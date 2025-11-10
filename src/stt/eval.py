@@ -562,8 +562,8 @@ async def main():
     logger.add(log_save_path)
 
     audio_dir = join(args.input_dir, "audio")
-    audio_files = natsorted(list(Path(audio_dir).glob("*_pcm16.wav")))
-    # audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
+    # audio_files = natsorted(list(Path(audio_dir).glob("*_pcm16.wav")))
+    audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
 
     if args.debug:
         logger.debug(f"running in debug mode: using first 5 audio files for evaluation")
