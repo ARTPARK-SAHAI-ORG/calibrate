@@ -131,3 +131,6 @@ venv.bak/
 Thumbs.db
 Desktop.ini
 
+logs
+out
+data

@@ -1,12 +1,17 @@
 import asyncio
+import argparse
+from os.path import join, exists, basename, splitext
 import os
+import json
 import wave
 from contextlib import suppress
 from pathlib import Path
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Literal
 
 from dotenv import load_dotenv
+from collections import defaultdict
 from loguru import logger
+import numpy as np
 
 from pipecat.frames.frames import (
     InputTransportMessageFrame,
@@ -14,6 +19,7 @@ from pipecat.frames.frames import (
     EndTaskFrame,
     EndFrame,
     OutputTransportReadyFrame,
+    UserStartedSpeakingFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -26,6 +32,7 @@ from pipecat.transports.websocket.client import (
     WebsocketClientParams,
     WebsocketClientTransport,
 )
+from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.transports.websocket.server import (
     WebsocketServerParams,
     WebsocketServerTransport,
@@ -34,11 +41,13 @@ from pipecat.transports.websocket.server import (
 from pipecat.audio.vad.silero import SileroVADAnalyzer, VADParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 
+from metrics import get_wer_score, get_llm_judge_score, get_string_similarity
+import pandas as pd
 
-load_dotenv("./server/.env", override=True)
+load_dotenv(".env", override=True)
 
 
-async def run_stt_bot(language: Language = Language.EN):
+async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
     """Starts an STT-only bot that reports RTVI transcription messages."""
 
     transport = WebsocketServerTransport(
@@ -61,19 +70,30 @@ async def run_stt_bot(language: Language = Language.EN):
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
-            logger.info(f"frame: {frame}")
+            logger.info(f"bot frame: {frame}")
 
             await self.push_frame(frame, direction)
 
     input_logger = IOLogger(agent="eval", position="after_input")
     output_logger = IOLogger(agent="eval", position="before_output")
 
-    stt = DeepgramSTTService(
-        api_key=os.getenv("DEEPGRAM_API_KEY"),
-        live_options=LiveOptions(language=language.value),
+    stt_language = (
+        Language.EN
+        if language == "english"
+        else Language.HI if language == "hindi" else Language.KN
     )
 
+    if provider == "deepgram":
+        stt = DeepgramSTTService(
+            api_key=os.getenv("DEEPGRAM_API_KEY"),
+            live_options=LiveOptions(language=stt_language.value),
+        )
+    else:
+        raise ValueError(f"Invalid provider: {provider}")
+
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+
+    transcript = TranscriptProcessor()
 
     pipeline = Pipeline(
         [
@@ -81,6 +101,7 @@ async def run_stt_bot(language: Language = Language.EN):
             rtvi,
             input_logger,
             stt,
+            transcript.user(),
             transport.output(),
         ]
     )
@@ -90,6 +111,7 @@ async def run_stt_bot(language: Language = Language.EN):
         params=PipelineParams(
             audio_in_sample_rate=16000,
             audio_out_sample_rate=16000,
+            enable_metrics=True,
         ),
         observers=[RTVIObserver(rtvi)],
         idle_timeout_secs=200,
@@ -139,9 +161,11 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
         def __init__(
             self,
             transcripts: list = [],
+            audio_streamer=None,
         ):
             super().__init__(enable_direct_mode=True, name="TranscriptionWriter")
             self._transcripts = transcripts
+            self._audio_streamer = audio_streamer
 
         def _is_final_user_transcript_message(
             self, frame: InputTransportMessageFrame
@@ -160,12 +184,44 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
             await super().process_frame(frame, direction)
 
             logger.info(f"frame transcription logger: {frame}")
-            logger.info(f"frame transcription logger type: {type(frame)}")
+            # logger.info(f"frame transcription logger type: {type(frame)}")
 
             if isinstance(frame, InputTransportMessageFrame):
                 if self._transcripts:
                     if user_transcript := self._is_final_user_transcript_message(frame):
-                        self._transcripts[-1]["content"] += user_transcript
+                        self._transcripts[-1] += user_transcript
+
+            await self.push_frame(frame, direction)
+
+    class MetricsLogger(FrameProcessor):
+        def __init__(
+            self,
+            ttfb: defaultdict,
+            processing_time: defaultdict,
+        ):
+            super().__init__(enable_direct_mode=True, name="MetricsLogger")
+            self._ttfb = ttfb
+            self._processing_time = processing_time
+
+        async def process_frame(self, frame, direction):
+            await super().process_frame(frame, direction)
+
+            if isinstance(frame, InputTransportMessageFrame):
+                message = getattr(frame, "message", {})
+                if isinstance(message, dict) and message.get("label") == "rtvi-ai":
+                    if message.get("type") == "metrics" and message.get("data"):
+                        if message.get("data").get("ttfb"):
+                            for d in message.get("data").get("ttfb"):
+                                if not d.get("value"):
+                                    continue
+                                self._ttfb[d.get("processor")].append(d.get("value"))
+                        if message.get("data").get("processing"):
+                            for d in message.get("data").get("processing"):
+                                if not d.get("value"):
+                                    continue
+                                self._processing_time[d.get("processor")].append(
+                                    d.get("value")
+                                )
 
             await self.push_frame(frame, direction)
 
@@ -185,6 +241,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
             self._state = "await_bot_turn_end"
             self._output_ready = asyncio.Event()
             self._transcripts = transcripts
+            self._pending_advance_task = None
 
         def _is_transcription_over(self, frame) -> bool:
             if isinstance(frame, InputTransportMessageFrame):
@@ -198,11 +255,22 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                             return True
             return False
 
+        def _is_user_started_speaking(self, frame) -> bool:
+            if isinstance(frame, InputTransportMessageFrame):
+                if hasattr(frame, "message"):
+                    message = frame.message
+                    if message.get("label") == "rtvi-ai":
+                        msg_type = message.get("type")
+                        if msg_type == "user-started-speaking":
+                            return True
+            return False
+
         def _start_new_audio_streaming(
             self,
         ):
             self._state = "streaming"
-            self._transcripts.append({"role": "user", "content": ""})
+            self._transcripts.append("")
+
             logger.info(f"transcripts length: {len(self._transcripts)}")
             asyncio.create_task(
                 self._stream_audio(self._audio_paths[self._current_audio_index])
@@ -211,12 +279,26 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
-            logger.info(f"frame: {frame}")
+            # logger.info(f"frame: {frame}")
             is_bot_turn_over = self._is_transcription_over(frame)
             logger.info(f"is_bot_turn_over: {is_bot_turn_over}")
 
             if isinstance(frame, OutputTransportReadyFrame):
                 self._output_ready.set()
+
+            # Handle UserStartedSpeakingFrame during buffering
+            if self._is_user_started_speaking(frame):
+                if self._state == "buffering":
+                    logger.info(
+                        "User started speaking during buffering, cancelling pending advance"
+                    )
+                    if (
+                        self._pending_advance_task
+                        and not self._pending_advance_task.done()
+                    ):
+                        self._pending_advance_task.cancel()
+                        self._pending_advance_task = None
+                    self._state = "await_reply_bot_turn_end"
 
             # Pass every frame through unchanged
             await self.push_frame(frame, direction)
@@ -229,19 +311,46 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
 
             elif self._state == "await_reply_bot_turn_end":
                 if is_bot_turn_over:
-                    self._current_audio_index += 1
+                    if self._current_audio_index + 1 < len(self._audio_paths):
 
-                    if self._current_audio_index < len(self._audio_paths):
-                        self._start_new_audio_streaming()
+                        async def advance_and_stream():
+
+                            await asyncio.sleep(2)
+                            self._current_audio_index += 1
+
+                            logger.info(
+                                f"incrementing audio index: {self._current_audio_index}"
+                            )
+
+                            self._start_new_audio_streaming()
+
+                        self._state = "buffering"
+                        self._pending_advance_task = asyncio.create_task(
+                            advance_and_stream()
+                        )
                     else:
-                        logger.info(f"completed simulation message received")
-                        await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
-                        await self.push_frame(EndFrame(), FrameDirection.UPSTREAM)
-                        self._state = "done"
+
+                        async def end_task_and_stream():
+
+                            await asyncio.sleep(2)
+                            logger.info(f"completed simulation message received")
+                            await self.push_frame(
+                                EndTaskFrame(), FrameDirection.UPSTREAM
+                            )
+                            await self.push_frame(EndFrame(), FrameDirection.UPSTREAM)
+                            self._state = "done"
+
+                        self._state = "buffering"
+                        self._pending_advance_task = asyncio.create_task(
+                            end_task_and_stream()
+                        )
 
         async def _stream_audio(self, audio_path: Path):
             try:
                 await self._output_ready.wait()
+
+                logger.info(f"Starting new audio streaming: {audio_path}")
+
                 if not audio_path.exists():
                     logger.error(f"Audio file not found for streaming: {audio_path}")
                     return
@@ -270,12 +379,9 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                 # After sending our audio, wait for bot's reply to finish
                 self._state = "await_reply_bot_turn_end"
                 self._last_audio_ts = None
+                logger.info(f"Finished streaming audio: {audio_path}")
 
     transcripts = []
-
-    transcription_logger = TranscriptionWriter(
-        transcripts,
-    )
 
     streamer = BotTurnAudioStreamer(
         audio_paths=audio_files,
@@ -283,11 +389,32 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
         transcripts=transcripts,
     )
 
+    transcription_logger = TranscriptionWriter(transcripts, audio_streamer=streamer)
+
+    ttfb = defaultdict(list)
+    processing_time = defaultdict(list)
+
+    metrics_logger = MetricsLogger(ttfb=ttfb, processing_time=processing_time)
+
+    class IOLogger(FrameProcessor):
+        def __init__(self):
+            super().__init__()
+
+        async def process_frame(self, frame, direction):
+            await super().process_frame(frame, direction)
+
+            logger.info(f"frame input logger: {frame}")
+
+            await self.push_frame(frame, direction)
+
+    input_logger = IOLogger()
+
     pipeline = Pipeline(
         [
             transport.input(),  # Bot audio coming in
-            # input_logger,
+            input_logger,
             transcription_logger,
+            metrics_logger,
             streamer,  # After transcript, trigger streaming local audio as output
             transport.output(),  # Send our streamed audio to bot
         ]
@@ -299,7 +426,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
             audio_in_sample_rate=16000,
             audio_out_sample_rate=16000,
         ),
-        idle_timeout_secs=10,
+        idle_timeout_secs=100,
     )
 
     @transport.event_handler("on_connected")
@@ -315,37 +442,148 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
 
     await runner.run(task)
 
-    return transcripts
+    return {
+        "transcripts": transcripts,
+        "metrics": {
+            "ttfb": ttfb,
+            "processing_time": processing_time,
+        },
+    }
 
 
 async def main():
-    audio_files = [
-        Path(__file__).with_name("input.wav"),
-        Path(__file__).with_name("input2.wav"),
-        Path(__file__).with_name("input3.wav"),
-    ]
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-p", "--provider", type=str, default="deepgram", choices=["deepgram"]
+    )
+    parser.add_argument(
+        "-l", "--language", type=str, default="english", choices=["english", "hindi"]
+    )
+    parser.add_argument("-i", "--input-dir", type=str, required=True)
+    parser.add_argument("-o", "--output-dir", type=str, default="./out")
+    parser.add_argument("-d", "--debug", action="store_true")
 
-    bot_task = asyncio.create_task(run_stt_bot())
+    args = parser.parse_args()
 
-    # await run_stt_bot()
+    if not exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    output_dir = join(args.output_dir, f"{args.provider}_{args.language}")
+
+    log_save_path = join(output_dir, "logs")
+
+    if exists(log_save_path):
+        os.remove(log_save_path)
+
+    logger.add(log_save_path)
+
+    audio_dir = join(args.input_dir, "audio")
+    audio_files = list(Path(audio_dir).glob(f"*.wav"))
+
+    if args.debug:
+        logger.debug(f"running in debug mode: using first 5 audio files for evaluation")
+        audio_files = audio_files[:5]
+
+    if not audio_files:
+        raise ValueError(f"No .wav audio files found in {audio_dir}")
+
+    logger.info(f"audio_files: {audio_files}")
+
+    gt_file = join(args.input_dir, "gt.json")
+
+    with open(gt_file, "r") as f:
+        gt = json.load(f)
+
+    bot_task = asyncio.create_task(
+        run_stt_bot(provider=args.provider, language=args.language)
+    )
 
     try:
         # Give the bot a moment to start listening before connecting.
         await asyncio.sleep(1.0)
         results = await run_stt_eval(audio_files)
+        pred_transcripts = results["transcripts"]
+        metrics = results["metrics"]
     finally:
         if not bot_task.done():
             bot_task.cancel()
             with suppress(asyncio.CancelledError):
                 await bot_task
 
-    if results:
-        logger.info("Completed transcriptions:")
-        logger.info(f"{results}")
-        # for entry in results:
-        #     logger.info(f"{entry['file']}: {entry['transcription']}")
-    else:
-        logger.warning("No transcriptions were produced")
+    ids = [splitext(basename(audio_file))[0] for audio_file in audio_files]
+    gt_transcripts = [gt[id] for id in ids]
+    logger.info(f"gt_transcripts: {gt_transcripts}")
+    logger.info(f"pred_transcripts: {pred_transcripts}")
+    logger.info(metrics)
+
+    wer_score = get_wer_score(gt_transcripts, pred_transcripts)
+    logger.info(f"WER: {wer_score['score']}")
+
+    string_similarity = get_string_similarity(gt_transcripts, pred_transcripts)
+    logger.info(f"String Similarity: {string_similarity['score']}")
+
+    llm_judge_score = await get_llm_judge_score(gt_transcripts, pred_transcripts)
+    logger.info(f"LLM Judge Score: {llm_judge_score['score']}")
+
+    metrics_data = [
+        {
+            "wer": wer_score["score"],
+        },
+        {
+            "string_similarity": string_similarity["score"],
+        },
+        {
+            "llm_judge_score": llm_judge_score["score"],
+        },
+    ]
+
+    data = []
+    for (
+        gt_transcript,
+        pred_transcript,
+        _id,
+        wer,
+        string_similarity,
+        llm_judge_score,
+    ) in zip(
+        gt_transcripts,
+        pred_transcripts,
+        ids,
+        wer_score["per_row"],
+        string_similarity["per_row"],
+        llm_judge_score["per_row"],
+    ):
+        data.append(
+            {
+                "id": _id,
+                "gt": gt_transcript,
+                "pred": pred_transcript,
+                "wer": wer,
+                "string_similarity": string_similarity,
+                "llm_judge_score": llm_judge_score["match"],
+                "llm_judge_reasoning": llm_judge_score["reasoning"],
+            }
+        )
+
+    for metric_name, metric_values in metrics.items():
+        for processor, values in metric_values.items():
+            mean = np.mean(values)
+            std = np.std(values)
+            metrics_data.append(
+                {
+                    "metric_name": metric_name,
+                    "processor": processor,
+                    "mean": mean,
+                    "std": std,
+                    "values": values,
+                }
+            )
+
+    metrics_save_path = join(output_dir, "metrics.json")
+    with open(metrics_save_path, "w") as f:
+        json.dump(metrics_data, f)
+
+    pd.DataFrame(data).to_csv(join(output_dir, "error_analysis.csv"), index=False)
 
 
 if __name__ == "__main__":
