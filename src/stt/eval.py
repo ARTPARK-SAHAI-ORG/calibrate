@@ -32,6 +32,7 @@ from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.deepgram.stt import DeepgramSTTService, Language, LiveOptions
+from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
 
 # from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 from pipecat.services.openai.stt import OpenAISTTService
@@ -110,7 +111,12 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
     if provider == "deepgram":
         stt = DeepgramSTTService(
             api_key=os.getenv("DEEPGRAM_API_KEY"),
-            live_options=LiveOptions(language=stt_language.value),
+            live_options=LiveOptions(language=stt_language.value, encoding="linear16"),
+        )
+    elif provider == "deepgram-flux":
+        stt = DeepgramFluxSTTService(
+            api_key=os.getenv("DEEPGRAM_API_KEY"),
+            live_options=LiveOptions(language=stt_language.value, encoding="linear16"),
         )
     elif provider == "sarvam":
         stt = SarvamSTTService(
@@ -147,8 +153,8 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
     elif provider == "groq":
         stt = GroqSTTService(
             api_key=os.getenv("GROQ_API_KEY"),
-            model="whisper-large-v3-turbo",
-            language=Language.HI,
+            model="whisper-large-v3",
+            language=stt_language,
         )
     else:
         raise ValueError(f"Invalid provider: {provider}")
@@ -531,13 +537,14 @@ async def main():
         type=str,
         default="deepgram",
         choices=[
-            "deepgram",
-            "openai",
-            "cartesia",
-            "smallest",
-            "groq",
-            "google",
-            "sarvam",
+            "deepgram",  # pcm16
+            "deepgram-flux",  # pcm16
+            "openai",  # pcm16
+            "cartesia",  # pcm16
+            "smallest",  # pcm16
+            "groq",  # wav
+            "google",  # wav
+            "sarvam",  # wav
         ],
     )
     parser.add_argument(
@@ -561,19 +568,24 @@ async def main():
 
     logger.add(log_save_path)
 
-    audio_dir = join(args.input_dir, "audio")
-    # audio_files = natsorted(list(Path(audio_dir).glob("*_pcm16.wav")))
-    audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
+    if args.provider in ["google", "sarvam", "groq"]:
+        format = "wav"
+    else:
+        format = "pcm16"
+
+    if format == "wav":
+        audio_dir = join(args.input_dir, "audio")
+        audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
+    else:
+        audio_dir = join(args.input_dir, "audio_pcm16")
+        audio_files = natsorted(list(Path(audio_dir).glob("*_pcm16.wav")))
 
     if args.debug:
         logger.debug(f"running in debug mode: using first 5 audio files for evaluation")
         audio_files = audio_files[:5]
-        # audio_files = [
-        #     file for file in audio_files if "3_21_english_baseline" in file.name
-        # ]
 
     if not audio_files:
-        raise ValueError(f"No *_pcm16.wav audio files found in {audio_dir}")
+        raise ValueError(f"No {format} audio files found in {audio_dir}")
 
     logger.info(f"audio_files: {audio_files}")
 
@@ -599,11 +611,16 @@ async def main():
                 await bot_task
 
     ids_with_suffix = [splitext(basename(audio_file))[0] for audio_file in audio_files]
-    # ids = [
-    #     _id[: -len("_pcm16")] if _id.endswith("_pcm16") else _id
-    #     for _id in ids_with_suffix
-    # ]
-    ids = ids_with_suffix
+
+    if format == "pcm16":
+        ids = [
+            _id[: -len("_pcm16")] if _id.endswith("_pcm16") else _id
+            for _id in ids_with_suffix
+        ]
+    else:
+        ids = ids_with_suffix
+
+    # ids = ids_with_suffix
     gt_transcripts = [gt[id] for id in ids]
     logger.info(f"gt_transcripts: {gt_transcripts}")
     logger.info(f"pred_transcripts: {pred_transcripts}")
