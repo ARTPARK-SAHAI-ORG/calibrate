@@ -12,15 +12,19 @@ from dotenv import load_dotenv
 from collections import defaultdict
 from loguru import logger
 import numpy as np
+from natsort import natsorted
 
 from pipecat.frames.frames import (
     InputTransportMessageFrame,
     OutputAudioRawFrame,
+    InputAudioRawFrame,
     EndTaskFrame,
     EndFrame,
     OutputTransportReadyFrame,
     UserStartedSpeakingFrame,
+    UserSpeakingFrame,
 )
+from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -28,6 +32,15 @@ from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.deepgram.stt import DeepgramSTTService, Language, LiveOptions
+
+# from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
+from pipecat.services.openai.stt import OpenAISTTService
+from integrations.smallest.stt import SmallestSTTService
+from pipecat.services.google.stt import GoogleSTTService
+from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOptions
+from pipecat.services.groq.stt import GroqSTTService
+from pipecat.services.sarvam.stt import SarvamSTTService
+
 from pipecat.transports.websocket.client import (
     WebsocketClientParams,
     WebsocketClientTransport,
@@ -56,10 +69,13 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             audio_in_enabled=True,
             audio_out_enabled=False,
             add_wav_header=False,
+            # audio_in_filter=KrispVivaFilter(),
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
             turn_analyzer=LocalSmartTurnAnalyzerV3(),
         ),
     )
+
+    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     class IOLogger(FrameProcessor):
         def __init__(self, agent: str, position: str):
@@ -71,11 +87,19 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             await super().process_frame(frame, direction)
 
             logger.info(f"bot frame: {frame}")
+            logger.info(f"bot frame type: {type(frame)}")
+
+            if isinstance(frame, UserSpeakingFrame):
+                frame = RTVIServerMessageFrame(
+                    data={
+                        "type": "user-speaking",
+                    }
+                )
+                asyncio.create_task(rtvi.push_frame(frame))
 
             await self.push_frame(frame, direction)
 
     input_logger = IOLogger(agent="eval", position="after_input")
-    output_logger = IOLogger(agent="eval", position="before_output")
 
     stt_language = (
         Language.EN
@@ -88,10 +112,46 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             api_key=os.getenv("DEEPGRAM_API_KEY"),
             live_options=LiveOptions(language=stt_language.value),
         )
+    elif provider == "sarvam":
+        stt = SarvamSTTService(
+            api_key=os.getenv("SARVAM_API_KEY"),
+            language=stt_language,
+        )
+    elif provider == "google":
+        stt = GoogleSTTService(
+            params=GoogleSTTService.InputParams(
+                languages=stt_language, model="chirp_3"
+            ),
+            location="us",
+            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        )
+    elif provider == "openai":
+        stt = OpenAISTTService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model="gpt-4o-transcribe",
+            language=stt_language,
+        )
+    elif provider == "cartesia":
+        stt = CartesiaSTTService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            live_options=CartesiaLiveOptions(language=stt_language.value),
+        )
+    elif provider == "smallest":
+        stt = SmallestSTTService(
+            api_key=os.getenv("SMALLEST_API_KEY"),
+            url="wss://waves-api.smallest.ai/api/v1/asr",
+            params=SmallestSTTService.SmallestInputParams(
+                audioLanguage=stt_language.value,
+            ),
+        )
+    elif provider == "groq":
+        stt = GroqSTTService(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model="whisper-large-v3-turbo",
+            language=Language.HI,
+        )
     else:
         raise ValueError(f"Invalid provider: {provider}")
-
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     transcript = TranscriptProcessor()
 
@@ -112,6 +172,7 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             audio_in_sample_rate=16000,
             audio_out_sample_rate=16000,
             enable_metrics=True,
+            allow_interruptions=True,
         ),
         observers=[RTVIObserver(rtvi)],
         idle_timeout_secs=200,
@@ -189,7 +250,8 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
             if isinstance(frame, InputTransportMessageFrame):
                 if self._transcripts:
                     if user_transcript := self._is_final_user_transcript_message(frame):
-                        self._transcripts[-1] += user_transcript
+                        logger.info(f"appending to user_transcript: {frame}")
+                        self._transcripts[-1] += " " + user_transcript
 
             await self.push_frame(frame, direction)
 
@@ -255,7 +317,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                             return True
             return False
 
-        def _is_user_started_speaking(self, frame) -> bool:
+        def _is_user_speaking(self, frame) -> bool:
             if isinstance(frame, InputTransportMessageFrame):
                 if hasattr(frame, "message"):
                     message = frame.message
@@ -263,6 +325,16 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                         msg_type = message.get("type")
                         if msg_type == "user-started-speaking":
                             return True
+
+                        if msg_type == "server-message":
+                            if message.get("data").get("type") == "user-speaking":
+                                return True
+
+                        if msg_type == "user-transcription" and message.get("data").get(
+                            "text"
+                        ):
+                            return True
+
             return False
 
         def _start_new_audio_streaming(
@@ -287,7 +359,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                 self._output_ready.set()
 
             # Handle UserStartedSpeakingFrame during buffering
-            if self._is_user_started_speaking(frame):
+            if self._is_user_speaking(frame):
                 if self._state == "buffering":
                     logger.info(
                         "User started speaking during buffering, cancelling pending advance"
@@ -299,9 +371,6 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                         self._pending_advance_task.cancel()
                         self._pending_advance_task = None
                     self._state = "await_reply_bot_turn_end"
-
-            # Pass every frame through unchanged
-            await self.push_frame(frame, direction)
 
             logger.info(f"state: {self._state}")
 
@@ -315,7 +384,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
 
                         async def advance_and_stream():
 
-                            await asyncio.sleep(2)
+                            await asyncio.sleep(5)
                             self._current_audio_index += 1
 
                             logger.info(
@@ -332,7 +401,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
 
                         async def end_task_and_stream():
 
-                            await asyncio.sleep(2)
+                            await asyncio.sleep(5)
                             logger.info(f"completed simulation message received")
                             await self.push_frame(
                                 EndTaskFrame(), FrameDirection.UPSTREAM
@@ -344,6 +413,9 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                         self._pending_advance_task = asyncio.create_task(
                             end_task_and_stream()
                         )
+
+            # Pass every frame through unchanged
+            await self.push_frame(frame, direction)
 
         async def _stream_audio(self, audio_path: Path):
             try:
@@ -454,7 +526,19 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-p", "--provider", type=str, default="deepgram", choices=["deepgram"]
+        "-p",
+        "--provider",
+        type=str,
+        default="deepgram",
+        choices=[
+            "deepgram",
+            "openai",
+            "cartesia",
+            "smallest",
+            "groq",
+            "google",
+            "sarvam",
+        ],
     )
     parser.add_argument(
         "-l", "--language", type=str, default="english", choices=["english", "hindi"]
@@ -478,14 +562,18 @@ async def main():
     logger.add(log_save_path)
 
     audio_dir = join(args.input_dir, "audio")
-    audio_files = list(Path(audio_dir).glob(f"*.wav"))
+    audio_files = natsorted(list(Path(audio_dir).glob("*_pcm16.wav")))
+    # audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
 
     if args.debug:
         logger.debug(f"running in debug mode: using first 5 audio files for evaluation")
         audio_files = audio_files[:5]
+        # audio_files = [
+        #     file for file in audio_files if "3_21_english_baseline" in file.name
+        # ]
 
     if not audio_files:
-        raise ValueError(f"No .wav audio files found in {audio_dir}")
+        raise ValueError(f"No *_pcm16.wav audio files found in {audio_dir}")
 
     logger.info(f"audio_files: {audio_files}")
 
@@ -510,7 +598,12 @@ async def main():
             with suppress(asyncio.CancelledError):
                 await bot_task
 
-    ids = [splitext(basename(audio_file))[0] for audio_file in audio_files]
+    ids_with_suffix = [splitext(basename(audio_file))[0] for audio_file in audio_files]
+    # ids = [
+    #     _id[: -len("_pcm16")] if _id.endswith("_pcm16") else _id
+    #     for _id in ids_with_suffix
+    # ]
+    ids = ids_with_suffix
     gt_transcripts = [gt[id] for id in ids]
     logger.info(f"gt_transcripts: {gt_transcripts}")
     logger.info(f"pred_transcripts: {pred_transcripts}")
