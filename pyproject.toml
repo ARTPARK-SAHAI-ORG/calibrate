@@ -1,0 +1,16 @@
+[project]
+name = "websocket"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "ipdb>=0.13.13",
+    "ipython>=8.37.0",
+    "onnxruntime>=1.23.2",
+    "pipecat-ai[cartesia,deepgram,google,local-smart-turn-v3,websocket]>=0.0.91",
+    "python-dotenv>=1.2.1",
+    "simpleaudio>=1.0.4",
+    "smallestai>=4.0.1",
+    "uvicorn>=0.38.0",
+]
