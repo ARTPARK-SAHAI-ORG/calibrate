@@ -546,13 +546,36 @@ async def main():
             "google",  # wav
             "sarvam",  # wav
         ],
+        help="STT provider to use for evaluation",
     )
     parser.add_argument(
-        "-l", "--language", type=str, default="english", choices=["english", "hindi"]
+        "-l",
+        "--language",
+        type=str,
+        default="english",
+        choices=["english", "hindi"],
+        help="Language of the audio files",
     )
-    parser.add_argument("-i", "--input-dir", type=str, required=True)
-    parser.add_argument("-o", "--output-dir", type=str, default="./out")
-    parser.add_argument("-d", "--debug", action="store_true")
+    parser.add_argument(
+        "-i",
+        "--input-dir",
+        type=str,
+        required=True,
+        help="Path to the input directory containing the audio files and gt.json",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default="./out",
+        help="Path to the output directory to save the results",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Run the evaluation on the first 5 audio files",
+    )
 
     args = parser.parse_args()
 
@@ -575,10 +598,10 @@ async def main():
 
     if format == "wav":
         audio_dir = join(args.input_dir, "audio")
-        audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
     else:
         audio_dir = join(args.input_dir, "audio_pcm16")
-        audio_files = natsorted(list(Path(audio_dir).glob("*_pcm16.wav")))
+
+    audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
 
     if args.debug:
         logger.debug(f"running in debug mode: using first 5 audio files for evaluation")
@@ -693,7 +716,7 @@ async def main():
     with open(metrics_save_path, "w") as f:
         json.dump(metrics_data, f)
 
-    pd.DataFrame(data).to_csv(join(output_dir, "error_analysis.csv"), index=False)
+    pd.DataFrame(data).to_csv(join(output_dir, "results.csv"), index=False)
 
 
 if __name__ == "__main__":
