@@ -44,14 +44,21 @@ Copy `src/stt/.env.example` to `src/stt/.env` and fill in the API keys for the p
 
 ```bash
 cd src/stt
-uv run python eval.py --input-dir /path/to/data -o /path/to/output -d -p sarvam -l hindi
+uv run python eval.py --input-dir /path/to/data -o /path/to/output -d -p <provider> -l <language>
+```
+
+You can use the sample inputs provided in [`src/stt/samples`](src/stt/samples) to test the evaluation script.
+
+```bash
+cd src/stt
+uv run python eval.py --input-dir samples -o ./out -d -p sarvam -l english
 ```
 
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
 /path/to/output
-├── sarvam_hindi
+├── sarvam_english
 │   ├── logs
 │   ├── results.csv
 │   └── metrics.json
@@ -135,7 +142,3 @@ Coming Soon
 ### Agent Tests
 
 Coming Soon
-
-```
-
-```
