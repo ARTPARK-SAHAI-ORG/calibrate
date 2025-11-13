@@ -15,9 +15,11 @@ from pipecat.frames.frames import (
     BotStoppedSpeakingFrame,
     TTSStoppedFrame,
     TTSStartedFrame,
+    UserSpeakingFrame,
     UserStoppedSpeakingFrame,
     UserStartedSpeakingFrame,
     BotStartedSpeakingFrame,
+    BotSpeakingFrame,
     EndFrame,
     LLMRunFrame,
     EndTaskFrame,
@@ -135,6 +137,7 @@ async def run_tts_bot(
         def __init__(self):
             super().__init__(enable_direct_mode=True, name="Processor")
             self._still_speaking = False
+            self._speaking_lock = asyncio.Lock()
 
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
@@ -171,54 +174,65 @@ async def run_tts_bot(
                         FrameDirection.DOWNSTREAM,
                     )
 
-            if (
-                isinstance(frame, BotStoppedSpeakingFrame)
-                or isinstance(frame, TTSStoppedFrame)
-            ) and self._still_speaking:
-                logger.info(f"turning off speaking with frame: {frame}")
-                self._still_speaking = False
-                await self.push_frame(
-                    OutputTransportMessageFrame(
-                        message={
-                            "label": "rtvi-ai",
-                            "type": "bot-stopped-speaking",
-                        }
-                    ),
-                    FrameDirection.DOWNSTREAM,
-                )
+            if isinstance(frame, BotStoppedSpeakingFrame):
+                async with self._speaking_lock:
+                    if self._still_speaking:
+                        logger.info(f"turning off speaking with frame: {frame}")
+                        self._still_speaking = False
+                        await self.push_frame(
+                            OutputTransportMessageFrame(
+                                message={
+                                    "label": "rtvi-ai",
+                                    "type": "bot-stopped-speaking",
+                                }
+                            ),
+                            FrameDirection.DOWNSTREAM,
+                        )
 
-            if (
-                isinstance(frame, BotStartedSpeakingFrame)
-                or isinstance(frame, TTSStartedFrame)
-            ) and not self._still_speaking:
-                self._still_speaking = True
-                logger.info(f"turning on speaking with frame: {frame}")
-                await self.push_frame(
-                    OutputTransportMessageFrame(
-                        message={
-                            "label": "rtvi-ai",
-                            "type": "bot-started-speaking",
-                        }
-                    ),
-                    FrameDirection.DOWNSTREAM,
-                )
+            if isinstance(frame, BotStartedSpeakingFrame):
+                async with self._speaking_lock:
+                    if not self._still_speaking:
+                        self._still_speaking = True
+                        logger.info(f"turning on speaking with frame: {frame}")
+                        await self.push_frame(
+                            OutputTransportMessageFrame(
+                                message={
+                                    "label": "rtvi-ai",
+                                    "type": "bot-started-speaking",
+                                }
+                            ),
+                            FrameDirection.DOWNSTREAM,
+                        )
+
+            if isinstance(frame, BotSpeakingFrame):
+                async with self._speaking_lock:
+                    self._still_speaking = True
+                    await self.push_frame(
+                        OutputTransportMessageFrame(
+                            message={
+                                "label": "rtvi-ai",
+                                "type": "bot-still-speaking",
+                            }
+                        ),
+                        FrameDirection.DOWNSTREAM,
+                    )
 
             if isinstance(frame, CancelFrame):
-                logger.info("received cancel frame")
-                logger.info(f"still speaking: {self._still_speaking}")
-
-            if isinstance(frame, CancelFrame) and self._still_speaking:
-                self._still_speaking = False
-                await self.push_frame(
-                    OutputTransportMessageFrame(
-                        message={
-                            "label": "rtvi-ai",
-                            "type": "bot-stopped-speaking",
-                        }
-                    ),
-                    FrameDirection.DOWNSTREAM,
-                )
-                return
+                async with self._speaking_lock:
+                    logger.info("received cancel frame")
+                    logger.info(f"still speaking: {self._still_speaking}")
+                    if self._still_speaking:
+                        self._still_speaking = False
+                        await self.push_frame(
+                            OutputTransportMessageFrame(
+                                message={
+                                    "label": "rtvi-ai",
+                                    "type": "bot-stopped-speaking",
+                                }
+                            ),
+                            FrameDirection.DOWNSTREAM,
+                        )
+                        return
 
             await self.push_frame(frame, direction)
 
@@ -293,7 +307,7 @@ async def run_tts_bot(
             enable_metrics=True,
         ),
         observers=[DebugLogObserver()],
-        idle_timeout_secs=5,
+        idle_timeout_secs=10,
     )
 
     @transport.event_handler("on_client_connected")
@@ -469,12 +483,21 @@ async def run_tts_eval(
                 message = getattr(frame, "message", {})
                 if isinstance(message, dict) and message.get("label") == "rtvi-ai":
                     if message.get("type") == "bot-started-speaking":
+                        logger.info("hURRRRYAYYYYYYYYY STARTEEDDDDDD SPEAKKKINNNGGGGG")
                         await self.push_frame(
-                            UserStartedSpeakingFrame(), FrameDirection.DOWNSTREAM
+                            UserStartedSpeakingFrame(emulated=True),
+                            FrameDirection.DOWNSTREAM,
                         )
-                    elif message.get("type") == "bot-stopped-speaking":
+                    elif message.get("type") == "bot-still-speaking":
                         await self.push_frame(
-                            UserStoppedSpeakingFrame(), FrameDirection.DOWNSTREAM
+                            UserSpeakingFrame(), FrameDirection.DOWNSTREAM
+                        )
+
+                    elif message.get("type") == "bot-stopped-speaking":
+                        logger.info("hURRRRYAYYYYYYYYY STOPPPPPEEDDDD SPEAKKKINNNGGGGG")
+                        await self.push_frame(
+                            UserStoppedSpeakingFrame(emulated=True),
+                            FrameDirection.DOWNSTREAM,
                         )
 
                         if self._turn_index == len(self._texts):
@@ -555,7 +578,7 @@ async def run_tts_eval(
             audio_in_sample_rate=audio_in_sample_rate,
         ),
         observers=[LLMLogObserver()],
-        idle_timeout_secs=5,
+        idle_timeout_secs=10,
     )
 
     # text_streamer.set_task(task)
