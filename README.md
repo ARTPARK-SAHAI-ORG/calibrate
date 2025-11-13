@@ -221,11 +221,11 @@ options:
   -d, --debug           Run the evaluation on the first 5 audio files
 ```
 
-### LLM Simulations
+### LLM simulations
 
 Coming Soon
 
-### LLM Tests
+### LLM tests
 
 Coming Soon
 
