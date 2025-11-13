@@ -1,0 +1,1 @@
+[{"metric_name": "ttfb", "processor": "SmallestTTSService#0", "mean": 0.3538844585418701, "std": 0.026930570602416992, "values": [0.3808150291442871, 0.3269538879394531]}, {"metric_name": "processing_time", "processor": "SmallestTTSService#0", "mean": 0.00022804737091064453, "std": 2.7060508728027344e-05, "values": [0.0002009868621826172, 0.0002551078796386719]}]

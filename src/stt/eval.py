@@ -489,7 +489,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
 
     pipeline = Pipeline(
         [
-            transport.input(),  # Bot audio coming in
+            transport.input(),
             input_logger,
             transcription_logger,
             metrics_logger,

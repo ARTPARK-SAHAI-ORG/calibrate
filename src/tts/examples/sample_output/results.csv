@@ -1,0 +1,3 @@
+text,audio_path
+hello world,./out/audios/1.wav
+this is a test,./out/audios/2.wav
