@@ -14,6 +14,7 @@ from pipecat.frames.frames import (
     InputTransportMessageFrame,
     BotStoppedSpeakingFrame,
     TTSStoppedFrame,
+    TTSStartedFrame,
     UserStoppedSpeakingFrame,
     UserStartedSpeakingFrame,
     BotStartedSpeakingFrame,
@@ -130,8 +131,6 @@ async def run_tts_bot(
 
             await self.push_frame(frame, direction)
 
-    message_router = TransportMessageRouter()
-
     class Processor(FrameProcessor):
         def __init__(self):
             super().__init__(enable_direct_mode=True, name="Processor")
@@ -173,8 +172,9 @@ async def run_tts_bot(
                     )
 
             if (
-                provider == "smallest" and isinstance(frame, BotStoppedSpeakingFrame)
-            ) or (provider != "smallest" and isinstance(frame, TTSStoppedFrame)):
+                isinstance(frame, BotStoppedSpeakingFrame)
+                or isinstance(frame, TTSStoppedFrame)
+            ) and self._still_speaking:
                 logger.info(f"turning off speaking with frame: {frame}")
                 self._still_speaking = False
                 await self.push_frame(
@@ -187,7 +187,10 @@ async def run_tts_bot(
                     FrameDirection.DOWNSTREAM,
                 )
 
-            if isinstance(frame, BotStartedSpeakingFrame):
+            if (
+                isinstance(frame, BotStartedSpeakingFrame)
+                or isinstance(frame, TTSStartedFrame)
+            ) and not self._still_speaking:
                 self._still_speaking = True
                 logger.info(f"turning on speaking with frame: {frame}")
                 await self.push_frame(
@@ -269,6 +272,7 @@ async def run_tts_bot(
 
     transcript = TranscriptProcessor()
     processor = Processor()
+    message_router = TransportMessageRouter()
 
     pipeline = Pipeline(
         [
