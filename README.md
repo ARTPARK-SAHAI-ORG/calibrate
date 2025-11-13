@@ -2,6 +2,10 @@
 
 Evaluation suite for voice agents.
 
+AgentLoop gives you the flexibility to evaluate different components of the voice agent pipeline in isolation while also running simulations and tests on the agent as a whole as well.
+
+AgentLoop is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
+
 ## Setup
 
 We use `uv` to manage the dependencies. Make sure you have it installed on your system.
@@ -133,12 +137,106 @@ options:
 
 ### Text To Speech (TTS)
 
+To evaluate different TTS providers, first prepare an input CSV file with the following structure:
+
+```csv
+text
+hello world
+this is a test
+```
+
+The CSV should have a single column `text` containing the text strings you want to synthesize into speech.
+
+Copy `src/tts/.env.example` to `src/tts/.env` and fill in the API keys for the providers you want to evaluate.
+
+```bash
+cd src/tts
+uv run python eval.py --input /path/to/input.csv -o /path/to/output -p <provider> -l <language>
+```
+
+You can use the sample inputs provided in [`src/tts/examples`](src/tts/examples) to test the evaluation script.
+
+```bash
+cd src/tts
+uv run python eval.py --input examples/sample.csv -o ./out -p smallest -l english
+```
+
+The output of the evaluation script will be saved in the output directory.
+
+```bash
+/path/to/output
+├── audios
+│   ├── 1.wav
+│   ├── 2.wav
+├── logs
+├── results.csv
+└── metrics.json
+```
+
+`results.csv` will have the following columns:
+
+```csv
+text,audio_path
+hello world,./out/audios/1.wav
+this is a test,./out/audios/2.wav
+```
+
+`metrics.json` will have the following format:
+
+```json
+[
+  {
+    "metric_name": "ttfb", // Time to First Byte in seconds
+    "processor": "SmallestTTSService#0",
+    "mean": 0.3538844585418701,
+    "std": 0.026930570602416992,
+    "values": [0.3808150291442871, 0.3269538879394531] // values for each text input
+  },
+  {
+    "metric_name": "processing_time", // Time taken by the service to respond in seconds
+    "processor": "SmallestTTSService#0",
+    "mean": 0.00022804737091064453,
+    "std": 2.7060508728027344e-5,
+    "values": [0.0002009868621826172, 0.0002551078796386719] // values for each text input
+  }
+]
+```
+
+For more details, run `uv run python eval.py -h`.
+
+```bash
+usage: eval.py [-h] [-p {smallest,cartesia,openai,groq,google,elevenlabs,elevenlabs-http,sarvam,sarvam-http}]
+               [-l {english,hindi}] -i INPUT [-o OUTPUT_DIR] [-d]
+
+options:
+  -h, --help            show this help message and exit
+  -p {smallest,cartesia,openai,groq,google,elevenlabs,elevenlabs-http,sarvam,sarvam-http}, --provider {smallest,cartesia,openai,groq,google,elevenlabs,elevenlabs-http,sarvam,sarvam-http}
+                        TTS provider to use for evaluation
+  -l {english,hindi}, --language {english,hindi}
+                        Language of the audio files
+  -i INPUT, --input INPUT
+                        Path to the input CSV file containing the texts to synthesize
+  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
+                        Path to the output directory to save the results
+  -d, --debug           Run the evaluation on the first 5 audio files
+```
+
+### LLM Simulations
+
 Coming Soon
 
-### Agent Simulations
+### LLM Tests
 
 Coming Soon
 
-### Agent Tests
+### Agent simulations
 
 Coming Soon
+
+### Talk to the agent
+
+Coming Soon
+
+## TODO
+
+- Support for adding custom config for each provider for each component to override the defaults.

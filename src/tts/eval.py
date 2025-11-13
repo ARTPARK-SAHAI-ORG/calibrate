@@ -9,9 +9,11 @@ import numpy as np
 import json
 from os.path import join, exists
 import pandas as pd
+import shutil
 from pipecat.frames.frames import (
     InputTransportMessageFrame,
     BotStoppedSpeakingFrame,
+    TTSStoppedFrame,
     UserStoppedSpeakingFrame,
     UserStartedSpeakingFrame,
     BotStartedSpeakingFrame,
@@ -59,6 +61,13 @@ import websockets
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from integrations.smallest import SmallestTTSService
+from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.openai.tts import OpenAITTSService
+from pipecat.services.groq.tts import GroqTTSService
+from pipecat.services.google.tts import GoogleTTSService
+from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
+from pipecat.services.sarvam.tts import SarvamTTSService
+
 from pipecat.transcriptions.language import Language
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -70,53 +79,9 @@ from dotenv import load_dotenv
 load_dotenv(".env", override=True)
 
 
-# def chunk_text(text: str, max_chunk_size: int = 5) -> list[str]:
-#     """
-#     Chunk text with a maximum length, preferring to break on punctuation.
-
-#     Args:
-#         text: Input text to chunk.
-#         max_chunk_size: Maximum number of characters per chunk.
-
-#     Returns:
-#         List of text chunks.
-#     """
-#     chunks: list[str] = []
-#     remaining = text.strip()
-
-#     punctuation_marks = ".,:;।!?"
-
-#     while remaining:
-#         if len(remaining) <= max_chunk_size:
-#             chunks.append(remaining)
-#             break
-
-#         chunk_end = max_chunk_size
-#         found_punct = False
-#         search_start = max(chunk_end - 50, 0)
-
-#         for i in range(chunk_end, search_start, -1):
-#             if i < len(remaining) and remaining[i] in punctuation_marks:
-#                 chunk_end = i + 1
-#                 found_punct = True
-#                 break
-
-#         if not found_punct:
-#             for i in range(chunk_end, search_start, -1):
-#                 if i < len(remaining) and remaining[i].isspace():
-#                     chunk_end = i
-#                     break
-
-#         if chunk_end == 0:
-#             chunk_end = max_chunk_size
-
-#         chunks.append(remaining[:chunk_end].strip())
-#         remaining = remaining[chunk_end:].strip()
-
-#     return [chunk for chunk in chunks if chunk]
-
-
-async def run_tts_bot(provider: str, language: Literal["english", "hindi"]):
+async def run_tts_bot(
+    provider: str, language: Literal["english", "hindi"], audio_out_sample_rate=24000
+):
     """Starts a TTS-only bot that reports RTVI transcription messages."""
 
     transport = WebsocketServerTransport(
@@ -170,6 +135,7 @@ async def run_tts_bot(provider: str, language: Literal["english", "hindi"]):
     class Processor(FrameProcessor):
         def __init__(self):
             super().__init__(enable_direct_mode=True, name="Processor")
+            self._still_speaking = False
 
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
@@ -206,7 +172,11 @@ async def run_tts_bot(provider: str, language: Literal["english", "hindi"]):
                         FrameDirection.DOWNSTREAM,
                     )
 
-            if isinstance(frame, BotStoppedSpeakingFrame):
+            if (
+                provider == "smallest" and isinstance(frame, BotStoppedSpeakingFrame)
+            ) or (provider != "smallest" and isinstance(frame, TTSStoppedFrame)):
+                logger.info(f"turning off speaking with frame: {frame}")
+                self._still_speaking = False
                 await self.push_frame(
                     OutputTransportMessageFrame(
                         message={
@@ -218,6 +188,8 @@ async def run_tts_bot(provider: str, language: Literal["english", "hindi"]):
                 )
 
             if isinstance(frame, BotStartedSpeakingFrame):
+                self._still_speaking = True
+                logger.info(f"turning on speaking with frame: {frame}")
                 await self.push_frame(
                     OutputTransportMessageFrame(
                         message={
@@ -227,6 +199,23 @@ async def run_tts_bot(provider: str, language: Literal["english", "hindi"]):
                     ),
                     FrameDirection.DOWNSTREAM,
                 )
+
+            if isinstance(frame, CancelFrame):
+                logger.info("received cancel frame")
+                logger.info(f"still speaking: {self._still_speaking}")
+
+            if isinstance(frame, CancelFrame) and self._still_speaking:
+                self._still_speaking = False
+                await self.push_frame(
+                    OutputTransportMessageFrame(
+                        message={
+                            "label": "rtvi-ai",
+                            "type": "bot-stopped-speaking",
+                        }
+                    ),
+                    FrameDirection.DOWNSTREAM,
+                )
+                return
 
             await self.push_frame(frame, direction)
 
@@ -241,6 +230,39 @@ async def run_tts_bot(provider: str, language: Literal["english", "hindi"]):
             api_key=os.getenv("SMALLEST_API_KEY"),
             params=SmallestTTSService.InputParams(language=tts_language),
             voice_id="aarushi",
+        )
+    elif provider == "cartesia":
+        tts = CartesiaTTSService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+        )
+    elif provider == "openai":
+        tts = OpenAITTSService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            voice="fable",
+        )
+    elif provider == "groq":
+        tts = GroqTTSService(api_key=os.getenv("GROQ_API_KEY"))
+    elif provider == "google":
+        voice_id = (
+            "en-US-Chirp3-HD-Charon" if language == "english" else "hi-IN-Standard-A"
+        )
+        tts = GoogleTTSService(
+            voice_id=voice_id,
+            params=GoogleTTSService.InputParams(language=tts_language),
+            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        )
+    elif provider == "elevenlabs":
+        tts = ElevenLabsTTSService(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            voice_id="Ui0HFqLn4HkcAenlJJVJ",
+            params=ElevenLabsTTSService.InputParams(language=tts_language),
+        )
+    elif provider == "sarvam":
+        tts = SarvamTTSService(
+            api_key=os.getenv("SARVAM_API_KEY"),
+            model="bulbul:v2",
+            voice_id="anushka",
         )
     else:
         raise ValueError(f"Invalid provider: {provider}")
@@ -263,7 +285,7 @@ async def run_tts_bot(provider: str, language: Literal["english", "hindi"]):
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
-            audio_out_sample_rate=16000,
+            audio_out_sample_rate=audio_out_sample_rate,
             enable_metrics=True,
         ),
         observers=[DebugLogObserver()],
@@ -336,7 +358,9 @@ async def save_audio_chunk(
             await file.flush()
 
 
-async def run_tts_eval(texts: List[str], output_dir: str) -> List[Dict[str, str]]:
+async def run_tts_eval(
+    texts: List[str], output_dir: str, audio_in_sample_rate: int = 24000
+) -> List[Dict[str, str]]:
     """Connects to the TTS bot and streams audio files sequentially."""
 
     transport = WebsocketClientTransport(
@@ -458,7 +482,12 @@ async def run_tts_eval(texts: List[str], output_dir: str) -> List[Dict[str, str]
             await self.push_frame(frame, direction)
 
     audio_output_dir = os.path.join(output_dir, "audios")
-    os.makedirs(audio_output_dir, exist_ok=True)
+
+    if exists(audio_output_dir):
+        shutil.rmtree(audio_output_dir)
+
+    os.makedirs(audio_output_dir)
+
     audio_paths = []
 
     # streamer = BotTurnAudioStreamer(
@@ -519,8 +548,7 @@ async def run_tts_eval(texts: List[str], output_dir: str) -> List[Dict[str, str]
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
-            audio_in_sample_rate=16000,
-            audio_out_sample_rate=16000,
+            audio_in_sample_rate=audio_in_sample_rate,
         ),
         observers=[LLMLogObserver()],
         idle_timeout_secs=5,
@@ -572,6 +600,12 @@ async def main():
         default="smallest",
         choices=[
             "smallest",
+            "cartesia",
+            "openai",
+            "groq",
+            "google",
+            "elevenlabs",
+            "sarvam",
         ],
         help="TTS provider to use for evaluation",
     )
@@ -606,11 +640,24 @@ async def main():
 
     args = parser.parse_args()
 
-    bot_task = asyncio.create_task(run_tts_bot(provider="smallest", language="english"))
+    if args.provider in ["openai"]:
+        audio_sample_rate = 24000
+    else:
+        audio_sample_rate = 16000
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    bot_task = asyncio.create_task(
+        run_tts_bot(
+            provider=args.provider,
+            language=args.language,
+            audio_out_sample_rate=audio_sample_rate,
+        )
+    )
 
-    log_save_path = join(args.output_dir, "logs")
+    output_dir = os.path.join(args.output_dir, args.provider)
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    log_save_path = join(output_dir, "logs")
 
     if exists(log_save_path):
         os.remove(log_save_path)
@@ -623,7 +670,9 @@ async def main():
     try:
         # Give the bot a moment to start listening before connecting.
         await asyncio.sleep(1.0)
-        results = await run_tts_eval(texts, args.output_dir)
+        results = await run_tts_eval(
+            texts, output_dir, audio_in_sample_rate=audio_sample_rate
+        )
         audio_paths = results["audio_paths"]
         metrics = results["metrics"]
     finally:
@@ -675,11 +724,11 @@ async def main():
                 }
             )
 
-    metrics_save_path = join(args.output_dir, "metrics.json")
+    metrics_save_path = join(output_dir, "metrics.json")
     with open(metrics_save_path, "w") as f:
         json.dump(metrics_data, f)
 
-    pd.DataFrame(data).to_csv(join(args.output_dir, "results.csv"), index=False)
+    pd.DataFrame(data).to_csv(join(output_dir, "results.csv"), index=False)
 
 
 if __name__ == "__main__":
