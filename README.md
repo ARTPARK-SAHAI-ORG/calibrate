@@ -164,7 +164,7 @@ uv run python eval.py --input examples/sample.csv -o ./out -p smallest -l englis
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
-/path/to/output
+/path/to/output/provider
 ├── audios
 │   ├── 1.wav
 │   ├── 2.wav
@@ -239,4 +239,9 @@ Coming Soon
 
 ## TODO
 
+- Add evaluation metrics for quality of TTS
+- Add documentation for LLM tests and simulations
+- Add script for voice agent simulation
+- Add script for talking to the agent
 - Support for adding custom config for each provider for each component to override the defaults.
+- Make visualizations using tools like INK on the agent flow
