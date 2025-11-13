@@ -16,6 +16,7 @@ dependencies = [
     "sarvamai>=0.1.21",
     "simpleaudio>=1.0.4",
     "smallestai>=4.0.1",
+    "sounddevice>=0.5.3",
     "uvicorn>=0.38.0",
     "whisper-normalizer>=0.1.12",
 ]

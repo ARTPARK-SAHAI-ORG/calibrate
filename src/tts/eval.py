@@ -280,6 +280,7 @@ async def run_tts_bot(
             api_key=os.getenv("SARVAM_API_KEY"),
             model="bulbul:v2",
             voice_id="anushka",
+            params=SarvamTTSService.InputParams(language=tts_language),
         )
     else:
         raise ValueError(f"Invalid provider: {provider}")
@@ -483,7 +484,6 @@ async def run_tts_eval(
                 message = getattr(frame, "message", {})
                 if isinstance(message, dict) and message.get("label") == "rtvi-ai":
                     if message.get("type") == "bot-started-speaking":
-                        logger.info("hURRRRYAYYYYYYYYY STARTEEDDDDDD SPEAKKKINNNGGGGG")
                         await self.push_frame(
                             UserStartedSpeakingFrame(emulated=True),
                             FrameDirection.DOWNSTREAM,
@@ -494,7 +494,6 @@ async def run_tts_eval(
                         )
 
                     elif message.get("type") == "bot-stopped-speaking":
-                        logger.info("hURRRRYAYYYYYYYYY STOPPPPPEEDDDD SPEAKKKINNNGGGGG")
                         await self.push_frame(
                             UserStoppedSpeakingFrame(emulated=True),
                             FrameDirection.DOWNSTREAM,
@@ -505,6 +504,32 @@ async def run_tts_eval(
                         else:
                             await asyncio.sleep(1)
                             await self._send_text_frame()
+
+            # elif isinstance(frame, InputAudioRawFrame):
+            # Play OutputAudioRawFrame to the laptop sound device
+            # try:
+            #     import sounddevice as sd
+            #     import numpy as np
+
+            #     logger.info(f"has attr frame audio: {hasattr(frame, 'audio')}")
+            #     logger.info(
+            #         f"has attr frame sample_rate: {hasattr(frame, 'sample_rate')}"
+            #     )
+
+            #     if hasattr(frame, "audio") and hasattr(frame, "sample_rate"):
+            #         # Assume 16-bit signed PCM audio as bytes
+            #         audio_bytes = frame.audio
+            #         sample_rate = frame.sample_rate
+            #         # Convert bytes to numpy int16 array
+            #         audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+            #         # If the frame has a 'num_channels', handle accordingly
+            #         num_channels = getattr(frame, "num_channels", 1)
+            #         if num_channels > 1:
+            #             audio_np = audio_np.reshape(-1, num_channels)
+            #         sd.play(audio_np, sample_rate)
+            #         sd.wait()
+            # except Exception as e:
+            #     logger.warning(f"Failed to play audio frame: {e}")
 
             await self.push_frame(frame, direction)
 
