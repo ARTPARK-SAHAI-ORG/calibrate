@@ -657,7 +657,7 @@ async def main():
             "groq",
             "google",
             "elevenlabs",
-            "sarvam",
+            # "sarvam", # there is a bug with the sarvam tts not returning audio frames
         ],
         help="TTS provider to use for evaluation",
     )
