@@ -227,7 +227,143 @@ Coming Soon
 
 ### LLM tests
 
-Coming Soon
+To evaluate LLM behavior through test cases, prepare a JSON configuration file with test cases and evaluation criteria.
+
+The test configuration file should have the following structure:
+
+```json
+{
+  "params": {
+    "model": "gpt-4.1" // the name of the openai model
+  },
+  "system_prompt": "You are a helpful assistant...", // the system prompt for the LLM. Can include a placeholder for `{language}` that will be replaced with possible values from `variables`
+  "tools": [
+    // array of tools that the LLM can call. Each tool should have:
+    {
+      "type": "client", // the type of the tool. Currently only "client" is supported
+      "name": "plan_next_question", // the name of the tool
+      "description": "Tool description...", // the description of the tool
+      "parameters": [
+        // array of parameters that the tool accepts
+        {
+          "id": "next_unanswered_question_index", // the id of the parameter
+          "type": "integer", // the type of the parameter
+          "description": "Parameter description...", // the description of the parameter
+          "required": true // whether the parameter is required
+        }
+      ]
+    }
+  ],
+  "variables": {
+    "language": ["hindi", "english"] // array of language values to iterate over. The system prompt will be formatted with these values
+  },
+  "test_cases": [
+    // array of test cases, each containing:
+    {
+      "history": [
+        // the conversation history uptil the point of the test
+        {
+          "role": "assistant",
+          "content": "Hello! What is your name?"
+        },
+        {
+          "role": "user",
+          "content": "Aman Dalmia"
+        }
+      ],
+      "evaluation": {
+        // the evaluation criteria for the test
+        "type": "tool_call", // the type of evaluation. Either "tool_call" or "response". "tool_call" means that the LLM's tool calls will be evaluated against the expected tool calls.
+        "tool_calls": [
+          // array of tool calls that the LLM is expected to make. Each tool call should have:
+          {
+            "tool": "plan_next_question", // the name of the tool
+            "arguments": {
+              // the arguments that the tool accepts
+              "next_unanswered_question_index": 2, // the value of the parameter
+              "questions_answered": [1] // the value of the parameter
+            }
+          }
+        ]
+      }
+    },
+    {
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hello! Let's fill out your ANC form. What is your name?"
+        },
+        {
+          "role": "user",
+          "content": "Aman Dalmia"
+        },
+        {
+          "role": "assistant",
+          "content": "Thanks, what is your phone number?"
+        },
+        {
+          "role": "user",
+          "content": "Can I skip this question?"
+        }
+      ],
+      "evaluation": {
+        "type": "response", // `response` means that the LLM response will be evaluated using an LLM judge with custom criteria
+        "criteria": "The assistant should allow the user to skip giving their phone number if asked to skip, and not press them further to answer or call the plan_next_question tool for that question.", // the criteria for evaluating the agent response
+        "positive_examples": [], // array of positive examples that the LLM is expected to respond with
+        "negative_examples": [] // array of negative examples that the LLM is expected to respond with
+      }
+    }
+  ]
+}
+```
+
+Copy `src/llm/.env.example` to `src/llm/.env` and fill in the API keys for the providers you want to evaluate.
+
+```bash
+cd src/llm
+uv run python run_tests.py --config examples/tests.json -o ./out
+```
+
+You can use the sample test configuration provided in [`src/llm/examples/tests.json`](src/llm/examples/tests.json) to test the evaluation script.
+
+The script will run each test case for each variable value (e.g., for each language) and output:
+
+- Pass/fail status for each test case
+- Summary statistics showing total passed/failed tests
+- Detailed output for failed test cases including the test case, actual output, and evaluation metrics
+
+For more details, run `uv run python run_tests.py -h`.
+
+```bash
+usage: run_tests.py [-h] [--config CONFIG] [-o OUTPUT_DIR] [-d]
+
+options:
+  -h, --help            show this help message and exit
+  --config CONFIG       Path to the JSON configuration file for the tests (default: examples/tests.json)
+  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
+                        Path to the output directory to save the results (default: ./out)
+  -d, --debug           Run the evaluation on the first 5 audio files
+```
+
+Sample output:
+
+```
+----------------------------------------------------------------------------------------------------
+✅ Total Passed: 3/4 (75.0%)
+❌ Total Failed: 1/4 (25.0%)
+Failed test cases:
+====================================================================================================
+Test case:
+{'history': [{'role': 'assistant', 'content': "Hello! Let's fill out your ANC form. What is your name?"}, {'role': 'user', 'content': 'Aman Dalmia'}, {'role': 'assistant', 'content': 'Thanks, what is your phone number?'}, {'role': 'user', 'content': 'Can I skip this question?'}], 'evaluation': {'type': 'response', 'criteria': 'the assistant must let the user skip the plan_next_question', 'positive_examples': [], 'negative_examples': []}}
+----------------------------------------------------------------------------------------------------
+Output:
+{'response': 'Aapka phone number lena zaroori hai taki hum aapko zarurat padne par contact kar sakein. Kripya apna 10 digit phone number batayein.', 'tool_calls': []}
+----------------------------------------------------------------------------------------------------
+Metrics:
+{'passed': False, 'reasoning': 'The response does not adhere to the evaluation criteria. The assistant insists that the user provide their phone number, stating it is necessary for contact, and does not allow the user to skip the question. The criteria clearly state that the assistant must let the user skip the question and proceed to the next one, which is not done here.'}
+----------------------------------------------------------------------------------------------------
+=====================
+```
 
 ### Agent simulations
 
