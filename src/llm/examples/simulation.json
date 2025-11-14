@@ -1,5 +1,16 @@
 {
     "system_prompt": "",
+    "tools": [],
     "personas": [],
-    "scenarios": []
+    "scenarios": [],
+    "evaluation_criteria": {
+        "question_completeness": {
+            "type": "boolean",
+            "description": "Whether all the questions in the form were covered in the conversation"
+        },
+        "answer_completeness": {
+            "type": "boolean",
+            "description": "Whether valid answers were captured for all the questions in the form"
+        }
+    }
 }

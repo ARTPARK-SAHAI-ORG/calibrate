@@ -4,7 +4,7 @@ from typing import List, Optional
 from loguru import logger
 from dotenv import load_dotenv
 import os
-
+import json
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -30,6 +30,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
+from metrics import test_response_llm_judge
 
 load_dotenv(".env", override=True)
 
@@ -90,7 +91,7 @@ class Processor(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
-async def run_text_bot(
+async def run_inference(
     chat_history: List[dict[str, str]],
     system_prompt: str,
     tools: List[dict[str, str]] = [],
@@ -204,174 +205,38 @@ async def run_text_bot(
     }
 
 
-async def test_text_bot():
-    system_prompt = """You are a helpful nurse speaking to a pregnant mother who has come for an Antenatal visit (ANC visit).
-
-    You are helping her with filling the ANC visit form which has the following questions:
-
-    1: Name of patient (string)
-    2: Address (string)
-    3: Telephone (number)
-    4: Age (number)
-    5: Previous stillbirth or neonatal loss?
-    6: History of 3 or more consecutive spontaneous abortions
-    7: Birth weight of last baby (string)
-    8: Last pregnancy: hospital admission for hypertension or pre-eclampsia/eclampsia?
-    9: Previous surgery on reproductive tract (Caesarean section, myomectomy, cone biopsy, cervical cerclage,)
-    10: Diagnosed or suspected multiple pregnancy
-    11: Isoimmunisation Rh (-) in current or previous pregnancy
-    12: Vaginal bleeding
-    13: Pelvic mass
-    14: Diastolic blood pressure 90 mmHg or more at booking
-    15: Diabetes mellitus on insulin or oral hypoglycaemic treatment
-    16: Cardiac disease
-    17: Renal disease
-    18: Epilepsy
-    19: Asthmatic on medication
-    20: Tuberculosis
-    21: Known ‘substance’ abuse (including heavy alcohol drinking)
-    22: Any other severe medical disease or condition (string)
-
-    You always speak in {language}.
-
-    Your goal is to get the answer for all these questions from the user. Ask the questions sequentially, one at a time. Make sure to always speak out the next question for the user. They don't know what the next question will be. It is your responsibility to ask them the next question.
-    
-    Do not repeat the user's answer back to them.
-    
-    Except for the questions where a type has been explicitly given beside it, the rest of the questions are boolean questions (yes/no).
-
-    If the user gives an answer that is not valid for a question, then, don't call the `plan_next_question` tool at all.
-
-    Only if the user gives a valid answer to a question, then, call the `plan_next_question` tool.
-
-    Once all the questions have been answered, end the call by calling the `end_call` tool immediately without asking or saying anything else to the user.
-
-    # Important instructions
-    For each field, you must make sure that you get valid and complete answers from the user.
-
-    Name: the full name including both the first name and last name (users might have initials as part of their name - don't ask them to expand it)
-    Address: the full address of the user's specific place of residence
-    Telephone: must be a valid 10-digit phone number (don't bug the user to say the number in 10 digits or without spaces or without hyphens or to repeat it as long you can infer the number from your message, irrespective of whatever format it may have been given in - asking for repeating information that is already clear is not a good user experience)
-    Age: must be a valid age value
-    Birth weight of last baby: must be a valid weight value with the appropriate units (except if this is their first baby, in which case this should be null
-
-    Until you get a valid and complete response for a specific question from the user, keep probing for more details until you have extracted all the details required to meet the criteria of completeness for that question.
-
-    For the boolean questions, just look for whether the user has that symptom or not. If the user is not able to give a definitive answer to any the boolean questions, try probing once to help them arrive at a definitive answer. If they are still not able to give a definitive true/false answer, mark that response as null.
-
-    # Skipping already answered questions
-    It is possible that even though you have asked a particular question, the user's response may end up answering some of the future questions you were going to ask. If the user's response already definitively answers those questions, then, don't repeat those questions again and skip them to move to the next unanswered question. 
-
-    After every valid and complete response given by the user to a question, call the `plan_next_question` tool with the indices of the questions in the list of questions above that the user's response has already answered and the index of the next unanswered question that you are going to ask.
-
-    If the user's response only answers the exact question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_that_question>]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.   
-
-    If the user's response answers more questions beyond the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_first_question_answered>, <index_of_the_second_question_answered>, ....]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.   
-
-    If the user's response answers some other question from the form but not the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_question_answered>]` and `next_unanswered_question_index` as the index of the question you had originally asked but the user did not answer.
-
-    If the user's response is completely irrelevant to any of the questions in the form, don't call this tool and steer the user back to the conversation.
-
-    Use the same index values as mentioned in the list above: from 1-22. So, 1-indexed. Not, 0-indexed.
-    
-    # Ensuring completion of all questions
-    - If the user insists on skipping any question when you asked it, make sure to ask it again later. Before ending the call, make sure to ask all the questions that you asked. Only when all the questions have been asked and answered, then, call the `end_call` tool.
-
-    # Style
-    - Keep the conversation clear, warm, friendly and empathetic. It should feel like a natural and realistic conversation between a nurse and a mother who is pregnant. Make sure each question that you ask is concise and to the point.
-    - Speak in an empathetic, friendly tone like a nurse at a government hospital. 
-    - Always stay gender neutral and don't say anything that might indicate any gender or name for you or anthropomorphise you in any way."""
-
-    system_prompt = system_prompt.format(language="english")
-
-    tools = [
-        {
-            "type": "client",
-            "name": "plan_next_question",
-            "description": "Optional, only call this tool if the user gave a valid answer to a valid question that you asked; if yes, then which questions have been answered and which question needs to be asked next; if not, don't call this tool at all",
-            "disable_interruptions": False,
-            "force_pre_tool_speech": "auto",
-            "assignments": [],
-            "tool_call_sound": None,
-            "tool_call_sound_behavior": "auto",
-            "execution_mode": "immediate",
-            "expects_response": False,
-            "response_timeout_secs": 1,
-            "parameters": [
-                {
-                    "id": "next_unanswered_question_index",
-                    "type": "integer",
-                    "value_type": "llm_prompt",
-                    "description": "the index of the next unanswered question that should be asked to the user next. don't repeat questions that have been asked before already in the previous responses.",
-                    "dynamic_variable": "",
-                    "constant_value": "",
-                    # "enum": None,
-                    "required": True,
-                },
-                {
-                    "id": "questions_answered",
-                    "type": "array",
-                    "description": "Optional, the indices of the questions in the full list of questions that have been answered by the user's last response",
-                    "items": {
-                        "type": "integer",
-                        "description": "the index of each question that got answered by the current response of the user",
-                        # "constant_value": "",
-                        # "enum": None,
-                        # "required": False,
-                    },
-                    "required": True,
-                    "value_type": "llm_prompt",
-                },
-            ],
-            "dynamic_variables": {"dynamic_variable_placeholders": {}},
-        }
-    ]
-
-    model = "gpt-4.1"
-
-    test_cases = [
-        {
-            "history": [
-                {
-                    "role": "assistant",
-                    "content": "Hello! Let's fill out your ANC form. What is your name?",
-                },
-                {
-                    "role": "user",
-                    "content": "Aman Dalmia",
-                },
-            ],
-        }
-    ]
-
-    logger.info("Starting text bot test...")
-
-    outputs = []
-
-    for test_case in test_cases:
-        logger.info(f"Input: {test_case['history']}")
-
-        output = await run_text_bot(
-            chat_history=test_case["history"],
-            system_prompt=system_prompt,
-            tools=tools,
-            model=model,
+async def run_test(
+    chat_history: List[dict[str, str]],
+    evaluation: dict[str, str],
+    system_prompt: str,
+    tools: List[dict[str, str]] = [],
+    model: str = "gpt-4.1",
+):
+    output = await run_inference(
+        chat_history=chat_history,
+        system_prompt=system_prompt,
+        tools=tools,
+        model=model,
+    )
+    metrics = {"passed": True}
+    if evaluation["type"] == "tool_call":
+        if output["tool_calls"] != evaluation["tool_calls"]:
+            metrics["passed"] = False
+    elif evaluation["type"] == "response":
+        result = await test_response_llm_judge(
+            conversation=chat_history,
+            response=output["response"],
+            criteria=evaluation["criteria"],
         )
+        metrics["passed"] = result["match"]
+        metrics["reasoning"] = result["reasoning"]
+    else:
+        raise ValueError(f"Invalid evaluation type: {evaluation['type']}")
 
-        outputs.append(output)
-
-    logger.info("\n" + "=" * 50)
-    logger.info("RESULTS:")
-    logger.info("=" * 50)
-
-    for i, (input_text, output_text) in enumerate(zip(test_cases, outputs), 1):
-        logger.info(f"\nTurn {i}:")
-        logger.info(f"  Input:  {input_text}")
-        logger.info(
-            f"  Output:\n\nResponse: {output_text['response']}\nTool Calls: {output_text['tool_calls']}"
-        )
-
-    return outputs
+    return {
+        "output": output,
+        "metrics": metrics,
+    }
 
 
 async def main():
@@ -379,49 +244,88 @@ async def main():
         description="Text-only Pipecat bot that processes text through an LLM"
     )
     parser.add_argument(
-        "--test",
+        "--config",
+        type=str,
+        default="examples/tests.json",
+        help="Path to the JSON configuration file for the tests",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default="./out",
+        help="Path to the output directory to save the results",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
         action="store_true",
-        help="Run a simple test with predefined inputs",
-    )
-    parser.add_argument(
-        "--input",
-        type=str,
-        nargs="+",
-        help="Text inputs to process (space-separated)",
-    )
-    parser.add_argument(
-        "--system-prompt",
-        type=str,
-        default="You are a helpful AI assistant.",
-        help="System prompt for the LLM",
-    )
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="gpt-4o-mini",
-        help="OpenAI model to use",
+        help="Run the evaluation on the first 5 audio files",
     )
 
     args = parser.parse_args()
 
-    if args.test:
-        await test_text_bot()
-    elif args.input:
-        logger.info("Processing text inputs...")
-        outputs = await run_text_bot(
-            text_inputs=args.input,
-            system_prompt=args.system_prompt,
-            model=args.model,
-        )
-        logger.info("\n" + "=" * 50)
-        logger.info("RESULTS:")
-        logger.info("=" * 50)
-        for i, (input_text, output_text) in enumerate(zip(args.input, outputs), 1):
-            logger.info(f"\nTurn {i}:")
-            logger.info(f"  Input:  {input_text}")
-            logger.info(f"  Output: {output_text}")
+    config = json.load(open(args.config))
+
+    results = []
+    for test_case_index, test_case in enumerate(config["test_cases"]):
+        for language in config["variables"]["language"]:
+            print(f"Running test case {test_case_index} for language {language}")
+
+            formatted_system_prompt = config["system_prompt"].format(language=language)
+
+            result = await run_test(
+                chat_history=test_case["history"],
+                evaluation=test_case["evaluation"],
+                system_prompt=formatted_system_prompt,
+                tools=config["tools"],
+                model=config["params"]["model"],
+            )
+
+            if result["metrics"]["passed"]:
+                print(f"✅ Test case {test_case_index + 1} passed")
+            else:
+                print(f"❌ Test case {test_case_index + 1} failed")
+                print(result["metrics"]["reasoning"])
+
+            result["test_case"] = test_case
+            results.append(result)
+
+        print("-" * 100)
+
+    total_passed = sum(1 for result in results if result["metrics"]["passed"])
+    total_tests = len(results)
+
+    passed_count = total_passed
+    failed_count = total_tests - total_passed
+
+    if passed_count == total_tests:
+        print("🎉 All tests passed!")
+    elif failed_count == total_tests:
+        print("❌ All tests failed!")
     else:
-        parser.print_help()
+        print(
+            f"✅ Total Passed: {passed_count}/{total_tests} ({(passed_count/total_tests)*100:.1f}%)"
+        )
+        print(
+            f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
+        )
+
+    print("Failed test cases:")
+    print("=" * 100)
+    for result in results:
+        if result["metrics"]["passed"]:
+            continue
+        print("Test case:")
+        print(result["test_case"])
+        print("-" * 100)
+        print("Output:")
+        print(result["output"])
+        print("-" * 100)
+        print("Metrics:")
+        print(result["metrics"])
+        print("-" * 100)
+        print("=" * 100)
 
 
 if __name__ == "__main__":
