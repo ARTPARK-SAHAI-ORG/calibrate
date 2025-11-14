@@ -32,7 +32,9 @@ def get_string_similarity(references: List[str], predictions: List[str]) -> floa
 
     # Use edit distance (Levenshtein distance) to compute similarity between strings
     for reference, prediction in zip(references, predictions):
-        seq = difflib.SequenceMatcher(None, reference, prediction)
+        seq = difflib.SequenceMatcher(
+            None, normalizer(reference), normalizer(prediction)
+        )
         similarities.append(seq.ratio())  # value between 0 and 1
 
     return {

@@ -1,3 +1,3 @@
-text,audio_path
-hello world,./out/audios/1.wav
-this is a test,./out/audios/2.wav
+text,audio_path,llm_judge_score,llm_judge_reasoning
+hello world,out/smallest/audios/1.wav,True,"The provided audio says 'hello world'. The reference text is also 'hello world'. The pronunciation is clear, and the words match exactly. There are no discrepancies between the audio and the text."
+this is a test,out/smallest/audios/2.wav,True,"The provided reference text is 'this is a test'. The audio clearly says 'this is a test' without any deviations, mispronunciations, or missing words. The pace, clarity, and pronunciation all align with the reference text. Therefore, the audio matches the provided text exactly."

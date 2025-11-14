@@ -77,6 +77,7 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from loguru import logger
 from pipecat.processors.transcript_processor import TranscriptProcessor
+from metrics import get_tts_llm_judge_score
 from dotenv import load_dotenv
 
 load_dotenv(".env", override=True)
@@ -733,32 +734,31 @@ async def main():
             with suppress(asyncio.CancelledError):
                 await bot_task
 
-    print(results)
+    llm_judge_score = await get_tts_llm_judge_score(audio_paths, texts)
+    logger.info(f"LLM Judge Score: {llm_judge_score['score']}")
 
     metrics_data = [
-        # {
-        #     "wer": wer_score["score"],
-        # },
-        # {
-        #     "string_similarity": string_similarity["score"],
-        # },
-        # {
-        #     "llm_judge_score": llm_judge_score["score"],
-        # },
+        {
+            "llm_judge_score": llm_judge_score["score"],
+        },
     ]
 
     data = []
     for (
         text,
         audio_path,
+        llm_judge_score,
     ) in zip(
         texts,
         audio_paths,
+        llm_judge_score["per_row"],
     ):
         data.append(
             {
                 "text": text,
                 "audio_path": audio_path,
+                "llm_judge_score": llm_judge_score["match"],
+                "llm_judge_reasoning": llm_judge_score["reasoning"],
             }
         )
 
