@@ -608,7 +608,7 @@ async def main():
     else:
         audio_dir = join(args.input_dir, "audios/pcm16")
 
-    gt_file = join(args.input_dir, "gt.csv")
+    gt_file = join(args.input_dir, "stt.csv")
 
     gt = pd.read_csv(gt_file)
 
