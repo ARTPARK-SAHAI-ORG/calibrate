@@ -87,8 +87,8 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
-            logger.info(f"bot frame: {frame}")
-            logger.info(f"bot frame type: {type(frame)}")
+            # logger.info(f"bot frame: {frame}")
+            # logger.info(f"bot frame type: {type(frame)}")
 
             if isinstance(frame, UserSpeakingFrame):
                 frame = RTVIServerMessageFrame(
@@ -576,6 +576,13 @@ async def main():
         action="store_true",
         help="Run the evaluation on the first 5 audio files",
     )
+    parser.add_argument(
+        "-dc",
+        "--debug_count",
+        type=int,
+        default=5,
+        help="Number of audio files to run the evaluation on",
+    )
 
     args = parser.parse_args()
 
@@ -597,25 +604,34 @@ async def main():
         format = "pcm16"
 
     if format == "wav":
-        audio_dir = join(args.input_dir, "audio")
+        audio_dir = join(args.input_dir, "audios/wav")
     else:
-        audio_dir = join(args.input_dir, "audio_pcm16")
+        audio_dir = join(args.input_dir, "audios/pcm16")
 
-    audio_files = natsorted(list(Path(audio_dir).glob("*.wav")))
+    gt_file = join(args.input_dir, "gt.csv")
+
+    gt = pd.read_csv(gt_file)
+
+    audio_files = [
+        Path(audio_dir) / f"{audio_name}.wav" for audio_name in gt["id"].tolist()
+    ]
 
     if args.debug:
-        logger.debug(f"running in debug mode: using first 5 audio files for evaluation")
-        audio_files = audio_files[:5]
+        logger.debug(
+            f"running in debug mode: using first {args.debug_count} audio files for evaluation"
+        )
+        audio_files = audio_files[: args.debug_count]
+
+    # import ipdb
+
+    # ipdb.set_trace()
+
+    logger.info(f"Loading audio files: {audio_files}")
 
     if not audio_files:
         raise ValueError(f"No {format} audio files found in {audio_dir}")
 
     logger.info(f"audio_files: {audio_files}")
-
-    gt_file = join(args.input_dir, "gt.json")
-
-    with open(gt_file, "r") as f:
-        gt = json.load(f)
 
     bot_task = asyncio.create_task(
         run_stt_bot(provider=args.provider, language=args.language)
@@ -633,18 +649,17 @@ async def main():
             with suppress(asyncio.CancelledError):
                 await bot_task
 
-    ids_with_suffix = [splitext(basename(audio_file))[0] for audio_file in audio_files]
+    ids = [splitext(basename(audio_file))[0] for audio_file in audio_files]
 
-    if format == "pcm16":
-        ids = [
-            _id[: -len("_pcm16")] if _id.endswith("_pcm16") else _id
-            for _id in ids_with_suffix
-        ]
-    else:
-        ids = ids_with_suffix
+    gt_transcripts = gt["text"].tolist()
 
-    # ids = ids_with_suffix
-    gt_transcripts = [gt[id] for id in ids]
+    if args.debug:
+        gt_transcripts = gt_transcripts[: args.debug_count]
+
+    # import ipdb
+
+    # ipdb.set_trace()
+
     logger.info(f"gt_transcripts: {gt_transcripts}")
     logger.info(f"pred_transcripts: {pred_transcripts}")
     logger.info(metrics)

@@ -24,22 +24,21 @@ To evaluate different STT providers, first make sure to organize the input data 
 
 ```bash
 ├── /path/to/data
-│   └── gt.json
-│   └── audio
+│   └── stt.csv
+│   └── audios/wav
 │       └── audio_1.wav
 │       └── audio_2.wav
-│   └── audio_pcm16
+│   └── audios/pcm16
 │       └── audio_1.wav
 │       └── audio_2.wav
 ```
 
-`gt.json` should have the following format:
+`stt.csv` should have the following format:
 
-```json
-{
-  "audio_1": "<transcription_1>",
-  "audio_2": "<transcription_2>"
-}
+```csv
+id,text
+audio_1,"Hi"
+audio_2,"Madam, my name is Geeta Shankar"
 ```
 
 Store the audios in both `wav` and `pcm16` formats as different providers support different formats. The evaluation script will automatically select the right format for the provider you choose to evaluate.
