@@ -7,6 +7,7 @@ import difflib
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
+import backoff
 
 load_dotenv(".env", override=True)
 
@@ -43,6 +44,7 @@ def get_string_similarity(references: List[str], predictions: List[str]) -> floa
     }
 
 
+@backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
 async def stt_llm_judge(reference: str, prediction: str) -> float:
     client = AsyncOpenAI()
 

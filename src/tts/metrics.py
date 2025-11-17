@@ -8,12 +8,14 @@ from openai import AsyncOpenAI
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 import base64
+import backoff
 
 load_dotenv(".env", override=True)
 
 normalizer = BasicTextNormalizer()
 
 
+@backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
 async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
     client = AsyncOpenAI()
 
@@ -32,7 +34,10 @@ async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
             {
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": f"reference_text: {reference_text}"},
+                    {
+                        "type": "text",
+                        "text": f"Reference text: {reference_text}\n\nAudio:",
+                    },
                     {
                         "type": "input_audio",
                         "input_audio": {

@@ -46,7 +46,6 @@ from pipecat.transports.websocket.server import (
     WebsocketServerParams,
     WebsocketServerTransport,
 )
-from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from pipecat.processors.aggregators.llm_context import LLMContext
@@ -84,7 +83,9 @@ load_dotenv(".env", override=True)
 
 
 async def run_tts_bot(
-    provider: str, language: Literal["english", "hindi"], audio_out_sample_rate=24000
+    provider: str,
+    language: Literal["english", "hindi", "kannada"],
+    audio_out_sample_rate=24000,
 ):
     """Starts a TTS-only bot that reports RTVI transcription messages."""
 
@@ -105,7 +106,7 @@ async def run_tts_bot(
             await super().process_frame(frame, direction)
 
             logger.info(f"bot frame: {frame}")
-            logger.info(f"bot frame type: {type(frame)}")
+            # logger.info(f"bot frame type: {type(frame)}")
 
             await self.push_frame(frame, direction)
 
@@ -137,8 +138,6 @@ async def run_tts_bot(
     class Processor(FrameProcessor):
         def __init__(self):
             super().__init__(enable_direct_mode=True, name="Processor")
-            self._still_speaking = False
-            self._speaking_lock = asyncio.Lock()
 
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
@@ -176,64 +175,37 @@ async def run_tts_bot(
                     )
 
             if isinstance(frame, BotStoppedSpeakingFrame):
-                async with self._speaking_lock:
-                    if self._still_speaking:
-                        logger.info(f"turning off speaking with frame: {frame}")
-                        self._still_speaking = False
-                        await self.push_frame(
-                            OutputTransportMessageFrame(
-                                message={
-                                    "label": "rtvi-ai",
-                                    "type": "bot-stopped-speaking",
-                                }
-                            ),
-                            FrameDirection.DOWNSTREAM,
-                        )
+                await self.push_frame(
+                    OutputTransportMessageFrame(
+                        message={
+                            "label": "rtvi-ai",
+                            "type": "bot-stopped-speaking",
+                        }
+                    ),
+                    FrameDirection.DOWNSTREAM,
+                )
 
             if isinstance(frame, BotStartedSpeakingFrame):
-                async with self._speaking_lock:
-                    if not self._still_speaking:
-                        self._still_speaking = True
-                        logger.info(f"turning on speaking with frame: {frame}")
-                        await self.push_frame(
-                            OutputTransportMessageFrame(
-                                message={
-                                    "label": "rtvi-ai",
-                                    "type": "bot-started-speaking",
-                                }
-                            ),
-                            FrameDirection.DOWNSTREAM,
-                        )
+                await self.push_frame(
+                    OutputTransportMessageFrame(
+                        message={
+                            "label": "rtvi-ai",
+                            "type": "bot-started-speaking",
+                        }
+                    ),
+                    FrameDirection.DOWNSTREAM,
+                )
 
             if isinstance(frame, BotSpeakingFrame):
-                async with self._speaking_lock:
-                    self._still_speaking = True
-                    await self.push_frame(
-                        OutputTransportMessageFrame(
-                            message={
-                                "label": "rtvi-ai",
-                                "type": "bot-still-speaking",
-                            }
-                        ),
-                        FrameDirection.DOWNSTREAM,
-                    )
-
-            if isinstance(frame, CancelFrame):
-                async with self._speaking_lock:
-                    logger.info("received cancel frame")
-                    logger.info(f"still speaking: {self._still_speaking}")
-                    if self._still_speaking:
-                        self._still_speaking = False
-                        await self.push_frame(
-                            OutputTransportMessageFrame(
-                                message={
-                                    "label": "rtvi-ai",
-                                    "type": "bot-stopped-speaking",
-                                }
-                            ),
-                            FrameDirection.DOWNSTREAM,
-                        )
-                        return
+                await self.push_frame(
+                    OutputTransportMessageFrame(
+                        message={
+                            "label": "rtvi-ai",
+                            "type": "bot-still-speaking",
+                        }
+                    ),
+                    FrameDirection.DOWNSTREAM,
+                )
 
             await self.push_frame(frame, direction)
 
@@ -247,7 +219,9 @@ async def run_tts_bot(
         tts = SmallestTTSService(
             api_key=os.getenv("SMALLEST_API_KEY"),
             params=SmallestTTSService.InputParams(language=tts_language),
-            voice_id="aarushi",
+            voice_id=(
+                "aarushi" if tts_language in [Language.EN, Language.HI] else "vijay"
+            ),
         )
     elif provider == "cartesia":
         tts = CartesiaTTSService(
@@ -263,7 +237,13 @@ async def run_tts_bot(
         tts = GroqTTSService(api_key=os.getenv("GROQ_API_KEY"))
     elif provider == "google":
         voice_id = (
-            "en-US-Chirp3-HD-Charon" if language == "english" else "hi-IN-Standard-A"
+            "en-US-Chirp3-HD-Charon"
+            if language == "english"
+            else (
+                "hi-IN-Chirp3-HD-Charon"
+                if language == "hindi"
+                else "kn-IN-Chirp3-HD-Charon"
+            )
         )
         tts = GoogleTTSService(
             voice_id=voice_id,
@@ -444,11 +424,15 @@ async def run_tts_eval(
         def __init__(
             self,
             texts: list[str],
+            audio_output_dir: str,
+            audio_save_paths: list[str],
         ):
             super().__init__(enable_direct_mode=True, name="Processor")
             self._ready = False
             self._texts = texts
             self._turn_index = 0
+            self._audio_output_dir = audio_output_dir
+            self._audio_save_paths = audio_save_paths
 
         def set_task(self, task: "PipelineTask"):
             """Set the task reference after task creation."""
@@ -486,7 +470,7 @@ async def run_tts_eval(
                 if isinstance(message, dict) and message.get("label") == "rtvi-ai":
                     if message.get("type") == "bot-started-speaking":
                         await self.push_frame(
-                            UserStartedSpeakingFrame(emulated=True),
+                            UserStartedSpeakingFrame(),
                             FrameDirection.DOWNSTREAM,
                         )
                     elif message.get("type") == "bot-still-speaking":
@@ -496,7 +480,7 @@ async def run_tts_eval(
 
                     elif message.get("type") == "bot-stopped-speaking":
                         await self.push_frame(
-                            UserStoppedSpeakingFrame(emulated=True),
+                            UserStoppedSpeakingFrame(),
                             FrameDirection.DOWNSTREAM,
                         )
 
@@ -506,31 +490,44 @@ async def run_tts_eval(
                             await asyncio.sleep(1)
                             await self._send_text_frame()
 
-            # elif isinstance(frame, InputAudioRawFrame):
-            # Play OutputAudioRawFrame to the laptop sound device
-            # try:
-            #     import sounddevice as sd
-            #     import numpy as np
+            elif isinstance(frame, InputAudioRawFrame):
+                try:
+                    import sounddevice as sd
+                    import numpy as np
 
-            #     logger.info(f"has attr frame audio: {hasattr(frame, 'audio')}")
-            #     logger.info(
-            #         f"has attr frame sample_rate: {hasattr(frame, 'sample_rate')}"
-            #     )
+                    logger.info(f"has attr frame audio: {hasattr(frame, 'audio')}")
+                    audio_save_path = os.path.join(
+                        self._audio_output_dir, f"{self._turn_index}.wav"
+                    )
+                    if audio_save_path not in self._audio_save_paths:
+                        self._audio_save_paths.append(audio_save_path)
 
-            #     if hasattr(frame, "audio") and hasattr(frame, "sample_rate"):
-            #         # Assume 16-bit signed PCM audio as bytes
-            #         audio_bytes = frame.audio
-            #         sample_rate = frame.sample_rate
-            #         # Convert bytes to numpy int16 array
-            #         audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
-            #         # If the frame has a 'num_channels', handle accordingly
-            #         num_channels = getattr(frame, "num_channels", 1)
-            #         if num_channels > 1:
-            #             audio_np = audio_np.reshape(-1, num_channels)
-            #         sd.play(audio_np, sample_rate)
-            #         sd.wait()
-            # except Exception as e:
-            #     logger.warning(f"Failed to play audio frame: {e}")
+                    await save_audio_chunk(
+                        audio_save_path,
+                        frame.audio,
+                        frame.sample_rate,
+                        getattr(frame, "num_channels", 1),
+                    )
+
+                    # Play OutputAudioRawFrame to the laptop sound device
+                    # logger.info(
+                    #     f"has attr frame sample_rate: {hasattr(frame, 'sample_rate')}"
+                    # )
+
+                    # if hasattr(frame, "audio") and hasattr(frame, "sample_rate"):
+                    #     # Assume 16-bit signed PCM audio as bytes
+                    #     audio_bytes = frame.audio
+                    #     sample_rate = frame.sample_rate
+                    #     # Convert bytes to numpy int16 array
+                    #     audio_np = np.frombuffer(audio_bytes, dtype=np.int16)
+                    #     # If the frame has a 'num_channels', handle accordingly
+                    #     num_channels = getattr(frame, "num_channels", 1)
+                    #     if num_channels > 1:
+                    #         audio_np = audio_np.reshape(-1, num_channels)
+                    #     sd.play(audio_np, sample_rate)
+                    #     sd.wait()
+                except Exception as e:
+                    logger.warning(f"Failed to play audio frame: {e}")
 
             await self.push_frame(frame, direction)
 
@@ -543,28 +540,15 @@ async def run_tts_eval(
 
     audio_paths = []
 
-    # streamer = BotTurnAudioStreamer(
-    #     audio_paths=audio_files,
-    #     chunk_ms=40,
-    #     transcripts=transcripts,
-    # # )
-    # llm = OpenAILLMService(
-    #     api_key=os.getenv("OPENAI_API_KEY"),
-    #     model="gpt-4.1",
-    # )
-
     messages = [
         {
             "role": "system",
             "content": 'You are a helpful assistant. Begin the conversation with "Hello, how can I help you today?"',
         }
     ]
-    # context = LLMContext(
-    #     messages,
-    # )
-    # context_aggregator = LLMContextAggregatorPair(context)
-    text_streamer = BotTurnTextStreamer(texts=texts)
-    # transcription_logger = TranscriptionWriter(transcripts, audio_streamer=streamer)
+    text_streamer = BotTurnTextStreamer(
+        texts=texts, audio_output_dir=audio_output_dir, audio_save_paths=audio_paths
+    )
 
     ttfb = defaultdict(list)
     processing_time = defaultdict(list)
@@ -584,8 +568,6 @@ async def run_tts_eval(
 
     input_logger = IOLogger()
 
-    audio_buffer = AudioBufferProcessor(enable_turn_audio=True)
-
     pipeline = Pipeline(
         [
             transport.input(),  # Bot audio coming in
@@ -594,7 +576,6 @@ async def run_tts_eval(
             metrics_logger,
             text_streamer,
             transport.output(),  # Send our streamed text to bot
-            audio_buffer,
         ]
     )
 
@@ -607,22 +588,9 @@ async def run_tts_eval(
         idle_timeout_secs=10,
     )
 
-    # text_streamer.set_task(task)
-
-    @audio_buffer.event_handler("on_user_turn_audio_data")
-    async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
-        logger.info(f"Audio data received")
-        logger.info(f"turn index: {text_streamer._turn_index}")
-        audio_save_path = os.path.join(
-            audio_output_dir, f"{text_streamer._turn_index}.wav"
-        )
-        audio_paths.append(audio_save_path)
-        await save_audio_chunk(audio_save_path, audio, sample_rate, num_channels)
-
     @transport.event_handler("on_connected")
     async def on_connected(transport, client):
         logger.info(f"WebSocket connected")
-        await audio_buffer.start_recording()
 
     @transport.event_handler("on_disconnected")
     async def on_disconnected(transport, client):
@@ -667,7 +635,7 @@ async def main():
         "--language",
         type=str,
         default="english",
-        choices=["english", "hindi"],
+        choices=["english", "hindi", "kannada"],
         help="Language of the audio files",
     )
     parser.add_argument(
@@ -689,6 +657,13 @@ async def main():
         "--debug",
         action="store_true",
         help="Run the evaluation on the first 5 audio files",
+    )
+    parser.add_argument(
+        "-dc",
+        "--debug_count",
+        help="Number of texts to run the evaluation on",
+        type=int,
+        default=5,
     )
 
     args = parser.parse_args()
@@ -719,6 +694,9 @@ async def main():
 
     df = pd.read_csv(args.input)
     texts = df["text"].tolist()
+
+    if args.debug:
+        texts = texts[: args.debug_count]
 
     try:
         # Give the bot a moment to start listening before connecting.
