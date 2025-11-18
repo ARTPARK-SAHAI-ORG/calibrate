@@ -4,6 +4,7 @@ from os.path import join, exists, basename, splitext
 import os
 import json
 import wave
+from datetime import datetime
 from contextlib import suppress
 from pathlib import Path
 from typing import Dict, List, Sequence, Literal
@@ -23,6 +24,8 @@ from pipecat.frames.frames import (
     OutputTransportReadyFrame,
     UserStartedSpeakingFrame,
     UserSpeakingFrame,
+    InterimTranscriptionFrame,
+    TranscriptionFrame,
 )
 from pipecat.processors.frameworks.rtvi import RTVIServerMessageFrame
 from pipecat.pipeline.pipeline import Pipeline
@@ -79,15 +82,14 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     class IOLogger(FrameProcessor):
-        def __init__(self, agent: str, position: str):
+        def __init__(self, position: str):
             super().__init__()
-            self._agent = agent
             self._position = position
 
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
-            # logger.info(f"bot frame: {frame}")
+            logger.info(f"{self._position} bot frame: {frame}")
             # logger.info(f"bot frame type: {type(frame)}")
 
             if isinstance(frame, UserSpeakingFrame):
@@ -100,7 +102,8 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
 
             await self.push_frame(frame, direction)
 
-    input_logger = IOLogger(agent="eval", position="after_input")
+    input_logger = IOLogger(position="input")
+    output_logger = IOLogger(position="output")
 
     stt_language = (
         Language.EN
@@ -113,23 +116,22 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             api_key=os.getenv("DEEPGRAM_API_KEY"),
             live_options=LiveOptions(language=stt_language.value, encoding="linear16"),
         )
-    elif provider == "deepgram-flux":
-        stt = DeepgramFluxSTTService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"),
-            live_options=LiveOptions(language=stt_language.value, encoding="linear16"),
-        )
+    # elif provider == "deepgram-flux":
+    #     stt = DeepgramFluxSTTService(
+    #         api_key=os.getenv("DEEPGRAM_API_KEY"),
+    #         live_options=LiveOptions(language=stt_language.value, encoding="linear16"),
+    #     )
     elif provider == "sarvam":
+        stt_language = (
+            Language.EN_IN
+            if language == "english"
+            else Language.HI_IN if language == "hindi" else Language.KN_IN
+        )
         stt = SarvamSTTService(
             api_key=os.getenv("SARVAM_API_KEY"),
-            language=stt_language,
-        )
-    elif provider == "google":
-        stt = GoogleSTTService(
-            params=GoogleSTTService.InputParams(
-                languages=stt_language, model="chirp_3"
+            params=SarvamSTTService.InputParams(
+                vad_signals=True, language=stt_language.value, high_vad_sensitivity=True
             ),
-            location="us",
-            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )
     elif provider == "openai":
         stt = OpenAISTTService(
@@ -156,6 +158,18 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             model="whisper-large-v3",
             language=stt_language,
         )
+    elif provider == "google":
+        stt = GoogleSTTService(
+            sample_rate=16000,
+            params=GoogleSTTService.InputParams(
+                languages=stt_language,
+                # model="chirp_3",
+                # enable_interim_results=True,
+                # enable_voice_activity_events=True,
+            ),
+            # location="us",
+            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        )
     else:
         raise ValueError(f"Invalid provider: {provider}")
 
@@ -168,6 +182,7 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             input_logger,
             stt,
             transcript.user(),
+            output_logger,
             transport.output(),
         ]
     )
@@ -181,7 +196,7 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
             allow_interruptions=True,
         ),
         observers=[RTVIObserver(rtvi)],
-        idle_timeout_secs=200,
+        idle_timeout_secs=15,
     )
 
     @transport.event_handler("on_client_connected")
@@ -247,6 +262,19 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                             return data["text"]
             return False
 
+        def _is_user_transcript_message(
+            self, frame: InputTransportMessageFrame
+        ) -> str | bool:
+            if hasattr(frame, "message"):
+                message = frame.message
+                if message.get("label") == "rtvi-ai":
+                    msg_type = message.get("type")
+                    if msg_type == "user-transcription":
+                        data = message.get("data")
+                        return data.get("text", "")
+
+            return False
+
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
@@ -258,6 +286,23 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                     if user_transcript := self._is_final_user_transcript_message(frame):
                         logger.info(f"appending to user_transcript: {frame}")
                         self._transcripts[-1] += " " + user_transcript
+                        await self.push_frame(
+                            TranscriptionFrame(
+                                text=user_transcript,
+                                user_id="",
+                                timestamp=datetime.now().isoformat(),
+                            ),
+                            FrameDirection.UPSTREAM,
+                        )
+                    elif partial_transcript := self._is_user_transcript_message(frame):
+                        await self.push_frame(
+                            InterimTranscriptionFrame(
+                                text=partial_transcript,
+                                user_id="",
+                                timestamp=datetime.now().isoformat(),
+                            ),
+                            FrameDirection.UPSTREAM,
+                        )
 
             await self.push_frame(frame, direction)
 
@@ -370,12 +415,14 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                     logger.info(
                         "User started speaking during buffering, cancelling pending advance"
                     )
+
                     if (
                         self._pending_advance_task
                         and not self._pending_advance_task.done()
                     ):
                         self._pending_advance_task.cancel()
                         self._pending_advance_task = None
+
                     self._state = "await_reply_bot_turn_end"
 
             logger.info(f"state: {self._state}")
@@ -453,6 +500,23 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
                         # Send audio downstream to the transport output
                         await self.push_frame(frame, FrameDirection.DOWNSTREAM)
                         await asyncio.sleep(1 / 1000.0)
+
+                # Pad a short burst of silence so downstream STT services (e.g. Google)
+                # see a clean end-of-stream and flush their final transcripts before the
+                # server times out the streaming RPC.
+                silence_duration_ms = 1000
+                silence_chunks = max(1, int(silence_duration_ms / self._chunk_ms))
+                silence_sample_count = frames_per_chunk * channels
+                silence_audio = b"\x00" * silence_sample_count * 2  # 16-bit audio
+
+                for _ in range(silence_chunks):
+                    frame = OutputAudioRawFrame(
+                        audio=silence_audio,
+                        sample_rate=sample_rate,
+                        num_channels=channels,
+                    )
+                    await self.push_frame(frame, FrameDirection.DOWNSTREAM)
+                    await asyncio.sleep(self._chunk_ms / 1000.0)
             finally:
                 # After sending our audio, wait for bot's reply to finish
                 self._state = "await_reply_bot_turn_end"
@@ -504,7 +568,7 @@ async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
             audio_in_sample_rate=16000,
             audio_out_sample_rate=16000,
         ),
-        idle_timeout_secs=100,
+        idle_timeout_secs=200,
     )
 
     @transport.event_handler("on_connected")
@@ -538,13 +602,14 @@ async def main():
         default="deepgram",
         choices=[
             "deepgram",  # pcm16
-            "deepgram-flux",  # pcm16
+            # "deepgram-flux",  # pcm16
             "openai",  # pcm16
             "cartesia",  # pcm16
             "smallest",  # pcm16
             "groq",  # wav
             "google",  # wav
             "sarvam",  # wav
+            # elevenlabs
         ],
         help="STT provider to use for evaluation",
     )
@@ -598,15 +663,12 @@ async def main():
 
     logger.add(log_save_path)
 
-    if args.provider in ["google", "sarvam", "groq"]:
-        format = "wav"
+    if args.provider in ["sarvam", "groq"]:
+        audio_format = "wav"
     else:
-        format = "pcm16"
+        audio_format = "pcm16"
 
-    if format == "wav":
-        audio_dir = join(args.input_dir, "audios/wav")
-    else:
-        audio_dir = join(args.input_dir, "audios/pcm16")
+    audio_dir = join(args.input_dir, f"audios/{audio_format}")
 
     gt_file = join(args.input_dir, "stt.csv")
 
@@ -629,7 +691,7 @@ async def main():
     logger.info(f"Loading audio files: {audio_files}")
 
     if not audio_files:
-        raise ValueError(f"No {format} audio files found in {audio_dir}")
+        raise ValueError(f"No {audio_format} audio files found in {audio_dir}")
 
     logger.info(f"audio_files: {audio_files}")
 
