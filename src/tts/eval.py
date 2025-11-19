@@ -768,7 +768,7 @@ async def main():
 
     metrics_save_path = join(output_dir, "metrics.json")
     with open(metrics_save_path, "w") as f:
-        json.dump(metrics_data, f)
+        json.dump(metrics_data, f, indent=4)
 
     pd.DataFrame(data).to_csv(join(output_dir, "results.csv"), index=False)
 

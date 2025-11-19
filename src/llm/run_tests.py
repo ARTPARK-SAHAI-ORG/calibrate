@@ -206,6 +206,10 @@ async def run_inference(
     }
 
 
+def sort_tool_calls(tool_calls):
+    return sorted(tool_calls, key=lambda val: val["tool"])
+
+
 async def run_test(
     chat_history: List[dict[str, str]],
     evaluation: dict[str, str],
@@ -221,7 +225,9 @@ async def run_test(
     )
     metrics = {"passed": True}
     if evaluation["type"] == "tool_call":
-        if output["tool_calls"] != evaluation["tool_calls"]:
+        if sort_tool_calls(output["tool_calls"]) != sort_tool_calls(
+            evaluation["tool_calls"]
+        ):
             metrics["passed"] = False
     elif evaluation["type"] == "response":
         result = await test_response_llm_judge(
@@ -331,13 +337,16 @@ async def main():
             f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
         )
 
-    output = {
+    with open(join(output_dir, "results.json"), "w") as f:
+        json.dump(results, f, indent=4)
+
+    metrics = {
         "total": total_tests,
         "passed": passed_count,
     }
 
-    with open(join(output_dir, "results.json"), "w") as f:
-        json.dump(output, f)
+    with open(join(output_dir, "metrics.json"), "w") as f:
+        json.dump(metrics, f, indent=4)
 
     if failed_count:
         print("Failed test cases:")

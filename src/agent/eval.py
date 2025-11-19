@@ -484,17 +484,17 @@ async def run_simulation_pipeline(
                     with open(
                         os.path.join(self._output_dir, "transcripts.json"), "w"
                     ) as transcripts_file:
-                        json.dump(serialized_transcripts, transcripts_file)
+                        json.dump(serialized_transcripts, transcripts_file, indent=4)
 
                     with open(
                         os.path.join(self._output_dir, "tool_calls.json"), "w"
                     ) as tool_calls_file:
-                        json.dump(self._tool_calls, tool_calls_file)
+                        json.dump(self._tool_calls, tool_calls_file, indent=4)
 
                     with open(
                         os.path.join(self._output_dir, "stt_outputs.json"), "w"
                     ) as stt_outputs_file:
-                        json.dump(self._stt_outputs, stt_outputs_file)
+                        json.dump(self._stt_outputs, stt_outputs_file, indent=4)
 
                     ttft = dict(self._ttft)
                     processing_time = dict(self._processing_time)
@@ -505,6 +505,7 @@ async def run_simulation_pipeline(
                         json.dump(
                             {"ttft": ttft, "processing_time": processing_time},
                             metrics_file,
+                            indent=4,
                         )
 
                 except Exception as exc:
