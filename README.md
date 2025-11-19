@@ -50,7 +50,7 @@ cd src/stt
 uv run python eval.py --input-dir /path/to/data -o /path/to/output -d -p <provider> -l <language>
 ```
 
-You can use the sample inputs provided in [`src/stt/samples`](src/stt/samples) to test the evaluation script.
+You can use the sample inputs provided in [`src/stt/examples/sample_input`](src/stt/examples/sample_input) to test the evaluation script.
 
 ```bash
 cd src/stt
@@ -115,6 +115,8 @@ The definition of all the metrics we compute are stored in [`src/stt/metrics.py`
 }
 ```
 
+You can checkout [`src/stt/examples/sample_output`](src/stt/examples/sample_output) to see the sample output of the evaluation script.
+
 For more details, run `uv run python eval.py -h`.
 
 ```bash
@@ -164,7 +166,7 @@ cd src/tts
 uv run python eval.py --input /path/to/input.csv -o /path/to/output -p <provider> -l <language>
 ```
 
-You can use the sample inputs provided in [`src/tts/examples`](src/tts/examples) to test the evaluation script.
+You can use the sample inputs provided in [`src/tts/examples/sample.csv`](src/tts/examples/sample.csv) to test the evaluation script.
 
 ```bash
 cd src/tts
@@ -211,6 +213,8 @@ this is a test,./out/audios/2.wav
   }
 ]
 ```
+
+You can checkout [`src/tts/examples/sample_output`](src/tts/examples/sample_output) to see the sample output of the evaluation script.
 
 For more details, run `uv run python eval.py -h`.
 
@@ -342,10 +346,14 @@ Copy `src/llm/.env.example` to `src/llm/.env` and fill in the API keys for the p
 
 ```bash
 cd src/llm
-uv run python run_tests.py --config examples/tests.json -o ./out
+uv run python eval.py --config /path/to/test_config.json -o /path/to/output_dir -m <model_name>
 ```
 
 You can use the sample test configuration provided in [`src/llm/examples/tests.json`](src/llm/examples/tests.json) to test the evaluation script.
+
+```bash
+uv run python run_tests.py --config examples/tests.json -o ./out -m gpt-4.1
+```
 
 The script will run each test case for each variable value (e.g., for each language) and output:
 
@@ -361,18 +369,7 @@ The output of the script will be saved in the output directory.
 ├── logs
 ```
 
-For more details, run `uv run python run_tests.py -h`.
-
-```bash
-usage: run_tests.py [-h] [--config CONFIG] [-o OUTPUT_DIR] [-d]
-
-options:
-  -h, --help            show this help message and exit
-  --config CONFIG       Path to the JSON configuration file for the tests (default: examples/tests.json)
-  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
-                        Path to the output directory to save the results (default: ./out)
-  -d, --debug           Run the evaluation on the first 5 audio files
-```
+You can checkout [`src/llm/examples/sample_output`](src/llm/examples/sample_output) to see the sample output of the evaluation script.
 
 Sample output:
 
@@ -400,7 +397,7 @@ Once you have results for multiple models or scenarios, compile a leaderboard CS
 
 ```bash
 cd src/llm
-uv run python leaderboard.py -o /path/to/output -s ./leaderboards
+uv run python leaderboard.py -o /path/to/output -s ./leaderboard
 ```
 
 `src/llm/leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
@@ -469,11 +466,15 @@ The voice agent is defined in `src/agent/bot.py`. For now, the default configura
 
 Copy `src/agent/.env.example` to `src/agent/.env` and fill in the API keys for the providers you want to evaluate.
 
-You can use the sample configuration provided in [`src/agent/samples/sample.json`](src/agent/samples/sample.json) to test the voice agent simulation.
-
 ```bash
 cd src/agent
-uv run python eval.py -c samples/sample_short.json -o ./out
+uv run python eval.py  -c /path/to/config.json -o /path/to/output
+```
+
+You can use the sample configuration provided in [`src/agent/examples/sample_short.json`](src/agent/examples/sample_short.json) to test the voice agent simulation.
+
+```bash
+uv run python eval.py -c examples/sample_short.json -o ./out
 ```
 
 The output of the evaluation script will be saved in the output directory.
