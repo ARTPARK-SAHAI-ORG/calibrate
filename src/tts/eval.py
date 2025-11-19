@@ -86,6 +86,7 @@ async def run_tts_bot(
     provider: str,
     language: Literal["english", "hindi", "kannada"],
     audio_out_sample_rate=24000,
+    port: int = 8765,
 ):
     """Starts a TTS-only bot that reports RTVI transcription messages."""
 
@@ -96,6 +97,7 @@ async def run_tts_bot(
             audio_out_enabled=True,
             add_wav_header=False,
         ),
+        port=port,
     )
 
     class IOLogger(FrameProcessor):
@@ -129,7 +131,7 @@ async def run_tts_bot(
                     content = data.get("content")
                     if content:
                         await self.push_frame(LLMFullResponseStartFrame(), direction)
-                        await self.push_frame(TextFrame(text=content), direction)
+                        await self.push_frame(TextFrame(text="Hi"), direction)
                         await self.push_frame(LLMFullResponseEndFrame(), direction)
                     return
 
@@ -359,12 +361,15 @@ async def save_audio_chunk(
 
 
 async def run_tts_eval(
-    texts: List[str], output_dir: str, audio_in_sample_rate: int = 24000
+    texts: List[str],
+    output_dir: str,
+    audio_in_sample_rate: int = 24000,
+    port: int = 8765,
 ) -> List[Dict[str, str]]:
     """Connects to the TTS bot and streams audio files sequentially."""
 
     transport = WebsocketClientTransport(
-        uri="ws://localhost:8765",
+        uri=f"ws://localhost:{port}",
         params=WebsocketClientParams(
             audio_in_enabled=True,
             audio_out_enabled=False,
@@ -665,6 +670,12 @@ async def main():
         type=int,
         default=5,
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Websocket port to connect to the STT bot",
+    )
 
     args = parser.parse_args()
 
@@ -678,6 +689,7 @@ async def main():
             provider=args.provider,
             language=args.language,
             audio_out_sample_rate=audio_sample_rate,
+            port=args.port,
         )
     )
 
@@ -702,7 +714,7 @@ async def main():
         # Give the bot a moment to start listening before connecting.
         await asyncio.sleep(1.0)
         results = await run_tts_eval(
-            texts, output_dir, audio_in_sample_rate=audio_sample_rate
+            texts, output_dir, audio_in_sample_rate=audio_sample_rate, port=args.port
         )
         audio_paths = results["audio_paths"]
         metrics = results["metrics"]

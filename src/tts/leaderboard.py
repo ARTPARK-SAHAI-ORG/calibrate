@@ -15,8 +15,6 @@ except ImportError:  # pragma: no cover
     plt = None
 
 TARGET_METRICS = [
-    "wer",
-    "string_similarity",
     "llm_judge_score",
     "ttfb",
     "processing_time",
@@ -55,7 +53,7 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
     summary_df = pd.DataFrame(summary_rows)
 
     _create_metric_charts(summary_df, save_path)
-    workbook_path = save_path / "stt_leaderboard.xlsx"
+    workbook_path = save_path / "tts_leaderboard.xlsx"
     _write_workbook(summary_df, run_results, workbook_path)
 
     print(f"Saved leaderboard workbook to {workbook_path}")
@@ -78,12 +76,10 @@ def _read_metrics(metrics_path: Path) -> Dict[str, float]:
             continue
 
         metric_name = entry.get("metric_name")
-        # ttfb and processing time
         if metric_name:
             metrics[metric_name] = entry["mean"]
             continue
 
-        # wer, string similarity and llm judge score
         for key, value in entry.items():
             metrics[key] = float(value)
 
