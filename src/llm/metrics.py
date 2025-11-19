@@ -13,7 +13,7 @@ async def test_response_llm_judge(
     client = AsyncOpenAI()
 
     conversation_as_prompt = "\n".join(
-        [f'{msg["role"]}: {msg["content"]}' for msg in conversation]
+        [f'{msg["role"]}: {msg["content"]}' for msg in conversation if "content" in msg]
     )
 
     class Output(BaseModel):

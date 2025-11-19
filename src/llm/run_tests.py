@@ -4,6 +4,7 @@ from typing import List, Optional
 from loguru import logger
 from dotenv import load_dotenv
 import os
+from os.path import join, exists, splitext, basename
 import json
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -244,6 +245,7 @@ async def main():
         description="Text-only Pipecat bot that processes text through an LLM"
     )
     parser.add_argument(
+        "-c",
         "--config",
         type=str,
         default="examples/tests.json",
@@ -257,6 +259,13 @@ async def main():
         help="Path to the output directory to save the results",
     )
     parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="gpt-4.1",
+        help="OpenAI model to use for the evaluation",
+    )
+    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
@@ -267,31 +276,42 @@ async def main():
 
     config = json.load(open(args.config))
 
+    config_name = splitext(basename(args.config))[0]
+
+    output_dir = join(args.output_dir, config_name, args.model)
+
+    if not exists(output_dir):
+        os.makedirs(output_dir)
+
+    log_save_path = join(output_dir, "logs")
+
+    if exists(log_save_path):
+        os.remove(log_save_path)
+
+    logger.remove()
+    logger.add(log_save_path)
+
     results = []
     for test_case_index, test_case in enumerate(config["test_cases"]):
-        for language in config["variables"]["language"]:
-            print(f"Running test case {test_case_index} for language {language}")
+        result = await run_test(
+            chat_history=test_case["history"],
+            evaluation=test_case["evaluation"],
+            system_prompt=config["system_prompt"],
+            tools=config["tools"],
+            model=args.model,
+        )
 
-            formatted_system_prompt = config["system_prompt"].format(language=language)
-
-            result = await run_test(
-                chat_history=test_case["history"],
-                evaluation=test_case["evaluation"],
-                system_prompt=formatted_system_prompt,
-                tools=config["tools"],
-                model=config["params"]["model"],
-            )
-
-            if result["metrics"]["passed"]:
-                print(f"✅ Test case {test_case_index + 1} passed")
-            else:
-                print(f"❌ Test case {test_case_index + 1} failed")
+        if result["metrics"]["passed"]:
+            print(f"✅ Test case {test_case_index + 1} passed")
+        else:
+            print(f"❌ Test case {test_case_index + 1} failed")
+            if "reasoning" in result["metrics"]:
                 print(result["metrics"]["reasoning"])
 
-            result["test_case"] = test_case
-            results.append(result)
+        result["test_case"] = test_case
+        results.append(result)
 
-        print("-" * 100)
+        print("-" * 40)
 
     total_passed = sum(1 for result in results if result["metrics"]["passed"])
     total_tests = len(results)
@@ -311,21 +331,41 @@ async def main():
             f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
         )
 
-    print("Failed test cases:")
-    print("=" * 100)
-    for result in results:
-        if result["metrics"]["passed"]:
-            continue
-        print("Test case:")
-        print(result["test_case"])
-        print("-" * 100)
-        print("Output:")
-        print(result["output"])
-        print("-" * 100)
-        print("Metrics:")
-        print(result["metrics"])
-        print("-" * 100)
-        print("=" * 100)
+    output = {
+        "total": total_tests,
+        "passed": passed_count,
+    }
+
+    with open(join(output_dir, "results.json"), "w") as f:
+        json.dump(output, f)
+
+    if failed_count:
+        print("Failed test cases:")
+        print("=" * 40)
+        for result in results:
+            if result["metrics"]["passed"]:
+                continue
+
+            print("History:\n\n")
+            print(
+                "\n".join(
+                    [
+                        f"{message['role']}: {message['content']}"
+                        for message in result["test_case"]["history"]
+                        if "content" in message
+                    ]
+                )
+            )
+            print("\n\nExpected output:")
+            print(result["test_case"]["evaluation"])
+            print("-" * 40)
+            print("Output:")
+            print(result["output"])
+            print("-" * 40)
+            print("Metrics:")
+            print(result["metrics"])
+            print("-" * 40)
+            print("=" * 40)
 
 
 if __name__ == "__main__":

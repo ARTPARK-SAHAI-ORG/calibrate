@@ -64,10 +64,11 @@ import pandas as pd
 load_dotenv(".env", override=True)
 
 
-async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
+async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port: int):
     """Starts an STT-only bot that reports RTVI transcription messages."""
 
     transport = WebsocketServerTransport(
+        port=port,
         params=WebsocketServerParams(
             serializer=ProtobufFrameSerializer(),
             audio_in_enabled=True,
@@ -213,11 +214,11 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"]):
     await runner.run(task)
 
 
-async def run_stt_eval(audio_files: Sequence[Path]) -> List[Dict[str, str]]:
+async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str, str]]:
     """Connects to the STT bot and streams audio files sequentially."""
 
     transport = WebsocketClientTransport(
-        uri="ws://localhost:8765",
+        uri=f"ws://localhost:{port}",
         params=WebsocketClientParams(
             audio_in_enabled=False,
             audio_out_enabled=True,
@@ -648,6 +649,12 @@ async def main():
         default=5,
         help="Number of audio files to run the evaluation on",
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Websocket port to connect to the STT bot",
+    )
 
     args = parser.parse_args()
 
@@ -696,13 +703,13 @@ async def main():
     logger.info(f"audio_files: {audio_files}")
 
     bot_task = asyncio.create_task(
-        run_stt_bot(provider=args.provider, language=args.language)
+        run_stt_bot(provider=args.provider, language=args.language, port=args.port)
     )
 
     try:
         # Give the bot a moment to start listening before connecting.
         await asyncio.sleep(1.0)
-        results = await run_stt_eval(audio_files)
+        results = await run_stt_eval(audio_files, port=args.port)
         pred_transcripts = results["transcripts"]
         metrics = results["metrics"]
     finally:
