@@ -371,24 +371,44 @@ The output of the script will be saved in the output directory.
 
 You can checkout [`src/llm/examples/sample_output`](src/llm/examples/sample_output) to see the sample output of the evaluation script.
 
-Sample output:
+Sample output 1:
 
 ```
-----------------------------------------------------------------------------------------------------
-✅ Total Passed: 3/4 (75.0%)
-❌ Total Failed: 1/4 (25.0%)
+✅ Test case 1 passed
+----------------------------------------
+✅ Test case 2 passed
+----------------------------------------
+🎉 All tests passed!
+```
+
+Sample output 2:
+
+```
+❌ Test case 1 failed
+----------------------------------------
+✅ Test case 2 passed
+----------------------------------------
+✅ Total Passed: 1/2 (50.0%)
+❌ Total Failed: 1/2 (50.0%)
 Failed test cases:
-====================================================================================================
-Test case:
-{'history': [{'role': 'assistant', 'content': "Hello! Let's fill out your ANC form. What is your name?"}, {'role': 'user', 'content': 'Aman Dalmia'}, {'role': 'assistant', 'content': 'Thanks, what is your phone number?'}, {'role': 'user', 'content': 'Can I skip this question?'}], 'evaluation': {'type': 'response', 'criteria': 'the assistant must let the user skip the plan_next_question', 'positive_examples': [], 'negative_examples': []}}
-----------------------------------------------------------------------------------------------------
+========================================
+History:
+
+
+assistant: Namaste, I’m Nurse Anitha. To start, what name should I write for you?
+user: My name is Geetha Shankar. I am 24 years old and live in Hosahalli village, Holenarasipura taluk, Hassan district
+
+
+Expected output:
+{'type': 'tool_call', 'tool_calls': [{'tool': 'plan_next_question', 'arguments': {'next_unanswered_question_index': 3, 'questions_answered': [1, 2, 4]}}]}
+----------------------------------------
 Output:
-{'response': 'Aapka phone number lena zaroori hai taki hum aapko zarurat padne par contact kar sakein. Kripya apna 10 digit phone number batayein.', 'tool_calls': []}
-----------------------------------------------------------------------------------------------------
+{'response': '', 'tool_calls': [{'tool': 'plan_next_question', 'arguments': {'next_unanswered_question_index': 3, 'questions_answered': [1, 2]}}, {'tool': 'plan_next_question', 'arguments': {'next_unanswered_question_index': 4, 'questions_answered': [1, 2]}}]}
+----------------------------------------
 Metrics:
-{'passed': False, 'reasoning': 'The response does not adhere to the evaluation criteria. The assistant insists that the user provide their phone number, stating it is necessary for contact, and does not allow the user to skip the question. The criteria clearly state that the assistant must let the user skip the question and proceed to the next one, which is not done here.'}
-----------------------------------------------------------------------------------------------------
-=====================
+{'passed': False}
+----------------------------------------
+========================================
 ```
 
 #### LLM leaderboard
