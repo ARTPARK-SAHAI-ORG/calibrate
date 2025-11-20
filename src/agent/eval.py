@@ -474,13 +474,13 @@ async def run_simulation_pipeline(
                             continue
                         role = message.get("role")
 
-                        # if role in {"user", "assistant"}:
-                        serialized_transcripts.append(
-                            {
-                                "role": role,
-                                "content": message.get("content", ""),
-                            }
-                        )
+                        if role in {"user", "assistant"}:
+                            serialized_transcripts.append(
+                                {
+                                    "role": role,
+                                    "content": message.get("content", ""),
+                                }
+                            )
                     with open(
                         os.path.join(self._output_dir, "transcripts.json"), "w"
                     ) as transcripts_file:

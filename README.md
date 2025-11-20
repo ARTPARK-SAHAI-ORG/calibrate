@@ -136,8 +136,6 @@ options:
   -d, --debug           Run the evaluation on the first 5 audio files
 ```
 
-#### STT leaderboard
-
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
 ```bash
@@ -146,6 +144,10 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboards
 ```
 
 The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`src/stt/leaderboard.py`).
+
+You can checkout [`src/stt/examples/leaderboard`](src/stt/examples/leaderboard) to see the sample output of the leaderboard script.
+
+![Leaderboard example](src/stt/examples/leaderboard/all_metrics_by_run.png)
 
 ### Text To Speech (TTS)
 
@@ -235,8 +237,6 @@ options:
   -d, --debug           Run the evaluation on the first 5 audio files
 ```
 
-#### TTS leaderboard
-
 To benchmark several TTS runs, generate the combined workbook and chart with:
 
 ```bash
@@ -245,6 +245,10 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboards
 ```
 
 `src/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
+
+You can checkout [`src/tts/examples/leaderboard`](src/tts/examples/leaderboard) to see the sample output of the leaderboard script.
+
+![Leaderboard example](src/tts/examples/leaderboard/all_metrics_by_run.png)
 
 ### LLM simulations
 
@@ -411,8 +415,6 @@ Metrics:
 ========================================
 ```
 
-#### LLM leaderboard
-
 Once you have results for multiple models or scenarios, compile a leaderboard CSV and comparison chart:
 
 ```bash
@@ -421,6 +423,10 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboard
 ```
 
 `src/llm/leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
+
+You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) to see the sample output of the leaderboard script.
+
+![Leaderboard example](src/llm/examples/leaderboard/llm_leaderboard.png)
 
 ### Voice agent simulations
 
@@ -541,7 +547,11 @@ cd src/agent
 uv run python run.py -c examples/run/sample_run.json -o ./out/run
 ```
 
-Once you run it, you can open `http://localhost:7860/client/` in your browser. Click **Connect**, and begin talking to the agent through your browser. The client UI streams the conversation transcript in real time, while the **Metrics** tab mirrors the live latency statistics reported by the pipeline.
+Once you run it, you can open `http://localhost:7860/client/` in your browser. Click **Connect**, and begin talking to the agent through your browser. The client UI streams the conversation transcript in real time, while the **Metrics** tab mirrors the live latency statistics reported by the pipeline as shwon in the images below:
+
+![Conversation example](images/run_conversation.png)
+
+![Metrics example](images/run_metrics.png)
 
 Every user/bot audio turn is persisted inside `<output_dir>/audios` (see the sample output folder for the exact layout). The terminal also logs each transcript message and every function/tool call issued by the LLM so you can audit the interaction without leaving your shell.
 
