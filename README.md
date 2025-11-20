@@ -250,10 +250,6 @@ You can checkout [`src/tts/examples/leaderboard`](src/tts/examples/leaderboard) 
 
 ![Leaderboard example](src/tts/examples/leaderboard/all_metrics_by_run.png)
 
-### LLM simulations
-
-Coming Soon
-
 ### LLM tests
 
 To evaluate LLM behavior through test cases, prepare a JSON configuration file with test cases and evaluation criteria.
@@ -353,10 +349,10 @@ cd src/llm
 uv run python eval.py --config /path/to/test_config.json -o /path/to/output_dir -m <model_name>
 ```
 
-You can use the sample test configuration provided in [`src/llm/examples/tests.json`](src/llm/examples/tests.json) to test the evaluation script.
+You can use the sample test configuration provided in [`src/llm/examples/tests/config.json`](src/llm/examples/tests/config.json) to test the evaluation script.
 
 ```bash
-uv run python run_tests.py --config examples/tests.json -o ./out -m gpt-4.1
+uv run python run_tests.py --config examples/tests/config.json -o ./out -m gpt-4.1
 ```
 
 The script will run each test case for each variable value (e.g., for each language) and output:
@@ -373,7 +369,7 @@ The output of the script will be saved in the output directory.
 ├── logs
 ```
 
-You can checkout [`src/llm/examples/sample_output`](src/llm/examples/sample_output) to see the sample output of the evaluation script.
+You can checkout [`src/llm/examples/tests/sample_output`](src/llm/examples/tests/sample_output) to see the sample output of the evaluation script.
 
 Sample output 1:
 
@@ -427,6 +423,10 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboard
 You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) to see the sample output of the leaderboard script.
 
 ![Leaderboard example](src/llm/examples/leaderboard/llm_leaderboard.png)
+
+### LLM simulations
+
+Coming Soon
 
 ### Voice agent simulations
 
