@@ -276,6 +276,59 @@ async def run_bot(
         {"role": "system", "content": system_prompt},
     ]
 
+    async def _exec_call_call():
+        try:
+            await task.cancel()
+        except Exception as exc:
+            bot_logger.warning(
+                f"Unable to cancel task after end_call (no tool_call_id): {exc}"
+            )
+
+    async def end_call(params: FunctionCallParams):
+        reason = params.arguments.get("reason") if params.arguments else None
+        if reason:
+            bot_logger.info(f"end_call tool invoked by LLM: {reason}")
+        else:
+            bot_logger.info("end_call tool invoked by LLM")
+
+        if mode == "run":
+            await params.result_callback(
+                None, properties=FunctionCallResultProperties(run_llm=False)
+            )
+            await _exec_call_call()
+            return
+
+        tool_call_id = params.tool_call_id
+        pending_tool_calls[tool_call_id] = params
+
+        try:
+            await rtvi.handle_function_call(params)
+        except Exception as exc:
+            pending_tool_calls.pop(tool_call_id, None)
+            bot_logger.warning(f"Unable to forward end_call to client: {exc}")
+
+    async def generic_function_call(params: FunctionCallParams):
+        bot_logger.info(
+            f"{params.function_name} invoked with arguments: {params.arguments}"
+        )
+
+        if mode == "run":
+            await params.result_callback(
+                {"status": "received"},
+            )
+            return
+
+        tool_call_id = params.tool_call_id
+        pending_tool_calls[tool_call_id] = params
+
+        try:
+            await rtvi.handle_function_call(params)
+        except Exception as exc:
+            pending_tool_calls.pop(tool_call_id, None)
+            bot_logger.warning(
+                f"Unable to forward {params.function_name} to client: {exc}"
+            )
+
     end_call_tool = FunctionSchema(
         name="end_call",
         description="End the current call when the conversation is complete.",
@@ -288,6 +341,7 @@ async def run_bot(
         required=[],
     )
     standard_tools = [end_call_tool]
+    llm.register_function("end_call", end_call)
 
     for tool in tools:
         properties = {}
@@ -312,6 +366,7 @@ async def run_bot(
             required=[],
         )
         standard_tools.append(tool_function)
+        llm.register_function(tool["name"], generic_function_call)
 
     tools = ToolsSchema(standard_tools=standard_tools)
 
@@ -393,58 +448,6 @@ async def run_bot(
         observers=[RTVIObserver(rtvi), LLMLogObserver()],  # RTVI protocol events
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
-
-    async def _exec_call_call():
-        try:
-            await task.cancel()
-        except Exception as exc:
-            bot_logger.warning(
-                f"Unable to cancel task after end_call (no tool_call_id): {exc}"
-            )
-
-    async def end_call(params: FunctionCallParams):
-        reason = params.arguments.get("reason") if params.arguments else None
-        if reason:
-            bot_logger.info(f"end_call tool invoked by LLM: {reason}")
-        else:
-            bot_logger.info("end_call tool invoked by LLM")
-
-        if mode == "run":
-            await params.result_callback(
-                None, properties=FunctionCallResultProperties(run_llm=False)
-            )
-            await _exec_call_call()
-            return
-
-        tool_call_id = params.tool_call_id
-        pending_tool_calls[tool_call_id] = params
-
-        try:
-            await rtvi.handle_function_call(params)
-        except Exception as exc:
-            pending_tool_calls.pop(tool_call_id, None)
-            bot_logger.warning(f"Unable to forward end_call to client: {exc}")
-
-    async def plan_next_question(params: FunctionCallParams):
-        bot_logger.info(f"plan_next_question tool invoked by LLM: {params.arguments}")
-
-        if mode == "run":
-            await params.result_callback(
-                {"status": "received"},
-            )
-            return
-
-        tool_call_id = params.tool_call_id
-        pending_tool_calls[tool_call_id] = params
-
-        try:
-            await rtvi.handle_function_call(params)
-        except Exception as exc:
-            pending_tool_calls.pop(tool_call_id, None)
-            bot_logger.warning(f"Unable to forward plan_next_question to client: {exc}")
-
-    llm.register_function("end_call", end_call)
-    llm.register_function("plan_next_question", plan_next_question)
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
