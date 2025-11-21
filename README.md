@@ -422,7 +422,7 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboard
 
 You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) to see the sample output of the leaderboard script.
 
-![Leaderboard example](src/llm/examples/leaderboard/llm_leaderboard.png)
+![Leaderboard example](src/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
 ### LLM simulations
 
