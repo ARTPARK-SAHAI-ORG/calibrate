@@ -16,6 +16,27 @@ Create the virtual environment and install the dependencies.
 uv sync --frozen
 ```
 
+## Talk to the agent
+
+`src/agent/run.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
+
+1. Copy `src/agent/.env.example` to `src/agent/.env` and provide the API keys for the STT/LLM/TTS providers you want to exercise (the defaults in `run.py` use OpenAI STT + LLM and Google TTS).
+2. Pick or edit a config file. `src/agent/examples/run/sample_run.json` is a ready-to-use prompt/tools configuration, and `src/agent/examples/run/sample_output` shows the artifacts that the script writes after a short conversation.
+3. Start the runner:
+
+```bash
+cd src/agent
+uv run python run.py -c examples/run/sample_run.json -o ./out/run
+```
+
+Once you run it, you can open `http://localhost:7860/client/` in your browser. Click **Connect**, and begin talking to the agent through your browser. The client UI streams the conversation transcript in real time, while the **Metrics** tab mirrors the live latency statistics reported by the pipeline as shwon in the images below:
+
+![Conversation example](images/run_conversation.png)
+
+![Metrics example](images/run_metrics.png)
+
+Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sample output folder for the exact layout). The terminal also logs each transcript message and every function/tool call issued by the LLM so you can audit the interaction without leaving your shell.
+
 ## Speech To Text (STT)
 
 To evaluate different STT providers, first make sure to organize the input data in the following structure:
@@ -565,27 +586,6 @@ Each `simulation_persona_*_scenario_*` directory contains:
 - `transcripts.json`: full conversation transcript - alternating `user`/`assistant` turns.
 
 You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
-
-## Talk to the agent
-
-`src/agent/run.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
-
-1. Copy `src/agent/.env.example` to `src/agent/.env` and provide the API keys for the STT/LLM/TTS providers you want to exercise (the defaults in `run.py` use OpenAI STT + LLM and Google TTS).
-2. Pick or edit a config file. `src/agent/examples/run/sample_run.json` is a ready-to-use prompt/tools configuration, and `src/agent/examples/run/sample_output` shows the artifacts that the script writes after a short conversation.
-3. Start the runner:
-
-```bash
-cd src/agent
-uv run python run.py -c examples/run/sample_run.json -o ./out/run
-```
-
-Once you run it, you can open `http://localhost:7860/client/` in your browser. Click **Connect**, and begin talking to the agent through your browser. The client UI streams the conversation transcript in real time, while the **Metrics** tab mirrors the live latency statistics reported by the pipeline as shwon in the images below:
-
-![Conversation example](images/run_conversation.png)
-
-![Metrics example](images/run_metrics.png)
-
-Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sample output folder for the exact layout). The terminal also logs each transcript message and every function/tool call issued by the LLM so you can audit the interaction without leaving your shell.
 
 ## TODO
 
