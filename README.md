@@ -1,8 +1,12 @@
 # AgentLoop
 
-Evaluation suite for voice agents.
+An open-source simulation and testing framework for voice agents.
 
-AgentLoop gives you the flexibility to evaluate different components of the voice agent pipeline in isolation while also running simulations and tests on the agent as a whole as well.
+With AgentLoop, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
+
+- Evaluate different components of your voice agents across multiple vendors in isolation
+- Create comprehensive test suites that verify both conversational responses and tool usage
+- Simulate entire conversations spanning thousands of scenarios across multiple user personas
 
 AgentLoop is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
 
