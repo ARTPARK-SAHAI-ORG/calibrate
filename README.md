@@ -16,9 +16,7 @@ Create the virtual environment and install the dependencies.
 uv sync --frozen
 ```
 
-## Quickstart
-
-### Speech To Text (STT)
+## Speech To Text (STT)
 
 To evaluate different STT providers, first make sure to organize the input data in the following structure:
 
@@ -149,7 +147,7 @@ You can checkout [`src/stt/examples/leaderboard`](src/stt/examples/leaderboard) 
 
 ![Leaderboard example](src/stt/examples/leaderboard/all_metrics_by_run.png)
 
-### Text To Speech (TTS)
+## Text To Speech (TTS)
 
 To evaluate different TTS providers, first prepare an input CSV file with the following structure:
 
@@ -250,7 +248,7 @@ You can checkout [`src/tts/examples/leaderboard`](src/tts/examples/leaderboard) 
 
 ![Leaderboard example](src/tts/examples/leaderboard/all_metrics_by_run.png)
 
-### LLM tests
+## LLM tests
 
 To evaluate LLM behavior through test cases, prepare a JSON configuration file with test cases and evaluation criteria.
 
@@ -424,7 +422,7 @@ You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) 
 
 ![Leaderboard example](src/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
-### LLM simulations
+## LLM simulations
 
 Run fully automated, text-only conversations between two LLMs—the “agent” plus multiple users having specific personas to mimic specific scenarios given by you. Prepare a JSON configuration file as shown below:
 
@@ -462,7 +460,7 @@ uv run python run_simulation.py \
 
 You can checkout [`src/llm/examples/simulation/sample_output`](src/llm/examples/simulation/sample_output) to see a sample output of the simulation.
 
-### Voice agent simulations
+## Voice agent simulations
 
 To run agent simulations with all the three components - STT, LLM, and TTS - prepare a JSON configuration file as shown below.
 
@@ -568,7 +566,7 @@ Each `simulation_persona_*_scenario_*` directory contains:
 
 You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
 
-### Talk to the agent
+## Talk to the agent
 
 `src/agent/run.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
 
