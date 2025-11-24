@@ -738,7 +738,8 @@ async def main():
                 tasks = [
                     asyncio.create_task(
                         start_bot(
-                            config["agent_system_prompt"],
+                            config["agent_system_prompt"]
+                            + f"\n\nYou must always speak in {config['language']}.",
                             config["tools"],
                             config["language"],
                         )
@@ -770,4 +771,5 @@ async def main():
             eval_logger.remove(log_file_id)
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())

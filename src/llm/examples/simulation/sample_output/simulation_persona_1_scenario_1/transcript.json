@@ -1,0 +1,78 @@
+[
+    {
+        "role": "assistant",
+        "content": "Hello! Welcome to your antenatal visit. Can you please tell me your full name, including both your first name and last name?"
+    },
+    {
+        "role": "user",
+        "content": "Geeta Prasad."
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_3xQLXk3DWM7w8JMN6QwdoucY",
+                "function": {
+                    "name": "plan_next_question",
+                    "arguments": "{\"questions_answered\": [1], \"next_unanswered_question_index\": 2}"
+                },
+                "type": "function"
+            }
+        ]
+    },
+    {
+        "role": "assistant",
+        "content": "Thank you, Geeta Prasad. Can you please provide your full address, including your house number, street, locality, and city?"
+    },
+    {
+        "role": "user",
+        "content": "Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar."
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_fbpHGRtHezpxycNlaAkiM7Gn",
+                "function": {
+                    "name": "plan_next_question",
+                    "arguments": "{\"questions_answered\": [2], \"next_unanswered_question_index\": 3}"
+                },
+                "type": "function"
+            }
+        ]
+    },
+    {
+        "role": "assistant",
+        "content": "Thank you. Can you please share your 10-digit telephone number for our records?"
+    },
+    {
+        "role": "user",
+        "content": "Nine eight triple three, forty-seven twenty-nine zero."
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_G3nzKyzLKVcD8SyBmZckIhDX",
+                "function": {
+                    "name": "plan_next_question",
+                    "arguments": "{\"questions_answered\": [3]}"
+                },
+                "type": "function"
+            }
+        ]
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_kErcYQYZRdlQkz2MsYTnrG26",
+                "function": {
+                    "name": "end_call",
+                    "arguments": "{}"
+                },
+                "type": "function"
+            }
+        ]
+    }
+]

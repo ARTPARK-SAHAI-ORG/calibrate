@@ -1,10 +1,14 @@
 import asyncio
 import argparse
+import json
+from operator import index
 from typing import List, Optional
 from loguru import logger
 from dotenv import load_dotenv
 import os
-
+from os.path import join, exists
+import shutil
+from contextvars import ContextVar
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -14,7 +18,11 @@ from pipecat.frames.frames import (
     CancelFrame,
     LLMMessagesAppendFrame,
     TextFrame,
+    FunctionCallResultProperties,
 )
+from pipecat.adapters.schemas.function_schema import FunctionSchema
+from pipecat.adapters.schemas.tools_schema import ToolsSchema
+from pipecat.services.llm_service import FunctionCallParams
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -27,6 +35,29 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 
 load_dotenv(".env", override=True)
+
+current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
+
+
+# Configure logger format to support source prefix
+def add_default_source(record):
+    """Add default source if not present in extra"""
+    if "source" not in record["extra"]:
+        context = current_context.get()
+        record["extra"]["source"] = f"{context}-SYS"
+    return True
+
+
+logger.remove()
+logger.add(
+    lambda msg: print(msg, end=""),
+    format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>[{extra[source]}]</cyan> | <level>{message}</level>",
+    colorize=True,
+    filter=add_default_source,
+)
+
+# Create a contextual logger with EVAL prefix
+eval_logger = logger.bind(source="EVAL")
 
 
 class ConversationState:
@@ -115,11 +146,13 @@ class Processor(FrameProcessor):
 
         # Capture text frames from LLM
         if isinstance(frame, TextFrame):
+            logger.info(f"Received text frame: {frame}")
             text = frame.text
             if text:
                 self._collecting_response = True
                 self._current_response += text
                 logger.info(f"Received text chunk: {text}")
+                frame.includes_inter_frame_spaces = True
 
         # When we get an EndFrame after collecting text, save the complete response
         if isinstance(frame, LLMFullResponseEndFrame):
@@ -172,6 +205,7 @@ class Processor(FrameProcessor):
 
 async def run_simulation(
     bot_system_prompt: str,
+    tools: List[dict],
     user_system_prompt: str,
     bot_model: str = "gpt-4.1",
     user_model: str = "gpt-4.1",
@@ -191,15 +225,6 @@ async def run_simulation(
         model=user_model,
     )
 
-    # Create context with system prompt
-    messages = [{"role": "system", "content": bot_system_prompt}]
-    bot_context = LLMContext(messages)
-    bot_context_aggregator = LLMContextAggregatorPair(bot_context)
-
-    messages = [{"role": "system", "content": user_system_prompt}]
-    user_context = LLMContext(messages)
-    user_context_aggregator = LLMContextAggregatorPair(user_context)
-
     conversation_state = ConversationState(max_turns=max_turns)
 
     # Create processors (text_output needs to be created first for reference)
@@ -213,6 +238,88 @@ async def run_simulation(
         conversation_state=conversation_state,
         name="UserProcessor",
     )
+
+    # Create context with system prompt
+    messages = [{"role": "system", "content": bot_system_prompt}]
+
+    async def _exec_call_call():
+        try:
+            await bot_processor._end_conversation()
+        except Exception as exc:
+            logger.warning(
+                f"Unable to cancel task after end_call (no tool_call_id): {exc}"
+            )
+
+    async def end_call(params: FunctionCallParams):
+        reason = params.arguments.get("reason") if params.arguments else None
+        if reason:
+            logger.info(f"end_call tool invoked by LLM: {reason}")
+        else:
+            logger.info("end_call tool invoked by LLM")
+
+        await params.result_callback(
+            None, properties=FunctionCallResultProperties(run_llm=False)
+        )
+        await _exec_call_call()
+        return
+
+    async def generic_function_call(params: FunctionCallParams):
+        logger.info(
+            f"{params.function_name} invoked with arguments: {params.arguments}"
+        )
+
+        await params.result_callback(
+            {"status": "received"},
+        )
+        return
+
+    end_call_tool = FunctionSchema(
+        name="end_call",
+        description="End the current call when the conversation is complete.",
+        properties={
+            "reason": {
+                "type": "string",
+                "description": "Optional explanation for why the call should end.",
+            }
+        },
+        required=[],
+    )
+    standard_tools = [end_call_tool]
+    bot_llm.register_function("end_call", end_call)
+
+    for tool in tools:
+        properties = {}
+        for parameter in tool["parameters"]:
+            prop = {
+                "type": parameter["type"],
+                "description": parameter["description"],
+            }
+
+            if "items" in parameter:
+                prop["items"] = parameter["items"]
+
+            if "enum" in parameter:
+                prop["enum"] = parameter["enum"]
+
+            properties[parameter["id"]] = prop
+
+        tool_function = FunctionSchema(
+            name=tool["name"],
+            description=tool["description"],
+            properties=properties,
+            required=[],
+        )
+        standard_tools.append(tool_function)
+        bot_llm.register_function(tool["name"], generic_function_call)
+
+    tools = ToolsSchema(standard_tools=standard_tools)
+
+    bot_context = LLMContext(messages, tools=tools)
+    bot_context_aggregator = LLMContextAggregatorPair(bot_context)
+
+    messages = [{"role": "system", "content": user_system_prompt}]
+    user_context = LLMContext(messages)
+    user_context_aggregator = LLMContextAggregatorPair(user_context)
 
     # Build pipeline with all processors
     bot_pipeline = Pipeline(
@@ -272,111 +379,91 @@ async def run_simulation(
         logger.error(f"Pipeline error: {e}")
         raise
 
-    return bot_context.get_messages()
-
-
-async def test_text_bot():
-    """Simple test function to demonstrate the text bot."""
-
-    bot_system_prompt = (
-        "You are a helpful and friendly AI assistant. Keep your responses concise."
-    )
-
-    user_system_prompt = "You are a mother. This is your persona:\n\n{user_persona}\n\nYou are speaking to an agent acting as a nurse. The agent will ask you questions and you need to answer them based on your persona. The following scenario will be played out: {simulation_scenario}. Make sure to respond to the agent to match the given scenario."
-
-    model = "gpt-4.1"
-
-    simulation_configs = [
-        {
-            "user_persona": "Name: R. Lakshmi, Address: Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar; Phone number: +919843322940. Never a stillbirth or a baby who died soon after birth; one baby had died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy, wasn’t admitted for high blood pressure or eclampsia; carrying only one baby as per the scan; age: 39 years old; blood group is O positive, so there are no Rh-related issues; experienced light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; uncertain about her exact blood-pressure reading, but recalls that it was around 150/95 mmHg at booking; does not have diabetes, heart disease, kidney disease, or epilepsy; does does have asthma and uses an inhaler daily; never had tuberculosis or any other serious medical condition; she no longer drinks alcohol or uses substances, having stopped completely after learning about pregnancy; very shy, reserved and uses short answers to questions",
-            "simulation_scenario": "the mother hesitates in directly answering some questions and wants to skip answering them at first but answers later on further probing",
-        }
+    return [
+        message
+        for message in bot_context._messages
+        if message["role"] not in ["system", "tool"]
     ]
-
-    logger.info("Starting simulations...")
-
-    outputs = []
-
-    for simulation_config in simulation_configs:
-        logger.info(f"Simulation config: {simulation_config}")
-
-        output = await run_simulation(
-            bot_system_prompt=bot_system_prompt,
-            user_system_prompt=user_system_prompt.format(
-                user_persona=simulation_config["user_persona"],
-                simulation_scenario=simulation_config["simulation_scenario"],
-            ),
-            bot_model=model,
-            user_model=model,
-        )
-
-        outputs.append(output)
-
-    logger.info("\n" + "=" * 50)
-    logger.info("RESULTS:")
-    logger.info("=" * 50)
-
-    for i, (simulation_config, conversation) in enumerate(
-        zip(simulation_configs, outputs), 1
-    ):
-        logger.info(f"\nSimulation {i}:")
-        logger.info(f"  User persona:  {simulation_config['user_persona']}")
-        logger.info(
-            f"  Simulation scenario: {simulation_config['simulation_scenario']}"
-        )
-        logger.info(f"  Conversation:\n\n{conversation}")
-
-    return outputs
 
 
 async def main():
-    parser = argparse.ArgumentParser(
-        description="Text-only Pipecat bot that processes text through an LLM"
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--test",
-        action="store_true",
-        help="Run a simple test with predefined inputs",
-    )
-    parser.add_argument(
-        "--input",
+        "-c",
+        "--config",
         type=str,
-        nargs="+",
-        help="Text inputs to process (space-separated)",
+        required=True,
+        help="Path to the config JSON file containing the evaluation config",
     )
     parser.add_argument(
-        "--system-prompt",
+        "-o",
+        "--output-dir",
         type=str,
-        default="You are a helpful AI assistant.",
-        help="System prompt for the LLM",
+        default="./out",
+        help="Path to the output directory to save the results",
     )
     parser.add_argument(
+        "-m",
         "--model",
         type=str,
-        default="gpt-4o-mini",
-        help="OpenAI model to use",
+        default="gpt-4.1",
+        help="OpenAI model to use for the evaluation",
     )
 
     args = parser.parse_args()
 
-    if args.test:
-        await test_text_bot()
-    elif args.input:
-        logger.info("Processing text inputs...")
-        outputs = await run_simulation(
-            text_inputs=args.input,
-            system_prompt=args.system_prompt,
-            model=args.model,
-        )
-        logger.info("\n" + "=" * 50)
-        logger.info("RESULTS:")
-        logger.info("=" * 50)
-        for i, (input_text, output_text) in enumerate(zip(args.input, outputs), 1):
-            logger.info(f"\nTurn {i}:")
-            logger.info(f"  Input:  {input_text}")
-            logger.info(f"  Output: {output_text}")
-    else:
-        parser.print_help()
+    with open(args.config, "r") as f:
+        config = json.load(f)
+
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    for persona_index, user_persona in enumerate(config["personas"]):
+        for scenario_index, scenario in enumerate(config["scenarios"]):
+
+            user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{user_persona}\n\nThe following scenario will be played out: {scenario}. Make sure to respond to the agent to match the given scenario as per the given persona for you."
+
+            simulation_name = (
+                f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
+            )
+
+            simulation_output_dir = f"{args.output_dir}/{simulation_name}"
+
+            if exists(simulation_output_dir):
+                shutil.rmtree(simulation_output_dir)
+
+            os.makedirs(simulation_output_dir)
+
+            eval_logger.info(
+                f"""Running simulation {simulation_name} for scenario "{scenario}" with persona: {user_persona}"""
+            )
+
+            logs_file_path = f"{args.output_dir}/{simulation_name}/logs"
+
+            log_file_id = eval_logger.add(
+                logs_file_path,
+                level="DEBUG",
+                format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
+                filter=add_default_source,
+                colorize=False,
+            )
+
+            output = await run_simulation(
+                bot_system_prompt=config["agent_system_prompt"]
+                + f"\n\nYou must always speak in {config['language']}.",
+                tools=config["tools"],
+                user_system_prompt=user_system_prompt,
+                bot_model=args.model,
+                user_model=args.model,
+            )
+
+            with open(join(simulation_output_dir, "transcript.json"), "w") as f:
+                json.dump(output, f, indent=4)
+
+            eval_logger.remove(log_file_id)
+
+        #     break
+
+        # break
 
 
 if __name__ == "__main__":

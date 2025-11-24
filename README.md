@@ -115,7 +115,7 @@ The definition of all the metrics we compute are stored in [`src/stt/metrics.py`
 }
 ```
 
-You can checkout [`src/stt/examples/sample_output`](src/stt/examples/sample_output) to see the sample output of the evaluation script.
+You can checkout [`src/stt/examples/sample_output`](src/stt/examples/sample_output) to see a sample output of the evaluation script.
 
 For more details, run `uv run python eval.py -h`.
 
@@ -145,7 +145,7 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboards
 
 The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`src/stt/leaderboard.py`).
 
-You can checkout [`src/stt/examples/leaderboard`](src/stt/examples/leaderboard) to see the sample output of the leaderboard script.
+You can checkout [`src/stt/examples/leaderboard`](src/stt/examples/leaderboard) to see a sample output of the leaderboard script.
 
 ![Leaderboard example](src/stt/examples/leaderboard/all_metrics_by_run.png)
 
@@ -216,7 +216,7 @@ this is a test,./out/audios/2.wav
 ]
 ```
 
-You can checkout [`src/tts/examples/sample_output`](src/tts/examples/sample_output) to see the sample output of the evaluation script.
+You can checkout [`src/tts/examples/sample_output`](src/tts/examples/sample_output) to see a sample output of the evaluation script.
 
 For more details, run `uv run python eval.py -h`.
 
@@ -246,7 +246,7 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboards
 
 `src/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
 
-You can checkout [`src/tts/examples/leaderboard`](src/tts/examples/leaderboard) to see the sample output of the leaderboard script.
+You can checkout [`src/tts/examples/leaderboard`](src/tts/examples/leaderboard) to see a sample output of the leaderboard script.
 
 ![Leaderboard example](src/tts/examples/leaderboard/all_metrics_by_run.png)
 
@@ -369,7 +369,7 @@ The output of the script will be saved in the output directory.
 ├── logs
 ```
 
-You can checkout [`src/llm/examples/tests/sample_output`](src/llm/examples/tests/sample_output) to see the sample output of the evaluation script.
+You can checkout [`src/llm/examples/tests/sample_output`](src/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
 
 Sample output 1:
 
@@ -420,13 +420,47 @@ uv run python leaderboard.py -o /path/to/output -s ./leaderboard
 
 `src/llm/leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
 
-You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) to see the sample output of the leaderboard script.
+You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) to see a sample output of the leaderboard script.
 
 ![Leaderboard example](src/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
 ### LLM simulations
 
-Coming Soon
+Run fully automated, text-only conversations between two LLMs—the “agent” plus multiple users having specific personas to mimic specific scenarios given by you. Prepare a JSON configuration file as shown below:
+
+```json
+{
+  "agent_system_prompt": "instructions for the bot",
+  "language": "english", // language of the conversation
+  "tools": [...], // tool schemas available to the agent LLM
+  "personas": [...], // different personas for users in the simulation
+  "scenarios": [...], // different simulation scenarios to be run with each user persona
+}
+```
+
+Each simulation pairs every persona with every scenario. The runner fans out into separate folders named `simulation_persona_<n>_scenario_<m>` and saves transcripts plus logs for inspection. Use the sample persona/scenario set from the example config or replace them with your own scripted behaviors (e.g., “refuses to share phone number until probed twice”). Use these artifacts to verify that the agent follows your instructions (e.g., responds appropriately, calls the right tools at the right times, and terminates the call correctly), then iterate on the prompts/config as needed.
+
+Prepare the `.env` file with your OpenAI key (`cp src/llm/.env.example src/llm/.env`), then launch simulations:
+
+```bash
+cd src/llm
+uv run python run_simulation.py \
+  --config /path/to/config.json \
+  --output-dir /path/to/output \
+  --model <model_name>
+```
+
+You can use the sample configuration provided in [`src/llm/examples/simulation/config.json`](src/llm/examples/simulation/config.json) to test the simulation.
+
+```bash
+cd src/llm
+uv run python run_simulation.py \
+  --config examples/simulation/config.json \
+  --output-dir ./out \
+  --model gpt-4.1
+```
+
+You can checkout [`src/llm/examples/simulation/sample_output`](src/llm/examples/simulation/sample_output) to see a sample output of the simulation.
 
 ### Voice agent simulations
 
@@ -532,7 +566,7 @@ Each `simulation_persona_*_scenario_*` directory contains:
 - `tool_calls.json`: chronologically ordered tool calls made by the agent.
 - `transcripts.json`: full conversation transcript - alternating `user`/`assistant` turns.
 
-You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examples/simulation/sample_output) to see the sample output of the voice agent simulation.
+You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
 
 ### Talk to the agent
 
@@ -553,7 +587,7 @@ Once you run it, you can open `http://localhost:7860/client/` in your browser. C
 
 ![Metrics example](images/run_metrics.png)
 
-Every user/bot audio turn is persisted inside `<output_dir>/audios` (see the sample output folder for the exact layout). The terminal also logs each transcript message and every function/tool call issued by the LLM so you can audit the interaction without leaving your shell.
+Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sample output folder for the exact layout). The terminal also logs each transcript message and every function/tool call issued by the LLM so you can audit the interaction without leaving your shell.
 
 ## TODO
 
