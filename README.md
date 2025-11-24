@@ -589,10 +589,13 @@ Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sampl
 
 ## TODO
 
-- Add documentation for LLM simulations
-- Test data extraction for all the questions in the form at the end of the conversation
 - Add evaluation criteria for agent and LLM simulations
-- Add script for talking to the agent
 - Support for configuring interrupts in the voice agent simulation
-- Support for adding custom config for each provider for each component to override the defaults.
 - Make visualizations using tools like INK on the agent flow
+- Support for adding knowledge base to agent/llm simulations
+- Reuse code blocks between different modules instead of duplicating code.
+- Support for adding custom config for each provider for each component to override the defaults.
+
+## Bugs
+
+- The STT module doesn't run on all the audio files for some reason and currently, the number of audios it runs on varies for each run. The transcript captured is sometimes incomplete as well where only the last text chunk is captured.
