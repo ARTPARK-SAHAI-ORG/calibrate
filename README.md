@@ -440,10 +440,10 @@ Once you have results for multiple models or scenarios, compile a leaderboard CS
 
 ```bash
 cd src/llm
-uv run python leaderboard.py -o /path/to/output -s ./leaderboard
+uv run python tests_leaderboard.py -o /path/to/output -s ./leaderboard
 ```
 
-`src/llm/leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
+`src/llm/tests_leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
 
 You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) to see a sample output of the leaderboard script.
 

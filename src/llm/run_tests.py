@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import logging
 from typing import List, Optional
 from loguru import logger
 from dotenv import load_dotenv
@@ -34,6 +35,31 @@ from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from metrics import test_response_llm_judge
 
 load_dotenv(".env", override=True)
+
+print_logger: Optional[logging.Logger] = None
+
+
+def configure_print_logger(log_path: str):
+    """Configure a dedicated logger for console print mirroring."""
+    global print_logger
+    print_logger = logging.getLogger("run_tests_print_logger")
+    print_logger.setLevel(logging.INFO)
+    print_logger.propagate = False
+
+    for handler in list(print_logger.handlers):
+        print_logger.removeHandler(handler)
+
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    print_logger.addHandler(handler)
+
+
+def log_and_print(message: object = ""):
+    """Print to stdout and mirror the message to the print logger."""
+    text = str(message)
+    print(text)
+    if print_logger:
+        print_logger.info(text)
 
 
 class Processor(FrameProcessor):
@@ -280,6 +306,10 @@ async def main():
 
     args = parser.parse_args()
 
+    print(
+        f"\033[91mRunning tests defined in the config at {args.config} for model: {args.model}\033[0m"
+    )
+
     config = json.load(open(args.config))
 
     config_name = splitext(basename(args.config))[0]
@@ -297,6 +327,13 @@ async def main():
     logger.remove()
     logger.add(log_save_path)
 
+    print_log_save_path = join(output_dir, "results.log")
+
+    if exists(print_log_save_path):
+        os.remove(print_log_save_path)
+
+    configure_print_logger(print_log_save_path)
+
     results = []
     for test_case_index, test_case in enumerate(config["test_cases"]):
         result = await run_test(
@@ -308,16 +345,16 @@ async def main():
         )
 
         if result["metrics"]["passed"]:
-            print(f"✅ Test case {test_case_index + 1} passed")
+            log_and_print(f"✅ Test case {test_case_index + 1} passed")
         else:
-            print(f"❌ Test case {test_case_index + 1} failed")
+            log_and_print(f"❌ Test case {test_case_index + 1} failed")
             if "reasoning" in result["metrics"]:
-                print(result["metrics"]["reasoning"])
+                log_and_print(result["metrics"]["reasoning"])
 
         result["test_case"] = test_case
         results.append(result)
 
-        print("-" * 40)
+        log_and_print("-" * 40)
 
     total_passed = sum(1 for result in results if result["metrics"]["passed"])
     total_tests = len(results)
@@ -326,14 +363,14 @@ async def main():
     failed_count = total_tests - total_passed
 
     if passed_count == total_tests:
-        print("🎉 All tests passed!")
+        log_and_print("🎉 All tests passed!")
     elif failed_count == total_tests:
-        print("❌ All tests failed!")
+        log_and_print("❌ All tests failed!")
     else:
-        print(
+        log_and_print(
             f"✅ Total Passed: {passed_count}/{total_tests} ({(passed_count/total_tests)*100:.1f}%)"
         )
-        print(
+        log_and_print(
             f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
         )
 
@@ -349,14 +386,14 @@ async def main():
         json.dump(metrics, f, indent=4)
 
     if failed_count:
-        print("Failed test cases:")
-        print("=" * 40)
+        log_and_print("Failed test cases:")
+        log_and_print("=" * 40)
         for result in results:
             if result["metrics"]["passed"]:
                 continue
 
-            print("History:\n\n")
-            print(
+            log_and_print("History:\n\n")
+            log_and_print(
                 "\n".join(
                     [
                         f"{message['role']}: {message['content']}"
@@ -365,16 +402,16 @@ async def main():
                     ]
                 )
             )
-            print("\n\nExpected output:")
-            print(result["test_case"]["evaluation"])
-            print("-" * 40)
-            print("Output:")
-            print(result["output"])
-            print("-" * 40)
-            print("Metrics:")
-            print(result["metrics"])
-            print("-" * 40)
-            print("=" * 40)
+            log_and_print("\n\nExpected output:")
+            log_and_print(result["test_case"]["evaluation"])
+            log_and_print("-" * 40)
+            log_and_print("Output:")
+            log_and_print(result["output"])
+            log_and_print("-" * 40)
+            log_and_print("Metrics:")
+            log_and_print(result["metrics"])
+            log_and_print("-" * 40)
+            log_and_print("=" * 40)
 
 
 if __name__ == "__main__":

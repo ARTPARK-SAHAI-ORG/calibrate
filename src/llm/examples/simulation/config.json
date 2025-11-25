@@ -55,9 +55,9 @@
             "type": "boolean",
             "description": "Whether all the questions in the form were covered in the conversation - Name of patient, Address, Telephone"
         },
-        "answer_completeness": {
+        "assistant_behavior": {
             "type": "boolean",
-            "description": "Whether the correct answers were captured for all the questions in the form - Name of patient, Address, Telephone"
+            "description": "The assistant asks one concise question per turn; is empathetic, does not anthropomorphise itself, and does not repeat the user's answer back to them."
         }
     }
 }

@@ -42,7 +42,7 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
             continue
 
         for model_dir in model_dirs:
-            result = _read_results(model_dir / "results.json")
+            result = _read_results(model_dir / "metrics.json")
             if result is None:
                 continue
 
@@ -72,7 +72,7 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
 
 def _read_results(results_path: Path) -> Optional[Tuple[int, int]]:
     if not results_path.exists():
-        print(f"[WARN] results.json missing for {results_path.parent}")
+        print(f"[WARN] metrics.json missing for {results_path.parent}")
         return None
 
     try:
