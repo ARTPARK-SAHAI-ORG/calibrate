@@ -2,6 +2,7 @@ from evaluate import load
 from typing import List
 from transformers.models.whisper.english_normalizer import BasicTextNormalizer
 import numpy as np
+import instructor
 from tqdm.asyncio import tqdm_asyncio
 import json
 from openai import AsyncOpenAI
@@ -17,9 +18,18 @@ normalizer = BasicTextNormalizer()
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
 async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
-    client = AsyncOpenAI()
+    client = instructor.from_provider("openai/gpt-4o-audio-preview", async_client=True)
 
-    response = await client.chat.completions.create(
+    class Output(BaseModel):
+        reasoning: str = Field(
+            ...,
+            description="Step-by-step analysis of what is said in the audio and how it compares with the given text.",
+        )
+        match: bool = Field(
+            ..., description="Indicates whether the audio matches the provided text."
+        )
+
+    response = await client.create(
         model="gpt-audio-2025-08-28",
         messages=[
             {
@@ -50,41 +60,17 @@ async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
                 ],
             },
         ],
+        response_model=Output,
         modalities=["text"],
-        tools=[
-            {
-                "type": "function",
-                "function": {
-                    "name": "evaluation_result",
-                    "description": "Provides a step-by-step analysis of the audio's content and determines if it matches the given text.",
-                    "parameters": {
-                        "type": "object",
-                        "required": ["reasoning", "match"],
-                        "properties": {
-                            "reasoning": {
-                                "type": "string",
-                                "description": "Step-by-step analysis of what is said in the audio and how it compares with the given text.",
-                            },
-                            "match": {
-                                "type": "boolean",
-                                "description": "Indicates whether the audio matches the provided text.",
-                            },
-                        },
-                        "additionalProperties": False,
-                    },
-                    "strict": True,
-                },
-            }
-        ],
         temperature=0,
-        max_completion_tokens=2048,
+        max_completion_tokens=8192,
         top_p=1,
         frequency_penalty=0,
         presence_penalty=0,
         store=True,
     )
 
-    return json.loads(response.choices[0].message.tool_calls[0].function.arguments)
+    return response.model_dump()
 
 
 async def get_tts_llm_judge_score(

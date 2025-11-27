@@ -21,6 +21,7 @@ from pipecat.frames.frames import (
     BotStartedSpeakingFrame,
     BotSpeakingFrame,
     EndFrame,
+    EndTaskFrame,
     LLMRunFrame,
     EndTaskFrame,
     CancelFrame,
@@ -78,8 +79,37 @@ from loguru import logger
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from metrics import get_tts_llm_judge_score
 from dotenv import load_dotenv
+import logging
 
 load_dotenv(".env", override=True)
+
+WAIT_TIME_BETWEEN_TURNS = 2
+IDLE_TIMEOUT_SECS = 10
+
+print_logger: Optional[logging.Logger] = None
+
+
+def configure_print_logger(log_path: str):
+    """Configure a dedicated logger for console print mirroring."""
+    global print_logger
+    print_logger = logging.getLogger("tts_eval_print_logger")
+    print_logger.setLevel(logging.INFO)
+    print_logger.propagate = False
+
+    for handler in list(print_logger.handlers):
+        print_logger.removeHandler(handler)
+
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    print_logger.addHandler(handler)
+
+
+def log_and_print(message: object = ""):
+    text = str(message)
+    print(text)
+    logger.info(text)
+    if print_logger:
+        print_logger.info(text)
 
 
 async def run_tts_bot(
@@ -131,7 +161,7 @@ async def run_tts_bot(
                     content = data.get("content")
                     if content:
                         await self.push_frame(LLMFullResponseStartFrame(), direction)
-                        await self.push_frame(TextFrame(text="Hi"), direction)
+                        await self.push_frame(TextFrame(text=content), direction)
                         await self.push_frame(LLMFullResponseEndFrame(), direction)
                     return
 
@@ -291,7 +321,6 @@ async def run_tts_bot(
             enable_metrics=True,
         ),
         observers=[DebugLogObserver()],
-        idle_timeout_secs=10,
     )
 
     @transport.event_handler("on_client_connected")
@@ -319,7 +348,9 @@ async def save_audio_chunk(
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     if not filepath.exists():
-        logger.debug(f"Creating new audio file for {path} at {filepath}")
+        log_and_print(
+            f"\033[92mCreating new audio file for {path} at {filepath}\033[0m"
+        )
         with io.BytesIO() as buffer:
             with wave.open(buffer, "wb") as wf:
                 wf.setsampwidth(2)
@@ -329,7 +360,7 @@ async def save_audio_chunk(
             async with aiofiles.open(filepath, "wb") as file:
                 await file.write(buffer.getvalue())
     else:
-        logger.debug(f"Appending audio chunk for {path} to {filepath}")
+        log_and_print(f"\033[92mAppending audio chunk for {path} to {filepath}\033[0m")
         async with aiofiles.open(filepath, "rb+") as file:
             current_size = await file.seek(0, os.SEEK_END)
             if current_size < 44:
@@ -438,13 +469,17 @@ async def run_tts_eval(
             self._turn_index = 0
             self._audio_output_dir = audio_output_dir
             self._audio_save_paths = audio_save_paths
+            self._pending_advance_task = None
 
         def set_task(self, task: "PipelineTask"):
             """Set the task reference after task creation."""
             self._task = task
 
         async def _send_text_frame(self):
-            logger.info(f"pushing: {self._texts[self._turn_index]}")
+            log_and_print(f"--------------------------------")
+            log_and_print(
+                f"Streaming text [{self._turn_index + 1}/{len(self._texts)}]: {self._texts[self._turn_index]}"
+            )
             await self.push_frame(
                 OutputTransportMessageFrame(
                     message={
@@ -474,6 +509,14 @@ async def run_tts_eval(
                 message = getattr(frame, "message", {})
                 if isinstance(message, dict) and message.get("label") == "rtvi-ai":
                     if message.get("type") == "bot-started-speaking":
+                        # Cancel any pending advance task when bot starts speaking
+                        if (
+                            self._pending_advance_task
+                            and not self._pending_advance_task.done()
+                        ):
+                            self._pending_advance_task.cancel()
+                            self._pending_advance_task = None
+
                         await self.push_frame(
                             UserStartedSpeakingFrame(),
                             FrameDirection.DOWNSTREAM,
@@ -489,11 +532,22 @@ async def run_tts_eval(
                             FrameDirection.DOWNSTREAM,
                         )
 
-                        if self._turn_index == len(self._texts):
-                            await self.push_frame(EndFrame(), FrameDirection.DOWNSTREAM)
-                        else:
-                            await asyncio.sleep(1)
+                        async def end_task():
+                            await asyncio.sleep(WAIT_TIME_BETWEEN_TURNS)
+                            await self.push_frame(
+                                EndTaskFrame(), FrameDirection.DOWNSTREAM
+                            )
+
+                        async def advance_and_send():
+                            await asyncio.sleep(WAIT_TIME_BETWEEN_TURNS)
                             await self._send_text_frame()
+
+                        if self._turn_index == len(self._texts):
+                            task_fn = end_task
+                        else:
+                            task_fn = advance_and_send
+
+                        self._pending_advance_task = asyncio.create_task(task_fn())
 
             elif isinstance(frame, InputAudioRawFrame):
                 try:
@@ -590,7 +644,7 @@ async def run_tts_eval(
             audio_in_sample_rate=audio_in_sample_rate,
         ),
         observers=[LLMLogObserver()],
-        idle_timeout_secs=10,
+        # idle_timeout_secs=IDLE_TIMEOUT_SECS,
     )
 
     @transport.event_handler("on_connected")
@@ -702,7 +756,15 @@ async def main():
     if exists(log_save_path):
         os.remove(log_save_path)
 
+    logger.remove()
     logger.add(log_save_path)
+
+    print_log_save_path = join(output_dir, "results.log")
+
+    if exists(print_log_save_path):
+        os.remove(print_log_save_path)
+
+    configure_print_logger(print_log_save_path)
 
     df = pd.read_csv(args.input)
     texts = df["text"].tolist()

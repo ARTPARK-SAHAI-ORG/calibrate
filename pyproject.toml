@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "backoff>=2.2.1",
     "evaluate>=0.4.6",
+    "instructor>=1.13.0",
     "ipdb>=0.13.13",
     "ipython>=8.37.0",
     "jiwer>=4.0.0",
