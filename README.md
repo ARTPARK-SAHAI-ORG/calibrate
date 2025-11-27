@@ -778,7 +778,6 @@ You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examp
 
 ## TODO
 
-- For TTS, LLM simulations and voice agent simulations, save the pipecat logs to a file and don't show in the terminal - only show key milestones in the terminal.
 - Support for configuring interrupts in the voice agent simulation
 - Make visualizations using tools like INK on the agent flow
 - Support for adding knowledge base to agent/llm simulations
