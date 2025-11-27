@@ -84,7 +84,6 @@ import logging
 load_dotenv(".env", override=True)
 
 WAIT_TIME_BETWEEN_TURNS = 2
-IDLE_TIMEOUT_SECS = 10
 
 print_logger: Optional[logging.Logger] = None
 
@@ -535,7 +534,7 @@ async def run_tts_eval(
                         async def end_task():
                             await asyncio.sleep(WAIT_TIME_BETWEEN_TURNS)
                             await self.push_frame(
-                                EndTaskFrame(), FrameDirection.DOWNSTREAM
+                                EndTaskFrame(), FrameDirection.UPSTREAM
                             )
 
                         async def advance_and_send():
@@ -644,7 +643,6 @@ async def run_tts_eval(
             audio_in_sample_rate=audio_in_sample_rate,
         ),
         observers=[LLMLogObserver()],
-        # idle_timeout_secs=IDLE_TIMEOUT_SECS,
     )
 
     @transport.event_handler("on_connected")
