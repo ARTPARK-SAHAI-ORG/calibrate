@@ -82,12 +82,28 @@ cd src/stt
 uv run python eval.py --input-dir samples -o ./out -d -p sarvam -l english
 ```
 
+Sample output:
+
+```bash
+Created new user transcript
+Starting new audio streaming: /path/to/audio_1.wav
+Finished streaming audio: /path/to/audio_1.wav
+appending to last user transcript: <transcript>.
+--------------------------------
+Created new user transcript
+Starting new audio streaming: /path/to/audio_2.wav
+Finished streaming audio: /path/to/audio_2.wav
+appending to last user transcript: <transcript_part_1>,
+appending to last user transcript: <transcript_part_2>,
+```
+
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
 /path/to/output
 ├── sarvam_english
 │   ├── logs
+│   ├── results.log
 │   ├── results.csv
 │   └── metrics.json
 ```
@@ -139,6 +155,8 @@ The definition of all the metrics we compute are stored in [`src/stt/metrics.py`
   ]
 }
 ```
+
+`logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
 
 You can checkout [`src/stt/examples/sample_output`](src/stt/examples/sample_output) to see a sample output of the evaluation script.
 
@@ -656,7 +674,7 @@ You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examp
 
 ## TODO
 
-- Add evaluation criteria for agent and LLM simulations
+- For STT and TTS, save the pipecat logs to a file and don't show in the terminal - only show key milestones in the terminal.
 - Support for configuring interrupts in the voice agent simulation
 - Make visualizations using tools like INK on the agent flow
 - Support for adding knowledge base to agent/llm simulations

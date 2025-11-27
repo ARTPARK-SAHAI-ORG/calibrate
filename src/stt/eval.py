@@ -7,7 +7,8 @@ import wave
 from datetime import datetime
 from contextlib import suppress
 from pathlib import Path
-from typing import Dict, List, Sequence, Literal
+from typing import Dict, List, Sequence, Literal, Optional
+import logging
 
 from dotenv import load_dotenv
 from collections import defaultdict
@@ -62,6 +63,32 @@ from metrics import get_wer_score, get_llm_judge_score, get_string_similarity
 import pandas as pd
 
 load_dotenv(".env", override=True)
+
+
+print_logger: Optional[logging.Logger] = None
+
+
+def configure_print_logger(log_path: str):
+    """Configure a dedicated logger for console print mirroring."""
+    global print_logger
+    print_logger = logging.getLogger("run_tests_print_logger")
+    print_logger.setLevel(logging.INFO)
+    print_logger.propagate = False
+
+    for handler in list(print_logger.handlers):
+        print_logger.removeHandler(handler)
+
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    print_logger.addHandler(handler)
+
+
+def log_and_print(message: object = ""):
+    text = str(message)
+    print(text)
+    logger.info(text)
+    if print_logger:
+        print_logger.info(text)
 
 
 async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port: int):
@@ -285,8 +312,10 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
             if isinstance(frame, InputTransportMessageFrame):
                 if self._transcripts:
                     if user_transcript := self._is_final_user_transcript_message(frame):
-                        logger.info(f"appending to user_transcript: {frame}")
                         self._transcripts[-1] += " " + user_transcript
+                        log_and_print(
+                            f"\033[93mappending to last user transcript: {user_transcript}\033[0m"
+                        )
                         await self.push_frame(
                             TranscriptionFrame(
                                 text=user_transcript,
@@ -393,6 +422,8 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
             self,
         ):
             self._state = "streaming"
+            log_and_print(f"--------------------------------")
+            log_and_print(f"\033[93mCreated new user transcript\033[0m")
             self._transcripts.append("")
 
             logger.info(f"transcripts length: {len(self._transcripts)}")
@@ -475,7 +506,7 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
             try:
                 await self._output_ready.wait()
 
-                logger.info(f"Starting new audio streaming: {audio_path}")
+                log_and_print(f"Starting new audio streaming: {audio_path}")
 
                 if not audio_path.exists():
                     logger.error(f"Audio file not found for streaming: {audio_path}")
@@ -522,7 +553,7 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
                 # After sending our audio, wait for bot's reply to finish
                 self._state = "await_reply_bot_turn_end"
                 self._last_audio_ts = None
-                logger.info(f"Finished streaming audio: {audio_path}")
+                log_and_print(f"Finished streaming audio: {audio_path}")
 
     transcripts = []
 
@@ -668,7 +699,15 @@ async def main():
     if exists(log_save_path):
         os.remove(log_save_path)
 
+    logger.remove()
     logger.add(log_save_path)
+
+    print_log_save_path = join(output_dir, "results.log")
+
+    if exists(print_log_save_path):
+        os.remove(print_log_save_path)
+
+    configure_print_logger(print_log_save_path)
 
     if args.provider in ["sarvam", "groq"]:
         audio_format = "wav"
