@@ -347,9 +347,7 @@ async def save_audio_chunk(
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     if not filepath.exists():
-        log_and_print(
-            f"\033[92mCreating new audio file for {path} at {filepath}\033[0m"
-        )
+        log_and_print(f"\033[92mCreating new audio file at {filepath}\033[0m")
         with io.BytesIO() as buffer:
             with wave.open(buffer, "wb") as wf:
                 wf.setsampwidth(2)
@@ -359,7 +357,7 @@ async def save_audio_chunk(
             async with aiofiles.open(filepath, "wb") as file:
                 await file.write(buffer.getvalue())
     else:
-        log_and_print(f"\033[92mAppending audio chunk for {path} to {filepath}\033[0m")
+        log_and_print(f"\033[92mAppending audio chunk to {filepath}\033[0m")
         async with aiofiles.open(filepath, "rb+") as file:
             current_size = await file.seek(0, os.SEEK_END)
             if current_size < 44:

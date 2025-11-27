@@ -218,6 +218,19 @@ cd src/tts
 uv run python eval.py --input examples/sample.csv -o ./out -p smallest -l english
 ```
 
+Sample output:
+
+```bash
+--------------------------------
+Streaming text [1/2]: <text_1>
+Creating new audio file at /path/to/audio_1.wav
+Appending audio chunk to /path/to/audio_1.wav
+--------------------------------
+Streaming text [2/2]: <text_2>
+Creating new audio file at /path/to/audio_2.wav
+Appending audio chunk to /path/to/audio_2.wav
+```
+
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
@@ -226,6 +239,7 @@ The output of the evaluation script will be saved in the output directory.
 │   ├── 1.wav
 │   ├── 2.wav
 ├── logs
+├── results.log
 ├── results.csv
 └── metrics.json
 ```
@@ -258,6 +272,8 @@ this is a test,./out/audios/2.wav
   }
 ]
 ```
+
+`logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
 
 You can checkout [`src/tts/examples/sample_output`](src/tts/examples/sample_output) to see a sample output of the evaluation script.
 
