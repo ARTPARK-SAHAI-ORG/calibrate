@@ -84,7 +84,7 @@ uv run python eval.py --input-dir samples -o ./out -d -p sarvam -l english
 
 Sample output:
 
-```bash
+```
 Created new user transcript
 Starting new audio streaming: /path/to/audio_1.wav
 Finished streaming audio: /path/to/audio_1.wav
@@ -220,7 +220,7 @@ uv run python eval.py --input examples/sample.csv -o ./out -p smallest -l englis
 
 Sample output:
 
-```bash
+```
 --------------------------------
 Streaming text [1/2]: <text_1>
 Creating new audio file at /path/to/audio_1.wav
@@ -532,6 +532,55 @@ uv run python run_simulation.py \
   --model gpt-4.1
 ```
 
+Sample output:
+
+```
+--------------------------------
+Running simulation simulation_persona_1_scenario_1
+Persona:
+You are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; uncertain about her exact blood-pressure reading, but recalls that it was around 150/95 mmHg at booking; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant; is very shy and reserved and uses short answers to questions
+Scenario:
+the mother answers all the questions and completes the form, don't ask any further questions after the form is filled
+--------------------------------
+[Agent]: To get started with your antenatal visit details, could you please tell me your full name, including both your first name and last name?
+[User]: Geeta Prasad.
+tool call: plan_next_question invoked with arguments: {'questions_answered': [1], 'next_unanswered_question_index': 2}
+[Agent]: Thank you. Could you please provide your full address, including your house number, street, area, and city or village?
+[User]: Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar.
+tool call: plan_next_question invoked with arguments: {'questions_answered': [2], 'next_unanswered_question_index': 3}
+[Agent]: Thank you. Now, could you let me know your 10-digit telephone number, please?
+[User]: Nine eight triple three, forty-seven twenty-nine zero.
+tool call: plan_next_question invoked with arguments: {'questions_answered': [3]}
+tool call: end_call invoked by LLM
+--------------------------------
+Running simulation simulation_persona_1_scenario_2
+Persona:
+You are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; uncertain about her exact blood-pressure reading, but recalls that it was around 150/95 mmHg at booking; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant; is very shy and reserved and uses short answers to questions
+Scenario:
+the mother hesitates in directly answering some questions and wants to skip answering them at first but answers later on further probing
+--------------------------------
+[Agent]: Hello! I will help you with filling your antenatal visit form. May I please have your full name, including both your first name and last name?
+[User]: ...Uh... it's Geeta.
+
+(pause)
+
+Geeta Prasad.
+tool call: plan_next_question invoked with arguments: {'questions_answered': [1], 'next_unanswered_question_index': 2}
+[Agent]: Thank you, Geeta Prasad. Could you please share your full address, including your specific place of residence?
+[User]: It’s in Indiranagar.
+
+…Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar.
+tool call: plan_next_question invoked with arguments: {'questions_answered': [2], 'next_unanswered_question_index': 3}
+[Agent]: Thank you. Could you please provide your telephone number?
+[User]: Do I have to?
+
+(pause)
+
+It’s plus nine one, nine eight triple three, forty-seven twenty-nine zero.
+tool call: plan_next_question invoked with arguments: {'questions_answered': [3], 'next_unanswered_question_index': 4}
+tool call: end_call invoked by LLM
+```
+
 The output of the simulation will be saved in the output directory:
 
 ```bash
@@ -539,7 +588,8 @@ The output of the simulation will be saved in the output directory:
 ├── simulation_persona_1_scenario_1
 │   ├── transcript.json          # full conversation transcript
 │   ├── evaluation_results.csv   # per-criterion evaluation results
-│   └── logs                     # timestamped pipeline logs
+│   ├── logs                     # timestamped pipeline logs
+│   └── results.log              # terminal output of the simulation
 ├── simulation_persona_1_scenario_2
 │   └── ...
 ├── results.csv                  # aggregated results for all simulations
@@ -579,6 +629,8 @@ simulation_persona_1_scenario_3,1.0,1.0
   }
 }
 ```
+
+`logs` contain the full logs of the simulation including all the pipecat logs whereas `results.log` contains only the terminal output of the simulation as shown in the sample output above.
 
 You can checkout [`src/llm/examples/simulation/sample_output`](src/llm/examples/simulation/sample_output) to see a sample output of the simulation.
 

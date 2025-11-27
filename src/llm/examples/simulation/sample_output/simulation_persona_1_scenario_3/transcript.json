@@ -1,17 +1,17 @@
 [
     {
         "role": "assistant",
-        "content": "Hello and welcome to your antenatal checkup. To get started, could you please tell me your full name, including both your first and last name?"
+        "content": "Hello! I\u2019m here to help you fill out your antenatal visit form. Let\u2019s get started.\n\nCould you please tell me your full name, including both first and last name?"
     },
     {
         "role": "user",
-        "content": "Geeta Prasad, I live at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. My phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero."
+        "content": "Yes, it\u2019s Geeta Prasad. I live at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. My phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero."
     },
     {
         "role": "assistant",
         "tool_calls": [
             {
-                "id": "call_E0sIMBfyokCko22LL09pVFl5",
+                "id": "call_a4DggJGYXWnnxG8Rmmf5QDah",
                 "function": {
                     "name": "end_call",
                     "arguments": "{}"

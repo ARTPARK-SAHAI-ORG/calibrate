@@ -1,8 +1,9 @@
 import asyncio
 import argparse
 import json
+import logging
 from operator import index
-from typing import List, Optional
+from typing import List, Optional, Literal
 from loguru import logger
 from dotenv import load_dotenv
 import os
@@ -44,25 +45,30 @@ load_dotenv(".env", override=True)
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
-# Configure logger format to support source prefix
-def add_default_source(record):
-    """Add default source if not present in extra"""
-    if "source" not in record["extra"]:
-        context = current_context.get()
-        record["extra"]["source"] = f"{context}-SYS"
-    return True
+print_logger: Optional[logging.Logger] = None
 
 
-logger.remove()
-logger.add(
-    lambda msg: print(msg, end=""),
-    format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>[{extra[source]}]</cyan> | <level>{message}</level>",
-    colorize=True,
-    filter=add_default_source,
-)
+def configure_print_logger(log_path: str):
+    """Configure a dedicated logger for console print mirroring."""
+    global print_logger
+    print_logger = logging.getLogger("llm_simulation_print_logger")
+    print_logger.setLevel(logging.INFO)
+    print_logger.propagate = False
 
-# Create a contextual logger with EVAL prefix
-eval_logger = logger.bind(source="EVAL")
+    for handler in list(print_logger.handlers):
+        print_logger.removeHandler(handler)
+
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    print_logger.addHandler(handler)
+
+
+def log_and_print(message: object = ""):
+    text = str(message)
+    print(text)
+    logger.info(text)
+    if print_logger:
+        print_logger.info(text)
 
 
 class ConversationState:
@@ -117,6 +123,7 @@ class Processor(FrameProcessor):
         *,
         conversation_state: "ConversationState",
         name: str = "Processor",
+        role: Literal["agent", "user"] = "agent",
     ):
         super().__init__(enable_direct_mode=True, name=name)
         self._current_response = ""
@@ -126,6 +133,7 @@ class Processor(FrameProcessor):
         self._conversation_state = conversation_state
         self._partner_task: Optional["PipelineTask"] = None
         self._self_end_sent = False
+        self._role = role
 
     def set_task(self, task: "PipelineTask"):
         """Set the task reference after task creation."""
@@ -174,6 +182,12 @@ class Processor(FrameProcessor):
 
     async def _handle_completed_response(self, response: str):
         should_continue = True
+
+        # Log the LLM message with role color
+        color = (
+            "\033[94m" if self._role == "agent" else "\033[93m"
+        )  # Blue for bot, Yellow for user
+        log_and_print(f"{color}[{self._role.capitalize()}]: {response}\033[0m")
 
         if self._conversation_state:
             should_continue = await self._conversation_state.record_turn()
@@ -235,11 +249,13 @@ async def run_simulation(
 
     # Create processors (text_output needs to be created first for reference)
     bot_processor = Processor(
+        role="agent",
         speaks_first=bot_speaks_first,
         conversation_state=conversation_state,
         name="BotProcessor",
     )
     user_processor = Processor(
+        role="user",
         speaks_first=not bot_speaks_first,
         conversation_state=conversation_state,
         name="UserProcessor",
@@ -259,9 +275,9 @@ async def run_simulation(
     async def end_call(params: FunctionCallParams):
         reason = params.arguments.get("reason") if params.arguments else None
         if reason:
-            logger.info(f"end_call tool invoked by LLM: {reason}")
+            log_and_print(f"tool call: end_call invoked by LLM: {reason}")
         else:
-            logger.info("end_call tool invoked by LLM")
+            log_and_print("tool call: end_call invoked by LLM")
 
         await params.result_callback(
             None, properties=FunctionCallResultProperties(run_llm=False)
@@ -270,8 +286,8 @@ async def run_simulation(
         return
 
     async def generic_function_call(params: FunctionCallParams):
-        logger.info(
-            f"{params.function_name} invoked with arguments: {params.arguments}"
+        log_and_print(
+            f"tool call: {params.function_name} invoked with arguments: {params.arguments}"
         )
 
         await params.result_callback(
@@ -458,19 +474,23 @@ async def main():
 
             os.makedirs(simulation_output_dir)
 
-            eval_logger.info(
-                f"""Running simulation {simulation_name} for scenario "{scenario}" with persona: {user_persona}"""
-            )
-
             logs_file_path = f"{args.output_dir}/{simulation_name}/logs"
 
-            log_file_id = eval_logger.add(
+            logger.remove()
+            log_file_id = logger.add(
                 logs_file_path,
                 level="DEBUG",
-                format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
-                filter=add_default_source,
                 colorize=False,
             )
+
+            print_log_save_path = f"{args.output_dir}/{simulation_name}/results.log"
+            configure_print_logger(print_log_save_path)
+
+            log_and_print("--------------------------------")
+            log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
+            log_and_print(f"\033[93mPersona:\033[0m\n{user_persona}")
+            log_and_print(f"\033[93mScenario:\033[0m\n{scenario}")
+            log_and_print("--------------------------------")
 
             output = await run_simulation(
                 bot_system_prompt=config["agent_system_prompt"]
@@ -501,7 +521,7 @@ async def main():
                 join(simulation_output_dir, "evaluation_results.csv"), index=False
             )
 
-            eval_logger.remove(log_file_id)
+            logger.remove(log_file_id)
 
         #     break
 
