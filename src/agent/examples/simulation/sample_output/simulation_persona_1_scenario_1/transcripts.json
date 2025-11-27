@@ -5,7 +5,7 @@
     },
     {
         "role": "user",
-        "content": "Hello! I\u2019m here to help you with your antenatal visit registration. Can I please have your full name, including both your first name and last name?"
+        "content": "Hello! I\u2019m here to help you with your antenatal visit. May I please have your full name, including both first and last name?"
     },
     {
         "role": "assistant",
@@ -13,7 +13,7 @@
     },
     {
         "role": "user",
-        "content": "Thank you, Gita Prasad. Could you please tell me your full address, including the specific place where you live?"
+        "content": "Thank you, Gita. Can you please tell me your full address where you currently live?"
     },
     {
         "role": "assistant",
@@ -21,18 +21,18 @@
     },
     {
         "role": "user",
-        "content": "Thanks for sharing that. Could you please confirm if this is the complete address, including any street name, area, or city details? This helps ensure we have the correct information for your records."
+        "content": "Thank you. Could you please provide the complete address, including any missing details like the street name, locality, city, and postal code, so we have your full place of residence?"
     },
     {
         "role": "assistant",
-        "content": "Yes, that's the full address."
+        "content": "That's all I know\u2014the full address is Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar.  Sorry, I don't remember the postal code."
     },
     {
         "role": "user",
-        "content": "Thank you for confirming your address. Could you please provide your 10-digit telephone number?"
+        "content": "Thank you for sharing your address. Can you please provide your 10-digit telephone number?"
     },
     {
         "role": "assistant",
-        "content": "Nine eight triple three four seven two nine zero."
+        "content": "Nine eight three three three four seven two nine zero."
     }
 ]

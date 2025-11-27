@@ -86,16 +86,16 @@ class MetricsLogger(FrameProcessor):
         if isinstance(frame, MetricsFrame):
             for d in frame.data:
                 if isinstance(d, TTFBMetricsData):
-                    print(f"!!! MetricsFrame: {frame}, ttfb: {d.value}")
+                    bot_logger.info(f"!!! MetricsFrame: {frame}, ttfb: {d.value}")
                 elif isinstance(d, ProcessingMetricsData):
-                    print(f"!!! MetricsFrame: {frame}, processing: {d.value}")
+                    bot_logger.info(f"!!! MetricsFrame: {frame}, processing: {d.value}")
                 elif isinstance(d, LLMUsageMetricsData):
                     tokens = d.value
-                    print(
+                    bot_logger.info(
                         f"!!! MetricsFrame: {frame}, tokens: {tokens.prompt_tokens}, characters: {tokens.completion_tokens}"
                     )
                 elif isinstance(d, TTSUsageMetricsData):
-                    print(f"!!! MetricsFrame: {frame}, characters: {d.value}")
+                    bot_logger.info(f"!!! MetricsFrame: {frame}, characters: {d.value}")
         await self.push_frame(frame, direction)
 
 

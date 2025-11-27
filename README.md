@@ -630,7 +630,7 @@ simulation_persona_1_scenario_3,1.0,1.0
 }
 ```
 
-`logs` contain the full logs of the simulation including all the pipecat logs whereas `results.log` contains only the terminal output of the simulation as shown in the sample output above.
+`logs` contains the full logs of the simulation including all the pipecat logs whereas `results.log` contains only the terminal output of the simulation as shown in the sample output above.
 
 You can checkout [`src/llm/examples/simulation/sample_output`](src/llm/examples/simulation/sample_output) to see a sample output of the simulation.
 
@@ -709,6 +709,40 @@ You can use the sample configuration provided in [`src/agent/examples/sample_sho
 uv run python eval.py -c examples/sample_short.json -o ./out
 ```
 
+Sample output:
+
+```
+--------------------------------
+Running simulation simulation_persona_1_scenario_1
+Persona:
+You are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; uncertain about her exact blood-pressure reading, but recalls that it was around 150/95 mmHg at booking; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant; is very shy and reserved and uses short answers to questions
+Scenario:
+the mother answers all the questions and completes the form, don't ask any further questions after the form is filled
+--------------------------------
+
+[User]: Hi.
+Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/0_user.wav
+[User (transcribed)]: Hi.
+Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/1_bot.wav
+Appending audio chunk to out/agent-sim/simulation_persona_1_scenario_1/audios/1_bot.wav
+[Agent]: Hello! I’m here to help you with your antenatal visit. May I please have your full name, including both first and last name?
+Appending audio chunk to out/agent-sim/simulation_persona_1_scenario_1/audios/1_bot.wav
+[User]: Geeta Prasad.
+Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/1_user.wav
+[User (transcribed)]: Gita Prasad.
+[Agent]: Thank you, Gita. Can you please tell me your full address where you currently live?
+Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/2_bot.wav
+[User]: Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar.
+[User (transcribed)]: 302. Sri Venkateshwara Nilaya, Nirhanuman
+[User (transcribed)]: Temple in Duranagar.
+Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/2_user.wav
+Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/3_bot.wav
+Appending audio chunk to out/agent-sim/simulation_persona_1_scenario_1/audios/3_bot.wav
+.
+.
+.
+```
+
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
@@ -720,6 +754,7 @@ The output of the evaluation script will be saved in the output directory.
 │   │    ├── 1_user.wav
 │   │    ...
 │   ├── logs
+│   ├── results.log
 │   ├── metrics.json
 │   ├── stt_outputs.json
 │   ├── tool_calls.json
@@ -732,7 +767,8 @@ The output of the evaluation script will be saved in the output directory.
 Each `simulation_persona_*_scenario_*` directory contains:
 
 - `audios/`: alternating `*_user.wav` and `*_bot.wav` clips for every turn so you can audit microphone and synthesis quality at each step.
-- `logs`: timestamped pipeline logs (component + severity) that make it easy to trace pipeline startup and per-turn processing.
+- `logs`: full logs of the simulation including all the pipecat logs
+- `results.log`: only the terminal output of the simulation as shown in the sample output above.
 - `metrics.json`: latency traces grouped by processor for both `ttft` (time to first token) and `processing_time`, reported separately for STT, LLM, and TTS providers.
 - `stt_outputs.json`: The output of the STT step for each turn in the voice agent being evaluated.
 - `tool_calls.json`: chronologically ordered tool calls made by the agent.

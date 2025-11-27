@@ -23,6 +23,11 @@ from collections import defaultdict
 # Context variable to track current execution context (BOT or EVAL)
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
+USER_MESSAGE_COLOR = "\033[94m"
+AGENT_MESSAGE_COLOR = "\033[92m"
+GENERAL_LOG_COLOR = "\033[93m"
+RESET_COLOR = "\033[0m"
+
 
 # Configure logger format to support source prefix
 def add_default_source(record):
@@ -32,14 +37,6 @@ def add_default_source(record):
         record["extra"]["source"] = f"{context}-SYS"
     return True
 
-
-logger.remove()
-logger.add(
-    lambda msg: print(msg, end=""),
-    format="<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>[{extra[source]}]</cyan> | <level>{message}</level>",
-    colorize=True,
-    filter=add_default_source,
-)
 
 # Create a contextual logger with EVAL prefix
 eval_logger = logger.bind(source="EVAL")
@@ -64,6 +61,9 @@ from pipecat.frames.frames import (
     UserStoppedSpeakingFrame,
     InputAudioRawFrame,
     LLMMessagesAppendFrame,
+    LLMFullResponseStartFrame,
+    LLMFullResponseEndFrame,
+    TextFrame,
     InputTransportMessageFrame,
     OutputTransportMessageUrgentFrame,
 )
@@ -101,8 +101,36 @@ from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from bot import run_bot, STTConfig, TTSConfig, LLMConfig
 from dotenv import load_dotenv
 from pipecat.utils.time import time_now_iso8601
+import logging
 
 load_dotenv(override=True)
+
+
+print_logger: Optional[logging.Logger] = None
+
+
+def configure_print_logger(log_path: str):
+    """Configure a dedicated logger for console print mirroring."""
+    global print_logger
+    print_logger = logging.getLogger("agent_eval_print_logger")
+    print_logger.setLevel(logging.INFO)
+    print_logger.propagate = False
+
+    for handler in list(print_logger.handlers):
+        print_logger.removeHandler(handler)
+
+    handler = logging.FileHandler(log_path)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    print_logger.addHandler(handler)
+
+
+def log_and_print(message: object = ""):
+    text = str(message)
+    print(text)
+    eval_logger.info(text)
+    if print_logger:
+        print_logger.info(text)
+
 
 PIPELINE_IDLE_TIMEOUT_SECS = 60
 EVAL_TIMEOUT_SECS = 3000
@@ -157,7 +185,9 @@ async def save_audio_chunk(
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     if not filepath.exists():
-        eval_logger.debug(f"Creating new audio file for {path} at {filepath}")
+        log_and_print(
+            f"{GENERAL_LOG_COLOR}Creating new audio file at {filepath}{RESET_COLOR}"
+        )
         with io.BytesIO() as buffer:
             with wave.open(buffer, "wb") as wf:
                 wf.setsampwidth(2)
@@ -167,7 +197,9 @@ async def save_audio_chunk(
             async with aiofiles.open(filepath, "wb") as file:
                 await file.write(buffer.getvalue())
     else:
-        eval_logger.debug(f"Appending audio chunk for {path} to {filepath}")
+        log_and_print(
+            f"{GENERAL_LOG_COLOR}Appending audio chunk to {filepath}{RESET_COLOR}"
+        )
         async with aiofiles.open(filepath, "rb+") as file:
             current_size = await file.seek(0, os.SEEK_END)
             if current_size < 44:
@@ -569,11 +601,30 @@ async def run_simulation_pipeline(
 
                     if msg_type == "user-transcription":
                         if (text := data.get("text")) and data.get("final"):
+                            log_and_print(
+                                f"{USER_MESSAGE_COLOR}[User (transcribed)]{RESET_COLOR}: {text}"
+                            )
                             if self._rtvi_adapter._turn_index > self.last_turn_index:
                                 self._stt_outputs.append(text)
                                 self.last_turn_index = self._rtvi_adapter._turn_index
                             else:
                                 self._stt_outputs[-1] += text
+
+            await self.push_frame(frame, direction)
+
+    class IOLogger(FrameProcessor):
+        def __init__(
+            self,
+        ):
+            super().__init__()
+
+        async def process_frame(self, frame, direction):
+            await super().process_frame(frame, direction)
+
+            if isinstance(frame, TextFrame) and hasattr(frame, "text"):
+                log_and_print(
+                    f"{USER_MESSAGE_COLOR}[User]\033[0m: {frame.text}{RESET_COLOR}"
+                )
 
             await self.push_frame(frame, direction)
 
@@ -588,6 +639,8 @@ async def run_simulation_pipeline(
 
     stt_logger = STTLogger(stt_outputs, rtvi_message_adapter)
 
+    output_logger = IOLogger()
+
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
@@ -599,7 +652,7 @@ async def run_simulation_pipeline(
             context_aggregator.user(),  # User responses
             llm,  # LLM
             tts,  # TTS
-            # output_logger,
+            output_logger,
             transport.output(),  # Transport bot output
             # transcript.assistant(),
             context_aggregator.assistant(),  # Assistant spoken responses
@@ -671,6 +724,15 @@ async def run_simulation_pipeline(
             eval_logger.info(
                 f"Eval transcript: [{message.timestamp}] {message.role}: {message.content}"
             )
+            role = (
+                "Agent" if message.role == "user" else "User"
+            )  # since the user for the simulation pipeline is the agent we are testing
+            color = (
+                AGENT_MESSAGE_COLOR if message.role == "user" else USER_MESSAGE_COLOR
+            )
+            log_and_print(
+                f"{color}[{role}]{RESET_COLOR}: {message.content}{RESET_COLOR}"
+            )
 
     runner = PipelineRunner(handle_sigint=False)
 
@@ -720,11 +782,10 @@ async def main():
 
             os.makedirs(simulation_output_dir)
 
-            eval_logger.info(
-                f"""Running simulation {simulation_name} for scenario "{scenario}" with persona: {user_persona}"""
-            )
-
             logs_file_path = f"{args.output_dir}/{simulation_name}/logs"
+
+            logger.remove()
+            eval_logger.remove()
 
             log_file_id = eval_logger.add(
                 logs_file_path,
@@ -733,6 +794,17 @@ async def main():
                 filter=add_default_source,
                 colorize=False,
             )
+
+            print_log_save_path = f"{args.output_dir}/{simulation_name}/results.log"
+            configure_print_logger(print_log_save_path)
+
+            log_and_print("--------------------------------")
+            log_and_print(
+                f"""Running simulation {GENERAL_LOG_COLOR}{simulation_name}{RESET_COLOR}"""
+            )
+            log_and_print(f"{GENERAL_LOG_COLOR}Persona:{RESET_COLOR}\n{user_persona}")
+            log_and_print(f"{GENERAL_LOG_COLOR}Scenario:{RESET_COLOR}\n{scenario}")
+            log_and_print("--------------------------------")
 
             try:
                 tasks = [

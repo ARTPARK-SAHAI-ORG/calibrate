@@ -1,1 +1,36 @@
-[{"function_name": "plan_next_question", "tool_call_id": "call_WtsfHbRMIdkCaZJgKqzIqRE0", "args": {"questions_answered": [1], "next_unanswered_question_index": 2}}, {"function_name": "plan_next_question", "tool_call_id": "call_HF0mcY9WdMn318729jZdJ1q6", "args": {"questions_answered": [2], "next_unanswered_question_index": 3}}, {"function_name": "plan_next_question", "tool_call_id": "call_LtNBqmE9wKSYhfVL6JNfiQjk", "args": {"questions_answered": [3], "next_unanswered_question_index": null}}, {"function_name": "end_call", "tool_call_id": "call_JpJcxbPgwjONyCJTFduxQFa3", "args": {}}]
+[
+    {
+        "function_name": "plan_next_question",
+        "tool_call_id": "call_5kKBx69FAVLFR5UHMKaM71sG",
+        "args": {
+            "questions_answered": [
+                1
+            ],
+            "next_unanswered_question_index": 2
+        }
+    },
+    {
+        "function_name": "plan_next_question",
+        "tool_call_id": "call_1JuqyEdRREbdzguNme7pWc98",
+        "args": {
+            "questions_answered": [
+                2
+            ],
+            "next_unanswered_question_index": 3
+        }
+    },
+    {
+        "function_name": "plan_next_question",
+        "tool_call_id": "call_XsZIupc4et7MiSr2H7RZWPyJ",
+        "args": {
+            "questions_answered": [
+                3
+            ]
+        }
+    },
+    {
+        "function_name": "end_call",
+        "tool_call_id": "call_9i1NN26CKoQALc3luJnq4yCv",
+        "args": {}
+    }
+]

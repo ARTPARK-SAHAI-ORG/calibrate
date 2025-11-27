@@ -5,10 +5,10 @@
     },
     {
         "role": "user",
-        "content": "Hello! Welcome to your antenatal visit. May I please have your full name, including both your first and last names?"
+        "content": "Hello! I\u2019m here to help with your antenatal visit form. Could you please tell me your full name, including both your first and last name?"
     },
     {
         "role": "assistant",
-        "content": "Geeta Prasad, Flat 302 Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar, and my phone is plus nine one, nine eight triple three, forty-seven twenty-nine zero."
+        "content": "Geeta Prasad, Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar.  My number is plus nine one, nine eight triple three, forty-seven twenty-nine zero."
     }
 ]

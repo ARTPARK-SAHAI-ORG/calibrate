@@ -1,18 +1,7 @@
 [
     {
-        "function_name": "plan_next_question",
-        "tool_call_id": "call_z1bRsjM9Inhbt1Ts9gzD6AYk",
-        "args": {
-            "questions_answered": [
-                1,
-                2,
-                3
-            ]
-        }
-    },
-    {
         "function_name": "end_call",
-        "tool_call_id": "call_aw5ttEnArT0NmMgRRNh5yLjT",
+        "tool_call_id": "call_6lnmKBLj9QpDiWWZ39Aeuob3",
         "args": {}
     }
 ]

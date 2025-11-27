@@ -5,31 +5,31 @@
     },
     {
         "role": "user",
-        "content": "Hello! Welcome to your antenatal visit. May I please have your full name, including both first and last names, to begin filling out your ANC visit form?"
+        "content": "Hello! Welcome to your antenatal visit. May I have your full name, including both your first and last name?"
     },
     {
         "role": "assistant",
-        "content": "Geeta."
+        "content": "Just Geeta."
     },
     {
         "role": "user",
-        "content": "Thank you, Gita. Could you please provide your full name, including your last name? This helps us keep your records accurate."
+        "content": "Thank you, Gita. For our records, could you please provide your full name, including both your first and last name? If you have any initials, you can include them as well."
     },
     {
         "role": "assistant",
-        "content": "Sorry, it's Geeta Prasad."
+        "content": "Sorry, it\u2019s Geeta Prasad."
     },
     {
         "role": "user",
-        "content": "Thank you, Gita Prasad. Could you please share your full address, including the specific place where you live?"
+        "content": "Thank you, Gita Prasad. Could you please share your full address, including your house number, street, area, and city?"
     },
     {
         "role": "assistant",
-        "content": "Indiranagar."
+        "content": "Sri Venkateshwara Nilaya, Indiranagar."
     },
     {
         "role": "user",
-        "content": "Thank you for sharing part of your address. Could you please provide your full address, including house number or flat number, street name, and locality? This will help ensure your records are complete."
+        "content": "Thank you for that information. Could you please provide the complete address, including your house number or plot number (if available), street name, area, city, and PIN code? This helps us keep accurate records."
     },
     {
         "role": "assistant",
@@ -37,18 +37,26 @@
     },
     {
         "role": "user",
-        "content": "Thank you. Could you please provide your 10-digit telephone number? This helps us contact you if needed."
+        "content": "Thank you for providing more details. Could you also please tell me the city and PIN code for your address? This will help ensure we have the complete information."
     },
     {
         "role": "assistant",
-        "content": "Forty-seven twenty-nine zero."
+        "content": "Bangalore, PIN 560038."
     },
     {
         "role": "user",
-        "content": "Thank you for sharing your number.  Could you please provide your complete 10-digit telephone number?  The number you gave seems to be incomplete."
+        "content": "Thank you for sharing your address details. Could you please provide your 10-digit telephone number? This will help us contact you if needed."
     },
     {
         "role": "assistant",
-        "content": "It's 98 333 47 290."
+        "content": "Nine eight triple three, forty-seven."
+    },
+    {
+        "role": "user",
+        "content": "I understand you are saying your number as words. To ensure we have the complete 10-digit telephone number, could you please provide the remaining digits? So far, you have mentioned \"nine eight triple three forty seven.\" Please continue with the rest of the number."
+    },
+    {
+        "role": "assistant",
+        "content": "Sorry.  It\u2019s nine eight triple three forty-seven twenty-nine zero."
     }
 ]

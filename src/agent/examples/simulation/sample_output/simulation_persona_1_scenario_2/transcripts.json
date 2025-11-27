@@ -5,34 +5,34 @@
     },
     {
         "role": "user",
-        "content": "Hello! I hope you\u2019re doing well today. May I please have your full name, including both your first and last name, for the antenatal visit form?"
+        "content": "Hello! I\u2019m here to help you with your antenatal visit form. To get started, may I have your full name, please?"
     },
     {
         "role": "assistant",
-        "content": "Um\u2026  it\u2019s Geeta\u2026  Geeta Prasad."
+        "content": "Geeta Prasad."
     },
     {
         "role": "user",
-        "content": "Thank you. Could you please provide your full address, including your specific place of residence?"
+        "content": "Thank you. Could you please provide your full address where you currently live?"
     },
     {
         "role": "assistant",
-        "content": "It\u2019s, um\u2026  Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar."
+        "content": "Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar."
     },
     {
         "role": "user",
-        "content": "Thank you. Could you share your 10-digit telephone number, please?"
+        "content": "Thank you. Can you please provide your 10-digit telephone number?"
     },
     {
         "role": "assistant",
-        "content": "Can we skip that for now?  I\u2019m not comfortable\u2026"
+        "content": "Um...  can we skip that part?"
     },
     {
         "role": "user",
-        "content": "That\u2019s absolutely okay. Whenever you feel comfortable, you can provide your telephone number. If you\u2019d prefer, we can continue or revisit this question later."
+        "content": "I understand it may feel uncomfortable, but having your telephone number helps us reach you if needed regarding your care. If you prefer not to share it now, we can move forward, but I will need to ask for it again later before we finish. Is that alright?"
     },
     {
         "role": "assistant",
-        "content": "Okay\u2026  it\u2019s plus nine one, nine eight triple three, forty-seven twenty-nine zero."
+        "content": "Okay.  It\u2019s plus nine one, nine eight triple three, forty-seven twenty-nine zero."
     }
 ]
