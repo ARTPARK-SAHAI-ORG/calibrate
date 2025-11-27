@@ -1,7 +1,7 @@
 [
     {
         "role": "assistant",
-        "content": "Hello! Welcome to your antenatal visit. Can you please tell me your full name, including both your first name and last name?"
+        "content": "Hello! Welcome to your antenatal care visit. To get started, may I know your full name, including both your first name and last name?"
     },
     {
         "role": "user",
@@ -11,7 +11,7 @@
         "role": "assistant",
         "tool_calls": [
             {
-                "id": "call_3xQLXk3DWM7w8JMN6QwdoucY",
+                "id": "call_UDTtdW8ZpwAMKkILUP5uysIs",
                 "function": {
                     "name": "plan_next_question",
                     "arguments": "{\"questions_answered\": [1], \"next_unanswered_question_index\": 2}"
@@ -22,7 +22,7 @@
     },
     {
         "role": "assistant",
-        "content": "Thank you, Geeta Prasad. Can you please provide your full address, including your house number, street, locality, and city?"
+        "content": "Thank you, Geeta Prasad. Could you please tell me your full address, including your house number, street, area, and city?"
     },
     {
         "role": "user",
@@ -30,20 +30,7 @@
     },
     {
         "role": "assistant",
-        "tool_calls": [
-            {
-                "id": "call_fbpHGRtHezpxycNlaAkiM7Gn",
-                "function": {
-                    "name": "plan_next_question",
-                    "arguments": "{\"questions_answered\": [2], \"next_unanswered_question_index\": 3}"
-                },
-                "type": "function"
-            }
-        ]
-    },
-    {
-        "role": "assistant",
-        "content": "Thank you. Can you please share your 10-digit telephone number for our records?"
+        "content": "Thank you. Could you please also provide your 10-digit telephone number?"
     },
     {
         "role": "user",
@@ -53,10 +40,10 @@
         "role": "assistant",
         "tool_calls": [
             {
-                "id": "call_G3nzKyzLKVcD8SyBmZckIhDX",
+                "id": "call_1xjO9m7AhKFmXcKD9rXKpN4a",
                 "function": {
                     "name": "plan_next_question",
-                    "arguments": "{\"questions_answered\": [3]}"
+                    "arguments": "{\"questions_answered\": [2, 3], \"next_unanswered_question_index\": null}"
                 },
                 "type": "function"
             }
@@ -66,7 +53,7 @@
         "role": "assistant",
         "tool_calls": [
             {
-                "id": "call_kErcYQYZRdlQkz2MsYTnrG26",
+                "id": "call_L9GtcDBCRLtuUztJBnbjqY6A",
                 "function": {
                     "name": "end_call",
                     "arguments": "{}"

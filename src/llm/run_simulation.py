@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import os
 from os.path import join, exists
 import shutil
+from collections import defaultdict
 from contextvars import ContextVar
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -20,6 +21,7 @@ from pipecat.frames.frames import (
     TextFrame,
     FunctionCallResultProperties,
 )
+from openai import AsyncOpenAI
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.services.llm_service import FunctionCallParams
@@ -33,6 +35,9 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
+from metrics import evaluate_simuation
+import pandas as pd
+import numpy as np
 
 load_dotenv(".env", override=True)
 
@@ -207,6 +212,7 @@ async def run_simulation(
     bot_system_prompt: str,
     tools: List[dict],
     user_system_prompt: str,
+    evaluation_criteria: list[dict],
     bot_model: str = "gpt-4.1",
     user_model: str = "gpt-4.1",
     bot_speaks_first: bool = True,
@@ -379,11 +385,27 @@ async def run_simulation(
         logger.error(f"Pipeline error: {e}")
         raise
 
-    return [
+    transcript = [
         message
         for message in bot_context._messages
         if message["role"] not in ["system", "tool"]
     ]
+
+    llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
+
+    evaluation_results = [
+        {
+            "name": criterion["name"],
+            "match": llm_judge_result[criterion["name"]]["match"],
+            "reasoning": llm_judge_result[criterion["name"]]["reasoning"],
+        }
+        for criterion in evaluation_criteria
+    ]
+
+    return {
+        "transcript": transcript,
+        "evaluation_results": evaluation_results,
+    }
 
 
 async def main():
@@ -416,6 +438,9 @@ async def main():
         config = json.load(f)
 
     os.makedirs(args.output_dir, exist_ok=True)
+
+    metrics = defaultdict(list)
+    all_simulation_metrics = []
 
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
@@ -452,18 +477,50 @@ async def main():
                 + f"\n\nYou must always speak in {config['language']}.",
                 tools=config["tools"],
                 user_system_prompt=user_system_prompt,
+                evaluation_criteria=config["evaluation_criteria"],
                 bot_model=args.model,
                 user_model=args.model,
+                max_turns=config.get("max_turns", 50),
             )
 
+            simulation_metrics = {
+                "name": simulation_name,
+            }
+
+            for metric_dict in output["evaluation_results"]:
+                metrics[metric_dict["name"]].append(float(metric_dict["match"]))
+                simulation_metrics[metric_dict["name"]] = float(metric_dict["match"])
+
+            all_simulation_metrics.append(simulation_metrics)
+
             with open(join(simulation_output_dir, "transcript.json"), "w") as f:
-                json.dump(output, f, indent=4)
+                json.dump(output["transcript"], f, indent=4)
+
+            df = pd.DataFrame(output["evaluation_results"])
+            df.to_csv(
+                join(simulation_output_dir, "evaluation_results.csv"), index=False
+            )
 
             eval_logger.remove(log_file_id)
 
         #     break
 
         # break
+
+    metrics_summary = {}
+
+    for metric_name, metric_values in metrics.items():
+        metrics_summary[metric_name] = {
+            "mean": np.mean(metric_values),
+            "std": np.std(metric_values),
+            "values": metric_values,
+        }
+
+    df = pd.DataFrame(all_simulation_metrics)
+    df.to_csv(join(args.output_dir, "results.csv"), index=False)
+
+    with open(join(args.output_dir, "metrics.json"), "w") as f:
+        json.dump(metrics_summary, f, indent=4)
 
 
 if __name__ == "__main__":

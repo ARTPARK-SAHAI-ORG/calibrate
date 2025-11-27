@@ -460,10 +460,23 @@ Run fully automated, text-only conversations between two LLMs—the “agent” 
   "tools": [...], // tool schemas available to the agent LLM
   "personas": [...], // different personas for users in the simulation
   "scenarios": [...], // different simulation scenarios to be run with each user persona
+  "evaluation_criteria": [
+    // array of criteria to evaluate each simulation against
+    {
+      "name": "question_completeness", // unique name for the criterion
+      "description": "Whether all the questions in the form were covered in the conversation" // description used by LLM judge to evaluate
+    },
+    {
+      "name": "assistant_behavior",
+      "description": "Whether the assistant asks one concise question per turn; is empathetic and does not repeat the user's answer back to them."
+    }
+  ]
 }
 ```
 
-Each simulation pairs every persona with every scenario. The runner fans out into separate folders named `simulation_persona_<n>_scenario_<m>` and saves transcripts plus logs for inspection. Use the sample persona/scenario set from the example config or replace them with your own scripted behaviors (e.g., “refuses to share phone number until probed twice”). Use these artifacts to verify that the agent follows your instructions (e.g., responds appropriately, calls the right tools at the right times, and terminates the call correctly), then iterate on the prompts/config as needed.
+Each simulation pairs every persona with every scenario. The runner fans out into separate folders named `simulation_persona_<n>_scenario_<m>` and saves transcripts, evaluation results, plus logs for inspection. Use the sample persona/scenario set from the example config or replace them with your own scripted behaviors (e.g., "refuses to share phone number until probed twice"). Use these artifacts to verify that the agent follows your instructions (e.g., responds appropriately, calls the right tools at the right times, and terminates the call correctly), then iterate on the prompts/config as needed.
+
+After each simulation, an LLM judge evaluates the transcript against all `evaluation_criteria` defined in the config. Each criterion produces a match (true/false) and reasoning. The results are aggregated across all simulations at the end of the run.
 
 Prepare the `.env` file with your OpenAI key (`cp src/llm/.env.example src/llm/.env`), then launch simulations:
 
@@ -483,6 +496,54 @@ uv run python run_simulation.py \
   --config examples/simulation/config.json \
   --output-dir ./out \
   --model gpt-4.1
+```
+
+The output of the simulation will be saved in the output directory:
+
+```bash
+/path/to/output
+├── simulation_persona_1_scenario_1
+│   ├── transcript.json          # full conversation transcript
+│   ├── evaluation_results.csv   # per-criterion evaluation results
+│   └── logs                     # timestamped pipeline logs
+├── simulation_persona_1_scenario_2
+│   └── ...
+├── results.csv                  # aggregated results for all simulations
+└── metrics.json                 # summary statistics for each criterion
+```
+
+`evaluation_results.csv` contains the evaluation results for each criterion in a simulation:
+
+```csv
+name,match,reasoning
+question_completeness,True,"The assistant asked for the user's full name, address, and telephone number..."
+assistant_behavior,True,"The assistant asked one concise question per turn..."
+```
+
+`results.csv` aggregates the match scores across all simulations:
+
+```csv
+name,question_completeness,assistant_behavior
+simulation_persona_1_scenario_1,1.0,1.0
+simulation_persona_1_scenario_2,1.0,1.0
+simulation_persona_1_scenario_3,1.0,1.0
+```
+
+`metrics.json` provides summary statistics (mean, std, values) for each evaluation criterion:
+
+```json
+{
+  "question_completeness": {
+    "mean": 1.0,
+    "std": 0,
+    "values": [1.0, 1.0, 1.0]
+  },
+  "assistant_behavior": {
+    "mean": 1.0,
+    "std": 0.0,
+    "values": [1.0, 1.0, 1.0]
+  }
+}
 ```
 
 You can checkout [`src/llm/examples/simulation/sample_output`](src/llm/examples/simulation/sample_output) to see a sample output of the simulation.

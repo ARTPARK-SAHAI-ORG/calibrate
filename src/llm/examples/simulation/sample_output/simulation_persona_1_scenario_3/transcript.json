@@ -1,0 +1,23 @@
+[
+    {
+        "role": "assistant",
+        "content": "Hello and welcome to your antenatal checkup. To get started, could you please tell me your full name, including both your first and last name?"
+    },
+    {
+        "role": "user",
+        "content": "Geeta Prasad, I live at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. My phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero."
+    },
+    {
+        "role": "assistant",
+        "tool_calls": [
+            {
+                "id": "call_E0sIMBfyokCko22LL09pVFl5",
+                "function": {
+                    "name": "end_call",
+                    "arguments": "{}"
+                },
+                "type": "function"
+            }
+        ]
+    }
+]

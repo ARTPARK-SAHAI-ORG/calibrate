@@ -47,17 +47,16 @@
     "scenarios": [
         "the mother answers all the questions and completes the form, don't ask any further questions after the form is filled",
         "the mother hesitates in directly answering some questions and wants to skip answering them at first but answers later on further probing",
-        "the mother is in a rush and ends up answering multiple questions at once that are related to each other when being asked one question; the list of all questions - Name of patient, Address, Telephone",
-        "mother ends up occasionally giving partial or invalid answers and corrects them later on in her immediate next message instead of answering the question that she was asked on that turn; first give an incomplete/invalid response and wait for the agent's next message before correcting your previous response"
+        "the mother is in a rush and ends up answering multiple questions at once that are related to each other when being asked one question; the list of all questions - Name of patient, Address, Telephone"
     ],
-    "evaluation_criteria": {
-        "question_completeness": {
-            "type": "boolean",
-            "description": "Whether all the questions in the form were covered in the conversation - Name of patient, Address, Telephone"
+    "evaluation_criteria": [
+        {
+            "name": "question_completeness",
+            "description": "Whether all the questions in the form were covered in the conversation - Name, Address, Telephone"
         },
-        "assistant_behavior": {
-            "type": "boolean",
-            "description": "The assistant asks one concise question per turn; is empathetic, does not anthropomorphise itself, and does not repeat the user's answer back to them."
+        {
+            "name": "assistant_behavior",
+            "description": "Whether the assistant asks one concise question per turn; is empathetic, does not anthropomorphise itself, and does not repeat the user's answer back to them."
         }
-    }
+    ]
 }

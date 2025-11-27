@@ -27,7 +27,7 @@ async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
                 "content": [
                     {
                         "type": "text",
-                        "text": "You are a highly accurate evaluator evaluating the audio output of a TTs model.\n\nYou will be given the audio and the text that should have been spoken in the audio.\n\nYou need to evaluate if the text is easily understandable from the audio. ",
+                        "text": "You are a highly accurate evaluator evaluating the audio output of a TTs model.\n\nYou will be given the audio and the text that should have been spoken in the audio.\n\nYou need to evaluate if the text is easily understandable from the audio.",
                     }
                 ],
             },

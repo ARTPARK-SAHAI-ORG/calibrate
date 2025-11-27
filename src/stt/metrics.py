@@ -57,16 +57,31 @@ async def stt_llm_judge(reference: str, prediction: str) -> float:
             ..., description="True if the two strings match, otherwise false."
         )
 
+    system_prompt = """You are a highly accurate evaluator evaluating the transcription output of an STT model.
+
+You will be given two strings - one is the source string used to produce an audio and the other is the transcription of that audio.
+
+You need to evaluate if the two strings are the same.
+
+# Important Instructions:
+- Check whether the values represented by both the strings match. E.g. if one string says 1,2,3 but the other string says "one, two, three" or "one, 2, three", they should be considered the same as their underlying value is the same. However, if the actual values itself are different, e.g. for the name of a person or address or the value of any other key detail - that difference should be noted.
+- Ignore differences like a word being split up into more than 1 word by spaces. Look at whether the values mean the same in both the strings.
+- If all the "values" for the strings match, mark it as True. Else, False."""
+
+    user_prompt = f"""Source: {reference}\nTranscription: {prediction}"""
+
     response = await client.responses.parse(
         model="gpt-4.1-2025-04-14",
-        prompt={
-            "id": "pmpt_6911a8348998819081b6c12f5c3025f909e4b4db654ec487",
-            "version": "1",
-            "variables": {
-                "source": reference,
-                "transcription": prediction,
+        input=[
+            {
+                "role": "system",
+                "content": system_prompt,
             },
-        },
+            {
+                "role": "user",
+                "content": user_prompt,
+            },
+        ],
         text_format=Output,
         temperature=0,
         max_output_tokens=2048,
