@@ -257,7 +257,15 @@ async def run_tts_bot(
     elif provider == "cartesia":
         tts = CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id="71a7ad14-091c-4e8e-a314-022ece01c121",  # British Reading Lady
+            voice_id=(
+                "95d51f79-c397-46f9-b49a-23763d3eaa2d"
+                if language == "english"
+                else (
+                    "7c6219d2-e8d2-462c-89d8-7ecba7c75d65"
+                    if language == "kannada"
+                    else "f8f5f1b2-f02d-4d8e-a40d-fd850a487b3d"  # english
+                )
+            ),  # British Reading Lady
         )
     elif provider == "openai":
         tts = OpenAITTSService(
@@ -284,7 +292,11 @@ async def run_tts_bot(
     elif provider == "elevenlabs":
         tts = ElevenLabsTTSService(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            voice_id="Ui0HFqLn4HkcAenlJJVJ",
+            voice_id=(
+                "jUjRbhZWoMK4aDciW36V"
+                if language == "hindi"
+                else "90ipbRoKi4CpHXvKVtl0"
+            ),
             params=ElevenLabsTTSService.InputParams(language=tts_language),
         )
     elif provider == "sarvam":
@@ -675,7 +687,7 @@ async def main():
         type=str,
         default="smallest",
         choices=[
-            "smallest",
+            # "smallest",
             "cartesia",
             "openai",
             "groq",
