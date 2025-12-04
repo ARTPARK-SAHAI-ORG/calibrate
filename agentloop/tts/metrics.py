@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 import base64
 import backoff
 
-load_dotenv(".env", override=True)
+load_dotenv(override=True)
 
 normalizer = BasicTextNormalizer()
 

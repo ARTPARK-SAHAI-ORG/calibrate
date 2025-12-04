@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 import backoff
 
-load_dotenv(".env", override=True)
+load_dotenv(override=True)
 
 normalizer = BasicTextNormalizer()
 

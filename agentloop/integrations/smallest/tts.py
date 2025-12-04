@@ -1,9 +1,3 @@
-#
-# Copyright (c) 2024–2025, Daily
-#
-# SPDX-License-Identifier: BSD 2-Clause License
-# src/pipecat/services/smallest/tts.py
-
 import base64
 import json
 import uuid

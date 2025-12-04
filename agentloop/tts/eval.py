@@ -2,15 +2,20 @@ from contextlib import suppress
 import csv
 import io
 import sys
-import aiofiles
 import os
-import struct
-import wave
 import numpy as np
 import json
 from os.path import join, exists
 import pandas as pd
 import shutil
+
+from agentloop.utils import (
+    configure_print_logger,
+    log_and_print,
+    save_audio_chunk,
+    MetricsLogger,
+)
+
 from pipecat.frames.frames import (
     InputTransportMessageFrame,
     BotStoppedSpeakingFrame,
@@ -64,7 +69,8 @@ from collections import defaultdict
 import websockets
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
-from integrations.smallest import SmallestTTSService
+
+from agentloop.integrations.smallest.tts import SmallestTTSService
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.openai.tts import OpenAITTSService
 from pipecat.services.groq.tts import GroqTTSService
@@ -78,38 +84,12 @@ from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
 from loguru import logger
 from pipecat.processors.transcript_processor import TranscriptProcessor
-from metrics import get_tts_llm_judge_score
+from agentloop.tts.metrics import get_tts_llm_judge_score
 from dotenv import load_dotenv
-import logging
 
-load_dotenv(".env", override=True)
+load_dotenv(override=True)
 
-WAIT_TIME_BETWEEN_TURNS = 2
-
-print_logger: Optional[logging.Logger] = None
-
-
-def configure_print_logger(log_path: str):
-    """Configure a dedicated logger for console print mirroring."""
-    global print_logger
-    print_logger = logging.getLogger("tts_eval_print_logger")
-    print_logger.setLevel(logging.INFO)
-    print_logger.propagate = False
-
-    for handler in list(print_logger.handlers):
-        print_logger.removeHandler(handler)
-
-    handler = logging.FileHandler(log_path)
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    print_logger.addHandler(handler)
-
-
-def log_and_print(message: object = ""):
-    text = str(message)
-    print(text)
-    logger.info(text)
-    if print_logger:
-        print_logger.info(text)
+WAIT_TIME_BETWEEN_TURNS = 5
 
 
 async def run_tts_bot(
@@ -301,10 +281,15 @@ async def run_tts_bot(
             params=ElevenLabsTTSService.InputParams(language=tts_language),
         )
     elif provider == "sarvam":
+        tts_language = (
+            Language.KN_IN
+            if language == "kannada"
+            else Language.HI_IN if language == "hindi" else Language.EN_IN
+        )
         tts = SarvamTTSService(
             api_key=os.getenv("SARVAM_API_KEY"),
             model="bulbul:v2",
-            voice_id="anushka",
+            voice_id="abhilash",
             params=SarvamTTSService.InputParams(language=tts_language),
         )
     else:
@@ -349,58 +334,6 @@ async def run_tts_bot(
     await runner.run(task)
 
 
-async def save_audio_chunk(
-    path: str, audio_chunk: bytes, sample_rate: int, num_channels: int
-):
-    if len(audio_chunk) == 0:
-        logger.warning(f"There's no audio to save for {path}")
-        return
-
-    filepath = Path(path)
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-
-    if not filepath.exists():
-        log_and_print(f"\033[92mCreating new audio file at {filepath}\033[0m")
-        with io.BytesIO() as buffer:
-            with wave.open(buffer, "wb") as wf:
-                wf.setsampwidth(2)
-                wf.setnchannels(num_channels)
-                wf.setframerate(sample_rate)
-                wf.writeframes(audio_chunk)
-            async with aiofiles.open(filepath, "wb") as file:
-                await file.write(buffer.getvalue())
-    else:
-        log_and_print(f"\033[92mAppending audio chunk to {filepath}\033[0m")
-        async with aiofiles.open(filepath, "rb+") as file:
-            current_size = await file.seek(0, os.SEEK_END)
-            if current_size < 44:
-                logger.error(
-                    f"Existing audio file {filepath} is too small to be a valid WAV; rewriting"
-                )
-                await file.seek(0)
-                await file.truncate(0)
-                with io.BytesIO() as buffer:
-                    with wave.open(buffer, "wb") as wf:
-                        wf.setsampwidth(2)
-                        wf.setnchannels(num_channels)
-                        wf.setframerate(sample_rate)
-                        wf.writeframes(audio_chunk)
-                    await file.write(buffer.getvalue())
-                return
-
-            await file.write(audio_chunk)
-            new_size = current_size + len(audio_chunk)
-            data_chunk_size = max(0, new_size - 44)
-
-            await file.seek(40)
-            await file.write(struct.pack("<I", data_chunk_size))
-
-            await file.seek(4)
-            await file.write(struct.pack("<I", new_size - 8))
-
-            await file.flush()
-
-
 async def run_tts_eval(
     texts: List[str],
     output_dir: str,
@@ -431,38 +364,6 @@ async def run_tts_eval(
     session.connect = locked_connect
     # Workaround for race condition: manually initialize the audio queue before connection
     transport.input()._audio_in_queue = asyncio.Queue()
-
-    class MetricsLogger(FrameProcessor):
-        def __init__(
-            self,
-            ttfb: defaultdict,
-            processing_time: defaultdict,
-        ):
-            super().__init__(enable_direct_mode=True, name="MetricsLogger")
-            self._ttfb = ttfb
-            self._processing_time = processing_time
-
-        async def process_frame(self, frame, direction):
-            await super().process_frame(frame, direction)
-
-            if isinstance(frame, InputTransportMessageFrame):
-                message = getattr(frame, "message", {})
-                if isinstance(message, dict) and message.get("label") == "rtvi-ai":
-                    if message.get("type") == "metrics" and message.get("data"):
-                        if message.get("data").get("ttfb"):
-                            for d in message.get("data").get("ttfb"):
-                                if not d.get("value"):
-                                    continue
-                                self._ttfb[d.get("processor")].append(d.get("value"))
-                        if message.get("data").get("processing"):
-                            for d in message.get("data").get("processing"):
-                                if not d.get("value"):
-                                    continue
-                                self._processing_time[d.get("processor")].append(
-                                    d.get("value")
-                                )
-
-            await self.push_frame(frame, direction)
 
     class BotTurnTextStreamer(FrameProcessor):
         """Processor that captures LLM text output."""
@@ -694,7 +595,7 @@ async def main():
             "groq",
             "google",
             "elevenlabs",
-            # "sarvam", # there is a bug with the sarvam tts not returning audio frames
+            "sarvam",  # there is a bug with the sarvam tts not returning audio frames
         ],
         help="TTS provider to use for evaluation",
     )

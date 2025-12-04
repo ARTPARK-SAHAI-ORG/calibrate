@@ -1,43 +1,37 @@
 import asyncio
-import io
 import json
 import os
 import sys
 from os.path import join, exists
 import shutil
-import time
-import struct
-import wave
-from contextvars import ContextVar
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Literal
 from uuid import uuid4
 import shutil
-import aiofiles
 from deepgram import LiveOptions
 from loguru import logger
 from PIL.ImageFile import ImageFile
 from dataclasses import dataclass
+import numpy as np
 from collections import defaultdict
 
-# Context variable to track current execution context (BOT or EVAL)
-current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
+from agentloop.utils import (
+    current_context,
+    add_default_source,
+    configure_print_logger,
+    log_and_print,
+    save_audio_chunk,
+)
 
 USER_MESSAGE_COLOR = "\033[94m"
+PARTIAL_AGENT_MESSAGE_COLOR = "\033[95m"
+PARTIAL_AGENT_MESSAGE_COLOR_IGNORED = "\033[36m"
 AGENT_MESSAGE_COLOR = "\033[92m"
+TOOL_CALL_COLOR = "\033[33m"  # Magenta, not used for any of the above or below
 GENERAL_LOG_COLOR = "\033[93m"
 RESET_COLOR = "\033[0m"
-
-
-# Configure logger format to support source prefix
-def add_default_source(record):
-    """Add default source if not present in extra"""
-    if "source" not in record["extra"]:
-        context = current_context.get()
-        record["extra"]["source"] = f"{context}-SYS"
-    return True
-
+INTERRUPTION_COLOR = "\033[91m"
 
 # Create a contextual logger with EVAL prefix
 eval_logger = logger.bind(source="EVAL")
@@ -50,11 +44,13 @@ from pipecat.transcriptions.language import Language
 
 from pipecat.frames.frames import (
     EndFrame,
+    AggregatedTextFrame,
     StopFrame,
     CancelFrame,
     EndTaskFrame,
     InterimTranscriptionFrame,
     LLMRunFrame,
+    TTSTextFrame,
     TranscriptionFrame,
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
@@ -84,7 +80,6 @@ from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.processors.transcript_processor import TranscriptProcessor
-from integrations.smallest.tts import SmallestTTSService
 from pipecat.services.google.tts import GoogleTTSService
 
 # from pipecat.processors.transcript_processor import TranscriptProcessor
@@ -99,38 +94,11 @@ from pipecat.transports.websocket.client import (
 )
 
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
-from bot import run_bot, STTConfig, TTSConfig, LLMConfig
+from agentloop.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
 from dotenv import load_dotenv
 from pipecat.utils.time import time_now_iso8601
-import logging
 
 load_dotenv(override=True)
-
-
-print_logger: Optional[logging.Logger] = None
-
-
-def configure_print_logger(log_path: str):
-    """Configure a dedicated logger for console print mirroring."""
-    global print_logger
-    print_logger = logging.getLogger("agent_eval_print_logger")
-    print_logger.setLevel(logging.INFO)
-    print_logger.propagate = False
-
-    for handler in list(print_logger.handlers):
-        print_logger.removeHandler(handler)
-
-    handler = logging.FileHandler(log_path)
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    print_logger.addHandler(handler)
-
-
-def log_and_print(message: object = ""):
-    text = str(message)
-    print(text)
-    eval_logger.info(text)
-    if print_logger:
-        print_logger.info(text)
 
 
 PIPELINE_IDLE_TIMEOUT_SECS = 60
@@ -175,62 +143,6 @@ async def start_bot(
     )
 
 
-async def save_audio_chunk(
-    path: str, audio_chunk: bytes, sample_rate: int, num_channels: int
-):
-    if len(audio_chunk) == 0:
-        eval_logger.warning(f"There's no audio to save for {path}")
-        return
-
-    filepath = Path(path)
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-
-    if not filepath.exists():
-        log_and_print(
-            f"{GENERAL_LOG_COLOR}Creating new audio file at {filepath}{RESET_COLOR}"
-        )
-        with io.BytesIO() as buffer:
-            with wave.open(buffer, "wb") as wf:
-                wf.setsampwidth(2)
-                wf.setnchannels(num_channels)
-                wf.setframerate(sample_rate)
-                wf.writeframes(audio_chunk)
-            async with aiofiles.open(filepath, "wb") as file:
-                await file.write(buffer.getvalue())
-    else:
-        log_and_print(
-            f"{GENERAL_LOG_COLOR}Appending audio chunk to {filepath}{RESET_COLOR}"
-        )
-        async with aiofiles.open(filepath, "rb+") as file:
-            current_size = await file.seek(0, os.SEEK_END)
-            if current_size < 44:
-                eval_logger.error(
-                    f"Existing audio file {filepath} is too small to be a valid WAV; rewriting"
-                )
-                await file.seek(0)
-                await file.truncate(0)
-                with io.BytesIO() as buffer:
-                    with wave.open(buffer, "wb") as wf:
-                        wf.setsampwidth(2)
-                        wf.setnchannels(num_channels)
-                        wf.setframerate(sample_rate)
-                        wf.writeframes(audio_chunk)
-                    await file.write(buffer.getvalue())
-                return
-
-            await file.write(audio_chunk)
-            new_size = current_size + len(audio_chunk)
-            data_chunk_size = max(0, new_size - 44)
-
-            await file.seek(40)
-            await file.write(struct.pack("<I", data_chunk_size))
-
-            await file.seek(4)
-            await file.write(struct.pack("<I", new_size - 8))
-
-            await file.flush()
-
-
 async def run_simulation_pipeline(
     system_prompt: str,
     language: Literal[
@@ -262,8 +174,8 @@ async def run_simulation_pipeline(
             audio_out_enabled=True,
             add_wav_header=False,
             serializer=ProtobufFrameSerializer(),
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            turn_analyzer=LocalSmartTurnAnalyzerV3(),
+            # vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            # turn_analyzer=LocalSmartTurnAnalyzerV3(),
         ),
     )
     session = transport._session
@@ -347,11 +259,12 @@ async def run_simulation_pipeline(
     audio_buffer = AudioBufferProcessor(enable_turn_audio=True)
 
     class RTVIFunctionCallResponder(FrameProcessor):
-        def __init__(self, tool_calls: list[dict]):
+        def __init__(self, tool_calls: list[dict], context: LLMContext):
             super().__init__(enable_direct_mode=True, name="RTVIFunctionCallResponder")
             self._send_frame = None
             self._end_call_callback = None
             self._tool_calls = tool_calls
+            self._context = context
 
         def set_frame_sender(self, sender):
             self._send_frame = sender
@@ -366,8 +279,18 @@ async def run_simulation_pipeline(
                 message = getattr(frame, "message", {})
                 if isinstance(message, dict) and message.get("label") == "rtvi-ai":
                     if message.get("type") == "llm-function-call":
+                        tool_call_name = message.get("data", {}).get("function_name")
+                        arguments = message.get("data", {}).get("args") or {}
+
+                        log_and_print(
+                            f"{TOOL_CALL_COLOR}tool call: {tool_call_name} invoked with arguments: {arguments}{RESET_COLOR}"
+                        )
+
                         self._tool_calls.append(
-                            message.get("data"),
+                            {
+                                "position": len(self._context.get_messages()),
+                                "data": message.get("data"),
+                            }
                         )
 
                         data = message.get("data") or {}
@@ -448,7 +371,22 @@ async def run_simulation_pipeline(
             self._stt_outputs = stt_outputs
             self._ttft = ttft
             self._processing_time = processing_time
+            self._text_buffer = (
+                ""  # buffer of the text that the bot has generated so far
+            )
+            self._spoken_text_buffer = (
+                ""  # buffer of the text that the bot has spoken so far
+            )
+            self._is_bot_interrupted = (
+                False  # whether the bot has been interrupted by the user yet
+            )
+            self._is_spoken_text_buffer_complete = False  # whether the spoken text buffer is complete and matches the text buffer; only used for interruption simulations
+            self._turns_concluded = set()
+
+        def _reset_buffers(self):
+            self._turns_concluded.add(self._turn_index)  # mark the turn as concluded
             self._text_buffer = ""
+            self._spoken_text_buffer = ""
 
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
@@ -466,7 +404,10 @@ async def run_simulation_pipeline(
                         self._turn_index += 1
                         eval_logger.info(f"[rtvi] turn index: {self._turn_index}")
                         generated_frames.append(UserStartedSpeakingFrame())
-                    elif msg_type == "bot-stopped-speaking":
+                    elif (
+                        msg_type == "bot-stopped-speaking"
+                        and self._turn_index not in self._turns_concluded
+                    ):
                         generated_frames.extend(
                             [
                                 TranscriptionFrame(
@@ -478,22 +419,87 @@ async def run_simulation_pipeline(
                                 UserStoppedSpeakingFrame(),
                             ]
                         )
-                        self._text_buffer = ""
-                    elif msg_type == "bot-transcription":
+                        self._reset_buffers()
+
+                    elif msg_type == "bot-output":
                         text = data.get("text") or ""
-                        if text:
-                            self._text_buffer += text
+                        spoken = data.get("spoken") or False
+
+                        if (
+                            text
+                            and (
+                                not self._is_bot_interrupted or spoken
+                            )  # only continue if either the bot is not interrupted yet or the message is being spoken by the bot and does not match the interrupted text yet
+                            and not self._is_spoken_text_buffer_complete
+                        ):
+                            if spoken and self._is_bot_interrupted:
+                                self._spoken_text_buffer += text
+
+                                # once the spoken text buffer matches the text buffer, mark the spoken
+                                # text buffer as complete and interrupt the bot by the simulated user
+                                if self._spoken_text_buffer == self._text_buffer:
+                                    self._is_spoken_text_buffer_complete = True
+                                    log_and_print(
+                                        "Setting is spoken text buffer complete to True"
+                                    )
+
+                                    generated_frames.extend(
+                                        [
+                                            TranscriptionFrame(
+                                                text=self._text_buffer,
+                                                user_id=user_id,
+                                                timestamp=timestamp,
+                                                result={},
+                                            ),
+                                            UserStoppedSpeakingFrame(),
+                                        ]
+                                    )
+
+                                    self._reset_buffers()
+                            else:
+                                log_and_print(
+                                    f"{PARTIAL_AGENT_MESSAGE_COLOR}Received agent message{RESET_COLOR}: {text}{RESET_COLOR}"
+                                )
+                                self._text_buffer += text
 
                             result_payload = data if data else None
 
-                            generated_frames.append(
-                                InterimTranscriptionFrame(
-                                    text=self._text_buffer,
-                                    user_id=user_id,
-                                    timestamp=timestamp,
-                                    result=result_payload,
+                            if np.random.rand() < 0.9 and not self._is_bot_interrupted:
+                                # decide to interrupt the bot by the simulated user based on whatever they have said so far
+                                log_and_print(
+                                    f"--------------------------------\n{INTERRUPTION_COLOR}[User interupts the bot]{RESET_COLOR}\n--------------------------------"
                                 )
-                            )
+                                # mark the text collected so far as the text after which the user will interrupt the bot
+                                # we still need to wait for the bot to finish speaking the text after which the user will interrupt the bot
+                                self._is_bot_interrupted = True
+                            else:
+                                # otherwise, add the interim transcription frame for the text buffer as usual
+                                generated_frames.append(
+                                    InterimTranscriptionFrame(
+                                        text=self._text_buffer,
+                                        user_id=user_id,
+                                        timestamp=timestamp,
+                                        result=result_payload,
+                                    )
+                                )
+
+                        else:
+                            if not spoken:
+                                log_and_print(
+                                    "is bot interrupted: "
+                                    + str(self._is_bot_interrupted)
+                                )
+                                log_and_print(
+                                    "is spoken text buffer complete: "
+                                    + str(self._is_spoken_text_buffer_complete)
+                                )
+                                log_and_print(
+                                    f"{PARTIAL_AGENT_MESSAGE_COLOR_IGNORED}Received agent message (ignored){RESET_COLOR}: {text}{RESET_COLOR}"
+                                )
+                            else:
+                                log_and_print(
+                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message{RESET_COLOR}"
+                                )
 
                     for generated_frame in generated_frames:
                         await self.push_frame(generated_frame, direction)
@@ -501,19 +507,63 @@ async def run_simulation_pipeline(
             if isinstance(frame, EndFrame) or isinstance(frame, CancelFrame):
                 try:
                     self._output_dir.mkdir(parents=True, exist_ok=True)
+
                     serialized_transcripts: list[dict] = []
-                    for message in self._context.get_messages():
+
+                    tool_call_current_index = 0
+
+                    for index, message in enumerate(self._context.get_messages()):
                         if not isinstance(message, dict):
                             continue
                         role = message.get("role")
 
-                        if role in {"user", "assistant"}:
+                        if (
+                            tool_call_current_index < len(self._tool_calls)
+                            and self._tool_calls[tool_call_current_index].get(
+                                "position"
+                            )
+                            == index
+                        ):
                             serialized_transcripts.append(
                                 {
-                                    "role": role,
-                                    "content": message.get("content", ""),
+                                    "role": "tool_call",
+                                    "content": self._tool_calls[
+                                        tool_call_current_index
+                                    ].get("data"),
                                 }
                             )
+                            tool_call_current_index += 1
+
+                        # flip the role as the user for the transcript is the agent and vice versa
+                        if role == "user":
+                            role = "assistant"
+                        elif role == "assistant":
+                            role = "user"
+
+                        serialized_transcripts.append(
+                            {
+                                "role": role,
+                                "content": message.get("content", ""),
+                            }
+                        )
+
+                    while tool_call_current_index < len(self._tool_calls):
+                        serialized_transcripts.append(
+                            {
+                                "role": "tool_call",
+                                "content": self._tool_calls[
+                                    tool_call_current_index
+                                ].get("data"),
+                            }
+                        )
+                        tool_call_current_index += 1
+
+                    serialized_transcripts = [
+                        message
+                        for message in serialized_transcripts
+                        if message.get("role") in {"user", "assistant", "tool_call"}
+                    ]
+
                     with open(
                         os.path.join(self._output_dir, "transcripts.json"), "w"
                     ) as transcripts_file:
@@ -603,7 +653,7 @@ async def run_simulation_pipeline(
                     if msg_type == "user-transcription":
                         if (text := data.get("text")) and data.get("final"):
                             log_and_print(
-                                f"{USER_MESSAGE_COLOR}[User (transcribed)]{RESET_COLOR}: {text}"
+                                f"{USER_MESSAGE_COLOR}[User (as transcribed by the agent)]{RESET_COLOR}: {text}"
                             )
                             if self._rtvi_adapter._turn_index > self.last_turn_index:
                                 self._stt_outputs.append(text)
@@ -616,21 +666,29 @@ async def run_simulation_pipeline(
     class IOLogger(FrameProcessor):
         def __init__(
             self,
+            rtvi_adapter: RTVIMessageFrameAdapter,
         ):
             super().__init__()
+            self._rtvi_adapter = rtvi_adapter
 
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
-            if isinstance(frame, TextFrame) and hasattr(frame, "text"):
+            if isinstance(frame, TTSTextFrame) and hasattr(frame, "text"):
                 log_and_print(
                     f"{USER_MESSAGE_COLOR}[User]\033[0m: {frame.text}{RESET_COLOR}"
                 )
+                if self._rtvi_adapter._is_bot_interrupted:
+                    # once the simulated user starts speaking, mark the bot as not
+                    # interrupted anymore and spoken text buffer as not complete anymore
+                    self._rtvi_adapter._is_bot_interrupted = False
+                    self._rtvi_adapter._is_spoken_text_buffer_complete = False
+                    log_and_print("Setting is spoken text buffer complete to False")
 
             await self.push_frame(frame, direction)
 
     tool_calls = []
-    function_call_handler = RTVIFunctionCallResponder(tool_calls)
+    function_call_handler = RTVIFunctionCallResponder(tool_calls, context)
 
     rtvi_message_adapter = RTVIMessageFrameAdapter(
         context, tool_calls, stt_outputs, ttft, processing_time, output_dir
@@ -640,7 +698,7 @@ async def run_simulation_pipeline(
 
     stt_logger = STTLogger(stt_outputs, rtvi_message_adapter)
 
-    output_logger = IOLogger()
+    output_logger = IOLogger(rtvi_message_adapter)
 
     pipeline = Pipeline(
         [
@@ -725,14 +783,13 @@ async def run_simulation_pipeline(
             eval_logger.info(
                 f"Eval transcript: [{message.timestamp}] {message.role}: {message.content}"
             )
-            role = (
-                "Agent" if message.role == "user" else "User"
-            )  # since the user for the simulation pipeline is the agent we are testing
-            color = (
-                AGENT_MESSAGE_COLOR if message.role == "user" else USER_MESSAGE_COLOR
-            )
+
+            # since the user for the simulation pipeline is the agent we are testing
+            if message.role != "user":
+                continue
+
             log_and_print(
-                f"{color}[{role}]{RESET_COLOR}: {message.content}{RESET_COLOR}"
+                f"{AGENT_MESSAGE_COLOR}[Agent]{RESET_COLOR}: {message.content}{RESET_COLOR}"
             )
 
     runner = PipelineRunner(handle_sigint=False)

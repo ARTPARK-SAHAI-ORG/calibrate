@@ -4,18 +4,14 @@ import os
 import sys
 import argparse
 import json
-import io
-from pathlib import Path
-import aiofiles
-import shutil
-import struct
 from os.path import join, exists
 from dotenv import load_dotenv
 from loguru import logger
-from datetime import datetime
-import wave
+import shutil
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
+
+from utils import save_audio_chunk
 from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -111,58 +107,6 @@ def parse_bot_config(config_data: Dict[str, Any]) -> BotConfig:
         language=language,
         tools=tools,
     )
-
-
-async def save_audio_chunk(
-    path: str, audio_chunk: bytes, sample_rate: int, num_channels: int
-):
-    if len(audio_chunk) == 0:
-        logger.info(f"There's no audio to save for {path}")
-        return
-
-    filepath = Path(path)
-    filepath.parent.mkdir(parents=True, exist_ok=True)
-
-    if not filepath.exists():
-        logger.info(f"Creating new audio file for {path} at {filepath}")
-        with io.BytesIO() as buffer:
-            with wave.open(buffer, "wb") as wf:
-                wf.setsampwidth(2)
-                wf.setnchannels(num_channels)
-                wf.setframerate(sample_rate)
-                wf.writeframes(audio_chunk)
-            async with aiofiles.open(filepath, "wb") as file:
-                await file.write(buffer.getvalue())
-    else:
-        logger.info(f"Appending audio chunk for {path} to {filepath}")
-        async with aiofiles.open(filepath, "rb+") as file:
-            current_size = await file.seek(0, os.SEEK_END)
-            if current_size < 44:
-                logger.info(
-                    f"Existing audio file {filepath} is too small to be a valid WAV; rewriting"
-                )
-                await file.seek(0)
-                await file.truncate(0)
-                with io.BytesIO() as buffer:
-                    with wave.open(buffer, "wb") as wf:
-                        wf.setsampwidth(2)
-                        wf.setnchannels(num_channels)
-                        wf.setframerate(sample_rate)
-                        wf.writeframes(audio_chunk)
-                    await file.write(buffer.getvalue())
-                return
-
-            await file.write(audio_chunk)
-            new_size = current_size + len(audio_chunk)
-            data_chunk_size = max(0, new_size - 44)
-
-            await file.seek(40)
-            await file.write(struct.pack("<I", data_chunk_size))
-
-            await file.seek(4)
-            await file.write(struct.pack("<I", new_size - 8))
-
-            await file.flush()
 
 
 async def run_bot(

@@ -20,17 +20,19 @@ Create the virtual environment and install the dependencies.
 uv sync --frozen
 ```
 
+Copy `.env.example` to `.env` and fill in the API keys for the providers you want to evaluate. All modules (agent, stt, tts, llm) will use this single `.env` file:
+
 ## Talk to the agent
 
-`src/agent/run.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
+`agentloop/agent/test.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
 
-1. Copy `src/agent/.env.example` to `src/agent/.env` and provide the API keys for the STT/LLM/TTS providers you want to exercise (the defaults in `run.py` use OpenAI STT + LLM and Google TTS).
-2. Pick or edit a config file. `src/agent/examples/run/config.json` is a ready-to-use config file.
+1. Make sure your `.env` file has the required API keys (defaults use OpenAI STT + LLM and Google TTS).
+2. Pick or edit a config file. `agentloop/agent/examples/test/config.json` is a ready-to-use config file.
 3. Start the runner:
 
 ```bash
-cd src/agent
-uv run python run.py -c examples/run/config.json -o ./out/run
+cd agentloop/agent
+uv run python test.py -c examples/test/config.json -o ./out/run
 ```
 
 Once you run it, you can open `http://localhost:7860/client/` in your browser. Click **Connect**, and begin talking to the agent through your browser. The client UI streams the conversation transcript in real time, while the **Metrics** tab mirrors the live latency statistics reported by the pipeline as shwon in the images below:
@@ -41,7 +43,7 @@ Once you run it, you can open `http://localhost:7860/client/` in your browser. C
 
 Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sample output folder for the exact layout). The terminal also logs each transcript message and every function/tool call issued by the LLM so you can audit the interaction without leaving your shell.
 
-You can checkout `src/agent/examples/run/sample_output` as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
+You can checkout `agentloop/agent/examples/test/sample_output` as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
 
 ## Speech To Text (STT)
 
@@ -68,17 +70,31 @@ audio_2,"Madam, my name is Geeta Shankar"
 
 Store the audios in both `wav` and `pcm16` formats as different providers support different formats. The evaluation script will automatically select the right format for the provider you choose to evaluate.
 
-Copy `src/stt/.env.example` to `src/stt/.env` and fill in the API keys for the providers you want to evaluate.
+Set the required environment variables for the STT provider you want to evaluate:
 
 ```bash
-cd src/stt
+# For Sarvam
+export SARVAM_API_KEY=your_key
+
+# For Deepgram
+export DEEPGRAM_API_KEY=your_key
+
+# For OpenAI
+export OPENAI_API_KEY=your_key
+
+# For Google
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+```
+
+```bash
+cd agentloop/stt
 uv run python eval.py --input-dir /path/to/data -o /path/to/output -d -p <provider> -l <language>
 ```
 
-You can use the sample inputs provided in [`src/stt/examples/sample_input`](src/stt/examples/sample_input) to test the evaluation script.
+You can use the sample inputs provided in [`agentloop/stt/examples/sample_input`](agentloop/stt/examples/sample_input) to test the evaluation script.
 
 ```bash
-cd src/stt
+cd agentloop/stt
 uv run python eval.py --input-dir samples -o ./out -d -p sarvam -l english
 ```
 
@@ -115,7 +131,7 @@ id,gt,pred,wer,string_similarity,llm_judge_score,llm_judge_reasoning
 3_1_english_baseline,"Please write Rekha Kumari, sister.", Please write Reha Kumari's sister.,0.4,0.927536231884058,False,"The source says 'Rekha Kumari, sister' which indicates the name is 'Rekha Kumari' and she is a sister. The transcription says 'Reha Kumari's sister', which changes the name to 'Reha Kumari' and refers to her sister, not Rekha Kumari herself. The name is different ('Rekha' vs 'Reha') and the relationship is also changed (from identifying Rekha Kumari as the sister to referring to the sister of Reha Kumari). Therefore, the values do not match."
 ```
 
-The definition of all the metrics we compute are stored in [`src/stt/metrics.py`](src/stt/metrics.py).
+The definition of all the metrics we compute are stored in [`agentloop/stt/metrics.py`](agentloop/stt/metrics.py).
 
 `metrics.json` will have the following format:
 
@@ -158,7 +174,7 @@ The definition of all the metrics we compute are stored in [`src/stt/metrics.py`
 
 `logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
 
-You can checkout [`src/stt/examples/sample_output`](src/stt/examples/sample_output) to see a sample output of the evaluation script.
+You can checkout [`agentloop/stt/examples/sample_output`](agentloop/stt/examples/sample_output) to see a sample output of the evaluation script.
 
 For more details, run `uv run python eval.py -h`.
 
@@ -182,15 +198,15 @@ options:
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
 ```bash
-cd src/stt
+cd agentloop/stt
 uv run python leaderboard.py -o /path/to/output -s ./leaderboards
 ```
 
-The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`src/stt/leaderboard.py`).
+The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`agentloop/stt/leaderboard.py`).
 
-You can checkout [`src/stt/examples/leaderboard`](src/stt/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`agentloop/stt/examples/leaderboard`](agentloop/stt/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](src/stt/examples/leaderboard/all_metrics_by_run.png)
+![Leaderboard example](agentloop/stt/examples/leaderboard/all_metrics_by_run.png)
 
 ## Text To Speech (TTS)
 
@@ -204,17 +220,34 @@ this is a test
 
 The CSV should have a single column `text` containing the text strings you want to synthesize into speech.
 
-Copy `src/tts/.env.example` to `src/tts/.env` and fill in the API keys for the providers you want to evaluate.
+Set the required environment variables for the TTS provider you want to evaluate:
 
 ```bash
-cd src/tts
+# For Smallest
+export SMALLEST_API_KEY=your_key
+
+# For Cartesia
+export CARTESIA_API_KEY=your_key
+
+# For OpenAI
+export OPENAI_API_KEY=your_key
+
+# For ElevenLabs
+export ELEVENLABS_API_KEY=your_key
+
+# For Google
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+```
+
+```bash
+cd agentloop/tts
 uv run python eval.py --input /path/to/input.csv -o /path/to/output -p <provider> -l <language>
 ```
 
-You can use the sample inputs provided in [`src/tts/examples/sample.csv`](src/tts/examples/sample.csv) to test the evaluation script.
+You can use the sample inputs provided in [`agentloop/tts/examples/sample.csv`](agentloop/tts/examples/sample.csv) to test the evaluation script.
 
 ```bash
-cd src/tts
+cd agentloop/tts
 uv run python eval.py --input examples/sample.csv -o ./out -p smallest -l english
 ```
 
@@ -275,7 +308,7 @@ this is a test,./out/audios/2.wav
 
 `logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
 
-You can checkout [`src/tts/examples/sample_output`](src/tts/examples/sample_output) to see a sample output of the evaluation script.
+You can checkout [`agentloop/tts/examples/sample_output`](agentloop/tts/examples/sample_output) to see a sample output of the evaluation script.
 
 For more details, run `uv run python eval.py -h`.
 
@@ -299,15 +332,15 @@ options:
 To benchmark several TTS runs, generate the combined workbook and chart with:
 
 ```bash
-cd src/tts
+cd agentloop/tts
 uv run python leaderboard.py -o /path/to/output -s ./leaderboards
 ```
 
-`src/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
+`agentloop/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
 
-You can checkout [`src/tts/examples/leaderboard`](src/tts/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`agentloop/tts/examples/leaderboard`](agentloop/tts/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](src/tts/examples/leaderboard/all_metrics_by_run.png)
+![Leaderboard example](agentloop/tts/examples/leaderboard/all_metrics_by_run.png)
 
 ## LLM tests
 
@@ -401,14 +434,18 @@ The test configuration file should have the following structure:
 }
 ```
 
-Copy `src/llm/.env.example` to `src/llm/.env` and fill in the API keys for the providers you want to evaluate.
+Set the required environment variables:
 
 ```bash
-cd src/llm
-uv run python eval.py --config /path/to/test_config.json -o /path/to/output_dir -m <model_name>
+export OPENAI_API_KEY=your_key
 ```
 
-You can use the sample test configuration provided in [`src/llm/examples/tests/config.json`](src/llm/examples/tests/config.json) to test the evaluation script.
+```bash
+cd agentloop/llm
+uv run python run_tests.py --config /path/to/test_config.json -o /path/to/output_dir -m <model_name>
+```
+
+You can use the sample test configuration provided in [`agentloop/llm/examples/tests/config.json`](agentloop/llm/examples/tests/config.json) to test the evaluation script.
 
 ```bash
 uv run python run_tests.py --config examples/tests/config.json -o ./out -m gpt-4.1
@@ -428,7 +465,7 @@ The output of the script will be saved in the output directory.
 ├── logs
 ```
 
-You can checkout [`src/llm/examples/tests/sample_output`](src/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
+You can checkout [`agentloop/llm/examples/tests/sample_output`](agentloop/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
 
 Sample output 1:
 
@@ -473,15 +510,15 @@ Metrics:
 Once you have results for multiple models or scenarios, compile a leaderboard CSV and comparison chart:
 
 ```bash
-cd src/llm
+cd agentloop/llm
 uv run python tests_leaderboard.py -o /path/to/output -s ./leaderboard
 ```
 
-`src/llm/tests_leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
+`agentloop/llm/tests_leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
 
-You can checkout [`src/llm/examples/leaderboard`](src/llm/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`agentloop/llm/examples/leaderboard`](agentloop/llm/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](src/llm/examples/tests/leaderboard/llm_leaderboard.png)
+![Leaderboard example](agentloop/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
 ## LLM simulations
 
@@ -512,20 +549,26 @@ Each simulation pairs every persona with every scenario. The runner fans out int
 
 After each simulation, an LLM judge evaluates the transcript against all `evaluation_criteria` defined in the config. Each criterion produces a match (true/false) and reasoning. The results are aggregated across all simulations at the end of the run.
 
-Prepare the `.env` file with your OpenAI key (`cp src/llm/.env.example src/llm/.env`), then launch simulations:
+Set the required environment variables:
 
 ```bash
-cd src/llm
+export OPENAI_API_KEY=your_key
+```
+
+Then launch simulations:
+
+```bash
+cd agentloop/llm
 uv run python run_simulation.py \
   --config /path/to/config.json \
   --output-dir /path/to/output \
   --model <model_name>
 ```
 
-You can use the sample configuration provided in [`src/llm/examples/simulation/config.json`](src/llm/examples/simulation/config.json) to test the simulation.
+You can use the sample configuration provided in [`agentloop/llm/examples/simulation/config.json`](agentloop/llm/examples/simulation/config.json) to test the simulation.
 
 ```bash
-cd src/llm
+cd agentloop/llm
 uv run python run_simulation.py \
   --config examples/simulation/config.json \
   --output-dir ./out \
@@ -632,7 +675,7 @@ simulation_persona_1_scenario_3,1.0,1.0
 
 `logs` contains the full logs of the simulation including all the pipecat logs whereas `results.log` contains only the terminal output of the simulation as shown in the sample output above.
 
-You can checkout [`src/llm/examples/simulation/sample_output`](src/llm/examples/simulation/sample_output) to see a sample output of the simulation.
+You can checkout [`agentloop/llm/examples/simulation/sample_output`](agentloop/llm/examples/simulation/sample_output) to see a sample output of the simulation.
 
 ## Voice agent simulations
 
@@ -694,19 +737,26 @@ To run agent simulations with all the three components - STT, LLM, and TTS - pre
 }
 ```
 
-The voice agent is defined in `src/agent/bot.py`. For now, the default configuration of the bot uses Deepgram for STT, OpenAI for LLM, and Google for TTS. You can configure the bot to use different providers for STT, LLM, and TTS by modifying the `STTConfig`, `LLMConfig`, and `TTSConfig` classes in `src/agent/bot.py`. We will soon add support for changing the configuration for each provider for each component to override the defaults.
+The voice agent is defined in `agentloop/agent/bot.py`. For now, the default configuration of the bot uses Deepgram for STT, OpenAI for LLM, and Google for TTS. You can configure the bot to use different providers for STT, LLM, and TTS by modifying the `STTConfig`, `LLMConfig`, and `TTSConfig` classes in `agentloop/agent/bot.py`. We will soon add support for changing the configuration for each provider for each component to override the defaults.
 
-Copy `src/agent/.env.example` to `src/agent/.env` and fill in the API keys for the providers you want to evaluate.
+Set the required environment variables for the providers you want to use:
 
 ```bash
-cd src/agent
-uv run python eval.py  -c /path/to/config.json -o /path/to/output
+# For the default configuration (Deepgram STT + OpenAI LLM + Google TTS)
+export DEEPGRAM_API_KEY=your_key
+export OPENAI_API_KEY=your_key
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 ```
 
-You can use the sample configuration provided in [`src/agent/examples/sample_short.json`](src/agent/examples/sample_short.json) to test the voice agent simulation.
+```bash
+cd agentloop/agent
+uv run python run_simulation.py  -c /path/to/config.json -o /path/to/output
+```
+
+You can use the sample configuration provided in [`agentloop/agent/examples/sample_short.json`](agentloop/agent/examples/sample_short.json) to test the voice agent simulation.
 
 ```bash
-uv run python eval.py -c examples/sample_short.json -o ./out
+uv run python run_simulation.py -c examples/sample_short.json -o ./out
 ```
 
 Sample output:
@@ -774,16 +824,18 @@ Each `simulation_persona_*_scenario_*` directory contains:
 - `tool_calls.json`: chronologically ordered tool calls made by the agent.
 - `transcripts.json`: full conversation transcript - alternating `user`/`assistant` turns.
 
-You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
+You can checkout [`agentloop/agent/examples/simulation/sample_output`](agentloop/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
 
-## TODO
+## TODOs
 
-- Debug why sarvam STT/TTS not working as expected
-- Support for testing interrupts in the voice agent simulation
+- Debug why EL is getting affected for one audio based on the index of the audio file in the list of audio files to be run!
+- Support for testing interrupts in the voice agent simulation - use probabilities to decide when to interrupt the user and when to not interrupt.
 - Add multiple dialects and accents in the voice agent simulation
 - Make visualizations using tools like INK on the agent flow
+- Add support for running openai STT on the TTS outputs.
 - Support for adding knowledge base to agent/llm simulations
-- Reuse code blocks between different modules instead of duplicating code.
+- Generate test cases instead of manually having to create them.
+- Build a UI to go along with this.
 - Store transcripts and tool calls in the output directory when talking to an agent.
 - Support for adding custom config for each provider for each component to override the defaults.
 - Support for other telephony providers and be able to connect to a given agent.

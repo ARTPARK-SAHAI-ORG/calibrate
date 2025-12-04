@@ -46,8 +46,8 @@ from pipecat.services.deepgram.tts import DeepgramTTSService
 from pipecat.services.openai.stt import OpenAISTTService
 from pipecat.services.openai.tts import OpenAITTSService
 
-from integrations.smallest.stt import SmallestSTTService
-from integrations.smallest.tts import SmallestTTSService
+from agentloop.integrations.smallest.stt import SmallestSTTService
+from agentloop.integrations.smallest.tts import SmallestTTSService
 
 from pipecat.services.groq.llm import GroqLLMService
 from pipecat.services.groq.stt import GroqSTTService

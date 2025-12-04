@@ -7,17 +7,20 @@ import json
 import wave
 from datetime import datetime
 from contextlib import suppress
-from contextvars import ContextVar
 from pathlib import Path
 from typing import Dict, List, Sequence, Literal, Optional
-import logging
 
 from dotenv import load_dotenv
 from collections import defaultdict
 from loguru import logger
 
-# Context variable to track current execution context (BOT or EVAL)
-current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
+from agentloop.utils import (
+    current_context,
+    add_default_source,
+    configure_print_logger,
+    log_and_print,
+    MetricsLogger,
+)
 import numpy as np
 from natsort import natsorted
 
@@ -45,14 +48,13 @@ from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
 
 # from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 from pipecat.services.openai.stt import OpenAISTTService
-from integrations.smallest.stt import SmallestSTTService
+
+from agentloop.integrations.smallest.stt import SmallestSTTService
 from pipecat.services.google.stt import GoogleSTTService
 from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOptions
 from pipecat.services.groq.stt import GroqSTTService
 from pipecat.services.sarvam.stt import SarvamSTTService
 from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
-from pipecat.utils.tracing.setup import setup_tracing
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from pipecat.observers.loggers.debug_log_observer import DebugLogObserver
 
 from pipecat.transports.websocket.client import (
@@ -68,57 +70,14 @@ from pipecat.transports.websocket.server import (
 from pipecat.audio.vad.silero import SileroVADAnalyzer, VADParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 
-from metrics import get_wer_score, get_llm_judge_score, get_string_similarity
+from agentloop.stt.metrics import (
+    get_wer_score,
+    get_llm_judge_score,
+    get_string_similarity,
+)
 import pandas as pd
 
-load_dotenv(".env", override=True)
-
-exporter = OTLPSpanExporter()
-
-setup_tracing(
-    service_name="stt-eval",
-    exporter=exporter,
-    console_export=False,  # Set to True for debug output
-)
-
-
-# Configure logger format to support source prefix
-def add_default_source(record):
-    """Add default source if not present in extra"""
-    if "source" not in record["extra"]:
-        context = current_context.get()
-        record["extra"]["source"] = f"{context}-SYS"
-    return True
-
-
-# Create contextual loggers with BOT/EVAL prefix
-# bot_logger = logger.bind(source="BOT")
-# eval_logger = logger.bind(source="EVAL")
-
-print_logger: Optional[logging.Logger] = None
-
-
-def configure_print_logger(log_path: str):
-    """Configure a dedicated logger for console print mirroring."""
-    global print_logger
-    print_logger = logging.getLogger("run_tests_print_logger")
-    print_logger.setLevel(logging.INFO)
-    print_logger.propagate = False
-
-    for handler in list(print_logger.handlers):
-        print_logger.removeHandler(handler)
-
-    handler = logging.FileHandler(log_path)
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    print_logger.addHandler(handler)
-
-
-def log_and_print(message: object = ""):
-    text = str(message)
-    print(text)
-    logger.info(text)
-    if print_logger:
-        print_logger.info(text)
+load_dotenv(override=True)
 
 
 async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port: int):
@@ -181,15 +140,13 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
     #     )
     elif provider == "sarvam":
         stt_language = (
-            Language.EN_IN
-            if language == "english"
-            else Language.HI_IN if language == "hindi" else Language.KN_IN
+            Language.KN_IN
+            if language == "kannada"
+            else Language.HI_IN if language == "hindi" else Language.EN_IN
         )
         stt = SarvamSTTService(
             api_key=os.getenv("SARVAM_API_KEY"),
-            params=SarvamSTTService.InputParams(
-                vad_signals=True, language=stt_language.value, high_vad_sensitivity=True
-            ),
+            params=SarvamSTTService.InputParams(language=stt_language.value),
         )
     elif provider == "elevenlabs":
         stt = ElevenLabsRealtimeSTTService(
@@ -226,9 +183,10 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
     elif provider == "google":
         stt = GoogleSTTService(
             sample_rate=16000,
+            location="us",
             params=GoogleSTTService.InputParams(
                 languages=stt_language,
-                # model="chirp_3",
+                model="chirp_3",
                 # enable_interim_results=True,
                 # enable_voice_activity_events=True,
             ),
@@ -373,38 +331,6 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
 
             await self.push_frame(frame, direction)
 
-    class MetricsLogger(FrameProcessor):
-        def __init__(
-            self,
-            ttfb: defaultdict,
-            processing_time: defaultdict,
-        ):
-            super().__init__(enable_direct_mode=True, name="MetricsLogger")
-            self._ttfb = ttfb
-            self._processing_time = processing_time
-
-        async def process_frame(self, frame, direction):
-            await super().process_frame(frame, direction)
-
-            if isinstance(frame, InputTransportMessageFrame):
-                message = getattr(frame, "message", {})
-                if isinstance(message, dict) and message.get("label") == "rtvi-ai":
-                    if message.get("type") == "metrics" and message.get("data"):
-                        if message.get("data").get("ttfb"):
-                            for d in message.get("data").get("ttfb"):
-                                if not d.get("value"):
-                                    continue
-                                self._ttfb[d.get("processor")].append(d.get("value"))
-                        if message.get("data").get("processing"):
-                            for d in message.get("data").get("processing"):
-                                if not d.get("value"):
-                                    continue
-                                self._processing_time[d.get("processor")].append(
-                                    d.get("value")
-                                )
-
-            await self.push_frame(frame, direction)
-
     class BotTurnAudioStreamer(FrameProcessor):
         def __init__(
             self,
@@ -435,7 +361,7 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
                         ):
                             return True
 
-                        if msg_type == "user-started-speaking":
+                        if msg_type == "user-stopped-speaking":
                             return True
             return False
 
@@ -708,6 +634,13 @@ async def main():
         help="Path to the input directory containing the audio files and gt.json",
     )
     parser.add_argument(
+        "-f",
+        "--input-file-name",
+        type=str,
+        default="stt.csv",
+        help="name of the input file containing the dataset to evaluate",
+    )
+    parser.add_argument(
         "-o",
         "--output-dir",
         type=str,
@@ -775,7 +708,7 @@ async def main():
 
     audio_dir = join(args.input_dir, f"audios/{audio_format}")
 
-    gt_file = join(args.input_dir, "stt.csv")
+    gt_file = join(args.input_dir, args.input_file_name)
 
     gt = pd.read_csv(gt_file)
 

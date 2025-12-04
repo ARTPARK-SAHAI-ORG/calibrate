@@ -2,8 +2,6 @@ import asyncio
 import argparse
 import json
 import sys
-import logging
-from operator import index
 from typing import List, Optional, Literal
 from loguru import logger
 from dotenv import load_dotenv
@@ -11,7 +9,8 @@ import os
 from os.path import join, exists
 import shutil
 from collections import defaultdict
-from contextvars import ContextVar
+
+from agentloop.utils import configure_print_logger, log_and_print
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -37,39 +36,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from metrics import evaluate_simuation
+from agentloop.llm.metrics import evaluate_simuation
 import pandas as pd
 import numpy as np
 
-load_dotenv(".env", override=True)
-
-current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
-
-
-print_logger: Optional[logging.Logger] = None
-
-
-def configure_print_logger(log_path: str):
-    """Configure a dedicated logger for console print mirroring."""
-    global print_logger
-    print_logger = logging.getLogger("llm_simulation_print_logger")
-    print_logger.setLevel(logging.INFO)
-    print_logger.propagate = False
-
-    for handler in list(print_logger.handlers):
-        print_logger.removeHandler(handler)
-
-    handler = logging.FileHandler(log_path)
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    print_logger.addHandler(handler)
-
-
-def log_and_print(message: object = ""):
-    text = str(message)
-    print(text)
-    logger.info(text)
-    if print_logger:
-        print_logger.info(text)
+load_dotenv(override=True)
 
 
 class ConversationState:

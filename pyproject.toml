@@ -1,5 +1,5 @@
 [project]
-name = "websocket"
+name = "agentloop"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -29,3 +29,10 @@ dependencies = [
     "uvicorn>=0.38.0",
     "whisper-normalizer>=0.1.12",
 ]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

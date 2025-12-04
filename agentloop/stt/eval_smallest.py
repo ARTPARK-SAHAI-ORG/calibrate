@@ -11,7 +11,7 @@ import os
 from os.path import join, exists
 from loguru import logger
 
-load_dotenv(".env", override=True)
+load_dotenv(override=True)
 
 english_normalizer = EnglishTextNormalizer()
 other_language_normalizer = BasicTextNormalizer()

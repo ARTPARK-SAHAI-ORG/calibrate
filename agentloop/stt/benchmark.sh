@@ -1,19 +1,20 @@
 #!/bin/bash
 
-# Benchmark script to run TTS evaluation for all providers in parallel
+# Benchmark script to run STT evaluation for all providers in parallel
 
 set -e
 
 # Required arguments
-INPUT_FILE=""
+INPUT_DIR=""
 OUTPUT_DIR=""
 LANGUAGE=""
+BASE_PORT=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -i|--input)
-            INPUT_FILE="$2"
+        -i|--input-dir)
+            INPUT_DIR="$2"
             shift 2
             ;;
         -o|--output-dir)
@@ -24,13 +25,18 @@ while [[ $# -gt 0 ]]; do
             LANGUAGE="$2"
             shift 2
             ;;
+        -p|--base-port)
+            BASE_PORT="$2"
+            shift 2
+            ;;
         -h|--help)
-            echo "Usage: $0 -i <input-file> -o <output-dir> -l <language>"
+            echo "Usage: $0 -i <input-dir> -o <output-dir> -l <language> -p <base-port>"
             echo ""
             echo "Options:"
-            echo "  -i, --input       Path to input CSV file containing texts to synthesize (required)"
+            echo "  -i, --input-dir   Path to input directory containing audio files and stt.csv (required)"
             echo "  -o, --output-dir  Path to output directory (required)"
-            echo "  -l, --language    Language of the texts: english, hindi, kannada (required)"
+            echo "  -l, --language    Language of the audio files: english, hindi (required)"
+            echo "  -p, --base-port   Starting port number for parallel providers (required)"
             exit 0
             ;;
         *)
@@ -41,42 +47,47 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Validate required arguments
-if [ -z "$INPUT_FILE" ]; then
-    echo "Error: Input file is required"
-    echo "Usage: $0 -i <input-file> -o <output-dir> -l <language>"
+if [ -z "$INPUT_DIR" ]; then
+    echo "Error: Input directory is required"
+    echo "Usage: $0 -i <input-dir> -o <output-dir> -l <language> -p <base-port>"
     exit 1
 fi
 
 if [ -z "$OUTPUT_DIR" ]; then
     echo "Error: Output directory is required"
-    echo "Usage: $0 -i <input-file> -o <output-dir> -l <language>"
+    echo "Usage: $0 -i <input-dir> -o <output-dir> -l <language> -p <base-port>"
     exit 1
 fi
 
 if [ -z "$LANGUAGE" ]; then
     echo "Error: Language is required"
-    echo "Usage: $0 -i <input-file> -o <output-dir> -l <language>"
+    echo "Usage: $0 -i <input-dir> -o <output-dir> -l <language> -p <base-port>"
+    exit 1
+fi
+
+if [ -z "$BASE_PORT" ]; then
+    echo "Error: Base port is required"
+    echo "Usage: $0 -i <input-dir> -o <output-dir> -l <language> -p <base-port>"
     exit 1
 fi
 
 # List of providers to benchmark
 PROVIDERS=(
-    # "smallest"
-    "cartesia"
+    "deepgram"
     "openai"
+    "cartesia"
+    "elevenlabs"
+    # "smallest"
     "groq"
     "google"
-    "elevenlabs"
-    # "sarvam"  # there is a bug with the sarvam tts not returning audio frames
+    "sarvam"
 )
 
-# Starting port
-BASE_PORT=8800
-
-echo "Starting TTS benchmark..."
-echo "Input file: $INPUT_FILE"
+echo "Starting STT benchmark..."
+echo "Input directory: $INPUT_DIR"
 echo "Output directory: $OUTPUT_DIR"
 echo "Language: $LANGUAGE"
+echo "Base port: $BASE_PORT"
 echo "Providers: ${PROVIDERS[*]}"
 echo ""
 
@@ -96,10 +107,11 @@ for i in "${!PROVIDERS[@]}"; do
     uv run python eval.py \
         --provider "$PROVIDER" \
         --language "$LANGUAGE" \
-        --input "$INPUT_FILE" \
+        --input-dir "$INPUT_DIR" \
         --output-dir "$OUTPUT_DIR" \
-        --port "$PORT" &
-
+        --port "$PORT" \
+        > "$OUTPUT_DIR/${PROVIDER}_${LANGUAGE}.log" 2>&1 &
+    
     PIDS+=($!)
 done
 
