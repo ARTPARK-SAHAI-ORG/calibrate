@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import logging
+import sys
 from typing import List, Optional
 from loguru import logger
 from dotenv import load_dotenv
@@ -333,6 +334,9 @@ async def main():
         os.remove(print_log_save_path)
 
     configure_print_logger(print_log_save_path)
+
+    command = " ".join(sys.argv)
+    log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
     results = []
     for test_case_index, test_case in enumerate(config["test_cases"]):

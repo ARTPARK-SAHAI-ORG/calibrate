@@ -63,7 +63,8 @@ fi
 PROVIDERS=(
     "deepgram"
     "openai"
-    # "cartesia"
+    "cartesia"
+    "elevenlabs"
     # "smallest"
     "groq"
     "google"
@@ -71,7 +72,7 @@ PROVIDERS=(
 )
 
 # Starting port
-BASE_PORT=8780
+BASE_PORT=8800
 
 echo "Starting STT benchmark..."
 echo "Input directory: $INPUT_DIR"
@@ -99,6 +100,7 @@ for i in "${!PROVIDERS[@]}"; do
         --input-dir "$INPUT_DIR" \
         --output-dir "$OUTPUT_DIR" \
         --port "$PORT" \
+        > "$OUTPUT_DIR/${PROVIDER}_${LANGUAGE}.log" 2>&1 &
     
     PIDS+=($!)
 done

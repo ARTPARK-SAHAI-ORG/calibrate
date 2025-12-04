@@ -779,13 +779,16 @@ You can checkout [`src/agent/examples/simulation/sample_output`](src/agent/examp
 ## TODO
 
 - Debug why sarvam STT/TTS not working as expected
-- Support for configuring interrupts in the voice agent simulation
+- Support for testing interrupts in the voice agent simulation
+- Add multiple dialects and accents in the voice agent simulation
 - Make visualizations using tools like INK on the agent flow
 - Support for adding knowledge base to agent/llm simulations
 - Reuse code blocks between different modules instead of duplicating code.
 - Store transcripts and tool calls in the output directory when talking to an agent.
 - Support for adding custom config for each provider for each component to override the defaults.
 - Support for other telephony providers and be able to connect to a given agent.
+- Instructions on how to evaluate someone's own models not added to pipecat yet.
+- Evaluate even non-pipecat models
 
 ## Bugs
 

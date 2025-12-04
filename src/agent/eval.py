@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import os
+import sys
 from os.path import join, exists
 import shutil
 import time
@@ -797,6 +798,9 @@ async def main():
 
             print_log_save_path = f"{args.output_dir}/{simulation_name}/results.log"
             configure_print_logger(print_log_save_path)
+
+            command = " ".join(sys.argv)
+            log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
             log_and_print("--------------------------------")
             log_and_print(

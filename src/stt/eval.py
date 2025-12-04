@@ -1,11 +1,13 @@
 import asyncio
 import argparse
+import sys
 from os.path import join, exists, basename, splitext
 import os
 import json
 import wave
 from datetime import datetime
 from contextlib import suppress
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Dict, List, Sequence, Literal, Optional
 import logging
@@ -13,6 +15,9 @@ import logging
 from dotenv import load_dotenv
 from collections import defaultdict
 from loguru import logger
+
+# Context variable to track current execution context (BOT or EVAL)
+current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 import numpy as np
 from natsort import natsorted
 
@@ -45,6 +50,10 @@ from pipecat.services.google.stt import GoogleSTTService
 from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOptions
 from pipecat.services.groq.stt import GroqSTTService
 from pipecat.services.sarvam.stt import SarvamSTTService
+from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
+from pipecat.utils.tracing.setup import setup_tracing
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from pipecat.observers.loggers.debug_log_observer import DebugLogObserver
 
 from pipecat.transports.websocket.client import (
     WebsocketClientParams,
@@ -64,6 +73,27 @@ import pandas as pd
 
 load_dotenv(".env", override=True)
 
+exporter = OTLPSpanExporter()
+
+setup_tracing(
+    service_name="stt-eval",
+    exporter=exporter,
+    console_export=False,  # Set to True for debug output
+)
+
+
+# Configure logger format to support source prefix
+def add_default_source(record):
+    """Add default source if not present in extra"""
+    if "source" not in record["extra"]:
+        context = current_context.get()
+        record["extra"]["source"] = f"{context}-SYS"
+    return True
+
+
+# Create contextual loggers with BOT/EVAL prefix
+# bot_logger = logger.bind(source="BOT")
+# eval_logger = logger.bind(source="EVAL")
 
 print_logger: Optional[logging.Logger] = None
 
@@ -93,6 +123,7 @@ def log_and_print(message: object = ""):
 
 async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port: int):
     """Starts an STT-only bot that reports RTVI transcription messages."""
+    current_context.set("BOT")
 
     transport = WebsocketServerTransport(
         port=port,
@@ -118,7 +149,6 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
             await super().process_frame(frame, direction)
 
             logger.info(f"{self._position} bot frame: {frame}")
-            # logger.info(f"bot frame type: {type(frame)}")
 
             if isinstance(frame, UserSpeakingFrame):
                 frame = RTVIServerMessageFrame(
@@ -134,9 +164,9 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
     output_logger = IOLogger(position="output")
 
     stt_language = (
-        Language.EN
-        if language == "english"
-        else Language.HI if language == "hindi" else Language.KN
+        Language.KN
+        if language == "kannada"
+        else Language.HI if language == "hindi" else Language.EN
     )
 
     if provider == "deepgram":
@@ -159,6 +189,13 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
             api_key=os.getenv("SARVAM_API_KEY"),
             params=SarvamSTTService.InputParams(
                 vad_signals=True, language=stt_language.value, high_vad_sensitivity=True
+            ),
+        )
+    elif provider == "elevenlabs":
+        stt = ElevenLabsRealtimeSTTService(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            params=ElevenLabsRealtimeSTTService.InputParams(
+                language_code=stt_language.value,
             ),
         )
     elif provider == "openai":
@@ -219,12 +256,11 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=16000,
-            audio_out_sample_rate=16000,
             enable_metrics=True,
             allow_interruptions=True,
         ),
-        observers=[RTVIObserver(rtvi)],
-        idle_timeout_secs=15,
+        enable_tracing=True,
+        observers=[RTVIObserver(rtvi), DebugLogObserver()],
     )
 
     @transport.event_handler("on_client_connected")
@@ -243,6 +279,7 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
 
 async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str, str]]:
     """Connects to the STT bot and streams audio files sequentially."""
+    current_context.set("EVAL")
 
     transport = WebsocketClientTransport(
         uri=f"ws://localhost:{port}",
@@ -377,11 +414,12 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
         ):
             super().__init__(enable_direct_mode=True, name="BotTurnAudioStreamer")
             self._audio_paths = audio_paths
+            self._num_audios = len(audio_paths)
             self._chunk_ms = chunk_ms
             self._current_audio_index = 0
 
-            # States: 'await_bot_turn_end' -> 'streaming' -> 'await_reply_bot_turn_end' -> 'done'
-            self._state = "await_bot_turn_end"
+            # States: 'waiting_for_new_stream' -> 'streaming' -> 'stream_complete' -> 'done'
+            self._state = "waiting_for_new_stream"
             self._output_ready = asyncio.Event()
             self._transcripts = transcripts
             self._pending_advance_task = None
@@ -395,6 +433,9 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
                         if msg_type == "user-transcription" and message.get("data").get(
                             "final"
                         ):
+                            return True
+
+                        if msg_type == "user-started-speaking":
                             return True
             return False
 
@@ -455,49 +496,52 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
                         self._pending_advance_task.cancel()
                         self._pending_advance_task = None
 
-                    self._state = "await_reply_bot_turn_end"
+                    self._state = "stream_complete"
 
             logger.info(f"state: {self._state}")
 
-            if self._state == "await_bot_turn_end":
+            if self._state == "waiting_for_new_stream":
                 # Start streaming only after transcript signals end of bot input
                 self._start_new_audio_streaming()
 
-            elif self._state == "await_reply_bot_turn_end":
-                if is_bot_turn_over:
-                    if self._current_audio_index + 1 < len(self._audio_paths):
+            elif self._state == "stream_complete" and is_bot_turn_over:
+                if self._current_audio_index + 1 < len(self._audio_paths):
 
-                        async def advance_and_stream():
+                    logger.info(
+                        "Setting state to buffering and advancing to next audio file in 5 seconds"
+                    )
 
-                            await asyncio.sleep(5)
-                            self._current_audio_index += 1
+                    async def advance_and_stream():
 
-                            logger.info(
-                                f"incrementing audio index: {self._current_audio_index}"
-                            )
+                        await asyncio.sleep(5)
+                        self._current_audio_index += 1
 
-                            self._start_new_audio_streaming()
-
-                        self._state = "buffering"
-                        self._pending_advance_task = asyncio.create_task(
-                            advance_and_stream()
+                        logger.info(
+                            f"incrementing audio index: {self._current_audio_index}"
                         )
-                    else:
 
-                        async def end_task_and_stream():
+                        self._start_new_audio_streaming()
 
-                            await asyncio.sleep(5)
-                            logger.info(f"completed simulation message received")
-                            await self.push_frame(
-                                EndTaskFrame(), FrameDirection.UPSTREAM
-                            )
-                            await self.push_frame(EndFrame(), FrameDirection.UPSTREAM)
-                            self._state = "done"
+                    self._pending_advance_task = asyncio.create_task(
+                        advance_and_stream()
+                    )
+                else:
+                    logger.info(
+                        "Setting state to buffering and ending the task in 5 seconds"
+                    )
 
-                        self._state = "buffering"
-                        self._pending_advance_task = asyncio.create_task(
-                            end_task_and_stream()
-                        )
+                    async def end_task_and_stream():
+                        await asyncio.sleep(5)
+                        logger.info(f"Completed streaming all audio files")
+                        await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+                        await self.push_frame(EndFrame(), FrameDirection.UPSTREAM)
+                        self._state = "done"
+
+                    self._pending_advance_task = asyncio.create_task(
+                        end_task_and_stream()
+                    )
+
+                self._state = "buffering"
 
             # Pass every frame through unchanged
             await self.push_frame(frame, direction)
@@ -506,7 +550,9 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
             try:
                 await self._output_ready.wait()
 
-                log_and_print(f"Starting new audio streaming: {audio_path}")
+                log_and_print(
+                    f"Starting new audio streaming {self._current_audio_index + 1}/{self._num_audios}: {audio_path}"
+                )
 
                 if not audio_path.exists():
                     logger.error(f"Audio file not found for streaming: {audio_path}")
@@ -551,7 +597,7 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
                     await asyncio.sleep(self._chunk_ms / 1000.0)
             finally:
                 # After sending our audio, wait for bot's reply to finish
-                self._state = "await_reply_bot_turn_end"
+                self._state = "stream_complete"
                 self._last_audio_ts = None
                 log_and_print(f"Finished streaming audio: {audio_path}")
 
@@ -577,7 +623,7 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
-            logger.info(f"frame input logger: {frame}")
+            logger.info(f"eval frame: {frame}")
 
             await self.push_frame(frame, direction)
 
@@ -597,10 +643,11 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
     task = PipelineTask(
         pipeline,
         params=PipelineParams(
-            audio_in_sample_rate=16000,
             audio_out_sample_rate=16000,
         ),
-        idle_timeout_secs=200,
+        enable_tracing=True,
+        cancel_on_idle_timeout=False,
+        observers=[DebugLogObserver()],
     )
 
     @transport.event_handler("on_connected")
@@ -631,7 +678,7 @@ async def main():
         "-p",
         "--provider",
         type=str,
-        default="deepgram",
+        required=True,
         choices=[
             "deepgram",  # pcm16
             # "deepgram-flux",  # pcm16
@@ -641,7 +688,7 @@ async def main():
             "groq",  # wav
             "google",  # wav
             "sarvam",  # wav
-            # elevenlabs
+            "elevenlabs",  # wav
         ],
         help="STT provider to use for evaluation",
     )
@@ -700,7 +747,13 @@ async def main():
         os.remove(log_save_path)
 
     logger.remove()
-    logger.add(log_save_path)
+    logger.add(
+        log_save_path,
+        level="DEBUG",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
+        filter=add_default_source,
+        colorize=False,
+    )
 
     print_log_save_path = join(output_dir, "results.log")
 
@@ -708,6 +761,12 @@ async def main():
         os.remove(print_log_save_path)
 
     configure_print_logger(print_log_save_path)
+
+    log_and_print(f"Running on port: {args.port}")
+    log_and_print("--------------------------------")
+
+    command = " ".join(sys.argv)
+    log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
     if args.provider in ["sarvam", "groq"]:
         audio_format = "wav"

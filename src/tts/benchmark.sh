@@ -98,8 +98,8 @@ for i in "${!PROVIDERS[@]}"; do
         --language "$LANGUAGE" \
         --input "$INPUT_FILE" \
         --output-dir "$OUTPUT_DIR" \
-        --port "$PORT" \
-    
+        --port "$PORT" &
+
     PIDS+=($!)
 done
 

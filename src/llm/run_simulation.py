@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import json
+import sys
 import logging
 from operator import index
 from typing import List, Optional, Literal
@@ -485,6 +486,9 @@ async def main():
 
             print_log_save_path = f"{args.output_dir}/{simulation_name}/results.log"
             configure_print_logger(print_log_save_path)
+
+            command = " ".join(sys.argv)
+            log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
             log_and_print("--------------------------------")
             log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")

@@ -1,6 +1,7 @@
 from contextlib import suppress
 import csv
 import io
+import sys
 import aiofiles
 import os
 import struct
@@ -773,6 +774,12 @@ async def main():
         os.remove(print_log_save_path)
 
     configure_print_logger(print_log_save_path)
+
+    log_and_print(f"Running on port: {args.port}")
+    log_and_print("--------------------------------")
+
+    command = " ".join(sys.argv)
+    log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
     df = pd.read_csv(args.input)
     texts = df["text"].tolist()
