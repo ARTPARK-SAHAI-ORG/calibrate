@@ -23,6 +23,9 @@ from agentloop.utils import (
     log_and_print,
     save_audio_chunk,
 )
+from agentloop.llm.metrics import evaluate_simuation
+from agentloop.stt.metrics import get_llm_judge_score as stt_llm_judge_score
+import pandas as pd
 
 USER_MESSAGE_COLOR = "\033[94m"
 PARTIAL_AGENT_MESSAGE_COLOR = "\033[95m"
@@ -44,6 +47,7 @@ from pipecat.transcriptions.language import Language
 
 from pipecat.frames.frames import (
     EndFrame,
+    InterruptionFrame,
     AggregatedTextFrame,
     StopFrame,
     CancelFrame,
@@ -128,7 +132,7 @@ async def start_bot(
     )
 
     runner_args = RunnerArguments()
-    runner_args.pipeline_idle_timeout_secs = PIPELINE_IDLE_TIMEOUT_SECS
+    # runner_args.pipeline_idle_timeout_secs = PIPELINE_IDLE_TIMEOUT_SECS
 
     await run_bot(
         transport,
@@ -143,15 +147,19 @@ async def start_bot(
     )
 
 
-async def run_simulation_pipeline(
+async def run_simulation(
     system_prompt: str,
     language: Literal[
         "english",
         "hindi",
     ],
+    evaluation_criteria: list[dict],
     output_dir: str,
-    user_speaks_first: bool = False,
-):
+    # user_speaks_first: bool = False,
+    interrupt_probability: float = 0.5,  # medium
+) -> dict:
+    user_speaks_first = True  # hardcoded for now
+
     # Set context for EVAL logs
     current_context.set("EVAL")
 
@@ -242,9 +250,7 @@ async def run_simulation_pipeline(
     if not user_speaks_first:
         simulation_system_prompt = system_prompt
     else:
-        simulation_system_prompt = (
-            f"{system_prompt}.\n\nBegin the conversation by saying 'Hi' to the agent."
-        )
+        simulation_system_prompt = f"{system_prompt}.\n\nBegin the conversation by saying 'Hello' to the agent."
 
     messages = [
         {
@@ -382,6 +388,7 @@ async def run_simulation_pipeline(
             )
             self._is_spoken_text_buffer_complete = False  # whether the spoken text buffer is complete and matches the text buffer; only used for interruption simulations
             self._turns_concluded = set()
+            self._serialized_transcript = []  # Store transcripts for return
 
         def _reset_buffers(self):
             self._turns_concluded.add(self._turn_index)  # mark the turn as concluded
@@ -439,8 +446,19 @@ async def run_simulation_pipeline(
                                 # text buffer as complete and interrupt the bot by the simulated user
                                 if self._spoken_text_buffer == self._text_buffer:
                                     self._is_spoken_text_buffer_complete = True
-                                    log_and_print(
-                                        "Setting is spoken text buffer complete to True"
+
+                                    await self.push_frame(
+                                        OutputTransportMessageUrgentFrame(
+                                            message={
+                                                "label": "rtvi-ai",
+                                                "type": "client-message",
+                                                "id": str(uuid4()),
+                                                "data": {
+                                                    "t": "interrupt",
+                                                },
+                                            }
+                                        ),
+                                        FrameDirection.DOWNSTREAM,
                                     )
 
                                     generated_frames.extend(
@@ -456,49 +474,49 @@ async def run_simulation_pipeline(
                                     )
 
                                     self._reset_buffers()
-                            else:
+                            elif not spoken and not self._is_bot_interrupted:
                                 log_and_print(
                                     f"{PARTIAL_AGENT_MESSAGE_COLOR}Received agent message{RESET_COLOR}: {text}{RESET_COLOR}"
                                 )
                                 self._text_buffer += text
 
-                            result_payload = data if data else None
+                                result_payload = data if data else None
 
-                            if np.random.rand() < 0.9 and not self._is_bot_interrupted:
-                                # decide to interrupt the bot by the simulated user based on whatever they have said so far
-                                log_and_print(
-                                    f"--------------------------------\n{INTERRUPTION_COLOR}[User interupts the bot]{RESET_COLOR}\n--------------------------------"
-                                )
-                                # mark the text collected so far as the text after which the user will interrupt the bot
-                                # we still need to wait for the bot to finish speaking the text after which the user will interrupt the bot
-                                self._is_bot_interrupted = True
-                            else:
-                                # otherwise, add the interim transcription frame for the text buffer as usual
-                                generated_frames.append(
-                                    InterimTranscriptionFrame(
-                                        text=self._text_buffer,
-                                        user_id=user_id,
-                                        timestamp=timestamp,
-                                        result=result_payload,
+                                if (
+                                    np.random.rand() < interrupt_probability
+                                    and not self._is_bot_interrupted
+                                ):
+                                    # decide to interrupt the bot by the simulated user based on whatever they have said so far
+                                    log_and_print(
+                                        f"--------------------------------\n{INTERRUPTION_COLOR}[User interrupts the bot]{RESET_COLOR}\n--------------------------------"
                                     )
+
+                                    # mark the text collected so far as the text after which the user will interrupt the bot
+                                    # we still need to wait for the bot to finish speaking the text after which the user will interrupt the bot
+                                    self._is_bot_interrupted = True
+                                else:
+                                    # otherwise, add the interim transcription frame for the text buffer as usual
+                                    generated_frames.append(
+                                        InterimTranscriptionFrame(
+                                            text=self._text_buffer,
+                                            user_id=user_id,
+                                            timestamp=timestamp,
+                                            result=result_payload,
+                                        )
+                                    )
+                            elif spoken:
+                                log_and_print(
+                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message: {text}{RESET_COLOR}"
                                 )
 
                         else:
                             if not spoken:
                                 log_and_print(
-                                    "is bot interrupted: "
-                                    + str(self._is_bot_interrupted)
-                                )
-                                log_and_print(
-                                    "is spoken text buffer complete: "
-                                    + str(self._is_spoken_text_buffer_complete)
-                                )
-                                log_and_print(
                                     f"{PARTIAL_AGENT_MESSAGE_COLOR_IGNORED}Received agent message (ignored){RESET_COLOR}: {text}{RESET_COLOR}"
                                 )
                             else:
                                 log_and_print(
-                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message{RESET_COLOR}"
+                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message 2: {text}{RESET_COLOR}"
                                 )
 
                     for generated_frame in generated_frames:
@@ -508,7 +526,7 @@ async def run_simulation_pipeline(
                 try:
                     self._output_dir.mkdir(parents=True, exist_ok=True)
 
-                    serialized_transcripts: list[dict] = []
+                    serialized_transcript: list[dict] = []
 
                     tool_call_current_index = 0
 
@@ -524,7 +542,7 @@ async def run_simulation_pipeline(
                             )
                             == index
                         ):
-                            serialized_transcripts.append(
+                            serialized_transcript.append(
                                 {
                                     "role": "tool_call",
                                     "content": self._tool_calls[
@@ -540,7 +558,7 @@ async def run_simulation_pipeline(
                         elif role == "assistant":
                             role = "user"
 
-                        serialized_transcripts.append(
+                        serialized_transcript.append(
                             {
                                 "role": role,
                                 "content": message.get("content", ""),
@@ -548,7 +566,7 @@ async def run_simulation_pipeline(
                         )
 
                     while tool_call_current_index < len(self._tool_calls):
-                        serialized_transcripts.append(
+                        serialized_transcript.append(
                             {
                                 "role": "tool_call",
                                 "content": self._tool_calls[
@@ -558,16 +576,19 @@ async def run_simulation_pipeline(
                         )
                         tool_call_current_index += 1
 
-                    serialized_transcripts = [
+                    serialized_transcript = [
                         message
-                        for message in serialized_transcripts
+                        for message in serialized_transcript
                         if message.get("role") in {"user", "assistant", "tool_call"}
                     ]
+
+                    # Store transcripts for return
+                    self._serialized_transcript = serialized_transcript
 
                     with open(
                         os.path.join(self._output_dir, "transcripts.json"), "w"
                     ) as transcripts_file:
-                        json.dump(serialized_transcripts, transcripts_file, indent=4)
+                        json.dump(serialized_transcript, transcripts_file, indent=4)
 
                     with open(
                         os.path.join(self._output_dir, "tool_calls.json"), "w"
@@ -578,18 +599,6 @@ async def run_simulation_pipeline(
                         os.path.join(self._output_dir, "stt_outputs.json"), "w"
                     ) as stt_outputs_file:
                         json.dump(self._stt_outputs, stt_outputs_file, indent=4)
-
-                    ttft = dict(self._ttft)
-                    processing_time = dict(self._processing_time)
-
-                    with open(
-                        os.path.join(self._output_dir, "metrics.json"), "w"
-                    ) as metrics_file:
-                        json.dump(
-                            {"ttft": ttft, "processing_time": processing_time},
-                            metrics_file,
-                            indent=4,
-                        )
 
                 except Exception as exc:
                     eval_logger.error(
@@ -683,7 +692,6 @@ async def run_simulation_pipeline(
                     # interrupted anymore and spoken text buffer as not complete anymore
                     self._rtvi_adapter._is_bot_interrupted = False
                     self._rtvi_adapter._is_spoken_text_buffer_complete = False
-                    log_and_print("Setting is spoken text buffer complete to False")
 
             await self.push_frame(frame, direction)
 
@@ -727,7 +735,7 @@ async def run_simulation_pipeline(
             allow_interruptions=True,
         ),
         observers=[LLMLogObserver()],
-        idle_timeout_secs=PIPELINE_IDLE_TIMEOUT_SECS,
+        cancel_on_idle_timeout=False,
     )
 
     function_call_handler.set_frame_sender(task.queue_frame)
@@ -796,6 +804,69 @@ async def run_simulation_pipeline(
 
     await runner.run(task)
 
+    transcript = rtvi_message_adapter._serialized_transcript
+
+    log_and_print(
+        f"Evaluating the conversation based on the criteria: {evaluation_criteria}"
+    )
+    # Get evaluation results from LLM judge
+    llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
+
+    evaluation_results = [
+        {
+            "name": criterion["name"],
+            "match": llm_judge_result[criterion["name"]]["match"],
+            "reasoning": llm_judge_result[criterion["name"]]["reasoning"],
+        }
+        for criterion in evaluation_criteria
+    ]
+
+    # Get user messages from transcript (these are what the agent heard/transcribed)
+    user_messages_in_transcript = [
+        msg["content"]
+        for msg in transcript
+        if msg.get("role") == "user" and msg.get("content")
+    ]
+
+    # Filter out empty STT outputs
+    filtered_stt_outputs = [s for s in stt_outputs if s.strip()]
+
+    # # Compare STT outputs with user messages using STT LLM judge
+    stt_llm_judge_result = None
+    if filtered_stt_outputs and user_messages_in_transcript:
+        # Align lengths - take minimum length
+        log_and_print(f"Evaluating the STT outputs with user messages")
+        min_len = min(len(filtered_stt_outputs), len(user_messages_in_transcript))
+        if min_len > 0:
+            stt_llm_judge_result = await stt_llm_judge_score(
+                references=user_messages_in_transcript[:min_len],
+                predictions=filtered_stt_outputs[:min_len],
+            )
+
+    # Build comprehensive metrics
+    ttft_dict = dict(ttft)
+    processing_time_dict = dict(processing_time)
+
+    metrics = {
+        "ttft": ttft_dict,
+        "processing_time": processing_time_dict,
+        "evaluation_results": evaluation_results,
+        "stt_llm_judge": stt_llm_judge_result,
+    }
+
+    # Save comprehensive metrics.json
+    with open(os.path.join(output_dir, "metrics.json"), "w") as metrics_file:
+        json.dump(metrics, metrics_file, indent=4)
+
+    # Return all data
+    return {
+        "transcript": transcript,
+        "stt_outputs": filtered_stt_outputs,
+        "tool_calls": tool_calls,
+        "evaluation_results": evaluation_results,
+        "metrics": metrics,
+    }
+
 
 async def main():
     import argparse
@@ -824,84 +895,172 @@ async def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
 
+    interrupt_labels = [
+        # "no",
+        # "low",
+        "medium",
+        "high",
+    ]
+    interrupt_probabilities = [
+        # 0, 0.25,
+        0.5,
+        0.8,
+    ]
+
+    # Aggregated metrics across all simulations
+    all_simulation_metrics = []
+    metrics_by_criterion = defaultdict(list)
+    stt_llm_judge_scores = []
+
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
 
             user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{user_persona}\n\nThe following scenario will be played out: {scenario}. Make sure to respond to the agent to match the given scenario as per the given persona for you."
 
-            simulation_name = (
-                f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
-            )
+            for prob, label in zip(interrupt_probabilities, interrupt_labels):
+                simulation_name = f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}_{label}_interrupt"
 
-            simulation_output_dir = f"{args.output_dir}/{simulation_name}"
+                simulation_output_dir = f"{args.output_dir}/{simulation_name}"
 
-            if exists(simulation_output_dir):
-                shutil.rmtree(simulation_output_dir)
+                if exists(simulation_output_dir):
+                    shutil.rmtree(simulation_output_dir)
 
-            os.makedirs(simulation_output_dir)
+                os.makedirs(simulation_output_dir)
 
-            logs_file_path = f"{args.output_dir}/{simulation_name}/logs"
+                simulation_config = {
+                    "persona": user_persona,
+                    "scenario": scenario,
+                    "interrupt_probability": prob,
+                    "interrupt_type": label,
+                }
 
-            logger.remove()
-            eval_logger.remove()
+                with open(f"{simulation_output_dir}/config.json", "w") as f:
+                    json.dump(simulation_config, f, indent=4)
 
-            log_file_id = eval_logger.add(
-                logs_file_path,
-                level="DEBUG",
-                format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
-                filter=add_default_source,
-                colorize=False,
-            )
+                logs_file_path = f"{args.output_dir}/{simulation_name}/logs"
 
-            print_log_save_path = f"{args.output_dir}/{simulation_name}/results.log"
-            configure_print_logger(print_log_save_path)
+                logger.remove()
+                eval_logger.remove()
 
-            command = " ".join(sys.argv)
-            log_and_print(f"\033[33mRunning command\033[0m: {command}")
+                log_file_id = eval_logger.add(
+                    logs_file_path,
+                    level="DEBUG",
+                    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
+                    filter=add_default_source,
+                    colorize=False,
+                )
 
-            log_and_print("--------------------------------")
-            log_and_print(
-                f"""Running simulation {GENERAL_LOG_COLOR}{simulation_name}{RESET_COLOR}"""
-            )
-            log_and_print(f"{GENERAL_LOG_COLOR}Persona:{RESET_COLOR}\n{user_persona}")
-            log_and_print(f"{GENERAL_LOG_COLOR}Scenario:{RESET_COLOR}\n{scenario}")
-            log_and_print("--------------------------------")
+                print_log_save_path = f"{args.output_dir}/{simulation_name}/results.log"
+                configure_print_logger(print_log_save_path)
 
-            try:
-                tasks = [
-                    asyncio.create_task(
+                command = " ".join(sys.argv)
+                log_and_print(f"\033[33mRunning command\033[0m: {command}")
+
+                log_and_print("--------------------------------")
+                log_and_print(
+                    f"""Running simulation {GENERAL_LOG_COLOR}{simulation_name}{RESET_COLOR}"""
+                )
+                log_and_print(
+                    f"{GENERAL_LOG_COLOR}Persona:{RESET_COLOR}\n{user_persona}"
+                )
+                log_and_print(f"{GENERAL_LOG_COLOR}Scenario:{RESET_COLOR}\n{scenario}")
+                log_and_print("--------------------------------")
+
+                simulation_result = None
+                try:
+                    bot_task = asyncio.create_task(
                         start_bot(
                             config["agent_system_prompt"]
                             + f"\n\nYou must always speak in {config['language']}.",
                             config["tools"],
                             config["language"],
                         )
-                    ),
-                    asyncio.create_task(
-                        run_simulation_pipeline(
+                    )
+                    sim_task = asyncio.create_task(
+                        run_simulation(
                             user_system_prompt,
                             config["language"],
+                            config["evaluation_criteria"],
                             simulation_output_dir,
-                            user_speaks_first=True,
+                            # user_speaks_first=True,
+                            interrupt_probability=prob,
                         )
-                    ),
-                ]
-                _, pending = await asyncio.wait(tasks, timeout=EVAL_TIMEOUT_SECS)
-                if pending:
-                    eval_logger.error(
-                        f"ERROR: Eval timeout expired, cancelling pending tasks..."
                     )
-                    # Both pipeline idle timeouts should have worked and both tasks
-                    # should have exited already, but if we got here something went
-                    # wrong so we perform an abrupt asyncio task cancellation, which
-                    # will not cleanup things nicely.
-                    for task in pending:
-                        task.cancel()
-                    await asyncio.gather(*pending, return_exceptions=True)
-            except Exception as e:
-                eval_logger.error(f"ERROR: Unable to run: {e}")
+                    tasks = [bot_task, sim_task]
+                    done, pending = await asyncio.wait(tasks, timeout=EVAL_TIMEOUT_SECS)
+                    if pending:
+                        eval_logger.error(
+                            f"ERROR: Eval timeout expired, cancelling pending tasks..."
+                        )
+                        # Both pipeline idle timeouts should have worked and both tasks
+                        # should have exited already, but if we got here something went
+                        # wrong so we perform an abrupt asyncio task cancellation, which
+                        # will not cleanup things nicely.
+                        for task in pending:
+                            task.cancel()
+                        await asyncio.gather(*pending, return_exceptions=True)
 
-            eval_logger.remove(log_file_id)
+                    # Get result from simulation task
+                    if sim_task in done and not sim_task.cancelled():
+                        try:
+                            simulation_result = sim_task.result()
+                        except Exception as e:
+                            eval_logger.error(
+                                f"ERROR: Failed to get simulation result: {e}"
+                            )
+                except Exception as e:
+                    eval_logger.error(f"ERROR: Unable to run: {e}")
+
+                # Aggregate metrics from this simulation
+                if simulation_result:
+                    sim_metrics_row = {"name": simulation_name}
+
+                    # Evaluation criteria metrics
+                    for eval_result in simulation_result.get("evaluation_results", []):
+                        criterion_name = eval_result["name"]
+                        match_value = float(eval_result["match"])
+                        metrics_by_criterion[criterion_name].append(match_value)
+                        sim_metrics_row[criterion_name] = match_value
+
+                    # STT LLM judge score
+                    stt_judge = simulation_result.get("metrics", {}).get(
+                        "stt_llm_judge"
+                    )
+                    if stt_judge and "score" in stt_judge:
+                        stt_llm_judge_scores.append(stt_judge["score"])
+                        sim_metrics_row["stt_llm_judge_score"] = stt_judge["score"]
+
+                    all_simulation_metrics.append(sim_metrics_row)
+
+                eval_logger.remove(log_file_id)
+
+    # Compute and save aggregated metrics
+    metrics_summary = {}
+
+    # Aggregate evaluation criteria metrics
+    for criterion_name, values in metrics_by_criterion.items():
+        metrics_summary[criterion_name] = {
+            "mean": float(np.mean(values)),
+            "std": float(np.std(values)),
+            "values": values,
+        }
+
+    # Aggregate STT LLM judge scores
+    if stt_llm_judge_scores:
+        metrics_summary["stt_llm_judge"] = {
+            "mean": float(np.mean(stt_llm_judge_scores)),
+            "std": float(np.std(stt_llm_judge_scores)),
+            "values": stt_llm_judge_scores,
+        }
+
+    # Save overall results.csv
+    if all_simulation_metrics:
+        df = pd.DataFrame(all_simulation_metrics)
+        df.to_csv(join(args.output_dir, "results.csv"), index=False)
+
+    # Save overall metrics.json
+    with open(join(args.output_dir, "metrics.json"), "w") as f:
+        json.dump(metrics_summary, f, indent=4)
 
 
 if __name__ == "__main__":

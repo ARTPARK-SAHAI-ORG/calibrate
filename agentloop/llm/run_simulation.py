@@ -35,6 +35,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
 )
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from agentloop.llm.metrics import evaluate_simuation
 import pandas as pd
@@ -201,21 +202,37 @@ async def run_simulation(
     evaluation_criteria: list[dict],
     bot_model: str = "gpt-4.1",
     user_model: str = "gpt-4.1",
+    bot_provider: str = "openai",
+    user_provider: str = "openai",
     bot_speaks_first: bool = True,
     max_turns: int = 10,
 ) -> List[str]:
     """Runs a text-only bot that processes text inputs through an LLM and returns text outputs."""
     # Create LLM service
 
-    bot_llm = OpenAILLMService(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model=bot_model,
-    )
+    if bot_provider == "openrouter":
+        bot_llm = OpenRouterLLMService(
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model=bot_model,
+            base_url="https://openrouter.ai/api/v1",
+        )
+    else:
+        bot_llm = OpenAILLMService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model=bot_model,
+        )
 
-    user_llm = OpenAILLMService(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model=user_model,
-    )
+    if user_provider == "openrouter":
+        user_llm = OpenRouterLLMService(
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model=user_model,
+            base_url="https://openrouter.ai/api/v1",
+        )
+    else:
+        user_llm = OpenAILLMService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model=user_model,
+        )
 
     conversation_state = ConversationState(max_turns=max_turns)
 
@@ -376,7 +393,7 @@ async def run_simulation(
     transcript = [
         message
         for message in bot_context._messages
-        if message["role"] not in ["system", "tool"]
+        if message["role"] not in ["system"]
     ]
 
     llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
@@ -419,11 +436,20 @@ async def main():
         default="gpt-4.1",
         help="OpenAI model to use for the evaluation",
     )
+    parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        default="openai",
+        help="LLM provider to use (openai or openrouter)",
+    )
 
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         config = json.load(f)
+
+    args.output_dir = join(args.output_dir, args.provider, args.model)
 
     os.makedirs(args.output_dir, exist_ok=True)
 
@@ -475,6 +501,8 @@ async def main():
                 evaluation_criteria=config["evaluation_criteria"],
                 bot_model=args.model,
                 user_model=args.model,
+                bot_provider=args.provider,
+                user_provider=args.provider,
                 max_turns=config.get("max_turns", 50),
             )
 

@@ -67,7 +67,7 @@ def convert_evaluation_criteria_to_prompt(evaluation_criteria: list[dict]) -> st
     )
 
 
-async def evaluate_simuation(conversation: List[str], evaluation_criteria: list[dict]):
+async def evaluate_simuation(conversation: list[dict], evaluation_criteria: list[dict]):
     client = AsyncOpenAI()
 
     conversation_as_prompt = "\n".join(

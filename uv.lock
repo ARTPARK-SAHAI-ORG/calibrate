@@ -63,7 +63,7 @@ requires-dist = [
     { name = "opentelemetry-api", specifier = ">=1.38.0" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.38.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.38.0" },
-    { name = "pipecat-ai", extras = ["cartesia", "deepgram", "google", "groq", "local-smart-turn-v3", "tracing", "webrtc", "websocket"], specifier = ">=0.0.93" },
+    { name = "pipecat-ai", extras = ["cartesia", "deepgram", "google", "groq", "local-smart-turn-v3", "openrouter", "tracing", "webrtc", "websocket"], specifier = ">=0.0.93" },
     { name = "pipecat-ai-small-webrtc-prebuilt", specifier = ">=1.0.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "sarvamai", specifier = ">=0.1.21" },

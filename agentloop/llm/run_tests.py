@@ -33,6 +33,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
 )
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from agentloop.llm.metrics import test_response_llm_judge
 
@@ -100,13 +101,21 @@ async def run_inference(
     system_prompt: str,
     tools: List[dict[str, str]] = [],
     model: str = "gpt-4.1",
+    provider: str = "openai",
 ) -> List[str]:
     """Runs a text-only bot that processes text inputs through an LLM and returns text outputs."""
     # Create LLM service
-    llm = OpenAILLMService(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model=model,
-    )
+    if provider == "openrouter":
+        llm = OpenRouterLLMService(
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model=model,
+            base_url="https://openrouter.ai/api/v1",
+        )
+    else:
+        llm = OpenAILLMService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model=model,
+        )
 
     # Create context with system prompt
     messages = [{"role": "system", "content": system_prompt}]
@@ -219,12 +228,14 @@ async def run_test(
     system_prompt: str,
     tools: List[dict[str, str]] = [],
     model: str = "gpt-4.1",
+    provider: str = "openai",
 ):
     output = await run_inference(
         chat_history=chat_history,
         system_prompt=system_prompt,
         tools=tools,
         model=model,
+        provider=provider,
     )
     metrics = {"passed": True}
     if evaluation["type"] == "tool_call":
@@ -275,6 +286,14 @@ async def main():
         help="OpenAI model to use for the evaluation",
     )
     parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        choices=["openai", "openrouter"],
+        default="openai",
+        help="LLM provider to use (openai or openrouter)",
+    )
+    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
@@ -291,7 +310,7 @@ async def main():
 
     config_name = splitext(basename(args.config))[0]
 
-    output_dir = join(args.output_dir, config_name, args.model)
+    output_dir = join(args.output_dir, config_name, args.provider, args.model)
 
     if not exists(output_dir):
         os.makedirs(output_dir)
@@ -322,6 +341,7 @@ async def main():
             system_prompt=config["system_prompt"],
             tools=config["tools"],
             model=args.model,
+            provider=args.provider,
         )
 
         if result["metrics"]["passed"]:

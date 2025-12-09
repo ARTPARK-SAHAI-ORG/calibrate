@@ -55,6 +55,10 @@
             "description": "Whether all the questions in the form were covered in the conversation - Name, Address, Telephone"
         },
         {
+            "name": "tool_calls",
+            "description": "The indices of all the questions - Name, Address, Telephone - are present in one or more tool calls and each time the user has given a valid answer to a question, the tool call is present with the indices of the questions that have been answered and the index of the next unanswered question that should be asked next."
+        },
+        {
             "name": "assistant_behavior",
             "description": "Whether the assistant asks one concise question per turn; is empathetic, does not anthropomorphise itself, and does not repeat the user's answer back to them."
         }

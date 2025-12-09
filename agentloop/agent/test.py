@@ -10,8 +10,9 @@ from loguru import logger
 import shutil
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
+from typing import Literal
 
-from utils import save_audio_chunk
+from agentloop.utils import save_audio_chunk
 from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -30,9 +31,14 @@ from pipecat.transcriptions.language import Language
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
 from pipecat.services.cartesia.tts import CartesiaTTSService
+from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOptions
 from pipecat.services.deepgram.stt import DeepgramSTTService, LiveOptions
+from pipecat.services.deepgram.tts import DeepgramTTSService
 from pipecat.services.llm_service import FunctionCallParams
+
 from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openrouter.llm import OpenRouterLLMService
+
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 
@@ -40,9 +46,16 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.services.google.tts import GoogleTTSService
 from pipecat.services.google.stt import GoogleSTTService
 from pipecat.services.openai.stt import OpenAISTTService
-from integrations.smallest.stt import SmallestSTTService
-from integrations.smallest.tts import SmallestTTSService
+from pipecat.services.openai.tts import OpenAITTSService
+from agentloop.integrations.smallest.stt import SmallestSTTService
+from agentloop.integrations.smallest.tts import SmallestTTSService
 from pipecat.services.sarvam.stt import SarvamSTTService
+from pipecat.services.sarvam.tts import SarvamTTSService
+
+from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
+from pipecat.services.elevenlabs.tts import (
+    ElevenLabsTTSService,
+)
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 
@@ -88,10 +101,45 @@ transport_params = {
 
 
 @dataclass
+class STTConfig:
+    provider: Literal[
+        "deepgram", "google", "openai", "elevenlabs", "sarvam", "cartesia", "smallest"
+    ] = "elevenlabs"
+    model: Optional[str] = None
+
+
+@dataclass
+class TTSConfig:
+    provider: Literal[
+        "elevenlabs",
+        "cartesia",
+        "google",
+        "openai",
+        "smallest",
+        "deepgram",
+        "sarvam",
+    ] = "elevenlabs"
+    voice_id: Optional[str] = None
+    model: Optional[str] = None
+    instructions: Optional[str] = None
+
+
+@dataclass
+class LLMConfig:
+    provider: Literal["openrouter", "openai"] = "openrouter"
+    model: str = "openai/gpt-4o-2024-11-20"
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+
+
+@dataclass
 class BotConfig:
     system_prompt: str
     language: str
     tools: list[dict]
+    stt: STTConfig
+    tts: TTSConfig
+    llm: LLMConfig
 
 
 def parse_bot_config(config_data: Dict[str, Any]) -> BotConfig:
@@ -102,10 +150,35 @@ def parse_bot_config(config_data: Dict[str, Any]) -> BotConfig:
     language = config_data.get("language", "english")
     tools = config_data.get("tools", [])
 
+    stt_data = config_data.get("stt", {})
+    stt_config = STTConfig(
+        provider=stt_data.get("provider", "elevenlabs"),
+        model=stt_data.get("model"),
+    )
+
+    tts_data = config_data.get("tts", {})
+    tts_config = TTSConfig(
+        provider=tts_data.get("provider", "elevenlabs"),
+        voice_id=tts_data.get("voice_id"),
+        model=tts_data.get("model"),
+        instructions=tts_data.get("instructions"),
+    )
+
+    llm_data = config_data.get("llm", {})
+    llm_config = LLMConfig(
+        provider=llm_data.get("provider", "openrouter"),
+        model=llm_data.get("model", "openai/gpt-4o-2024-11-20"),
+        base_url=llm_data.get("base_url"),
+        api_key=llm_data.get("api_key"),
+    )
+
     return BotConfig(
         system_prompt=system_prompt,
         language=language,
         tools=tools,
+        stt=stt_config,
+        tts=tts_config,
+        llm=llm_config,
     )
 
 
@@ -117,53 +190,155 @@ async def run_bot(
 ):
     logger.info(f"Starting bot")
 
-    language = Language.HI if config.language == "hindi" else Language.EN
+    # Helper for language mapping
+    def get_language_enum(lang_str: str) -> Language:
+        if lang_str == "hindi":
+            return Language.HI
+        elif lang_str == "kannada":
+            return Language.KN
+        return Language.EN
 
-    # stt = DeepgramSTTService(
-    #     api_key=os.getenv("DEEPGRAM_API_KEY"),
-    #     live_options=LiveOptions(language=Language.HI.value),
-    # )
-    # stt = GoogleSTTService(
-    #     params=GoogleSTTService.InputParams(
-    #         languages=language,
-    #         # model="chirp_3",
-    #     ),
-    #     credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-    # )
+    # --- STT Setup ---
+    stt_config = config.stt
+    stt_language = get_language_enum(config.language)
 
-    # stt = SmallestSTTService(
-    #     api_key=os.getenv("SMALLEST_API_KEY"),
-    #     url="wss://waves-api.smallest.ai/api/v1/asr",
-    #     params=SmallestSTTService.SmallestInputParams(
-    #         audioLanguage=language.value,
-    #     ),
-    # )
-    # stt = SarvamSTTService(
-    #     api_key=os.getenv("SARVAM_API_KEY"),
-    #     params=SarvamSTTService.InputParams(
-    #         language=language.value,
-    #     ),
-    # )
+    if stt_config.provider == "deepgram":
+        stt = DeepgramSTTService(
+            api_key=os.getenv("DEEPGRAM_API_KEY"),
+            live_options=LiveOptions(language=stt_language.value),
+        )
+    elif stt_config.provider == "google":
+        stt = GoogleSTTService(
+            params=GoogleSTTService.InputParams(languages=stt_language),
+            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        )
+    elif stt_config.provider == "openai":
+        stt = OpenAISTTService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            model=stt_config.model or "gpt-4o-transcribe",
+            language=stt_language,
+        )
+    elif stt_config.provider == "elevenlabs":
+        stt = ElevenLabsRealtimeSTTService(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            params=ElevenLabsRealtimeSTTService.InputParams(
+                language_code=stt_language.value,
+            ),
+        )
+    elif stt_config.provider == "sarvam":
+        sarvam_lang = (
+            Language.KN_IN
+            if config.language == "kannada"
+            else Language.HI_IN if config.language == "hindi" else Language.EN_IN
+        )
+        stt = SarvamSTTService(
+            api_key=os.getenv("SARVAM_API_KEY"),
+            params=SarvamSTTService.InputParams(language=sarvam_lang.value),
+        )
+    elif stt_config.provider == "cartesia":
+        stt = CartesiaSTTService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            live_options=CartesiaLiveOptions(language=stt_language.value),
+        )
+    elif stt_config.provider == "smallest":
+        stt = SmallestSTTService(
+            api_key=os.getenv("SMALLEST_API_KEY"),
+            url="wss://waves-api.smallest.ai/api/v1/asr",
+            params=SmallestSTTService.SmallestInputParams(
+                audioLanguage=stt_language.value,
+            ),
+        )
+    else:
+        raise ValueError(f"Unknown STT provider: {stt_config.provider}")
 
-    stt = OpenAISTTService(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        model="gpt-4o-transcribe",
-        language=Language.HI,
-    )
+    # --- TTS Setup ---
+    tts_config = config.tts
+    tts_language = get_language_enum(config.language)
 
-    tts = GoogleTTSService(
-        voice_id="hi-IN-Chirp3-HD-Achernar",
-        params=GoogleTTSService.InputParams(language=Language.HI_IN),
-        credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-    )
+    if tts_config.provider == "elevenlabs":
+        default_voice = (
+            "jUjRbhZWoMK4aDciW36V"
+            if config.language == "hindi"
+            else "90ipbRoKi4CpHXvKVtl0"
+        )
+        voice_id = tts_config.voice_id or default_voice
+        tts = ElevenLabsTTSService(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            voice_id=voice_id,
+            params=ElevenLabsTTSService.InputParams(language=tts_language),
+        )
+    elif tts_config.provider == "cartesia":
+        default_voice = (
+            "28ca2041-5dda-42df-8123-f58ea9c3da00"
+            if config.language == "hindi"
+            else "66c6b81c-ddb7-4892-bdd5-19b5a7be38e7"
+        )
+        voice_id = tts_config.voice_id or default_voice
+        tts = CartesiaTTSService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            voice_id=voice_id,
+            model=tts_config.model or "sonic-3",
+            params=CartesiaTTSService.InputParams(language=tts_language),
+        )
+    elif tts_config.provider == "google":
+        default_voice = (
+            "hi-IN-Chirp3-HD-Achernar"
+            if config.language == "hindi"
+            else "en-US-Chirp3-HD-Achernar"
+        )
+        tts = GoogleTTSService(
+            voice_id=tts_config.voice_id or default_voice,
+            params=GoogleTTSService.InputParams(language=tts_language),
+            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        )
+    elif tts_config.provider == "openai":
+        tts = OpenAITTSService(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            voice=tts_config.voice_id or "fable",
+            params=OpenAITTSService.InputParams(instructions=tts_config.instructions),
+        )
+    elif tts_config.provider == "smallest":
+        default_voice = "aarushi"
+        tts = SmallestTTSService(
+            api_key=os.getenv("SMALLEST_API_KEY"),
+            voice_id=tts_config.voice_id or default_voice,
+            params=SmallestTTSService.InputParams(language=tts_language),
+        )
+    elif tts_config.provider == "deepgram":
+        tts = DeepgramTTSService(
+            api_key=os.getenv("DEEPGRAM_API_KEY"),
+            voice=tts_config.voice_id or "aura-2-andromeda-en",
+        )
+    elif tts_config.provider == "sarvam":
+        sarvam_lang = (
+            Language.KN_IN
+            if config.language == "kannada"
+            else Language.HI_IN if config.language == "hindi" else Language.EN_IN
+        )
+        tts = SarvamTTSService(
+            api_key=os.getenv("SARVAM_API_KEY"),
+            model=tts_config.model or "bulbul:v2",
+            voice_id=tts_config.voice_id or "abhilash",
+            params=SarvamTTSService.InputParams(language=sarvam_lang),
+        )
+    else:
+        raise ValueError(f"Unknown TTS provider: {tts_config.provider}")
 
-    # tts = SmallestTTSService(
-    #     api_key=os.getenv("SMALLEST_API_KEY"),
-    #     params=SmallestTTSService.InputParams(language=language),
-    #     voice_id="aarushi",
-    # )
-
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4.1")
+    # --- LLM Setup ---
+    llm_config = config.llm
+    if llm_config.provider == "openrouter":
+        llm = OpenRouterLLMService(
+            api_key=llm_config.api_key or os.getenv("OPENROUTER_API_KEY"),
+            model=llm_config.model,
+            base_url=llm_config.base_url or "https://openrouter.ai/api/v1",
+        )
+    elif llm_config.provider == "openai":
+        llm = OpenAILLMService(
+            api_key=llm_config.api_key or os.getenv("OPENAI_API_KEY"),
+            model=llm_config.model,
+        )
+    else:
+        raise ValueError(f"Unknown LLM provider: {llm_config.provider}")
 
     messages = [
         {
@@ -329,6 +504,17 @@ async def run_bot(
     runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
 
     await runner.run(task)
+
+    print("Conversation complete. Saving conversation transcript...")
+
+    transcript = [
+        message for message in context.get_messages() if message.get("role") != "system"
+    ]
+
+    with open(join(output_dir, "transcript.json"), "w") as transcript_file:
+        json.dump(transcript, transcript_file, indent=4)
+
+    print(f"Conversation transcript saved to {join(output_dir, 'transcript.json')}")
 
 
 async def bot(runner_args: RunnerArguments):

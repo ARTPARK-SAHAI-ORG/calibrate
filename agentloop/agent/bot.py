@@ -13,11 +13,15 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     Frame,
+    InterruptionFrame,
     LLMRunFrame,
     MetricsFrame,
     InputAudioRawFrame,
     OutputAudioRawFrame,
+    OutputTransportMessageUrgentFrame,
+    InputTransportMessageFrame,
     FunctionCallResultFrame,
+    UserStartedSpeakingFrame,
     FunctionCallResultProperties,
 )
 from pipecat.metrics.metrics import (
@@ -57,22 +61,25 @@ from pipecat.services.google.llm import GoogleLLMService
 from pipecat.services.google.stt import GoogleSTTService
 from pipecat.services.google.tts import GoogleTTSService
 
-from pipecat.services.elevenlabs.stt import ElevenLabsSTTService, Language
+from pipecat.services.sarvam.stt import SarvamSTTService
+from pipecat.services.sarvam.tts import SarvamTTSService
+
+from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService, Language
 from pipecat.services.elevenlabs.tts import (
     ElevenLabsTTSService,
-    ElevenLabsHttpTTSService,
 )
 
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport, TransportParams
 
 # from pipecat.transports.daily.transport import DailyParams
-from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.processors.aggregators.openai_llm_context import OpenAILLMContext
+from pipecat.observers.loggers.user_bot_latency_log_observer import (
+    UserBotLatencyLogObserver,
+)
 
 bot_logger = logger.bind(source="BOT")
 
@@ -101,14 +108,14 @@ class MetricsLogger(FrameProcessor):
 
 class STTConfig(BaseModel):
     provider: Literal[
-        "deepgram", "google", "openai", "cartesia", "smallest", "elevenlabs"
+        "deepgram", "google", "openai", "cartesia", "smallest", "elevenlabs", "sarvam"
     ] = "deepgram"
 
 
 class TTSConfig(BaseModel):
-    provider: Literal["cartesia", "google", "openai", "smallest", "elevenlabs"] = (
-        "google"
-    )
+    provider: Literal[
+        "cartesia", "google", "openai", "smallest", "elevenlabs", "sarvam"
+    ] = "google"
     instructions: str = None
 
 
@@ -134,9 +141,9 @@ async def run_bot(
     bot_logger.info(f"Starting bot")
 
     stt_language = (
-        Language.EN
-        if language == "english"
-        else Language.HI if language == "hindi" else Language.KN
+        Language.KN
+        if language == "kannada"
+        else Language.HI if language == "hindi" else Language.EN
     )
 
     if stt_config.provider == "deepgram":
@@ -156,6 +163,23 @@ async def run_bot(
             # prompt=prompt,
             language=stt_language,
         )
+    elif stt_config.provider == "elevenlabs":
+        stt = ElevenLabsRealtimeSTTService(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            params=ElevenLabsRealtimeSTTService.InputParams(
+                language_code=stt_language.value,
+            ),
+        )
+    elif stt_config.provider == "sarvam":
+        stt_language = (
+            Language.KN_IN
+            if language == "kannada"
+            else Language.HI_IN if language == "hindi" else Language.EN_IN
+        )
+        stt = SarvamSTTService(
+            api_key=os.getenv("SARVAM_API_KEY"),
+            params=SarvamSTTService.InputParams(language=stt_language.value),
+        )
     elif stt_config.provider == "cartesia":
         stt = CartesiaSTTService(
             api_key=os.getenv("CARTESIA_API_KEY"),
@@ -169,16 +193,6 @@ async def run_bot(
                 audioLanguage=stt_language,
             ),
         )
-    # import aiohttp
-
-    # async with aiohttp.ClientSession() as session
-    #     stt = ElevenLabsSTTService(
-    #             api_key=os.getenv("ELEVENLABS_API_KEY"),
-    #             aiohttp_session=session,
-    #             params=ElevenLabsSTTService.InputParams(
-    #                 language=Language.HI, tag_audio_events=True
-    #             ),
-    #         )
 
     tts_language = (
         Language.EN
@@ -228,7 +242,18 @@ async def run_bot(
             ),
             voice_id="Ui0HFqLn4HkcAenlJJVJ",
         )
-
+    elif tts_config.provider == "sarvam":
+        tts_language = (
+            Language.KN_IN
+            if language == "kannada"
+            else Language.HI_IN if language == "hindi" else Language.EN_IN
+        )
+        tts = SarvamTTSService(
+            api_key=os.getenv("SARVAM_API_KEY"),
+            model="bulbul:v2",
+            voice_id="abhilash",
+            params=SarvamTTSService.InputParams(language=tts_language),
+        )
     elif tts_config.provider == "openai":
 
         # You are an indian nurse in a public health clinic. Speak in a natural, conversational tone. Have an indian accent and you should sound indian. {extra_instructions}
@@ -254,7 +279,9 @@ async def run_bot(
     #     )
 
     if llm_config.provider == "openai":
-        llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"))
+        llm = OpenAILLMService(
+            api_key=os.getenv("OPENAI_API_KEY"), model=llm_config.model
+        )
     elif llm_config.provider == "google":
         llm = GoogleLLMService(
             api_key=os.getenv("GOOGLE_API_KEY"),
@@ -377,6 +404,34 @@ async def run_bot(
 
     pending_tool_calls: Dict[str, FunctionCallParams] = {}
 
+    class IOLogger(FrameProcessor):
+        def __init__(
+            self,
+        ):
+            super().__init__()
+
+        async def process_frame(self, frame, direction):
+            await super().process_frame(frame, direction)
+
+            logger.info(f"bot frame: {frame}")
+
+            if isinstance(frame, InputTransportMessageFrame):
+                logger.info(f"InputTransportMessageFrame yesss: {frame}")
+
+            if isinstance(frame, OutputTransportMessageUrgentFrame):
+                logger.info(f"OutputTransportMessageUrgentFrame yesss: {frame}")
+
+            if (
+                isinstance(frame, InputTransportMessageFrame)
+                and hasattr(frame, "message")
+                and frame.message.get("type") == "client-message"
+                and frame.message.get("data", {}).get("t") == "interrupt"
+            ):
+                logger.info(f"Simulating user interruption of the bot")
+                self.push_frame(InterruptionFrame(), FrameDirection.UPSTREAM)
+
+            await self.push_frame(frame, direction)
+
     class FunctionCallResultHandler(FrameProcessor):
         def __init__(self):
             super().__init__(enable_direct_mode=True, name="FunctionCallResultHandler")
@@ -418,6 +473,7 @@ async def run_bot(
     pipeline_processors = [
         transport.input(),
         rtvi,
+        IOLogger(),
     ]
 
     if mode == "eval":
@@ -445,8 +501,12 @@ async def run_bot(
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi), LLMLogObserver()],  # RTVI protocol events
-        idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
+        observers=[
+            RTVIObserver(rtvi),
+            LLMLogObserver(),
+            UserBotLatencyLogObserver(),
+        ],  # RTVI protocol events
+        cancel_on_idle_timeout=False,
     )
 
     @transport.event_handler("on_client_connected")
