@@ -47,7 +47,6 @@ from pipecat.transcriptions.language import Language
 
 from pipecat.frames.frames import (
     EndFrame,
-    InterruptionFrame,
     AggregatedTextFrame,
     StopFrame,
     CancelFrame,
@@ -61,12 +60,15 @@ from pipecat.frames.frames import (
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
     InputAudioRawFrame,
+    OutputAudioRawFrame,
     LLMMessagesAppendFrame,
     LLMFullResponseStartFrame,
     LLMFullResponseEndFrame,
     TextFrame,
     InputTransportMessageFrame,
     OutputTransportMessageUrgentFrame,
+    Frame,
+    InterruptionFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -145,6 +147,454 @@ async def start_bot(
         language=language,
         mode="eval",
     )
+
+
+class RTVIMessageFrameAdapter(FrameProcessor):
+    def __init__(
+        self,
+        context: LLMContext,
+        audio_buffer: AudioBufferProcessor,
+        interrupt_probability: float,
+        tool_calls: list[dict],
+        stt_outputs: list[str],
+        ttft: defaultdict,
+        processing_time: defaultdict,
+        output_dir: str,
+    ):
+        super().__init__(enable_direct_mode=True, name="RTVIMessageFrameAdapter")
+        self._context = context
+        self._audio_buffer = audio_buffer
+        self._interrupt_probability = interrupt_probability
+        self._tool_calls = tool_calls
+        self._output_dir = Path(output_dir)
+        self._turn_index = 0
+        self._stt_outputs = stt_outputs
+        self._ttft = ttft
+        self._processing_time = processing_time
+        self._text_buffer = ""  # buffer of the text that the bot has generated so far
+        self._spoken_text_buffer = (
+            ""  # buffer of the text that the bot has spoken so far
+        )
+        self._is_bot_interrupt_decided = False  # whether the decision to interrupt the bot by the user has been made yet
+        self._is_bot_interrupt_triggered = False  # whether the spoken text buffer is complete and matches the text buffer; only when this becomes true is when the intteruption actually triggered
+        self._turns_concluded = set()
+        self._serialized_transcript = []  # Store transcripts for return
+
+    async def _reset_buffers(self):
+        self._turns_concluded.add(self._turn_index)  # mark the turn as concluded
+        self._text_buffer = ""
+        self._spoken_text_buffer = ""
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, OutputAudioRawFrame) and self._is_bot_interrupt_triggered:
+            # don't forward bot audio frames after the interruption has been triggered
+            return
+
+        if isinstance(frame, InputTransportMessageFrame):
+            message = getattr(frame, "message", {}) or {}
+            if message.get("label") == "rtvi-ai":
+                msg_type = message.get("type")
+                data = message.get("data") or {}
+                generated_frames: list = []
+                timestamp = time_now_iso8601()
+                user_id = ""
+
+                if msg_type == "bot-started-speaking":
+                    self._audio_buffer._reset_all_audio_buffers()
+                    self._turn_index += 1
+                    eval_logger.info(f"[rtvi] turn index: {self._turn_index}")
+                    generated_frames.append(UserStartedSpeakingFrame())
+                elif (
+                    msg_type == "bot-stopped-speaking"
+                    and self._turn_index not in self._turns_concluded
+                ):
+                    generated_frames.extend(
+                        [
+                            TranscriptionFrame(
+                                text=self._text_buffer,
+                                user_id=user_id,
+                                timestamp=timestamp,
+                                result={},
+                            ),
+                            UserStoppedSpeakingFrame(),
+                        ]
+                    )
+                    await self._reset_buffers()
+                elif msg_type == "user-stopped-speaking":
+                    # once the simulated user starts speaking, mark the bot as not
+                    # interrupted anymore and spoken text buffer as not complete anymore
+                    self._is_bot_interrupt_decided = False
+                    self._is_bot_interrupt_triggered = False
+                elif msg_type == "bot-output":
+                    text = data.get("text") or ""
+                    spoken = data.get("spoken") or False
+
+                    if text:
+                        log_and_print(
+                            f"{INTERRUPTION_COLOR}Agent message for debugging: {data}{RESET_COLOR}"
+                        )
+                        if (
+                            (
+                                not self._is_bot_interrupt_decided or spoken
+                            )  # only continue if either the decision to interrupt the bot by the user has not been made yet or the message is being spoken by the bot and does not match the interrupted text yet
+                            and not self._is_bot_interrupt_triggered  # bot has not been interrupted yet
+                        ):
+                            if spoken and self._is_bot_interrupt_decided:
+                                log_and_print(
+                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message before interruption: {text}{RESET_COLOR}"
+                                )
+
+                                # the text is being spoken by the bot and the decision to interrupt
+                                # the bot by the user has been made
+                                self._spoken_text_buffer += " " + text
+
+                                # once the spoken text buffer matches the text buffer, mark the spoken
+                                # text buffer as complete and interrupt the bot by the simulated user
+                                if self._spoken_text_buffer == self._text_buffer:
+                                    self._is_bot_interrupt_triggered = True
+
+                                    await self.push_frame(
+                                        OutputTransportMessageUrgentFrame(
+                                            message={
+                                                "label": "rtvi-ai",
+                                                "type": "client-message",
+                                                "id": str(uuid4()),
+                                                "data": {
+                                                    "t": "interrupt",
+                                                },
+                                            }
+                                        ),
+                                        FrameDirection.DOWNSTREAM,
+                                    )
+
+                                    generated_frames.extend(
+                                        [
+                                            TranscriptionFrame(
+                                                text=self._text_buffer,
+                                                user_id=user_id,
+                                                timestamp=timestamp,
+                                                result={},
+                                            ),
+                                            UserStoppedSpeakingFrame(),
+                                        ]
+                                    )
+
+                                    await self._reset_buffers()
+                            elif not spoken and not self._is_bot_interrupt_decided:
+                                # the text has been spoken by the bot yet and the decision to
+                                # interrupt the bot by the user has not been made yet
+                                log_and_print(
+                                    f"{PARTIAL_AGENT_MESSAGE_COLOR}Received agent message{RESET_COLOR}: {text}{RESET_COLOR}"
+                                )
+                                self._text_buffer += " " + text
+
+                                result_payload = data if data else None
+
+                                if (
+                                    np.random.rand() < self._interrupt_probability
+                                    and not self._is_bot_interrupt_decided
+                                ):
+                                    # decide to interrupt the bot by the simulated user based on whatever they have said so far
+                                    # the actual interruption will happen when the bot finishes speaking the text recorded so far
+                                    log_and_print(
+                                        f"--------------------------------\n{INTERRUPTION_COLOR}[User interrupts the bot]{RESET_COLOR}\n--------------------------------"
+                                    )
+
+                                    # mark the text collected so far as the text after which the user will interrupt the bot
+                                    # we still need to wait for the bot to finish speaking the text after which the user will interrupt the bot
+                                    self._is_bot_interrupt_decided = True
+
+                                # add the interim transcription frame for the text buffer as usual
+                                generated_frames.append(
+                                    InterimTranscriptionFrame(
+                                        text=self._text_buffer,
+                                        user_id=user_id,
+                                        timestamp=timestamp,
+                                        result=result_payload,
+                                    )
+                                )
+                            elif spoken:
+                                log_and_print(
+                                    f"{GENERAL_LOG_COLOR}Agent just speaking the generated message: {text}{RESET_COLOR}"
+                                )
+
+                        else:
+                            if not spoken:
+                                log_and_print(
+                                    f"{PARTIAL_AGENT_MESSAGE_COLOR_IGNORED}Received agent message (ignored){RESET_COLOR}: {text}{RESET_COLOR}"
+                                )
+                            else:
+                                log_and_print(
+                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message 2: {text}{RESET_COLOR}"
+                                )
+
+                for generated_frame in generated_frames:
+                    await self.push_frame(generated_frame, direction)
+
+        if isinstance(frame, EndFrame) or isinstance(frame, CancelFrame):
+            try:
+                self._output_dir.mkdir(parents=True, exist_ok=True)
+
+                serialized_transcript: list[dict] = []
+
+                tool_call_current_index = 0
+
+                for index, message in enumerate(self._context.get_messages()):
+                    if not isinstance(message, dict):
+                        continue
+                    role = message.get("role")
+
+                    if (
+                        tool_call_current_index < len(self._tool_calls)
+                        and self._tool_calls[tool_call_current_index].get("position")
+                        == index
+                    ):
+                        serialized_transcript.append(
+                            {
+                                "role": "tool_call",
+                                "content": self._tool_calls[
+                                    tool_call_current_index
+                                ].get("data"),
+                            }
+                        )
+                        tool_call_current_index += 1
+
+                    # flip the role as the user for the transcript is the agent and vice versa
+                    if role == "user":
+                        role = "assistant"
+                    elif role == "assistant":
+                        role = "user"
+
+                    serialized_transcript.append(
+                        {
+                            "role": role,
+                            "content": message.get("content", ""),
+                        }
+                    )
+
+                while tool_call_current_index < len(self._tool_calls):
+                    serialized_transcript.append(
+                        {
+                            "role": "tool_call",
+                            "content": self._tool_calls[tool_call_current_index].get(
+                                "data"
+                            ),
+                        }
+                    )
+                    tool_call_current_index += 1
+
+                serialized_transcript = [
+                    message
+                    for message in serialized_transcript
+                    if message.get("role") in {"user", "assistant", "tool_call"}
+                ]
+
+                # Store transcripts for return
+                self._serialized_transcript = serialized_transcript
+
+                with open(
+                    os.path.join(self._output_dir, "transcripts.json"), "w"
+                ) as transcripts_file:
+                    json.dump(serialized_transcript, transcripts_file, indent=4)
+
+                with open(
+                    os.path.join(self._output_dir, "tool_calls.json"), "w"
+                ) as tool_calls_file:
+                    json.dump(self._tool_calls, tool_calls_file, indent=4)
+
+                with open(
+                    os.path.join(self._output_dir, "stt_outputs.json"), "w"
+                ) as stt_outputs_file:
+                    json.dump(self._stt_outputs, stt_outputs_file, indent=4)
+
+            except Exception as exc:
+                eval_logger.error(
+                    "Failed to persist RTVI transcripts",
+                    extra={"error": str(exc)},
+                )
+
+        await self.push_frame(frame, direction)
+
+
+class MetricsLogger(FrameProcessor):
+    def __init__(
+        self, ttft: defaultdict, processing_time: defaultdict, context: LLMContext
+    ):
+        super().__init__(enable_direct_mode=True, name="MetricsLogger")
+        self._ttft = ttft
+        self._processing_time = processing_time
+        self._context = context
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if (
+            isinstance(frame, InputTransportMessageFrame)
+            and self._context.get_messages()
+        ):
+            message = getattr(frame, "message", {})
+            if isinstance(message, dict) and message.get("label") == "rtvi-ai":
+                if message.get("type") == "metrics" and message.get("data"):
+                    if message.get("data").get("ttfb"):
+                        for d in message.get("data").get("ttfb"):
+                            if not d.get("value"):
+                                continue
+                            self._ttft[d.get("processor")].append(d.get("value"))
+                    if message.get("data").get("processing"):
+                        for d in message.get("data").get("processing"):
+                            if not d.get("value"):
+                                continue
+                            self._processing_time[d.get("processor")].append(
+                                d.get("value")
+                            )
+
+        await self.push_frame(frame, direction)
+
+
+class STTLogger(FrameProcessor):
+    def __init__(self, stt_outputs: list[str], rtvi_adapter):
+        super().__init__(enable_direct_mode=True, name="STTLogger")
+        self._stt_outputs = stt_outputs
+        self._rtvi_adapter = rtvi_adapter
+        self._stt_outputs.append("")
+        self.last_turn_index = 0
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, InputTransportMessageFrame):
+            message = getattr(frame, "message", {}) or {}
+            if message.get("label") == "rtvi-ai":
+                msg_type = message.get("type")
+                data = message.get("data") or {}
+
+                if msg_type == "user-transcription":
+                    if (text := data.get("text")) and data.get("final"):
+                        log_and_print(
+                            f"{USER_MESSAGE_COLOR}[User (as transcribed by the agent)]{RESET_COLOR}: {text}"
+                        )
+                        if self._rtvi_adapter._turn_index > self.last_turn_index:
+                            self._stt_outputs.append(text)
+                            self.last_turn_index = self._rtvi_adapter._turn_index
+                        else:
+                            self._stt_outputs[-1] += text
+
+        await self.push_frame(frame, direction)
+
+
+class IOLogger(FrameProcessor):
+    def __init__(
+        self,
+    ):
+        super().__init__()
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, TTSTextFrame) and hasattr(frame, "text"):
+            log_and_print(
+                f"{USER_MESSAGE_COLOR}[User]\033[0m: {frame.text}{RESET_COLOR}"
+            )
+
+        await self.push_frame(frame, direction)
+
+
+class RTVIFunctionCallResponder(FrameProcessor):
+    def __init__(self, tool_calls: list[dict], context: LLMContext):
+        super().__init__(enable_direct_mode=True, name="RTVIFunctionCallResponder")
+        self._send_frame = None
+        self._end_call_callback = None
+        self._tool_calls = tool_calls
+        self._context = context
+
+    def set_frame_sender(self, sender):
+        self._send_frame = sender
+
+    def set_end_call_callback(self, callback):
+        self._end_call_callback = callback
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, InputTransportMessageFrame):
+            message = getattr(frame, "message", {})
+            if isinstance(message, dict) and message.get("label") == "rtvi-ai":
+                if message.get("type") == "llm-function-call":
+                    tool_call_name = message.get("data", {}).get("function_name")
+                    arguments = message.get("data", {}).get("args") or {}
+
+                    log_and_print(
+                        f"{TOOL_CALL_COLOR}tool call: {tool_call_name} invoked with arguments: {arguments}{RESET_COLOR}"
+                    )
+
+                    self._tool_calls.append(
+                        {
+                            "position": len(self._context.get_messages()),
+                            "data": message.get("data"),
+                        }
+                    )
+
+                    data = message.get("data") or {}
+                    function_name = data.get("function_name")
+                    tool_call_id = data.get("tool_call_id")
+                    arguments = data.get("args") or {}
+
+                    if function_name and tool_call_id:
+                        result, post_callback = await self._execute_function(
+                            function_name, arguments
+                        )
+                        await self._send_result_message(
+                            function_name, tool_call_id, arguments, result
+                        )
+                        if post_callback:
+                            await post_callback()
+
+        await self.push_frame(frame, direction)
+
+    async def _execute_function(self, function_name, arguments):
+        if function_name == "end_call":
+            reason = arguments.get("reason")
+
+            async def _post_callback():
+                if self._end_call_callback:
+                    await self._end_call_callback(reason)
+
+            result = {"acknowledged": True}
+            if reason:
+                result["reason"] = reason
+            return result, _post_callback
+
+        if function_name == "plan_next_question":
+            return {"status": "received"}, None
+
+        return {"status": "unhandled"}, None
+
+    async def _send_result_message(
+        self, function_name, tool_call_id, arguments, result
+    ):
+        if not self._send_frame:
+            eval_logger.warning(
+                "Skipping function call result send; sender not configured",
+                extra={"function_name": function_name},
+            )
+            return
+
+        payload = {
+            "label": "rtvi-ai",
+            "type": "llm-function-call-result",
+            "id": str(uuid4()),
+            "data": {
+                "function_name": function_name,
+                "tool_call_id": tool_call_id,
+                "arguments": arguments,
+                "result": result,
+            },
+        }
+
+        frame = OutputTransportMessageUrgentFrame(message=payload)
+        await self._send_frame(frame)
 
 
 async def run_simulation(
@@ -264,449 +714,25 @@ async def run_simulation(
 
     audio_buffer = AudioBufferProcessor(enable_turn_audio=True)
 
-    class RTVIFunctionCallResponder(FrameProcessor):
-        def __init__(self, tool_calls: list[dict], context: LLMContext):
-            super().__init__(enable_direct_mode=True, name="RTVIFunctionCallResponder")
-            self._send_frame = None
-            self._end_call_callback = None
-            self._tool_calls = tool_calls
-            self._context = context
-
-        def set_frame_sender(self, sender):
-            self._send_frame = sender
-
-        def set_end_call_callback(self, callback):
-            self._end_call_callback = callback
-
-        async def process_frame(self, frame, direction):
-            await super().process_frame(frame, direction)
-
-            if isinstance(frame, InputTransportMessageFrame):
-                message = getattr(frame, "message", {})
-                if isinstance(message, dict) and message.get("label") == "rtvi-ai":
-                    if message.get("type") == "llm-function-call":
-                        tool_call_name = message.get("data", {}).get("function_name")
-                        arguments = message.get("data", {}).get("args") or {}
-
-                        log_and_print(
-                            f"{TOOL_CALL_COLOR}tool call: {tool_call_name} invoked with arguments: {arguments}{RESET_COLOR}"
-                        )
-
-                        self._tool_calls.append(
-                            {
-                                "position": len(self._context.get_messages()),
-                                "data": message.get("data"),
-                            }
-                        )
-
-                        data = message.get("data") or {}
-                        function_name = data.get("function_name")
-                        tool_call_id = data.get("tool_call_id")
-                        arguments = data.get("args") or {}
-
-                        if function_name and tool_call_id:
-                            result, post_callback = await self._execute_function(
-                                function_name, arguments
-                            )
-                            await self._send_result_message(
-                                function_name, tool_call_id, arguments, result
-                            )
-                            if post_callback:
-                                await post_callback()
-
-            await self.push_frame(frame, direction)
-
-        async def _execute_function(self, function_name, arguments):
-            if function_name == "end_call":
-                reason = arguments.get("reason")
-
-                async def _post_callback():
-                    if self._end_call_callback:
-                        await self._end_call_callback(reason)
-
-                result = {"acknowledged": True}
-                if reason:
-                    result["reason"] = reason
-                return result, _post_callback
-
-            if function_name == "plan_next_question":
-                return {"status": "received"}, None
-
-            return {"status": "unhandled"}, None
-
-        async def _send_result_message(
-            self, function_name, tool_call_id, arguments, result
-        ):
-            if not self._send_frame:
-                eval_logger.warning(
-                    "Skipping function call result send; sender not configured",
-                    extra={"function_name": function_name},
-                )
-                return
-
-            payload = {
-                "label": "rtvi-ai",
-                "type": "llm-function-call-result",
-                "id": str(uuid4()),
-                "data": {
-                    "function_name": function_name,
-                    "tool_call_id": tool_call_id,
-                    "arguments": arguments,
-                    "result": result,
-                },
-            }
-
-            frame = OutputTransportMessageUrgentFrame(message=payload)
-            await self._send_frame(frame)
-
-    class RTVIMessageFrameAdapter(FrameProcessor):
-        def __init__(
-            self,
-            context: LLMContext,
-            tool_calls: list[dict],
-            stt_outputs: list[str],
-            ttft: defaultdict,
-            processing_time: defaultdict,
-            output_dir: str,
-        ):
-            super().__init__(enable_direct_mode=True, name="RTVIMessageFrameAdapter")
-            self._context = context
-            self._tool_calls = tool_calls
-            self._output_dir = Path(output_dir)
-            self._turn_index = 0
-            self._stt_outputs = stt_outputs
-            self._ttft = ttft
-            self._processing_time = processing_time
-            self._text_buffer = (
-                ""  # buffer of the text that the bot has generated so far
-            )
-            self._spoken_text_buffer = (
-                ""  # buffer of the text that the bot has spoken so far
-            )
-            self._is_bot_interrupted = (
-                False  # whether the bot has been interrupted by the user yet
-            )
-            self._is_spoken_text_buffer_complete = False  # whether the spoken text buffer is complete and matches the text buffer; only used for interruption simulations
-            self._turns_concluded = set()
-            self._serialized_transcript = []  # Store transcripts for return
-
-        def _reset_buffers(self):
-            self._turns_concluded.add(self._turn_index)  # mark the turn as concluded
-            self._text_buffer = ""
-            self._spoken_text_buffer = ""
-
-        async def process_frame(self, frame, direction):
-            await super().process_frame(frame, direction)
-
-            if isinstance(frame, InputTransportMessageFrame):
-                message = getattr(frame, "message", {}) or {}
-                if message.get("label") == "rtvi-ai":
-                    msg_type = message.get("type")
-                    data = message.get("data") or {}
-                    generated_frames: list = []
-                    timestamp = time_now_iso8601()
-                    user_id = ""
-
-                    if msg_type == "bot-started-speaking":
-                        self._turn_index += 1
-                        eval_logger.info(f"[rtvi] turn index: {self._turn_index}")
-                        generated_frames.append(UserStartedSpeakingFrame())
-                    elif (
-                        msg_type == "bot-stopped-speaking"
-                        and self._turn_index not in self._turns_concluded
-                    ):
-                        generated_frames.extend(
-                            [
-                                TranscriptionFrame(
-                                    text=self._text_buffer,
-                                    user_id=user_id,
-                                    timestamp=timestamp,
-                                    result={},
-                                ),
-                                UserStoppedSpeakingFrame(),
-                            ]
-                        )
-                        self._reset_buffers()
-
-                    elif msg_type == "bot-output":
-                        text = data.get("text") or ""
-                        spoken = data.get("spoken") or False
-
-                        if (
-                            text
-                            and (
-                                not self._is_bot_interrupted or spoken
-                            )  # only continue if either the bot is not interrupted yet or the message is being spoken by the bot and does not match the interrupted text yet
-                            and not self._is_spoken_text_buffer_complete
-                        ):
-                            if spoken and self._is_bot_interrupted:
-                                self._spoken_text_buffer += text
-
-                                # once the spoken text buffer matches the text buffer, mark the spoken
-                                # text buffer as complete and interrupt the bot by the simulated user
-                                if self._spoken_text_buffer == self._text_buffer:
-                                    self._is_spoken_text_buffer_complete = True
-
-                                    await self.push_frame(
-                                        OutputTransportMessageUrgentFrame(
-                                            message={
-                                                "label": "rtvi-ai",
-                                                "type": "client-message",
-                                                "id": str(uuid4()),
-                                                "data": {
-                                                    "t": "interrupt",
-                                                },
-                                            }
-                                        ),
-                                        FrameDirection.DOWNSTREAM,
-                                    )
-
-                                    generated_frames.extend(
-                                        [
-                                            TranscriptionFrame(
-                                                text=self._text_buffer,
-                                                user_id=user_id,
-                                                timestamp=timestamp,
-                                                result={},
-                                            ),
-                                            UserStoppedSpeakingFrame(),
-                                        ]
-                                    )
-
-                                    self._reset_buffers()
-                            elif not spoken and not self._is_bot_interrupted:
-                                log_and_print(
-                                    f"{PARTIAL_AGENT_MESSAGE_COLOR}Received agent message{RESET_COLOR}: {text}{RESET_COLOR}"
-                                )
-                                self._text_buffer += text
-
-                                result_payload = data if data else None
-
-                                if (
-                                    np.random.rand() < interrupt_probability
-                                    and not self._is_bot_interrupted
-                                ):
-                                    # decide to interrupt the bot by the simulated user based on whatever they have said so far
-                                    log_and_print(
-                                        f"--------------------------------\n{INTERRUPTION_COLOR}[User interrupts the bot]{RESET_COLOR}\n--------------------------------"
-                                    )
-
-                                    # mark the text collected so far as the text after which the user will interrupt the bot
-                                    # we still need to wait for the bot to finish speaking the text after which the user will interrupt the bot
-                                    self._is_bot_interrupted = True
-                                else:
-                                    # otherwise, add the interim transcription frame for the text buffer as usual
-                                    generated_frames.append(
-                                        InterimTranscriptionFrame(
-                                            text=self._text_buffer,
-                                            user_id=user_id,
-                                            timestamp=timestamp,
-                                            result=result_payload,
-                                        )
-                                    )
-                            elif spoken:
-                                log_and_print(
-                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message: {text}{RESET_COLOR}"
-                                )
-
-                        else:
-                            if not spoken:
-                                log_and_print(
-                                    f"{PARTIAL_AGENT_MESSAGE_COLOR_IGNORED}Received agent message (ignored){RESET_COLOR}: {text}{RESET_COLOR}"
-                                )
-                            else:
-                                log_and_print(
-                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message 2: {text}{RESET_COLOR}"
-                                )
-
-                    for generated_frame in generated_frames:
-                        await self.push_frame(generated_frame, direction)
-
-            if isinstance(frame, EndFrame) or isinstance(frame, CancelFrame):
-                try:
-                    self._output_dir.mkdir(parents=True, exist_ok=True)
-
-                    serialized_transcript: list[dict] = []
-
-                    tool_call_current_index = 0
-
-                    for index, message in enumerate(self._context.get_messages()):
-                        if not isinstance(message, dict):
-                            continue
-                        role = message.get("role")
-
-                        if (
-                            tool_call_current_index < len(self._tool_calls)
-                            and self._tool_calls[tool_call_current_index].get(
-                                "position"
-                            )
-                            == index
-                        ):
-                            serialized_transcript.append(
-                                {
-                                    "role": "tool_call",
-                                    "content": self._tool_calls[
-                                        tool_call_current_index
-                                    ].get("data"),
-                                }
-                            )
-                            tool_call_current_index += 1
-
-                        # flip the role as the user for the transcript is the agent and vice versa
-                        if role == "user":
-                            role = "assistant"
-                        elif role == "assistant":
-                            role = "user"
-
-                        serialized_transcript.append(
-                            {
-                                "role": role,
-                                "content": message.get("content", ""),
-                            }
-                        )
-
-                    while tool_call_current_index < len(self._tool_calls):
-                        serialized_transcript.append(
-                            {
-                                "role": "tool_call",
-                                "content": self._tool_calls[
-                                    tool_call_current_index
-                                ].get("data"),
-                            }
-                        )
-                        tool_call_current_index += 1
-
-                    serialized_transcript = [
-                        message
-                        for message in serialized_transcript
-                        if message.get("role") in {"user", "assistant", "tool_call"}
-                    ]
-
-                    # Store transcripts for return
-                    self._serialized_transcript = serialized_transcript
-
-                    with open(
-                        os.path.join(self._output_dir, "transcripts.json"), "w"
-                    ) as transcripts_file:
-                        json.dump(serialized_transcript, transcripts_file, indent=4)
-
-                    with open(
-                        os.path.join(self._output_dir, "tool_calls.json"), "w"
-                    ) as tool_calls_file:
-                        json.dump(self._tool_calls, tool_calls_file, indent=4)
-
-                    with open(
-                        os.path.join(self._output_dir, "stt_outputs.json"), "w"
-                    ) as stt_outputs_file:
-                        json.dump(self._stt_outputs, stt_outputs_file, indent=4)
-
-                except Exception as exc:
-                    eval_logger.error(
-                        "Failed to persist RTVI transcripts",
-                        extra={"error": str(exc)},
-                    )
-
-            await self.push_frame(frame, direction)
-
-    class MetricsLogger(FrameProcessor):
-        def __init__(
-            self, ttft: defaultdict, processing_time: defaultdict, context: LLMContext
-        ):
-            super().__init__(enable_direct_mode=True, name="MetricsLogger")
-            self._ttft = ttft
-            self._processing_time = processing_time
-            self._context = context
-
-        async def process_frame(self, frame, direction):
-            await super().process_frame(frame, direction)
-
-            if (
-                isinstance(frame, InputTransportMessageFrame)
-                and self._context.get_messages()
-            ):
-                message = getattr(frame, "message", {})
-                if isinstance(message, dict) and message.get("label") == "rtvi-ai":
-                    if message.get("type") == "metrics" and message.get("data"):
-                        if message.get("data").get("ttfb"):
-                            for d in message.get("data").get("ttfb"):
-                                if not d.get("value"):
-                                    continue
-                                self._ttft[d.get("processor")].append(d.get("value"))
-                        if message.get("data").get("processing"):
-                            for d in message.get("data").get("processing"):
-                                if not d.get("value"):
-                                    continue
-                                self._processing_time[d.get("processor")].append(
-                                    d.get("value")
-                                )
-
-            await self.push_frame(frame, direction)
-
-    class STTLogger(FrameProcessor):
-        def __init__(self, stt_outputs: list[str], rtvi_adapter):
-            super().__init__(enable_direct_mode=True, name="STTLogger")
-            self._stt_outputs = stt_outputs
-            self._rtvi_adapter = rtvi_adapter
-            self._stt_outputs.append("")
-            self.last_turn_index = 0
-
-        async def process_frame(self, frame, direction):
-            await super().process_frame(frame, direction)
-
-            if isinstance(frame, InputTransportMessageFrame):
-                message = getattr(frame, "message", {}) or {}
-                if message.get("label") == "rtvi-ai":
-                    msg_type = message.get("type")
-                    data = message.get("data") or {}
-
-                    if msg_type == "user-transcription":
-                        if (text := data.get("text")) and data.get("final"):
-                            log_and_print(
-                                f"{USER_MESSAGE_COLOR}[User (as transcribed by the agent)]{RESET_COLOR}: {text}"
-                            )
-                            if self._rtvi_adapter._turn_index > self.last_turn_index:
-                                self._stt_outputs.append(text)
-                                self.last_turn_index = self._rtvi_adapter._turn_index
-                            else:
-                                self._stt_outputs[-1] += text
-
-            await self.push_frame(frame, direction)
-
-    class IOLogger(FrameProcessor):
-        def __init__(
-            self,
-            rtvi_adapter: RTVIMessageFrameAdapter,
-        ):
-            super().__init__()
-            self._rtvi_adapter = rtvi_adapter
-
-        async def process_frame(self, frame, direction):
-            await super().process_frame(frame, direction)
-
-            if isinstance(frame, TTSTextFrame) and hasattr(frame, "text"):
-                log_and_print(
-                    f"{USER_MESSAGE_COLOR}[User]\033[0m: {frame.text}{RESET_COLOR}"
-                )
-                if self._rtvi_adapter._is_bot_interrupted:
-                    # once the simulated user starts speaking, mark the bot as not
-                    # interrupted anymore and spoken text buffer as not complete anymore
-                    self._rtvi_adapter._is_bot_interrupted = False
-                    self._rtvi_adapter._is_spoken_text_buffer_complete = False
-
-            await self.push_frame(frame, direction)
-
     tool_calls = []
     function_call_handler = RTVIFunctionCallResponder(tool_calls, context)
 
     rtvi_message_adapter = RTVIMessageFrameAdapter(
-        context, tool_calls, stt_outputs, ttft, processing_time, output_dir
+        context,
+        audio_buffer,
+        interrupt_probability,
+        tool_calls,
+        stt_outputs,
+        ttft,
+        processing_time,
+        output_dir,
     )
 
     metrics_logger = MetricsLogger(ttft, processing_time, context)
 
     stt_logger = STTLogger(stt_outputs, rtvi_message_adapter)
 
-    output_logger = IOLogger(rtvi_message_adapter)
+    output_logger = IOLogger()
 
     pipeline = Pipeline(
         [
@@ -896,13 +922,14 @@ async def main():
     os.makedirs(args.output_dir, exist_ok=True)
 
     interrupt_labels = [
-        # "no",
-        # "low",
+        "no",
+        "low",
         "medium",
         "high",
     ]
     interrupt_probabilities = [
-        # 0, 0.25,
+        0,
+        0.25,
         0.5,
         0.8,
     ]
@@ -915,7 +942,7 @@ async def main():
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
 
-            user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{user_persona}\n\nThe following scenario will be played out: {scenario}. Make sure to respond to the agent to match the given scenario as per the given persona for you."
+            user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{user_persona}\n\nThe following scenario will be played out: {scenario}. Make sure to respond to the agent to match the given scenario as per the given persona for you. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system."
 
             for prob, label in zip(interrupt_probabilities, interrupt_labels):
                 simulation_name = f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}_{label}_interrupt"

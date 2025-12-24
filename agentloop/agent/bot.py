@@ -3,25 +3,27 @@ from typing import Dict, Literal
 
 from dotenv import load_dotenv
 from loguru import logger
+import asyncio
 
 from pydantic import BaseModel
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
-from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
-from pipecat.audio.vad.silero import SileroVADAnalyzer
-from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import (
     Frame,
-    InterruptionFrame,
+    InterruptionTaskFrame,
     LLMRunFrame,
     MetricsFrame,
+    TranscriptionFrame,
     InputAudioRawFrame,
+    VADUserStartedSpeakingFrame,
+    VADUserStoppedSpeakingFrame,
+    InterruptionFrame,
     OutputAudioRawFrame,
     OutputTransportMessageUrgentFrame,
     InputTransportMessageFrame,
     FunctionCallResultFrame,
     UserStartedSpeakingFrame,
+    UserStoppedSpeakingFrame,
     FunctionCallResultProperties,
 )
 from pipecat.metrics.metrics import (
@@ -74,7 +76,14 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 
 # from pipecat.transports.daily.transport import DailyParams
 from pipecat.processors.transcript_processor import TranscriptProcessor
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.frameworks.rtvi import (
+    RTVIConfig,
+    RTVIObserver,
+    RTVIProcessor,
+    RTVIClientMessageFrame,
+)
+from pipecat.utils.time import time_now_iso8601
+
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.observers.loggers.user_bot_latency_log_observer import (
@@ -404,7 +413,7 @@ async def run_bot(
 
     pending_tool_calls: Dict[str, FunctionCallParams] = {}
 
-    class IOLogger(FrameProcessor):
+    class InputLogger(FrameProcessor):
         def __init__(
             self,
         ):
@@ -413,22 +422,35 @@ async def run_bot(
         async def process_frame(self, frame, direction):
             await super().process_frame(frame, direction)
 
-            logger.info(f"bot frame: {frame}")
+            logger.info(f"input bot frame: {frame}")
 
-            if isinstance(frame, InputTransportMessageFrame):
-                logger.info(f"InputTransportMessageFrame yesss: {frame}")
-
-            if isinstance(frame, OutputTransportMessageUrgentFrame):
-                logger.info(f"OutputTransportMessageUrgentFrame yesss: {frame}")
-
-            if (
-                isinstance(frame, InputTransportMessageFrame)
-                and hasattr(frame, "message")
-                and frame.message.get("type") == "client-message"
-                and frame.message.get("data", {}).get("t") == "interrupt"
-            ):
+            if isinstance(frame, RTVIClientMessageFrame) and frame.type == "interrupt":
                 logger.info(f"Simulating user interruption of the bot")
-                self.push_frame(InterruptionFrame(), FrameDirection.UPSTREAM)
+                await self.push_interruption_task_frame_and_wait()
+                await self.push_frame(UserStartedSpeakingFrame())
+                await self.push_frame(
+                    TranscriptionFrame(
+                        "",
+                        "",
+                        time_now_iso8601(),
+                    )
+                )
+                # Need to wait before sending the UserStoppedSpeakingFrame,
+                # otherwise TranscriptionFrame will be processed
+                # later than the UserStoppedSpeakingFrame
+                await asyncio.sleep(0.1)
+                await self.push_frame(UserStoppedSpeakingFrame())
+
+            await self.push_frame(frame, direction)
+
+    class OutputLogger(FrameProcessor):
+        def __init__(self):
+            super().__init__()
+
+        async def process_frame(self, frame, direction):
+            await super().process_frame(frame, direction)
+
+            logger.info(f"output bot frame: {frame}")
 
             await self.push_frame(frame, direction)
 
@@ -473,7 +495,7 @@ async def run_bot(
     pipeline_processors = [
         transport.input(),
         rtvi,
-        IOLogger(),
+        InputLogger(),
     ]
 
     if mode == "eval":
@@ -487,6 +509,7 @@ async def run_bot(
             llm,
             tts,
             ml,
+            OutputLogger(),
             transport.output(),
             transcript.assistant(),
             context_aggregator.assistant(),
