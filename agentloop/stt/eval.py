@@ -235,7 +235,13 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
     await runner.run(task)
 
 
-async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str, str]]:
+async def run_stt_eval(
+    audio_files: Sequence[Path],
+    port: int,
+    gt_transcript: Optional[List[Dict]] = None,
+    output_path: Optional[Path] = None,
+    existing_results: Optional[List[Dict]] = None,
+) -> List[Dict[str, str]]:
     """Connects to the STT bot and streams audio files sequentially."""
     current_context.set("EVAL")
 
@@ -337,6 +343,9 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
             audio_paths: List[Path],
             chunk_ms: int = 40,
             transcripts: list = [],
+            gt_transcript: Optional[List[Dict]] = None,
+            output_path: Optional[Path] = None,
+            existing_results: Optional[List[Dict]] = None,
         ):
             super().__init__(enable_direct_mode=True, name="BotTurnAudioStreamer")
             self._audio_paths = audio_paths
@@ -349,6 +358,34 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
             self._output_ready = asyncio.Event()
             self._transcripts = transcripts
             self._pending_advance_task = None
+            self._gt_transcript = gt_transcript
+            self._output_path = output_path
+            self._existing_results = existing_results or []
+
+        def _save_intermediate_results(self):
+            """Save current transcripts to CSV for crash recovery."""
+            if not self._output_path or not self._gt_transcript:
+                return
+
+            # Merge existing results with new transcripts
+            data = list(self._existing_results)
+
+            for i in range(len(self._transcripts)):
+                transcript = (
+                    self._transcripts[i].strip() if self._transcripts[i] else ""
+                )
+                if transcript and i < len(self._gt_transcript):
+                    data.append(
+                        {
+                            "id": self._gt_transcript[i]["id"],
+                            "gt": self._gt_transcript[i]["gt"],
+                            "pred": transcript,
+                        }
+                    )
+
+            if data:
+                pd.DataFrame(data).to_csv(self._output_path, index=False)
+                log_and_print(f"Saved intermediate results: {len(data)} transcripts")
 
         def _is_transcription_over(self, frame) -> bool:
             if isinstance(frame, InputTransportMessageFrame):
@@ -388,6 +425,9 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
         def _start_new_audio_streaming(
             self,
         ):
+            # Save intermediate results after completing this audio
+            self._save_intermediate_results()
+
             self._state = "streaming"
             log_and_print(f"--------------------------------")
             log_and_print(f"\033[93mCreated new user transcript\033[0m")
@@ -533,6 +573,9 @@ async def run_stt_eval(audio_files: Sequence[Path], port: int) -> List[Dict[str,
         audio_paths=audio_files,
         chunk_ms=40,
         transcripts=transcripts,
+        gt_transcript=gt_transcript,
+        output_path=output_path,
+        existing_results=existing_results,
     )
 
     transcription_logger = TranscriptionWriter(transcripts, audio_streamer=streamer)
@@ -712,19 +755,33 @@ async def main():
 
     gt = pd.read_csv(gt_file)
 
-    audio_files = [
-        Path(audio_dir) / f"{audio_name}.wav" for audio_name in gt["id"].tolist()
-    ]
-
     if args.debug:
         logger.debug(
             f"running in debug mode: using first {args.debug_count} audio files for evaluation"
         )
-        audio_files = audio_files[: args.debug_count]
+        gt = gt.head(args.debug_count)
 
-    # import ipdb
+    # Check for existing results and resume support
+    results_csv_path = join(output_dir, "results.csv")
+    existing_results = []
 
-    # ipdb.set_trace()
+    if exists(results_csv_path):
+        existing_df = pd.read_csv(results_csv_path)
+        processed_ids = set(existing_df["id"].tolist())
+        existing_results = existing_df[["id", "gt", "pred"]].to_dict("records")
+
+        # Filter to only unprocessed files
+        gt = gt[~gt["id"].isin(processed_ids)].reset_index(drop=True)
+
+        if gt.empty:
+            log_and_print("All audio files already processed, nothing to do")
+            return
+
+        log_and_print(f"Resuming: {len(processed_ids)} processed, {len(gt)} remaining")
+
+    audio_files = [
+        Path(audio_dir) / f"{audio_name}.wav" for audio_name in gt["id"].tolist()
+    ]
 
     logger.info(f"Loading audio files: {audio_files}")
 
@@ -733,6 +790,9 @@ async def main():
 
     logger.info(f"audio_files: {audio_files}")
 
+    # Prepare gt_transcript for intermediate saving
+    gt_transcript = [{"id": row["id"], "gt": row["text"]} for _, row in gt.iterrows()]
+
     bot_task = asyncio.create_task(
         run_stt_bot(provider=args.provider, language=args.language, port=args.port)
     )
@@ -740,7 +800,13 @@ async def main():
     try:
         # Give the bot a moment to start listening before connecting.
         await asyncio.sleep(1.0)
-        results = await run_stt_eval(audio_files, port=args.port)
+        results = await run_stt_eval(
+            audio_files,
+            port=args.port,
+            gt_transcript=gt_transcript,
+            output_path=results_csv_path,
+            existing_results=existing_results,
+        )
         pred_transcripts = results["transcripts"]
         metrics = results["metrics"]
     finally:
@@ -749,28 +815,28 @@ async def main():
             with suppress(asyncio.CancelledError):
                 await bot_task
 
-    ids = [splitext(basename(audio_file))[0] for audio_file in audio_files]
+    # Merge existing and new results for final metrics computation
+    all_ids = [r["id"] for r in existing_results] + [
+        splitext(basename(audio_file))[0] for audio_file in audio_files
+    ]
+    all_gt_transcripts = [r["gt"] for r in existing_results] + gt["text"].tolist()
+    all_pred_transcripts = [r["pred"] for r in existing_results] + [
+        t.strip() for t in pred_transcripts
+    ]
 
-    gt_transcripts = gt["text"].tolist()
-
-    if args.debug:
-        gt_transcripts = gt_transcripts[: args.debug_count]
-
-    # import ipdb
-
-    # ipdb.set_trace()
-
-    logger.info(f"gt_transcripts: {gt_transcripts}")
-    logger.info(f"pred_transcripts: {pred_transcripts}")
+    logger.info(f"gt_transcripts: {all_gt_transcripts}")
+    logger.info(f"pred_transcripts: {all_pred_transcripts}")
     logger.info(metrics)
 
-    wer_score = get_wer_score(gt_transcripts, pred_transcripts)
+    wer_score = get_wer_score(all_gt_transcripts, all_pred_transcripts)
     logger.info(f"WER: {wer_score['score']}")
 
-    string_similarity = get_string_similarity(gt_transcripts, pred_transcripts)
+    string_similarity = get_string_similarity(all_gt_transcripts, all_pred_transcripts)
     logger.info(f"String Similarity: {string_similarity['score']}")
 
-    llm_judge_score = await get_llm_judge_score(gt_transcripts, pred_transcripts)
+    llm_judge_score = await get_llm_judge_score(
+        all_gt_transcripts, all_pred_transcripts
+    )
     logger.info(f"LLM Judge Score: {llm_judge_score['score']}")
 
     metrics_data = [
@@ -794,9 +860,9 @@ async def main():
         string_similarity,
         llm_judge_score,
     ) in zip(
-        gt_transcripts,
-        pred_transcripts,
-        ids,
+        all_gt_transcripts,
+        all_pred_transcripts,
+        all_ids,
         wer_score["per_row"],
         string_similarity["per_row"],
         llm_judge_score["per_row"],
