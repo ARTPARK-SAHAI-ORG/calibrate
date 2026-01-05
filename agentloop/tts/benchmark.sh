@@ -79,7 +79,7 @@ PROVIDERS=(
     "groq"
     "google"
     "elevenlabs"
-    "sarvam"  # there is a bug with the sarvam tts not returning audio frames
+    "sarvam"
 )
 
 echo "Starting TTS benchmark..."

@@ -254,7 +254,11 @@ async def run_tts_bot(
             voice="fable",
         )
     elif provider == "groq":
-        tts = GroqTTSService(api_key=os.getenv("GROQ_API_KEY"))
+        tts = GroqTTSService(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model_name="canopylabs/orpheus-v1-english",
+            voice_id="autumn",
+        )
     elif provider == "google":
         voice_id = (
             "en-US-Chirp3-HD-Charon"
@@ -681,6 +685,12 @@ async def main():
 
     command = " ".join(sys.argv)
     log_and_print(f"\033[33mRunning command\033[0m: {command}")
+
+    if not args.input.lower().endswith(".csv"):
+        log_and_print(
+            "\033[31mInput must be a CSV file path. Got: {}\033[0m".format(args.input)
+        )
+        sys.exit(1)
 
     df = pd.read_csv(args.input)
     texts = df["text"].tolist()

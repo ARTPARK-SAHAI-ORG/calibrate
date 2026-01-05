@@ -18,7 +18,9 @@ def get_wer_score(references: List[str], predictions: List[str]) -> float:
     wer_metric = load("wer")
 
     references = [normalizer(ref) for ref in references]
-    predictions = [normalizer(pred) for pred in predictions]
+    predictions = [
+        normalizer(pred) if isinstance(pred, str) else "" for pred in predictions
+    ]
 
     per_row_wer = [
         wer_metric.compute(predictions=[p], references=[r])
@@ -34,7 +36,9 @@ def get_string_similarity(references: List[str], predictions: List[str]) -> floa
     # Use edit distance (Levenshtein distance) to compute similarity between strings
     for reference, prediction in zip(references, predictions):
         seq = difflib.SequenceMatcher(
-            None, normalizer(reference), normalizer(prediction)
+            None,
+            normalizer(reference),
+            normalizer(prediction) if isinstance(prediction, str) else "",
         )
         similarities.append(seq.ratio())  # value between 0 and 1
 

@@ -45,6 +45,7 @@ from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIPro
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pipecat.services.deepgram.stt import DeepgramSTTService, Language, LiveOptions
 from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
+from pipecat.services.google.gemini_live.llm import GeminiLiveLLMService
 
 # from pipecat.audio.filters.krisp_viva_filter import KrispVivaFilter
 from pipecat.services.openai.stt import OpenAISTTService
@@ -193,6 +194,11 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
             # location="us",
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )
+    # elif provider == "gemini":
+    #     stt = GeminiLiveLLMService(
+
+    #         credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+    #     )
     else:
         raise ValueError(f"Invalid provider: {provider}")
 
@@ -217,6 +223,7 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
             enable_metrics=True,
             allow_interruptions=True,
         ),
+        idle_timeout_secs=60,
         enable_tracing=True,
         observers=[RTVIObserver(rtvi), DebugLogObserver()],
     )
@@ -499,6 +506,7 @@ async def run_stt_eval(
                     async def end_task_and_stream():
                         await asyncio.sleep(5)
                         logger.info(f"Completed streaming all audio files")
+                        self._save_intermediate_results()
                         await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
                         await self.push_frame(EndFrame(), FrameDirection.UPSTREAM)
                         self._state = "done"
@@ -615,7 +623,8 @@ async def run_stt_eval(
             audio_out_sample_rate=16000,
         ),
         enable_tracing=True,
-        cancel_on_idle_timeout=False,
+        idle_timeout_secs=100,
+        cancel_on_idle_timeout=True,
         observers=[DebugLogObserver()],
     )
 
@@ -656,6 +665,7 @@ async def main():
             "smallest",  # pcm16
             "groq",  # wav
             "google",  # wav
+            "gemini",  # pcm16
             "sarvam",  # wav
             "elevenlabs",  # wav
         ],
@@ -719,8 +729,8 @@ async def main():
 
     log_save_path = join(output_dir, "logs")
 
-    if exists(log_save_path):
-        os.remove(log_save_path)
+    # if exists(log_save_path):
+    #     os.remove(log_save_path)
 
     logger.remove()
     logger.add(
@@ -755,6 +765,8 @@ async def main():
 
     gt = pd.read_csv(gt_file)
 
+    total_expected = len(gt)
+
     if args.debug:
         logger.debug(
             f"running in debug mode: using first {args.debug_count} audio files for evaluation"
@@ -765,55 +777,82 @@ async def main():
     results_csv_path = join(output_dir, "results.csv")
     existing_results = []
 
-    if exists(results_csv_path):
-        existing_df = pd.read_csv(results_csv_path)
-        processed_ids = set(existing_df["id"].tolist())
-        existing_results = existing_df[["id", "gt", "pred"]].to_dict("records")
+    # Loop until all results are collected
+    while True:
+        # Check for existing results and resume support
+        if exists(results_csv_path):
+            existing_df = pd.read_csv(results_csv_path)
+            processed_ids = set(existing_df["id"].tolist())
+            existing_results = existing_df[["id", "gt", "pred"]].to_dict("records")
 
-        # Filter to only unprocessed files
-        gt = gt[~gt["id"].isin(processed_ids)].reset_index(drop=True)
+            # Filter to only unprocessed files
+            gt_for_pending = gt[~gt["id"].isin(processed_ids)].reset_index(drop=True)
 
-        if gt.empty:
-            log_and_print("All audio files already processed, nothing to do")
-            return
+            if gt_for_pending.empty:
+                log_and_print("All audio files already processed, nothing to do")
+                audio_files = []
+                pred_transcripts = []
+                break
 
-        log_and_print(f"Resuming: {len(processed_ids)} processed, {len(gt)} remaining")
+            log_and_print(
+                f"Resuming: {len(processed_ids)} processed, {len(gt_for_pending)} remaining"
+            )
+        else:
+            gt_for_pending = gt
 
-    audio_files = [
-        Path(audio_dir) / f"{audio_name}.wav" for audio_name in gt["id"].tolist()
-    ]
+        audio_files = [
+            Path(audio_dir) / f"{audio_name}.wav"
+            for audio_name in gt_for_pending["id"].tolist()
+        ]
 
-    logger.info(f"Loading audio files: {audio_files}")
+        logger.info(f"Loading audio files: {audio_files}")
 
-    if not audio_files:
-        raise ValueError(f"No {audio_format} audio files found in {audio_dir}")
+        if not audio_files:
+            raise ValueError(f"No {audio_format} audio files found in {audio_dir}")
 
-    logger.info(f"audio_files: {audio_files}")
+        logger.info(f"audio_files: {audio_files}")
 
-    # Prepare gt_transcript for intermediate saving
-    gt_transcript = [{"id": row["id"], "gt": row["text"]} for _, row in gt.iterrows()]
+        # Prepare gt_transcript for intermediate saving
+        gt_transcript = [
+            {"id": row["id"], "gt": row["text"]} for _, row in gt_for_pending.iterrows()
+        ]
 
-    bot_task = asyncio.create_task(
-        run_stt_bot(provider=args.provider, language=args.language, port=args.port)
-    )
-
-    try:
-        # Give the bot a moment to start listening before connecting.
-        await asyncio.sleep(1.0)
-        results = await run_stt_eval(
-            audio_files,
-            port=args.port,
-            gt_transcript=gt_transcript,
-            output_path=results_csv_path,
-            existing_results=existing_results,
+        bot_task = asyncio.create_task(
+            run_stt_bot(provider=args.provider, language=args.language, port=args.port)
         )
-        pred_transcripts = results["transcripts"]
-        metrics = results["metrics"]
-    finally:
-        if not bot_task.done():
-            bot_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await bot_task
+
+        try:
+            # Give the bot a moment to start listening before connecting.
+            await asyncio.sleep(1.0)
+            results = await run_stt_eval(
+                audio_files,
+                port=args.port,
+                gt_transcript=gt_transcript,
+                output_path=results_csv_path,
+                existing_results=existing_results,
+            )
+            pred_transcripts = results["transcripts"]
+            metrics = results["metrics"]
+        finally:
+            if not bot_task.done():
+                bot_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await bot_task
+
+        # Check if all results are now collected
+        if exists(results_csv_path):
+            final_df = pd.read_csv(results_csv_path)
+            if len(final_df) >= total_expected:
+                log_and_print(
+                    f"All {total_expected} audio files processed, exiting loop"
+                )
+                break
+            else:
+                log_and_print(
+                    f"Only {len(final_df)}/{total_expected} processed, retrying..."
+                )
+        else:
+            log_and_print("No results file found after run, retrying...")
 
     # Merge existing and new results for final metrics computation
     all_ids = [r["id"] for r in existing_results] + [

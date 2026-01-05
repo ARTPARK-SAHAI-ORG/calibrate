@@ -174,7 +174,9 @@ def _write_workbook(
     sheet_names: Set[str] = set()
 
     with pd.ExcelWriter(workbook_path, engine="openpyxl") as writer:
-        summary_df.to_excel(writer, sheet_name="summary", index=False)
+        summary_df.to_excel(
+            writer, sheet_name="summary", index=False, float_format="%.5f"
+        )
 
         for run_name, df in run_results.items():
             df = df[~df["llm_judge_score"]]
@@ -184,7 +186,9 @@ def _write_workbook(
                     writer, sheet_name=sheet_name, index=False
                 )
             else:
-                df.to_excel(writer, sheet_name=sheet_name, index=False)
+                df.to_excel(
+                    writer, sheet_name=sheet_name, index=False, float_format="%.5f"
+                )
 
 
 def _unique_sheet_name(run_name: str, existing: Set[str]) -> str:
