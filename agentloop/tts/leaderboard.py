@@ -151,7 +151,7 @@ def _create_metric_charts(summary_df: pd.DataFrame, output_dir: Path) -> None:
         ha="right",
     )
     ax.set_ylim(bottom=0)
-    ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(0.05))
+    # ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(0.05))
     ax.grid(axis="y", linestyle="--", alpha=0.4)
     ax.legend(title="Run", bbox_to_anchor=(1.02, 1), loc="upper left")
 

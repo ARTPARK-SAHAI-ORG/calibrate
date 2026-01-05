@@ -3,6 +3,7 @@ import csv
 import io
 import sys
 import os
+import traceback
 import numpy as np
 import json
 from os.path import join, exists
@@ -484,17 +485,18 @@ async def run_tts_eval(
                             FrameDirection.DOWNSTREAM,
                         )
 
-                        # Mark current text as completed and save intermediate results
-                        self._mark_current_completed()
-
                         async def end_task():
                             await asyncio.sleep(WAIT_TIME_BETWEEN_TURNS)
+                            # Mark current text as completed and save intermediate results
+                            self._mark_current_completed()
                             await self.push_frame(
                                 EndTaskFrame(), FrameDirection.UPSTREAM
                             )
 
                         async def advance_and_send():
                             await asyncio.sleep(WAIT_TIME_BETWEEN_TURNS)
+                            # Mark current text as completed and save intermediate results
+                            self._mark_current_completed()
                             await self._send_text_frame()
 
                         if self._turn_index == len(self._texts):
@@ -512,7 +514,7 @@ async def run_tts_eval(
                     logger.info(f"has attr frame audio: {hasattr(frame, 'audio')}")
                     audio_save_path = os.path.join(
                         self._audio_output_dir,
-                        f"{self._ids[self._turn_index]}.wav",
+                        f"{self._ids[self._turn_index - 1]}.wav",
                     )
                     if audio_save_path not in self._audio_save_paths:
                         self._audio_save_paths.append(audio_save_path)
@@ -749,10 +751,25 @@ async def main():
 
     if exists(results_csv_path):
         existing_df = pd.read_csv(results_csv_path)
-        processed_ids = set(existing_df["id"].tolist())
-        existing_results = existing_df[["id", "text", "audio_path"]].to_dict("records")
+        all_existing_results = existing_df[["id", "text", "audio_path"]].to_dict(
+            "records"
+        )
 
-        # Filter to only unprocessed texts
+        # Filter existing results to only include those with existing audio files
+        existing_results = []
+        missing_audio_ids = set()
+        for result in all_existing_results:
+            if exists(result["audio_path"]):
+                existing_results.append(result)
+            else:
+                missing_audio_ids.add(result["id"])
+                log_and_print(
+                    f"Audio file missing for id {result['id']}: {result['audio_path']}"
+                )
+
+        processed_ids = set(r["id"] for r in existing_results)
+
+        # Filter to only unprocessed texts (not in processed_ids or missing audio)
         pending_indices = [i for i, _id in enumerate(ids) if _id not in processed_ids]
 
         if not pending_indices:
@@ -764,9 +781,14 @@ async def main():
         else:
             ids_pending = [ids[i] for i in pending_indices]
             texts_pending = [texts[i] for i in pending_indices]
-            log_and_print(
-                f"Resuming: {len(processed_ids)} processed, {len(pending_indices)} remaining"
-            )
+            if missing_audio_ids:
+                log_and_print(
+                    f"Resuming: {len(processed_ids)} processed, {len(missing_audio_ids)} missing audio files, {len(pending_indices)} remaining"
+                )
+            else:
+                log_and_print(
+                    f"Resuming: {len(processed_ids)} processed, {len(pending_indices)} remaining"
+                )
     else:
         ids_pending = ids
         texts_pending = texts
@@ -785,6 +807,9 @@ async def main():
                 existing_results=existing_results,
             )
             metrics = results["metrics"]
+        except Exception as e:
+
+            traceback.print_exc()
         finally:
             if not bot_task.done():
                 bot_task.cancel()
