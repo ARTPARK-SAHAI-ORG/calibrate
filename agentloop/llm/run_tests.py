@@ -222,6 +222,30 @@ def sort_tool_calls(tool_calls):
     return sorted(tool_calls, key=lambda val: val["tool"])
 
 
+def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
+    output_tool_calls = sort_tool_calls(output_tool_calls)
+    evaluation_tool_calls = sort_tool_calls(evaluation_tool_calls)
+
+    for output_tool_call, evaluation_tool_call in zip(
+        output_tool_calls, evaluation_tool_calls
+    ):
+        if output_tool_call["tool"] != evaluation_tool_call["tool"]:
+            return False
+
+        # if the "arguments" key is not present in the evaluation_tool_call, then we don't need to check the arguments
+        if "arguments" not in evaluation_tool_call:
+            continue
+
+        # if the "arguments" key is present in the evaluation_tool_call, then we need to check the arguments
+        if (
+            evaluation_tool_call["arguments"] is not None
+            and output_tool_call["arguments"] != evaluation_tool_call["arguments"]
+        ):
+            return False
+
+    return True
+
+
 async def run_test(
     chat_history: List[dict[str, str]],
     evaluation: dict[str, str],
@@ -239,10 +263,9 @@ async def run_test(
     )
     metrics = {"passed": True}
     if evaluation["type"] == "tool_call":
-        if sort_tool_calls(output["tool_calls"]) != sort_tool_calls(
-            evaluation["tool_calls"]
-        ):
-            metrics["passed"] = False
+        metrics["passed"] = evaluate_tool_calls(
+            output["tool_calls"], evaluation["tool_calls"]
+        )
     elif evaluation["type"] == "response":
         result = await test_response_llm_judge(
             conversation=chat_history,
@@ -294,10 +317,12 @@ async def main():
         help="LLM provider to use (openai or openrouter)",
     )
     parser.add_argument(
-        "-d",
-        "--debug",
-        action="store_true",
-        help="Run the evaluation on the first 5 audio files",
+        "-l",
+        "--language",
+        type=str,
+        choices=["english", "hindi"],
+        default="english",
+        help="Language of the bot",
     )
 
     args = parser.parse_args()
@@ -310,7 +335,14 @@ async def main():
 
     config_name = splitext(basename(args.config))[0]
 
-    output_dir = join(args.output_dir, config_name, args.provider, args.model)
+    save_folder_name = (
+        f"{args.provider}/{args.model}"
+        if args.provider == "openai"
+        else f"{args.model}"
+    )
+
+    save_folder_name = save_folder_name.replace("/", "__")
+    output_dir = join(args.output_dir, config_name, save_folder_name)
 
     if not exists(output_dir):
         os.makedirs(output_dir)
@@ -338,7 +370,8 @@ async def main():
         result = await run_test(
             chat_history=test_case["history"],
             evaluation=test_case["evaluation"],
-            system_prompt=config["system_prompt"],
+            system_prompt=config["system_prompt"]
+            + f"\n\nYou must always speak in {args.language}.",
             tools=config["tools"],
             model=args.model,
             provider=args.provider,
