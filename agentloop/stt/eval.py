@@ -714,6 +714,11 @@ async def main():
         help="Number of audio files to run the evaluation on",
     )
     parser.add_argument(
+        "--ignore_retry",
+        action="store_true",
+        help="Ignore retrying if all the audios are not processed and move on to LLM judge",
+    )
+    parser.add_argument(
         "--port",
         type=int,
         default=8765,
@@ -838,6 +843,9 @@ async def main():
                 bot_task.cancel()
                 with suppress(asyncio.CancelledError):
                     await bot_task
+
+        if args.ignore_retry:
+            break
 
         # Check if all results are now collected
         if exists(results_csv_path):

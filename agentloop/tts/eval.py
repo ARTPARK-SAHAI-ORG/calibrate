@@ -339,10 +339,13 @@ async def run_tts_bot(
 
 
 async def run_tts_eval(
+    ids: List[str],
     texts: List[str],
     output_dir: str,
     audio_in_sample_rate: int = 24000,
     port: int = 8765,
+    results_csv_path: Optional[str] = None,
+    existing_results: Optional[List[Dict]] = None,
 ) -> List[Dict[str, str]]:
     """Connects to the TTS bot and streams audio files sequentially."""
 
@@ -374,21 +377,55 @@ async def run_tts_eval(
 
         def __init__(
             self,
+            ids: List[str],
             texts: list[str],
             audio_output_dir: str,
             audio_save_paths: list[str],
+            results_csv_path: Optional[str] = None,
+            existing_results: Optional[List[Dict]] = None,
         ):
             super().__init__(enable_direct_mode=True, name="Processor")
             self._ready = False
             self._texts = texts
+            self._ids = ids
             self._turn_index = 0
             self._audio_output_dir = audio_output_dir
             self._audio_save_paths = audio_save_paths
             self._pending_advance_task = None
+            self._results_csv_path = results_csv_path
+            self._results = (
+                existing_results or []
+            )  # Track all results (existing + completed)
 
         def set_task(self, task: "PipelineTask"):
             """Set the task reference after task creation."""
             self._task = task
+
+        def _save_intermediate_results(self):
+            """Save current results to CSV for crash recovery."""
+            if not self._results_csv_path or not self._results:
+                return
+
+            pd.DataFrame(self._results).to_csv(self._results_csv_path, index=False)
+            log_and_print(f"Saved intermediate results: {len(self._results)} items")
+
+        def _mark_current_completed(self):
+            """Mark the current text as completed and save to results."""
+            if self._turn_index > 0:
+                completed_idx = self._turn_index - 1
+                if completed_idx < len(self._ids):
+                    audio_path = os.path.join(
+                        self._audio_output_dir,
+                        f"{self._ids[completed_idx]}.wav",
+                    )
+                    self._results.append(
+                        {
+                            "id": self._ids[completed_idx],
+                            "text": self._texts[completed_idx],
+                            "audio_path": audio_path,
+                        }
+                    )
+                    self._save_intermediate_results()
 
         async def _send_text_frame(self):
             log_and_print(f"--------------------------------")
@@ -447,6 +484,9 @@ async def run_tts_eval(
                             FrameDirection.DOWNSTREAM,
                         )
 
+                        # Mark current text as completed and save intermediate results
+                        self._mark_current_completed()
+
                         async def end_task():
                             await asyncio.sleep(WAIT_TIME_BETWEEN_TURNS)
                             await self.push_frame(
@@ -471,7 +511,8 @@ async def run_tts_eval(
 
                     logger.info(f"has attr frame audio: {hasattr(frame, 'audio')}")
                     audio_save_path = os.path.join(
-                        self._audio_output_dir, f"{self._turn_index}.wav"
+                        self._audio_output_dir,
+                        f"{self._ids[self._turn_index]}.wav",
                     )
                     if audio_save_path not in self._audio_save_paths:
                         self._audio_save_paths.append(audio_save_path)
@@ -507,21 +548,22 @@ async def run_tts_eval(
 
     audio_output_dir = os.path.join(output_dir, "audios")
 
-    if exists(audio_output_dir):
-        shutil.rmtree(audio_output_dir)
+    for _id in ids:
+        audio_path = os.path.join(audio_output_dir, f"{_id}.wav")
+        if exists(audio_path):
+            os.remove(audio_path)
 
-    os.makedirs(audio_output_dir)
+    os.makedirs(audio_output_dir, exist_ok=True)
 
     audio_paths = []
 
-    messages = [
-        {
-            "role": "system",
-            "content": 'You are a helpful assistant. Begin the conversation with "Hello, how can I help you today?"',
-        }
-    ]
     text_streamer = BotTurnTextStreamer(
-        texts=texts, audio_output_dir=audio_output_dir, audio_save_paths=audio_paths
+        ids=ids,
+        texts=texts,
+        audio_output_dir=audio_output_dir,
+        audio_save_paths=audio_paths,
+        results_csv_path=results_csv_path,
+        existing_results=existing_results,
     )
 
     ttfb = defaultdict(list)
@@ -693,26 +735,77 @@ async def main():
         sys.exit(1)
 
     df = pd.read_csv(args.input)
+
+    ids = df["id"].tolist()
     texts = df["text"].tolist()
 
     if args.debug:
+        ids = ids[: args.debug_count]
         texts = texts[: args.debug_count]
 
-    try:
-        # Give the bot a moment to start listening before connecting.
-        await asyncio.sleep(1.0)
-        results = await run_tts_eval(
-            texts, output_dir, audio_in_sample_rate=audio_sample_rate, port=args.port
-        )
-        audio_paths = results["audio_paths"]
-        metrics = results["metrics"]
-    finally:
+    # Check for existing results and resume support
+    results_csv_path = join(output_dir, "results.csv")
+    existing_results = []
+
+    if exists(results_csv_path):
+        existing_df = pd.read_csv(results_csv_path)
+        processed_ids = set(existing_df["id"].tolist())
+        existing_results = existing_df[["id", "text", "audio_path"]].to_dict("records")
+
+        # Filter to only unprocessed texts
+        pending_indices = [i for i, _id in enumerate(ids) if _id not in processed_ids]
+
+        if not pending_indices:
+            log_and_print(
+                "All texts already processed, skipping to metrics computation"
+            )
+            ids_pending = []
+            texts_pending = []
+        else:
+            ids_pending = [ids[i] for i in pending_indices]
+            texts_pending = [texts[i] for i in pending_indices]
+            log_and_print(
+                f"Resuming: {len(processed_ids)} processed, {len(pending_indices)} remaining"
+            )
+    else:
+        ids_pending = ids
+        texts_pending = texts
+
+    if ids_pending:
+        try:
+            # Give the bot a moment to start listening before connecting.
+            await asyncio.sleep(1.0)
+            results = await run_tts_eval(
+                ids_pending,
+                texts_pending,
+                output_dir,
+                audio_in_sample_rate=audio_sample_rate,
+                port=args.port,
+                results_csv_path=results_csv_path,
+                existing_results=existing_results,
+            )
+            metrics = results["metrics"]
+        finally:
+            if not bot_task.done():
+                bot_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await bot_task
+    else:
+        # No pending items, cancel the bot task
         if not bot_task.done():
             bot_task.cancel()
             with suppress(asyncio.CancelledError):
                 await bot_task
+        metrics = {"ttfb": {}, "processing_time": {}}
 
-    llm_judge_score = await get_tts_llm_judge_score(audio_paths, texts)
+    # Reload the final results from CSV (includes existing + newly completed)
+    if exists(results_csv_path):
+        final_df = pd.read_csv(results_csv_path)
+        all_ids = final_df["id"].tolist()
+        all_texts = final_df["text"].tolist()
+        all_audio_paths = final_df["audio_path"].tolist()
+
+    llm_judge_score = await get_tts_llm_judge_score(all_audio_paths, all_texts)
     logger.info(f"LLM Judge Score: {llm_judge_score['score']}")
 
     metrics_data = [
@@ -723,16 +816,19 @@ async def main():
 
     data = []
     for (
+        _id,
         text,
         audio_path,
         llm_judge_score,
     ) in zip(
-        texts,
-        audio_paths,
+        all_ids,
+        all_texts,
+        all_audio_paths,
         llm_judge_score["per_row"],
     ):
         data.append(
             {
+                "id": _id,
                 "text": text,
                 "audio_path": audio_path,
                 "llm_judge_score": llm_judge_score["match"],
