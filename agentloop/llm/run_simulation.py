@@ -6,7 +6,7 @@ from typing import List, Optional, Literal
 from loguru import logger
 from dotenv import load_dotenv
 import os
-from os.path import join, exists
+from os.path import join, exists, splitext, basename
 import shutil
 from collections import defaultdict
 
@@ -443,15 +443,32 @@ async def main():
         default="openai",
         help="LLM provider to use (openai or openrouter)",
     )
+    parser.add_argument(
+        "-l",
+        "--language",
+        type=str,
+        choices=["english", "hindi"],
+        default="english",
+        help="Language of the bot",
+    )
 
     args = parser.parse_args()
 
     with open(args.config, "r") as f:
         config = json.load(f)
 
-    args.output_dir = join(args.output_dir, args.provider, args.model)
+    config_name = splitext(basename(args.config))[0]
 
-    os.makedirs(args.output_dir, exist_ok=True)
+    save_folder_name = (
+        f"{args.provider}/{args.model}"
+        if args.provider == "openai"
+        else f"{args.model}"
+    )
+
+    save_folder_name = save_folder_name.replace("/", "__")
+    output_dir = join(args.output_dir, config_name, save_folder_name)
+
+    os.makedirs(output_dir, exist_ok=True)
 
     metrics = defaultdict(list)
     all_simulation_metrics = []
@@ -459,20 +476,20 @@ async def main():
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
 
-            user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{user_persona}\n\nThe following scenario will be played out: {scenario}. Make sure to respond to the agent to match the given scenario as per the given persona for you."
+            user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{user_persona}\n\nThe following scenario will be played out: {scenario}. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in {args.language}."
 
             simulation_name = (
                 f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
             )
 
-            simulation_output_dir = f"{args.output_dir}/{simulation_name}"
+            simulation_output_dir = f"{output_dir}/{simulation_name}"
 
             if exists(simulation_output_dir):
                 shutil.rmtree(simulation_output_dir)
 
             os.makedirs(simulation_output_dir)
 
-            logs_file_path = f"{args.output_dir}/{simulation_name}/logs"
+            logs_file_path = f"{output_dir}/{simulation_name}/logs"
 
             logger.remove()
             log_file_id = logger.add(
@@ -481,7 +498,7 @@ async def main():
                 colorize=False,
             )
 
-            print_log_save_path = f"{args.output_dir}/{simulation_name}/results.log"
+            print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
             configure_print_logger(print_log_save_path)
 
             command = " ".join(sys.argv)
@@ -495,7 +512,7 @@ async def main():
 
             output = await run_simulation(
                 bot_system_prompt=config["agent_system_prompt"]
-                + f"\n\nYou must always speak in {config['language']}.",
+                + f"\n\nYou must always speak in {args.language}.",
                 tools=config["tools"],
                 user_system_prompt=user_system_prompt,
                 evaluation_criteria=config["evaluation_criteria"],
@@ -540,9 +557,9 @@ async def main():
         }
 
     df = pd.DataFrame(all_simulation_metrics)
-    df.to_csv(join(args.output_dir, "results.csv"), index=False)
+    df.to_csv(join(output_dir, "results.csv"), index=False)
 
-    with open(join(args.output_dir, "metrics.json"), "w") as f:
+    with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics_summary, f, indent=4)
 
 

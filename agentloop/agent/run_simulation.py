@@ -913,6 +913,14 @@ async def main():
         default="./out",
         help="Path to the output directory to save the results",
     )
+    parser.add_argument(
+        "-l",
+        "--language",
+        type=str,
+        choices=["english", "hindi"],
+        default="english",
+        help="Language of the bot",
+    )
 
     args = parser.parse_args()
 
@@ -998,15 +1006,15 @@ async def main():
                     bot_task = asyncio.create_task(
                         start_bot(
                             config["agent_system_prompt"]
-                            + f"\n\nYou must always speak in {config['language']}.",
+                            + f"\n\nYou must always speak in {args.language}.",
                             config["tools"],
-                            config["language"],
+                            args.language,
                         )
                     )
                     sim_task = asyncio.create_task(
                         run_simulation(
                             user_system_prompt,
-                            config["language"],
+                            args.language,
                             config["evaluation_criteria"],
                             simulation_output_dir,
                             # user_speaks_first=True,
