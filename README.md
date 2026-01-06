@@ -863,6 +863,26 @@ Each `simulation_persona_*_scenario_*` directory contains:
 
 You can checkout [`pense/agent/examples/simulation/sample_output`](pense/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
 
+## Documentation
+
+Pense documentation is built using [MkDocs](https://www.mkdocs.org) with the [Material theme](https://squidfunk.github.io/mkdocs-material/).
+
+### Building Documentation Locally
+
+1. **Install documentation dependencies:**
+
+```bash
+uv pip install -r requirements-docs.txt
+```
+
+2. **Preview documentation locally:**
+
+```bash
+mkdocs serve
+```
+
+This will start a local server at `http://127.0.0.1:8000` where you can preview the documentation.
+
 ## TODOs
 
 - Add support for running openai STT on the TTS outputs and evaluating it.

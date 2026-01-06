@@ -1,0 +1,115 @@
+site_name: Pense Documentation
+site_description: Documentation for Pense - Voice Agent Testing Framework
+site_url: https://pense-docs.netlify.app
+# Update repo_url and repo_name with your actual repository details
+# repo_url: https://github.com/your-username/agentloop
+# repo_name: pense
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.annotate
+    - content.code.copy
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - admonition
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - getting-started/index.md
+    - getting-started/installation.md
+    - getting-started/configuration.md
+    - getting-started/first-evaluation.md
+  - Concepts:
+    - concepts/index.md
+    - concepts/evaluation-workflow.md
+    - concepts/metrics.md
+    - concepts/providers.md
+    - concepts/output-structure.md
+  - Guides:
+    - STT Evaluation:
+      - guides/stt/index.md
+      - guides/stt/preparing-data.md
+      - guides/stt/running-eval.md
+      - guides/stt/understanding-results.md
+      - guides/stt/leaderboard.md
+    - TTS Evaluation:
+      - guides/tts/index.md
+      - guides/tts/preparing-data.md
+      - guides/tts/running-eval.md
+      - guides/tts/understanding-results.md
+      - guides/tts/leaderboard.md
+    - LLM Evaluation:
+      - guides/llm/index.md
+      - LLM Tests:
+        - guides/llm/tests/index.md
+        - guides/llm/tests/creating-tests.md
+        - guides/llm/tests/running-tests.md
+        - guides/llm/tests/evaluation-types.md
+        - guides/llm/tests/leaderboard.md
+      - LLM Simulations:
+        - guides/llm/simulations/index.md
+        - guides/llm/simulations/creating-config.md
+        - guides/llm/simulations/personas-scenarios.md
+        - guides/llm/simulations/evaluation-criteria.md
+        - guides/llm/simulations/running-simulations.md
+        - guides/llm/simulations/leaderboard.md
+    - Agent Evaluation:
+      - guides/agent/index.md
+      - guides/agent/interactive-testing.md
+      - guides/agent/agent-simulations.md
+      - guides/agent/config-reference.md
+      - guides/agent/understanding-outputs.md
+  - Reference:
+    - reference/cli-reference.md
+    - reference/config-reference.md
+    - reference/providers.md
+    - reference/metrics-reference.md
+  - Examples:
+    - examples/index.md
+    - examples/stt-quick-eval.md
+    - examples/tts-quick-eval.md
+    - examples/llm-test-example.md
+    - examples/llm-simulation-example.md
+    - examples/agent-simulation-example.md
+  - Troubleshooting:
+    - troubleshooting/index.md
+    - troubleshooting/api-keys.md
+    - troubleshooting/data-format.md
+    - troubleshooting/performance.md
+  - FAQ: faq.md

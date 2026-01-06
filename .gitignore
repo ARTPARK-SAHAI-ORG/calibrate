@@ -134,3 +134,6 @@ Desktop.ini
 logs
 out
 data
+
+# MkDocs build output
+site/
