@@ -1,1 +1,0 @@
-# pense.stt module

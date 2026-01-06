@@ -3741,3 +3741,35 @@ Lint results
 
 ---
 
+
+## Summary
+
+1. **Added `pense agent test` command** to the CLI:
+   - Added a new `test` subcommand under `agent`
+   - Accepts `-c/--config` (required) and `-o/--output-dir` (default: `./out`)
+   - Converts `--output-dir` to `--output_dir` for compatibility with `test.py`
+   - Uses `runpy.run_path()` to execute the test script
+
+2. **Updated README.md**:
+   - Changed the command from `cd pense/agent && uv run python test.py ...` to `pense agent test ...`
+   - Updated the example to use the new CLI format
+
+Users can now run:
+```bash
+pense agent test -c pense/agent/examples/test/config.json -o ./out/run
+```
+
+Instead of:
+```bash
+cd pense/agent
+uv run python test.py -c examples/test/config.json -o ./out/run
+```
+
+The CLI now supports all agent commands:
+- `pense agent test` - Interactive agent testing
+- `pense agent simulation` - Agent simulation evaluation
+
+All commands are documented in the README and CLI help text.
+
+---
+

@@ -18,64 +18,6 @@ wheels = [
 ]
 
 [[package]]
-name = "agentloop"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "backoff" },
-    { name = "evaluate" },
-    { name = "instructor" },
-    { name = "ipdb" },
-    { name = "ipython", version = "8.37.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "ipython", version = "9.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-    { name = "jiwer" },
-    { name = "matplotlib" },
-    { name = "natsort" },
-    { name = "onnxruntime" },
-    { name = "openpyxl" },
-    { name = "opentelemetry-api" },
-    { name = "opentelemetry-exporter-otlp" },
-    { name = "opentelemetry-sdk" },
-    { name = "pipecat-ai", extra = ["cartesia", "deepgram", "google", "groq", "local-smart-turn-v3", "tracing", "webrtc", "websocket"] },
-    { name = "pipecat-ai-small-webrtc-prebuilt" },
-    { name = "python-dotenv" },
-    { name = "sarvamai" },
-    { name = "simpleaudio" },
-    { name = "smallestai" },
-    { name = "sounddevice" },
-    { name = "test-py" },
-    { name = "uvicorn" },
-    { name = "whisper-normalizer" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "backoff", specifier = ">=2.2.1" },
-    { name = "evaluate", specifier = ">=0.4.6" },
-    { name = "instructor", specifier = ">=1.13.0" },
-    { name = "ipdb", specifier = ">=0.13.13" },
-    { name = "ipython", specifier = ">=8.37.0" },
-    { name = "jiwer", specifier = ">=4.0.0" },
-    { name = "matplotlib", specifier = ">=3.10.7" },
-    { name = "natsort", specifier = ">=8.4.0" },
-    { name = "onnxruntime", specifier = ">=1.23.2" },
-    { name = "openpyxl", specifier = ">=3.1.5" },
-    { name = "opentelemetry-api", specifier = ">=1.38.0" },
-    { name = "opentelemetry-exporter-otlp", specifier = ">=1.38.0" },
-    { name = "opentelemetry-sdk", specifier = ">=1.38.0" },
-    { name = "pipecat-ai", extras = ["cartesia", "deepgram", "google", "groq", "local-smart-turn-v3", "openrouter", "tracing", "webrtc", "websocket"], specifier = ">=0.0.93" },
-    { name = "pipecat-ai-small-webrtc-prebuilt", specifier = ">=1.0.0" },
-    { name = "python-dotenv", specifier = ">=1.2.1" },
-    { name = "sarvamai", specifier = ">=0.1.21" },
-    { name = "simpleaudio", specifier = ">=1.0.4" },
-    { name = "smallestai", specifier = ">=4.0.1" },
-    { name = "sounddevice", specifier = ">=0.5.3" },
-    { name = "test-py", specifier = ">=0.3" },
-    { name = "uvicorn", specifier = ">=0.38.0" },
-    { name = "whisper-normalizer", specifier = ">=0.1.12" },
-]
-
-[[package]]
 name = "aiofiles"
 version = "24.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3252,6 +3194,64 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/d4/de/53e0bcf53d13e005bd8c92e7855142494f41171b34c2536b86187474184d/parso-0.8.5.tar.gz", hash = "sha256:034d7354a9a018bdce352f48b2a8a450f05e9d6ee85db84764e9b6bd96dafe5a", size = 401205, upload-time = "2025-08-23T15:15:28.028Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/16/32/f8e3c85d1d5250232a5d3477a2a28cc291968ff175caeadaf3cc19ce0e4a/parso-0.8.5-py2.py3-none-any.whl", hash = "sha256:646204b5ee239c396d040b90f9e272e9a8017c630092bf59980beb62fd033887", size = 106668, upload-time = "2025-08-23T15:15:25.663Z" },
+]
+
+[[package]]
+name = "pense"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "backoff" },
+    { name = "evaluate" },
+    { name = "instructor" },
+    { name = "ipdb" },
+    { name = "ipython", version = "8.37.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "ipython", version = "9.6.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+    { name = "jiwer" },
+    { name = "matplotlib" },
+    { name = "natsort" },
+    { name = "onnxruntime" },
+    { name = "openpyxl" },
+    { name = "opentelemetry-api" },
+    { name = "opentelemetry-exporter-otlp" },
+    { name = "opentelemetry-sdk" },
+    { name = "pipecat-ai", extra = ["cartesia", "deepgram", "google", "groq", "local-smart-turn-v3", "tracing", "webrtc", "websocket"] },
+    { name = "pipecat-ai-small-webrtc-prebuilt" },
+    { name = "python-dotenv" },
+    { name = "sarvamai" },
+    { name = "simpleaudio" },
+    { name = "smallestai" },
+    { name = "sounddevice" },
+    { name = "test-py" },
+    { name = "uvicorn" },
+    { name = "whisper-normalizer" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "backoff", specifier = ">=2.2.1" },
+    { name = "evaluate", specifier = ">=0.4.6" },
+    { name = "instructor", specifier = ">=1.13.0" },
+    { name = "ipdb", specifier = ">=0.13.13" },
+    { name = "ipython", specifier = ">=8.37.0" },
+    { name = "jiwer", specifier = ">=4.0.0" },
+    { name = "matplotlib", specifier = ">=3.10.7" },
+    { name = "natsort", specifier = ">=8.4.0" },
+    { name = "onnxruntime", specifier = ">=1.23.2" },
+    { name = "openpyxl", specifier = ">=3.1.5" },
+    { name = "opentelemetry-api", specifier = ">=1.38.0" },
+    { name = "opentelemetry-exporter-otlp", specifier = ">=1.38.0" },
+    { name = "opentelemetry-sdk", specifier = ">=1.38.0" },
+    { name = "pipecat-ai", extras = ["cartesia", "deepgram", "google", "groq", "local-smart-turn-v3", "openrouter", "tracing", "webrtc", "websocket"], specifier = ">=0.0.93" },
+    { name = "pipecat-ai-small-webrtc-prebuilt", specifier = ">=1.0.0" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "sarvamai", specifier = ">=0.1.21" },
+    { name = "simpleaudio", specifier = ">=1.0.4" },
+    { name = "smallestai", specifier = ">=4.0.1" },
+    { name = "sounddevice", specifier = ">=0.5.3" },
+    { name = "test-py", specifier = ">=0.3" },
+    { name = "uvicorn", specifier = ">=0.38.0" },
+    { name = "whisper-normalizer", specifier = ">=0.1.12" },
 ]
 
 [[package]]
