@@ -2703,3 +2703,1041 @@ _**Agent (model composer-1, mode Agent)**_
 
 ---
 
+
+Updating README.md to replace "agentloop" with "pense" and update commands to use the new CLI.
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating README.md to replace "agentloop" with "pense" and update commands to use the new CLI:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -1,7 +1,7 @@
+- # AgentLoop
++ # Pense
+  
+  An open-source simulation and testing framework for voice agents.
+  
+- With AgentLoop, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
++ With Pense, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
+  
+  - Evaluate different components of your voice agents across multiple vendors in isolation
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -9,5 +9,5 @@
+  - Simulate entire conversations spanning thousands of scenarios across multiple user personas
+  
+- AgentLoop is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
++ Pense is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
+  
+  ## Setup
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -25,8 +25,8 @@
+  ## Talk to the agent
+  
+- &#96;agentloop/agent/test.py&#96; spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
++ &#96;pense/agent/test.py&#96; spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
+  
+  1. Make sure your &#96;.env&#96; file has the required API keys (defaults use OpenAI STT + LLM and Google TTS).
+- 2. Pick or edit a config file. &#96;agentloop/agent/examples/test/config.json&#96; is a ready-to-use config file.
++ 2. Pick or edit a config file. &#96;pense/agent/examples/test/config.json&#96; is a ready-to-use config file.
+     You can configure the providers for STT, LLM, and TTS in the config file as shown below:
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -73,5 +73,5 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/agent
++ cd pense/agent
+  uv run python test.py -c examples/test/config.json -o ./out/run
+  &#96;&#96;&#96;
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -93,5 +93,5 @@
+  &#96;transcript.json&#96; in the output directory has the full transcript with function calls.
+  
+- You can checkout &#96;agentloop/agent/examples/test/sample_output&#96; as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
++ You can checkout &#96;pense/agent/examples/test/sample_output&#96; as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
+  
+  ## Speech To Text (STT)
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 5
+
+```diff
+@@ -137,13 +137,11 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/stt
+- uv run python eval.py --input-dir /path/to/data -o /path/to/output -d -p &lt;provider&gt; -l &lt;language&gt;
++ pense stt eval -p &lt;provider&gt; -l &lt;language&gt; -i /path/to/data -o /path/to/output -d
+  &#96;&#96;&#96;
+  
+- You can use the sample inputs provided in [&#96;agentloop/stt/examples/sample_input&#96;](agentloop/stt/examples/sample_input) to test the evaluation script.
++ You can use the sample inputs provided in [&#96;pense/stt/examples/sample_input&#96;](pense/stt/examples/sample_input) to test the evaluation script.
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/stt
+- uv run python eval.py --input-dir samples -o ./out -d -p sarvam -l english
++ pense stt eval -p sarvam -l english -i samples -o ./out -d
+  &#96;&#96;&#96;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -179,5 +179,5 @@
+  &#96;&#96;&#96;
+  
+- The definition of all the metrics we compute are stored in [&#96;agentloop/stt/metrics.py&#96;](agentloop/stt/metrics.py).
++ The definition of all the metrics we compute are stored in [&#96;pense/stt/metrics.py&#96;](pense/stt/metrics.py).
+  
+  &#96;metrics.json&#96; will have the following format:
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -222,7 +222,7 @@
+  &#96;logs&#96; contain the full logs of the evaluation script including all the pipecat logs whereas &#96;results.log&#96; contains only the terminal output of the evaluation script as shown in the sample output above.
+  
+- You can checkout [&#96;agentloop/stt/examples/sample_output&#96;](agentloop/stt/examples/sample_output) to see a sample output of the evaluation script.
++ You can checkout [&#96;pense/stt/examples/sample_output&#96;](pense/stt/examples/sample_output) to see a sample output of the evaluation script.
+  
+- For more details, run &#96;uv run python eval.py -h&#96;.
++ For more details, run &#96;pense stt eval -h&#96;.
+  
+  &#96;&#96;&#96;bash
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 5
+
+```diff
+@@ -246,13 +246,12 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/stt
+- uv run python leaderboard.py -o /path/to/output -s ./leaderboards
++ pense stt leaderboard -o /path/to/output -s ./leaderboards
+  &#96;&#96;&#96;
+  
+- The script scans each run directory, reads &#96;metrics.json&#96; and &#96;results.csv&#96;, then writes &#96;stt_leaderboard.xlsx&#96; plus &#96;all_metrics_by_run.png&#96; inside the save directory so you can compare providers side-by-side (&#96;agentloop/stt/leaderboard.py&#96;).
++ The script scans each run directory, reads &#96;metrics.json&#96; and &#96;results.csv&#96;, then writes &#96;stt_leaderboard.xlsx&#96; plus &#96;all_metrics_by_run.png&#96; inside the save directory so you can compare providers side-by-side (&#96;pense/stt/leaderboard.py&#96;).
+  
+- You can checkout [&#96;agentloop/stt/examples/leaderboard&#96;](agentloop/stt/examples/leaderboard) to see a sample output of the leaderboard script.
++ You can checkout [&#96;pense/stt/examples/leaderboard&#96;](pense/stt/examples/leaderboard) to see a sample output of the leaderboard script.
+  
+- ![Leaderboard example](agentloop/stt/examples/leaderboard/all_metrics_by_run.png)
++ ![Leaderboard example](pense/stt/examples/leaderboard/all_metrics_by_run.png)
+  
+  ## Text To Speech (TTS)
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 5
+
+```diff
+@@ -287,13 +287,11 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/tts
+- uv run python eval.py --input /path/to/input.csv -o /path/to/output -p &lt;provider&gt; -l &lt;language&gt;
++ pense tts eval -p &lt;provider&gt; -l &lt;language&gt; -i /path/to/input.csv -o /path/to/output
+  &#96;&#96;&#96;
+  
+- You can use the sample inputs provided in [&#96;agentloop/tts/examples/sample.csv&#96;](agentloop/tts/examples/sample.csv) to test the evaluation script.
++ You can use the sample inputs provided in [&#96;pense/tts/examples/sample.csv&#96;](pense/tts/examples/sample.csv) to test the evaluation script.
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/tts
+- uv run python eval.py --input examples/sample.csv -o ./out -p smallest -l english
++ pense tts eval -p smallest -l english -i examples/sample.csv -o ./out
+  &#96;&#96;&#96;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -353,7 +353,7 @@
+  &#96;logs&#96; contain the full logs of the evaluation script including all the pipecat logs whereas &#96;results.log&#96; contains only the terminal output of the evaluation script as shown in the sample output above.
+  
+- You can checkout [&#96;agentloop/tts/examples/sample_output&#96;](agentloop/tts/examples/sample_output) to see a sample output of the evaluation script.
++ You can checkout [&#96;pense/tts/examples/sample_output&#96;](pense/tts/examples/sample_output) to see a sample output of the evaluation script.
+  
+- For more details, run &#96;uv run python eval.py -h&#96;.
++ For more details, run &#96;pense tts eval -h&#96;.
+  
+  &#96;&#96;&#96;bash
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 5
+
+```diff
+@@ -377,13 +377,12 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/tts
+- uv run python leaderboard.py -o /path/to/output -s ./leaderboards
++ pense tts leaderboard -o /path/to/output -s ./leaderboards
+  &#96;&#96;&#96;
+  
+- &#96;agentloop/tts/leaderboard.py&#96; mirrors the STT workflow, emitting &#96;tts_leaderboard.xlsx&#96; plus &#96;all_metrics_by_run.png&#96; so you can spot which provider balances latency and judge scores best.
++ &#96;pense/tts/leaderboard.py&#96; mirrors the STT workflow, emitting &#96;tts_leaderboard.xlsx&#96; plus &#96;all_metrics_by_run.png&#96; so you can spot which provider balances latency and judge scores best.
+  
+- You can checkout [&#96;agentloop/tts/examples/leaderboard&#96;](agentloop/tts/examples/leaderboard) to see a sample output of the leaderboard script.
++ You can checkout [&#96;pense/tts/examples/leaderboard&#96;](pense/tts/examples/leaderboard) to see a sample output of the leaderboard script.
+  
+- ![Leaderboard example](agentloop/tts/examples/leaderboard/all_metrics_by_run.png)
++ ![Leaderboard example](pense/tts/examples/leaderboard/all_metrics_by_run.png)
+  
+  ## LLM tests
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 4
+
+```diff
+@@ -485,12 +485,11 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/llm
+- uv run python run_tests.py --config /path/to/test_config.json -o /path/to/output_dir -m &lt;model_name&gt;
++ pense llm tests run -c /path/to/test_config.json -o /path/to/output_dir -m &lt;model_name&gt;
+  &#96;&#96;&#96;
+  
+- You can use the sample test configuration provided in [&#96;agentloop/llm/examples/tests/config.json&#96;](agentloop/llm/examples/tests/config.json) to test the evaluation script.
++ You can use the sample test configuration provided in [&#96;pense/llm/examples/tests/config.json&#96;](pense/llm/examples/tests/config.json) to test the evaluation script.
+  
+  &#96;&#96;&#96;bash
+- uv run python run_tests.py --config examples/tests/config.json -o ./out -m gpt-4.1
++ pense llm tests run -c examples/tests/config.json -o ./out -m gpt-4.1
+  &#96;&#96;&#96;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -508,5 +508,5 @@
+  &#96;&#96;&#96;
+  
+- You can checkout [&#96;agentloop/llm/examples/tests/sample_output&#96;](agentloop/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
++ You can checkout [&#96;pense/llm/examples/tests/sample_output&#96;](pense/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
+  
+  Sample output 1:
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: 5
+
+```diff
+@@ -553,13 +553,12 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/llm
+- uv run python tests_leaderboard.py -o /path/to/output -s ./leaderboard
++ pense llm tests leaderboard -o /path/to/output -s ./leaderboard
+  &#96;&#96;&#96;
+  
+- &#96;agentloop/llm/tests_leaderboard.py&#96; walks every &#96;&lt;scenario&gt;/&lt;model&gt;&#96; folder under the output root, computes pass percentages, and saves &#96;llm_leaderboard.csv&#96; plus &#96;llm_leaderboard.png&#96; to the chosen save directory for quick reporting.
++ &#96;pense/llm/tests_leaderboard.py&#96; walks every &#96;&lt;scenario&gt;/&lt;model&gt;&#96; folder under the output root, computes pass percentages, and saves &#96;llm_leaderboard.csv&#96; plus &#96;llm_leaderboard.png&#96; to the chosen save directory for quick reporting.
+  
+- You can checkout [&#96;agentloop/llm/examples/leaderboard&#96;](agentloop/llm/examples/leaderboard) to see a sample output of the leaderboard script.
++ You can checkout [&#96;pense/llm/examples/leaderboard&#96;](pense/llm/examples/leaderboard) to see a sample output of the leaderboard script.
+  
+- ![Leaderboard example](agentloop/llm/examples/tests/leaderboard/llm_leaderboard.png)
++ ![Leaderboard example](pense/llm/examples/tests/leaderboard/llm_leaderboard.png)
+  
+  ## LLM simulations
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 9, lines removed: 11
+
+```diff
+@@ -600,19 +600,17 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/llm
+- uv run python run_simulation.py \
+-   --config /path/to/config.json \
+-   --output-dir /path/to/output \
+-   --model &lt;model_name&gt;
++ pense llm simulations run \
++   -c /path/to/config.json \
++   -o /path/to/output \
++   -m &lt;model_name&gt;
+  &#96;&#96;&#96;
+  
+- You can use the sample configuration provided in [&#96;agentloop/llm/examples/simulation/config.json&#96;](agentloop/llm/examples/simulation/config.json) to test the simulation.
++ You can use the sample configuration provided in [&#96;pense/llm/examples/simulation/config.json&#96;](pense/llm/examples/simulation/config.json) to test the simulation.
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/llm
+- uv run python run_simulation.py \
+-   --config examples/simulation/config.json \
+-   --output-dir ./out \
+-   --model gpt-4.1
++ pense llm simulations run \
++   -c examples/simulation/config.json \
++   -o ./out \
++   -m gpt-4.1
+  &#96;&#96;&#96;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -715,5 +715,5 @@
+  &#96;logs&#96; contains the full logs of the simulation including all the pipecat logs whereas &#96;results.log&#96; contains only the terminal output of the simulation as shown in the sample output above.
+  
+- You can checkout [&#96;agentloop/llm/examples/simulation/sample_output&#96;](agentloop/llm/examples/simulation/sample_output) to see a sample output of the simulation.
++ You can checkout [&#96;pense/llm/examples/simulation/sample_output&#96;](pense/llm/examples/simulation/sample_output) to see a sample output of the simulation.
+  
+  ## Voice agent simulations
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -777,5 +777,5 @@
+  &#96;&#96;&#96;
+  
+- The voice agent is defined in &#96;agentloop/agent/bot.py&#96;. For now, the default configuration of the bot uses Deepgram for STT, OpenAI for LLM, and Google for TTS. You can configure the bot to use different providers for STT, LLM, and TTS by modifying the &#96;STTConfig&#96;, &#96;LLMConfig&#96;, and &#96;TTSConfig&#96; classes in &#96;agentloop/agent/bot.py&#96;. We will soon add support for changing the configuration for each provider for each component to override the defaults.
++ The voice agent is defined in &#96;pense/agent/bot.py&#96;. For now, the default configuration of the bot uses Deepgram for STT, OpenAI for LLM, and Google for TTS. You can configure the bot to use different providers for STT, LLM, and TTS by modifying the &#96;STTConfig&#96;, &#96;LLMConfig&#96;, and &#96;TTSConfig&#96; classes in &#96;pense/agent/bot.py&#96;. We will soon add support for changing the configuration for each provider for each component to override the defaults.
+  
+  Set the required environment variables for the providers you want to use:
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 4
+
+```diff
+@@ -789,12 +789,11 @@
+  
+  &#96;&#96;&#96;bash
+- cd agentloop/agent
+- uv run python run_simulation.py  -c /path/to/config.json -o /path/to/output
++ pense agent simulation -c /path/to/config.json -o /path/to/output
+  &#96;&#96;&#96;
+  
+- You can use the sample configuration provided in [&#96;agentloop/agent/examples/sample_short_english.json&#96;](agentloop/agent/examples/sample_short_english.json) to test the voice agent simulation.
++ You can use the sample configuration provided in [&#96;pense/agent/examples/sample_short_english.json&#96;](pense/agent/examples/sample_short_english.json) to test the voice agent simulation.
+  
+  &#96;&#96;&#96;bash
+- uv run python run_simulation.py -c examples/sample_short_english.json -o ./out
++ pense agent simulation -c examples/sample_short_english.json -o ./out
+  &#96;&#96;&#96;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -863,5 +863,5 @@
+  - &#96;transcripts.json&#96;: full conversation transcript - alternating &#96;user&#96;/&#96;assistant&#96; turns.
+  
+- You can checkout [&#96;agentloop/agent/examples/simulation/sample_output&#96;](agentloop/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
++ You can checkout [&#96;pense/agent/examples/simulation/sample_output&#96;](pense/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
+  
+  ## TODOs
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updated README.md:
+
+1. Renamed "AgentLoop" to "Pense" in the title and throughout
+2. Updated all file paths from `agentloop/` to `pense/`
+3. Updated commands to use the new CLI:
+   - `pense stt eval ...` instead of `cd agentloop/stt && uv run python eval.py ...`
+   - `pense stt leaderboard ...` instead of `cd agentloop/stt && uv run python leaderboard.py ...`
+   - `pense tts eval ...` instead of `cd agentloop/tts && uv run python eval.py ...`
+   - `pense tts leaderboard ...` instead of `cd agentloop/tts && uv run python leaderboard.py ...`
+   - `pense llm tests run ...` instead of `cd agentloop/llm && uv run python run_tests.py ...`
+   - `pense llm tests leaderboard ...` instead of `cd agentloop/llm && uv run python tests_leaderboard.py ...`
+   - `pense llm simulations run ...` instead of `cd agentloop/llm && uv run python run_simulation.py ...`
+   - `pense agent simulation ...` instead of `cd agentloop/agent && uv run python run_simulation.py ...`
+
+The README now reflects the new package name and CLI commands. The `test.py` script for interactive testing still uses the direct Python command since it's not part of the CLI yet.
+
+---
+
+_**User (2026-01-06 16:41Z)**_
+
+update @agentloop/cli.py to also let someone test @agentloop/agent/test.py agent with cli and update REAMDE too
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Adding a CLI command for the agent test script and updating the README.
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: pense/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: agentloop/agent/test.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding the agent test command to the CLI:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: pense/cli.py</summary>
+
+**Chunk 1**
+Lines added: 8, lines removed: undefined
+
+```diff
+@@ -188,4 +188,12 @@
+      agent_subparsers = agent_parser.add_subparsers(dest="command", help="Agent command")
+      agent_subparsers.required = True
++ 
++     agent_test_parser = agent_subparsers.add_parser(
++         "test", help="Run interactive agent test"
++     )
++     agent_test_parser.add_argument("-c", "--config", type=str, required=True)
++     agent_test_parser.add_argument(
++         "-o", "--output-dir", type=str, default="./out"
++     )
+  
+      agent_simulation_parser = agent_subparsers.add_parser(
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: pense/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Adding dispatch logic for the agent test command:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: pense/cli.py</summary>
+
+**Chunk 1**
+Lines added: 18, lines removed: 1
+
+```diff
+@@ -286,5 +286,22 @@
+                  leaderboard_main()
+      elif args.component == "agent":
+-         if args.command == "simulation":
++         if args.command == "test":
++             # The test.py script uses pipecat's runner which expects specific sys.argv format
++             # We need to convert output-dir to output_dir for the test script
++             test_args = _args_to_argv(
++                 args, exclude_keys={"component", "command"}
++             )
++             # Convert --output-dir to --output_dir for test.py compatibility
++             test_args = [arg.replace("--output-dir", "--output_dir") if arg == "--output-dir" else arg for arg in test_args]
++             sys.argv = ["pense"] + test_args
++             
++             # Import and run the test module
++             import importlib.util
++             import os
++             test_module_path = os.path.join(os.path.dirname(__file__), "agent", "test.py")
++             spec = importlib.util.spec_from_file_location("pense.agent.test", test_module_path)
++             test_module = importlib.util.module_from_spec(spec)
++             spec.loader.exec_module(test_module)
++         elif args.command == "simulation":
+              from pense.agent.run_simulation import main as agent_main
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: pense/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Switching to `runpy` for a cleaner approach:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: pense/cli.py</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -18,4 +18,6 @@
+  import argparse
+  import asyncio
++ import runpy
++ import os
+  
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: pense/cli.py</summary>
+
+**Chunk 1**
+Lines added: 13, lines removed: 8
+
+```diff
+@@ -296,13 +296,18 @@
+              # Convert --output-dir to --output_dir for test.py compatibility
+              test_args = [arg.replace("--output-dir", "--output_dir") if arg == "--output-dir" else arg for arg in test_args]
+-             sys.argv = ["pense"] + test_args
+-             
+-             # Import and run the test module
+-             import importlib.util
+-             import os
++             # Also need to handle the value if it's the next argument
++             final_args = []
++             i = 0
++             while i &lt; len(test_args):
++                 if test_args[i] == "--output-dir" and i + 1 &lt; len(test_args):
++                     final_args.extend(["--output_dir", test_args[i + 1]])
++                     i += 2
++                 else:
++                     final_args.append(test_args[i])
++                     i += 1
++             
+              test_module_path = os.path.join(os.path.dirname(__file__), "agent", "test.py")
+-             spec = importlib.util.spec_from_file_location("pense.agent.test", test_module_path)
+-             test_module = importlib.util.module_from_spec(spec)
+-             spec.loader.exec_module(test_module)
++             sys.argv = ["pense-agent-test"] + final_args
++             runpy.run_path(test_module_path, run_name="__main__")
+          elif args.command == "simulation":
+              from pense.agent.run_simulation import main as agent_main
+```
+
+</details>
+
+</tool-use>
+
+---
+
+The model provided an ambiguous search string to replace.
+
+---
+
+The model provided an ambiguous search string to replace.
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `pense/cli.py`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating the epilog section:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: pense/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: pense/cli.py</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -70,4 +70,5 @@
+      pense llm simulations run -c ./config.json -o ./out
+      pense llm simulations leaderboard -o ./out -s ./leaderboard
++     pense agent test -c ./config.json -o ./out
+      pense agent simulation -c ./config.json -o ./out
+          """,
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Updating the README to use the new CLI command:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 2
+
+```diff
+@@ -73,6 +73,5 @@
+  
+  &#96;&#96;&#96;bash
+- cd pense/agent
+- uv run python test.py -c examples/test/config.json -o ./out/run
++ pense agent test -c pense/agent/examples/test/config.json -o ./out/run
+  &#96;&#96;&#96;
+  
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `pense/cli.py`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Verifying the implementation handles the argument conversion correctly:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: pense/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Simplifying the argument conversion:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: pense/cli.py</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 12
+
+```diff
+@@ -296,18 +296,8 @@
+              )
+              # Convert --output-dir to --output_dir for test.py compatibility
+-             test_args = [arg.replace("--output-dir", "--output_dir") if arg == "--output-dir" else arg for arg in test_args]
+-             # Also need to handle the value if it's the next argument
+-             final_args = []
+-             i = 0
+-             while i &lt; len(test_args):
+-                 if test_args[i] == "--output-dir" and i + 1 &lt; len(test_args):
+-                     final_args.extend(["--output_dir", test_args[i + 1]])
+-                     i += 2
+-                 else:
+-                     final_args.append(test_args[i])
+-                     i += 1
++             test_args = [arg.replace("--output-dir", "--output_dir") for arg in test_args]
+              
+              test_module_path = os.path.join(os.path.dirname(__file__), "agent", "test.py")
+-             sys.argv = ["pense-agent-test"] + final_args
++             sys.argv = ["pense-agent-test"] + test_args
+              runpy.run_path(test_module_path, run_name="__main__")
+          elif args.command == "simulation":
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `pense/cli.py`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+

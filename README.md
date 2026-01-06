@@ -72,8 +72,7 @@ Copy `.env.example` to `.env` and fill in the API keys for the providers you wan
 3. Start the runner:
 
 ```bash
-cd pense/agent
-uv run python test.py -c examples/test/config.json -o ./out/run
+pense agent test -c pense/agent/examples/test/config.json -o ./out/run
 ```
 
 Once you run it, you can open `http://localhost:7860/client/` in your browser. Click **Connect**, and begin talking to the agent through your browser.

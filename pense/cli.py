@@ -17,6 +17,8 @@ Usage:
 import sys
 import argparse
 import asyncio
+import runpy
+import os
 
 
 def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
@@ -67,6 +69,7 @@ Examples:
     pense llm tests leaderboard -o ./out -s ./leaderboard
     pense llm simulations run -c ./config.json -o ./out
     pense llm simulations leaderboard -o ./out -s ./leaderboard
+    pense agent test -c ./config.json -o ./out
     pense agent simulation -c ./config.json -o ./out
         """,
     )
@@ -188,6 +191,12 @@ Examples:
     agent_subparsers = agent_parser.add_subparsers(dest="command", help="Agent command")
     agent_subparsers.required = True
 
+    agent_test_parser = agent_subparsers.add_parser(
+        "test", help="Run interactive agent test"
+    )
+    agent_test_parser.add_argument("-c", "--config", type=str, required=True)
+    agent_test_parser.add_argument("-o", "--output-dir", type=str, default="./out")
+
     agent_simulation_parser = agent_subparsers.add_parser(
         "simulation", help="Run agent simulation"
     )
@@ -277,7 +286,21 @@ Examples:
                 )
                 leaderboard_main()
     elif args.component == "agent":
-        if args.command == "simulation":
+        if args.command == "test":
+            # The test.py script uses pipecat's runner which expects specific sys.argv format
+            # We need to convert output-dir to output_dir for the test script
+            test_args = _args_to_argv(args, exclude_keys={"component", "command"})
+            # Convert --output-dir to --output_dir for test.py compatibility
+            test_args = [
+                arg.replace("--output-dir", "--output_dir") for arg in test_args
+            ]
+
+            test_module_path = os.path.join(
+                os.path.dirname(__file__), "agent", "test.py"
+            )
+            sys.argv = ["pense-agent-test"] + test_args
+            runpy.run_path(test_module_path, run_name="__main__")
+        elif args.command == "simulation":
             from pense.agent.run_simulation import main as agent_main
 
             sys.argv = ["pense"] + _args_to_argv(
