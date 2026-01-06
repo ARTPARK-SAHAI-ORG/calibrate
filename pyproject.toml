@@ -30,6 +30,9 @@ dependencies = [
     "whisper-normalizer>=0.1.12",
 ]
 
+[project.scripts]
+agentloop = "agentloop.cli:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 
