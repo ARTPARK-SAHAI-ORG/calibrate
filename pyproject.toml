@@ -1,5 +1,5 @@
 [project]
-name = "agentloop"
+name = "pense"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.scripts]
-agentloop = "agentloop.cli:main"
+pense = "pense.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
