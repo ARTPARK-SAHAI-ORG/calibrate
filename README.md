@@ -1,14 +1,14 @@
-# AgentLoop
+# Pense
 
 An open-source simulation and testing framework for voice agents.
 
-With AgentLoop, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
+With Pense, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
 
 - Evaluate different components of your voice agents across multiple vendors in isolation
 - Create comprehensive test suites that verify both conversational responses and tool usage
 - Simulate entire conversations spanning thousands of scenarios across multiple user personas
 
-AgentLoop is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
+Pense is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
 
 ## Setup
 
@@ -24,10 +24,10 @@ Copy `.env.example` to `.env` and fill in the API keys for the providers you wan
 
 ## Talk to the agent
 
-`agentloop/agent/test.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
+`pense/agent/test.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
 
 1. Make sure your `.env` file has the required API keys (defaults use OpenAI STT + LLM and Google TTS).
-2. Pick or edit a config file. `agentloop/agent/examples/test/config.json` is a ready-to-use config file.
+2. Pick or edit a config file. `pense/agent/examples/test/config.json` is a ready-to-use config file.
    You can configure the providers for STT, LLM, and TTS in the config file as shown below:
 
    **Supported Providers:**
@@ -72,7 +72,7 @@ Copy `.env.example` to `.env` and fill in the API keys for the providers you wan
 3. Start the runner:
 
 ```bash
-cd agentloop/agent
+cd pense/agent
 uv run python test.py -c examples/test/config.json -o ./out/run
 ```
 
@@ -92,7 +92,7 @@ Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sampl
 
 `transcript.json` in the output directory has the full transcript with function calls.
 
-You can checkout `agentloop/agent/examples/test/sample_output` as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
+You can checkout `pense/agent/examples/test/sample_output` as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
 
 ## Speech To Text (STT)
 
@@ -136,15 +136,13 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 ```
 
 ```bash
-cd agentloop/stt
-uv run python eval.py --input-dir /path/to/data -o /path/to/output -d -p <provider> -l <language>
+pense stt eval -p <provider> -l <language> -i /path/to/data -o /path/to/output -d
 ```
 
-You can use the sample inputs provided in [`agentloop/stt/examples/sample_input`](agentloop/stt/examples/sample_input) to test the evaluation script.
+You can use the sample inputs provided in [`pense/stt/examples/sample_input`](pense/stt/examples/sample_input) to test the evaluation script.
 
 ```bash
-cd agentloop/stt
-uv run python eval.py --input-dir samples -o ./out -d -p sarvam -l english
+pense stt eval -p sarvam -l english -i samples -o ./out -d
 ```
 
 Sample output:
@@ -180,7 +178,7 @@ id,gt,pred,wer,string_similarity,llm_judge_score,llm_judge_reasoning
 3_1_english_baseline,"Please write Rekha Kumari, sister.", Please write Reha Kumari's sister.,0.4,0.927536231884058,False,"The source says 'Rekha Kumari, sister' which indicates the name is 'Rekha Kumari' and she is a sister. The transcription says 'Reha Kumari's sister', which changes the name to 'Reha Kumari' and refers to her sister, not Rekha Kumari herself. The name is different ('Rekha' vs 'Reha') and the relationship is also changed (from identifying Rekha Kumari as the sister to referring to the sister of Reha Kumari). Therefore, the values do not match."
 ```
 
-The definition of all the metrics we compute are stored in [`agentloop/stt/metrics.py`](agentloop/stt/metrics.py).
+The definition of all the metrics we compute are stored in [`pense/stt/metrics.py`](pense/stt/metrics.py).
 
 `metrics.json` will have the following format:
 
@@ -223,9 +221,9 @@ The definition of all the metrics we compute are stored in [`agentloop/stt/metri
 
 `logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
 
-You can checkout [`agentloop/stt/examples/sample_output`](agentloop/stt/examples/sample_output) to see a sample output of the evaluation script.
+You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_output) to see a sample output of the evaluation script.
 
-For more details, run `uv run python eval.py -h`.
+For more details, run `pense stt eval -h`.
 
 ```bash
 usage: eval.py [-h] [-p {deepgram,deepgram-flux,openai,cartesia,smallest,groq,google,sarvam}] [-l {english,hindi}] -i
@@ -247,15 +245,14 @@ options:
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
 ```bash
-cd agentloop/stt
-uv run python leaderboard.py -o /path/to/output -s ./leaderboards
+pense stt leaderboard -o /path/to/output -s ./leaderboards
 ```
 
-The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`agentloop/stt/leaderboard.py`).
+The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`pense/stt/leaderboard.py`).
 
-You can checkout [`agentloop/stt/examples/leaderboard`](agentloop/stt/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`pense/stt/examples/leaderboard`](pense/stt/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](agentloop/stt/examples/leaderboard/all_metrics_by_run.png)
+![Leaderboard example](pense/stt/examples/leaderboard/all_metrics_by_run.png)
 
 ## Text To Speech (TTS)
 
@@ -289,15 +286,13 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 ```
 
 ```bash
-cd agentloop/tts
-uv run python eval.py --input /path/to/input.csv -o /path/to/output -p <provider> -l <language>
+pense tts eval -p <provider> -l <language> -i /path/to/input.csv -o /path/to/output
 ```
 
-You can use the sample inputs provided in [`agentloop/tts/examples/sample.csv`](agentloop/tts/examples/sample.csv) to test the evaluation script.
+You can use the sample inputs provided in [`pense/tts/examples/sample.csv`](pense/tts/examples/sample.csv) to test the evaluation script.
 
 ```bash
-cd agentloop/tts
-uv run python eval.py --input examples/sample.csv -o ./out -p smallest -l english
+pense tts eval -p smallest -l english -i examples/sample.csv -o ./out
 ```
 
 Sample output:
@@ -357,9 +352,9 @@ this is a test,./out/audios/2.wav
 
 `logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
 
-You can checkout [`agentloop/tts/examples/sample_output`](agentloop/tts/examples/sample_output) to see a sample output of the evaluation script.
+You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_output) to see a sample output of the evaluation script.
 
-For more details, run `uv run python eval.py -h`.
+For more details, run `pense tts eval -h`.
 
 ```bash
 usage: eval.py [-h] [-p {smallest,cartesia,openai,groq,google,elevenlabs,elevenlabs-http,sarvam,sarvam-http}]
@@ -381,15 +376,14 @@ options:
 To benchmark several TTS runs, generate the combined workbook and chart with:
 
 ```bash
-cd agentloop/tts
-uv run python leaderboard.py -o /path/to/output -s ./leaderboards
+pense tts leaderboard -o /path/to/output -s ./leaderboards
 ```
 
-`agentloop/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
+`pense/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
 
-You can checkout [`agentloop/tts/examples/leaderboard`](agentloop/tts/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`pense/tts/examples/leaderboard`](pense/tts/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](agentloop/tts/examples/leaderboard/all_metrics_by_run.png)
+![Leaderboard example](pense/tts/examples/leaderboard/all_metrics_by_run.png)
 
 ## LLM tests
 
@@ -490,14 +484,13 @@ export OPENAI_API_KEY=your_key
 ```
 
 ```bash
-cd agentloop/llm
-uv run python run_tests.py --config /path/to/test_config.json -o /path/to/output_dir -m <model_name>
+pense llm tests run -c /path/to/test_config.json -o /path/to/output_dir -m <model_name>
 ```
 
-You can use the sample test configuration provided in [`agentloop/llm/examples/tests/config.json`](agentloop/llm/examples/tests/config.json) to test the evaluation script.
+You can use the sample test configuration provided in [`pense/llm/examples/tests/config.json`](pense/llm/examples/tests/config.json) to test the evaluation script.
 
 ```bash
-uv run python run_tests.py --config examples/tests/config.json -o ./out -m gpt-4.1
+pense llm tests run -c examples/tests/config.json -o ./out -m gpt-4.1
 ```
 
 The script will run each test case for each variable value (e.g., for each language) and output:
@@ -514,7 +507,7 @@ The output of the script will be saved in the output directory.
 ├── logs
 ```
 
-You can checkout [`agentloop/llm/examples/tests/sample_output`](agentloop/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
+You can checkout [`pense/llm/examples/tests/sample_output`](pense/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
 
 Sample output 1:
 
@@ -559,15 +552,14 @@ Metrics:
 Once you have results for multiple models or scenarios, compile a leaderboard CSV and comparison chart:
 
 ```bash
-cd agentloop/llm
-uv run python tests_leaderboard.py -o /path/to/output -s ./leaderboard
+pense llm tests leaderboard -o /path/to/output -s ./leaderboard
 ```
 
-`agentloop/llm/tests_leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
+`pense/llm/tests_leaderboard.py` walks every `<scenario>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
 
-You can checkout [`agentloop/llm/examples/leaderboard`](agentloop/llm/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`pense/llm/examples/leaderboard`](pense/llm/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](agentloop/llm/examples/tests/leaderboard/llm_leaderboard.png)
+![Leaderboard example](pense/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
 ## LLM simulations
 
@@ -607,21 +599,19 @@ export OPENAI_API_KEY=your_key
 Then launch simulations:
 
 ```bash
-cd agentloop/llm
-uv run python run_simulation.py \
-  --config /path/to/config.json \
-  --output-dir /path/to/output \
-  --model <model_name>
+pense llm simulations run \
+  -c /path/to/config.json \
+  -o /path/to/output \
+  -m <model_name>
 ```
 
-You can use the sample configuration provided in [`agentloop/llm/examples/simulation/config.json`](agentloop/llm/examples/simulation/config.json) to test the simulation.
+You can use the sample configuration provided in [`pense/llm/examples/simulation/config.json`](pense/llm/examples/simulation/config.json) to test the simulation.
 
 ```bash
-cd agentloop/llm
-uv run python run_simulation.py \
-  --config examples/simulation/config.json \
-  --output-dir ./out \
-  --model gpt-4.1
+pense llm simulations run \
+  -c examples/simulation/config.json \
+  -o ./out \
+  -m gpt-4.1
 ```
 
 Sample output:
@@ -724,7 +714,7 @@ simulation_persona_1_scenario_3,1.0,1.0
 
 `logs` contains the full logs of the simulation including all the pipecat logs whereas `results.log` contains only the terminal output of the simulation as shown in the sample output above.
 
-You can checkout [`agentloop/llm/examples/simulation/sample_output`](agentloop/llm/examples/simulation/sample_output) to see a sample output of the simulation.
+You can checkout [`pense/llm/examples/simulation/sample_output`](pense/llm/examples/simulation/sample_output) to see a sample output of the simulation.
 
 ## Voice agent simulations
 
@@ -786,7 +776,7 @@ To run agent simulations with all the three components - STT, LLM, and TTS - pre
 }
 ```
 
-The voice agent is defined in `agentloop/agent/bot.py`. For now, the default configuration of the bot uses Deepgram for STT, OpenAI for LLM, and Google for TTS. You can configure the bot to use different providers for STT, LLM, and TTS by modifying the `STTConfig`, `LLMConfig`, and `TTSConfig` classes in `agentloop/agent/bot.py`. We will soon add support for changing the configuration for each provider for each component to override the defaults.
+The voice agent is defined in `pense/agent/bot.py`. For now, the default configuration of the bot uses Deepgram for STT, OpenAI for LLM, and Google for TTS. You can configure the bot to use different providers for STT, LLM, and TTS by modifying the `STTConfig`, `LLMConfig`, and `TTSConfig` classes in `pense/agent/bot.py`. We will soon add support for changing the configuration for each provider for each component to override the defaults.
 
 Set the required environment variables for the providers you want to use:
 
@@ -798,14 +788,13 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 ```
 
 ```bash
-cd agentloop/agent
-uv run python run_simulation.py  -c /path/to/config.json -o /path/to/output
+pense agent simulation -c /path/to/config.json -o /path/to/output
 ```
 
-You can use the sample configuration provided in [`agentloop/agent/examples/sample_short_english.json`](agentloop/agent/examples/sample_short_english.json) to test the voice agent simulation.
+You can use the sample configuration provided in [`pense/agent/examples/sample_short_english.json`](pense/agent/examples/sample_short_english.json) to test the voice agent simulation.
 
 ```bash
-uv run python run_simulation.py -c examples/sample_short_english.json -o ./out
+pense agent simulation -c examples/sample_short_english.json -o ./out
 ```
 
 Sample output:
@@ -873,7 +862,7 @@ Each `simulation_persona_*_scenario_*` directory contains:
 - `tool_calls.json`: chronologically ordered tool calls made by the agent.
 - `transcripts.json`: full conversation transcript - alternating `user`/`assistant` turns.
 
-You can checkout [`agentloop/agent/examples/simulation/sample_output`](agentloop/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
+You can checkout [`pense/agent/examples/simulation/sample_output`](pense/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
 
 ## TODOs
 

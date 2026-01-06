@@ -2691,3 +2691,15 @@ Note: The `uv.lock` file will be regenerated when you rebuild the package, and `
 
 ---
 
+_**User (2026-01-06 16:41Z)**_
+
+update @README.md with change to pense and also change the commands to use the cli commands
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
