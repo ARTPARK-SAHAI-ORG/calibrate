@@ -86,9 +86,6 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from loguru import logger
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from pense.tts.metrics import get_tts_llm_judge_score
-from dotenv import load_dotenv
-
-load_dotenv(override=True)
 
 WAIT_TIME_BETWEEN_TURNS = 5
 

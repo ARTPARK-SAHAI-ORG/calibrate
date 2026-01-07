@@ -6,12 +6,9 @@ import itertools
 from whisper_normalizer.english import EnglishTextNormalizer
 from whisper_normalizer.basic import BasicTextNormalizer
 from jiwer import wer
-from dotenv import load_dotenv
 import os
 from os.path import join, exists
 from loguru import logger
-
-load_dotenv(override=True)
 
 english_normalizer = EnglishTextNormalizer()
 other_language_normalizer = BasicTextNormalizer()

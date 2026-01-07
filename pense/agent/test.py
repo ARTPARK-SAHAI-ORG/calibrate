@@ -5,7 +5,6 @@ import sys
 import argparse
 import json
 from os.path import join, exists
-from dotenv import load_dotenv
 from loguru import logger
 import shutil
 from dataclasses import dataclass
@@ -65,8 +64,6 @@ from pipecat.observers.loggers.user_bot_latency_log_observer import (
 )
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 
-
-load_dotenv(override=True)
 
 CUSTOM_CLI_ARGS: dict[str, Any] = {}
 

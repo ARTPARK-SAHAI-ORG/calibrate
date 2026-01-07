@@ -2,12 +2,9 @@ from openai import AsyncOpenAI
 from pyarrow import system_memory_pool
 from pydantic import BaseModel, Field
 from typing import List
-from dotenv import load_dotenv
 import os
 from pydantic import BaseModel, Field, create_model
 import json
-
-load_dotenv()
 
 
 async def test_response_llm_judge(

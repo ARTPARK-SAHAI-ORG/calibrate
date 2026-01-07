@@ -19,6 +19,7 @@ import argparse
 import asyncio
 import runpy
 import os
+from dotenv import load_dotenv
 
 
 def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
@@ -56,6 +57,9 @@ def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
 
 def main():
     """Main CLI entry point that dispatches to component-specific scripts."""
+    # Load environment variables from .env file
+    load_dotenv(override=True)
+
     parser = argparse.ArgumentParser(
         prog="pense",
         description="Voice agent evaluation and benchmarking toolkit",

@@ -4,7 +4,6 @@ import json
 import sys
 from typing import List, Optional, Literal
 from loguru import logger
-from dotenv import load_dotenv
 import os
 from os.path import join, exists, splitext, basename
 import shutil
@@ -40,8 +39,6 @@ from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from pense.llm.metrics import evaluate_simuation
 import pandas as pd
 import numpy as np
-
-load_dotenv(override=True)
 
 
 class ConversationState:

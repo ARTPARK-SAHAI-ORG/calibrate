@@ -1,7 +1,6 @@
 import os
 from typing import Dict, Literal
 
-from dotenv import load_dotenv
 from loguru import logger
 import asyncio
 
@@ -91,8 +90,6 @@ from pipecat.observers.loggers.user_bot_latency_log_observer import (
 )
 
 bot_logger = logger.bind(source="BOT")
-
-load_dotenv(override=True)
 
 
 class MetricsLogger(FrameProcessor):

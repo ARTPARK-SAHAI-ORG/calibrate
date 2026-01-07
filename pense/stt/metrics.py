@@ -5,11 +5,8 @@ import numpy as np
 from tqdm.asyncio import tqdm_asyncio
 import difflib
 from openai import AsyncOpenAI
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 import backoff
-
-load_dotenv(override=True)
 
 normalizer = BasicTextNormalizer()
 

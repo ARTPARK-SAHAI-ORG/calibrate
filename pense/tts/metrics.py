@@ -6,12 +6,9 @@ import instructor
 from tqdm.asyncio import tqdm_asyncio
 import json
 from openai import AsyncOpenAI
-from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 import base64
 import backoff
-
-load_dotenv(override=True)
 
 normalizer = BasicTextNormalizer()
 

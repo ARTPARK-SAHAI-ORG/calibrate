@@ -101,10 +101,7 @@ from pipecat.transports.websocket.client import (
 
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from pense.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
-from dotenv import load_dotenv
 from pipecat.utils.time import time_now_iso8601
-
-load_dotenv(override=True)
 
 
 PIPELINE_IDLE_TIMEOUT_SECS = 60

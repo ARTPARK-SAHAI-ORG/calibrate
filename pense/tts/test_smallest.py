@@ -1,9 +1,6 @@
 import time
 from smallestai.waves import TTSConfig, WavesStreamingTTS
-from dotenv import load_dotenv
 import os
-
-load_dotenv(override=True)
 
 config = TTSConfig(
     voice_id="aditi",

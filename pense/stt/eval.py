@@ -10,7 +10,6 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Dict, List, Sequence, Literal, Optional
 
-from dotenv import load_dotenv
 from collections import defaultdict
 from loguru import logger
 
@@ -77,8 +76,6 @@ from pense.stt.metrics import (
     get_string_similarity,
 )
 import pandas as pd
-
-load_dotenv(override=True)
 
 
 async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port: int):
@@ -730,7 +727,7 @@ async def main():
     if not exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    output_dir = join(args.output_dir, f"{args.provider}_{args.language}")
+    output_dir = join(args.output_dir, args.provider)
 
     log_save_path = join(output_dir, "logs")
 
