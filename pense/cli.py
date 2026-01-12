@@ -144,7 +144,6 @@ Examples:
     llm_tests_run_parser.add_argument(
         "-p", "--provider", type=str, default="openrouter"
     )
-    llm_tests_run_parser.add_argument("-l", "--language", type=str, default="english")
 
     llm_tests_leaderboard_parser = llm_tests_subparsers.add_parser(
         "leaderboard", help="Generate LLM tests leaderboard"
@@ -179,7 +178,11 @@ Examples:
         "-p", "--provider", type=str, default="openrouter"
     )
     llm_simulations_run_parser.add_argument(
-        "-l", "--language", type=str, default="english"
+        "-n",
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of simulations to run in parallel",
     )
 
     llm_simulations_leaderboard_parser = llm_simulations_subparsers.add_parser(
@@ -281,7 +284,9 @@ Examples:
                 sys.argv = ["pense"] + _args_to_argv(
                     args, exclude_keys={"component", "llm_type", "command"}
                 )
-                asyncio.run(llm_simulation_main())
+                output_dir = asyncio.run(llm_simulation_main())
+                if output_dir:
+                    print(f"Output directory: {output_dir}")
             elif args.command == "leaderboard":
                 from pense.llm.simulation_leaderboard import (
                     main as leaderboard_main,

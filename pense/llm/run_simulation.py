@@ -202,7 +202,7 @@ async def run_simulation(
     bot_provider: str = "openai",
     user_provider: str = "openai",
     bot_speaks_first: bool = True,
-    max_turns: int = 10,
+    max_turns: int = 50,
 ) -> List[str]:
     """Runs a text-only bot that processes text inputs through an LLM and returns text outputs."""
     # Create LLM service
@@ -410,6 +410,106 @@ async def run_simulation(
     }
 
 
+async def run_single_simulation_task(
+    semaphore: asyncio.Semaphore,
+    config: dict,
+    persona_index: int,
+    user_persona: dict,
+    scenario_index: int,
+    scenario: dict,
+    output_dir: str,
+    args,
+):
+    """Run a single simulation task with semaphore for concurrency control."""
+    async with semaphore:
+        characteristics = user_persona.get("characteristics", "")
+        gender = user_persona.get("gender", "")
+        language = user_persona.get("language", "english")
+
+        scenario_description = scenario.get("description", "")
+
+        gender_prompt = f"\n\nYour gender is {gender}." if gender else ""
+        user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{characteristics}{gender_prompt}\n\nThe following scenario will be played out: {scenario_description}. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in {language}."
+
+        simulation_name = (
+            f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
+        )
+
+        simulation_output_dir = f"{output_dir}/{simulation_name}"
+
+        if exists(simulation_output_dir):
+            shutil.rmtree(simulation_output_dir)
+
+        os.makedirs(simulation_output_dir)
+
+        logs_file_path = f"{output_dir}/{simulation_name}/logs"
+
+        # Create a unique logger for this simulation
+        log_file_id = logger.add(
+            logs_file_path,
+            level="DEBUG",
+            colorize=False,
+        )
+
+        print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
+        configure_print_logger(print_log_save_path)
+
+        command = " ".join(sys.argv)
+        log_and_print(f"\033[33mRunning command\033[0m: {command}")
+
+        log_and_print("--------------------------------")
+        log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
+        log_and_print(f"\033[93mPersona:\033[0m\n{characteristics}")
+        log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
+        log_and_print(f"\033[93mLanguage:\033[0m {language}")
+        log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
+        log_and_print("--------------------------------")
+
+        try:
+            output = await run_simulation(
+                bot_system_prompt=config["agent_system_prompt"]
+                + f"\n\nYou must always speak in {language}.",
+                tools=config["tools"],
+                user_system_prompt=user_system_prompt,
+                evaluation_criteria=config["evaluation_criteria"],
+                bot_model=args.model,
+                user_model=args.model,
+                bot_provider=args.provider,
+                user_provider=args.provider,
+                max_turns=config.get("max_turns", 50),
+            )
+
+            simulation_metrics = {
+                "name": simulation_name,
+            }
+
+            for metric_dict in output["evaluation_results"]:
+                simulation_metrics[metric_dict["name"]] = float(metric_dict["match"])
+
+            with open(join(simulation_output_dir, "transcript.json"), "w") as f:
+                json.dump(output["transcript"], f, indent=4)
+
+            df = pd.DataFrame(output["evaluation_results"])
+            df.to_csv(
+                join(simulation_output_dir, "evaluation_results.csv"), index=False
+            )
+
+            # Save persona dict and scenario dict
+            with open(join(simulation_output_dir, "config.json"), "w") as f:
+                json.dump(
+                    {
+                        "persona": user_persona,
+                        "scenario": scenario,
+                    },
+                    f,
+                    indent=4,
+                )
+
+            return simulation_metrics, output["evaluation_results"]
+        finally:
+            logger.remove(log_file_id)
+
+
 async def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -441,12 +541,11 @@ async def main():
         help="LLM provider to use (openai or openrouter)",
     )
     parser.add_argument(
-        "-l",
-        "--language",
-        type=str,
-        choices=["english", "hindi"],
-        default="english",
-        help="Language of the bot",
+        "-n",
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of simulations to run in parallel",
     )
 
     args = parser.parse_args()
@@ -454,95 +553,46 @@ async def main():
     with open(args.config, "r") as f:
         config = json.load(f)
 
-    config_name = splitext(basename(args.config))[0]
-
-    save_folder_name = (
-        f"{args.provider}/{args.model}"
-        if args.provider == "openai"
-        else f"{args.model}"
-    )
-
-    save_folder_name = save_folder_name.replace("/", "__")
-    output_dir = join(args.output_dir, config_name, save_folder_name)
+    output_dir = args.output_dir
 
     os.makedirs(output_dir, exist_ok=True)
 
+    # Create semaphore to limit parallel executions
+    semaphore = asyncio.Semaphore(args.parallel)
+
+    # Create all simulation tasks
+    tasks = []
+    for persona_index, user_persona in enumerate(config["personas"]):
+        for scenario_index, scenario in enumerate(config["scenarios"]):
+            task = run_single_simulation_task(
+                semaphore=semaphore,
+                config=config,
+                persona_index=persona_index,
+                user_persona=user_persona,
+                scenario_index=scenario_index,
+                scenario=scenario,
+                output_dir=output_dir,
+                args=args,
+            )
+            tasks.append(task)
+
+    # Run all tasks with controlled parallelism
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    # Collect metrics from results
     metrics = defaultdict(list)
     all_simulation_metrics = []
 
-    for persona_index, user_persona in enumerate(config["personas"]):
-        for scenario_index, scenario in enumerate(config["scenarios"]):
+    for result in results:
+        if isinstance(result, Exception):
+            logger.error(f"Simulation failed with error: {result}")
+            continue
 
-            user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{user_persona}\n\nThe following scenario will be played out: {scenario}. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in {args.language}."
+        simulation_metrics, evaluation_results = result
+        all_simulation_metrics.append(simulation_metrics)
 
-            simulation_name = (
-                f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
-            )
-
-            simulation_output_dir = f"{output_dir}/{simulation_name}"
-
-            if exists(simulation_output_dir):
-                shutil.rmtree(simulation_output_dir)
-
-            os.makedirs(simulation_output_dir)
-
-            logs_file_path = f"{output_dir}/{simulation_name}/logs"
-
-            logger.remove()
-            log_file_id = logger.add(
-                logs_file_path,
-                level="DEBUG",
-                colorize=False,
-            )
-
-            print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
-            configure_print_logger(print_log_save_path)
-
-            command = " ".join(sys.argv)
-            log_and_print(f"\033[33mRunning command\033[0m: {command}")
-
-            log_and_print("--------------------------------")
-            log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
-            log_and_print(f"\033[93mPersona:\033[0m\n{user_persona}")
-            log_and_print(f"\033[93mScenario:\033[0m\n{scenario}")
-            log_and_print("--------------------------------")
-
-            output = await run_simulation(
-                bot_system_prompt=config["agent_system_prompt"]
-                + f"\n\nYou must always speak in {args.language}.",
-                tools=config["tools"],
-                user_system_prompt=user_system_prompt,
-                evaluation_criteria=config["evaluation_criteria"],
-                bot_model=args.model,
-                user_model=args.model,
-                bot_provider=args.provider,
-                user_provider=args.provider,
-                max_turns=config.get("max_turns", 50),
-            )
-
-            simulation_metrics = {
-                "name": simulation_name,
-            }
-
-            for metric_dict in output["evaluation_results"]:
-                metrics[metric_dict["name"]].append(float(metric_dict["match"]))
-                simulation_metrics[metric_dict["name"]] = float(metric_dict["match"])
-
-            all_simulation_metrics.append(simulation_metrics)
-
-            with open(join(simulation_output_dir, "transcript.json"), "w") as f:
-                json.dump(output["transcript"], f, indent=4)
-
-            df = pd.DataFrame(output["evaluation_results"])
-            df.to_csv(
-                join(simulation_output_dir, "evaluation_results.csv"), index=False
-            )
-
-            logger.remove(log_file_id)
-
-        #     break
-
-        # break
+        for metric_dict in evaluation_results:
+            metrics[metric_dict["name"]].append(float(metric_dict["match"]))
 
     metrics_summary = {}
 

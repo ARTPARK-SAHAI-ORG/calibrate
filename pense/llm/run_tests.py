@@ -319,14 +319,6 @@ async def main():
         default="openrouter",
         help="LLM provider to use (openai or openrouter)",
     )
-    parser.add_argument(
-        "-l",
-        "--language",
-        type=str,
-        choices=["english", "hindi"],
-        default="english",
-        help="Language of the bot",
-    )
 
     args = parser.parse_args()
 
@@ -370,11 +362,12 @@ async def main():
 
     results = []
     for test_case_index, test_case in enumerate(config["test_cases"]):
+        agent_language = test_case.get("settings", {}).get("language", "english")
         result = await run_test(
             chat_history=test_case["history"],
             evaluation=test_case["evaluation"],
             system_prompt=config["system_prompt"]
-            + f"\n\nYou must always speak in {args.language}.",
+            + f"\n\nYou must always speak in {agent_language}.",
             model=args.model,
             provider=args.provider,
             tools=config["tools"],

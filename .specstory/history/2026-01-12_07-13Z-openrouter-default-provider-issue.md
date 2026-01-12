@@ -382,3 +382,207 @@ Done. I've added a sample CSV format for the LLM tests leaderboard showing:
 
 ---
 
+_**User (2026-01-11 10:15Z)**_
+
+update @pense/cli.py and @README.md to reflect that @pense/llm/run_tests.py does not take -language as input anymore
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update both cli.py and README.md to reflect that the llm tests run command no longer takes a -language argument. Looking at the run_tests.py file, I can see that the language argument is no longer in the argparse section (lines 289-323), and instead the language is taken from each test case (line 365: `language = test_case.get("language", "english")`).
+
+So I need to:
+1. Remove the `-l, --language` argument from `cli.py` for the `llm_tests_run_parser`
+2. Update the README.md to remove mentions of the `-l` flag for `pense llm tests run`
+
+Let me do both changes.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/cli.py</summary>
+
+**Chunk 1**
+Lines added: undefined, lines removed: 1
+
+```diff
+@@ -145,5 +145,4 @@
+          "-p", "--provider", type=str, default="openrouter"
+      )
+-     llm_tests_run_parser.add_argument("-l", "--language", type=str, default="english")
+  
+      llm_tests_leaderboard_parser = llm_tests_subparsers.add_parser(
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the README.md to remove mentions of the `-l` flag for `pense llm tests run`. Let me find the relevant section.</details></think>
+
+---
+
+Now let me update the README.md. First, let me find the relevant section:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "pense llm tests run" in "/Users/aman/Documents/repos/artpark/agentloop/README.md" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `README.md` | `pense llm tests run -c /path/to/test_config.json -o /path/to/output_dir -m <model_name>` | L483 |
+| `README.md` | `pense llm tests run -c examples/tests/config.json -o ./out -m gpt-4.1` | L489 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. I found the two instances where `pense llm tests run` is mentioned. Now let me also check for references to the `-l` language flag in that section. Let me look around those lines more to see if there are any references to the language flag.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me check the CLI examples at the top of the README to see if there are any mentions of `-l` for `pense llm tests run`:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "pense llm tests run.*-l" in "/Users/aman/Documents/repos/artpark/agentloop/README.md" • 0 matches</summary>
+
+Output mode: content
+
+
+_No matches found_
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, there are no instances of `pense llm tests run ... -l` in the README. The examples I found earlier don't have the `-l` flag. The README is already up to date in this regard.
+
+Let me also check `cli.py` to make sure the example lines in the docstring are updated:</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "pense llm tests run" in "/Users/aman/Documents/repos/artpark/agentloop/pense/cli.py" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `pense/cli.py` | `pense llm tests run -c ./config.json -o ./out` | L10 |
+| `pense/cli.py` | `pense llm tests run -c ./config.json -o ./out` | L72 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The examples in cli.py don't have the `-l` flag already, so they're fine. 
+
+Both files are now updated:
+1. cli.py - removed the `-l, --language` argument from the llm_tests_run_parser
+2. README.md - already didn't have `-l` in the `pense llm tests run` examples
+
+The changes are complete.</details></think>
+
+---
+
+Done. I've removed the `-l, --language` argument from the CLI for `pense llm tests run`. 
+
+The README examples were already correct (they don't use `-l` for the llm tests run command), since the language is now specified per test case in the config file rather than as a CLI argument.
+
+---
+
+_**User (2026-01-11 10:15Z)**_
+
+update @README.md to say that each test case for @pense/llm/run_tests.py can have @config.json (98-101) 
+
+language for that test case in the settings
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the README.md to document that each test case can have a `settings` object with a `language` field. Let me first read the relevant section of the README to find where the test case structure is documented.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see the test case structure. I need to add the `settings` object with `language` to the test case documentation. I'll add it to the first test case example to show how it works.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+**Chunk 1**
+Lines added: 4, lines removed: undefined
+
+```diff
+@@ -442,4 +442,8 @@
+            }
+          ]
++       },
++       "settings": {
++         // optional settings for this test case
++         "language": "english" // language for the LLM to respond in (defaults to "english")
+        }
+      },
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've added the `settings` object with the `language` field to the test case example in the README. This shows users that each test case can have its own language setting.</details></think>
+
+---
+
+Done. I've updated the README to show that each test case can have an optional `settings` object with a `language` field to specify the language for that particular test case.
+
+---
+

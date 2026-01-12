@@ -102,7 +102,7 @@ You need to evaluate if the agent's behaviour adheres to the evaluation criteria
     user_prompt = f"""Chat history: {conversation_as_prompt}\nEvaluation criteria: {convert_evaluation_criteria_to_prompt(evaluation_criteria)}"""
 
     response = await client.responses.parse(
-        model="gpt-4.1-2025-04-14",
+        model="gpt-5.2-2025-12-11",
         input=[
             {
                 "role": "system",
@@ -114,8 +114,8 @@ You need to evaluate if the agent's behaviour adheres to the evaluation criteria
             },
         ],
         text_format=Output,
-        temperature=0,
-        max_output_tokens=2048,
+        reasoning={"effort": "medium"},
+        max_output_tokens=8192,
         store=True,
     )
 
