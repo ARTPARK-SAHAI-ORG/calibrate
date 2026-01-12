@@ -141,7 +141,9 @@ Examples:
     )
     llm_tests_run_parser.add_argument("-o", "--output-dir", type=str, default="./out")
     llm_tests_run_parser.add_argument("-m", "--model", type=str, default="gpt-4.1")
-    llm_tests_run_parser.add_argument("-p", "--provider", type=str, default="openai")
+    llm_tests_run_parser.add_argument(
+        "-p", "--provider", type=str, default="openrouter"
+    )
     llm_tests_run_parser.add_argument("-l", "--language", type=str, default="english")
 
     llm_tests_leaderboard_parser = llm_tests_subparsers.add_parser(
@@ -174,7 +176,7 @@ Examples:
         "-m", "--model", type=str, default="gpt-4.1"
     )
     llm_simulations_run_parser.add_argument(
-        "-p", "--provider", type=str, default="openai"
+        "-p", "--provider", type=str, default="openrouter"
     )
     llm_simulations_run_parser.add_argument(
         "-l", "--language", type=str, default="english"
