@@ -681,7 +681,7 @@ async def main():
         "--input-dir",
         type=str,
         required=True,
-        help="Path to the input directory containing the audio files and gt.json",
+        help="Path to the input directory containing the audio files and stt.csv",
     )
     parser.add_argument(
         "-f",

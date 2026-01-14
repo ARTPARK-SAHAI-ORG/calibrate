@@ -213,6 +213,13 @@ Examples:
     agent_simulation_parser.add_argument(
         "-o", "--output-dir", type=str, default="./out"
     )
+    agent_simulation_parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of simulations to run in parallel",
+    )
 
     args = parser.parse_args()
 

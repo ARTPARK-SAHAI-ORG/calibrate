@@ -140,10 +140,6 @@ pense stt eval -p <provider> -l <language> -i /path/to/data -o /path/to/output -
 
 You can use the sample inputs provided in [`pense/stt/examples/sample_input`](pense/stt/examples/sample_input) to test the evaluation script.
 
-```bash
-pense stt eval -p sarvam -l english -i samples -o ./out -d
-```
-
 Sample output:
 
 ```
@@ -182,40 +178,43 @@ The definition of all the metrics we compute are stored in [`pense/stt/metrics.p
 `metrics.json` will have the following format:
 
 ```json
-{
-  "wer": 0.12962962962962962, // mean of the Word Error Rate (WER) across all audio files
-  "string_similarity": 0.8792465033551621, // mean of the string similarity score across all audio files
-  "llm_judge_score": 1.0, // mean of the LLM Judge score across all audio files
-  "metrics": [
-    // latency metrics for each audio file
-    {
-      "metric_name": "ttfb", // Time to First Byte in seconds
-      "processor": "SarvamSTTService#0",
-      "mean": 2.3087445222414456,
-      "std": 2.4340144350359867,
-      "values": [
-        // values for each audio file
-        0.48694515228271484, 0.006701946258544922, 0.4470040798187256, 2.5300347805023193,
-        0.2064838409423828, 6.574702978134155, 3.0182559490203857, 2.9680559635162354,
-        7.94110107421875, 0.08572530746459961, 2.0372867584228516, 0.4102351665496826,
-        3.3011457920074463
-      ]
-    },
-    {
-      "metric_name": "processing_time", // Time taken by the service to respond in seconds
-      "processor": "SarvamSTTService#0",
-      "mean": 2.3089125706599307,
-      "std": 2.4341351775837228,
-      "values": [
-        // values for each audio file
-        0.48702311515808105, 0.006762981414794922, 0.4470367431640625, 2.530163049697876,
-        0.2065589427947998, 6.575268745422363, 3.0185441970825195, 2.9680910110473633,
-        7.941352128982544, 0.08578085899353027, 2.0373899936676025, 0.4102756977081299,
-        3.3016159534454346
-      ]
-    }
-  ]
-}
+[
+  {
+    "wer": 0.12962962962962962 // mean of the Word Error Rate (WER) across all audio files
+  },
+  {
+    "string_similarity": 0.8792465033551621 // mean of the string similarity score across all audio files
+  },
+  {
+    "llm_judge_score": 1.0 // mean of the LLM Judge score across all audio files
+  },
+  {
+    "metric_name": "ttfb", // Time to First Byte in seconds
+    "processor": "SarvamSTTService#0",
+    "mean": 2.3087445222414456,
+    "std": 2.4340144350359867,
+    "values": [
+      // values for each audio file
+      0.48694515228271484, 0.006701946258544922, 0.4470040798187256, 2.5300347805023193,
+      0.2064838409423828, 6.574702978134155, 3.0182559490203857, 2.9680559635162354,
+      7.94110107421875, 0.08572530746459961, 2.0372867584228516, 0.4102351665496826,
+      3.3011457920074463
+    ]
+  },
+  {
+    "metric_name": "processing_time", // Time taken by the service to respond in seconds
+    "processor": "SarvamSTTService#0",
+    "mean": 2.3089125706599307,
+    "std": 2.4341351775837228,
+    "values": [
+      // values for each audio file
+      0.48702311515808105, 0.006762981414794922, 0.4470367431640625, 2.530163049697876,
+      0.2065589427947998, 6.575268745422363, 3.0185441970825195, 2.9680910110473633,
+      7.941352128982544, 0.08578085899353027, 2.0373899936676025, 0.4102756977081299,
+      3.3016159534454346
+    ]
+  }
+]
 ```
 
 `logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
@@ -258,12 +257,12 @@ You can checkout [`pense/stt/examples/leaderboard`](pense/stt/examples/leaderboa
 To evaluate different TTS providers, first prepare an input CSV file with the following structure:
 
 ```csv
-text
-hello world
-this is a test
+id,text
+row_1,hello world
+row_2,this is a test
 ```
 
-The CSV should have a single column `text` containing the text strings you want to synthesize into speech.
+The CSV should have two columns: `id` (unique identifier for each text) and `text` (the text strings you want to synthesize into speech).
 
 Set the required environment variables for the TTS provider you want to evaluate:
 
@@ -289,10 +288,6 @@ pense tts eval -p <provider> -l <language> -i /path/to/input.csv -o /path/to/out
 ```
 
 You can use the sample inputs provided in [`pense/tts/examples/sample.csv`](pense/tts/examples/sample.csv) to test the evaluation script.
-
-```bash
-pense tts eval -p smallest -l english -i examples/sample.csv -o ./out
-```
 
 Sample output:
 
@@ -323,15 +318,18 @@ The output of the evaluation script will be saved in the output directory.
 `results.csv` will have the following columns:
 
 ```csv
-text,audio_path
-hello world,./out/audios/1.wav
-this is a test,./out/audios/2.wav
+id,text,audio_path,llm_judge_score,llm_judge_reasoning
+row_1,hello world,./out/smallest/audios/1.wav,True,"The provided audio says 'hello world'. The pronunciation is clear, and the words match exactly."
+row_2,this is a test,./out/smallest/audios/2.wav,True,"The audio clearly says 'this is a test' without any deviations or mispronunciations."
 ```
 
 `metrics.json` will have the following format:
 
 ```json
 [
+  {
+    "llm_judge_score": 1.0 // mean of the LLM Judge score across all audio files
+  },
   {
     "metric_name": "ttfb", // Time to First Byte in seconds
     "processor": "SmallestTTSService#0",
@@ -356,14 +354,14 @@ You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_
 For more details, run `pense tts eval -h`.
 
 ```bash
-usage: eval.py [-h] [-p {smallest,cartesia,openai,groq,google,elevenlabs,elevenlabs-http,sarvam,sarvam-http}]
-               [-l {english,hindi}] -i INPUT [-o OUTPUT_DIR] [-d]
+usage: eval.py [-h] [-p {cartesia,openai,groq,google,elevenlabs,sarvam}]
+               [-l {english,hindi,kannada}] -i INPUT [-o OUTPUT_DIR] [-d]
 
 options:
   -h, --help            show this help message and exit
-  -p {smallest,cartesia,openai,groq,google,elevenlabs,elevenlabs-http,sarvam,sarvam-http}, --provider {smallest,cartesia,openai,groq,google,elevenlabs,elevenlabs-http,sarvam,sarvam-http}
+  -p {cartesia,openai,groq,google,elevenlabs,sarvam}, --provider {cartesia,openai,groq,google,elevenlabs,sarvam}
                         TTS provider to use for evaluation
-  -l {english,hindi}, --language {english,hindi}
+  -l {english,hindi,kannada}, --language {english,hindi,kannada}
                         Language of the audio files
   -i INPUT, --input INPUT
                         Path to the input CSV file containing the texts to synthesize
@@ -940,7 +938,8 @@ The output of the evaluation script will be saved in the output directory.
 │   └── config.json              # persona and scenario for this simulation
 ├── simulation_persona_1_scenario_2
 ├── simulation_persona_1_scenario_3
-└── ...
+├── results.csv                  # aggregated results for all simulations
+└── metrics.json                 # summary statistics for each criterion
 ```
 
 Each `simulation_persona_*_scenario_*` directory contains:
@@ -966,6 +965,37 @@ Each `simulation_persona_*_scenario_*` directory contains:
   },
   "scenario": {
     "description": "the scenario description for this simulation"
+  }
+}
+```
+
+`results.csv` aggregates the match scores across all simulations:
+
+```csv
+name,question_completeness,assistant_behavior,stt_llm_judge_score
+simulation_persona_1_scenario_1,1.0,1.0,0.95
+simulation_persona_1_scenario_2,1.0,0.0,0.92
+simulation_persona_1_scenario_3,1.0,1.0,0.98
+```
+
+`metrics.json` provides summary statistics (mean, std, values) for each evaluation criterion and STT LLM judge score:
+
+```json
+{
+  "question_completeness": {
+    "mean": 1.0,
+    "std": 0.0,
+    "values": [1.0, 1.0, 1.0]
+  },
+  "assistant_behavior": {
+    "mean": 0.6666666666666666,
+    "std": 0.5773502691896257,
+    "values": [1.0, 0.0, 1.0]
+  },
+  "stt_llm_judge": {
+    "mean": 0.95,
+    "std": 0.03,
+    "values": [0.95, 0.92, 0.98]
   }
 }
 ```
