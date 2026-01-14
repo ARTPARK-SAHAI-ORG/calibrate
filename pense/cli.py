@@ -213,9 +213,6 @@ Examples:
     agent_simulation_parser.add_argument(
         "-o", "--output-dir", type=str, default="./out"
     )
-    agent_simulation_parser.add_argument(
-        "-l", "--language", type=str, default="english"
-    )
 
     args = parser.parse_args()
 
@@ -284,9 +281,7 @@ Examples:
                 sys.argv = ["pense"] + _args_to_argv(
                     args, exclude_keys={"component", "llm_type", "command"}
                 )
-                output_dir = asyncio.run(llm_simulation_main())
-                if output_dir:
-                    print(f"Output directory: {output_dir}")
+                asyncio.run(llm_simulation_main())
             elif args.command == "leaderboard":
                 from pense.llm.simulation_leaderboard import (
                     main as leaderboard_main,
