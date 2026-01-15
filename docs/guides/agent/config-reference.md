@@ -6,7 +6,7 @@ Complete reference for agent configuration files.
 
 ```json
 {
-  "agent_system_prompt": "...",
+  "system_prompt": "...",
   "language": "english",
   "tools": [...],
   "personas": [...],

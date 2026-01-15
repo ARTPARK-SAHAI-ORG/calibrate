@@ -8,7 +8,7 @@ import os
 from os.path import join, exists, splitext, basename
 import shutil
 from collections import defaultdict
-
+import traceback
 from pense.utils import configure_print_logger, log_and_print
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -40,6 +40,8 @@ from pense.llm.metrics import evaluate_simuation
 import pandas as pd
 import numpy as np
 
+DEFAULT_MAX_TURNS = 50
+
 
 class ConversationState:
     """Tracks conversation turns and coordinates termination across pipelines."""
@@ -50,6 +52,7 @@ class ConversationState:
         self.finished = False
         self._lock = asyncio.Lock()
         self._finish_notified = False
+        self._is_max_turns_reached = False
 
     async def record_turn(self) -> bool:
         """Register a completed message turn.
@@ -64,6 +67,7 @@ class ConversationState:
             self.turn_count += 1
 
             if self.turn_count >= self.max_turns:
+                self._is_max_turns_reached = True
                 self.finished = True
                 return False
 
@@ -159,7 +163,7 @@ class Processor(FrameProcessor):
         )  # Blue for bot, Yellow for user
         log_and_print(f"{color}[{self._role.capitalize()}]: {response}\033[0m")
 
-        if self._conversation_state:
+        if self._conversation_state and self._role == "agent":
             should_continue = await self._conversation_state.record_turn()
 
         await self._forward_to_partner(response, run_partner=should_continue)
@@ -202,7 +206,7 @@ async def run_simulation(
     bot_provider: str = "openai",
     user_provider: str = "openai",
     bot_speaks_first: bool = True,
-    max_turns: int = 50,
+    max_turns: int = DEFAULT_MAX_TURNS,
 ) -> List[str]:
     """Runs a text-only bot that processes text inputs through an LLM and returns text outputs."""
     # Create LLM service
@@ -385,13 +389,21 @@ async def run_simulation(
         )
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
-        raise
+        raise e
 
     transcript = [
         message
         for message in bot_context._messages
         if message["role"] not in ["system"]
     ]
+
+    if conversation_state._is_max_turns_reached:
+        transcript.append(
+            {
+                "role": "end_reason",
+                "content": "max_turns",
+            }
+        )
 
     llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
 
@@ -467,7 +479,7 @@ async def run_single_simulation_task(
 
         try:
             output = await run_simulation(
-                bot_system_prompt=config["agent_system_prompt"]
+                bot_system_prompt=config["system_prompt"]
                 + f"\n\nYou must always speak in {language}.",
                 tools=config["tools"],
                 user_system_prompt=user_system_prompt,
@@ -476,7 +488,7 @@ async def run_single_simulation_task(
                 user_model=args.model,
                 bot_provider=args.provider,
                 user_provider=args.provider,
-                max_turns=config.get("max_turns", 50),
+                max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
             )
 
             simulation_metrics = {
@@ -506,6 +518,8 @@ async def run_single_simulation_task(
                 )
 
             return simulation_metrics, output["evaluation_results"]
+        except Exception as e:
+            traceback.print_exc()
         finally:
             logger.remove(log_file_id)
 

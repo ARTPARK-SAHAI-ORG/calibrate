@@ -6,7 +6,7 @@ Set up simulation configurations.
 
 ```json
 {
-  "agent_system_prompt": "...",
+  "system_prompt": "...",
   "tools": [...],
   "personas": [...],
   "scenarios": [...],

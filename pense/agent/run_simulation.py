@@ -36,6 +36,8 @@ TOOL_CALL_COLOR = "\033[33m"  # Magenta, not used for any of the above or below
 GENERAL_LOG_COLOR = "\033[93m"
 RESET_COLOR = "\033[0m"
 INTERRUPTION_COLOR = "\033[91m"
+DEFAULT_MAX_TURNS = 50
+DEFAULT_PORT = 8765
 
 # Create a contextual logger with EVAL prefix
 eval_logger = logger.bind(source="EVAL")
@@ -49,6 +51,7 @@ from pipecat.transcriptions.language import Language
 from pipecat.frames.frames import (
     EndFrame,
     AggregatedTextFrame,
+    LLMContextFrame,
     StopFrame,
     CancelFrame,
     EndTaskFrame,
@@ -144,7 +147,7 @@ async def start_bot(
     system_prompt: str,
     tools: list[dict] = [],
     language: Literal["english", "hindi"] = "english",
-    port: int = 8765,
+    port: int = DEFAULT_PORT,
     stt_config: STTConfig = STTConfig(),
     tts_config: TTSConfig = TTSConfig(),
     llm_config: LLMConfig = LLMConfig(),
@@ -210,6 +213,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._is_bot_interrupt_triggered = False  # whether the spoken text buffer is complete and matches the text buffer; only when this becomes true is when the intteruption actually triggered
         self._turns_concluded = set()
         self._serialized_transcript = []  # Store transcripts for return
+        self._ended_due_to_max_turns = False
 
     async def _reset_buffers(self):
         self._turns_concluded.add(self._turn_index)  # mark the turn as concluded
@@ -253,11 +257,13 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         ]
                     )
                     await self._reset_buffers()
+
                 elif msg_type == "user-stopped-speaking":
-                    # once the simulated user starts speaking, mark the bot as not
+                    # once the simulated user stops speaking, mark the bot as not
                     # interrupted anymore and spoken text buffer as not complete anymore
                     self._is_bot_interrupt_decided = False
                     self._is_bot_interrupt_triggered = False
+
                 elif msg_type == "bot-output":
                     text = data.get("text") or ""
                     spoken = data.get("spoken") or False
@@ -422,6 +428,14 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     if message.get("role") in {"user", "assistant", "tool_call"}
                 ]
 
+                if self._ended_due_to_max_turns:
+                    serialized_transcript.append(
+                        {
+                            "role": "end_reason",
+                            "content": "max_turns",
+                        }
+                    )
+
                 # Store transcripts for return
                 self._serialized_transcript = serialized_transcript
 
@@ -532,6 +546,36 @@ class IOLogger(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+class MaxTurnsEndProcessor(FrameProcessor):
+    """Processor that ends the task after number of assistant messages exceeds max_turns."""
+
+    def __init__(self, max_turns: int, rtvi_adapter, context: LLMContext):
+        super().__init__(enable_direct_mode=True, name="MaxTurnsEndProcessor")
+        self._max_turns = max_turns
+        self._rtvi_adapter = rtvi_adapter
+        self._context = context
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        if isinstance(frame, LLMFullResponseStartFrame):
+            num_assistant_messages = len(
+                [
+                    message
+                    for message in self._context.get_messages()
+                    if message.get("role") == "assistant"
+                ]
+            )
+            if num_assistant_messages == self._max_turns:
+                log_and_print(
+                    f"{INTERRUPTION_COLOR}Max turns ({self._max_turns}) reached, ending conversation{RESET_COLOR}"
+                )
+                self._rtvi_adapter._ended_due_to_max_turns = True
+                await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
+
+        await self.push_frame(frame, direction)
+
+
 class RTVIFunctionCallResponder(FrameProcessor):
     def __init__(self, tool_calls: list[dict], context: LLMContext):
         super().__init__(enable_direct_mode=True, name="RTVIFunctionCallResponder")
@@ -636,9 +680,10 @@ async def run_simulation(
     ],
     evaluation_criteria: list[dict],
     output_dir: str,
-    port: int = 8765,
+    interrupt_probability: float,
+    port: int = DEFAULT_PORT,
     # user_speaks_first: bool = False,
-    interrupt_probability: float = 0.5,  # medium
+    max_turns: int = DEFAULT_MAX_TURNS,
 ) -> dict:
     user_speaks_first = True  # hardcoded for now
 
@@ -766,6 +811,12 @@ async def run_simulation(
 
     output_logger = IOLogger()
 
+    max_turns_end_processor = MaxTurnsEndProcessor(
+        max_turns,
+        rtvi_message_adapter,
+        context,
+    )
+
     pipeline = Pipeline(
         [
             transport.input(),  # Transport user input
@@ -776,6 +827,7 @@ async def run_simulation(
             transcript.user(),
             context_aggregator.user(),  # User responses
             llm,  # LLM
+            max_turns_end_processor,  # Check and end after assistant processing if max_turns reached
             tts,  # TTS
             output_logger,
             transport.output(),  # Transport bot output
@@ -865,7 +917,7 @@ async def run_simulation(
     transcript = rtvi_message_adapter._serialized_transcript
 
     log_and_print(
-        f"Evaluating the conversation based on the criteria: {evaluation_criteria}"
+        f"Evaluating the conversation based on the criteria:\n\n{evaluation_criteria}"
     )
     # Get evaluation results from LLM judge
     llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
@@ -895,10 +947,14 @@ async def run_simulation(
         # Align lengths - take minimum length
         log_and_print(f"Evaluating the STT outputs with user messages")
         min_len = min(len(filtered_stt_outputs), len(user_messages_in_transcript))
+
+        stt_eval_references = user_messages_in_transcript[:min_len]
+        stt_eval_predictions = filtered_stt_outputs[:min_len]
+
         if min_len > 0:
             stt_llm_judge_result = await stt_llm_judge_score(
-                references=user_messages_in_transcript[:min_len],
-                predictions=filtered_stt_outputs[:min_len],
+                references=stt_eval_references,
+                predictions=stt_eval_predictions,
             )
 
     # Build comprehensive metrics
@@ -912,9 +968,78 @@ async def run_simulation(
         "stt_llm_judge": stt_llm_judge_result,
     }
 
-    # Save comprehensive metrics.json
-    with open(os.path.join(output_dir, "metrics.json"), "w") as metrics_file:
-        json.dump(metrics, metrics_file, indent=4)
+    # Build evaluation_results.csv with all metrics
+    evaluation_results_rows = []
+
+    # Add evaluation criteria rows
+    for eval_result in evaluation_results:
+        evaluation_results_rows.append(
+            {
+                "name": eval_result["name"],
+                "value": int(eval_result["match"]),
+                "reasoning": eval_result["reasoning"],
+            }
+        )
+
+    # Add latency metrics rows
+    for processor, values in ttft_dict.items():
+        if not values:
+            continue
+
+        processor = processor.lower()
+        component = (
+            "stt" if "stt" in processor else "tts" if "tts" in processor else "llm"
+        )
+        evaluation_results_rows.append(
+            {
+                "name": f"{component}/ttft",
+                "value": float(np.mean(values)),
+                "reasoning": "",
+            }
+        )
+
+    for processor, values in processing_time_dict.items():
+        if not values:
+            continue
+
+        processor = processor.lower()
+        component = (
+            "stt" if "stt" in processor else "tts" if "tts" in processor else "llm"
+        )
+        evaluation_results_rows.append(
+            {
+                "name": f"{component}/processing_time",
+                "value": float(np.mean(values)),
+                "reasoning": "",
+            }
+        )
+
+    # Add STT LLM judge score row
+    if stt_llm_judge_result:
+        evaluation_results_rows.append(
+            {
+                "name": "stt_llm_judge_score",
+                "value": stt_llm_judge_result["score"],
+                "reasoning": "",
+            }
+        )
+
+        df = pd.DataFrame(
+            {
+                "reference": stt_eval_references,
+                "prediction": stt_eval_predictions,
+                "score": [int(row["match"]) for row in stt_llm_judge_result["per_row"]],
+                "reasoning": [
+                    row["reasoning"] for row in stt_llm_judge_result["per_row"]
+                ],
+            }
+        )
+        df.to_csv(os.path.join(output_dir, "stt_results.csv"), index=False)
+
+    # Save evaluation_results.csv
+    if evaluation_results_rows:
+        df = pd.DataFrame(evaluation_results_rows)
+        df.to_csv(os.path.join(output_dir, "evaluation_results.csv"), index=False)
 
     # Return all data
     return {
@@ -935,7 +1060,7 @@ async def run_single_simulation_task(
     scenario: dict,
     output_dir: str,
     interrupt_sensitivity_map: dict,
-    base_port: int = 8765,
+    base_port: int = DEFAULT_PORT,
     assigned_ports: Optional[set] = None,
     ports_lock: Optional[asyncio.Lock] = None,
 ):
@@ -1027,7 +1152,7 @@ async def run_single_simulation_task(
         try:
             bot_task = asyncio.create_task(
                 start_bot(
-                    config["agent_system_prompt"]
+                    config["system_prompt"]
                     + f"\n\nYou must always speak in {language}.",
                     config["tools"],
                     language,
@@ -1042,8 +1167,9 @@ async def run_single_simulation_task(
                     language,
                     config["evaluation_criteria"],
                     simulation_output_dir,
-                    port=port,
                     interrupt_probability=interrupt_probability,
+                    port=port,
+                    max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
                 )
             )
             tasks = [bot_task, sim_task]
@@ -1157,7 +1283,6 @@ async def main():
                 scenario=scenario,
                 output_dir=args.output_dir,
                 interrupt_sensitivity_map=interrupt_sensitivity_map,
-                base_port=8765,
                 assigned_ports=assigned_ports,
                 ports_lock=ports_lock,
             )

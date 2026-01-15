@@ -478,18 +478,33 @@ The test configuration file should have the following structure:
 Set the required environment variables:
 
 ```bash
+# For OpenAI provider
 export OPENAI_API_KEY=your_key
+
+# For OpenRouter provider
+export OPENROUTER_API_KEY=your_key
 ```
 
 ```bash
-pense llm tests run -c /path/to/test_config.json -o /path/to/output_dir -m <model_name>
+pense llm tests run -c /path/to/test_config.json -o /path/to/output_dir -m <model_name> -p <provider>
+```
+
+**Provider Options:**
+
+- `openai`: Use OpenAI's API directly. Model names should match OpenAI's naming convention (e.g., `gpt-4.1`, `gpt-4o`).
+- `openrouter`: Use OpenRouter's API to access multiple LLM providers. Model names should match OpenRouter's naming convention (e.g., `openai/gpt-4.1`, `anthropic/claude-3-opus`).
+
+**Examples:**
+
+```bash
+# Using OpenAI provider with OpenAI model name
+pense llm tests run -c /path/to/config.json -o ./out -m gpt-4.1 -p openai
+
+# Using OpenRouter provider with OpenRouter model name
+pense llm tests run -c /path/to/config.json -o ./out -m openai/gpt-4.1 -p openrouter
 ```
 
 You can use the sample test configuration provided in [`pense/llm/examples/tests/config.json`](pense/llm/examples/tests/config.json) to test the evaluation script.
-
-```bash
-pense llm tests run -c examples/tests/config.json -o ./out -m gpt-4.1
-```
 
 The script will run each test case for each variable value (e.g., for each language) and output:
 
@@ -603,7 +618,7 @@ openai__gpt-4o,100.0,100.0
 
 Each column after `model` represents a test config (scenario), and `overall` is the aggregate pass percentage across all configs.
 
-You can checkout [`pense/llm/examples/leaderboard`](pense/llm/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`pense/llm/examples/tests/leaderboard`](pense/llm/examples/tests/leaderboard) to see a sample output of the leaderboard script.
 
 ![Leaderboard example](pense/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
@@ -613,7 +628,7 @@ Run fully automated, text-only conversations between two LLMs—the “agent” 
 
 ```json
 {
-  "agent_system_prompt": "instructions for the bot",
+  "system_prompt": "instructions for the bot",
   "tools": [...], // tool schemas available to the agent LLM
   "personas": [
     // array of persona objects for users in the simulation
@@ -639,7 +654,8 @@ Run fully automated, text-only conversations between two LLMs—the “agent” 
       "name": "assistant_behavior",
       "description": "Whether the assistant asks one concise question per turn; is empathetic and does not repeat the user's answer back to them."
     }
-  ]
+  ],
+  "max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, an end_reason message is added to the transcript.
 }
 ```
 
@@ -647,10 +663,16 @@ Each simulation pairs every persona with every scenario. The runner fans out int
 
 After each simulation, an LLM judge evaluates the transcript against all `evaluation_criteria` defined in the config. Each criterion produces a match (true/false) and reasoning. The results are aggregated across all simulations at the end of the run.
 
+**Max Turns:** You can optionally specify `max_turns` in the config to limit the maximum number of assistant turns in a conversation. When `max_turns` is reached, the conversation will end gracefully after the current turn completes, and an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` will be added to the transcript. The default value is 50 turns.
+
 Set the required environment variables:
 
 ```bash
+# For OpenAI provider
 export OPENAI_API_KEY=your_key
+
+# For OpenRouter provider
+export OPENROUTER_API_KEY=your_key
 ```
 
 Then launch simulations:
@@ -659,17 +681,34 @@ Then launch simulations:
 pense llm simulations run \
   -c /path/to/config.json \
   -o /path/to/output \
-  -m <model_name>
+  -m <model_name> \
+  -p <provider>
+```
+
+**Provider Options:**
+
+- `openai`: Use OpenAI's API directly. Model names should match OpenAI's naming convention (e.g., `gpt-4.1`, `gpt-4o`).
+- `openrouter`: Use OpenRouter's API to access multiple LLM providers. Model names should match OpenRouter's naming convention (e.g., `openai/gpt-4.1`, `anthropic/claude-3-opus`).
+
+**Examples:**
+
+```bash
+# Using OpenAI provider with OpenAI model name
+pense llm simulations run \
+  -c pense/llm/examples/simulation/config.json \
+  -o ./out \
+  -m gpt-4.1 \
+  -p openai
+
+# Using OpenRouter provider with OpenRouter model name
+pense llm simulations run \
+  -c pense/llm/examples/simulation/config.json \
+  -o ./out \
+  -m openai/gpt-4.1 \
+  -p openrouter
 ```
 
 You can use the sample configuration provided in [`pense/llm/examples/simulation/config.json`](pense/llm/examples/simulation/config.json) to test the simulation.
-
-```bash
-pense llm simulations run \
-  -c examples/simulation/config.json \
-  -o ./out \
-  -m gpt-4.1
-```
 
 Sample output:
 
@@ -799,7 +838,7 @@ To run agent simulations with all the three components - STT, LLM, and TTS - pre
 
 ```json
 {
-  "agent_system_prompt": "You are a helpful nurse speaking to a pregnant mother who has come for an Antenatal visit (ANC visit).\n\nYou are helping her with filling the ANC visit form which has the following questions:\n\n1: Name of patient (string)\n2: Address (string)\n3: Telephone (number)\n\nYour goal is to get the answer for all these questions from the user. Ask the questions sequentially, one at a time. Make sure to always speak out the next question for the user. They don't know what the next question will be. It is your responsibility to ask them the next question.\n\nDo not repeat the user's answer back to them.\n\nExcept for the questions where a type has been explicitly given beside it, the rest of the questions are boolean questions (yes/no).\n\nIf the user gives an answer that is not valid for a question, then, don't call the `plan_next_question` tool at all.\n\nOnly if the user gives a valid answer to a question, then, call the `plan_next_question` tool.\n\nOnce all the questions have been answered, end the call by calling the `end_call` tool immediately without asking or saying anything else to the user.\n\n# Important instructions\nFor each field, you must make sure that you get valid and complete answers from the user.\n\nName: the full name including both the first name and last name (users might have initials as part of their name - don't ask them to expand it)\nAddress: the full address of the user's specific place of residence\nTelephone: must be a valid 10-digit phone number (don't bug the user to say the number in 10 digits or without spaces or without hyphens or to repeat it as long you can infer the number from your message, irrespective of whatever format it may have been given in - asking for repeating information that is already clear is not a good user experience)\n\nUntil you get a valid and complete response for a specific question from the user, keep probing for more details until you have extracted all the details required to meet the criteria of completeness for that question.\n\nFor the boolean questions, just look for whether the user has that symptom or not. If the user is not able to give a definitive answer to any the boolean questions, try probing once to help them arrive at a definitive answer. If they are still not able to give a definitive true/false answer, mark that response as null.\n\n# Skipping already answered questions\nIt is possible that even though you have asked a particular question, the user's response may end up answering some of the future questions you were going to ask. If the user's response already definitively answers those questions, then, don't repeat those questions again and skip them to move to the next unanswered question.\n\nAfter every valid and complete response given by the user to a question, call the `plan_next_question` tool with the indices of the questions in the list of questions above that the user's response has already answered and the index of the next unanswered question that you are going to ask.\n\nIf the user's response only answers the exact question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_that_question>]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers more questions beyond the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_first_question_answered>, <index_of_the_second_question_answered>, ....]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers some other question from the form but not the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_question_answered>]` and `next_unanswered_question_index` as the index of the question you had originally asked but the user did not answer.\n\nIf the user's response is completely irrelevant to any of the questions in the form, don't call this tool and steer the user back to the conversation.\n\nUse the same index values as mentioned in the list above: from 1-22. So, 1-indexed. Not, 0-indexed.\n\n# Ensuring completion of all questions\n- If the user insists on skipping any question when you asked it, make sure to ask it again later. Before ending the call, make sure to ask all the questions that you asked. Only when all the questions have been asked and answered, then, call the `end_call` tool.\n\n# Style\n- Keep the conversation clear, warm, friendly and empathetic. It should feel like a natural and realistic conversation between a nurse and a mother who is pregnant. Make sure each question that you ask is concise and to the point.\n- Speak in an empathetic, friendly tone like a nurse at a government hospital.\n- Always stay gender neutral and don't say anything that might indicate any gender or name for you or anthropomorphise you in any way.\n", // prompt for the voice agent
+  "system_prompt": "You are a helpful nurse speaking to a pregnant mother who has come for an Antenatal visit (ANC visit).\n\nYou are helping her with filling the ANC visit form which has the following questions:\n\n1: Name of patient (string)\n2: Address (string)\n3: Telephone (number)\n\nYour goal is to get the answer for all these questions from the user. Ask the questions sequentially, one at a time. Make sure to always speak out the next question for the user. They don't know what the next question will be. It is your responsibility to ask them the next question.\n\nDo not repeat the user's answer back to them.\n\nExcept for the questions where a type has been explicitly given beside it, the rest of the questions are boolean questions (yes/no).\n\nIf the user gives an answer that is not valid for a question, then, don't call the `plan_next_question` tool at all.\n\nOnly if the user gives a valid answer to a question, then, call the `plan_next_question` tool.\n\nOnce all the questions have been answered, end the call by calling the `end_call` tool immediately without asking or saying anything else to the user.\n\n# Important instructions\nFor each field, you must make sure that you get valid and complete answers from the user.\n\nName: the full name including both the first name and last name (users might have initials as part of their name - don't ask them to expand it)\nAddress: the full address of the user's specific place of residence\nTelephone: must be a valid 10-digit phone number (don't bug the user to say the number in 10 digits or without spaces or without hyphens or to repeat it as long you can infer the number from your message, irrespective of whatever format it may have been given in - asking for repeating information that is already clear is not a good user experience)\n\nUntil you get a valid and complete response for a specific question from the user, keep probing for more details until you have extracted all the details required to meet the criteria of completeness for that question.\n\nFor the boolean questions, just look for whether the user has that symptom or not. If the user is not able to give a definitive answer to any the boolean questions, try probing once to help them arrive at a definitive answer. If they are still not able to give a definitive true/false answer, mark that response as null.\n\n# Skipping already answered questions\nIt is possible that even though you have asked a particular question, the user's response may end up answering some of the future questions you were going to ask. If the user's response already definitively answers those questions, then, don't repeat those questions again and skip them to move to the next unanswered question.\n\nAfter every valid and complete response given by the user to a question, call the `plan_next_question` tool with the indices of the questions in the list of questions above that the user's response has already answered and the index of the next unanswered question that you are going to ask.\n\nIf the user's response only answers the exact question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_that_question>]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers more questions beyond the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_first_question_answered>, <index_of_the_second_question_answered>, ....]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers some other question from the form but not the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_question_answered>]` and `next_unanswered_question_index` as the index of the question you had originally asked but the user did not answer.\n\nIf the user's response is completely irrelevant to any of the questions in the form, don't call this tool and steer the user back to the conversation.\n\nUse the same index values as mentioned in the list above: from 1-22. So, 1-indexed. Not, 0-indexed.\n\n# Ensuring completion of all questions\n- If the user insists on skipping any question when you asked it, make sure to ask it again later. Before ending the call, make sure to ask all the questions that you asked. Only when all the questions have been asked and answered, then, call the `end_call` tool.\n\n# Style\n- Keep the conversation clear, warm, friendly and empathetic. It should feel like a natural and realistic conversation between a nurse and a mother who is pregnant. Make sure each question that you ask is concise and to the point.\n- Speak in an empathetic, friendly tone like a nurse at a government hospital.\n- Always stay gender neutral and don't say anything that might indicate any gender or name for you or anthropomorphise you in any way.\n", // prompt for the voice agent
   "tools": [
     {
       "type": "client",
@@ -858,7 +897,8 @@ To run agent simulations with all the three components - STT, LLM, and TTS - pre
       "name": "question_completeness", // unique name for the criterion
       "description": "Whether all the questions in the form were covered in the conversation" // description used by LLM judge to evaluate
     }
-  ]
+  ],
+  "max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, the conversation ends gracefully after the current turn completes, and an end_reason message is added to the transcript.
 }
 ```
 
@@ -931,6 +971,8 @@ The output of the evaluation script will be saved in the output directory.
 │   │    ...
 │   ├── logs
 │   ├── results.log
+│   ├── evaluation_results.csv   # per-criterion evaluation results with latency metrics
+│   ├── stt_results.csv           # detailed per-row STT evaluation results
 │   ├── metrics.json
 │   ├── stt_outputs.json
 │   ├── tool_calls.json
@@ -947,11 +989,15 @@ Each `simulation_persona_*_scenario_*` directory contains:
 - `audios/`: alternating `*_user.wav` and `*_bot.wav` clips for every turn so you can audit microphone and synthesis quality at each step.
 - `logs`: full logs of the simulation including all the pipecat logs
 - `results.log`: only the terminal output of the simulation as shown in the sample output above.
+- `evaluation_results.csv`: per-criterion evaluation results including evaluation criteria, latency metrics (ttft and processing_time for each processor), and STT LLM judge score.
+- `stt_results.csv`: detailed per-row STT evaluation results comparing STT outputs with user messages from the transcript, including score and reasoning for each row.
 - `metrics.json`: latency traces grouped by processor for both `ttft` (time to first token) and `processing_time`, reported separately for STT, LLM, and TTS providers.
 - `stt_outputs.json`: The output of the STT step for each turn in the voice agent being evaluated.
 - `tool_calls.json`: chronologically ordered tool calls made by the agent.
-- `transcripts.json`: full conversation transcript - alternating `user`/`assistant` turns.
+- `transcripts.json`: full conversation transcript - alternating `user`/`assistant` turns. If the conversation ends due to `max_turns`, an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` is appended.
 - `config.json`: persona dict and scenario dict used for this simulation
+
+**Max Turns:** You can optionally specify `max_turns` in the config to limit the maximum number of assistant turns in a conversation. When `max_turns` is reached, the conversation will end gracefully after the current turn completes (ensuring the final assistant message is recorded), and an `end_reason` message will be added to the transcript. The default value is 50 turns.
 
 `config.json` in each simulation directory contains the persona and scenario used for that specific simulation:
 
@@ -967,6 +1013,27 @@ Each `simulation_persona_*_scenario_*` directory contains:
     "description": "the scenario description for this simulation"
   }
 }
+```
+
+`evaluation_results.csv` contains the evaluation results for each criterion, latency metrics, and STT LLM judge score in a simulation:
+
+```csv
+name,value,reasoning
+question_completeness,1,"The assistant asked for the user's full name, address, and telephone number..."
+assistant_behavior,1,"The assistant asked one concise question per turn..."
+ttft,0.6209,""
+processing_time,0.6209,""
+stt_llm_judge_score,0.95,""
+```
+
+Note: For latency metrics (`ttft` and `processing_time`), one row is added per processor with the mean value. The `reasoning` column is empty for latency metrics and STT LLM judge score. Evaluation criteria use `value` of 1 for True (match) and 0 for False (no match).
+
+`stt_results.csv` contains detailed per-row STT evaluation results:
+
+```csv
+reference,prediction,score,reasoning
+"Hi.","Hi.",1,"The transcription matches exactly."
+"Geeta Prasad.","Gita Prasad.",0,"The name 'Geeta' was transcribed as 'Gita'..."
 ```
 
 `results.csv` aggregates the match scores across all simulations:

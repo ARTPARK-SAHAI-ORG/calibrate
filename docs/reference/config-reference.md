@@ -20,7 +20,7 @@ No separate config file - uses command-line arguments.
 
 ```json
 {
-  "agent_system_prompt": "...",
+  "system_prompt": "...",
   "personas": [...],
   "scenarios": [...],
   "evaluation_criteria": [...]
@@ -31,7 +31,7 @@ No separate config file - uses command-line arguments.
 
 ```json
 {
-  "agent_system_prompt": "...",
+  "system_prompt": "...",
   "language": "english",
   "tools": [...],
   "personas": [...],
