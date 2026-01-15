@@ -405,12 +405,15 @@ async def run_simulation(
             }
         )
 
+    log_and_print(
+        f"Evaluating the conversation based on the criteria:\n\n{evaluation_criteria}"
+    )
     llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
 
     evaluation_results = [
         {
             "name": criterion["name"],
-            "match": llm_judge_result[criterion["name"]]["match"],
+            "value": int(llm_judge_result[criterion["name"]]["match"]),
             "reasoning": llm_judge_result[criterion["name"]]["reasoning"],
         }
         for criterion in evaluation_criteria
@@ -496,7 +499,7 @@ async def run_single_simulation_task(
             }
 
             for metric_dict in output["evaluation_results"]:
-                simulation_metrics[metric_dict["name"]] = float(metric_dict["match"])
+                simulation_metrics[metric_dict["name"]] = float(metric_dict["value"])
 
             with open(join(simulation_output_dir, "transcript.json"), "w") as f:
                 json.dump(output["transcript"], f, indent=4)
@@ -606,7 +609,7 @@ async def main():
         all_simulation_metrics.append(simulation_metrics)
 
         for metric_dict in evaluation_results:
-            metrics[metric_dict["name"]].append(float(metric_dict["match"]))
+            metrics[metric_dict["name"]].append(float(metric_dict["value"]))
 
     metrics_summary = {}
 

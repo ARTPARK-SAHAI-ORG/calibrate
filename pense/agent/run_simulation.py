@@ -440,7 +440,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 self._serialized_transcript = serialized_transcript
 
                 with open(
-                    os.path.join(self._output_dir, "transcripts.json"), "w"
+                    os.path.join(self._output_dir, "transcript.json"), "w"
                 ) as transcripts_file:
                     json.dump(serialized_transcript, transcripts_file, indent=4)
 

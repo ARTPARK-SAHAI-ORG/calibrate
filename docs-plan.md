@@ -390,7 +390,7 @@ docs/
 
 - Output directory structure
 - Audio files (`audios/`)
-- Transcripts (`transcripts.json`)
+- Transcripts (`transcript.json`)
 - Tool calls (`tool_calls.json`)
 - STT outputs (`stt_outputs.json`)
 - Metrics (`metrics.json`)

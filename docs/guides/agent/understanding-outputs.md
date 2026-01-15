@@ -8,7 +8,7 @@ Interpret agent simulation results.
 output_dir/
 ├── simulation_persona_1_scenario_1/
 │   ├── audios/
-│   ├── transcripts.json
+│   ├── transcript.json
 │   ├── tool_calls.json
 │   ├── metrics.json
 │   └── logs/
@@ -16,7 +16,7 @@ output_dir/
 
 ## Key Files
 
-- **transcripts.json**: Full conversation
+- **transcript.json**: Full conversation
 - **tool_calls.json**: Tool invocations
 - **metrics.json**: Latency and performance metrics
 - **audios/**: Audio files for each turn

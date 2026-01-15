@@ -24,7 +24,7 @@ output_dir/
 ### JSON Files
 
 - **metrics.json**: Aggregated statistics
-- **transcripts.json**: Conversation transcripts (agent simulations)
+- **transcript.json**: Conversation transcripts (agent simulations)
 - **tool_calls.json**: Tool call history (agent simulations)
 
 ### Logs
@@ -42,7 +42,7 @@ output_dir/
 ### Agent Simulations
 
 - `audios/`: Audio files for each turn
-- `transcripts.json`: Full conversation
+- `transcript.json`: Full conversation
 - `tool_calls.json`: Tool invocations
 - `stt_outputs.json`: STT results per turn
 

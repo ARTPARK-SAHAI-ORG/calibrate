@@ -976,7 +976,7 @@ The output of the evaluation script will be saved in the output directory.
 │   ├── metrics.json
 │   ├── stt_outputs.json
 │   ├── tool_calls.json
-│   ├── transcripts.json
+│   ├── transcript.json
 │   └── config.json              # persona and scenario for this simulation
 ├── simulation_persona_1_scenario_2
 ├── simulation_persona_1_scenario_3
@@ -994,7 +994,7 @@ Each `simulation_persona_*_scenario_*` directory contains:
 - `metrics.json`: latency traces grouped by processor for both `ttft` (time to first token) and `processing_time`, reported separately for STT, LLM, and TTS providers.
 - `stt_outputs.json`: The output of the STT step for each turn in the voice agent being evaluated.
 - `tool_calls.json`: chronologically ordered tool calls made by the agent.
-- `transcripts.json`: full conversation transcript - alternating `user`/`assistant` turns. If the conversation ends due to `max_turns`, an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` is appended.
+- `transcript.json`: full conversation transcript - alternating `user`/`assistant` turns. If the conversation ends due to `max_turns`, an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` is appended.
 - `config.json`: persona dict and scenario dict used for this simulation
 
 **Max Turns:** You can optionally specify `max_turns` in the config to limit the maximum number of assistant turns in a conversation. When `max_turns` is reached, the conversation will end gracefully after the current turn completes (ensuring the final assistant message is recorded), and an `end_reason` message will be added to the transcript. The default value is 50 turns.
