@@ -48,6 +48,8 @@ from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOption
 from pipecat.services.deepgram.stt import DeepgramSTTService, Language, LiveOptions
 from pipecat.services.deepgram.tts import DeepgramTTSService
 
+from pipecat.services.openrouter.llm import OpenRouterLLMService
+
 from pipecat.services.openai.stt import OpenAISTTService
 from pipecat.services.openai.tts import OpenAITTSService
 
@@ -114,31 +116,31 @@ class MetricsLogger(FrameProcessor):
 
 class STTConfig(BaseModel):
     provider: Literal[
-        "deepgram", "google", "openai", "cartesia", "smallest", "elevenlabs", "sarvam"
+        "deepgram", "google", "openai", "cartesia", "groq", "elevenlabs", "sarvam"
     ] = "deepgram"
 
 
 class TTSConfig(BaseModel):
     provider: Literal[
-        "cartesia", "google", "openai", "smallest", "elevenlabs", "sarvam"
+        "cartesia", "google", "openai", "groq", "elevenlabs", "sarvam"
     ] = "google"
     instructions: str = None
 
 
 class LLMConfig(BaseModel):
-    provider: Literal["openai", "groq", "google"] = "openai"
-    model: str = "gpt-4.1"
+    provider: Literal["openai", "openrouter"] = "openrouter"
+    model: str = "openai/gpt-4.1"
 
 
 async def run_bot(
     transport: BaseTransport,
     runner_args: RunnerArguments,
-    system_prompt: str = "You are a helpful assistant.",
-    tools: list[dict] = [],
-    stt_config: STTConfig = STTConfig(),
-    tts_config: TTSConfig = TTSConfig(),
-    llm_config: LLMConfig = LLMConfig(),
-    language: Literal["english", "hindi"] = "english",
+    system_prompt: str,
+    tools: list[dict],
+    stt_config: STTConfig,
+    tts_config: TTSConfig,
+    llm_config: LLMConfig,
+    language: Literal["english", "hindi"],
     mode: Literal["run", "eval"] = "run",
 ):
     if language not in ["english", "hindi"]:
@@ -157,9 +159,20 @@ async def run_bot(
             api_key=os.getenv("DEEPGRAM_API_KEY"),
             live_options=LiveOptions(language=stt_language.value),
         )
+    elif stt_config.provider == "groq":
+        stt = GroqSTTService(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model="whisper-large-v3",
+            language=stt_language,
+        )
     elif stt_config.provider == "google":
         stt = GoogleSTTService(
-            params=GoogleSTTService.InputParams(languages=stt_language),
+            sample_rate=16000,
+            location="us",
+            params=GoogleSTTService.InputParams(
+                languages=stt_language,
+                model="chirp_3",
+            ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )
     elif stt_config.provider == "openai":
@@ -184,7 +197,9 @@ async def run_bot(
         )
         stt = SarvamSTTService(
             api_key=os.getenv("SARVAM_API_KEY"),
-            params=SarvamSTTService.InputParams(language=stt_language.value),
+            params=SarvamSTTService.InputParams(
+                language=stt_language.value,
+            ),
         )
     elif stt_config.provider == "cartesia":
         stt = CartesiaSTTService(
@@ -227,6 +242,12 @@ async def run_bot(
                 language=tts_language,
             ),
             voice_id=language_to_voice_id[language][tts_config.provider],
+        )
+    elif tts_config.provider == "groq":
+        tts = GroqTTSService(
+            api_key=os.getenv("GROQ_API_KEY"),
+            model_name="canopylabs/orpheus-v1-english",
+            voice_id="autumn",
         )
     elif tts_config.provider == "google":
         tts = GoogleTTSService(
@@ -288,17 +309,11 @@ async def run_bot(
         llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"), model=llm_config.model
         )
-    elif llm_config.provider == "google":
-        llm = GoogleLLMService(
-            api_key=os.getenv("GOOGLE_API_KEY"),
-            model="gemini-2.5-flash",
-            # turn on thinking if you want it
-            # params=GoogleLLMService.InputParams(extra={"thinking_config": {"thinking_budget": 4096}}),)
-        )
-    elif llm_config.provider == "groq":
-        llm = GroqLLMService(
-            api_key=os.getenv("GROQ_API_KEY"),
-            model="meta-llama/llama-4-maverick-17b-128e-instruct",
+    elif llm_config.provider == "openrouter":
+        llm = OpenRouterLLMService(
+            api_key=os.getenv("OPENROUTER_API_KEY"),
+            model=llm_config.model,
+            base_url="https://openrouter.ai/api/v1",
         )
 
     ml = MetricsLogger()
@@ -520,6 +535,8 @@ async def run_bot(
         params=PipelineParams(
             enable_metrics=True,
             enable_usage_metrics=True,
+            audio_in_sample_rate=16000,
+            audio_out_sample_rate=16000,
         ),
         observers=[
             RTVIObserver(rtvi),

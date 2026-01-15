@@ -32,8 +32,8 @@ Copy `.env.example` to `.env` and fill in the API keys for the providers you wan
 
    **Supported Providers:**
 
-   - **STT**: deepgram, google, openai, elevenlabs, sarvam, cartesia, smallest
-   - **TTS**: elevenlabs, cartesia, google, openai, smallest, deepgram, sarvam
+   - **STT**: deepgram, google, openai, elevenlabs, sarvam, cartesia
+   - **TTS**: elevenlabs, cartesia, google, openai, deepgram, sarvam
    - **LLM**: openrouter, openai
 
    ```json
@@ -224,12 +224,12 @@ You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_
 For more details, run `pense stt eval -h`.
 
 ```bash
-usage: eval.py [-h] [-p {deepgram,deepgram-flux,openai,cartesia,smallest,groq,google,sarvam}] [-l {english,hindi}] -i
+usage: eval.py [-h] [-p {deepgram,openai,cartesia,groq,google,sarvam}] [-l {english,hindi}] -i
                INPUT_DIR [-o OUTPUT_DIR] [-d]
 
 options:
   -h, --help            show this help message and exit
-  -p {deepgram,deepgram-flux,openai,cartesia,smallest,groq,google,sarvam}, --provider {deepgram,deepgram-flux,openai,cartesia,smallest,groq,google,sarvam}
+  -p {deepgram,openai,cartesia,groq,google,sarvam}, --provider {deepgram,openai,cartesia,groq,google,sarvam}
                         STT provider to use for evaluation
   -l {english,hindi}, --language {english,hindi}
                         Language of the audio files
@@ -267,9 +267,6 @@ The CSV should have two columns: `id` (unique identifier for each text) and `tex
 Set the required environment variables for the TTS provider you want to evaluate:
 
 ```bash
-# For Smallest
-export SMALLEST_API_KEY=your_key
-
 # For Cartesia
 export CARTESIA_API_KEY=your_key
 
@@ -319,8 +316,8 @@ The output of the evaluation script will be saved in the output directory.
 
 ```csv
 id,text,audio_path,llm_judge_score,llm_judge_reasoning
-row_1,hello world,./out/smallest/audios/1.wav,True,"The provided audio says 'hello world'. The pronunciation is clear, and the words match exactly."
-row_2,this is a test,./out/smallest/audios/2.wav,True,"The audio clearly says 'this is a test' without any deviations or mispronunciations."
+row_1,hello world,./out/audios/1.wav,True,"The provided audio says 'hello world'. The pronunciation is clear, and the words match exactly."
+row_2,this is a test,./out/audios/2.wav,True,"The audio clearly says 'this is a test' without any deviations or mispronunciations."
 ```
 
 `metrics.json` will have the following format:
@@ -332,14 +329,14 @@ row_2,this is a test,./out/smallest/audios/2.wav,True,"The audio clearly says 't
   },
   {
     "metric_name": "ttfb", // Time to First Byte in seconds
-    "processor": "SmallestTTSService#0",
+    "processor": "GoogleTTSService#0",
     "mean": 0.3538844585418701,
     "std": 0.026930570602416992,
     "values": [0.3808150291442871, 0.3269538879394531] // values for each text input
   },
   {
     "metric_name": "processing_time", // Time taken by the service to respond in seconds
-    "processor": "SmallestTTSService#0",
+    "processor": "GoogleTTSService#0",
     "mean": 0.00022804737091064453,
     "std": 2.7060508728027344e-5,
     "values": [0.0002009868621826172, 0.0002551078796386719] // values for each text input
@@ -839,6 +836,16 @@ To run agent simulations with all the three components - STT, LLM, and TTS - pre
 ```json
 {
   "system_prompt": "You are a helpful nurse speaking to a pregnant mother who has come for an Antenatal visit (ANC visit).\n\nYou are helping her with filling the ANC visit form which has the following questions:\n\n1: Name of patient (string)\n2: Address (string)\n3: Telephone (number)\n\nYour goal is to get the answer for all these questions from the user. Ask the questions sequentially, one at a time. Make sure to always speak out the next question for the user. They don't know what the next question will be. It is your responsibility to ask them the next question.\n\nDo not repeat the user's answer back to them.\n\nExcept for the questions where a type has been explicitly given beside it, the rest of the questions are boolean questions (yes/no).\n\nIf the user gives an answer that is not valid for a question, then, don't call the `plan_next_question` tool at all.\n\nOnly if the user gives a valid answer to a question, then, call the `plan_next_question` tool.\n\nOnce all the questions have been answered, end the call by calling the `end_call` tool immediately without asking or saying anything else to the user.\n\n# Important instructions\nFor each field, you must make sure that you get valid and complete answers from the user.\n\nName: the full name including both the first name and last name (users might have initials as part of their name - don't ask them to expand it)\nAddress: the full address of the user's specific place of residence\nTelephone: must be a valid 10-digit phone number (don't bug the user to say the number in 10 digits or without spaces or without hyphens or to repeat it as long you can infer the number from your message, irrespective of whatever format it may have been given in - asking for repeating information that is already clear is not a good user experience)\n\nUntil you get a valid and complete response for a specific question from the user, keep probing for more details until you have extracted all the details required to meet the criteria of completeness for that question.\n\nFor the boolean questions, just look for whether the user has that symptom or not. If the user is not able to give a definitive answer to any the boolean questions, try probing once to help them arrive at a definitive answer. If they are still not able to give a definitive true/false answer, mark that response as null.\n\n# Skipping already answered questions\nIt is possible that even though you have asked a particular question, the user's response may end up answering some of the future questions you were going to ask. If the user's response already definitively answers those questions, then, don't repeat those questions again and skip them to move to the next unanswered question.\n\nAfter every valid and complete response given by the user to a question, call the `plan_next_question` tool with the indices of the questions in the list of questions above that the user's response has already answered and the index of the next unanswered question that you are going to ask.\n\nIf the user's response only answers the exact question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_that_question>]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers more questions beyond the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_first_question_answered>, <index_of_the_second_question_answered>, ....]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers some other question from the form but not the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_question_answered>]` and `next_unanswered_question_index` as the index of the question you had originally asked but the user did not answer.\n\nIf the user's response is completely irrelevant to any of the questions in the form, don't call this tool and steer the user back to the conversation.\n\nUse the same index values as mentioned in the list above: from 1-22. So, 1-indexed. Not, 0-indexed.\n\n# Ensuring completion of all questions\n- If the user insists on skipping any question when you asked it, make sure to ask it again later. Before ending the call, make sure to ask all the questions that you asked. Only when all the questions have been asked and answered, then, call the `end_call` tool.\n\n# Style\n- Keep the conversation clear, warm, friendly and empathetic. It should feel like a natural and realistic conversation between a nurse and a mother who is pregnant. Make sure each question that you ask is concise and to the point.\n- Speak in an empathetic, friendly tone like a nurse at a government hospital.\n- Always stay gender neutral and don't say anything that might indicate any gender or name for you or anthropomorphise you in any way.\n", // prompt for the voice agent
+  "stt": {
+    "provider": "google" // optional: STT provider to use. Supported: deepgram, google, openai, cartesia, elevenlabs, sarvam. Default: google
+  },
+  "tts": {
+    "provider": "google" // optional: TTS provider to use. Supported: cartesia, google, openai, elevenlabs, sarvam. Default: google
+  },
+  "llm": {
+    "provider": "openrouter", // optional: LLM provider to use. Supported: openai, openrouter. Default: openrouter
+    "model": "openai/gpt-4.1" // optional: model name. For openai provider, use OpenAI model names (e.g., "gpt-4.1", "gpt-4o"). For openrouter provider, use OpenRouter model names (e.g., "openai/gpt-4.1", "anthropic/claude-3-opus"). Default: openai/gpt-4.1
+  },
   "tools": [
     {
       "type": "client",
@@ -902,15 +909,37 @@ To run agent simulations with all the three components - STT, LLM, and TTS - pre
 }
 ```
 
-The voice agent is defined in `pense/agent/bot.py`. For now, the default configuration of the bot uses Deepgram for STT, OpenAI for LLM, and Google for TTS. You can configure the bot to use different providers for STT, LLM, and TTS by modifying the `STTConfig`, `LLMConfig`, and `TTSConfig` classes in `pense/agent/bot.py`. We will soon add support for changing the configuration for each provider for each component to override the defaults.
+You can configure the STT, TTS, and LLM providers directly in the config JSON file using the `stt`, `tts`, and `llm` sections. If these sections are omitted, the defaults are Google for STT, Google for TTS, and GPT-4.1 for LLM.
+
+**Supported Providers:**
+
+- **STT**: deepgram, google, openai, elevenlabs, sarvam, cartesia
+- **TTS**: cartesia, google, openai, elevenlabs, sarvam
+- **LLM**: openrouter, openai
 
 Set the required environment variables for the providers you want to use:
 
 ```bash
-# For the default configuration (Deepgram STT + OpenAI LLM + Google TTS)
+# For Deepgram STT
 export DEEPGRAM_API_KEY=your_key
-export OPENAI_API_KEY=your_key
+
+# For Google STT/TTS
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+# For OpenAI STT/LLM/TTS
+export OPENAI_API_KEY=your_key
+
+# For OpenRouter LLM
+export OPENROUTER_API_KEY=your_key
+
+# For Cartesia STT/TTS
+export CARTESIA_API_KEY=your_key
+
+# For ElevenLabs STT/TTS
+export ELEVENLABS_API_KEY=your_key
+
+# For Sarvam STT/TTS
+export SARVAM_API_KEY=your_key
 ```
 
 ```bash

@@ -51,10 +51,11 @@ from pipecat.transcriptions.language import Language
 from pipecat.frames.frames import (
     EndFrame,
     AggregatedTextFrame,
+    EndTaskFrame,
     LLMContextFrame,
     StopFrame,
     CancelFrame,
-    EndTaskFrame,
+    EndFrame,
     InterimTranscriptionFrame,
     LLMRunFrame,
     TTSTextFrame,
@@ -73,6 +74,7 @@ from pipecat.frames.frames import (
     OutputTransportMessageUrgentFrame,
     Frame,
     InterruptionFrame,
+    TTSStoppedFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -546,6 +548,53 @@ class IOLogger(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+class SilencePadder(FrameProcessor):
+    """Adds silence padding after TTS audio to help STT services flush transcriptions.
+
+    Some STT services (like Sarvam) need trailing silence to properly detect
+    end of speech and return final transcriptions.
+    """
+
+    def __init__(self, silence_duration_ms: int = 1000, chunk_ms: int = 40):
+        super().__init__(enable_direct_mode=True, name="SilencePadder")
+        self._silence_duration_ms = silence_duration_ms
+        self._chunk_ms = chunk_ms
+        self._last_sample_rate = 16000
+        self._last_num_channels = 1
+
+    async def process_frame(self, frame, direction):
+        await super().process_frame(frame, direction)
+
+        # Track audio parameters from outgoing audio frames
+        if isinstance(frame, OutputAudioRawFrame):
+            self._last_sample_rate = frame.sample_rate
+            self._last_num_channels = frame.num_channels
+
+        # When TTS stops, add silence padding before pushing the frame
+        if isinstance(frame, TTSStoppedFrame):
+            await self._push_silence()
+
+        await self.push_frame(frame, direction)
+
+    async def _push_silence(self):
+        """Generate and push silence frames."""
+        frames_per_chunk = max(
+            1, int(self._last_sample_rate * (self._chunk_ms / 1000.0))
+        )
+        silence_chunks = max(1, int(self._silence_duration_ms / self._chunk_ms))
+        # 16-bit audio: 2 bytes per sample
+        silence_audio = b"\x00" * (frames_per_chunk * self._last_num_channels * 2)
+
+        for _ in range(silence_chunks):
+            frame = OutputAudioRawFrame(
+                audio=silence_audio,
+                sample_rate=self._last_sample_rate,
+                num_channels=self._last_num_channels,
+            )
+            await self.push_frame(frame, FrameDirection.DOWNSTREAM)
+            await asyncio.sleep(self._chunk_ms / 1000.0)
+
+
 class MaxTurnsEndProcessor(FrameProcessor):
     """Processor that ends the task after number of assistant messages exceeds max_turns."""
 
@@ -811,6 +860,9 @@ async def run_simulation(
 
     output_logger = IOLogger()
 
+    # Add silence padding after TTS to help STT services (like Sarvam) flush transcriptions
+    silence_padder = SilencePadder(silence_duration_ms=1000, chunk_ms=40)
+
     max_turns_end_processor = MaxTurnsEndProcessor(
         max_turns,
         rtvi_message_adapter,
@@ -829,6 +881,7 @@ async def run_simulation(
             llm,  # LLM
             max_turns_end_processor,  # Check and end after assistant processing if max_turns reached
             tts,  # TTS
+            silence_padder,  # Add silence padding after TTS for STT flush
             output_logger,
             transport.output(),  # Transport bot output
             # transcript.assistant(),
@@ -1136,6 +1189,19 @@ async def run_single_simulation_task(
         print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
         configure_print_logger(print_log_save_path)
 
+        # Extract STT and TTS configs from config dict
+        stt_config_data = config.get("stt", {})
+        stt_config = STTConfig(provider=stt_config_data.get("provider", "google"))
+
+        tts_config_data = config.get("tts", {})
+        tts_config = TTSConfig(provider=tts_config_data.get("provider", "google"))
+
+        llm_config_data = config.get("llm", {})
+        llm_config = LLMConfig(
+            provider=llm_config_data.get("provider", "openrouter"),
+            model=llm_config_data.get("model", "openai/gpt-4.1"),
+        )
+
         command = " ".join(sys.argv)
         log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
@@ -1146,6 +1212,9 @@ async def run_single_simulation_task(
         log_and_print(f"\033[93mLanguage:\033[0m {language}")
         log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
         log_and_print(f"\033[93mPort:\033[0m {port}")
+        log_and_print(f"\033[93mSTT Config:\033[0m {stt_config}")
+        log_and_print(f"\033[93mTTS Config:\033[0m {tts_config}")
+        log_and_print(f"\033[93mLLM Config:\033[0m {llm_config}")
         log_and_print("--------------------------------")
 
         simulation_result = None
@@ -1157,6 +1226,9 @@ async def run_single_simulation_task(
                     config["tools"],
                     language,
                     port=port,
+                    stt_config=stt_config,
+                    tts_config=tts_config,
+                    llm_config=llm_config,
                 )
             )
             # Give the bot a moment to start listening before connecting
