@@ -205,7 +205,7 @@ async def run_simulation(
     user_model: str = "gpt-4.1",
     bot_provider: str = "openai",
     user_provider: str = "openai",
-    bot_speaks_first: bool = True,
+    agent_speaks_first: bool = True,
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> List[str]:
     """Runs a text-only bot that processes text inputs through an LLM and returns text outputs."""
@@ -240,13 +240,13 @@ async def run_simulation(
     # Create processors (text_output needs to be created first for reference)
     bot_processor = Processor(
         role="agent",
-        speaks_first=bot_speaks_first,
+        speaks_first=agent_speaks_first,
         conversation_state=conversation_state,
         name="BotProcessor",
     )
     user_processor = Processor(
         role="user",
-        speaks_first=not bot_speaks_first,
+        speaks_first=not agent_speaks_first,
         conversation_state=conversation_state,
         name="UserProcessor",
     )
@@ -466,6 +466,8 @@ async def run_single_simulation_task(
             colorize=False,
         )
 
+        agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
+
         print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
         configure_print_logger(print_log_save_path)
 
@@ -478,6 +480,7 @@ async def run_single_simulation_task(
         log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
         log_and_print(f"\033[93mLanguage:\033[0m {language}")
         log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
+        log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
         log_and_print("--------------------------------")
 
         try:
@@ -491,6 +494,7 @@ async def run_single_simulation_task(
                 user_model=args.model,
                 bot_provider=args.provider,
                 user_provider=args.provider,
+                agent_speaks_first=agent_speaks_first,
                 max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
             )
 

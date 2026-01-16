@@ -581,6 +581,9 @@ Run fully automated, text-only conversations between two LLMs—the “agent” 
       "description": "Whether the assistant asks one concise question per turn; is empathetic and does not repeat the user's answer back to them."
     }
   ],
+  "settings": {
+    "agent_speaks_first": true // optional: if true (default), the agent initiates the conversation. If false, the simulated user speaks first.
+  },
   "max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, an end_reason message is added to the transcript.
 }
 ```
@@ -590,6 +593,8 @@ Each simulation pairs every persona with every scenario. The runner fans out int
 After each simulation, an LLM judge evaluates the transcript against all `evaluation_criteria` defined in the config. Each criterion produces a match (true/false) and reasoning. The results are aggregated across all simulations at the end of the run.
 
 **Max Turns:** You can optionally specify `max_turns` in the config to limit the maximum number of assistant turns in a conversation. When `max_turns` is reached, the conversation will end gracefully after the current turn completes, and an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` will be added to the transcript. The default value is 50 turns.
+
+**Agent Speaks First:** You can optionally specify `agent_speaks_first` in the `settings` section to control who initiates the conversation. When set to `true` (default), the agent starts the conversation. When set to `false`, the simulated user speaks first.
 
 Set the required environment variables:
 
@@ -834,11 +839,16 @@ To run agent simulations with all the three components - STT, LLM, and TTS - pre
       "description": "Whether all the questions in the form were covered in the conversation" // description used by LLM judge to evaluate
     }
   ],
+  "settings": {
+    "agent_speaks_first": true // optional: if true (default), the agent initiates the conversation. If false, the simulated user speaks first.
+  },
   "max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, the conversation ends gracefully after the current turn completes, and an end_reason message is added to the transcript.
 }
 ```
 
 You can configure the STT, TTS, and LLM providers directly in the config JSON file using the `stt`, `tts`, and `llm` sections. If these sections are omitted, the defaults are Google for STT, Google for TTS, and GPT-4.1 for LLM.
+
+**Agent Speaks First:** You can optionally specify `agent_speaks_first` in the `settings` section to control who initiates the conversation. When set to `true` (default), the agent starts the conversation. When set to `false`, the simulated user speaks first by saying "Hello" to the agent.
 
 **Supported Providers:**
 
