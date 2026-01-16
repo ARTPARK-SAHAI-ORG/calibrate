@@ -1,15 +1,16 @@
 import asyncio
+import gc
 import json
 import os
 import sys
 import socket
 from os.path import join, exists
 import shutil
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Literal
 from uuid import uuid4
-import shutil
 from deepgram import LiveOptions
 from loguru import logger
 from PIL.ImageFile import ImageFile
@@ -164,6 +165,7 @@ async def start_bot(
     stt_config: STTConfig = STTConfig(),
     tts_config: TTSConfig = TTSConfig(),
     llm_config: LLMConfig = LLMConfig(),
+    agent_speaks_first: bool = True,
 ):
     current_context.set("BOT")
 
@@ -193,6 +195,7 @@ async def start_bot(
         llm_config=llm_config,
         language=language,
         mode="eval",
+        agent_speaks_first=agent_speaks_first,
     )
 
 
@@ -468,6 +471,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     json.dump(self._stt_outputs, stt_outputs_file, indent=4)
 
             except Exception as exc:
+                traceback.print_exc()
                 eval_logger.error(
                     "Failed to persist RTVI transcripts",
                     extra={"error": str(exc)},
@@ -597,6 +601,10 @@ class SilencePadder(FrameProcessor):
         silence_audio = b"\x00" * (frames_per_chunk * self._last_num_channels * 2)
 
         for _ in range(silence_chunks):
+            eval_logger.warning(
+                "Sending simulated silence frames",
+            )
+
             frame = OutputAudioRawFrame(
                 audio=silence_audio,
                 sample_rate=self._last_sample_rate,
@@ -738,15 +746,14 @@ async def run_simulation(
         "english",
         "hindi",
     ],
+    gender: Literal["male", "female"],
     evaluation_criteria: list[dict],
     output_dir: str,
     interrupt_probability: float,
     port: int = DEFAULT_PORT,
-    # user_speaks_first: bool = False,
+    agent_speaks_first: bool = True,
     max_turns: int = DEFAULT_MAX_TURNS,
 ) -> dict:
-    user_speaks_first = True  # hardcoded for now
-
     # Set context for EVAL logs
     current_context.set("EVAL")
 
@@ -790,6 +797,7 @@ async def run_simulation(
                 try:
                     return await original_connect(*args, **kwargs)
                 except (OSError, ConnectionError) as exc:
+                    traceback.print_exc()
                     last_error = exc
                     delay = min(base_delay * (2 ** (attempt - 1)), 5.0)
                     eval_logger.warning(
@@ -801,6 +809,9 @@ async def run_simulation(
                         },
                     )
                     await asyncio.sleep(delay)
+                except Exception as exc:
+                    traceback.print_exc()
+                    raise exc
 
             raise (
                 last_error
@@ -814,14 +825,19 @@ async def run_simulation(
     transport.input()._audio_in_queue = asyncio.Queue()
 
     tts_language = (
-        Language.EN
-        if language == "english"
-        else Language.HI if language == "hindi" else Language.KN
+        Language.KN
+        if language == "kannada"
+        else Language.HI if language == "hindi" else Language.EN
     )
 
-    voice_id = (
-        "hi-IN-Chirp3-HD-Zephyr" if language == "hindi" else "en-US-Chirp3-HD-Zephyr"
+    voice_name = "Zephyr" if gender == "female" else "Charon"
+    language_code = (
+        "hi-IN"
+        if language == "hindi"
+        else "kn-IN" if language == "kannada" else "en-US"
     )
+    voice_id = f"{language_code}-Chirp3-HD-{voice_name}"
+    eval_logger.info(f"Using voice ID: {voice_id}")
     tts = GoogleTTSService(
         voice_id=voice_id,
         params=GoogleTTSService.InputParams(language=tts_language),
@@ -834,9 +850,8 @@ async def run_simulation(
 
     transcript = TranscriptProcessor()
 
-    if not user_speaks_first:
-        simulation_system_prompt = system_prompt
-    else:
+    simulation_system_prompt = system_prompt
+    if not agent_speaks_first:
         simulation_system_prompt = f"{system_prompt}.\n\nBegin the conversation by saying 'Hello' to the agent."
 
     messages = [
@@ -871,7 +886,7 @@ async def run_simulation(
 
     output_logger = IOLogger()
 
-    # Add silence padding after TTS to help STT services (like Sarvam) flush transcriptions
+    # Add silence padding after TTS to help STT services (like Google, Sarvam) flush transcriptions
     silence_padder = SilencePadder(silence_duration_ms=1000, chunk_ms=40)
 
     max_turns_end_processor = MaxTurnsEndProcessor(
@@ -947,10 +962,7 @@ async def run_simulation(
         eval_logger.info(f"WebSocket connected")
         await audio_buffer.start_recording()
 
-        # Default behavior is for the bot to speak first
-        # If the eval bot speaks first, we append the prompt to the messages
-        if user_speaks_first:
-            # Always kick off the eval agent
+        if not agent_speaks_first:
             await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_disconnected")
@@ -1200,6 +1212,7 @@ async def run_single_simulation_task(
         provider=llm_config_data.get("provider", "openrouter"),
         model=llm_config_data.get("model", "openai/gpt-4.1"),
     )
+    agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
 
     command = " ".join(sys.argv)
     log_and_print(f"\033[33mRunning command\033[0m: {command}")
@@ -1214,20 +1227,23 @@ async def run_single_simulation_task(
     log_and_print(f"\033[93mSTT Config:\033[0m {stt_config}")
     log_and_print(f"\033[93mTTS Config:\033[0m {tts_config}")
     log_and_print(f"\033[93mLLM Config:\033[0m {llm_config}")
+    log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
     log_and_print("--------------------------------")
 
     simulation_result = None
+    bot_task = None
+    sim_task = None
     try:
         bot_task = asyncio.create_task(
             start_bot(
-                config["system_prompt"]
-                + f"\n\nYou must always speak in {language}.",
+                config["system_prompt"] + f"\n\nYou must always speak in {language}.",
                 config["tools"],
                 language,
                 port=port,
                 stt_config=stt_config,
                 tts_config=tts_config,
                 llm_config=llm_config,
+                agent_speaks_first=agent_speaks_first,
             )
         )
         # Give the bot a moment to start listening before connecting
@@ -1236,17 +1252,17 @@ async def run_single_simulation_task(
             run_simulation(
                 user_system_prompt,
                 language,
+                gender,
                 config["evaluation_criteria"],
                 simulation_output_dir,
                 interrupt_probability=interrupt_probability,
                 port=port,
+                agent_speaks_first=agent_speaks_first,
                 max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
             )
         )
         simulation_tasks = [bot_task, sim_task]
-        done, pending = await asyncio.wait(
-            simulation_tasks, timeout=EVAL_TIMEOUT_SECS
-        )
+        done, pending = await asyncio.wait(simulation_tasks, timeout=EVAL_TIMEOUT_SECS)
         if pending:
             eval_logger.error(
                 f"ERROR: Eval timeout expired, cancelling pending tasks..."
@@ -1264,10 +1280,24 @@ async def run_single_simulation_task(
             try:
                 simulation_result = sim_task.result()
             except Exception as e:
+                traceback.print_exc()
                 eval_logger.error(f"ERROR: Failed to get simulation result: {e}")
     except Exception as e:
+        traceback.print_exc()
         eval_logger.error(f"ERROR: Unable to run: {e}")
     finally:
+        # Ensure all tasks are fully cancelled and cleaned up
+        for task in [bot_task, sim_task]:
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        # Give async cleanup tasks time to complete (WebSocket close, STT stream close, etc.)
+        await asyncio.sleep(0.5)
+
         eval_logger.remove(log_file_id)
 
     # Return metrics for aggregation
@@ -1331,8 +1361,12 @@ async def main():
 
     # Run simulations sequentially
     results = []
+    total_simulations = len(config["personas"]) * len(config["scenarios"])
+    simulation_count = 0
+
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
+            simulation_count += 1
             try:
                 result = await run_single_simulation_task(
                     config=config,
@@ -1345,8 +1379,24 @@ async def main():
                 )
                 results.append(result)
             except Exception as e:
+                traceback.print_exc()
                 logger.error(f"Simulation failed with error: {e}")
                 results.append(e)
+            finally:
+                # Cleanup between simulations to prevent state leakage
+                # This is critical when running multiple simulations sequentially
+                if simulation_count < total_simulations:
+                    # Force garbage collection to clean up lingering objects
+                    # (WebSocket connections, STT streams, turn analyzer state, etc.)
+                    gc.collect()
+
+                    # Wait for ports to be fully released (TIME_WAIT state)
+                    # and for async cleanup tasks to complete
+                    cleanup_delay = 3.0  # seconds
+                    log_and_print(
+                        f"Waiting {cleanup_delay}s for cleanup before next simulation..."
+                    )
+                    await asyncio.sleep(cleanup_delay)
 
     # Aggregated metrics across all simulations
     all_simulation_metrics = []

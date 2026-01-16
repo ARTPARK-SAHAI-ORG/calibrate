@@ -1191,7 +1191,3587 @@ Currently the order is:
 
 The user wants to move "Talk to the agent" (lines 25-94) to be just above "Documentation" (line 1101), so between "Voice agent simulations" and "Documentation".
 
-Let me </details></think>
+Let me do this by:
+1. First, remove the "Talk to the agent" section from its current location
+2. Then insert it just before the "Documentation" section</details></think>
+
+---
+
+I'll move the "Talk to the agent" section (lines 25-95) to just above the "Documentation" section.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, I've removed the "Talk to the agent" section from its original location. Now I need to add it back just above the "Documentation" section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've moved the "Talk to the agent" section from its original position (after Setup) to just above the "Documentation" section. The README now has the following order:
+
+1. Setup
+2. Speech To Text (STT)
+3. Text To Speech (TTS)
+4. LLM tests
+5. LLM simulations
+6. Voice agent simulations
+7. Talk to the agent (moved here)
+8. Documentation
+9. TODOs
+10. Bugs</details></think>
+
+---
+
+Done. I've moved the "Talk to the agent" section to just above the "Documentation" section. The README now has this order:
+
+1. Setup
+2. Speech To Text (STT)
+3. Text To Speech (TTS)
+4. LLM tests
+5. LLM simulations
+6. Voice agent simulations
+7. **Talk to the agent** ← moved here
+8. Documentation
+9. TODOs
+10. Bugs
+
+---
+
+_**User**_
+
+when I am running @pense/agent/run_simulation.py via cli it is working fine
+
+@uv (1004-1025) 
+
+but when I install the pense library using pip install -e /path/to/pense repo and run it on my fastapi server using subprocess POpen
+
+ | [BOT-SYS] | User stopped speaking
+2026-01-16 09:29:56.491 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#5(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 09:29:56.491 | INFO     | [BOT-SYS] | input bot frame: UserStoppedSpeakingFrame#0
+2026-01-16 09:29:56.491 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#5(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 09:29:56.491 | INFO     | [BOT-SYS] | output bot frame: UserStoppedSpeakingFrame#0
+2026-01-16 09:29:56.492 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#4(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 09:30:00.033 | DEBUG    | [BOT-SYS] | LLMUserAggregator#0: User stopped speaking (strategy: None)
+2026-01-16 09:30:00.033 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#6(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 09:30:00.034 | INFO     | [BOT-SYS] | input bot frame: UserStoppedSpeakingFrame#3
+2026-01-16 09:30:00.034 | INFO     | [BOT-SYS] | output bot frame: UserStoppedSpeakingFrame#2
+2026-01-16 09:30:00.034 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#6(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 09:30:00.034 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#5(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 09:30:06.257 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 Stream aborted due to inactivity (no audio input). Reconnecting automatically...
+2026-01-16 09:30:06.263 | ERROR    | [BOT-SYS] | GoogleSTTService#0 exception (/Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/google/api_core/grpc_helpers_async.py:110): Unknown error occurred: 409 Stream timed out after receiving no more client requests.
+2026-01-16 09:30:06.263 | INFO     | [BOT-SYS] | input bot frame: ErrorFrame#0(error: Unknown error occurred: 409 Stream timed out after receiving no more client requests., fatal: False)
+2026-01-16 09:30:06.264 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#7(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error
+
+
+in the logs after user stopped speaking on the bot side @pense/agent/bot.py there is no llm generation that starts and so, google stt starts erroring out with timeouts
+
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is experiencing an issue where:
+1. When running `pense/agent/run_simulation.py` via CLI directly, it works fine
+2. When running it as a subprocess from a FastAPI server (after installing with `pip install -e`), the simulation gets stuck
+
+Looking at the logs, after "User stopped speaking", the LLM generation doesn't start, and eventually Google STT times out.
+
+This is a different issue from the parallelization one. The issue seems to be that when running as a subprocess from FastAPI:
+- The bot receives the user's speech
+- STT transcribes it
+- But the LLM doesn't generate a response
+- Eventually Google STT times out due to inactivity
+
+This could be related to:
+1. Environment variables not being passed correctly to the subprocess
+2. Event loop issues when running as a subprocess
+3. Signal handling issues
+4. Some async/threading issue
+
+Let me think about what could cause the LLM not to generate after user stops speaking...
+
+Looking at the logs:
+```
+2026-01-16 09:29:56.491 | INFO     | [BOT-SYS] | User stopped speaking
+...
+2026-01-16 09:30:00.033 | DEBUG    | [BOT-SYS] | LLMUserAggregator#0: User stopped speaking (strategy: None)
+...
+2026-01-16 09:30:06.257 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 Stream aborted due to inactivity
+```
+
+There's about 3.5 seconds between "User stopped speaking" and "LLMUserAggregator#0: User stopped speaking", and then 6 more seconds before the STT times out. The LLM should have been triggered after the user stopped speaking.
+
+The fact that it works via CLI but not via subprocess suggests there might be:
+1. Missing environment variables (like OPENAI_API_KEY or OPENROUTER_API_KEY)
+
+
+2. Event loop or signal handler inheritance issues when spawning the subprocess
+3. Buffering problems with stdout/stderr that could affect logging or communication
+
+Without seeing the FastAPI code spawning the subprocess, the most likely culprits are environment variables not being explicitly passed to the subprocess, or the working directory being different when invoked from FastAPI versus the CLI.
+
+Signal handling for SIGINT might need to be restored for subprocess compatibility, and the asyncio event loop could be behaving differently in a subprocess context. I should suggest adding back subprocess-friendly event loop handling and ask the user to share their FastAPI implementation to diagnose the actual issue.</details></think>
+
+---
+
+This issue is likely caused by environment variables not being passed to the subprocess, or event loop/signal handling issues when running as a subprocess from FastAPI.
+
+Let me add back the subprocess-friendly setup that I removed earlier:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me add back the subprocess-friendly setup:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also check if there's anything else that might be causing the issue. The key issue seems to be that after "User stopped speaking", the LLM doesn't get triggered.
+
+But actually, looking at the logs more carefully:
+- `LLMUserAggregator#0: User stopped speaking (strategy: None)` - this suggests the LLM aggregator received the user stopped speaking signal
+- But there's no LLM generation happening after that
+
+This could be because:
+1. The LLM service (OpenRouter/OpenAI) isn't receiving the request
+2. Environment variables for API keys aren't set
+3. Some frame isn't being propagated correctly
+
+Let me ask the user to check their subprocess call and ensure environment variables are being passed.</details></think>
+
+---
+
+I've added back the subprocess-friendly event loop setup. However, the main issue you're seeing (LLM not generating after user stops speaking) is likely due to **environment variables not being passed** to the subprocess.
+
+When you run via subprocess from FastAPI, make sure you're passing environment variables:
+
+```python
+import subprocess
+import os
+
+process = subprocess.Popen(
+    ["python", "-m", "pense.agent.run_simulation", ...],
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    env=os.environ.copy(),  # <-- Critical: pass environment variables
+    start_new_session=True,
+)
+```
+
+The logs show `LLMUserAggregator#0: User stopped speaking` but no LLM generation starts. This typically means:
+
+1. **Missing API keys**: `OPENROUTER_API_KEY` or `OPENAI_API_KEY` isn't available to the subprocess
+2. **Missing Google credentials**: `GOOGLE_APPLICATION_CREDENTIALS` for STT/TTS
+
+Can you share your FastAPI subprocess code? That would help identify the exact issue. Also, check if there are any error logs related to the LLM service (OpenRouter) - they might be silently failing due to missing credentials.
+
+---
+
+_**User**_
+
+no you are wrong,
+
+when @pense/agent/run_simulation.py is run using the image shown subprocess.run - it works fine
+
+when I use subprocess.POpen and move to non-blocking, that is when this issue happens
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+Ah, I see! The user is clarifying:
+
+1. `subprocess.run()` (blocking) - works fine
+2. `subprocess.Popen()` (non-blocking) - has the issue where LLM doesn't generate
+
+The difference is that `subprocess.run()` blocks until the subprocess completes, while `subprocess.Popen()` returns immediately and the subprocess runs in the background.
+
+When using `Popen` without waiting, the issue could be:
+
+1. **stdout/stderr buffering** - If stdout/stderr aren't being read, the subprocess might block when the buffer fills up
+2. **Process detachment issues** - The subprocess might not be properly detached from the parent
+3. **Signal propagation** - Signals from the parent might interfere with the child
+
+The key issue is likely that with `Popen`, if you don't read stdout/stderr, the pipe buffers can fill up and block the subprocess. This could cause the LLM request to hang.
+
+Let me suggest solutions for running with `Popen`:
+
+1. Use `start_new_session=True` to detach from parent process group
+2. Either:
+   - Redirect stdout/stderr to files instead of PIPE
+   - Or use DEVNULL if you don't need the output
+   - Or actively read from the pipes in a separate thread
+
+Let me explain this to the user.</details></think>
+
+---
+
+Ah, I understand now. The issue is with `subprocess.Popen()` (non-blocking) vs `subprocess.run()` (blocking).
+
+The problem is likely **stdout/stderr pipe buffering**. When using `Popen` with `stdout=subprocess.PIPE` and `stderr=subprocess.PIPE`, if you don't actively read from these pipes, they fill up and **block the subprocess**.
+
+Here are the solutions:
+
+**Option 1: Redirect to files (recommended for background processes)**
+```python
+with open(f"{output_dir}/stdout.log", "w") as stdout_file, \
+     open(f"{output_dir}/stderr.log", "w") as stderr_file:
+    process = subprocess.Popen(
+        run_cmd,
+        stdout=stdout_file,
+        stderr=stderr_file,
+        start_new_session=True,  # Detach from parent process group
+        cwd=str(output_dir),
+    )
+```
+
+**Option 2: Discard output if you don't need it**
+```python
+process = subprocess.Popen(
+    run_cmd,
+    stdout=subprocess.DEVNULL,
+    stderr=subprocess.DEVNULL,
+    start_new_session=True,
+    cwd=str(output_dir),
+)
+```
+
+**Option 3: Read pipes in background threads (if you need live output)**
+```python
+import threading
+
+process = subprocess.Popen(
+    run_cmd,
+    stdout=subprocess.PIPE,
+    stderr=subprocess.PIPE,
+    start_new_session=True,
+    cwd=str(output_dir),
+)
+
+# Start threads to drain the pipes
+def drain_pipe(pipe):
+    for line in pipe:
+        pass  # or log it somewhere
+
+threading.Thread(target=drain_pipe, args=(process.stdout,), daemon=True).start()
+threading.Thread(target=drain_pipe, args=(process.stderr,), daemon=True).start()
+```
+
+The key insight: with `Popen` + `PIPE`, the subprocess blocks when the pipe buffer (~64KB) fills up. Since the LLM generates a lot of output, it hits this limit and hangs. Redirecting to files or DEVNULL avoids this entirely.
+
+---
+
+_**User**_
+
+| [BOT-SYS] | GoogleSTTService#0 processing time: 1.567255973815918
+2026-01-16 09:51:51.147 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#1(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:21:51.146+00:00', 'final': True}})
+2026-01-16 09:51:51.147 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#2(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.567255973815918}]}})
+2026-01-16 09:51:51.147 | INFO     | [BOT] | Bot transcript:[2026-01-16T04:21:51.146+00:00] user: हेलो।
+2026-01-16 09:51:51.148 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#1, processing: 1.567255973815918
+2026-01-16 09:51:51.148 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#1
+2026-01-16 09:51:51.148 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#1(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:21:51.146+00:00', 'final': True}})
+2026-01-16 09:51:51.148 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#2(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.567255973815918}]}})
+2026-01-16 09:51:51.149 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#0(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:21:51.146+00:00', 'final': True}})
+2026-01-16 09:51:51.149 | INFO     | [EVAL-SYS] | [94m[User (as transcribed by the agent)][0m: हेलो।
+2026-01-16 09:51:51.149 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#1(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.567255973815918}]}})
+2026-01-16 09:51:51.149 | INFO     | [BOT-SYS] | output bot frame: TranscriptionUpdateFrame#0(pts: None, messages: 1)
+2026-01-16 09:51:59.855 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 Stream aborted due to inactivity (no audio input). Reconnecting automatically...
+2026-01-16 09:51:59.858 | ERROR    | [BOT-SYS] | GoogleSTTService#0 exception (/Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/google/api_core/grpc_helpers_async.py:110): Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"
+value: "\010\n\022\007generic\0329Stream timed out after receiving no more client requests.*D\013\020\206\326\215'\032;\0229Stream timed out after receiving no more client requests.\014"
+]
+2026-01-16 09:51:59.859 | INFO     | [BOT-SYS] | input bot frame: ErrorFrame#0(error: Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"
+value: "\010\n\022\007generic\0329Stream timed out after receiving no more client requests.*D\013\020\206\326\215'\032;\0229Stream timed out after receiving no more client requests.\014"
+], fatal: False)
+2026-01-16 09:51:59.860 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#3(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"\nvalue: "\\010\\n\\022\\007generic\\0329Stream timed out after receiving no more client requests.*D\\013\\020\\206\\326\\215\'\\032;\\0229Stream timed out after receiving no more client requests.\\014"\n]', 'fatal': False}})
+2026-01-16 09:51:59.860 | WARNING  | [BOT-SYS] | PipelineTask#0: Something went wrong: ErrorFrame#0(error: Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"
+value: "\010\n\022\007generic\0329Stream timed out after receiving no more client requests.*D\013\020\206\326\215'\032;\0229Stream timed out after receiving no more client requests.\014"
+], fatal: False)
+2026-01-16 09:51:59.861 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#3(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving 
+
+now after this change it went one step further to running the stt on the @pense/agent/bot.py side as the log shows but there was a major 9 second delay where nothing happened
+
+2026-01-16 09:51:51.149 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#1(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.567255973815918}]}})
+2026-01-16 09:51:51.149 | INFO     | [BOT-SYS] | output bot frame: TranscriptionUpdateFrame#0(pts: None, messages: 1)
+2026-01-16 09:51:59.855 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 Stream aborted due to inactivity (no audio input). Reconnecting automatically...
+2026-01-16 09:51:59.858 | ERROR    | [BOT
+
+why is that happening?
+
+
+    # Run pense agent simulation command as a non-blocking process
+    run_cmd = [
+        "pense",
+        "agent",
+        "simulation",
+        "-c",
+        str(config_file),
+        "-o",
+        str(output_dir),
+    ]
+
+    logger.info(f"{log_prefix} command: {' '.join(run_cmd)}")
+
+    # Open log files for stdout and stderr
+    stdout_log_path = output_dir / "stdout.log"
+    stderr_log_path = output_dir / "stderr.log"
+
+    with open(stdout_log_path, "w") as stdout_file, open(
+        stderr_log_path, "w"
+    ) as stderr_file:
+        # Start the process without blocking, writing output to files
+        process = subprocess.Popen(
+            run_cmd,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            start_new_session=True,  # Detach from parent process group
+            cwd=str(output_dir),
+        )
+
+        # Track processed simulations and uploaded files
+        processed_simulations = set()
+        uploaded_audio_files = set()
+        simulation_results = []
+
+        # Calculate expected number of simulations
+        num_personas = len(pense_config.get("personas", []))
+        num_scenarios = len(pense_config.get("scenarios", []))
+        expected_total = num_personas * num_scenarios
+        logger.info(
+            f"{log_prefix}: Expecting {expected_total} simulations ({num_personas} personas x {num_scenarios} scenarios)"
+        )
+
+        # Monitor for new simulation directories while the process runs
+        poll_interval = 2  # seconds between checks
+        while process.poll() is None:
+            # Find all simulation directories
+            for item in output_dir.iterdir():
+                if (
+                    item.is_dir()
+                    and item.name.startswith("simulation_persona_")
+                    and item.name not in processed_simulations
+                ):
+                    # Check if this simulation is complete
+                    if _is_simulation_complete(item):
+                        logger.info(
+                            f"{log_prefix}: Found completed simulation directory: {item.name}"
+                        )
+                        # Parse the simulation directory
+                        sim_result = _parse_simulation_directory(
+                            sim_dir=item,
+                            output_dir=output_dir,
+                            s3_bucket=s3_bucket,
+                            s3_prefix=s3_prefix,
+                            uploaded_audio_files=uploaded_audio_files,
+                        )
+                        if sim_result:
+                            simulation_results.append(sim_result)
+                            processed_simulations.add(item.name)
+
+                            # Update the database with incremental results
+                            results_dict = {
+                                "total_simulations": expected_total,
+                                "completed_simulations": len(simulation_results),
+                                "simulation_results": simulation_results,
+                                "results_s3_prefix": s3_prefix,
+                            }
+                            update_simulation_job(
+                                task_id,
+                                status=TaskStatus.IN_PROGRESS.value,
+                                results=results_dict,
+                            )
+                            logger.info(
+                                f"{log_prefix}: Updated DB with {len(simulation_results)}/{expected_total} completed simulations"
+                            )
+
+            time.sleep(poll_interval)
+
+        # Process finished, wait for it to complete
+        process.wait()
+
+    # Read logs from files
+    stdout = ""
+    stderr = ""
+    if stdout_log_path.exists():
+        with open(stdout_log_path, "r") as f:
+            stdout = f.read()
+        if stdout:
+            logger.info(f"{log_prefix} stdout: {stdout}")
+    if stderr_log_path.exists():
+        with open(stderr_log_path, "r") as f:
+            stderr = f.read()
+        if stderr:
+            logger.info(f"{log_prefix} stderr: {stderr}")
+
+    # Final pass: check for any remaining simulation dire
+
+_-- Updated code
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+Looking at the logs, the user is making progress. Now the issue is:
+
+1. STT works and transcribes "हेलो।" at `09:51:51.149`
+2. Then there's a 9-second gap where nothing happens
+3. At `09:51:59.855` the GoogleSTTService times out due to inactivity
+
+The gap is between:
+- `09:51:51.149 | INFO | [BOT-SYS] | output bot frame: TranscriptionUpdateFrame#0`
+- `09:51:59.855 | DEBUG | [BOT-SYS] | GoogleSTTService#0 Stream aborted due to inactivity`
+
+So after the transcription is output, the LLM should be triggered, but it's not happening. The 9-second delay suggests something is blocking or the LLM isn't being triggered.
+
+Looking at the code flow:
+1. User speaks → STT transcribes → `TranscriptionFrame` is pushed
+2. `TranscriptionFrame` goes to `LLMUserAggregator` → which should trigger LLM
+3. LLM generates response → TTS speaks it
+
+But in the logs, I don't see the LLM being triggered after the transcription. The `TranscriptionUpdateFrame` is output but there's no LLM activity.
+
+Wait, looking at the subprocess code, the user has:
+```python
+with open(stdout_log_path, "w") as stdout_file, open(stderr_log_path, "w") as stderr_file:
+    process = subprocess.Popen(...)
+    while process.poll() is None:
+        # monitoring loop
+        time.sleep(poll_interval)
+    process.wait()
+```
+
+The problem here is that the file handles `stdout_file` and `stderr_file` are opened in a `with` block, but the process might outlive the with block's scope... Actually no, the `while process.poll() is None` loop keeps running until the process finishes, so the files should stay open.
+
+
+The file buffering could be an issue - the subprocess writes to stdout/stderr which go to the file handles opened in write mode, but Python's buffering might delay what gets written to disk. However, this shouldn't block the subprocess itself from executing. The real question is what's preventing the LLM from being triggered after the transcription completes. Looking at the log sequence, the transcription happens but then there's silence for 9 seconds before the STT service times out, suggesting the downstream processing isn't happening. transcription being sent as an RTVI message. But I'm not seeing the actual `TranscriptionFrame` that should trigger the LLM processing.
+
+In the bot.py flow, the STT service outputs a `TranscriptionFrame` which feeds into the LLM context aggregator to initiate LLM processing. However, these logs show no LLM-related frames being handled. The `TranscriptionFrame` might not be propagating correctly through the pipeline, possibly due to incorrect pipeline configuration, dropped frames, or an async issue preventing the LLM task from running. Looking more closely at the log sequence, the EVAL side sends audio and the BOT side receives it, but something in that handoff seems to be breaking the chain.
+
+The STT produces a transcription at 09:51:51, then there's a 9-second gap before Google STT times out. The core question is why the LLM doesn't activate after transcription completes. Normally the flow should be: `TranscriptionFrame` → `LLMUserContextAggregator` → wait for `UserStoppedSpeakingFrame` → send aggregated transcription to LLM. But in the earlier logs from the initial report, I can see `LLMUserAggregator#0: User stopped speaking (strategy: None)` at 09:30:00, which indicates the user stopped speaking signal was being detected.
+
+In this current log, there's no sign of `UserStoppedSpeakingFrame` or `LLMUserAggregator` appearing at all. The transcription happens but the user-stopped-speaking signal isn't reaching the bot. Looking at the EVAL side, I see `ProtobufFrameSerializer: Transport message InputTransportMessageFrame#1` but no evidence of `UserStoppedSpeakingFrame` being sent to the bot. The issue seems to be that the EVAL client isn't transmitting the user-stopped-speaking signal through the websocket connection to trigger the LLM.
+
+The simulation flow should be: EVAL sends audio via TTS, BOT receives and transcribes it, BOT sends transcription back, EVAL receives it and feeds it to the simulated user's LLM context, EVAL's LLM generates a response, EVAL's TTS speaks it, BOT transcribes that, and finally BOT's LLM generates its response. The critical piece is that the BOT needs the `UserStoppedSpeakingFrame` to know when to trigger its LLM generation. Looking at the `RTVIMessageFrameAdapter` in run_simulation.py, there's logic for handling "bot-stopped-speaking" messages, but it seems the corresponding user-stopped-speaking signal isn't being sent properly from EVAL to BOT. The bot frame shows a transcription update, but there's no `UserStoppedSpeakingFrame` following it—which means the bot's VAD isn't detecting the end of user speech. This could stem from several issues: the audio stream might lack proper silence markers, VAD parameters could be misconfigured for this particular audio, or there's a problem with how frames are being transmitted. The `SilencePadder` on the evaluation side should be adding silence after TTS to help the bot recognize speech boundaries, but something in that chain appears to be breaking down.
+
+Looking at the debug logs the user added to `SilencePadder`, I'd expect to see warnings about silence frames being sent, but they're not appearing in the provided output. The logs might be getting filtered or routed differently—the `stderr.log` the user shared may not capture evaluation-side logging. The core problem likely comes down to either the silence padding not being generated correctly or failing to reach the bot's VAD detector.
+
+Checking the bot's transport configuration, the VAD is instantiated at the transport level with `SileroVADAnalyzer` and a 0.2 second stop threshold. When the eval side sends audio frames through the websocket client transport, those frames should flow through the server-side VAD for speech detection. But I need to verify whether the audio actually reaches the VAD pipeline or if there's a disconnect in how frames are being routed through the transport layers.
+
+The timing could be problematic—audio arriving in bursts from the subprocess might not give the VAD enough continuous silence to register that speech has ended. There's also a possibility that the subprocess's event loop isn't properly initialized, especially with `start_new_session=True` potentially interfering with asyncio's operation in the detached process.</details></think>
+
+---
+
+Looking at the logs, the issue is clear now. After the STT transcription at `09:51:51.149`, there's no `UserStoppedSpeakingFrame` being triggered on the BOT side. This means the BOT's VAD (Voice Activity Detection) isn't detecting that the user stopped speaking, so the LLM never gets triggered.
+
+The 9-second gap is the VAD waiting for more audio, then Google STT times out due to inactivity.
+
+This is likely a **timing/buffering issue** with how audio frames are being sent through the websocket when running as a detached subprocess. The silence padding frames might not be reaching the BOT's VAD properly.
+
+Let me check if the silence padder is actually sending frames:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see the SilencePadder. It triggers on `TTSStoppedFrame` and sends silence frames. The user added a warning log `"Sending simulated silence frames"`.
+
+The issue might be:
+1. The silence frames are sent but not triggering the BOT's VAD
+2. Or the `TTSStoppedFrame` is not being triggered
+3. Or there's a timing issue where the websocket doesn't flush the audio properly
+
+Let me also check if there's a `UserStoppedSpeakingFrame` being sent from the EVAL side to the BOT. Looking at the `RTVIMessageFrameAdapter`:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Looking at this, I see the flow:
+
+1. EVAL side sends audio to BOT via websocket
+2. BOT's transport has VAD enabled which should detect when user stops speaking
+3. When BOT's VAD detects user stopped speaking, it should send `user-stopped-speaking` RTVI message
+4. EVAL receives this message and handles it at line 274-278
+
+The issue is that the BOT's VAD isn't detecting end of speech. Looking at the logs:
+- `09:51:51.149` - Transcription output
+- `09:51:59.855` - STT times out (9 seconds later)
+
+The VAD on the BOT side should trigger `UserStoppedSpeakingFrame` when it detects silence. But this isn't happening.
+
+The silence padder on the EVAL side sends silence frames after TTS. But these silence frames need to:
+1. Go through the websocket to the BOT
+2. The BOT's VAD needs to receive them and detect end of speech
+
+The problem might be that:
+1. The silence frames are `OutputAudioRawFrame` which might not trigger the transport to send them over websocket
+2. Or the websocket is not flushing properly in the detached subprocess
+
+Let me check what happens after silence frames are pushed... They go through the pipeline and should reach `transport.output()`. The transport should then send them over websocket.
+
+But wait - looking at the EVAL pipeline:
+```python
+pipeline = Pipeline([
+    transport.input(),
+    function_call_handler,
+    rtvi_message_adapter,
+    metrics_logger,
+    stt_logger,
+    transcript.user(),
+    context_aggregator.user(),
+    llm,
+    max_turns_end_processor,
+    tts,
+    silence_padder,  # After TTS
+    output_logger,
+    transport.output(),
+    context_aggregator.assistant(),
+    audio_buffer,
+
+
+])
+```
+
+The silence_padder is after TTS and before transport.output(), so silence frames should be sent over websocket. The issue might be timing-related in the subprocess—when running with Popen in a detached session, there could be different async scheduling, file descriptor issues affecting websocket I/O, or buffering problems. I'm also wondering if the BOT's turn analyzer needs a specific pattern beyond just silence to trigger end of turn, and I should check the BOT transport setup to see how it's configured.
+
+Looking at the VAD configuration, it has `stop_secs=0.2` (200ms of silence to trigger stop), and the silence padder sends 1000ms of silence in 40ms chunks, which should be sufficient. However, the silence padder uses `asyncio.sleep(self._chunk_ms / 1000.0)` between chunks—40ms sleep—and in a subprocess with different timing characteristics, these sleeps might behave differently. I suspect the issue is in how the silence padder pushes frames and whether they're being properly delivered over the websocket.
+
+The silence padder pushes frames downstream and then the `process_frame` method also calls `await self.push_frame(frame, direction)`, which means both the silence frames and the `TTSStoppedFrame` get pushed in sequence. This flow looks correct, but the websocket might not be sending all audio frames in time, particularly in a subprocess environment where timing is less predictable.
+
+The subprocess is created with `start_new_session=True`, which isolates the process group and session—this could interfere with signal handling and I/O buffering. Looking at the logs more carefully, the BOT outputs a `TranscriptionUpdateFrame` at 09:51:51.149 and then stops, waiting for either more audio or a signal that the user has finished speaking. The EVAL side should receive this transcription and trigger its LLM to generate a response, but I need to verify if the LLM is actually running on that side.
+
+The EVAL logs show it received the transcribed message, yet there's no subsequent LLM output. I suspect the issue is that EVAL's LLM generation is blocked waiting for a `bot-stopped-speaking` signal. The `RTVIMessageFrameAdapter` logic shows that `bot-stopped-speaking` triggers both a `TranscriptionFrame` and `UserStoppedSpeakingFrame`, which would then allow the LLM to proceed with generating the next response.
+
+For the initial exchange, `user_speaks_first` is hardcoded to True, so an `LLMRunFrame()` kicks off EVAL's first generation. The logs confirm EVAL's TTS produced "Hello." which the BOT's STT captured and transcribed to "हेलो।" - but now EVAL appears stuck waiting for the BOT to finish its turn before continuing.
+
+The BOT should respond once its VAD detects the user stopped speaking and generates a `UserStoppedSpeakingFrame` to trigger the LLM. However, the VAD isn't firing, suggesting the silence frames from EVAL's `SilencePadder` either aren't being sent or aren't reaching the BOT with the right timing or pattern to signal end-of-turn. The missing warning log about silence frames being sent indicates they may not be generated at all.
+
+The `eval_logger` might be writing to a different file than the `stderr.log` being reviewed. Rather than relying on VAD detection, I could explicitly send a `UserStoppedSpeakingFrame` from EVAL after TTS completes, though this would require modifying how EVAL signals the BOT. More likely, the silence padding duration is insufficient or the timing breaks down when running as a detached subprocess, so increasing the silence duration could help trigger the VAD properly.</details></think>
+
+---
+
+Looking at this more carefully, the issue is that the **BOT's VAD (Voice Activity Detection) is not detecting that the user stopped speaking**. After the EVAL side's TTS speaks "Hello", the silence frames should trigger the BOT's VAD, but this isn't happening when running as a detached subprocess.
+
+A few things to try:
+
+1. **Increase silence duration** - The current 1000ms might not be enough with subprocess timing differences:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+That's one change. But I also want to add some more debug logging to understand what's happening. Let me also add a log when TTSStoppedFrame is received to confirm the silence padding is being triggered.</details></think>
+
+---
+
+2. **Add more debug logging** to see if silence frames are actually being sent:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also check if there's something we can do on the BOT side to help trigger the VAD. Actually, the BOT is in bot.py and it uses the websocket transport's VAD. Let me check if we can adjust VAD parameters there.
+
+Actually, the issue might also be that when running as a subprocess with file redirection, the event loop's timing might be different, causing the sleep intervals in the silence padder to behave differently.
+
+Let me also reduce the sleep time between silence chunks to send them faster:</details></think>
+
+---
+
+3. **Reduce the sleep time** between silence chunks to send them more quickly:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check the linter:</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. Now let me summarize what I changed and also suggest checking the BOT side's VAD settings.
+
+Actually, I also want to check if there's an issue with the event loop or if we need to yield control differently. But let me first see if these changes help.</details></think>
+
+---
+
+I've made these changes:
+
+1. **Increased silence duration** from 1000ms to 2000ms
+2. **Added debug logs** to confirm TTSStoppedFrame is being received and silence is being sent
+3. **Reduced sleep time** between silence chunks from 40ms to 10ms (to send them faster)
+
+Run it again and check the logs for:
+- `"TTSStoppedFrame received, pushing silence padding"`
+- `"Sending simulated silence frames"` (multiple times)
+- `"Finished pushing silence padding"`
+
+If you **don't see these logs**, it means the TTS isn't completing properly and `TTSStoppedFrame` isn't being generated.
+
+If you **do see them** but the BOT still doesn't respond, the issue is on the BOT side's VAD not detecting the silence. In that case, we might need to also check the BOT's VAD parameters in `bot.py` or send an explicit signal.
+
+Also - can you check both `stdout.log` and `stderr.log`? The `eval_logger` warnings might be going to a different file than where you're looking.
+
+---
+
+_**User**_
+
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [33mRunning command[0m: pense --config /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmpibi6n3ci/output/simulation_config.json --output-dir /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmpibi6n3ci/output
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | --------------------------------
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | Running simulation [93msimulation_persona_1_scenario_1[0m
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mPersona:[0m
+You are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mGender:[0m female
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mLanguage:[0m hindi
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mScenario:[0m
+use very few words to give your answers
+hesitate from giving away the full answer right away
+try to refrain from giving any answer until nudged a few times
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mPort:[0m 8765
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mSTT Config:[0m provider='google'
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mTTS Config:[0m provider='google' instructions=None
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | [93mLLM Config:[0m provider='openrouter' model='google/gemini-3-flash-preview'
+2026-01-16 09:51:45.580 | INFO     | [UNKNOWN-SYS] | --------------------------------
+2026-01-16 09:51:45.580 | DEBUG    | [BOT-SYS] | Loading Silero VAD model...
+2026-01-16 09:51:45.642 | DEBUG    | [BOT-SYS] | Loaded Silero VAD
+2026-01-16 09:51:45.647 | DEBUG    | [BOT-SYS] | Loading Local Smart Turn v3.x model from /Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/pipecat/audio/turn/smart_turn/data/smart-turn-v3.2-cpu.onnx...
+2026-01-16 09:51:45.684 | DEBUG    | [BOT-SYS] | Loaded Local Smart Turn v3.x
+2026-01-16 09:51:45.684 | INFO     | [BOT] | Starting bot
+2026-01-16 09:51:45.792 | DEBUG    | [BOT-SYS] | Creating OpenRouter client with api https://openrouter.ai/api/v1
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking Pipeline#0::Source -> WebsocketServerInputTransport#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking WebsocketServerInputTransport#0 -> RTVIProcessor#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking RTVIProcessor#0 -> InputLogger#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking InputLogger#0 -> FunctionCallResultHandler
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking FunctionCallResultHandler -> GoogleSTTService#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking GoogleSTTService#0 -> UserTranscriptProcessor#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking UserTranscriptProcessor#0 -> LLMUserAggregator#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking LLMUserAggregator#0 -> OpenRouterLLMService#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking OpenRouterLLMService#0 -> GoogleTTSService#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking GoogleTTSService#0 -> MetricsLogger#0
+2026-01-16 09:51:45.818 | DEBUG    | [BOT-SYS] | Linking MetricsLogger#0 -> OutputLogger#0
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Linking OutputLogger#0 -> WebsocketServerOutputTransport#0
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Linking WebsocketServerOutputTransport#0 -> AssistantTranscriptProcessor#0
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Linking AssistantTranscriptProcessor#0 -> LLMAssistantAggregator#0
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Linking LLMAssistantAggregator#0 -> Pipeline#0::Sink
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Linking PipelineTask#0::Source -> Pipeline#0
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Linking Pipeline#0 -> PipelineTask#0::Sink
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Runner PipelineRunner#0 started running PipelineTask#0
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | PipelineTask#0: Starting. Waiting for StartFrame#0 to reach the end of the pipeline...
+2026-01-16 09:51:45.819 | DEBUG    | [BOT-SYS] | Setting VAD params to: confidence=0.7 start_secs=0.2 stop_secs=0.2 min_volume=0.6
+2026-01-16 09:51:45.819 | INFO     | [BOT-SYS] | Starting websocket server on localhost:8765
+2026-01-16 09:51:45.820 | INFO     | [BOT-SYS] | input bot frame: StartFrame#0
+2026-01-16 09:51:45.820 | INFO     | [BOT-SYS] | input bot frame: SpeechControlParamsFrame#0
+2026-01-16 09:51:45.820 | DEBUG    | [BOT-SYS] | Connecting to Google Speech-to-Text
+2026-01-16 09:51:45.820 | WARNING  | [BOT-SYS] | LLMUserAggregator#0: `turn_analyzer` in base input transport is deprecated. Use `LLMUserAggregator`'s new `user_turn_strategies` parameter with `TurnAnalyzerUserTurnStopStrategy` instead:
+
+    context_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            ...,
+            user_turn_strategies=UserTurnStrategies(
+                stop=[
+                    TurnAnalyzerUserTurnStopStrategy(
+                        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams())
+                    )
+                ],
+            )
+        ),
+    )
+2026-01-16 09:51:45.823 | INFO     | [BOT-SYS] | output bot frame: StartFrame#0
+2026-01-16 09:51:45.824 | INFO     | [BOT-SYS] | output bot frame: OutputTransportReadyFrame#0
+2026-01-16 09:51:45.824 | DEBUG    | [BOT-SYS] | PipelineTask#0: StartFrame#0 reached the end of the pipeline, pipeline is now ready.
+2026-01-16 09:51:45.824 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#0(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}], 'processing': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}]}})
+2026-01-16 09:51:45.824 | INFO     | [BOT-SYS] | input bot frame: MetricsFrame#0
+2026-01-16 09:51:45.824 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#0(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}], 'processing': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}]}})
+2026-01-16 09:51:45.825 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, ttfb: 0.0
+2026-01-16 09:51:45.825 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, processing: 0.0
+2026-01-16 09:51:45.825 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, ttfb: 0.0
+2026-01-16 09:51:45.825 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, processing: 0.0
+2026-01-16 09:51:45.825 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, ttfb: 0.0
+2026-01-16 09:51:45.825 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, processing: 0.0
+2026-01-16 09:51:45.825 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#0
+2026-01-16 09:51:45.825 | INFO     | [BOT-SYS] | input bot frame: OutputTransportReadyFrame#0
+2026-01-16 09:51:46.580 | INFO     | [EVAL] | Starting evaluation pipeline
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking Pipeline#2::Source -> WebsocketClientInputTransport#0
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking WebsocketClientInputTransport#0 -> RTVIFunctionCallResponder
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking RTVIFunctionCallResponder -> RTVIMessageFrameAdapter
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking RTVIMessageFrameAdapter -> MetricsLogger
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking MetricsLogger -> STTLogger
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking STTLogger -> UserTranscriptProcessor#1
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking UserTranscriptProcessor#1 -> LLMUserAggregator#1
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking LLMUserAggregator#1 -> OpenAILLMService#0
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking OpenAILLMService#0 -> MaxTurnsEndProcessor
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking MaxTurnsEndProcessor -> GoogleTTSService#1
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking GoogleTTSService#1 -> SilencePadder
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking SilencePadder -> IOLogger#0
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking IOLogger#0 -> WebsocketClientOutputTransport#0
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking WebsocketClientOutputTransport#0 -> LLMAssistantAggregator#1
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking LLMAssistantAggregator#1 -> AudioBufferProcessor#0
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking AudioBufferProcessor#0 -> Pipeline#2::Sink
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking PipelineTask#1::Source -> Pipeline#2
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Linking Pipeline#2 -> PipelineTask#1::Sink
+2026-01-16 09:51:46.631 | DEBUG    | [EVAL-SYS] | Runner PipelineRunner#1 started running PipelineTask#1
+2026-01-16 09:51:46.632 | DEBUG    | [EVAL-SYS] | PipelineTask#1: Starting. Waiting for StartFrame#1 to reach the end of the pipeline...
+2026-01-16 09:51:46.636 | DEBUG    | [EVAL-SYS] | PipelineTask#1: StartFrame#1 reached the end of the pipeline, pipeline is now ready.
+2026-01-16 09:51:46.638 | INFO     | [BOT-SYS] | New client connection from ('::1', 53603, 0, 0)
+2026-01-16 09:51:46.638 | INFO     | [BOT] | Client connected
+2026-01-16 09:51:46.639 | INFO     | [EVAL] | WebSocket connected
+2026-01-16 09:51:46.639 | DEBUG    | [EVAL-SYS] | 🧠 → OpenAILLMService#0 LLM CONTEXT FRAME: [{'role': 'system', 'content': "You are a user speaking to an agent. This is your persona:\n\nYou are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;\n\nYour gender is female.\n\nThe following scenario will be played out: use very few words to give your answers\nhesitate from giving away the full answer right away\ntry to refrain from giving any answer until nudged a few times. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in hindi. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system..\n\nBegin the conversation by saying 'Hello' to the agent."}] at 0.01s
+2026-01-16 09:51:46.640 | DEBUG    | [EVAL-SYS] | OpenAILLMService#0: Generating chat from universal context [{'role': 'system', 'content': "You are a user speaking to an agent. This is your persona:\n\nYou are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;\n\nYour gender is female.\n\nThe following scenario will be played out: use very few words to give your answers\nhesitate from giving away the full answer right away\ntry to refrain from giving any answer until nudged a few times. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in hindi. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system..\n\nBegin the conversation by saying 'Hello' to the agent."}]
+2026-01-16 09:51:46.743 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM START RESPONSE at 0.01s
+2026-01-16 09:51:47.678 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM GENERATING: 'Hello' at 1.05s
+2026-01-16 09:51:47.678 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM GENERATING: '.' at 1.05s
+2026-01-16 09:51:47.684 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM END RESPONSE at 1.05s
+2026-01-16 09:51:47.684 | DEBUG    | [EVAL-SYS] | GoogleTTSService#1: Generating TTS [Hello.]
+2026-01-16 09:51:48.136 | DEBUG    | [EVAL-SYS] | Bot started speaking
+2026-01-16 09:51:48.143 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#0(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.144 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.144 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#0(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.144 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.152 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.179 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#4(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.180 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#4(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.193 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.219 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#7(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.220 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#7(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.234 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.259 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#10(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.259 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#10(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.276 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.299 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#13(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.300 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#13(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.317 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.340 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#16(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.340 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#16(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.358 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.379 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#19(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.380 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#19(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.399 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.419 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#22(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.419 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#22(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.440 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.459 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#25(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.459 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#25(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.481 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.499 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#28(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.499 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#28(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.522 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.540 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#31(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.540 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#31(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.563 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.579 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#34(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.580 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#34(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.605 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.619 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#37(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.620 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#37(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.645 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.658 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#40(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.659 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#40(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.686 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.699 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#43(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.700 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#43(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.727 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.738 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#46(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.739 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#46(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.767 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.779 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#49(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.779 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#49(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.809 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.819 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#52(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.819 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#52(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.849 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.859 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#55(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.859 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#55(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.891 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.899 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#58(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.899 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#58(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.932 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.939 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#61(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.939 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#61(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.973 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:48.979 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#64(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:48.979 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#64(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.014 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:49.019 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#67(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.019 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#67(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.054 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:49.059 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#70(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.059 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#70(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.095 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:49.099 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#73(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.099 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#73(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.136 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 09:51:49.138 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#76(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.139 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#76(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.177 | INFO     | [EVAL-SYS] | [94m[User][0m: Hello.[0m
+2026-01-16 09:51:49.179 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#77(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.180 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#77(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.219 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#78(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.219 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#78(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.259 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#79(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.259 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#79(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.299 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#80(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.299 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#80(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.339 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#81(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.340 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#81(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.378 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#82(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.379 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#82(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.418 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#83(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.419 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#83(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.459 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#84(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.460 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#84(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.499 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#85(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.500 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#85(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.539 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#86(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.539 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#86(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.579 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#87(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.579 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#87(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 09:51:49.969 | DEBUG    | [EVAL-SYS] | Bot stopped speaking
+2026-01-16 09:51:49.970 | INFO     | [EVAL] | Audio data received - user
+2026-01-16 09:51:49.970 | INFO     | [EVAL] | [user] turn index: 0
+2026-01-16 09:51:49.971 | INFO     | [EVAL-SYS] | [92mCreating new audio file at /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmpibi6n3ci/output/simulation_persona_1_scenario_1/audios/0_user.wav[0m
+2026-01-16 09:51:51.146 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 processing time: 1.567255973815918
+2026-01-16 09:51:51.147 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#1(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:21:51.146+00:00', 'final': True}})
+2026-01-16 09:51:51.147 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#2(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.567255973815918}]}})
+2026-01-16 09:51:51.147 | INFO     | [BOT] | Bot transcript:[2026-01-16T04:21:51.146+00:00] user: हेलो।
+2026-01-16 09:51:51.148 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#1, processing: 1.567255973815918
+2026-01-16 09:51:51.148 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#1
+2026-01-16 09:51:51.148 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#1(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:21:51.146+00:00', 'final': True}})
+2026-01-16 09:51:51.148 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#2(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.567255973815918}]}})
+2026-01-16 09:51:51.149 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#0(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:21:51.146+00:00', 'final': True}})
+2026-01-16 09:51:51.149 | INFO     | [EVAL-SYS] | [94m[User (as transcribed by the agent)][0m: हेलो।
+2026-01-16 09:51:51.149 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#1(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.567255973815918}]}})
+2026-01-16 09:51:51.149 | INFO     | [BOT-SYS] | output bot frame: TranscriptionUpdateFrame#0(pts: None, messages: 1)
+2026-01-16 09:51:59.855 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 Stream aborted due to inactivity (no audio input). Reconnecting automatically...
+2026-01-16 09:51:59.858 | ERROR    | [BOT-SYS] | GoogleSTTService#0 exception (/Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/google/api_core/grpc_helpers_async.py:110): Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"
+value: "\010\n\022\007generic\0329Stream timed out after receiving no more client requests.*D\013\020\206\326\215'\032;\0229Stream timed out after receiving no more client requests.\014"
+]
+2026-01-16 09:51:59.859 | INFO     | [BOT-SYS] | input bot frame: ErrorFrame#0(error: Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"
+value: "\010\n\022\007generic\0329Stream timed out after receiving no more client requests.*D\013\020\206\326\215'\032;\0229Stream timed out after receiving no more client requests.\014"
+], fatal: False)
+2026-01-16 09:51:59.860 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#3(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"\nvalue: "\\010\\n\\022\\007generic\\0329Stream timed out after receiving no more client requests.*D\\013\\020\\206\\326\\215\'\\032;\\0229Stream timed out after receiving no more client requests.\\014"\n]', 'fatal': False}})
+2026-01-16 09:51:59.860 | WARNING  | [BOT-SYS] | PipelineTask#0: Something went wrong: ErrorFrame#0(error: Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"
+value: "\010\n\022\007generic\0329Stream timed out after receiving no more client requests.*D\013\020\206\326\215'\032;\0229Stream timed out after receiving no more client requests.\014"
+], fatal: False)
+2026-01-16 09:51:59.861 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#3(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"\nvalue: "\\010\\n\\022\\007generic\\0329Stream timed out after receiving no more client requests.*D\\013\\020\\206\\326\\215\'\\032;\\0229Stream timed out after receiving no more client requests.\\014"\n]', 'fatal': False}})
+2026-01-16 09:51:59.862 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#2(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"\nvalue: "\\010\\n\\022\\007generic\\0329Stream timed out after receiving no more client requests.*D\\013\\020\\206\\326\\215\'\\032;\\0229Stream timed out after receiving no more client requests.\\014"\n]', 'fatal': False}})
+2026-01-16 09:56:45.819 | WARNING  | [BOT-SYS] | Idle timeout detected.
+2026-01-16 09:56:48.538 | WARNING  | [EVAL-SYS] | Idle timeout detected.
+
+
+full logs - you can see silence frames being sent
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+Now I can see the full picture. Looking at the logs:
+
+1. EVAL's TTS generates "Hello." and sends audio frames to BOT
+2. Silence frames ARE being sent (`[EVAL] | Sending simulated silence frames` - 25+ times)
+3. BOT receives all the audio frames (OutputAudioRawFrame#0 through #87)
+4. BOT's STT transcribes "हेलो।" at 09:51:51.147
+5. Then there's a 9-second gap until Google STT times out at 09:51:59.855
+
+The key issue is clear now: **The BOT's VAD is NOT detecting that the user stopped speaking**. Even though silence frames are being sent, the BOT's VAD/turn analyzer is not triggering `UserStoppedSpeakingFrame`.
+
+Looking at the BOT pipeline:
+```
+WebsocketServerInputTransport#0 -> RTVIProcessor#0 -> ... -> GoogleSTTService#0 -> ... -> LLMUserAggregator#0 -> OpenRouterLLMService#0
+```
+
+The `WebsocketServerInputTransport` has:
+- `vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2))`
+- `turn_analyzer=LocalSmartTurnAnalyzerV3()`
+
+But I notice something in the logs - there's NO `UserStartedSpeakingFrame` or `UserStoppedSpeakingFrame` being logged from the BOT side! The VAD should be emitting these frames when it detects voice activity and silence.
+
+Wait, looking at the logs more carefully:
+- The BOT receives `OutputAudioRawFrame` frames from the EVAL side
+- But these are OUTPUT frames, not INPUT frames
+
+The issue might be that the BOT's transport is receiving `OutputAudioRawFrame` but the VAD might be looking for `InputAudioRawFrame` or the frames aren't being routed to the VAD properly.
+
+
+There's a mismatch in the frame types being received. The transport is getting `OutputAudioRawFrame` when it should be processing `InputAudioRawFrame` for VAD analysis. The log notation "input bot frame: OutputAudioRawFrame" suggests the frames aren't being properly converted or routed through the VAD pipeline, which would explain why no voice activity detection events are being triggered despite the audio data arriving.
+
+The critical issue is that after silence frames are sent following the speech, the VAD isn't emitting a `UserStoppedSpeakingFrame`. The sequence shows TTS audio coming through, then 25+ silence frames (~1 second), then Google STT produces a transcription—but the VAD never signals the end of speech. This suggests the VAD either isn't receiving the audio in the right format, isn't processing it correctly, or the silence detection threshold isn't being met.
+
+Looking at the timeline more carefully, the EVAL side logs "Bot stopped speaking" after sending silence, and the BOT's STT transcribes about 2 seconds later (normal latency). But then there's a 9-second gap with no VAD activity before Google STT times out. The websocket transport or VAD configuration might be preventing proper silence detection.
+
+I suspect the issue is in how the VAD analyzer processes incoming audio. The transport is configured with `SileroVADAnalyzer` and a 0.2-second stop threshold, which should detect when speech ends. But if the silence frames being sent aren't being recognized as actual silence—perhaps due to how they're being encoded or buffered—the VAD won't trigger the end-of-speech event that would normally prompt a response.
+
+The `min_volume=0.6` parameter could be particularly problematic here. If the audio stream doesn't meet this volume threshold, the VAD might never classify it as speech to begin with, meaning it can't detect when that speech stops. This would explain why the bot stays silent even though the audio is being processed elsewhere in the pipeline.
+
+The turn analyzer configuration seems relevant too. The deprecation warning about `turn_analyzer` in the base input transport suggests the system might not be properly detecting conversation boundaries. When running through Popen, there could be timing issues or configuration mismatches that prevent the analyzer from recognizing when the user's turn has ended, keeping the bot in a waiting state.
+
+A potential solution is to have the evaluation side explicitly signal the end of speech using the `user-stopped-speaking` message type in the RTVI protocol, rather than relying solely on VAD detection. This would give the bot a clear indication that the simulated user has finished speaking.</details></think>
+
+---
+
+Now I can see the full picture. The silence frames ARE being sent (25+ of them), and the BOT receives all the audio frames. The BOT's STT transcribes "हेलो।" correctly. But then **the BOT's VAD never triggers `UserStoppedSpeakingFrame`** - there's no such frame in the logs.
+
+The issue is that the BOT's VAD/turn analyzer isn't detecting the end of speech from the silence frames. This works in CLI but not in subprocess - likely a timing issue.
+
+**Solution**: Instead of relying on the BOT's VAD, send an explicit `user-stopped-speaking` RTVI message from the EVAL side after the silence frames:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to make sure `OutputTransportMessageUrgentFrame` is imported. Let me check the imports.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "from pipecat.frames.frames import",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "from pipecat.frames.frames import",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "pense/agent/run_simulation.py",
+              "matches": [
+                {
+                  "lineNumber": 51,
+                  "content": "from pipecat.frames.frames import ("
+                }
+              ]
+            }
+          ],
+          "totalLines": 1,
+          "totalMatchedLines": 1
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me read the imports to see if `OutputTransportMessageUrgentFrame` is already imported:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, `OutputTransportMessageUrgentFrame` is already imported. Let me check for linter errors:</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No linter errors. The change adds an explicit `user-stopped-speaking` RTVI message after the silence frames. This should tell the BOT's transport that the user has stopped speaking, which should trigger the LLM to generate a response.
+
+However, I should check if the BOT's transport actually handles this message and triggers the LLM. Let me check the bot.py or the RTVI processor to see how it handles incoming RTVI messages.
+
+Actually, looking at the pipecat architecture, the `user-stopped-speaking` message would need to be handled by the BOT's transport or RTVI processor to generate a `UserStoppedSpeakingFrame` that triggers the LLM aggregator.
+
+The BOT side uses `WebsocketServerTransport` with `RTVIProcessor`. The RTVI processor should handle the `user-stopped-speaking` message and generate the appropriate frame.
+
+Let me check if this will work...
+
+Actually, I realize there might be an issue. The `user-stopped-speaking` message is typically sent FROM the BOT to the client to indicate when the BOT (as perceived by the user) has stopped speaking. In this case, we want to signal to the BOT that the user (EVAL's simulated user) has stopped speaking.
+
+Looking at the RTVI protocol, the client can send messages to the server. But I need to check if the BOT's RTVI processor handles a `user-stopped-speaking` message from the client.
+
+Actually, looking at the logs more carefully:
+```
+2026-01-16 09:51:49.969 | DEBUG    | [EVAL-SYS] | Bot stopped speaking
+```
+
+This is logged by the EVAL side, indicating that from EVAL's perspective, the "bot" (which is the simulated user in this context) stopped speaking. But this doesn't trigger anything on the BOT side.
+
+The issue is that the BOT's VAD needs to detect end of speech. The `user-stopped-speaking` message I'm sending would go to the BOT via websocket, but the RTVI processor might not handle it the way we need.
+
+
+I could try sending a `UserStoppedSpeakingFrame` directly through the websocket if the transport supports it, though that might not work either. Alternatively, I could adjust the BOT's VAD sensitivity to better detect silence, or modify the silence frames to include low-level noise instead of pure zeros for more realistic speech detection. For now, I'll test the explicit message approach and see if the RTVI processor generates the necessary frame to trigger the LLM.
+
+If this doesn't work, I'll need to check whether the bot side handles incoming RTVI messages and potentially modify it to process the `user-stopped-speaking` message explicitly. Let me start with this approach and iterate from there if needed.</details></think>
+
+---
+
+Good, `OutputTransportMessageUrgentFrame` is already imported. The change adds an explicit `user-stopped-speaking` RTVI message after the silence frames, which should tell the BOT that the user has stopped speaking and trigger the LLM.
+
+Try running it again. You should see in the logs:
+- `"Sending explicit user-stopped-speaking signal"`
+- Then the BOT should receive this message and trigger its LLM
+
+If this still doesn't work, the BOT's RTVI processor might not be handling the incoming `user-stopped-speaking` message. In that case, we'd need to modify the BOT side to handle it. Let me know what happens.
+
+---
+
+_**User**_
+
+okay now one simulation worked fine but the next simulation run got stuck
+
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [33mRunning command[0m: pense --config /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmp9gqr01mh/output/simulation_config.json --output-dir /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmp9gqr01mh/output
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | --------------------------------
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | Running simulation [93msimulation_persona_1_scenario_2[0m
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mPersona:[0m
+You are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mGender:[0m female
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mLanguage:[0m hindi
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mScenario:[0m
+answer all the questions and complete the form, don't ask any further questions after the form is filled
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mPort:[0m 8768
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mSTT Config:[0m provider='google'
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mTTS Config:[0m provider='google' instructions=None
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | [93mLLM Config:[0m provider='openrouter' model='google/gemini-3-flash-preview'
+2026-01-16 10:02:01.182 | INFO     | [UNKNOWN-SYS] | --------------------------------
+2026-01-16 10:02:01.183 | DEBUG    | [BOT-SYS] | Loading Silero VAD model...
+2026-01-16 10:02:01.230 | DEBUG    | [BOT-SYS] | Loaded Silero VAD
+2026-01-16 10:02:01.230 | DEBUG    | [BOT-SYS] | Loading Local Smart Turn v3.x model from /Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/pipecat/audio/turn/smart_turn/data/smart-turn-v3.2-cpu.onnx...
+2026-01-16 10:02:01.259 | DEBUG    | [BOT-SYS] | Loaded Local Smart Turn v3.x
+2026-01-16 10:02:01.260 | INFO     | [BOT] | Starting bot
+2026-01-16 10:02:01.352 | DEBUG    | [BOT-SYS] | Creating OpenRouter client with api https://openrouter.ai/api/v1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking Pipeline#4::Source -> WebsocketServerInputTransport#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking WebsocketServerInputTransport#1 -> RTVIProcessor#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking RTVIProcessor#1 -> InputLogger#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking InputLogger#1 -> FunctionCallResultHandler
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking FunctionCallResultHandler -> GoogleSTTService#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking GoogleSTTService#1 -> UserTranscriptProcessor#2
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking UserTranscriptProcessor#2 -> LLMUserAggregator#2
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking LLMUserAggregator#2 -> OpenRouterLLMService#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking OpenRouterLLMService#1 -> GoogleTTSService#2
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking GoogleTTSService#2 -> MetricsLogger#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking MetricsLogger#1 -> OutputLogger#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking OutputLogger#1 -> WebsocketServerOutputTransport#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking WebsocketServerOutputTransport#1 -> AssistantTranscriptProcessor#1
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking AssistantTranscriptProcessor#1 -> LLMAssistantAggregator#2
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking LLMAssistantAggregator#2 -> Pipeline#4::Sink
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking PipelineTask#2::Source -> Pipeline#4
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Linking Pipeline#4 -> PipelineTask#2::Sink
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Runner PipelineRunner#2 started running PipelineTask#2
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | PipelineTask#2: Starting. Waiting for StartFrame#2 to reach the end of the pipeline...
+2026-01-16 10:02:01.357 | DEBUG    | [BOT-SYS] | Setting VAD params to: confidence=0.7 start_secs=0.2 stop_secs=0.2 min_volume=0.6
+2026-01-16 10:02:01.358 | INFO     | [BOT-SYS] | Starting websocket server on localhost:8768
+2026-01-16 10:02:01.358 | INFO     | [BOT-SYS] | input bot frame: StartFrame#2
+2026-01-16 10:02:01.358 | INFO     | [BOT-SYS] | input bot frame: SpeechControlParamsFrame#2
+2026-01-16 10:02:01.358 | DEBUG    | [BOT-SYS] | Connecting to Google Speech-to-Text
+2026-01-16 10:02:01.358 | WARNING  | [BOT-SYS] | LLMUserAggregator#2: `turn_analyzer` in base input transport is deprecated. Use `LLMUserAggregator`'s new `user_turn_strategies` parameter with `TurnAnalyzerUserTurnStopStrategy` instead:
+
+    context_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            ...,
+            user_turn_strategies=UserTurnStrategies(
+                stop=[
+                    TurnAnalyzerUserTurnStopStrategy(
+                        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams())
+                    )
+                ],
+            )
+        ),
+    )
+2026-01-16 10:02:01.359 | INFO     | [BOT-SYS] | output bot frame: StartFrame#2
+2026-01-16 10:02:01.359 | INFO     | [BOT-SYS] | output bot frame: OutputTransportReadyFrame#2
+2026-01-16 10:02:01.359 | DEBUG    | [BOT-SYS] | PipelineTask#2: StartFrame#2 reached the end of the pipeline, pipeline is now ready.
+2026-01-16 10:02:01.359 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#109(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#1', 'value': 0.0}, {'processor': 'OpenRouterLLMService#1', 'value': 0.0}, {'processor': 'GoogleTTSService#2', 'value': 0.0}], 'processing': [{'processor': 'GoogleSTTService#1', 'value': 0.0}, {'processor': 'OpenRouterLLMService#1', 'value': 0.0}, {'processor': 'GoogleTTSService#2', 'value': 0.0}]}})
+2026-01-16 10:02:01.359 | INFO     | [BOT-SYS] | input bot frame: MetricsFrame#37
+2026-01-16 10:02:01.360 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#109(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#1', 'value': 0.0}, {'processor': 'OpenRouterLLMService#1', 'value': 0.0}, {'processor': 'GoogleTTSService#2', 'value': 0.0}], 'processing': [{'processor': 'GoogleSTTService#1', 'value': 0.0}, {'processor': 'OpenRouterLLMService#1', 'value': 0.0}, {'processor': 'GoogleTTSService#2', 'value': 0.0}]}})
+2026-01-16 10:02:01.360 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#37, ttfb: 0.0
+2026-01-16 10:02:01.360 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#37, processing: 0.0
+2026-01-16 10:02:01.360 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#37, ttfb: 0.0
+2026-01-16 10:02:01.360 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#37, processing: 0.0
+2026-01-16 10:02:01.360 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#37, ttfb: 0.0
+2026-01-16 10:02:01.360 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#37, processing: 0.0
+2026-01-16 10:02:01.360 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#37
+2026-01-16 10:02:01.360 | INFO     | [BOT-SYS] | input bot frame: OutputTransportReadyFrame#2
+2026-01-16 10:02:02.183 | INFO     | [EVAL] | Starting evaluation pipeline
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking Pipeline#6::Source -> WebsocketClientInputTransport#1
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking WebsocketClientInputTransport#1 -> RTVIFunctionCallResponder
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking RTVIFunctionCallResponder -> RTVIMessageFrameAdapter
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking RTVIMessageFrameAdapter -> MetricsLogger
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking MetricsLogger -> STTLogger
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking STTLogger -> UserTranscriptProcessor#3
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking UserTranscriptProcessor#3 -> LLMUserAggregator#3
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking LLMUserAggregator#3 -> OpenAILLMService#1
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking OpenAILLMService#1 -> MaxTurnsEndProcessor
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking MaxTurnsEndProcessor -> GoogleTTSService#3
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking GoogleTTSService#3 -> SilencePadder
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking SilencePadder -> IOLogger#1
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking IOLogger#1 -> WebsocketClientOutputTransport#1
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking WebsocketClientOutputTransport#1 -> LLMAssistantAggregator#3
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking LLMAssistantAggregator#3 -> AudioBufferProcessor#1
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking AudioBufferProcessor#1 -> Pipeline#6::Sink
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking PipelineTask#3::Source -> Pipeline#6
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Linking Pipeline#6 -> PipelineTask#3::Sink
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | Runner PipelineRunner#3 started running PipelineTask#3
+2026-01-16 10:02:02.240 | DEBUG    | [EVAL-SYS] | PipelineTask#3: Starting. Waiting for StartFrame#3 to reach the end of the pipeline...
+2026-01-16 10:02:02.242 | DEBUG    | [EVAL-SYS] | PipelineTask#3: StartFrame#3 reached the end of the pipeline, pipeline is now ready.
+2026-01-16 10:02:02.242 | INFO     | [BOT-SYS] | New client connection from ('::1', 57950, 0, 0)
+2026-01-16 10:02:02.242 | INFO     | [BOT] | Client connected
+2026-01-16 10:02:02.243 | INFO     | [EVAL] | WebSocket connected
+2026-01-16 10:02:02.243 | DEBUG    | [EVAL-SYS] | 🧠 → OpenAILLMService#1 LLM CONTEXT FRAME: [{'role': 'system', 'content': "You are a user speaking to an agent. This is your persona:\n\nYou are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;\n\nYour gender is female.\n\nThe following scenario will be played out: answer all the questions and complete the form, don't ask any further questions after the form is filled. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in hindi. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system..\n\nBegin the conversation by saying 'Hello' to the agent."}] at 0.00s
+2026-01-16 10:02:02.243 | DEBUG    | [EVAL-SYS] | OpenAILLMService#1: Generating chat from universal context [{'role': 'system', 'content': "You are a user speaking to an agent. This is your persona:\n\nYou are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;\n\nYour gender is female.\n\nThe following scenario will be played out: answer all the questions and complete the form, don't ask any further questions after the form is filled. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in hindi. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system..\n\nBegin the conversation by saying 'Hello' to the agent."}]
+2026-01-16 10:02:02.243 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#1 → LLM START RESPONSE at 0.00s
+2026-01-16 10:02:03.336 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#1 → LLM GENERATING: 'Hello' at 1.10s
+2026-01-16 10:02:03.336 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#1 → LLM GENERATING: '.' at 1.10s
+2026-01-16 10:02:03.346 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#1 → LLM END RESPONSE at 1.11s
+2026-01-16 10:02:03.347 | DEBUG    | [EVAL-SYS] | GoogleTTSService#3: Generating TTS [Hello.]
+2026-01-16 10:02:03.805 | DEBUG    | [EVAL-SYS] | Bot started speaking
+2026-01-16 10:02:03.808 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1137(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.809 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1137(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.809 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1138(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.809 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1138(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.834 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:03.848 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1141(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.849 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1141(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.875 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:03.888 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1144(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.888 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1144(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.916 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:03.928 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1147(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.928 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1147(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.958 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:03.969 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1150(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.969 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1150(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:03.998 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.009 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1153(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.009 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1153(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.039 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.048 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1156(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.049 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1156(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.081 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.088 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1159(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.088 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1159(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.122 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.127 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1162(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.128 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1162(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.163 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.167 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1165(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.168 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1165(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.204 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.207 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1168(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.208 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1168(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.245 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.247 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1171(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.248 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1171(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.286 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.287 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1174(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.288 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1174(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.327 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.328 | DEBUG    | [BOT-SYS] | User started speaking
+2026-01-16 10:02:04.328 | DEBUG    | [BOT-SYS] | PipelineTask#2: received interruption task frame InterruptionTaskFrame#8
+2026-01-16 10:02:04.329 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#110(message: {'label': 'rtvi-ai', 'type': 'user-started-speaking'})
+2026-01-16 10:02:04.329 | INFO     | [BOT-SYS] | input bot frame: VADUserStartedSpeakingFrame#4
+2026-01-16 10:02:04.329 | INFO     | [BOT-SYS] | input bot frame: UserStartedSpeakingFrame#18
+2026-01-16 10:02:04.330 | DEBUG    | [BOT-SYS] | LLMUserAggregator#2: User started speaking (strategy: ExternalUserTurnStartStrategy#1)
+2026-01-16 10:02:04.330 | INFO     | [BOT-SYS] | input bot frame: InterruptionFrame#8
+2026-01-16 10:02:04.330 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#126
+2026-01-16 10:02:04.330 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1176(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.330 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#110(message: {'label': 'rtvi-ai', 'type': 'user-started-speaking'})
+2026-01-16 10:02:04.330 | INFO     | [BOT-SYS] | output bot frame: VADUserStartedSpeakingFrame#4
+2026-01-16 10:02:04.330 | INFO     | [BOT-SYS] | output bot frame: UserStartedSpeakingFrame#18
+2026-01-16 10:02:04.331 | DEBUG    | [BOT-SYS] | GoogleSTTService#1 TTFB: 0.04317808151245117
+2026-01-16 10:02:04.331 | DEBUG    | [BOT-SYS] | GoogleSTTService#1 processing time: 0.0432279109954834
+2026-01-16 10:02:04.331 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#108(message: {'label': 'rtvi-ai', 'type': 'user-started-speaking'})
+2026-01-16 10:02:04.331 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#111(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#1', 'value': 0.04317808151245117}]}})
+2026-01-16 10:02:04.331 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#112(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#1', 'value': 0.0432279109954834}]}})
+2026-01-16 10:02:04.332 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#38, ttfb: 0.04317808151245117
+2026-01-16 10:02:04.332 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#39, processing: 0.0432279109954834
+2026-01-16 10:02:04.332 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#38
+2026-01-16 10:02:04.332 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#39
+2026-01-16 10:02:04.333 | INFO     | [BOT-SYS] | output bot frame: InterruptionFrame#8
+2026-01-16 10:02:04.333 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#126
+2026-01-16 10:02:04.333 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1176(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.333 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#111(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#1', 'value': 0.04317808151245117}]}})
+2026-01-16 10:02:04.333 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#112(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#1', 'value': 0.0432279109954834}]}})
+2026-01-16 10:02:04.334 | WARNING  | [BOT-SYS] | Frame type <class 'pipecat.frames.frames.InterruptionFrame'> is not serializable
+2026-01-16 10:02:04.334 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#109(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#1', 'value': 0.04317808151245117}]}})
+2026-01-16 10:02:04.334 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#110(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#1', 'value': 0.0432279109954834}]}})
+2026-01-16 10:02:04.367 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.368 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#128
+2026-01-16 10:02:04.368 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1178(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.368 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#128
+2026-01-16 10:02:04.368 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1178(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.407 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#130
+2026-01-16 10:02:04.408 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1181(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.408 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.408 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#130
+2026-01-16 10:02:04.408 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1181(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.448 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.448 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#132
+2026-01-16 10:02:04.448 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1184(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.449 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#132
+2026-01-16 10:02:04.449 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1184(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.488 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#134
+2026-01-16 10:02:04.488 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1187(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.488 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.488 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#134
+2026-01-16 10:02:04.488 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1187(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.528 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.528 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#136
+2026-01-16 10:02:04.528 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1190(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.529 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#136
+2026-01-16 10:02:04.529 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1190(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.568 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#138
+2026-01-16 10:02:04.568 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1193(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.568 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.569 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#138
+2026-01-16 10:02:04.569 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1193(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.608 | INFO     | [BOT-SYS] | input bot frame: VADUserStoppedSpeakingFrame#4
+2026-01-16 10:02:04.609 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.609 | INFO     | [BOT-SYS] | output bot frame: VADUserStoppedSpeakingFrame#4
+2026-01-16 10:02:04.649 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.653 | DEBUG    | [BOT-SYS] | End of Turn result: EndOfTurnState.INCOMPLETE
+2026-01-16 10:02:04.653 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#113(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {}})
+2026-01-16 10:02:04.653 | INFO     | [BOT-SYS] | input bot frame: MetricsFrame#40
+2026-01-16 10:02:04.653 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1196(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.654 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1199(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.654 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#113(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {}})
+2026-01-16 10:02:04.654 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#40
+2026-01-16 10:02:04.654 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1196(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.655 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#111(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {}})
+2026-01-16 10:02:04.655 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1199(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.687 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1202(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.687 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1202(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.690 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.728 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1205(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.728 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1205(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.730 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.767 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1208(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.767 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1208(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.770 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.808 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1211(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.808 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1211(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.811 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:02:04.848 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1214(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.849 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1214(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.851 | WARNING  | [EVAL] | Sending explicit user-stopped-speaking signal
+2026-01-16 10:02:04.851 | INFO     | [EVAL-SYS] | [94m[User][0m: Hello.[0m
+2026-01-16 10:02:04.852 | DEBUG    | [BOT-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#112(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking', 'id': '3a3e2eef-0a2d-4dc9-967f-636a18512be7'})
+2026-01-16 10:02:04.852 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#115(message: {'label': 'rtvi-ai', 'type': 'error-response', 'id': '3a3e2eef-0a2d-4dc9-967f-636a18512be7', 'data': {'error': 'Unsupported type user-stopped-speaking'}})
+2026-01-16 10:02:04.852 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#115(message: {'label': 'rtvi-ai', 'type': 'error-response', 'id': '3a3e2eef-0a2d-4dc9-967f-636a18512be7', 'data': {'error': 'Unsupported type user-stopped-speaking'}})
+2026-01-16 10:02:04.853 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#113(message: {'label': 'rtvi-ai', 'type': 'error-response', 'id': '3a3e2eef-0a2d-4dc9-967f-636a18512be7', 'data': {'error': 'Unsupported type user-stopped-speaking'}})
+2026-01-16 10:02:04.888 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1215(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.888 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1215(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.928 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1216(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.929 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1216(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.968 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1217(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:04.969 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1217(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.009 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1218(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.009 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1218(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.050 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1219(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.051 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1219(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.092 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1220(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.093 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1220(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.128 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1221(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.129 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1221(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.168 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1222(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.169 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1222(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.208 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1223(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.209 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1223(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.248 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1224(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.248 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1224(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.288 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1225(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.289 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1225(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.328 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1226(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.329 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1226(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.367 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1227(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.368 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1227(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.408 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1228(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.409 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1228(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.448 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1229(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.449 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1229(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.489 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1230(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.489 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1230(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.527 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1231(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.528 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1231(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.568 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1232(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.569 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1232(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:02:05.959 | DEBUG    | [EVAL-SYS] | Bot stopped speaking
+2026-01-16 10:02:05.959 | INFO     | [EVAL] | Audio data received - user
+2026-01-16 10:02:05.959 | INFO     | [EVAL] | [user] turn index: 0
+2026-01-16 10:02:05.959 | INFO     | [EVAL-SYS] | [92mCreating new audio file at /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmp9gqr01mh/output/simulation_persona_1_scenario_2/audios/0_user.wav[0m
+2026-01-16 10:02:06.069 | WARNING  | [BOT-SYS] | Forcing VAD user stopped speaking due to timeout receiving audio frame!
+2026-01-16 10:02:06.069 | DEBUG    | [BOT-SYS] | User stopped speaking
+2026-01-16 10:02:06.069 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#116(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:06.070 | INFO     | [BOT-SYS] | input bot frame: UserStoppedSpeakingFrame#18
+2026-01-16 10:02:06.070 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#116(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:06.070 | INFO     | [BOT-SYS] | output bot frame: UserStoppedSpeakingFrame#18
+2026-01-16 10:02:06.071 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#114(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:09.610 | DEBUG    | [BOT-SYS] | LLMUserAggregator#2: User stopped speaking (strategy: None)
+2026-01-16 10:02:09.612 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#117(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:09.613 | INFO     | [BOT-SYS] | input bot frame: UserStoppedSpeakingFrame#21
+2026-01-16 10:02:09.613 | INFO     | [BOT-SYS] | output bot frame: UserStoppedSpeakingFrame#20
+2026-01-16 10:02:09.613 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#117(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:09.614 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#115(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:15.844 | DEBUG    | [BOT-SYS] | GoogleSTTService#1 Stream aborted due to inactivity (no audio input). Reconnecting automatically...
+2026-01-16 10:02:15.846 | ERROR    | [BOT-SYS] | GoogleSTTService#1 exception (/Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/google/api_core/grpc_helpers_async.py:110): Unknown error occurred: 409 Stream timed out after receiving no more client requests.
+2026-01-16 10:02:15.846 | INFO     | [BOT-SYS] | input bot frame: ErrorFrame#2(error: Unknown error occurred: 409 Stream timed out after receiving no more client requests., fatal: False)
+2026-01-16 10:02:15.847 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#118(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving no more client requests.', 'fatal': False}})
+2026-01-16 10:02:15.847 | WARNING  | [BOT-SYS] | PipelineTask#2: Something went wrong: ErrorFrame#2(error: Unknown error occurred: 409 Stream timed out after receiving no more client requests., fatal: False)
+2026-01-16 10:02:15.847 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#118(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving no more client requests.', 'fatal': False}})
+2026-01-16 10:02:15.848 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#116(message: {'label': 'rtvi-ai', 'type': 'error', 'data': {'error': 'Unknown error occurred: 409 Stream timed out after receiving no more client requests.', 'fatal': False}})
+
+
+-- logs from that run
+
+why is that happening? If one simulation is working fine, the next simulation should be treated as basically a restart right?
+
+
+def _parse_simulation_directory(
+    sim_dir: Path,
+    output_dir: Path,
+    s3_bucket: str,
+    s3_prefix: str,
+    uploaded_audio_files: set,
+) -> Optional[Dict[str, Any]]:
+    """
+    Parse a single simulation directory and upload its audio files to S3.
+
+    Args:
+        sim_dir: Path to the simulation directory
+        output_dir: Base output directory
+        s3_bucket: S3 bucket name
+        s3_prefix: S3 key prefix for uploading results
+        uploaded_audio_files: Set to track uploaded audio files (modified in place)
+
+    Returns:
+        Dict with simulation result data, or None if parsing failed
+    """
+    s3 = get_s3_client()
+    sim_name = sim_dir.name
+    eval_results_file = sim_dir / "evaluation_results.csv"
+    transcript_file = sim_dir / "transcript.json"
+    config_file = sim_dir / "config.json"
+    audios_dir = sim_dir / "audios"
+
+    eval_results = []
+    if eval_results_file.exists():
+        import csv
+
+        with open(eval_results_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                eval_results.append(
+                    {
+                        "name": row.get("name"),
+                        "value": row.get("value"),
+                        "reasoning": row.get("reasoning", ""),
+                    }
+                )
+
+    # Parse transcript.json if it exists
+    transcript = None
+    if transcript_file.exists():
+        try:
+            with open(transcript_file, "r", encoding="utf-8") as f:
+                transcript = json.load(f)
+        except Exception as e:
+            logger.warning(f"Failed to parse transcript.json for {sim_name}: {e}")
+
+    # Parse config.json to get persona and scenario data
+    persona_data = None
+    scenario_data = None
+    if config_file.exists():
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+                persona_data = config_data.get("persona")
+                scenario_data = config_data.get("scenario")
+        except Exception as e:
+            logger.warning(f"Failed to parse config.json for {sim_name}: {e}")
+
+    # Upload audios folder for this simulation to S3
+    audios_s3_path = None
+    if audios_dir.exists() and audios_dir.is_dir():
+        audios_s3_prefix = f"{s3_prefix}/{sim_name}/audios"
+        audio_files_uploaded = 0
+        for audio_file in audios_dir.iterdir():
+            if audio_file.is_file() and (
+                audio_file.suffix == ".wav"
+                or audio_file.suffix == ".mp3"
+                or audio_file.suffix == ".ogg"
+            ):
+                # Skip if already uploaded
+                if str(audio_file) in uploaded_audio_files:
+                    continue
+                relative_audio_path = audio_file.relative_to(output_dir)
+                audio_s3_key = f"{s3_prefix}/{relative_audio_path}"
+                s3.upload_file(str(audio_file), s3_bucket, audio_s3_key)
+                uploaded_audio_files.add(str(audio_file))
+                audio_files_uploaded += 1
+                logger.info(
+                    f"Uploaded audio file {audio_file.name} to S3: {audio_s3_key}"
+                )
+        if audio_files_uploaded > 0:
+            # Store just the S3 key prefix, not the full s3:// path
+            audios_s3_path = audios_s3_prefix
+            logger.info(
+                f"Uploaded {audio_files_uploaded} audio file(s) for {sim_name} to s3://{s3_bucket}/{audios_s3_prefix}"
+            )
+
+    return {
+        "simulation_name": sim_name,
+        "persona": persona_data,
+        "scenario": scenario_data,
+        "evaluation_results": eval_results,
+        "transcript": transcript,
+        "audios_s3_path": audios_s3_path,
+    }
+
+
+def _is_simulation_complete(sim_dir: Path) -> bool:
+    """
+    Check if a simulation directory is complete.
+    A simulation is considered complete when it has a transcript.json file.
+    """
+    transcript_file = sim_dir / "transcript.json"
+    return transcript_file.exists()
+
+
+def _run_pense_voice_simulation(
+    pense_config: Dict[str, Any],
+    output_dir: Path,
+    s3_bucket: str,
+    s3_prefix: str,
+    task_id: str,
+    log_prefix: str = "Voice simulation",
+) -> Dict[str, Any]:
+    """
+    Run pense agent simulation command and return parsed results.
+    Updates the database incrementally as each simulation completes.
+
+    Args:
+        pense_config: The pense config dict (for voice simulations)
+        output_dir: Directory to write output files
+        s3_bucket: S3 bucket name
+        s3_prefix: S3 key prefix for uploading results
+        task_id: The task ID for updating the database with incremental results
+        log_prefix: Prefix for log messages
+
+    Returns:
+        Dict with keys: success, total_simulations, metrics, simulation_results, error, audios_s3_path
+    """
+    import time
+
+    s3 = get_s3_client()
+
+    # Resolve output directory to absolute path
+    output_dir = output_dir.resolve()
+
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write config to temp file
+    config_file_name = "simulation_config"
+    config_file = output_dir / f"{config_file_name}.json"
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(pense_config, f, indent=2)
+
+    # Run pense agent simulation command as a non-blocking process
+    run_cmd = [
+        "pense",
+        "agent",
+        "simulation",
+        "-c",
+        str(config_file),
+        "-o",
+        str(output_dir),
+    ]
+
+    logger.info(f"{log_prefix} command: {' '.join(run_cmd)}")
+
+    # Open log files for stdout and stderr
+    stdout_log_path = output_dir / "stdout.log"
+    stderr_log_path = output_dir / "stderr.log"
+
+    with open(stdout_log_path, "w") as stdout_file, open(
+        stderr_log_path, "w"
+    ) as stderr_file:
+        # Start the process without blocking, writing output to files
+        process = subprocess.Popen(
+            run_cmd,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            start_new_session=True,  # Detach from parent process group
+            cwd=str(output_dir),
+        )
+
+        # Track processed simulations and uploaded files
+        processed_simulations = set()
+        uploaded_audio_files = set()
+        simulation_results = []
+
+        # Calculate expected number of simulations
+        num_personas = len(pense_config.get("personas", []))
+        num_scenarios = len(pense_config.get("scenarios", []))
+        expected_total = num_personas * num_scenarios
+        logger.info(
+            f"{log_prefix}: Expecting {expected_total} simulations ({num_personas} personas x {num_scenarios} scenarios)"
+        )
+
+        # Monitor for new simulation directories while the process runs
+        poll_interval = 2  # seconds between checks
+        while process.poll() is None:
+            # Find all simulation directories
+            for item in output_dir.iterdir():
+                if (
+                    item.is_dir()
+                    and item.name.startswith("simulation_persona_")
+                    and item.name not in processed_simulations
+                ):
+                    # Check if this simulation is complete
+                    if _is_simulation_complete(item):
+                        logger.info(
+                            f"{log_prefix}: Found completed simulation directory: {item.name}"
+                        )
+                        # Parse the simulation directory
+                        sim_result = _parse_simulation_directory(
+                            sim_dir=item,
+                            output_dir=output_dir,
+                            s3_bucket=s3_bucket,
+                            s3_prefix=s3_prefix,
+                            uploaded_audio_files=uploaded_audio_files,
+                        )
+                        if sim_result:
+                            simulation_results.append(sim_result)
+                            processed_simulations.add(item.name)
+
+                            # Update the database with incremental results
+                            results_dict = {
+                                "total_simulations": expected_total,
+                                "completed_simulations": len(simulation_results),
+                                "simulation_results": simulation_results,
+                                "results_s3_prefix": s3_prefix,
+                            }
+                            update_simulation_job(
+                                task_id,
+                                status=TaskStatus.IN_PROGRESS.value,
+                                results=results_dict,
+                            )
+                            logger.info(
+                                f"{log_prefix}: Updated DB with {len(simulation_results)}/{expected_total} completed simulations"
+                            )
+
+            time.sleep(poll_interval)
+
+        # Process finished, wait for it to complete
+        process.wait()
+
+    # Read logs from files
+    stdout = ""
+    stderr = ""
+    if stdout_log_path.exists():
+        with open(stdout_log_path, "r") as f:
+            stdout = f.read()
+        if stdout:
+            logger.info(f"{log_prefix} stdout: {stdout}")
+    if stderr_log_path.exists():
+        with open(stderr_log_path, "r") as f:
+            stderr = f.read()
+        if stderr:
+            logger.info(f"{log_prefix} stderr: {stderr}")
+
+    # Final pass: check for any remaining simulation directories that weren't processed
+    for item in output_dir.iterdir():
+        if (
+            item.is_dir()
+            and item.name.startswith("simulation_persona_")
+            and item.name not in processed_simulations
+        ):
+            if _is_simulation_complete(item):
+                logger.info(
+                    f"{log_prefix}: Found remaining completed simulation directory: {item.name}"
+                )
+                sim_result = _parse_simulation_directory(
+                    sim_dir=item,
+                    output_dir=output_dir,
+                    s3_bucket=s3_bucket,
+                    s3_prefix=s3_prefix,
+                    uploaded_audio_files=uploaded_audio_files,
+                )
+                if sim_result:
+                    simulation_results.append(sim_result)
+                    processed_simulations.add(item.name)
+
+    # Parse final results (metrics.json and results.csv)
+    metrics_data = None
+    metrics_file = output_dir / "metrics.json"
+    results_file = output_dir / "results.csv"
+
+    if metrics_file.exists():
+        with open(metrics_file, "r", encoding="utf-8") as f:
+            metrics_data = json.load(f)
+
+    # Parse results.csv for aggregated scores
+    if results_file.exists():
+        import csv
+
+        with open(results_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            results_data = list(reader)
+
+    # Upload all other results to S3 (excluding audios which are already uploaded)
+    for root, dirs, files in os.walk(output_dir):
+        # Skip audios directories as they're already uploaded
+        if "audios" in root.split(os.sep):
+            continue
+        for file in files:
+            local_file_path = Path(root) / file
+            # Skip audio files that were already uploaded
+            if str(local_file_path) in uploaded_audio_files:
+                continue
+            relative_path = local_file_path.relative_to(output_dir)
+            s3_key = f"{s3_prefix}/{relative_path}"
+            s3.upload_file(str(local_file_path), s3_bucket, s3_key)
+
+    error = None
+    if process.returncode != 0:
+        error = f"Command failed: {stderr}"
+
+    return {
+        "success": process.returncode == 0,
+        "total_simulations": len(simulation_results),
+        "metrics": metrics_data,
+        "simulation_results": simulation_results,
+        "error": error,
+    }
+
+
+code
+
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [33mRunning command[0m: pense --config /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmp9gqr01mh/output/simulation_config.json --output-dir /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmp9gqr01mh/output
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | --------------------------------
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | Running simulation [93msimulation_persona_1_scenario_1[0m
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [93mPersona:[0m
+You are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [93mGender:[0m female
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [93mLanguage:[0m hindi
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [93mScenario:[0m
+use very few words to give your answers
+hesitate from giving away the full answer right away
+try to refrain from giving any answer until nudged a few times
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [93mPort:[0m 8768
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [93mSTT Config:[0m provider='google'
+2026-01-16 10:01:05.852 | INFO     | [UNKNOWN-SYS] | [93mTTS Config:[0m provider='google' instructions=None
+2026-01-16 10:01:05.853 | INFO     | [UNKNOWN-SYS] | [93mLLM Config:[0m provider='openrouter' model='google/gemini-3-flash-preview'
+2026-01-16 10:01:05.853 | INFO     | [UNKNOWN-SYS] | --------------------------------
+2026-01-16 10:01:05.853 | DEBUG    | [BOT-SYS] | Loading Silero VAD model...
+2026-01-16 10:01:05.926 | DEBUG    | [BOT-SYS] | Loaded Silero VAD
+2026-01-16 10:01:05.927 | DEBUG    | [BOT-SYS] | Loading Local Smart Turn v3.x model from /Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/pipecat/audio/turn/smart_turn/data/smart-turn-v3.2-cpu.onnx...
+2026-01-16 10:01:05.969 | DEBUG    | [BOT-SYS] | Loaded Local Smart Turn v3.x
+2026-01-16 10:01:05.969 | INFO     | [BOT] | Starting bot
+2026-01-16 10:01:06.103 | DEBUG    | [BOT-SYS] | Creating OpenRouter client with api https://openrouter.ai/api/v1
+2026-01-16 10:01:06.128 | DEBUG    | [BOT-SYS] | Linking Pipeline#0::Source -> WebsocketServerInputTransport#0
+2026-01-16 10:01:06.128 | DEBUG    | [BOT-SYS] | Linking WebsocketServerInputTransport#0 -> RTVIProcessor#0
+2026-01-16 10:01:06.128 | DEBUG    | [BOT-SYS] | Linking RTVIProcessor#0 -> InputLogger#0
+2026-01-16 10:01:06.128 | DEBUG    | [BOT-SYS] | Linking InputLogger#0 -> FunctionCallResultHandler
+2026-01-16 10:01:06.128 | DEBUG    | [BOT-SYS] | Linking FunctionCallResultHandler -> GoogleSTTService#0
+2026-01-16 10:01:06.128 | DEBUG    | [BOT-SYS] | Linking GoogleSTTService#0 -> UserTranscriptProcessor#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking UserTranscriptProcessor#0 -> LLMUserAggregator#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking LLMUserAggregator#0 -> OpenRouterLLMService#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking OpenRouterLLMService#0 -> GoogleTTSService#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking GoogleTTSService#0 -> MetricsLogger#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking MetricsLogger#0 -> OutputLogger#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking OutputLogger#0 -> WebsocketServerOutputTransport#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking WebsocketServerOutputTransport#0 -> AssistantTranscriptProcessor#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking AssistantTranscriptProcessor#0 -> LLMAssistantAggregator#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking LLMAssistantAggregator#0 -> Pipeline#0::Sink
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking PipelineTask#0::Source -> Pipeline#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Linking Pipeline#0 -> PipelineTask#0::Sink
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | Runner PipelineRunner#0 started running PipelineTask#0
+2026-01-16 10:01:06.129 | DEBUG    | [BOT-SYS] | PipelineTask#0: Starting. Waiting for StartFrame#0 to reach the end of the pipeline...
+2026-01-16 10:01:06.130 | DEBUG    | [BOT-SYS] | Setting VAD params to: confidence=0.7 start_secs=0.2 stop_secs=0.2 min_volume=0.6
+2026-01-16 10:01:06.130 | INFO     | [BOT-SYS] | Starting websocket server on localhost:8768
+2026-01-16 10:01:06.130 | INFO     | [BOT-SYS] | input bot frame: StartFrame#0
+2026-01-16 10:01:06.130 | INFO     | [BOT-SYS] | input bot frame: SpeechControlParamsFrame#0
+2026-01-16 10:01:06.130 | DEBUG    | [BOT-SYS] | Connecting to Google Speech-to-Text
+2026-01-16 10:01:06.131 | WARNING  | [BOT-SYS] | LLMUserAggregator#0: `turn_analyzer` in base input transport is deprecated. Use `LLMUserAggregator`'s new `user_turn_strategies` parameter with `TurnAnalyzerUserTurnStopStrategy` instead:
+
+    context_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            ...,
+            user_turn_strategies=UserTurnStrategies(
+                stop=[
+                    TurnAnalyzerUserTurnStopStrategy(
+                        turn_analyzer=LocalSmartTurnAnalyzerV3(params=SmartTurnParams())
+                    )
+                ],
+            )
+        ),
+    )
+2026-01-16 10:01:06.133 | INFO     | [BOT-SYS] | output bot frame: StartFrame#0
+2026-01-16 10:01:06.134 | INFO     | [BOT-SYS] | output bot frame: OutputTransportReadyFrame#0
+2026-01-16 10:01:06.134 | DEBUG    | [BOT-SYS] | PipelineTask#0: StartFrame#0 reached the end of the pipeline, pipeline is now ready.
+2026-01-16 10:01:06.134 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#0(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}], 'processing': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}]}})
+2026-01-16 10:01:06.134 | INFO     | [BOT-SYS] | input bot frame: MetricsFrame#0
+2026-01-16 10:01:06.135 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#0(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}], 'processing': [{'processor': 'GoogleSTTService#0', 'value': 0.0}, {'processor': 'OpenRouterLLMService#0', 'value': 0.0}, {'processor': 'GoogleTTSService#0', 'value': 0.0}]}})
+2026-01-16 10:01:06.135 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, ttfb: 0.0
+2026-01-16 10:01:06.135 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, processing: 0.0
+2026-01-16 10:01:06.135 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, ttfb: 0.0
+2026-01-16 10:01:06.135 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, processing: 0.0
+2026-01-16 10:01:06.135 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, ttfb: 0.0
+2026-01-16 10:01:06.135 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#0, processing: 0.0
+2026-01-16 10:01:06.135 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#0
+2026-01-16 10:01:06.135 | INFO     | [BOT-SYS] | input bot frame: OutputTransportReadyFrame#0
+2026-01-16 10:01:06.853 | INFO     | [EVAL] | Starting evaluation pipeline
+2026-01-16 10:01:06.922 | DEBUG    | [EVAL-SYS] | Linking Pipeline#2::Source -> WebsocketClientInputTransport#0
+2026-01-16 10:01:06.922 | DEBUG    | [EVAL-SYS] | Linking WebsocketClientInputTransport#0 -> RTVIFunctionCallResponder
+2026-01-16 10:01:06.922 | DEBUG    | [EVAL-SYS] | Linking RTVIFunctionCallResponder -> RTVIMessageFrameAdapter
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking RTVIMessageFrameAdapter -> MetricsLogger
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking MetricsLogger -> STTLogger
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking STTLogger -> UserTranscriptProcessor#1
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking UserTranscriptProcessor#1 -> LLMUserAggregator#1
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking LLMUserAggregator#1 -> OpenAILLMService#0
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking OpenAILLMService#0 -> MaxTurnsEndProcessor
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking MaxTurnsEndProcessor -> GoogleTTSService#1
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking GoogleTTSService#1 -> SilencePadder
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking SilencePadder -> IOLogger#0
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking IOLogger#0 -> WebsocketClientOutputTransport#0
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking WebsocketClientOutputTransport#0 -> LLMAssistantAggregator#1
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking LLMAssistantAggregator#1 -> AudioBufferProcessor#0
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking AudioBufferProcessor#0 -> Pipeline#2::Sink
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking PipelineTask#1::Source -> Pipeline#2
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Linking Pipeline#2 -> PipelineTask#1::Sink
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | Runner PipelineRunner#1 started running PipelineTask#1
+2026-01-16 10:01:06.923 | DEBUG    | [EVAL-SYS] | PipelineTask#1: Starting. Waiting for StartFrame#1 to reach the end of the pipeline...
+2026-01-16 10:01:06.925 | DEBUG    | [EVAL-SYS] | PipelineTask#1: StartFrame#1 reached the end of the pipeline, pipeline is now ready.
+2026-01-16 10:01:06.926 | INFO     | [BOT-SYS] | New client connection from ('::1', 57445, 0, 0)
+2026-01-16 10:01:06.926 | INFO     | [BOT] | Client connected
+2026-01-16 10:01:06.926 | INFO     | [EVAL] | WebSocket connected
+2026-01-16 10:01:06.927 | DEBUG    | [EVAL-SYS] | 🧠 → OpenAILLMService#0 LLM CONTEXT FRAME: [{'role': 'system', 'content': "You are a user speaking to an agent. This is your persona:\n\nYou are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;\n\nYour gender is female.\n\nThe following scenario will be played out: use very few words to give your answers\nhesitate from giving away the full answer right away\ntry to refrain from giving any answer until nudged a few times. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in hindi. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system..\n\nBegin the conversation by saying 'Hello' to the agent."}] at 0.00s
+2026-01-16 10:01:06.927 | DEBUG    | [EVAL-SYS] | OpenAILLMService#0: Generating chat from universal context [{'role': 'system', 'content': "You are a user speaking to an agent. This is your persona:\n\nYou are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn’t admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; blood-pressure 150/95 mmHg; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant;\n\nYour gender is female.\n\nThe following scenario will be played out: use very few words to give your answers\nhesitate from giving away the full answer right away\ntry to refrain from giving any answer until nudged a few times. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in hindi. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system..\n\nBegin the conversation by saying 'Hello' to the agent."}]
+2026-01-16 10:01:07.049 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM START RESPONSE at 0.00s
+2026-01-16 10:01:07.928 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM GENERATING: 'Hello' at 1.00s
+2026-01-16 10:01:07.928 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM GENERATING: '.' at 1.01s
+2026-01-16 10:01:07.941 | DEBUG    | [EVAL-SYS] | 🧠 OpenAILLMService#0 → LLM END RESPONSE at 1.02s
+2026-01-16 10:01:07.941 | DEBUG    | [EVAL-SYS] | GoogleTTSService#1: Generating TTS [Hello.]
+2026-01-16 10:01:08.497 | DEBUG    | [EVAL-SYS] | Bot started speaking
+2026-01-16 10:01:08.501 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#0(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.503 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#0(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.503 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#1(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.503 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#1(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.524 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.541 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#4(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.541 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#4(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.565 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.581 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#7(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.582 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#7(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.606 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.623 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#10(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.624 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#10(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.647 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.664 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#13(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.665 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#13(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.689 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.702 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#16(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.702 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#16(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.729 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.740 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#19(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.741 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#19(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.770 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.780 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#22(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.780 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#22(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.811 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.820 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#25(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.820 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#25(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.852 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.860 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#28(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.860 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#28(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.893 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.900 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#31(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.900 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#31(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.934 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.941 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#34(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.941 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#34(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.975 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:08.983 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#37(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:08.984 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#37(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.017 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.021 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#40(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.023 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#40(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.058 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.065 | DEBUG    | [BOT-SYS] | User started speaking
+2026-01-16 10:01:09.066 | DEBUG    | [BOT-SYS] | PipelineTask#0: received interruption task frame InterruptionTaskFrame#0
+2026-01-16 10:01:09.067 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#1(message: {'label': 'rtvi-ai', 'type': 'user-started-speaking'})
+2026-01-16 10:01:09.067 | INFO     | [BOT-SYS] | input bot frame: VADUserStartedSpeakingFrame#0
+2026-01-16 10:01:09.067 | INFO     | [BOT-SYS] | input bot frame: UserStartedSpeakingFrame#0
+2026-01-16 10:01:09.068 | DEBUG    | [BOT-SYS] | LLMUserAggregator#0: User started speaking (strategy: ExternalUserTurnStartStrategy#0)
+2026-01-16 10:01:09.069 | INFO     | [BOT-SYS] | input bot frame: InterruptionFrame#0
+2026-01-16 10:01:09.069 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#0
+2026-01-16 10:01:09.069 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#42(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.069 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#1(message: {'label': 'rtvi-ai', 'type': 'user-started-speaking'})
+2026-01-16 10:01:09.069 | INFO     | [BOT-SYS] | output bot frame: VADUserStartedSpeakingFrame#0
+2026-01-16 10:01:09.069 | INFO     | [BOT-SYS] | output bot frame: UserStartedSpeakingFrame#0
+2026-01-16 10:01:09.070 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 TTFB: 0.048082828521728516
+2026-01-16 10:01:09.070 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 processing time: 0.04818606376647949
+2026-01-16 10:01:09.071 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#0(message: {'label': 'rtvi-ai', 'type': 'user-started-speaking'})
+2026-01-16 10:01:09.071 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#2(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#0', 'value': 0.048082828521728516}]}})
+2026-01-16 10:01:09.072 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#3(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 0.04818606376647949}]}})
+2026-01-16 10:01:09.072 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#1, ttfb: 0.048082828521728516
+2026-01-16 10:01:09.072 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#2, processing: 0.04818606376647949
+2026-01-16 10:01:09.073 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#1
+2026-01-16 10:01:09.073 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#2
+2026-01-16 10:01:09.074 | INFO     | [BOT-SYS] | output bot frame: InterruptionFrame#0
+2026-01-16 10:01:09.074 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#0
+2026-01-16 10:01:09.074 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#42(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.074 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#2(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#0', 'value': 0.048082828521728516}]}})
+2026-01-16 10:01:09.074 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#3(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 0.04818606376647949}]}})
+2026-01-16 10:01:09.075 | WARNING  | [BOT-SYS] | Frame type <class 'pipecat.frames.frames.InterruptionFrame'> is not serializable
+2026-01-16 10:01:09.076 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#1(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleSTTService#0', 'value': 0.048082828521728516}]}})
+2026-01-16 10:01:09.076 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#2(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 0.04818606376647949}]}})
+2026-01-16 10:01:09.099 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.101 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#2
+2026-01-16 10:01:09.101 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#45(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.102 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#2
+2026-01-16 10:01:09.102 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#45(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.139 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.140 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#4
+2026-01-16 10:01:09.140 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#47(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.141 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#4
+2026-01-16 10:01:09.141 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#47(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.179 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#6
+2026-01-16 10:01:09.180 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#50(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.180 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.180 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#6
+2026-01-16 10:01:09.180 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#50(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.220 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#8
+2026-01-16 10:01:09.220 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#53(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.220 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.221 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#8
+2026-01-16 10:01:09.221 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#53(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.260 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#10
+2026-01-16 10:01:09.260 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#56(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.260 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.260 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#10
+2026-01-16 10:01:09.260 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#56(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.300 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#12
+2026-01-16 10:01:09.300 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#59(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.300 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.300 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#12
+2026-01-16 10:01:09.301 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#59(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.341 | INFO     | [BOT-SYS] | input bot frame: UserSpeakingFrame#14
+2026-01-16 10:01:09.342 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#62(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.342 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.345 | INFO     | [BOT-SYS] | output bot frame: UserSpeakingFrame#14
+2026-01-16 10:01:09.345 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#62(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.380 | INFO     | [BOT-SYS] | input bot frame: VADUserStoppedSpeakingFrame#0
+2026-01-16 10:01:09.381 | INFO     | [BOT-SYS] | output bot frame: VADUserStoppedSpeakingFrame#0
+2026-01-16 10:01:09.385 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.423 | DEBUG    | [BOT-SYS] | End of Turn result: EndOfTurnState.COMPLETE
+2026-01-16 10:01:09.423 | DEBUG    | [BOT-SYS] | User stopped speaking
+2026-01-16 10:01:09.423 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#4(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {}})
+2026-01-16 10:01:09.423 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#5(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:01:09.423 | INFO     | [BOT-SYS] | input bot frame: MetricsFrame#3
+2026-01-16 10:01:09.423 | INFO     | [BOT-SYS] | input bot frame: UserStoppedSpeakingFrame#0
+2026-01-16 10:01:09.423 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#65(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.424 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#68(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.425 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#4(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {}})
+2026-01-16 10:01:09.425 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#5(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:01:09.425 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#3
+2026-01-16 10:01:09.425 | INFO     | [BOT-SYS] | output bot frame: UserStoppedSpeakingFrame#0
+2026-01-16 10:01:09.425 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#65(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.425 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#3(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {}})
+2026-01-16 10:01:09.425 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#4(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:01:09.425 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#68(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.426 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.460 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#71(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.460 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#71(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.466 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.500 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#74(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.500 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#74(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.507 | WARNING  | [EVAL] | Sending simulated silence frames
+2026-01-16 10:01:09.540 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#77(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.540 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#77(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.548 | WARNING  | [EVAL] | Sending explicit user-stopped-speaking signal
+2026-01-16 10:01:09.548 | INFO     | [EVAL-SYS] | [94m[User][0m: Hello.[0m
+2026-01-16 10:01:09.549 | DEBUG    | [BOT-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#5(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking', 'id': '19451718-d37e-4fd0-a936-44b95640d676'})
+2026-01-16 10:01:09.549 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#7(message: {'label': 'rtvi-ai', 'type': 'error-response', 'id': '19451718-d37e-4fd0-a936-44b95640d676', 'data': {'error': 'Unsupported type user-stopped-speaking'}})
+2026-01-16 10:01:09.550 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#7(message: {'label': 'rtvi-ai', 'type': 'error-response', 'id': '19451718-d37e-4fd0-a936-44b95640d676', 'data': {'error': 'Unsupported type user-stopped-speaking'}})
+2026-01-16 10:01:09.550 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#6(message: {'label': 'rtvi-ai', 'type': 'error-response', 'id': '19451718-d37e-4fd0-a936-44b95640d676', 'data': {'error': 'Unsupported type user-stopped-speaking'}})
+2026-01-16 10:01:09.580 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#78(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.580 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#78(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.620 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#79(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.620 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#79(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.660 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#80(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.660 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#80(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.700 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#81(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.701 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#81(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.740 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#82(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.740 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#82(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.788 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#83(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.835 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#83(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.842 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#84(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.843 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#84(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.863 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#85(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.865 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#85(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.900 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#86(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.901 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#86(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.940 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#87(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.941 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#87(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.980 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#88(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:09.981 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#88(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.020 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#89(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.021 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#89(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.060 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#90(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.060 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#90(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.100 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#91(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.100 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#91(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.139 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#92(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.140 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#92(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.181 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#93(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.182 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#93(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.220 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#94(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.221 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#94(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.260 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#95(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.261 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#95(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.300 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#96(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.301 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#96(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.340 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#97(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.342 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#97(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:10.730 | DEBUG    | [EVAL-SYS] | Bot stopped speaking
+2026-01-16 10:01:10.731 | INFO     | [EVAL] | Audio data received - user
+2026-01-16 10:01:10.731 | INFO     | [EVAL] | [user] turn index: 0
+2026-01-16 10:01:10.731 | INFO     | [EVAL-SYS] | [92mCreating new audio file at /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmp9gqr01mh/output/simulation_persona_1_scenario_1/audios/0_user.wav[0m
+2026-01-16 10:01:12.177 | DEBUG    | [BOT-SYS] | GoogleSTTService#0 processing time: 1.835296869277954
+2026-01-16 10:01:12.178 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#8(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:31:12.177+00:00', 'final': True}})
+2026-01-16 10:01:12.178 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#9(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.835296869277954}]}})
+2026-01-16 10:01:12.179 | INFO     | [BOT] | Bot transcript:[2026-01-16T04:31:12.177+00:00] user: हेलो।
+2026-01-16 10:01:12.179 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#4, processing: 1.835296869277954
+2026-01-16 10:01:12.179 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#4
+2026-01-16 10:01:12.179 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#8(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:31:12.177+00:00', 'final': True}})
+2026-01-16 10:01:12.179 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#9(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.835296869277954}]}})
+2026-01-16 10:01:12.180 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#7(message: {'label': 'rtvi-ai', 'type': 'user-transcription', 'data': {'text': 'हेलो।', 'user_id': '', 'timestamp': '2026-01-16T04:31:12.177+00:00', 'final': True}})
+2026-01-16 10:01:12.180 | INFO     | [EVAL-SYS] | [94m[User (as transcribed by the agent)][0m: हेलो।
+2026-01-16 10:01:12.180 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#8(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleSTTService#0', 'value': 1.835296869277954}]}})
+2026-01-16 10:01:12.181 | INFO     | [BOT-SYS] | output bot frame: TranscriptionUpdateFrame#0(pts: None, messages: 1)
+2026-01-16 10:01:12.680 | DEBUG    | [BOT-SYS] | LLMUserAggregator#0: User stopped speaking (strategy: ExternalUserTurnStopStrategy#0)
+2026-01-16 10:01:12.681 | DEBUG    | [BOT-SYS] | 🧠 → OpenRouterLLMService#0 LLM CONTEXT FRAME: [{'role': 'system', 'content': "You are a helpful nurse speaking to a pregnant mother who has come for an Antenatal visit (ANC visit).\n\nYou are helping her with filling the ANC visit form which has the following questions:\n\n```\n1: Name of patient (string)\n```\n\nDo not ask any further questions after this question is answered. Do not engage in any pleasantries after the questions have been asked and close the conversation after informing the user that all questions are done.\n\nYour goal is to get the answer for all these questions from the user. Ask the questions sequentially, one at a time. Make sure to always speak out the next question for the user. They don't know what the next question will be. It is your responsibility to ask them the next question.\n\nDo not repeat the user's answer back to them.\n\nIf the user gives an answer that is not valid for a question, then, don't call the `plan_next_question` tool at all.\n\nOnly if the user gives a valid answer to a question, then, call the `plan_next_question` tool.\n\n# Important instructions\nFor each field, you must make sure that you get valid and complete answers from the user.\n\nName: the full name including both the first name and last name (users might have initials as part of their name - don't ask them to expand it)\n\nUntil you get a valid and complete response for a specific question from the user, keep probing for more details until you have extracted all the details required to meet the criteria of completeness for that question.\n\nThe user may have given the answer to a question in parts across several messages. For example, they might have clarified something in a later message or corrected something they missed earlier. So, make sure to look for the complete answer in the user's response across all the messages and don't unnecessarily repeat the same question to the user as long as the full answer is clear from the entire conversation history so far.\n\nAfter every valid and complete response given by the user to a question, call the `plan_next_question` tool with the indices of the questions in the list of questions above that the user's response has already answered and the index of the next unanswered question that you are going to ask.\n\nIf the user's response only answers the exact question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_that_question>]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers more questions beyond the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_first_question_answered>, <index_of_the_second_question_answered>, ....]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers some other question from the form but not the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_question_answered>]` and `next_unanswered_question_index` as the index of the question you had originally asked but the user did not answer.\n\nIf the user's response is completely irrelevant to any of the questions in the form, don't call this tool and steer the user back to the conversation.\n\nUse the same index values as mentioned in the list above. So, 1-indexed. Not, 0-indexed.\n\n# Ensuring completion of all questions\n- If the user insists on skipping any question when you asked it, make sure to ask it again later. Before ending the call, make sure to ask all the questions that you asked.\n\n# Style\n- Keep the conversation clear, warm, friendly and empathetic. It should feel like a natural and realistic conversation between a nurse and a mother who is pregnant. Make sure each question that you ask is concise and to the point.\n- Speak in an empathetic, friendly tone like a nurse at a government hospital.\n- Always stay gender neutral and don't say anything that might indicate any gender or name for you or anthropomorphise you in any way.\nWhenever you invoke the `fill_form` tool, always use Roman characters for the string values\n\nYou must always speak in hindi."}, {'role': 'user', 'content': 'हेलो।'}] at 6.55s
+2026-01-16 10:01:12.681 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#10(message: {'label': 'rtvi-ai', 'type': 'user-llm-text', 'data': {'text': 'हेलो।'}})
+2026-01-16 10:01:12.681 | DEBUG    | [BOT-SYS] | OpenRouterLLMService#0: Generating chat from universal context [{'role': 'system', 'content': "You are a helpful nurse speaking to a pregnant mother who has come for an Antenatal visit (ANC visit).\n\nYou are helping her with filling the ANC visit form which has the following questions:\n\n```\n1: Name of patient (string)\n```\n\nDo not ask any further questions after this question is answered. Do not engage in any pleasantries after the questions have been asked and close the conversation after informing the user that all questions are done.\n\nYour goal is to get the answer for all these questions from the user. Ask the questions sequentially, one at a time. Make sure to always speak out the next question for the user. They don't know what the next question will be. It is your responsibility to ask them the next question.\n\nDo not repeat the user's answer back to them.\n\nIf the user gives an answer that is not valid for a question, then, don't call the `plan_next_question` tool at all.\n\nOnly if the user gives a valid answer to a question, then, call the `plan_next_question` tool.\n\n# Important instructions\nFor each field, you must make sure that you get valid and complete answers from the user.\n\nName: the full name including both the first name and last name (users might have initials as part of their name - don't ask them to expand it)\n\nUntil you get a valid and complete response for a specific question from the user, keep probing for more details until you have extracted all the details required to meet the criteria of completeness for that question.\n\nThe user may have given the answer to a question in parts across several messages. For example, they might have clarified something in a later message or corrected something they missed earlier. So, make sure to look for the complete answer in the user's response across all the messages and don't unnecessarily repeat the same question to the user as long as the full answer is clear from the entire conversation history so far.\n\nAfter every valid and complete response given by the user to a question, call the `plan_next_question` tool with the indices of the questions in the list of questions above that the user's response has already answered and the index of the next unanswered question that you are going to ask.\n\nIf the user's response only answers the exact question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_that_question>]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers more questions beyond the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_first_question_answered>, <index_of_the_second_question_answered>, ....]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers some other question from the form but not the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_question_answered>]` and `next_unanswered_question_index` as the index of the question you had originally asked but the user did not answer.\n\nIf the user's response is completely irrelevant to any of the questions in the form, don't call this tool and steer the user back to the conversation.\n\nUse the same index values as mentioned in the list above. So, 1-indexed. Not, 0-indexed.\n\n# Ensuring completion of all questions\n- If the user insists on skipping any question when you asked it, make sure to ask it again later. Before ending the call, make sure to ask all the questions that you asked.\n\n# Style\n- Keep the conversation clear, warm, friendly and empathetic. It should feel like a natural and realistic conversation between a nurse and a mother who is pregnant. Make sure each question that you ask is concise and to the point.\n- Speak in an empathetic, friendly tone like a nurse at a government hospital.\n- Always stay gender neutral and don't say anything that might indicate any gender or name for you or anthropomorphise you in any way.\nWhenever you invoke the `fill_form` tool, always use Roman characters for the string values\n\nYou must always speak in hindi."}, {'role': 'user', 'content': 'हेलो।'}]
+2026-01-16 10:01:12.681 | DEBUG    | [BOT-SYS] | Retrieving the tools using the adapter: <class 'pipecat.adapters.services.open_ai_adapter.OpenAILLMAdapter'>
+2026-01-16 10:01:12.683 | DEBUG    | [BOT-SYS] | 🧠 OpenRouterLLMService#0 → LLM START RESPONSE at 6.55s
+2026-01-16 10:01:12.683 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#11(message: {'label': 'rtvi-ai', 'type': 'bot-llm-started'})
+2026-01-16 10:01:12.686 | INFO     | [BOT-SYS] | output bot frame: LLMFullResponseStartFrame#1
+2026-01-16 10:01:12.686 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#10(message: {'label': 'rtvi-ai', 'type': 'user-llm-text', 'data': {'text': 'हेलो।'}})
+2026-01-16 10:01:12.686 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#11(message: {'label': 'rtvi-ai', 'type': 'bot-llm-started'})
+2026-01-16 10:01:12.686 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#9(message: {'label': 'rtvi-ai', 'type': 'user-llm-text', 'data': {'text': 'हेलो।'}})
+2026-01-16 10:01:12.686 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#10(message: {'label': 'rtvi-ai', 'type': 'bot-llm-started'})
+2026-01-16 10:01:14.695 | DEBUG    | [BOT-SYS] | OpenRouterLLMService#0 TTFB: 2.0135610103607178
+2026-01-16 10:01:14.708 | DEBUG    | [BOT-SYS] | 🧠 OpenRouterLLMService#0 → LLM GENERATING: 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में' at 8.57s
+2026-01-16 10:01:14.708 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#12(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'OpenRouterLLMService#0', 'model': 'google/gemini-3-flash-preview', 'value': 2.0135610103607178}]}})
+2026-01-16 10:01:14.708 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#13(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में'}})
+2026-01-16 10:01:14.708 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#5, ttfb: 2.0135610103607178
+2026-01-16 10:01:14.708 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#5
+2026-01-16 10:01:14.709 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#12(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'OpenRouterLLMService#0', 'model': 'google/gemini-3-flash-preview', 'value': 2.0135610103607178}]}})
+2026-01-16 10:01:14.709 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#13(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में'}})
+2026-01-16 10:01:14.709 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#11(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'OpenRouterLLMService#0', 'model': 'google/gemini-3-flash-preview', 'value': 2.0135610103607178}]}})
+2026-01-16 10:01:14.709 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#12(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में'}})
+2026-01-16 10:01:14.817 | DEBUG    | [BOT-SYS] | 🧠 OpenRouterLLMService#0 → LLM GENERATING: ' मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?' at 8.69s
+2026-01-16 10:01:14.818 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#14(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': ' मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?'}})
+2026-01-16 10:01:14.818 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#15(message: {'label': 'rtvi-ai', 'type': 'bot-transcription', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?'}})
+2026-01-16 10:01:14.818 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#14(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': ' मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?'}})
+2026-01-16 10:01:14.819 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#15(message: {'label': 'rtvi-ai', 'type': 'bot-transcription', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?'}})
+2026-01-16 10:01:14.819 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#13(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': ' मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?'}})
+2026-01-16 10:01:14.819 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#14(message: {'label': 'rtvi-ai', 'type': 'bot-transcription', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?'}})
+2026-01-16 10:01:14.846 | DEBUG    | [BOT-SYS] | 🧠 OpenRouterLLMService#0 → LLM GENERATING: ' (कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)' at 8.72s
+2026-01-16 10:01:14.846 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#16(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': ' (कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)'}})
+2026-01-16 10:01:14.847 | DEBUG    | [BOT-SYS] | GoogleTTSService#0: Generating TTS [नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।
+
+क्या आप मुझे अपना पूरा नाम बता सकती हैं?]
+2026-01-16 10:01:14.848 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#17(message: {'label': 'rtvi-ai', 'type': 'bot-output', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?', 'spoken': False, 'aggregated_by': 'sentence'}})
+2026-01-16 10:01:14.849 | INFO     | [BOT-SYS] | output bot frame: AggregatedTextFrame#1(pts: None, text: [नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।
+
+क्या आप मुझे अपना पूरा नाम बता सकती हैं?])
+2026-01-16 10:01:14.849 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#16(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': ' (कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)'}})
+2026-01-16 10:01:14.850 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#17(message: {'label': 'rtvi-ai', 'type': 'bot-output', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?', 'spoken': False, 'aggregated_by': 'sentence'}})
+2026-01-16 10:01:14.850 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#15(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': ' (कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)'}})
+2026-01-16 10:01:14.850 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#16(message: {'label': 'rtvi-ai', 'type': 'bot-output', 'data': {'text': 'नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।\n\nक्या आप मुझे अपना पूरा नाम बता सकती हैं?', 'spoken': False, 'aggregated_by': 'sentence'}})
+2026-01-16 10:01:14.850 | INFO     | [EVAL-SYS] | [95mReceived agent message[0m: नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।
+
+क्या आप मुझे अपना पूरा नाम बता सकती हैं?[0m
+2026-01-16 10:01:14.855 | DEBUG    | [EVAL-SYS] | LLMUserAggregator#1: User started speaking (strategy: TranscriptionUserTurnStartStrategy#1)
+2026-01-16 10:01:14.856 | DEBUG    | [EVAL-SYS] | PipelineTask#1: received interruption task frame InterruptionTaskFrame#1
+2026-01-16 10:01:14.856 | DEBUG    | [BOT-SYS] | OpenRouterLLMService#0 prompt tokens: 1109, completion tokens: 45
+2026-01-16 10:01:14.857 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#18(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'tokens': [{'prompt_tokens': 1109, 'completion_tokens': 45, 'total_tokens': 1154, 'cache_read_input_tokens': 0, 'reasoning_tokens': 0}]}})
+2026-01-16 10:01:14.857 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#6, tokens: 1109, characters: 45
+2026-01-16 10:01:14.857 | DEBUG    | [BOT-SYS] | OpenRouterLLMService#0 processing time: 2.176111936569214
+2026-01-16 10:01:14.858 | DEBUG    | [BOT-SYS] | 🧠 OpenRouterLLMService#0 → LLM END RESPONSE at 8.73s
+2026-01-16 10:01:14.858 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#6
+2026-01-16 10:01:14.858 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#19(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'OpenRouterLLMService#0', 'model': 'google/gemini-3-flash-preview', 'value': 2.176111936569214}]}})
+2026-01-16 10:01:14.858 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#20(message: {'label': 'rtvi-ai', 'type': 'bot-llm-stopped'})
+2026-01-16 10:01:14.858 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#7, processing: 2.176111936569214
+2026-01-16 10:01:14.858 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#7
+2026-01-16 10:01:14.859 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#18(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'tokens': [{'prompt_tokens': 1109, 'completion_tokens': 45, 'total_tokens': 1154, 'cache_read_input_tokens': 0, 'reasoning_tokens': 0}]}})
+2026-01-16 10:01:14.860 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#19(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'OpenRouterLLMService#0', 'model': 'google/gemini-3-flash-preview', 'value': 2.176111936569214}]}})
+2026-01-16 10:01:14.860 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#20(message: {'label': 'rtvi-ai', 'type': 'bot-llm-stopped'})
+2026-01-16 10:01:14.861 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#17(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'tokens': [{'prompt_tokens': 1109, 'completion_tokens': 45, 'total_tokens': 1154, 'cache_read_input_tokens': 0, 'reasoning_tokens': 0}]}})
+2026-01-16 10:01:14.861 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#18(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'OpenRouterLLMService#0', 'model': 'google/gemini-3-flash-preview', 'value': 2.176111936569214}]}})
+2026-01-16 10:01:14.861 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#19(message: {'label': 'rtvi-ai', 'type': 'bot-llm-stopped'})
+2026-01-16 10:01:15.021 | DEBUG    | [BOT-SYS] | GoogleTTSService#0 usage characters: 114
+2026-01-16 10:01:15.022 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#8, characters: 114
+2026-01-16 10:01:15.022 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#21(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'characters': [{'processor': 'GoogleTTSService#0', 'value': 114}]}})
+2026-01-16 10:01:15.022 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#22(message: {'label': 'rtvi-ai', 'type': 'bot-tts-started'})
+2026-01-16 10:01:15.022 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#8
+2026-01-16 10:01:15.023 | INFO     | [BOT-SYS] | output bot frame: TTSStartedFrame#1
+2026-01-16 10:01:15.024 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#21(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'characters': [{'processor': 'GoogleTTSService#0', 'value': 114}]}})
+2026-01-16 10:01:15.024 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#22(message: {'label': 'rtvi-ai', 'type': 'bot-tts-started'})
+2026-01-16 10:01:15.024 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#20(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'characters': [{'processor': 'GoogleTTSService#0', 'value': 114}]}})
+2026-01-16 10:01:15.025 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#21(message: {'label': 'rtvi-ai', 'type': 'bot-tts-started'})
+2026-01-16 10:01:15.233 | DEBUG    | [BOT-SYS] | GoogleTTSService#0 TTFB: 0.3860440254211426
+2026-01-16 10:01:15.233 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#9, ttfb: 0.3860440254211426
+2026-01-16 10:01:15.233 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#23(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleTTSService#0', 'value': 0.3860440254211426}]}})
+2026-01-16 10:01:15.233 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#9
+2026-01-16 10:01:15.234 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#23(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleTTSService#0', 'value': 0.3860440254211426}]}})
+2026-01-16 10:01:15.234 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#22(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleTTSService#0', 'value': 0.3860440254211426}]}})
+2026-01-16 10:01:15.293 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#25(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.294 | DEBUG    | [BOT-SYS] | Bot started speaking
+2026-01-16 10:01:15.294 | DEBUG    | [BOT-SYS] | ⏱️ LATENCY FROM USER STOPPED SPEAKING TO BOT STARTED SPEAKING: 5.913s
+2026-01-16 10:01:15.294 | INFO     | [BOT-SYS] | output bot frame: BotStartedSpeakingFrame#3
+2026-01-16 10:01:15.294 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#9
+2026-01-16 10:01:15.294 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#24(message: {'label': 'rtvi-ai', 'type': 'bot-started-speaking'})
+2026-01-16 10:01:15.295 | INFO     | [BOT-SYS] | input bot frame: BotStartedSpeakingFrame#3
+2026-01-16 10:01:15.295 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#9
+2026-01-16 10:01:15.295 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#24(message: {'label': 'rtvi-ai', 'type': 'bot-started-speaking'})
+2026-01-16 10:01:15.296 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#23(message: {'label': 'rtvi-ai', 'type': 'bot-started-speaking'})
+2026-01-16 10:01:15.296 | INFO     | [EVAL] | [rtvi] turn index: 1
+2026-01-16 10:01:15.410 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#38(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.471 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#52(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.496 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#11
+2026-01-16 10:01:15.496 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#11
+2026-01-16 10:01:15.558 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#65(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.591 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#79(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.735 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#13
+2026-01-16 10:01:15.736 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#13
+2026-01-16 10:01:15.786 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#92(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.841 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#106(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.842 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#119(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.842 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#133(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:15.936 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#15
+2026-01-16 10:01:15.936 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#15
+2026-01-16 10:01:15.963 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#146(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.023 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#160(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.083 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#173(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.137 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#17
+2026-01-16 10:01:16.138 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#17
+2026-01-16 10:01:16.147 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#187(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.209 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#200(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.276 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#214(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.298 | DEBUG    | [BOT-SYS] | GoogleTTSService#0 processing time: 1.4508700370788574
+2026-01-16 10:01:16.318 | DEBUG    | [BOT-SYS] | GoogleTTSService#0: Generating TTS [(कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)]
+2026-01-16 10:01:16.319 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#10, processing: 1.4508700370788574
+2026-01-16 10:01:16.349 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#25(message: {'label': 'rtvi-ai', 'type': 'bot-tts-stopped'})
+2026-01-16 10:01:16.349 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#26(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleTTSService#0', 'value': 1.4508700370788574}]}})
+2026-01-16 10:01:16.350 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#27(message: {'label': 'rtvi-ai', 'type': 'bot-output', 'data': {'text': '(कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)', 'spoken': False, 'aggregated_by': 'sentence'}})
+2026-01-16 10:01:16.353 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#10
+2026-01-16 10:01:16.360 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#227(pts: None, destination: None, size: 3212, frames: 1606, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.360 | INFO     | [BOT-SYS] | output bot frame: TTSStoppedFrame#1
+2026-01-16 10:01:16.360 | INFO     | [BOT-SYS] | output bot frame: TTSTextFrame#1(pts: None, text: [नमस्ते। मैं यहाँ आपकी एएनसी (ANC) जांच के लिए फॉर्म भरने में मदद करूँगी।
+
+क्या आप मुझे अपना पूरा नाम बता सकती हैं?])
+2026-01-16 10:01:16.360 | INFO     | [BOT-SYS] | output bot frame: AggregatedTextFrame#2(pts: None, text: [(कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)])
+2026-01-16 10:01:16.364 | DEBUG    | [BOT-SYS] | GoogleTTSService#0 usage characters: 43
+2026-01-16 10:01:16.365 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#19
+2026-01-16 10:01:16.366 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#11, characters: 43
+2026-01-16 10:01:16.367 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#28(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'characters': [{'processor': 'GoogleTTSService#0', 'value': 43}]}})
+2026-01-16 10:01:16.368 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#29(message: {'label': 'rtvi-ai', 'type': 'bot-tts-started'})
+2026-01-16 10:01:16.375 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#11
+2026-01-16 10:01:16.377 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#25(message: {'label': 'rtvi-ai', 'type': 'bot-tts-stopped'})
+2026-01-16 10:01:16.377 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#26(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleTTSService#0', 'value': 1.4508700370788574}]}})
+2026-01-16 10:01:16.377 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#27(message: {'label': 'rtvi-ai', 'type': 'bot-output', 'data': {'text': '(कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)', 'spoken': False, 'aggregated_by': 'sentence'}})
+2026-01-16 10:01:16.381 | INFO     | [BOT-SYS] | output bot frame: TTSStartedFrame#2
+2026-01-16 10:01:16.387 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#19
+2026-01-16 10:01:16.388 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#24(message: {'label': 'rtvi-ai', 'type': 'bot-tts-stopped'})
+2026-01-16 10:01:16.388 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#25(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleTTSService#0', 'value': 1.4508700370788574}]}})
+2026-01-16 10:01:16.388 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#26(message: {'label': 'rtvi-ai', 'type': 'bot-output', 'data': {'text': '(कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)', 'spoken': False, 'aggregated_by': 'sentence'}})
+2026-01-16 10:01:16.388 | INFO     | [EVAL-SYS] | [95mReceived agent message[0m: (कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)[0m
+2026-01-16 10:01:16.390 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#28(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'characters': [{'processor': 'GoogleTTSService#0', 'value': 43}]}})
+2026-01-16 10:01:16.390 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#29(message: {'label': 'rtvi-ai', 'type': 'bot-tts-started'})
+2026-01-16 10:01:16.395 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#27(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'characters': [{'processor': 'GoogleTTSService#0', 'value': 43}]}})
+2026-01-16 10:01:16.395 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#28(message: {'label': 'rtvi-ai', 'type': 'bot-tts-started'})
+2026-01-16 10:01:16.584 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#21
+2026-01-16 10:01:16.585 | DEBUG    | [BOT-SYS] | GoogleTTSService#0 TTFB: 0.26711106300354004
+2026-01-16 10:01:16.586 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#12, ttfb: 0.26711106300354004
+2026-01-16 10:01:16.586 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#30(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleTTSService#0', 'value': 0.26711106300354004}]}})
+2026-01-16 10:01:16.586 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#12
+2026-01-16 10:01:16.588 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#21
+2026-01-16 10:01:16.590 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#30(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleTTSService#0', 'value': 0.26711106300354004}]}})
+2026-01-16 10:01:16.590 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#29(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'GoogleTTSService#0', 'value': 0.26711106300354004}]}})
+2026-01-16 10:01:16.634 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#231(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.695 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#244(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.754 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#258(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.808 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#23
+2026-01-16 10:01:16.809 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#23
+2026-01-16 10:01:16.816 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#271(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.874 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#285(pts: None, destination: None, size: 16000, frames: 8000, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.891 | DEBUG    | [BOT-SYS] | GoogleTTSService#0 processing time: 0.5732080936431885
+2026-01-16 10:01:16.891 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#13, processing: 0.5732080936431885
+2026-01-16 10:01:16.891 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#31(message: {'label': 'rtvi-ai', 'type': 'bot-tts-stopped'})
+2026-01-16 10:01:16.891 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#32(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleTTSService#0', 'value': 0.5732080936431885}]}})
+2026-01-16 10:01:16.892 | INFO     | [BOT-SYS] | output bot frame: MetricsFrame#13
+2026-01-16 10:01:16.892 | INFO     | [BOT-SYS] | output bot frame: TTSAudioRawFrame#298(pts: None, destination: None, size: 5772, frames: 2886, sample_rate: 16000, channels: 1)
+2026-01-16 10:01:16.892 | INFO     | [BOT-SYS] | output bot frame: TTSStoppedFrame#2
+2026-01-16 10:01:16.892 | INFO     | [BOT-SYS] | output bot frame: TTSTextFrame#2(pts: None, text: [(कृपया अपना पहला और आखिरी नाम, दोनों बताएँ)])
+2026-01-16 10:01:16.892 | INFO     | [BOT-SYS] | output bot frame: LLMFullResponseEndFrame#1
+2026-01-16 10:01:16.892 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#31(message: {'label': 'rtvi-ai', 'type': 'bot-tts-stopped'})
+2026-01-16 10:01:16.892 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#32(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleTTSService#0', 'value': 0.5732080936431885}]}})
+2026-01-16 10:01:16.893 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#30(message: {'label': 'rtvi-ai', 'type': 'bot-tts-stopped'})
+2026-01-16 10:01:16.893 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#31(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'processing': [{'processor': 'GoogleTTSService#0', 'value': 0.5732080936431885}]}})
+2026-01-16 10:01:17.047 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#25
+2026-01-16 10:01:17.050 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#25
+2026-01-16 10:01:17.247 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#27
+2026-01-16 10:01:17.248 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#27
+2026-01-16 10:01:17.488 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#29
+2026-01-16 10:01:17.489 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#29
+2026-01-16 10:01:17.690 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#31
+2026-01-16 10:01:17.693 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#31
+2026-01-16 10:01:17.927 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#33
+2026-01-16 10:01:17.930 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#33
+2026-01-16 10:01:18.167 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#35
+2026-01-16 10:01:18.168 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#35
+2026-01-16 10:01:18.407 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#37
+2026-01-16 10:01:18.407 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#37
+2026-01-16 10:01:18.607 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#39
+2026-01-16 10:01:18.609 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#39
+2026-01-16 10:01:18.808 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#41
+2026-01-16 10:01:18.809 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#41
+2026-01-16 10:01:19.047 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#43
+2026-01-16 10:01:19.049 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#43
+2026-01-16 10:01:19.287 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#45
+2026-01-16 10:01:19.288 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#45
+2026-01-16 10:01:19.487 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#47
+2026-01-16 10:01:19.488 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#47
+2026-01-16 10:01:19.727 | INFO     | [BOT-SYS] | output bot frame: BotSpeakingFrame#49
+2026-01-16 10:01:19.728 | INFO     | [BOT-SYS] | input bot frame: BotSpeakingFrame#49
+2026-01-16 10:01:19.859 | DEBUG    | [EVAL-SYS] | LLMUserAggregator#1: User stopped speaking (strategy: None)
+
+logs from the first successful run
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+Looking at the logs, I can see the difference between the successful first simulation and the stuck second simulation:
+
+**First simulation (successful):**
+```
+2026-01-16 10:01:09.423 | DEBUG    | [BOT-SYS] | End of Turn result: EndOfTurnState.COMPLETE
+2026-01-16 10:01:09.423 | DEBUG    | [BOT-SYS] | User stopped speaking
+```
+The turn analyzer detected "End of Turn result: EndOfTurnState.COMPLETE" which triggered the LLM.
+
+**Second simulation (stuck):**
+```
+2026-01-16 10:02:04.653 | DEBUG    | [BOT-SYS] | End of Turn result: EndOfTurnState.INCOMPLETE
+```
+The turn analyzer detected "End of Turn result: EndOfTurnState.INCOMPLETE" which did NOT trigger the LLM properly.
+
+The key difference is that in the first simulation, the `LocalSmartTurnAnalyzerV3` detected `EndOfTurnState.COMPLETE`, but in the second simulation it detected `EndOfTurnState.INCOMPLETE`.
+
+This is why the explicit `user-stopped-speaking` message I added didn't help - it's being rejected:
+```
+2026-01-16 10:02:04.852 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#115(message: {'label': 'rtvi-ai', 'type': 'error-response', 'id': '3a3e2eef-0a2d-4dc9-967f-636a18512be7', 'data': {'error': 'Unsupported type user-stopped-speaking'}})
+```
+
+So the RTVI processor on the BOT side doesn't support receiving `user-stopped-speaking` messages from the client.
+
+The issue seems to be with the `LocalSmartTurnAnalyzerV3` - it's non-deterministic and sometimes returns INCOMPLETE even when there's clear silence.
+
+
+The turn analyzer's inconsistency is the real problem. In the first case it correctly identified the turn as complete, but in the second it marked it incomplete despite the same conditions. The explicit user-stopped-speaking message was rejected anyway since RTVI doesn't support that message type. Eventually VAD forced a timeout, but by then STT had already timed out, creating a deadlock.
+
+I should either disable the turn analyzer entirely and rely on VAD alone, modify the RTVI processor to accept user-stopped-speaking messages, or find an alternative signaling mechanism. The deprecation warning suggests the turn analyzer shouldn't be on the transport layer at all—it should use the LLMUserAggregator's user_turn_strategies parameter instead. Let me check how bot.py configures the transport to see if removing or reconfiguring the turn analyzer there would help.</details></think>
+
+---
+
+I can see the issue now. Looking at the logs:
+
+**First simulation (worked):**
+```
+End of Turn result: EndOfTurnState.COMPLETE
+User stopped speaking
+```
+
+**Second simulation (stuck):**
+```
+End of Turn result: EndOfTurnState.INCOMPLETE
+```
+
+The `LocalSmartTurnAnalyzerV3` is non-deterministic - it detected `COMPLETE` in the first simulation but `INCOMPLETE` in the second. Also, the explicit `user-stopped-speaking` message is rejected by the BOT's RTVI processor (`Unsupported type user-stopped-speaking`).
+
+The solution is to disable the turn analyzer on the BOT side for simulations, since we're sending synthesized audio that the turn analyzer can't reliably analyze. Let me check the bot.py:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/bot.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me find where the transport is configured with the turn_analyzer:</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "turn_analyzer|LocalSmartTurn|SmartTurn",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/bot.py",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "turn_analyzer|LocalSmartTurn|SmartTurn",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/bot.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The turn analyzer is not configured in bot.py directly. Let me search where it might be configured in the transport creation:</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "turn_analyzer|LocalSmartTurn",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/pense",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "turn_analyzer|LocalSmartTurn",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/pense",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "pense/agent/run_simulation.py",
+              "matches": [
+                {
+                  "lineNumber": 48,
+                  "content": "from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3"
+                },
+                {
+                  "lineNumber": 178,
+                  "content": "            turn_analyzer=LocalSmartTurnAnalyzerV3(),"
+                },
+                {
+                  "lineNumber": 777,
+                  "content": "            # turn_analyzer=LocalSmartTurnAnalyzerV3(),"
+                }
+              ]
+            },
+            {
+              "file": "pense/stt/eval.py",
+              "matches": [
+                {
+                  "lineNumber": 71,
+                  "content": "from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3"
+                },
+                {
+                  "lineNumber": 94,
+                  "content": "            turn_analyzer=LocalSmartTurnAnalyzerV3(),"
+                }
+              ]
+            },
+            {
+              "file": "pense/agent/test.py",
+              "matches": [
+                {
+                  "lineNumber": 16,
+                  "content": "from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3"
+                },
+                {
+                  "lineNumber": 89,
+                  "content": "        turn_analyzer=LocalSmartTurnAnalyzerV3(),"
+                },
+                {
+                  "lineNumber": 95,
+                  "content": "        turn_analyzer=LocalSmartTurnAnalyzerV3(),"
+                }
+              ]
+            }
+          ],
+          "totalLines": 8,
+          "totalMatchedLines": 8
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+So the turn analyzer is configured in `run_simulation.py` at line 178. Let me look at that section:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The `LocalSmartTurnAnalyzerV3` is configured on the BOT side's `WebsocketServerTransport` at line 178. This is the turn analyzer that's producing inconsistent results between simulations.
+
+The problem is that:
+1. In the first simulation, the turn analyzer detected `EndOfTurnState.COMPLETE`
+2. In the second simulation, it detected `EndOfTurnState.INCOMPLETE`
+
+This inconsistency is causing the LLM not to trigger in the second simulation.
+
+The solution is to remove the turn analyzer from the BOT side when running simulations, since:
+1. We're sending synthesized audio that the turn analyzer can't reliably analyze
+2. The VAD + timeout should be sufficient for simulations
+3. We can rely on the simulated user sending explicit signals
+
+I should remove `turn_analyzer=LocalSmartTurnAnalyzerV3()` from line 178, or make it configurable.
+
+Actually, wait - looking at the logs more carefully, I see that even though the turn analyzer detected INCOMPLETE, there's later:
+
+```
+2026-01-16 10:02:06.069 | WARNING  | [BOT-SYS] | Forcing VAD user stopped speaking due to timeout receiving audio frame!
+2026-01-16 10:02:06.069 | DEBUG    | [BOT-SYS] | User stopped speaking
+```
+
+So the VAD eventually timed out and signaled user stopped speaking. But then there's a 3.5 second gap before:
+
+```
+2026-01-16 10:02:09.610 | DEBUG    | [BOT-SYS] | LLMUserAggregator#2: User stopped speaking (strategy: None)
+```
+
+And then it takes another 6+ seconds before the STT timeout:
+```
+2026-01-16 10:02:15.844 | DEBUG    | [BOT-SYS] | GoogleSTTService#1 Stream aborted due to inactivity
+
+
+```
+
+But there's still no LLM generation happening! Let me check what happens in the first simulation after user stopped speaking. In the first simulation, `UserStoppedSpeakingFrame` is logged immediately at 10:01:09.423, followed by the LLMUserAggregator processing it around 10:01:12.680. The key difference is that the first simulation's turn analyzer returned COMPLETE, which likely triggered immediate LLM processing, whereas the second simulation's INCOMPLETE state is blocking the pipeline. Looking at the second simulation, when the strategy is `None` instead of `ExternalUserTurnStopStrategy#0`, the LLM aggregator doesn't trigger generation at all. The critical difference appears to be in how the turn completion state is determined—in the first case, `EndOfTurnState.COMPLETE` is reached, which then enables the strategy to fire and initiate LLM processing. Without that completion state, the aggregator remains inactive even when user speech stops. The first scenario shows `EndOfTurnState.COMPLETE` followed by STT processing completing at 10:01:12.180, then the user stopping speaking is detected at 10:01:12.680, which triggers LLM generation. In the second scenario, `EndOfTurnState.INCOMPLETE` leads to a timeout forcing VAD to stop at 10:02:06.069 with `strategy: None`, preventing any LLM invocation. The key distinction appears to be the end-of-turn state and whether a complete transcription arrives before the user stop signal—in the first case both conditions align to enable generation, while in the second they don't. The transcription comes through at 10:01:12.177, with the LLM beginning processing shortly after at 10:01:12.681. In the second simulation, I need to verify whether a transcription actually occurs before the STT timeout. Scanning the logs more carefully, I notice the user started speaking at 10:02:04.328, but there's no transcription logged before the STT times out at 10:02:15.844. However, the earlier logs the user shared show a transcription at 09:51:51.147 with the same text. The discrepancy is puzzling—in the second simulation's logs, speech is being detected but no transcription is being produced before the timeout occurs. The full logs with silence frames do show a transcription happening, so I need to focus on what's actually present in the current message's second simulation logs. User stopped speaking at 10:01:12.680, then the LLM starts at 10:01:12.681.
+
+The critical difference between the two simulations is that the first one receives a transcription from STT, which triggers the LLM, while the second one never gets a transcription and times out instead. Both use the same port 8768 and Google STT service, but the second runs immediately after the first completes. I notice the processor instances differ—the first uses GoogleSTTService#0 and PipelineTask#0, while the second uses GoogleSTTService#1 and PipelineTask#2, suggesting different service instances are handling each simulation.
+
+The VAD behavior appears identical in both cases, detecting speech at 10:02:04.328 and silence at 10:02:04.608. However, when audio flows from EVAL to BOT in the second simulation, the STT service fails to produce a transcription, which seems to be where the problem originates.
+
+Looking at the timing metrics, the second simulation shows GoogleSTTService#1 with TTFB and processing time both at 0.043 seconds—suspiciously identical and extremely brief. This suggests an empty or zero-length transcription, whereas the first simulation's GoogleSTTService#0 shows a TTFB of 0.048 seconds with actual content being processed.
+
+The critical difference: the first simulation eventually reports a processing time of 1.835 seconds for the full transcription, but the second simulation never produces a subsequent processing time metric for GoogleSTTService#1. This indicates the transcription never completes or produces output in the second case. The issue appears to be with what audio data is being sent to Google's STT service in the second simulation.
+
+Both simulations transmit the same synthesized "Hello" audio along with silence frames from the EVAL to the BOT. However, examining the frame types more closely reveals a potential mismatch: the BOT is receiving `OutputAudioRawFrame` objects from the EVAL, yet Google's STT service expects `InputAudioRawFrame` types. Neither simulation shows `InputAudioRawFrame` being passed through, only output frames. This frame type discrepancy could explain why transcription fails to process in the second simulation—the STT service may not be recognizing or accepting the audio data format being provided. d something important. The second simulation logs show the Silero VAD and Local Smart Turn models being loaded fresh, followed by a new PipelineRunner#2 being instantiated. This suggests the pipeline is being recreated rather than reused between simulations, which could explain why the STT behavior differs.
+
+Looking at the timing, the second simulation starts immediately after the first completes, both using port 8768. While port reuse shouldn't directly impact transcription, there's a possibility of lingering connection states. More likely though, the `LocalSmartTurnAnalyzerV3` returning `INCOMPLETE` leaves the pipeline in an unexpected state where the `LLMUserAggregator` waits indefinitely for signals that never arrive. The fix probably involves ensuring proper state cleanup or timeout handling when turn analysis is incomplete.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand the issue better. The `LocalSmartTurnAnalyzerV3` is used on the BOT side (line 178), and it's giving inconsistent results. In the first simulation, it returned `COMPLETE`, which triggered the LLM. In the second simulation, it returned `INCOMPLETE`, which didn't trigger the LLM properly.
+
+The core issue:
+1. When `EndOfTurnState.COMPLETE` → `UserStoppedSpeakingFrame` is sent → LLM aggregator triggers with `ExternalUserTurnStopStrategy`
+2. When `EndOfTurnState.INCOMPLETE` → VAD eventually times out and sends `UserStoppedSpeakingFrame` → LLM aggregator triggers with `strategy: None` → But the LLM doesn't start!
+
+Looking at the difference:
+- First sim: `LLMUserAggregator#0: User stopped speaking (strategy: ExternalUserTurnStopStrategy#0)` → LLM triggers
+- Second sim: `LLMUserAggregator#2: User stopped speaking (strategy: None)` → LLM doesn't trigger
+
+The problem is that when the turn analyzer returns INCOMPLETE, the LLM aggregator doesn't recognize it as a valid turn stop signal.
+
+The fix is to remove the turn analyzer from the BOT side when running simulations. Since the synthesized audio from TTS can't be reliably analyzed by the turn analyzer, we should rely only on VAD.
+
+Let me make that change:</details></think>
+
+---
+
+I found the issue. Looking at the logs:
+
+**First simulation:**
+```
+End of Turn result: EndOfTurnState.COMPLETE
+LLMUserAggregator#0: User stopped speaking (strategy: ExternalUserTurnStopStrategy#0)
+→ LLM triggers
+```
+
+**Second simulation:**
+```
+End of Turn result: EndOfTurnState.INCOMPLETE
+LLMUserAggregator#2: User stopped speaking (strategy: None)
+→ LLM doesn't trigger!
+```
+
+The `LocalSmartTurnAnalyzerV3` is non-deterministic with synthesized audio. When it returns `INCOMPLETE`, the `LLMUserAggregator` doesn't properly trigger the LLM.
+
+The fix is to remove the turn analyzer from the BOT side for simulations - the VAD alone should be sufficient:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I also need to remove the `user-stopped-speaking` explicit signal I added earlier since it's not supported by the RTVI processor (causing an error). Let me also remove that code since it's not needed now that we're removing the turn analyzer. Actually, let me first check if removing the turn analyzer is sufficient. The explicit signal is being rejected anyway (`Unsupported type user-stopped-speaking`), so it's not helping. But it's also not hurting because it's being silently ignored after the error.
+
+Actually, let me leave the explicit signal removal for now and just test if removing the turn analyzer fixes the issue. If there are still problems, we can come back to it.
+
+Actually, I should also remove the explicit user-stopped-speaking signal since it's causing error logs and is not needed anymore:</details></think>
+
+---
+
+Now let me also remove the explicit `user-stopped-speaking` signal I added earlier since it's being rejecte
+
+---
+
+_**User**_
+
+no turn detection is needed as we also need to verify the accuracy of the smart turn detection
+
+
+2026-01-16 10:02:06.069 | WARNING  | [BOT-SYS] | Forcing VAD user stopped speaking due to timeout receiving audio frame!
+2026-01-16 10:02:06.069 | DEBUG    | [BOT-SYS] | User stopped speaking
+2026-01-16 10:02:06.069 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#116(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:06.070 | INFO     | [BOT-SYS] | input bot frame: UserStoppedSpeakingFrame#18
+2026-01-16 10:02:06.070 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#116(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:06.070 | INFO     | [BOT-SYS] | output bot frame: UserStoppedSpeakingFrame#18
+2026-01-16 10:02:06.071 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#114(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:09.610 | DEBUG    | [BOT-SYS] | LLMUserAggregator#2: User stopped speaking (strategy: None)
+2026-01-16 10:02:09.612 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#117(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:09.613 | INFO     | [BOT-SYS] | input bot frame: UserStoppedSpeakingFrame#21
+2026-01-16 10:02:09.613 | INFO     | [BOT-SYS] | output bot frame: UserStoppedSpeakingFrame#20
+2026-01-16 10:02:09.613 | INFO     | [BOT-SYS] | output bot frame: OutputTransportMessageUrgentFrame#117(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:09.614 | DEBUG    | [EVAL-SYS] | ProtobufFrameSerializer: Transport message InputTransportMessageFrame#115(message: {'label': 'rtvi-ai', 'type': 'user-stopped-speaking'})
+2026-01-16 10:02:15.844 | DEBUG    | [BOT-SYS] | GoogleSTTService#1 Stream aborted due to inactivity (no audio input). Reconnecting automatically...
+
+-- and the actual error happens later because even if smart turn analyser makes a mistake, after a second, the turn is forcefully ended anyway 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is right - they want to keep the turn analyzer enabled because they need to test its accuracy. The issue is that even after VAD forces the user stopped speaking (at 10:02:06.069), and even after `LLMUserAggregator#2: User stopped speaking (strategy: None)` at 10:02:09.610, the LLM still doesn't start.
+
+Let me trace through what happens:
+1. Turn analyzer returns INCOMPLETE at 10:02:04.653
+2. VAD forces user stopped speaking at 10:02:06.069 (about 1.4 seconds later)
+3. `UserStoppedSpeakingFrame#18` is emitted
+4. `LLMUserAggregator#2: User stopped speaking (strategy: None)` at 10:02:09.610 (3.5 seconds later!)
+5. Another `UserStoppedSpeakingFrame#21` is emitted
+6. STT times out at 10:02:15.844 (6 seconds later)
+
+The key problem seems to be that even though `LLMUserAggregator#2: User stopped speaking (strategy: None)` is logged, the LLM doesn't start generating.
+
+In the first successful simulation:
+- `LLMUserAggregator#0: User stopped speaking (strategy: ExternalUserTurnStopStrategy#0)` at 10:01:12.680
+- Immediately followed by LLM context frame at 10:01:12.681
+
+The difference is the strategy:
+- `ExternalUserTurnStopStrategy#0` → triggers LLM
+- `None` → doesn't trigger LLM
+
+So when the turn analyzer returns INCOMPLETE but VAD eventually forces a stop, the LLMUserAggregator's stop strategy is `None`, which doesn't actually trigger the LLM to respond!
+
+This seems like a bug or configuration issue with how the LLMUserAggregator handles the case when the turn analyzer returns INCOMPLETE but VAD forces a stop.
+
+
+The deprecation warning points to the real issue - using the old `turn_analyzer` on the transport doesn't properly integrate with the LLMUserAggregator's strategy system. When the turn analyzer returns INCOMPLETE and VAD takes over, there's no configured strategy to actually trigger LLM generation. The fix would be migrating to the new `user_turn_strategies` parameter with `TurnAnalyzerUserTurnStopStrategy` to ensure proper fallback behavior when the analyzer is uncertain.
+
+But this is happening on the bot side in `run_simulation.py`'s `start_eval_bot` function, which calls `run_bot` from `bot.py`. I need to check how the LLMContextAggregatorPair is actually configured there to see what strategies are currently in place.</details></think>
+
+---
+
+I understand - you want to keep the turn analyzer to test its accuracy. The real issue is that when the turn analyzer returns `INCOMPLETE` but VAD later forces a stop, the `LLMUserAggregator` uses `strategy: None` which doesn't trigger the LLM.
+
+Let me look at how the LLM context aggregator is configured in the bot:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "LLMContextAggregator|context_aggregator",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/bot.py",
+  "context": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "LLMContextAggregator|context_aggregator",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/bot.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "pense/agent/bot.py",
+              "matches": [
+                {
+                  "lineNumber": 34,
+                  "content": "from pipecat.pipeline.pipeline import Pipeline",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 35,
+                  "content": "from pipecat.pipeline.runner import PipelineRunner",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 36,
+                  "content": "from pipecat.pipeline.task import PipelineParams, PipelineTask",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 37,
+                  "content": "from pipecat.processors.aggregators.llm_context import LLMContext",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 38,
+                  "content": "from pipecat.processors.aggregators.llm_response_universal import (",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 39,
+                  "content": "    LLMContextAggregatorPair,"
+                },
+                {
+                  "lineNumber": 40,
+                  "content": ")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 41,
+                  "content": "from pipecat.processors.frame_processor import FrameDirection, FrameProcessor",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 42,
+                  "content": "from pipecat.runner.types import RunnerArguments",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 43,
+                  "content": "from pipecat.runner.utils import create_transport",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 44,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 486,
+                  "content": "        llm.register_function(tool[\"name\"], generic_function_call)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 487,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 488,
+                  "content": "    tools = ToolsSchema(standard_tools=standard_tools)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 489,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 490,
+                  "content": "    context = LLMContext(messages, tools)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 491,
+                  "content": "    context_aggregator = LLMContextAggregatorPair(context)"
+                },
+                {
+                  "lineNumber": 492,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 493,
+                  "content": "    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 494,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 495,
+                  "content": "    pending_tool_calls: Dict[str, FunctionCallParams] = {}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 496,
+                  "content": "    pending_tool_call_events: Dict[str, asyncio.Event] = {}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 576,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 577,
+                  "content": "    pipeline_processors.extend(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 578,
+                  "content": "        [",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 579,
+                  "content": "            stt,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 580,
+                  "content": "            transcript.user(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 581,
+                  "content": "            context_aggregator.user(),"
+                },
+                {
+                  "lineNumber": 582,
+                  "content": "            llm,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 583,
+                  "content": "            tts,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 584,
+                  "content": "            ml,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 585,
+                  "content": "            OutputLogger(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 586,
+                  "content": "            transport.output(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 587,
+                  "content": "            transcript.assistant(),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 588,
+                  "content": "            context_aggregator.assistant(),"
+                },
+                {
+                  "lineNumber": 589,
+                  "content": "        ]",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 590,
+                  "content": "    )",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 591,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 592,
+                  "content": "    pipeline = Pipeline(pipeline_processors)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 593,
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 40,
+          "totalMatchedLines": 4
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see that the `LLMContextAggregatorPair` is created without any custom parameters at line 491. This means it's using default strategies.
+
+The deprecation warning says:
+```
+LLMUserAggregator#2: `turn_analyzer` in base input transport is deprecated. Use `LLMUserAggregator`'s new `user_turn_strategies` parameter with `TurnAnalyzerUserTurnStopStrategy` instead
+```
+
+So the issue is that the turn_analyzer is set on the transport (in run_simulation.py), but the LLMContextAggregatorPair doesn't know about it. When the turn analyzer returns INCOMPLETE and VAD forces a stop later, the aggregator doesn't have a proper stop strategy configured.
+
+The fix would be to configure the `LLMContextAggregatorPair` with proper user turn strategies that include both:
+1. The turn analyzer strategy
+2. A fallback VAD-based strategy
+
+But actually, looking at the successful first simulation, it worked! The `ExternalUserTurnStopStrategy#0` was used. So somehow in the first simulation, the turn analyzer returned COMPLETE and an ExternalUserTurnStopStrategy was used. In the second simulation, the turn analyzer returned INCOMPLETE and strategy was None.
+
+Wait - I think the issue might be with state carryover between simulations. Let me think about this more carefully...
+
+Actually, looking at the timestamps again:
+- First simulation starts at 10:01:05
+- Second simulation starts at 10:02:01
+
+These are different BOT instances with different GoogleSTTService instances (#0 vs #1). But they might be sharing some global state or the same event loop...
+
+Actually, wait. Let me look at the core difference again. In the successful run:
+```
+10:01:09.423 | DEBUG    | [BOT-SYS] | End of Turn result: EndOfTurnState.COMPLETE
+10:01:09.423 | DEBUG    | [BOT-SYS] | User stopped speaking
+
+
+```
+
+Then later:
+```
+10:01:12.680 | DEBUG    | [BOT-SYS] | LLMUserAggregator#0: User stopped speaking (strategy: ExternalUserTurnStopStrategy#0)
+```
+
+In the failed run, the turn analyzer returns INCOMPLETE instead, and then VAD forces a stop with a timeout warning. The key difference is that the first simulation gets a COMPLETE result from the turn analyzer, allowing the external strategy to trigger properly, while the second gets INCOMPLETE and falls back to the VAD timeout mechanism without a configured strategy.
+
+The deprecation warning suggests moving away from setting `turn_analyzer` on the transport and instead configuring `user_turn_strategies` directly on the `LLMUserAggregator`, though this could require changes in bot.py. There might be a simpler underlying issue with how the turn analyzer behaves across consecutive simulations.
+
+Looking at the actual behavior: the first simulation produces an STT transcription ("हेलो।") but the second one never does—STT times out without any transcription. The audio frames are being received by the bot in the second simulation, so the WebSocket connection appears functional. This suggests the problem isn't with audio delivery to STT, but rather something about how STT processes or returns the transcription in the second run.
+
+Both simulations successfully connect to Google Speech-to-Text at different timestamps, yet only the first produces output. This points to either a state issue with the STT service between runs, or perhaps the transcription is being generated but not properly propagated back through the system.
+
+Looking at the second simulation's metrics, there's an immediate TTFB and processing time report of roughly 43 milliseconds right when speech begins. This early metric suggests the service may be responding, but with minimal or empty content. The first simulation shows a similar pattern with its own early metrics report, indicating both are attempting to process audio, but something diverges in how results are handled afterward.
+
+The critical difference emerges when examining the full timeline: the first simulation produces a second processing time report much later (1.8 seconds), capturing the actual transcription work, while the second simulation never generates this follow-up report. This absence suggests the transcription pipeline either stalled or never received the necessary audio data to complete the recognition task. The underlying cause could relate to how the audio stream is being fed to the service.
+
+Looking more closely at the timeout message in the second simulation—"Forcing VAD user stopped speaking due to timeout receiving audio frame!"—this reveals the real issue. The VAD system is timing out while waiting for audio frames after the turn analyzer marked the input as INCOMPLETE. The first simulation shows audio continuing to flow even after the "User stopped speaking" event, allowing the transcription to eventually complete. But in the second case, the audio stream appears to halt prematurely, triggering the timeout before sufficient audio reaches the STT service.
+
+The silence duration EVAL sends (roughly 1 second, from 10:02:03.834 to 10:02:04.851) seems adequate, but the timing between when the turn analyzer returns INCOMPLETE and when EVAL stops sending frames might be creating a gap. If EVAL terminates the audio stream too quickly after the turn analyzer's response, the BOT never receives enough frames to satisfy the STT timeout threshold, forcing VAD to artificially end the turn.
+
+The core problem appears to be a mismatch: when the turn analyzer returns INCOMPLETE, the BOT expects more audio input, but EVAL has already finished sending silence frames and stopped. This leaves the BOT hanging until it times out. Two potential solutions emerge—either extend the silence window to give the analyzer more time to reach COMPLETE, or have EVAL continue sending silence frames until the BOT explicitly signals turn completion rather than stopping after a fixed duration.
+
+However, there's another angle worth considering: in the first simulation, the transcription arrived nearly 3 seconds after the user stopped speaking, suggesting the STT had buffered enough audio to produce output. In the second case, the turn analyzer's INCOMPLETE decision and subsequent VAD cutoff prevent that buffering from ever completing, causing the pipeline to stall. never comes. The pipeline stalls because the STT is waiting for additional audio that won't arrive, and by the time the timeout triggers, the stream is already in a compromised state.
+
+I should focus on ensuring EVAL sends enough silence padding after audio stops. Rather than relying on the turn analyzer's timing, I can increase the silence duration to guarantee the STT has sufficient time to process. The current 1000ms padding might be insufficient for cases where analysis takes longer. Alternatively, making the silence padding adaptive—continuing until the BOT responds—would be more robust than a fixed duration.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Looking at the code, I see that the explicit `user-stopped-speaking` signal was removed (the user reverted it). The SilencePadder now just sends silence frames for 1000ms.
+
+The core issue is:
+1. EVAL sends TTS audio + 1000ms of silence2. Turn analyzer on BOT might return INCOMPLETE (non-deterministic)3. EVAL stops sending audio after 1000ms silence4. BOT times out waiting for more audio (because turn analyzer said INCOMPLETE)5. VAD forces user stopped speaking
+6. But STT never received enough audio context to produce transcription, or the STT stream was interrupted
+
+The fundamental problem is that when the turn analyzer returns INCOMPLETE, the BOT expects more audio to come, but EVAL has already stopped sending. This leads to the BOT's STT timing out without producing a transcription.
+
+There are a few potential fixes:
+
+1. **Increase silence duration** - Simple but adds latency to every turn
+
+2. **Keep sending silence until BOT responds** - EVAL should continue sending silence frames until it receives some signal from BOT that the turn has been processed (like a transcription or bot-started-speaking message)
+
+3. **The BOT should handle the case when audio stops** - When no more audio comes and VAD forces stop, the STT should still produce whatever transcription it has
+
+Looking at the logs more carefully, in the first simulation the STT produced a transcription ~2.7 seconds after user stopped speaking. In the second simulation, the STT timed out ~10 seconds after VAD forced stop.
+
+The difference might be:
+- First simulation: Turn analyzer returns COMPLETE immediately, STT continues processing buffered audio- Second simulation: Turn analyzer returns INCOMPLETE, this somehow affects how STT processes audio
+
+Actually, I think the issue might be simpler. Looking at the second simulation:
+- `End of Turn result: EndOfTurnState.INCOMPLETE` at 10:02:04.653- Audio frames continue to be received after this- `VADUserStoppedSpeakingFrame#4` at 10:02:04.608 (wait, this is BEFORE INCOMPLETE?)
+
+
+- 10:02:04.608: VAD detects a pause, then 10:02:04.653: turn analyzer says INCOMPLETE, so the system waits for more speech instead of ending the turn. But EVAL stops sending audio shortly after around 10:02:04.851, which means the BOT is left waiting for audio that never arrives, causing STT to eventually timeout without producing output.
+
+Then at 10:02:06.069, VAD forces a stop due to timeout. However, there's a puzzling 3.5 second gap before the aggregator finally processes this at 10:02:09.610. During that interval, the aggregator seems stuck—possibly waiting for STT results or some other signal that never materializes. The root cause appears to be that when turn analyzer marks the turn INCOMPLETE but audio stops coming, the system gets trapped in a waiting state. A potential solution would be for EVAL to keep sending silence frames longer, giving the turn analyzer additional opportunity to recognize the actual end of turn before the timeout forces a stop.</details></think>
+
+---
+
+I see the issue now. Looking at the timeline:
+
+1. Turn analyzer returns `INCOMPLETE` at 10:02:04.653
+2. EVAL stops sending audio around 10:02:04.851 (after ~1s of silence)
+3. BOT's VAD forces stop at 10:02:06.069 due to timeout (no more audio)
+4. STT never produces a transcription → times out
+
+The problem is that when the turn analyzer returns `INCOMPLETE`, it expects more audio. But EVAL stops sending after only 1 second of silence. The STT never gets enough audio context to produce a transcription.
+
+The fix is to send more silence after TTS to give the turn analyzer and STT more time. Let me increase the silence duration:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me find where the silence_padder is instantiated:</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "silence_padder\\s*=",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "silence_padder\\s*=",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "pense/agent/run_simulation.py",
+              "matches": [
+                {
+                  "lineNumber": 876,
+                  "content": "    output_logger = IOLogger()",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 877,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 878,
+                  "content": "    # Add silence padding after TTS to help STT services (like Google, Sarvam) flush transcriptions",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 879,
+                  "content": "    silence_padder = SilencePadder(silence_duration_ms=1000, chunk_ms=40)"
+                },
+                {
+                  "lineNumber": 880,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 881,
+                  "content": "    max_turns_end_processor = MaxTurnsEndProcessor(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 882,
+                  "content": "        max_turns,",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 7,
+          "totalMatchedLines": 1
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I'll increase the silence duration from 1000ms to 3000ms. This should give the turn analyzer and STT more time to process the audio.
+
+However, this might be a band-aid. A better approach would be to have the EVAL continue sending silence until it receives confirmation that the BOT has processed the turn (e.g., receives a transcription or bot-started-speaking message).
+
+For now, let me increase the silence duration to 3 seconds as a quick fix:</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also check if there's anything else that might be causing the issue. Looking at the logs again, I noticed that even after the VAD forced stop at 10:02:06.069, there's a 3.5 second delay before `LLMUserAggregator#2: User stopped speaking (strategy: None)` at 10:02:09.610.
+
+This delay is very suspicious. In the first simulation, after user stopped speaking, the LLM aggregator responded much faster. Let me see if there's something in the LLM aggregator configuration that could cause this.
+
+Actually, the 3 second delay might be the `stop_secs` timeout in the turn analyzer or something similar. Let me also check if increasing silence duration is sufficient or if we need to do something else.
+
+For now, let me also check the ReadLints to see if there are any issues with my change:</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, no linter errors. Let me summarize what I've done:
+
+1. Increased silence_duration_ms from 1000 to 3000 (3 seconds)This should give the turn analyzer and STT more time to process. However, I'm</details></think>
+
+---
+
+_**User**_
+
+sometimes all the simulations run properly and end and sometimes the second simulation gets stuck
+
+
+logs for the first run that works:
+
+BOT-SYS] | output bot frame: OutputAudioRawFrame#249(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:51:59.940 | INFO     | [BOT-SYS] | input bot frame: OutputAudioRawFrame#250(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:51:59.940 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#250(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:52:00.331 | DEBUG    | [EVAL-SYS] | Bot stopped speaking
+2026-01-16 10:52:00.331 | INFO     | [EVAL] | Audio data received - user
+2026-01-16 10:52:00.331 | INFO     | [EVAL] | [user] turn index: 0
+2026-01-16 10:52:00.332 | INFO     | [EVAL-SYS] | [92mCreating new audio file at /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmpilhjn86t/output/simulation_persona_1_scenario_1/audios/0_user.wav[0m
+2026-01-16 10:52:01.809 | DEBUG    | [BOT-SYS] | OpenRouterLLMService#0 TTFB: 1.9878668785095215
+2026-01-16 10:52:01.975 | DEBUG    | [BOT-SYS] | 🧠 OpenRouterLLMService#0 → LLM GENERATING: 'नमस्ते। मैं आपकी आज की एंटेनेटल जांच (ANC check-up' at 8.35s
+2026-01-16 10:52:02.004 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#10(message: {'label': 'rtvi-ai', 'type': 'metrics', 'data': {'ttfb': [{'processor': 'OpenRouterLLMService#0', 'model': 'google/gemini-3-flash-preview', 'value': 1.9878668785095215}]}})
+2026-01-16 10:52:02.005 | INFO     | [BOT-SYS] | input bot frame: OutputTransportMessageUrgentFrame#11(message: {'label': 'rtvi-ai', 'type': 'bot-llm-text', 'data': {'text': 'नमस्ते। मैं आपकी आज की एंटेनेटल जांच (ANC check-up'}})
+2026-01-16 10:52:02.010 | INFO     | [BOT] | !!! MetricsFrame: MetricsFrame#5, ttfb: 1.9878668785095215
+2026-01-16 10:52:02.010 | DEBUG    | [BOT-SYS] | OpenRouterLLMSe
+
+---
+
+le_rate: 16000, channels: 1)
+2026-01-16 10:53:02.586 | INFO     | [BOT-SYS] | output bot frame: OutputAudioRawFrame#2514(pts: None, source: None, size: 1280, frames: 640, sample_rate: 16000, channels: 1)
+2026-01-16 10:53:02.973 | DEBUG    | [EVAL-SYS] | Bot stopped speaking
+2026-01-16 10:53:02.973 | INFO     | [EVAL] | Audio data received - user
+2026-01-16 10:53:02.973 | INFO     | [EVAL] | [user] turn index: 0
+2026-01-16 10:53:02.973 | INFO     | [EVAL-SYS] | [92mCreating new audio file at /private/var/folders/1f/s3v3bppd0ws4v19bk0l0f8gw0000gn/T/tmpilhjn86t/output/simulation_persona_1_scenario_2/audios/0_user.wav[0m
+2026-01-16 10:53:12.849 | DEBUG    | [BOT-SYS] | GoogleSTTService#1 Stream aborted due to inactivity (no audio input). Reconnecting automatically...
+2026-01-16 10:53:12.851 | ERROR    | [BOT-SYS] | GoogleSTTService#1 exception (/Users/aman/Documents/repos/artpark/pense-backend/.venv/lib/python3.11/site-packages/google/api_core/grpc_helpers_async.py:110): Unknown error occurred: 409 Stream timed out after receiving no more client requests. [type_url: "type.googleapis.com/util.StatusProto"
+value: "\010\n\022\007generic\0329Stream timed out after receiving no more client requests.*D\013\020\206\326\215'\032;\0229Stream timed out after receiving no more client requests.\014"
+]
+
+-- logs for the run that was stuck
+
+why is the open router not getting triggered after the audio is completed in the second simulation run
+
+And why is this sporadic? like sometimes all the simulations run properly, sometimes only the first one runs but the second one is stuck  -figure out why
+
+
+
+def _run_pense_voice_simulation(
+    pense_config: Dict[str, Any],
+    output_dir: Path,
+    s3_bucket: str,
+    s3_prefix: str,
+    task_id: str,
+    log_prefix: str = "Voice simulation",
+) -> Dict[str, Any]:
+    """
+    Run pense agent simulation command and return parsed results.
+    Updates the database incrementally as each simulation completes.
+
+    Args:
+        pense_config: The pense config dict (for voice simulations)
+        output_dir: Directory to write output files
+        s3_bucket: S3 bucket name
+        s3_prefix: S3 key prefix for uploading results
+        task_id: The task ID for updating the database with incremental results
+        log_prefix: Prefix for log messages
+
+    Returns:
+        Dict with keys: success, total_simulations, metrics, simulation_results, error, audios_s3_path
+    """
+    import time
+
+    s3 = get_s3_client()
+
+    # Resolve output directory to absolute path
+    output_dir = output_dir.resolve()
+
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Write config to temp file
+    config_file_name = "simulation_config"
+    config_file = output_dir / f"{config_file_name}.json"
+    with open(config_file, "w", encoding="utf-8") as f:
+        json.dump(pense_config, f, indent=2)
+
+    # Run pense agent simulation command as a non-blocking process
+    run_cmd = [
+        "pense",
+        "agent",
+        "simulation",
+        "-c",
+        str(config_file),
+        "-o",
+        str(output_dir),
+    ]
+
+    logger.info(f"{log_prefix} command: {' '.join(run_cmd)}")
+
+    # Open log files for stdout and stderr
+    stdout_log_path = output_dir / "stdout.log"
+    stderr_log_path = output_dir / "stderr.log"
+
+    with (
+        open(stdout_log_path, "w") as stdout_file,
+        open(stderr_log_path, "w") as stderr_file,
+    ):
+        # Start the process without blocking, writing output to files
+        process = subprocess.Popen(
+            run_cmd,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            start_new_session=True,  # Detach from parent process group
+            cwd=str(output_dir),
+        )
+
+        # Track processed simulations and uploaded files
+        processed_simulations = set()
+        uploaded_audio_files = set()
+        simulation_results = []
+
+        # Calculate expected number of simulations
+        num_personas = len(pense_config.get("personas", []))
+        num_scenarios = len(pense_config.get("scenarios", []))
+        expected_total = num_personas * num_scenarios
+        logger.info(
+            f"{log_prefix}: Expecting {expected_total} simulations ({num_personas} personas x {num_scenarios} scenarios)"
+        )
+
+        # Monitor for new simulation directories while the process runs
+        poll_interval = 2  # seconds between checks
+        while process.poll() is None:
+            # Find all simulation directories
+            for item in output_dir.iterdir():
+                if (
+                    item.is_dir()
+                    and item.name.startswith("simulation_persona_")
+                    and item.name not in processed_simulations
+                ):
+                    # Check if this simulation is complete
+                    if _is_simulation_complete(item):
+                        logger.info(
+                            f"{log_prefix}: Found completed simulation directory: {item.name}"
+                        )
+                        # Parse the simulation directory
+                        sim_result = _parse_simulation_directory(
+                            sim_dir=item,
+                            output_dir=output_dir,
+                            s3_bucket=s3_bucket,
+                            s3_prefix=s3_prefix,
+                            uploaded_audio_files=uploaded_audio_files,
+                        )
+                        if sim_result:
+                            simulation_results.append(sim_result)
+                            processed_simulations.add(item.name)
+
+                            # Update the database with incremental results
+                            results_dict = {
+                                "total_simulations": expected_total,
+                                "completed_simulations": len(simulation_results),
+                                "simulation_results": simulation_results,
+                                "results_s3_prefix": s3_prefix,
+                            }
+                            update_simulation_job(
+                                task_id,
+                                status=TaskStatus.IN_PROGRESS.value,
+                                results=results_dict,
+                            )
+                            logger.info(
+                                f"{log_prefix}: Updated DB with {len(simulation_results)}/{expected_total} completed simulations"
+                            )
+
+            time.sleep(poll_interval)
+
+        # Process finished, wait for it to complete
+        process.wait()
+
+    # Read logs from files
+    stdout = ""
+    stderr = ""
+    if stdout_log_path.exists():
+        with open(stdout_log_path, "r") as f:
+            stdout = f.read()
+        if stdout:
+            logger.info(f"{log_prefix} stdout: {stdout}")
+    if stderr_log_path.exists():
+        with open(stderr_log_path, "r") as f:
+            stderr = f.read()
+        if stderr:
+            logger.info(f"{log_prefix} stderr: {stderr}")
+
+    # Final pass: check for any remaining simulation directories that weren't processed
+    for item in output_dir.iterdir():
+        if (
+            item.is_dir()
+            and item.name.startswith("simulation_persona_")
+            and item.name not in processed_simulations
+        ):
+            if _is_simulation_complete(item):
+                logger.info(
+                    f"{log_prefix}: Found remaining completed simulation directory: {item.name}"
+                )
+                sim_result = _parse_simulation_directory(
+                    sim_dir=item,
+                    output_dir=output_dir,
+                    s3_bucket=s3_bucket,
+                    s3_prefix=s3_prefix,
+                    uploaded_audio_files=uploaded_audio_files,
+                )
+                if sim_result:
+                    simulation_results.append(sim_result)
+                    processed_simulations.add(item.name)
+
+    # Parse final results (metrics.json and results.csv)
+    metrics_data = None
+    metrics_file = output_dir / "metrics.json"
+    results_file = output_dir / "results.csv"
+
+    if metrics_file.exists():
+        with open(metrics_file, "r", encoding="utf-8") as f:
+            metrics_data = json.load(f)
+
+    # Parse results.csv for aggregated scores
+    if results_file.exists():
+        import csv
+
+        with open(results_file, "r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            results_data = list(reader)
+
+    # Upload all other results to S3 (excluding audios which are already uploaded)
+    for root, dirs, files in os.walk(output_dir):
+        # Skip audios directories as they're already uploaded
+        if "audios" in root.split(os.sep):
+            continue
+        for file in files:
+            local_file_path = Path(root) / file
+            # Skip audio files that were already uploaded
+            if str(local_file_path) in uploaded_audio_files:
+                continue
+            relative_path = local_file_path.relative_to(output_dir)
+            s3_key = f"{s3_prefix}/{relative_path}"
+            s3.upload_file(str(local_file_path), s3_bucket, s3_key)
+
+    error = None
+    if process.returncode != 0:
+        error = f"Command failed: {stderr}"
+
+    return {
+        "success": process.returncode == 0,
+        "total_simulations": len(simulation_results),
+        "metrics": metrics_data,
+        "simulation_results": simulation_results,
+        "error": error,
+    }
+
+
+
+this is how it is triggered from the fastapi server
+
+think exhaustively what could trigger this?
+
+completely destroy each simulation run after it is done and if needed wait for some time before rerunning it
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is experiencing sporadic issues where sometimes all simulations run properly, and sometimes the second simulation gets stuck. The key observation is:
+
+1. First simulation works: LLM triggers properly after audio
+2. Second simulation gets stuck: No LLM trigger, STT times out
+
+The sporadic nature suggests a race condition or state leakage between simulations. Let me think about what could cause this:
+
+1. **Port reuse issues**: The WebSocket server might not fully release the port between simulations. Even with `SO_REUSEADDR`, there could be `TIME_WAIT` states causing issues.
+
+2. **Async state leakage**: The `asyncio` event loop might have some state from the previous simulation that interferes with the next one.
+
+3. **Google STT connection state**: The Google STT service might have lingering connections or state.
+
+4. **Turn analyzer state**: The `LocalSmartTurnAnalyzerV3` might have some internal state that persists.
+
+5. **VAD analyzer state**: The Silero VAD might have state from the previous simulation.
+
+6. **Pipeline/Task cleanup**: The pipecat `PipelineTask` and `PipelineRunner` might not be properly cleaned up.
+
+7. **WebSocket connection cleanup**: The WebSocket connections might not be fully closed.
+
+Looking at the code flow:
+1. `run_simulation.py` has `run_single_simulation_task` which runs each simulation
+2. Each simulation creates its own BOT and EVAL pipelines
+3. After completion, the pipelines should be cleaned up
+
+The issue is likely that between simulations, something isn't being properly cleaned up. Let me look at the simulation flow:
+
+```python
+async def run_single_simulation_task(...):
+    # ... setup ...
+    
+    async with asyncio.TaskGroup() as tg:
+        tg.create_task(start_eval_bot(...))
+        tg.create_task(start_eval(...))
+```
+
+
+When both tasks complete, the TaskGroup exits. But there might be lingering WebSocket connections, Google STT streams, or ports not fully released. I should add explicit cleanup delays between simulations to allow connections to fully close, ensure all services are properly stopped, and check for any global state that might persist across runs.
+
+Let me examine the cleanup flow in run_simulation.py to understand how services are being shut down.</details></think>
+
+---
+
+Let me analyze the simulation flow to understand what might cause sporadic failures. I need to look at how simulations are cleaned up between runs.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
 
 ---
 

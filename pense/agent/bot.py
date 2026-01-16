@@ -140,11 +140,13 @@ async def run_bot(
     stt_config: STTConfig,
     tts_config: TTSConfig,
     llm_config: LLMConfig,
-    language: Literal["english", "hindi"],
+    language: Literal["english", "hindi", "kannada"],
     mode: Literal["run", "eval"] = "run",
+    agent_speaks_first: bool = True,
 ):
-    if language not in ["english", "hindi"]:
-        raise ValueError(f"Invalid language: {language}")
+    if language not in ["english", "hindi", "kannada"]:
+        bot_logger.error(f"Invalid language: {language}")
+        return
 
     bot_logger.info(f"Starting bot")
 
@@ -216,21 +218,23 @@ async def run_bot(
         )
 
     tts_language = (
-        Language.EN
-        if language == "english"
-        else Language.HI if language == "hindi" else Language.KN
+        Language.KN
+        if language == "kannada"
+        else Language.HI if language == "hindi" else Language.EN
     )
 
     language_to_voice_id = {
         "english": {
             "cartesia": "66c6b81c-ddb7-4892-bdd5-19b5a7be38e7",
-            "smallest": "aarushi",
             "google": "en-US-Chirp3-HD-Achernar",
         },
         "hindi": {
             "cartesia": "28ca2041-5dda-42df-8123-f58ea9c3da00",
-            "smallest": "aarushi",
             "google": "hi-IN-Chirp3-HD-Achernar",
+        },
+        "kannada": {
+            "cartesia": "7c6219d2-e8d2-462c-89d8-7ecba7c75d65",
+            "google": "kn-IN-Chirp3-HD-Achernar",
         },
     }
 
@@ -611,10 +615,15 @@ async def run_bot(
     async def on_client_connected(transport, client):
         bot_logger.info(f"Client connected")
         # Kick off the conversation.
-        # messages.append(
-        #     {"role": "system", "content": "Please introduce yourself to the user."}
-        # )
-        # await task.queue_frames([LLMRunFrame()])
+        if agent_speaks_first:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": "Hi",
+                }
+            )
+
+            await task.queue_frames([LLMRunFrame()])
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
