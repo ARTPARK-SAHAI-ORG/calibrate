@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Literal
+from typing import Any, Dict, Literal
 
 from loguru import logger
 import asyncio
@@ -349,10 +349,42 @@ async def run_bot(
         tool_call_id = params.tool_call_id
         pending_tool_calls[tool_call_id] = params
 
+        # Create an event to wait for the result from the eval side
+        result_event = asyncio.Event()
+        pending_tool_call_events[tool_call_id] = result_event
+
         try:
             await rtvi.handle_function_call(params)
+
+            # Wait for the result from the eval side (with timeout)
+            try:
+                await asyncio.wait_for(result_event.wait(), timeout=30.0)
+            except asyncio.TimeoutError:
+                bot_logger.warning(
+                    f"Timeout waiting for function call result for end_call:{tool_call_id}"
+                )
+                pending_tool_calls.pop(tool_call_id, None)
+                pending_tool_call_events.pop(tool_call_id, None)
+                return
+
+            # Get the result and call the callback
+            result = pending_tool_call_results.pop(tool_call_id, None)
+            pending_tool_calls.pop(tool_call_id, None)
+            pending_tool_call_events.pop(tool_call_id, None)
+
+            await params.result_callback(
+                result, properties=FunctionCallResultProperties(run_llm=False)
+            )
+            bot_logger.debug(
+                f"Delivered function call result for end_call:{tool_call_id}"
+            )
+
+            await _exec_call_call()
+
         except Exception as exc:
             pending_tool_calls.pop(tool_call_id, None)
+            pending_tool_call_events.pop(tool_call_id, None)
+            pending_tool_call_results.pop(tool_call_id, None)
             bot_logger.warning(f"Unable to forward end_call to client: {exc}")
 
     async def generic_function_call(params: FunctionCallParams):
@@ -369,10 +401,47 @@ async def run_bot(
         tool_call_id = params.tool_call_id
         pending_tool_calls[tool_call_id] = params
 
+        # Create an event to wait for the result from the eval side
+        result_event = asyncio.Event()
+        pending_tool_call_events[tool_call_id] = result_event
+
         try:
             await rtvi.handle_function_call(params)
+
+            # Wait for the result from the eval side (with timeout)
+            try:
+                await asyncio.wait_for(result_event.wait(), timeout=30.0)
+            except asyncio.TimeoutError:
+                bot_logger.warning(
+                    f"Timeout waiting for function call result for {params.function_name}:{tool_call_id}"
+                )
+                pending_tool_calls.pop(tool_call_id, None)
+                pending_tool_call_events.pop(tool_call_id, None)
+                return
+
+            # Get the result and call the callback
+            result = pending_tool_call_results.pop(tool_call_id, None)
+            pending_tool_calls.pop(tool_call_id, None)
+            pending_tool_call_events.pop(tool_call_id, None)
+
+            properties = (
+                FunctionCallResultProperties(run_llm=False)
+                if params.function_name == "end_call"
+                else None
+            )
+
+            await params.result_callback(result, properties=properties)
+            bot_logger.debug(
+                f"Delivered function call result for {params.function_name}:{tool_call_id}"
+            )
+
+            if params.function_name == "end_call":
+                await _exec_call_call()
+
         except Exception as exc:
             pending_tool_calls.pop(tool_call_id, None)
+            pending_tool_call_events.pop(tool_call_id, None)
+            pending_tool_call_results.pop(tool_call_id, None)
             bot_logger.warning(
                 f"Unable to forward {params.function_name} to client: {exc}"
             )
@@ -424,6 +493,8 @@ async def run_bot(
     rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
 
     pending_tool_calls: Dict[str, FunctionCallParams] = {}
+    pending_tool_call_events: Dict[str, asyncio.Event] = {}
+    pending_tool_call_results: Dict[str, Any] = {}
 
     class InputLogger(FrameProcessor):
         def __init__(
@@ -474,33 +545,23 @@ async def run_bot(
             await super().process_frame(frame, direction)
 
             if isinstance(frame, FunctionCallResultFrame):
-                params = pending_tool_calls.pop(frame.tool_call_id, None)
+                tool_call_id = frame.tool_call_id
 
-                if not params:
-                    bot_logger.warning(
-                        f"Received function call result for unknown tool_call_id {frame.tool_call_id} ({frame.function_name})"
+                # Check if we're waiting for this result
+                event = pending_tool_call_events.get(tool_call_id)
+
+                if event and not event.is_set():
+                    # Store the result and signal the waiting coroutine
+                    pending_tool_call_results[tool_call_id] = frame.result
+                    event.set()
+                    bot_logger.debug(
+                        f"Received function call result for {frame.function_name}:{tool_call_id}, signaling waiting handler"
                     )
-                else:
-                    try:
-                        properties = (
-                            FunctionCallResultProperties(run_llm=False)
-                            if params.function_name == "end_call"
-                            else None
-                        )
-
-                        await params.result_callback(
-                            frame.result, properties=properties
-                        )
-                        bot_logger.debug(
-                            f"Delivered function call result for {frame.function_name}:{frame.tool_call_id}"
-                        )
-                    except Exception as exc:
-                        bot_logger.warning(
-                            f"Failed to deliver function call result for {frame.function_name}:{frame.tool_call_id}: {exc}"
-                        )
-
-                    if frame.function_name == "end_call":
-                        await _exec_call_call()
+                elif tool_call_id not in pending_tool_calls:
+                    # Only warn if we're not expecting this tool_call_id at all
+                    bot_logger.debug(
+                        f"Received function call result for already-processed or unknown tool_call_id {tool_call_id} ({frame.function_name})"
+                    )
 
             await self.push_frame(frame, direction)
 

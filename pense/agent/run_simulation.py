@@ -115,10 +115,21 @@ EVAL_TIMEOUT_SECS = 3000
 
 
 def is_port_available(port: int) -> bool:
-    """Check if a port is available by attempting to bind to it."""
+    """Check if a port is available by verifying no process is listening on it."""
+    # First check if we can connect to the port (if yes, something is listening)
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.settimeout(0.5)
+            result = s.connect_ex(("localhost", port))
+            if result == 0:
+                # Connection succeeded, port is in use
+                return False
+    except OSError:
+        pass
+
+    # Then verify we can bind to it (without SO_REUSEADDR for stricter check)
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("localhost", port))
             return True
     except OSError:
@@ -1105,7 +1116,6 @@ async def run_simulation(
 
 
 async def run_single_simulation_task(
-    semaphore: asyncio.Semaphore,
     config: dict,
     persona_index: int,
     user_persona: dict,
@@ -1114,183 +1124,174 @@ async def run_single_simulation_task(
     output_dir: str,
     interrupt_sensitivity_map: dict,
     base_port: int = DEFAULT_PORT,
-    assigned_ports: Optional[set] = None,
-    ports_lock: Optional[asyncio.Lock] = None,
 ):
-    """Run a single simulation task with semaphore for concurrency control."""
-    async with semaphore:
-        characteristics = user_persona.get("characteristics", "")
-        gender = user_persona.get("gender", "")
-        language = user_persona.get("language", "english")
-        interruption_sensitivity = user_persona.get("interruption_sensitivity", "none")
+    """Run a single simulation task."""
+    simulation_name = (
+        f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
+    )
+    characteristics = user_persona.get("characteristics", "")
+    gender = user_persona.get("gender", "")
+    language = user_persona.get("language", "english")
+    interruption_sensitivity = user_persona.get("interruption_sensitivity", "none")
 
-        # Get interrupt probability from mapping
-        interrupt_probability = interrupt_sensitivity_map.get(interruption_sensitivity)
-        if interrupt_probability is None:
-            raise ValueError(
-                f"Invalid interruption_sensitivity '{interruption_sensitivity}'. "
-                f"Must be one of: {list(interrupt_sensitivity_map.keys())}"
-            )
-
-        scenario_description = scenario.get("description", "")
-
-        gender_prompt = f"\n\nYour gender is {gender}." if gender else ""
-        user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{characteristics}{gender_prompt}\n\nThe following scenario will be played out: {scenario_description}. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in {language}. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system."
-
-        simulation_name = (
-            f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
+    # Get interrupt probability from mapping
+    interrupt_probability = interrupt_sensitivity_map.get(interruption_sensitivity)
+    if interrupt_probability is None:
+        raise ValueError(
+            f"Invalid interruption_sensitivity '{interruption_sensitivity}'. "
+            f"Must be one of: {list(interrupt_sensitivity_map.keys())}"
         )
 
-        simulation_output_dir = f"{output_dir}/{simulation_name}"
+    scenario_description = scenario.get("description", "")
 
-        if exists(simulation_output_dir):
-            shutil.rmtree(simulation_output_dir)
+    gender_prompt = f"\n\nYour gender is {gender}." if gender else ""
+    user_system_prompt = f"You are a user speaking to an agent. This is your persona:\n\n{characteristics}{gender_prompt}\n\nThe following scenario will be played out: {scenario_description}. Make sure to respond to the agent to match the given scenario as per the given persona for you. You always speak in {language}. You must generate values like numbers, proper nouns, etc. in such a way that they can compatible with text-to-speech generation systems (e.g. write a phone number as individual digits instead of a full string or an email address like firstname.lastname@example.com as 'firstname dot lastname at example dot com') without ever mentioning in the generation that you are doing so for the TTS system."
 
-        os.makedirs(simulation_output_dir)
+    simulation_output_dir = f"{output_dir}/{simulation_name}"
 
-        # Find an available port for this simulation, excluding already assigned ports
-        port = None
-        if assigned_ports is not None and ports_lock is not None:
-            async with ports_lock:
-                port = find_available_port(base_port, excluded_ports=assigned_ports)
-                if port is not None:
-                    assigned_ports.add(port)
-        else:
-            port = find_available_port(base_port)
+    if exists(simulation_output_dir):
+        shutil.rmtree(simulation_output_dir)
 
-        if port is None:
-            raise RuntimeError(
-                f"Could not find an available port starting from {base_port} "
-                f"after checking 100 ports. Please free up some ports or use a different base port."
-            )
+    os.makedirs(simulation_output_dir)
 
-        # Save persona dict and scenario dict
-        simulation_config = {
-            "persona": user_persona,
-            "scenario": scenario,
-        }
+    # Find an available port for this simulation
+    port = find_available_port(base_port)
 
-        with open(f"{simulation_output_dir}/config.json", "w") as f:
-            json.dump(simulation_config, f, indent=4)
-
-        logs_file_path = f"{output_dir}/{simulation_name}/logs"
-
-        logger.remove()
-        eval_logger.remove()
-
-        log_file_id = eval_logger.add(
-            logs_file_path,
-            level="DEBUG",
-            format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
-            filter=add_default_source,
-            colorize=False,
+    if port is None:
+        raise RuntimeError(
+            f"Could not find an available port starting from {base_port} "
+            f"after checking 100 ports. Please free up some ports or use a different base port."
         )
 
-        print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
-        configure_print_logger(print_log_save_path)
+    # Save persona dict and scenario dict
+    simulation_config = {
+        "persona": user_persona,
+        "scenario": scenario,
+    }
 
-        # Extract STT and TTS configs from config dict
-        stt_config_data = config.get("stt", {})
-        stt_config = STTConfig(provider=stt_config_data.get("provider", "google"))
+    with open(f"{simulation_output_dir}/config.json", "w") as f:
+        json.dump(simulation_config, f, indent=4)
 
-        tts_config_data = config.get("tts", {})
-        tts_config = TTSConfig(provider=tts_config_data.get("provider", "google"))
+    logs_file_path = f"{output_dir}/{simulation_name}/logs"
 
-        llm_config_data = config.get("llm", {})
-        llm_config = LLMConfig(
-            provider=llm_config_data.get("provider", "openrouter"),
-            model=llm_config_data.get("model", "openai/gpt-4.1"),
+    logger.remove()
+    eval_logger.remove()
+
+    log_file_id = eval_logger.add(
+        logs_file_path,
+        level="DEBUG",
+        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
+        filter=add_default_source,
+        colorize=False,
+    )
+
+    print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
+    configure_print_logger(print_log_save_path)
+
+    # Extract STT and TTS configs from config dict
+    stt_config_data = config.get("stt", {})
+    stt_config = STTConfig(provider=stt_config_data.get("provider", "google"))
+
+    tts_config_data = config.get("tts", {})
+    tts_config = TTSConfig(provider=tts_config_data.get("provider", "google"))
+
+    llm_config_data = config.get("llm", {})
+    llm_config = LLMConfig(
+        provider=llm_config_data.get("provider", "openrouter"),
+        model=llm_config_data.get("model", "openai/gpt-4.1"),
+    )
+
+    command = " ".join(sys.argv)
+    log_and_print(f"\033[33mRunning command\033[0m: {command}")
+
+    log_and_print("--------------------------------")
+    log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
+    log_and_print(f"\033[93mPersona:\033[0m\n{characteristics}")
+    log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
+    log_and_print(f"\033[93mLanguage:\033[0m {language}")
+    log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
+    log_and_print(f"\033[93mPort:\033[0m {port}")
+    log_and_print(f"\033[93mSTT Config:\033[0m {stt_config}")
+    log_and_print(f"\033[93mTTS Config:\033[0m {tts_config}")
+    log_and_print(f"\033[93mLLM Config:\033[0m {llm_config}")
+    log_and_print("--------------------------------")
+
+    simulation_result = None
+    try:
+        bot_task = asyncio.create_task(
+            start_bot(
+                config["system_prompt"]
+                + f"\n\nYou must always speak in {language}.",
+                config["tools"],
+                language,
+                port=port,
+                stt_config=stt_config,
+                tts_config=tts_config,
+                llm_config=llm_config,
+            )
+        )
+        # Give the bot a moment to start listening before connecting
+        await asyncio.sleep(1.0)
+        sim_task = asyncio.create_task(
+            run_simulation(
+                user_system_prompt,
+                language,
+                config["evaluation_criteria"],
+                simulation_output_dir,
+                interrupt_probability=interrupt_probability,
+                port=port,
+                max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
+            )
+        )
+        simulation_tasks = [bot_task, sim_task]
+        done, pending = await asyncio.wait(
+            simulation_tasks, timeout=EVAL_TIMEOUT_SECS
+        )
+        if pending:
+            eval_logger.error(
+                f"ERROR: Eval timeout expired, cancelling pending tasks..."
+            )
+            # Both pipeline idle timeouts should have worked and both tasks
+            # should have exited already, but if we got here something went
+            # wrong so we perform an abrupt asyncio task cancellation, which
+            # will not cleanup things nicely.
+            for task in pending:
+                task.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+
+        # Get result from simulation task
+        if sim_task in done and not sim_task.cancelled():
+            try:
+                simulation_result = sim_task.result()
+            except Exception as e:
+                eval_logger.error(f"ERROR: Failed to get simulation result: {e}")
+    except Exception as e:
+        eval_logger.error(f"ERROR: Unable to run: {e}")
+    finally:
+        eval_logger.remove(log_file_id)
+
+    # Return metrics for aggregation
+    if simulation_result:
+        sim_metrics_row = {"name": simulation_name}
+
+        # Evaluation criteria metrics
+        for eval_result in simulation_result.get("evaluation_results", []):
+            criterion_name = eval_result["name"]
+            match_value = float(eval_result["match"])
+            sim_metrics_row[criterion_name] = match_value
+
+        # STT LLM judge score
+        stt_judge = simulation_result.get("metrics", {}).get("stt_llm_judge")
+        if stt_judge and "score" in stt_judge:
+            sim_metrics_row["stt_llm_judge_score"] = stt_judge["score"]
+
+        return (
+            sim_metrics_row,
+            simulation_result.get("evaluation_results", []),
+            stt_judge,
         )
 
-        command = " ".join(sys.argv)
-        log_and_print(f"\033[33mRunning command\033[0m: {command}")
-
-        log_and_print("--------------------------------")
-        log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
-        log_and_print(f"\033[93mPersona:\033[0m\n{characteristics}")
-        log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
-        log_and_print(f"\033[93mLanguage:\033[0m {language}")
-        log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
-        log_and_print(f"\033[93mPort:\033[0m {port}")
-        log_and_print(f"\033[93mSTT Config:\033[0m {stt_config}")
-        log_and_print(f"\033[93mTTS Config:\033[0m {tts_config}")
-        log_and_print(f"\033[93mLLM Config:\033[0m {llm_config}")
-        log_and_print("--------------------------------")
-
-        simulation_result = None
-        try:
-            bot_task = asyncio.create_task(
-                start_bot(
-                    config["system_prompt"]
-                    + f"\n\nYou must always speak in {language}.",
-                    config["tools"],
-                    language,
-                    port=port,
-                    stt_config=stt_config,
-                    tts_config=tts_config,
-                    llm_config=llm_config,
-                )
-            )
-            # Give the bot a moment to start listening before connecting
-            await asyncio.sleep(1.0)
-            sim_task = asyncio.create_task(
-                run_simulation(
-                    user_system_prompt,
-                    language,
-                    config["evaluation_criteria"],
-                    simulation_output_dir,
-                    interrupt_probability=interrupt_probability,
-                    port=port,
-                    max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
-                )
-            )
-            tasks = [bot_task, sim_task]
-            done, pending = await asyncio.wait(tasks, timeout=EVAL_TIMEOUT_SECS)
-            if pending:
-                eval_logger.error(
-                    f"ERROR: Eval timeout expired, cancelling pending tasks..."
-                )
-                # Both pipeline idle timeouts should have worked and both tasks
-                # should have exited already, but if we got here something went
-                # wrong so we perform an abrupt asyncio task cancellation, which
-                # will not cleanup things nicely.
-                for task in pending:
-                    task.cancel()
-                await asyncio.gather(*pending, return_exceptions=True)
-
-            # Get result from simulation task
-            if sim_task in done and not sim_task.cancelled():
-                try:
-                    simulation_result = sim_task.result()
-                except Exception as e:
-                    eval_logger.error(f"ERROR: Failed to get simulation result: {e}")
-        except Exception as e:
-            eval_logger.error(f"ERROR: Unable to run: {e}")
-        finally:
-            eval_logger.remove(log_file_id)
-
-        # Return metrics for aggregation
-        if simulation_result:
-            sim_metrics_row = {"name": simulation_name}
-
-            # Evaluation criteria metrics
-            for eval_result in simulation_result.get("evaluation_results", []):
-                criterion_name = eval_result["name"]
-                match_value = float(eval_result["match"])
-                sim_metrics_row[criterion_name] = match_value
-
-            # STT LLM judge score
-            stt_judge = simulation_result.get("metrics", {}).get("stt_llm_judge")
-            if stt_judge and "score" in stt_judge:
-                sim_metrics_row["stt_llm_judge_score"] = stt_judge["score"]
-
-            return (
-                sim_metrics_row,
-                simulation_result.get("evaluation_results", []),
-                stt_judge,
-            )
-
-        return None, [], None
+    return None, [], None
 
 
 async def main():
@@ -1312,13 +1313,6 @@ async def main():
         default="./out",
         help="Path to the output directory to save the results",
     )
-    parser.add_argument(
-        "-n",
-        "--parallel",
-        type=int,
-        default=1,
-        help="Number of simulations to run in parallel",
-    )
 
     args = parser.parse_args()
 
@@ -1335,33 +1329,24 @@ async def main():
         "high": 0.8,
     }
 
-    # Create semaphore to limit parallel executions
-    semaphore = asyncio.Semaphore(args.parallel)
-
-    # Track assigned ports to avoid conflicts
-    assigned_ports: set[int] = set()
-    ports_lock = asyncio.Lock()
-
-    # Create all simulation tasks
-    tasks = []
+    # Run simulations sequentially
+    results = []
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
-            task = run_single_simulation_task(
-                semaphore=semaphore,
-                config=config,
-                persona_index=persona_index,
-                user_persona=user_persona,
-                scenario_index=scenario_index,
-                scenario=scenario,
-                output_dir=args.output_dir,
-                interrupt_sensitivity_map=interrupt_sensitivity_map,
-                assigned_ports=assigned_ports,
-                ports_lock=ports_lock,
-            )
-            tasks.append(task)
-
-    # Run all tasks with controlled parallelism
-    results = await asyncio.gather(*tasks, return_exceptions=True)
+            try:
+                result = await run_single_simulation_task(
+                    config=config,
+                    persona_index=persona_index,
+                    user_persona=user_persona,
+                    scenario_index=scenario_index,
+                    scenario=scenario,
+                    output_dir=args.output_dir,
+                    interrupt_sensitivity_map=interrupt_sensitivity_map,
+                )
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Simulation failed with error: {e}")
+                results.append(e)
 
     # Aggregated metrics across all simulations
     all_simulation_metrics = []
@@ -1371,7 +1356,6 @@ async def main():
     # Collect metrics from results
     for result in results:
         if isinstance(result, Exception):
-            logger.error(f"Simulation failed with error: {result}")
             continue
 
         sim_metrics_row, evaluation_results, stt_judge = result
