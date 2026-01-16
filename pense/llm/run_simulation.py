@@ -459,6 +459,9 @@ async def run_single_simulation_task(
 
         logs_file_path = f"{output_dir}/{simulation_name}/logs"
 
+        # Remove default logger to prevent logs from being printed to terminal
+        logger.remove()
+
         # Create a unique logger for this simulation
         log_file_id = logger.add(
             logs_file_path,

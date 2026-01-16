@@ -126,3 +126,141 @@ The documentation now shows that:
 
 ---
 
+_**User (2026-01-16 10:52Z)**_
+
+same for @pense/llm/run_simulation.py  - update REDME
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the README.md to document the `agent_speaks_first` parameter for the LLM simulation as well. Looking at the code in `pense/llm/run_simulation.py`, I can see:
+
+1. Line 469: `agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)` - Same pattern as agent simulation
+2. It's passed to `run_simulation()` function
+3. It controls whether the agent or user speaks first
+
+I need to find the LLM simulations section in the README and add the same documentation there.</details></think>
+
+---
+
+I'll update the README.md to add the `agent_speaks_first` documentation for the LLM simulations section as well.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I found the LLM simulations section. I need to:
+1. Add `settings.agent_speaks_first` to the JSON config example (similar to what I did for agent simulations)
+2. Add a description paragraph for the parameter
+
+Let me make both changes.</details></think>
+
+---
+
+Now I'll update the LLM simulations section with the `agent_speaks_first` parameter:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: undefined
+
+```diff
+@@ -582,4 +582,7 @@
+      }
+    ],
++   "settings": {
++     "agent_speaks_first": true // optional: if true (default), the agent initiates the conversation. If false, the simulated user speaks first.
++   },
+    "max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, an end_reason message is added to the transcript.
+  }
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add the description paragraph for this parameter, similar to what I did for agent simulations. Let me add it after the "Max Turns" paragraph.</details></think>
+
+---
+
+Now let me add the description paragraph:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: undefined
+
+```diff
+@@ -594,4 +594,6 @@
+  
+  **Max Turns:** You can optionally specify &#96;max_turns&#96; in the config to limit the maximum number of assistant turns in a conversation. When &#96;max_turns&#96; is reached, the conversation will end gracefully after the current turn completes, and an &#96;end_reason&#96; message with &#96;"role": "end_reason"&#96; and &#96;"content": "max_turns"&#96; will be added to the transcript. The default value is 50 turns.
++ 
++ **Agent Speaks First:** You can optionally specify &#96;agent_speaks_first&#96; in the &#96;settings&#96; section to control who initiates the conversation. When set to &#96;true&#96; (default), the agent starts the conversation. When set to &#96;false&#96;, the simulated user speaks first.
+  
+  Set the required environment variables:
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The changes are done. Let me verify the changes look correct by reading that section.</details></think>
+
+---
+
+Let me verify the changes:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The changes look good. I've updated the LLM simulations section in the README.md with:
+1. Added `agent_speaks_first` in the JSON config example under a `settings` section (line 584-586)
+2. Added a descriptive paragraph explaining the parameter's behavior (line 597)
+
+The documentation is now consistent with the agent simulation section.</details></think>
+
+---
+
+Done! I've updated the README.md for the LLM simulations section with:
+
+1. Added `agent_speaks_first` parameter in the config JSON example under a `settings` section
+2. Added a descriptive paragraph explaining the parameter's behavior
+
+The documentation now shows that for both LLM and agent simulations:
+- `agent_speaks_first` is an optional setting (defaults to `true`)
+- When `true`, the agent initiates the conversation
+- When `false`, the simulated user speaks first
+
+---
+
