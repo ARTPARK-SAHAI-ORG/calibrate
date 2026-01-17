@@ -213,6 +213,7 @@ Examples:
     agent_simulation_parser.add_argument(
         "-o", "--output-dir", type=str, default="./out"
     )
+    agent_simulation_parser.add_argument("--port", type=int, default=8765)
 
     args = parser.parse_args()
 

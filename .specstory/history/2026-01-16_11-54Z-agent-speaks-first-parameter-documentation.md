@@ -264,3 +264,142 @@ The documentation now shows that for both LLM and agent simulations:
 
 ---
 
+_**User (2026-01-16 10:52Z)**_
+
+the output of results.log should be shown on the terminal when @pense/llm/run_simulation.py is run but instead the output of logs file is being shown on the terminal. fix it
+
+refer to @pense/agent/run_simulation.py 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is saying that when running `pense/llm/run_simulation.py`, the terminal shows the logs file output instead of the results.log output. They want me to refer to `pense/agent/run_simulation.py` to fix it.
+
+Let me look at how logging is configured in both files.
+
+In `pense/agent/run_simulation.py`, I can see around lines 1188-1201:
+```python
+logger.remove()
+eval_logger.remove()
+
+log_file_id = eval_logger.add(
+    logs_file_path,
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
+    filter=add_default_source,
+    colorize=False,
+)
+
+print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
+configure_print_logger(print_log_save_path)
+```
+
+So in the agent simulation, they:
+1. Remove all existing loggers with `logger.remove()` and `eval_logger.remove()`
+2. Add the log file handler
+3. Configure the print logger for results.log
+
+In `pense/llm/run_simulation.py`, around lines 461-472:
+```python
+logs_file_path = f"{output_dir}/{simulation_name}/logs"
+
+# Create a unique logger for this simulation
+log_file_id = logger.add(
+    logs_file_path,
+    level="DEBUG",
+    colorize=False,
+)
+
+agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
+
+print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
+configure_print_logger(print_log_save_path)
+```
+
+The issue is that in `pense/llm/run_simulation.py`, they don't call `logger.remove()` before adding the new log handler. 
+
+The default loguru handler is still active and logging to stderr, which is why terminal output appears instead of being captured in results.log. I need to add `logger.remove()` before the logger.add() call in `pense/llm/run_simulation.py` to match the pattern used in the agent version.</details></think>
+
+---
+
+Let me look at how logging is configured in both files to understand the difference.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/llm/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see the issue. In `pense/llm/run_simulation.py`, the code doesn't call `logger.remove()` before adding the new log handler. This means the default loguru handler (which logs to stderr/terminal) is still active.
+
+Looking at the agent simulation code (from the attached file), around lines 1188-1201:
+```python
+logger.remove()
+eval_logger.remove()
+
+log_file_id = eval_logger.add(
+    logs_file_path,
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
+    filter=add_default_source,
+    colorize=False,
+)
+
+print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
+configure_print_logger(print_log_save_path)
+```
+
+The key difference is that in `pense/agent/run_simulation.py`, they call `logger.remove()` before adding the new handler, which removes the default terminal handler.
+
+I need to add `logger.remove()` before adding the log handler in `pense/llm/run_simulation.py`.</details></think>
+
+---
+
+I see the issue. In `pense/agent/run_simulation.py`, `logger.remove()` is called before adding the log handler to remove the default terminal handler. This is missing in `pense/llm/run_simulation.py`.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/llm/run_simulation.py</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: undefined
+
+```diff
+@@ -459,4 +459,7 @@
+  
+          logs_file_path = f"{output_dir}/{simulation_name}/logs"
++ 
++         # Remove default logger to prevent logs from being printed to terminal
++         logger.remove()
+  
+          # Create a unique logger for this simulation
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The fix is applied. `logger.remove()` will remove the default loguru handler that prints to stderr/terminal, so now only the file handler will receive logs, while `log_and_print()` will handle printing to the terminal and saving to results.log.</details></think>
+
+---
+
+The fix is applied. The issue was that `logger.remove()` wasn't being called before adding the file handler. Without removing the default handler, loguru logs to both the terminal (default) and the file. Now:
+
+- `logger.remove()` removes the default terminal handler
+- The file handler writes logs to `logs`
+- `log_and_print()` handles output to both terminal and `results.log`
+
+---
+

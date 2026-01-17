@@ -1343,6 +1343,12 @@ async def main():
         default="./out",
         help="Path to the output directory to save the results",
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="Websocket port to run the simulations on",
+    )
 
     args = parser.parse_args()
 
@@ -1376,6 +1382,7 @@ async def main():
                     scenario=scenario,
                     output_dir=args.output_dir,
                     interrupt_sensitivity_map=interrupt_sensitivity_map,
+                    base_port=args.port,
                 )
                 results.append(result)
             except Exception as e:
