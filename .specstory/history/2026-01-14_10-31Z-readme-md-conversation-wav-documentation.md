@@ -145,3 +145,191 @@ The documentation now matches the code in `run_simulation.py` (lines 1302-1307),
 
 ---
 
+_**User (2026-01-17 14:00Z)**_
+
+no add it right below the Transcript header - before the actual conversation
+
+---
+
+_**Agent (model composer-1, mode Agent)**_
+
+
+
+---
+
+
+Searching for the "Transcript" header in README.md:
+
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "Transcript" in "README.md" • 21 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `README.md` | `Created new user transcript` | L75 |
+| `README.md` | `appending to last user transcript: <transcript>.` | L78 |
+| `README.md` | `Created new user transcript` | L80 |
+| `README.md` | `appending to last user transcript: <transcript_part_1>,` | L83 |
+| `README.md` | `appending to last user transcript: <transcript_part_2>,` | L84 |
+| `README.md` | `3_1_english_baseline,"Please write Rekha Kumari, sister.", Please write Reha Kumari's sister.,0.4,0.927536231884058,False,"The source says 'Rekha Kumari, sister' which indicates the name is 'Rekha Kumari' and she is a sister. The transcription says 'Reha Kumari's sister', which changes the name to 'Reha Kumari' and refers to her sister, not Rekha Kumari herself. The name is different ('Rekha' vs 'Reha') and the relationship is also changed (from identifying Rekha Kumari as the sister to referring to the sister of Reha Kumari). Therefore, the values do not match."` | L102 |
+| `README.md` | `"max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, an end_reason message is added to the transcript.` | L587 |
+| `README.md` | `Each simulation pairs every persona with every scenario. The runner fans out into separate folders named `simulation_persona_<n>_scenario_<m>` and saves transcripts, evaluation results, plus logs for inspection. Use the sample persona/scenario set from the example config or replace them with your own scripted behaviors (e.g., "refuses to share phone number until probed twice"). Use these artifacts to verify that the agent follows your instructions (e.g., responds appropriately, calls the right tools at the right times, and terminates the call correctly), then iterate on the prompts/config as needed.` | L591 |
+| `README.md` | `After each simulation, an LLM judge evaluates the transcript against all `evaluation_criteria` defined in the config. Each criterion produces a match (true/false) and reasoning. The results are aggregated across all simulations at the end of the run.` | L593 |
+| `README.md` | `**Max Turns:** You can optionally specify `max_turns` in the config to limit the maximum number of assistant turns in a conversation. When `max_turns` is reached, the conversation will end gracefully after the current turn completes, and an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` will be added to the transcript. The default value is 50 turns.` | L595 |
+| `README.md` | `│   ├── transcript.json          # full conversation transcript` | L702 |
+| `README.md` | `"max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, the conversation ends gracefully after the current turn completes, and an end_reason message is added to the transcript.` | L845 |
+| `README.md` | `│   ├── transcript.json` | L947 |
+| `README.md` | `- `stt_results.csv`: detailed per-row STT evaluation results comparing STT outputs with user messages from the transcript, including score and reasoning for each row.` | L962 |
+| `README.md` | `- `transcript.json`: full conversation transcript - alternating `user`/`assistant` turns. If the conversation ends due to `max_turns`, an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` is appended.` | L966 |
+| `README.md` | `**Max Turns:** You can optionally specify `max_turns` in the config to limit the maximum number of assistant turns in a conversation. When `max_turns` is reached, the conversation will end gracefully after the current turn completes (ensuring the final assistant message is recorded), and an `end_reason` message will be added to the transcript. The default value is 50 turns.` | L970 |
+| `README.md` | `"Hi.","Hi.",1,"The transcription matches exactly."` | L1005 |
+| `README.md` | `The client UI streams the conversation transcript in real time, while the **Metrics** tab mirrors the live latency statistics reported by the pipeline as shown in the images below:` | L1101 |
+| `README.md` | `Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sample output folder for the exact layout). The terminal also logs each transcript message and every function/tool call issued by the LLM so you can audit the interaction without leaving your shell.` | L1107 |
+| `README.md` | ``transcript.json` in the output directory has the full transcript with function calls.` | L1109 |
+| `README.md` | `- Store transcripts and tool calls in the output directory when talking to an agent.` | L1141 |
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking the section around line 1107 where `transcript.json` is mentioned:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Checking the voice agent simulations section where `transcript.json` is documented:
+
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Moving `conversation.wav` to right before `transcript.json`:
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 2, lines removed: 2
+
+```diff
+@@ -945,7 +945,7 @@
+  │   ├── stt_outputs.json
+  │   ├── tool_calls.json
++ │   ├── conversation.wav         # combined audio file of the entire conversation
+  │   ├── transcript.json
+- │   ├── config.json              # persona and scenario for this simulation
+- │   └── conversation.wav         # combined audio file of the entire conversation
++ │   └── config.json              # persona and scenario for this simulation
+  ├── simulation_persona_1_scenario_2
+  ├── simulation_persona_1_scenario_3
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: README.md</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -964,7 +964,7 @@
+  - &#96;stt_outputs.json&#96;: The output of the STT step for each turn in the voice agent being evaluated.
+  - &#96;tool_calls.json&#96;: chronologically ordered tool calls made by the agent.
++ - &#96;conversation.wav&#96;: combined audio file containing the entire conversation, generated by concatenating all individual audio files from the &#96;audios/&#96; directory in chronological order
+  - &#96;transcript.json&#96;: full conversation transcript - alternating &#96;user&#96;/&#96;assistant&#96; turns. If the conversation ends due to &#96;max_turns&#96;, an &#96;end_reason&#96; message with &#96;"role": "end_reason"&#96; and &#96;"content": "max_turns"&#96; is appended.
+  - &#96;config.json&#96;: persona dict and scenario dict used for this simulation
+- - &#96;conversation.wav&#96;: combined audio file containing the entire conversation, generated by concatenating all individual audio files from the &#96;audios/&#96; directory in chronological order
+  
+  **Max Turns:** You can optionally specify &#96;max_turns&#96; in the config to limit the maximum number of assistant turns in a conversation. When &#96;max_turns&#96; is reached, the conversation will end gracefully after the current turn completes (ensuring the final assistant message is recorded), and an &#96;end_reason&#96; message will be added to the transcript. The default value is 50 turns.
+```
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 1 file</summary>
+      
+Lint paths:
+
+- `README.md`
+
+Lint results
+
+
+**No lint errors found**
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+
+Moved `conversation.wav` to appear right before `transcript.json` in both the directory structure listing and the bullet point descriptions. It now appears right before the transcript entry, as requested.
+
+---
+

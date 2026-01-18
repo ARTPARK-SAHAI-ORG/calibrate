@@ -125,6 +125,111 @@ async def save_audio_chunk(
             await file.flush()
 
 
+def combine_turn_audio_chunks(audio_dir: str) -> bool:
+    """Combine audio chunks for each turn into single turn audio files.
+
+    Groups files like {turn_index}_{role}_{chunk_index}.wav and combines them
+    into {turn_index}_{role}.wav, then deletes the original chunks.
+
+    Args:
+        audio_dir: Directory containing the audio chunk files
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import glob
+    import re
+    from collections import defaultdict
+
+    # Pattern to match chunk files: {turn_index}_{role}_{chunk_index}.wav
+    chunk_pattern = re.compile(r"^(\d+)_(bot|user)_(\d+)\.wav$")
+
+    audio_files = glob.glob(os.path.join(audio_dir, "*.wav"))
+
+    if not audio_files:
+        logger.warning(f"No audio files found in {audio_dir}")
+        return False
+
+    # Group files by turn_index and role
+    turn_groups = defaultdict(list)
+    for audio_file in audio_files:
+        filename = os.path.basename(audio_file)
+        match = chunk_pattern.match(filename)
+        if match:
+            turn_index = int(match.group(1))
+            role = match.group(2)
+            chunk_index = int(match.group(3))
+            turn_groups[(turn_index, role)].append((chunk_index, audio_file))
+
+    if not turn_groups:
+        logger.info("No chunk files found to combine")
+        return True
+
+    # Combine each group
+    for (turn_index, role), chunks in turn_groups.items():
+        # Sort by chunk index
+        chunks.sort(key=lambda x: x[0])
+        chunk_files = [f for _, f in chunks]
+
+        output_path = os.path.join(audio_dir, f"{turn_index}_{role}.wav")
+
+        # Read and combine audio data
+        combined_audio = b""
+        sample_rate = None
+        num_channels = None
+        sample_width = None
+
+        for chunk_file in chunk_files:
+            try:
+                with wave.open(chunk_file, "rb") as wf:
+                    if sample_rate is None:
+                        sample_rate = wf.getframerate()
+                        num_channels = wf.getnchannels()
+                        sample_width = wf.getsampwidth()
+                    else:
+                        # Verify audio parameters match
+                        if (
+                            wf.getframerate() != sample_rate
+                            or wf.getnchannels() != num_channels
+                            or wf.getsampwidth() != sample_width
+                        ):
+                            logger.warning(
+                                f"Audio parameters mismatch in {chunk_file}, skipping"
+                            )
+                            continue
+
+                    combined_audio += wf.readframes(wf.getnframes())
+            except Exception as e:
+                logger.error(f"Error reading {chunk_file}: {e}")
+                continue
+
+        if not combined_audio or sample_rate is None:
+            logger.warning(f"No valid audio data for turn {turn_index} {role}")
+            continue
+
+        # Write combined audio
+        try:
+            with wave.open(output_path, "wb") as wf:
+                wf.setsampwidth(sample_width)
+                wf.setnchannels(num_channels)
+                wf.setframerate(sample_rate)
+                wf.writeframes(combined_audio)
+            logger.info(f"Combined turn audio saved to {output_path}")
+
+            # Delete the original chunk files
+            for chunk_file in chunk_files:
+                try:
+                    os.remove(chunk_file)
+                except Exception as e:
+                    logger.warning(f"Failed to delete chunk file {chunk_file}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error writing combined turn audio: {e}")
+            continue
+
+    return True
+
+
 def combine_audio_files(audio_dir: str, output_path: str) -> bool:
     """Combine all WAV files in a directory into a single conversation WAV file.
 
