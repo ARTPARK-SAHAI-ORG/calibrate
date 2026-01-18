@@ -125,6 +125,77 @@ async def save_audio_chunk(
             await file.flush()
 
 
+def combine_audio_files(audio_dir: str, output_path: str) -> bool:
+    """Combine all WAV files in a directory into a single conversation WAV file.
+
+    Files are sorted by modification time to preserve conversation order.
+
+    Args:
+        audio_dir: Directory containing the audio files
+        output_path: Path to save the combined audio file
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import glob
+
+    audio_files = glob.glob(os.path.join(audio_dir, "*.wav"))
+
+    if not audio_files:
+        logger.warning(f"No audio files found in {audio_dir}")
+        return False
+
+    # Sort files by modification time
+    sorted_files = sorted(audio_files, key=lambda f: os.path.getmtime(f))
+
+    # Read all audio data
+    combined_audio = b""
+    sample_rate = None
+    num_channels = None
+    sample_width = None
+
+    for audio_file in sorted_files:
+        try:
+            with wave.open(audio_file, "rb") as wf:
+                if sample_rate is None:
+                    sample_rate = wf.getframerate()
+                    num_channels = wf.getnchannels()
+                    sample_width = wf.getsampwidth()
+                else:
+                    # Verify audio parameters match
+                    if (
+                        wf.getframerate() != sample_rate
+                        or wf.getnchannels() != num_channels
+                        or wf.getsampwidth() != sample_width
+                    ):
+                        logger.warning(
+                            f"Audio parameters mismatch in {audio_file}, skipping"
+                        )
+                        continue
+
+                combined_audio += wf.readframes(wf.getnframes())
+        except Exception as e:
+            logger.error(f"Error reading {audio_file}: {e}")
+            continue
+
+    if not combined_audio or sample_rate is None:
+        logger.error("No valid audio data to combine")
+        return False
+
+    # Write combined audio
+    try:
+        with wave.open(output_path, "wb") as wf:
+            wf.setsampwidth(sample_width)
+            wf.setnchannels(num_channels)
+            wf.setframerate(sample_rate)
+            wf.writeframes(combined_audio)
+        logger.info(f"Combined audio saved to {output_path}")
+        return True
+    except Exception as e:
+        logger.error(f"Error writing combined audio: {e}")
+        return False
+
+
 class MetricsLogger(FrameProcessor):
     """Frame processor that logs RTVI metrics (TTFB and processing time)."""
 

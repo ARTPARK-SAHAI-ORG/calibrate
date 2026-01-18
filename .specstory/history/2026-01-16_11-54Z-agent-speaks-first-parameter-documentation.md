@@ -403,3 +403,507 @@ The fix is applied. The issue was that `logger.remove()` wasn't being called bef
 
 ---
 
+_**User (2026-01-17 14:00Z)**_
+
+update @pense/agent/run_simulation.py so that after each simulation run is over a final conversation.wav file is created outside the audios directory that combines all the audio files into one file .wav
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update `pense/agent/run_simulation.py` so that after each simulation run, a `conversation.wav` file is created that combines all the audio files from the `audios` directory into one file.
+
+Let me look at the current code structure to understand where audio files are saved and where I should add this functionality.
+
+From the attached code, I can see:
+1. Audio files are saved in `audio_save_dir = os.path.join(output_dir, "audios")` (around line 765-770 in the original file)
+2. The audio files are named like `{turn_index}_bot.wav` and `{turn_index}_user.wav`
+3. The simulation result is returned from `run_simulation()` function
+
+I need to:
+1. After the simulation completes (in `run_single_simulation_task`), combine all the audio files in the `audios` directory into a single `conversation.wav` file
+2. The files should be combined in the correct order (by turn index, alternating between user and bot)
+
+Let me read more of the code to understand the structure better.</details></think>
+
+---
+
+Let me first look at the relevant parts of the code to understand how audio files are saved and where to add the combination logic.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me look at the imports and the `save_audio_chunk` function to understand the audio format being used.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/utils.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand:
+1. Audio files are saved as WAV files with 16-bit samples (sample_width=2)
+2. The audio files are named like `{turn_index}_bot.wav` and `{turn_index}_user.wav` in the `audios` directory
+
+I need to add a function that combines all these audio files into a single `conversation.wav` file. The files should be combined in the correct order based on their turn index and type (user/bot).
+
+Let me add this function to `pense/utils.py` and then call it in `run_single_simulation_task` after the simulation completes.
+
+The logic should be:
+1. List all .wav files in the audios directory
+2. Sort them by turn index and then by type (bot first, then user - or the other way around based on the file naming convention)
+3. Combine all audio data into one file
+
+Looking at the naming convention in the code:- `{turn_index}_bot.wav` - for bot audio
+- `{turn_index}_user.wav` - for user audioThe order should be alternating: bot speaks, user speaks (or vice versa). Let me check the order from the file naming.
+
+From line 946-958:
+```python
+@audio_buffer.event_handler("on_user_turn_audio_data")
+async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
+    ...
+    audio_save_path = os.path.join(
+        audio_save_dir, f"{rtvi_message_adapter._turn_index}_bot.wav"
+    )
+
+@audio_buffer.event_handler("on_bot_turn_audio_data")
+async def on_bot_turn_audio_data(buffer, audio, sample_rate, num_channels):
+    ...
+    audio_save_path = os.path.join(
+        audio_save_dir, f"{rtvi_message_adapter._turn_index}_user.wav"
+    )
+```
+
+There's a naming mismatch here—the user turn handler saves to `_bot.wav` while the bot turn handler saves to `_user.wav`. This likely reflects that the pipeline's "user" is the agent being tested and its "bot" is the simulated user. So the sequence should be `0_user.wav`, `0_bot.wav`, `1_user.wav`, `1_bot.wav`, and so on. I'll create a function to merge these files in the proper order and add it to the utils module.</details></think>
+
+---
+
+Now I'll add a function to combine audio files and call it after each simulation. Let me first add a utility function to `pense/utils.py`:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/utils.py</summary>
+
+**Chunk 1**
+Lines added: 84, lines removed: undefined
+
+```diff
+@@ -125,4 +125,88 @@
+              await file.flush()
+  
++ 
++ def combine_audio_files(audio_dir: str, output_path: str) -&gt; bool:
++     """Combine all WAV files in a directory into a single conversation WAV file.
++ 
++     Files are sorted by turn index and type (user first, then bot for each turn).
++ 
++     Args:
++         audio_dir: Directory containing the audio files
++         output_path: Path to save the combined audio file
++ 
++     Returns:
++         True if successful, False otherwise
++     """
++     import glob
++     import re
++ 
++     audio_files = glob.glob(os.path.join(audio_dir, "*.wav"))
++ 
++     if not audio_files:
++         logger.warning(f"No audio files found in {audio_dir}")
++         return False
++ 
++     # Parse filenames and sort by turn index and type
++     # Format: {turn_index}_{type}.wav where type is 'user' or 'bot'
++     def sort_key(filepath):
++         filename = os.path.basename(filepath)
++         match = re.match(r"(\d+)_(user|bot)\.wav", filename)
++         if match:
++             turn_index = int(match.group(1))
++             file_type = match.group(2)
++             # Sort by turn index first, then user before bot within same turn
++             type_order = 0 if file_type == "user" else 1
++             return (turn_index, type_order)
++         return (float("inf"), 0)  # Put unmatched files at the end
++ 
++     sorted_files = sorted(audio_files, key=sort_key)
++ 
++     # Read all audio data
++     combined_audio = b""
++     sample_rate = None
++     num_channels = None
++     sample_width = None
++ 
++     for audio_file in sorted_files:
++         try:
++             with wave.open(audio_file, "rb") as wf:
++                 if sample_rate is None:
++                     sample_rate = wf.getframerate()
++                     num_channels = wf.getnchannels()
++                     sample_width = wf.getsampwidth()
++                 else:
++                     # Verify audio parameters match
++                     if (
++                         wf.getframerate() != sample_rate
++                         or wf.getnchannels() != num_channels
++                         or wf.getsampwidth() != sample_width
++                     ):
++                         logger.warning(
++                             f"Audio parameters mismatch in {audio_file}, skipping"
++                         )
++                         continue
++ 
++                 combined_audio += wf.readframes(wf.getnframes())
++         except Exception as e:
++             logger.error(f"Error reading {audio_file}: {e}")
++             continue
++ 
++     if not combined_audio or sample_rate is None:
++         logger.error("No valid audio data to combine")
++         return False
++ 
++     # Write combined audio
++     try:
++         with wave.open(output_path, "wb") as wf:
++             wf.setsampwidth(sample_width)
++             wf.setnchannels(num_channels)
++             wf.setframerate(sample_rate)
++             wf.writeframes(combined_audio)
++         logger.info(f"Combined audio saved to {output_path}")
++         return True
++     except Exception as e:
++         logger.error(f"Error writing combined audio: {e}")
++         return False
++ 
+  
+  class MetricsLogger(FrameProcessor):
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update `pense/agent/run_simulation.py` to:
+1. Import the `combine_audio_files` function
+2. Call it after each simulation completes
+
+Let me update the imports first and then add the call after the simulation.</details></think>
+
+---
+
+Now let me update the imports in `run_simulation.py`:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the import to include `combine_audio_files`.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: undefined
+
+```diff
+@@ -25,4 +25,5 @@
+      log_and_print,
+      save_audio_chunk,
++     combine_audio_files,
+  )
+  from pense.llm.metrics import evaluate_simuation
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to add the call to `combine_audio_files` after the simulation completes. Looking at the code, the best place to add this is in `run_single_simulation_task` after the simulation result is obtained but before returning. Let me find the right location.</details></think>
+
+---
+
+Now let me add the call to combine audio files after each simulation. Let me find the right spot:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I should add the call to combine audio files after the simulation completes and before returning metrics. The audio files are in `simulation_output_dir/audios/` and the combined file should be saved to `simulation_output_dir/conversation.wav`.Let me add it right after `eval_logger.remove(log_file_id)` and before the metrics aggregation section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+**Chunk 1**
+Lines added: 7, lines removed: undefined
+
+```diff
+@@ -1302,4 +1302,11 @@
+          eval_logger.remove(log_file_id)
+  
++     # Combine all audio files into a single conversation.wav
++     audio_dir = os.path.join(simulation_output_dir, "audios")
++     conversation_audio_path = os.path.join(simulation_output_dir, "conversation.wav")
++     if os.path.exists(audio_dir):
++         combine_audio_files(audio_dir, conversation_audio_path)
++         log_and_print(f"Combined audio saved to {conversation_audio_path}")
++ 
+      # Return metrics for aggregation
+      if simulation_result:
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The changes are done. Let me verify the changes look correct by reading the lints.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 2 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py`
+- `/Users/aman/Documents/repos/artpark/agentloop/pense/utils.py`
+
+Lint results
+
+Lint errors for `pense/agent/run_simulation.py`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| Import "datetime" is not accessed | 10:22-10:30 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "List" is not accessed | 12:25-12:29 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "Tuple" is not accessed | 12:41-12:46 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "LiveOptions" is not accessed | 14:22-14:33 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "ImageFile" is not accessed | 16:27-16:36 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "dataclass" is not accessed | 17:25-17:34 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "FunctionSchema" is not accessed | 47:54-47:68 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "ToolsSchema" is not accessed | 48:51-48:62 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "AggregatedTextFrame" is not accessed | 55:5-55:24 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "LLMContextFrame" is not accessed | 57:5-57:20 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "StopFrame" is not accessed | 58:5-58:14 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "BotStartedSpeakingFrame" is not accessed | 65:5-65:28 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "BotStoppedSpeakingFrame" is not accessed | 66:5-66:28 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "InputAudioRawFrame" is not accessed | 69:5-69:23 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "LLMMessagesAppendFrame" is not accessed | 71:5-71:27 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "LLMFullResponseEndFrame" is not accessed | 73:5-73:28 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "TextFrame" is not accessed | 74:5-74:14 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "Frame" is not accessed | 77:5-77:10 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "InterruptionFrame" is not accessed | 78:5-78:22 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "CartesiaTTSService" is not accessed | 92:43-92:61 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "DeepgramSTTService" is not accessed | 93:43-93:61 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "FunctionCallParams" is not accessed | 94:42-94:60 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "on_user_turn_audio_data" is not accessed | 944:15-944:38 | DIAGNOSTIC_SEVERITY_HINT |
+| "buffer" is not accessed | 944:39-944:45 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "on_bot_turn_audio_data" is not accessed | 953:15-953:37 | DIAGNOSTIC_SEVERITY_HINT |
+| "buffer" is not accessed | 953:38-953:44 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "on_connected" is not accessed | 962:15-962:27 | DIAGNOSTIC_SEVERITY_HINT |
+| "transport" is not accessed | 962:28-962:37 | DIAGNOSTIC_SEVERITY_HINT |
+| "client" is not accessed | 962:39-962:45 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "on_disconnected" is not accessed | 970:15-970:30 | DIAGNOSTIC_SEVERITY_HINT |
+| "transport" is not accessed | 970:31-970:40 | DIAGNOSTIC_SEVERITY_HINT |
+| "client" is not accessed | 970:42-970:48 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "handle_transcript_update" is not accessed | 975:15-975:39 | DIAGNOSTIC_SEVERITY_HINT |
+| "processor" is not accessed | 975:40-975:49 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No linter errors. Let me verify the changes look correct by reading the relevant sections.</details></think>
+
+---
+
+Let me verify the changes look correct:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The changes look good. Let me also verify the utility function:</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/utils.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The changes look good. The implementation:1. Added `combine_audio_files()` function to `pense/utils.py` that:
+   - Finds all .wav files in the audio directory
+   - Sorts them by turn index and type (user first, then bot for each turn)
+   - Reads and combines all audio data
+   - Writes the combined audio to a single WAV file2. Updated `pense/agent/run_simulation.py` to:
+   - Import the `combine_audio_files` function
+   - Call it after each simulation completes to create `conversation.wav` in the simulation output directoryThe conversation.wav file will be created at `{simulation_output_dir}/conversation.wav`, which is outside the `audios` directory as requested.</details></think>
+
+---
+
+Done! I've made the following changes:
+
+1. **Added `combine_audio_files()` function to `pense/utils.py`** that:
+   - Finds all `.wav` files in the audios directory
+   - Sorts them by turn index and type (user first, then bot for each turn)
+   - Combines all audio data into a single WAV file
+   - Handles mismatched audio parameters gracefully
+
+2. **Updated `pense/agent/run_simulation.py`** to:
+   - Import the new `combine_audio_files` function
+   - Call it after each simulation completes
+
+After each simulation run, a `conversation.wav` file will be created at:
+```
+{simulation_output_dir}/conversation.wav
+```
+
+This is outside the `audios/` directory, which contains the individual turn audio files (`0_user.wav`, `0_bot.wav`, `1_user.wav`, etc.).
+
+---
+
+_**User (2026-01-17 14:00Z)**_
+
+update the combine audio files method to sort the files by updation time and then join them
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to change the `combine_audio_files` function to sort files by modification time instead of by filename parsing. This makes sense because the files are created in chronological order during the conversation.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/utils.py</summary>
+
+**Chunk 1**
+Lines added: 1, lines removed: 1
+
+```diff
+@@ -129,5 +129,5 @@
+      """Combine all WAV files in a directory into a single conversation WAV file.
+  
+-     Files are sorted by turn index and type (user first, then bot for each turn).
++     Files are sorted by modification time to preserve conversation order.
+  
+      Args:
+```
+
+**Chunk 2**
+Lines added: undefined, lines removed: 1
+
+```diff
+@@ -139,5 +139,4 @@
+      """
+      import glob
+-     import re
+  
+      audio_files = glob.glob(os.path.join(audio_dir, "*.wav"))
+```
+
+**Chunk 3**
+Lines added: 2, lines removed: 14
+
+```diff
+@@ -147,18 +146,6 @@
+          return False
+  
+-     # Parse filenames and sort by turn index and type
+-     # Format: {turn_index}_{type}.wav where type is 'user' or 'bot'
+-     def sort_key(filepath):
+-         filename = os.path.basename(filepath)
+-         match = re.match(r"(\d+)_(user|bot)\.wav", filename)
+-         if match:
+-             turn_index = int(match.group(1))
+-             file_type = match.group(2)
+-             # Sort by turn index first, then user before bot within same turn
+-             type_order = 0 if file_type == "user" else 1
+-             return (turn_index, type_order)
+-         return (float("inf"), 0)  # Put unmatched files at the end
+- 
+-     sorted_files = sorted(audio_files, key=sort_key)
++     # Sort files by modification time
++     sorted_files = sorted(audio_files, key=lambda f: os.path.getmtime(f))
+  
+      # Read all audio data
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The change has been made. Now files will be sorted by modification time instead of by filename parsing. This is simpler and more reliable since the audio files are created in the order they appear in the conversation.</details></think>
+
+---
+
+Done! The `combine_audio_files` function now sorts files by modification time (`os.path.getmtime()`) instead of parsing filenames. This ensures the audio files are combined in the order they were created during the conversation.
+
+---
+
