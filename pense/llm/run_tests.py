@@ -361,6 +361,7 @@ async def main():
     log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
     results = []
+    results_file_path = join(output_dir, "results.json")
     for test_case_index, test_case in enumerate(config["test_cases"]):
         agent_language = test_case.get("settings", {}).get("language", "english")
         result = await run_test(
@@ -382,6 +383,10 @@ async def main():
 
         result["test_case"] = test_case
         results.append(result)
+
+        # Save intermediate results after each test case
+        with open(results_file_path, "w") as f:
+            json.dump(results, f, indent=4)
 
         log_and_print("-" * 40)
 

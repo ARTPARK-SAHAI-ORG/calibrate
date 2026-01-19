@@ -870,7 +870,6 @@ async def main():
 
     logger.info(f"gt_transcripts: {all_gt_transcripts}")
     logger.info(f"pred_transcripts: {all_pred_transcripts}")
-    logger.info(metrics)
 
     wer_score = get_wer_score(all_gt_transcripts, all_pred_transcripts)
     logger.info(f"WER: {wer_score['score']}")

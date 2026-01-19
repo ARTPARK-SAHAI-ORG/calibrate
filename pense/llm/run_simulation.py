@@ -98,6 +98,8 @@ class Processor(FrameProcessor):
         conversation_state: "ConversationState",
         name: str = "Processor",
         role: Literal["agent", "user"] = "agent",
+        context: Optional["LLMContext"] = None,
+        output_dir: Optional[str] = None,
     ):
         super().__init__(enable_direct_mode=True, name=name)
         self._current_response = ""
@@ -108,6 +110,8 @@ class Processor(FrameProcessor):
         self._partner_task: Optional["PipelineTask"] = None
         self._self_end_sent = False
         self._role = role
+        self._context = context
+        self._output_dir = output_dir
 
     def set_task(self, task: "PipelineTask"):
         """Set the task reference after task creation."""
@@ -154,6 +158,21 @@ class Processor(FrameProcessor):
 
         await self.push_frame(frame, direction)
 
+    def _save_intermediate_transcript(self):
+        """Save intermediate transcript to file."""
+        if not self._context or not self._output_dir:
+            return
+
+        transcript = [
+            message
+            for message in self._context._messages
+            if message["role"] not in ["system"]
+        ]
+
+        transcript_path = join(self._output_dir, "transcript.json")
+        with open(transcript_path, "w") as f:
+            json.dump(transcript, f, indent=4)
+
     async def _handle_completed_response(self, response: str):
         should_continue = True
 
@@ -165,6 +184,8 @@ class Processor(FrameProcessor):
 
         if self._conversation_state and self._role == "agent":
             should_continue = await self._conversation_state.record_turn()
+            # Save intermediate transcript after each agent turn
+            self._save_intermediate_transcript()
 
         await self._forward_to_partner(response, run_partner=should_continue)
 
@@ -207,6 +228,7 @@ async def run_simulation(
     user_provider: str = "openai",
     agent_speaks_first: bool = True,
     max_turns: int = DEFAULT_MAX_TURNS,
+    output_dir: Optional[str] = None,
 ) -> List[str]:
     """Runs a text-only bot that processes text inputs through an LLM and returns text outputs."""
     # Create LLM service
@@ -237,12 +259,18 @@ async def run_simulation(
 
     conversation_state = ConversationState(max_turns=max_turns)
 
+    # Create context with system prompt (before processors so we can pass it)
+    messages = [{"role": "system", "content": bot_system_prompt}]
+    # Note: bot_context will be created after tools are set up, but we need a placeholder
+    # We'll set the context on the processor later
+
     # Create processors (text_output needs to be created first for reference)
     bot_processor = Processor(
         role="agent",
         speaks_first=agent_speaks_first,
         conversation_state=conversation_state,
         name="BotProcessor",
+        output_dir=output_dir,
     )
     user_processor = Processor(
         role="user",
@@ -250,9 +278,6 @@ async def run_simulation(
         conversation_state=conversation_state,
         name="UserProcessor",
     )
-
-    # Create context with system prompt
-    messages = [{"role": "system", "content": bot_system_prompt}]
 
     async def _exec_call_call():
         try:
@@ -328,6 +353,9 @@ async def run_simulation(
 
     bot_context = LLMContext(messages, tools=tools)
     bot_context_aggregator = LLMContextAggregatorPair(bot_context)
+
+    # Set context on bot_processor for intermediate transcript saving
+    bot_processor._context = bot_context
 
     messages = [{"role": "system", "content": user_system_prompt}]
     user_context = LLMContext(messages)
@@ -499,6 +527,7 @@ async def run_single_simulation_task(
                 user_provider=args.provider,
                 agent_speaks_first=agent_speaks_first,
                 max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
+                output_dir=simulation_output_dir,
             )
 
             simulation_metrics = {

@@ -25,6 +25,7 @@ from pense.utils import (
     log_and_print,
     save_audio_chunk,
     combine_turn_audio_chunks,
+    combine_turn_audio_chunks_for_turn,
     combine_audio_files,
 )
 from pense.llm.metrics import evaluate_simuation
@@ -237,9 +238,119 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._bot_audio_chunk_indices = {}  # Track chunk indices for bot audio per turn
 
     async def _reset_buffers(self):
-        self._turns_concluded.add(self._turn_index)  # mark the turn as concluded
+        concluded_turn = self._turn_index
+        self._turns_concluded.add(concluded_turn)  # mark the turn as concluded
         self._text_buffer = ""
         self._spoken_text_buffer = ""
+
+        # Save intermediate state after each turn
+        await self._save_intermediate_state(concluded_turn)
+
+    def _build_serialized_transcript(
+        self, end_reason: Optional[str] = None
+    ) -> list[dict]:
+        """Build serialized transcript from context messages and tool calls.
+
+        Args:
+            end_reason: Optional reason for ending the conversation (e.g., "max_turns")
+
+        Returns:
+            List of transcript entries with roles flipped (user becomes assistant and vice versa)
+        """
+        serialized_transcript: list[dict] = []
+        tool_call_current_index = 0
+
+        for index, message in enumerate(self._context.get_messages()):
+            if not isinstance(message, dict):
+                continue
+            role = message.get("role")
+
+            if (
+                tool_call_current_index < len(self._tool_calls)
+                and self._tool_calls[tool_call_current_index].get("position") == index
+            ):
+                serialized_transcript.append(
+                    {
+                        "role": "tool_call",
+                        "content": self._tool_calls[tool_call_current_index].get(
+                            "data"
+                        ),
+                    }
+                )
+                tool_call_current_index += 1
+
+            # flip the role as the user for the transcript is the agent and vice versa
+            if role == "user":
+                role = "assistant"
+            elif role == "assistant":
+                role = "user"
+
+            serialized_transcript.append(
+                {
+                    "role": role,
+                    "content": message.get("content", ""),
+                }
+            )
+
+        while tool_call_current_index < len(self._tool_calls):
+            serialized_transcript.append(
+                {
+                    "role": "tool_call",
+                    "content": self._tool_calls[tool_call_current_index].get("data"),
+                }
+            )
+            tool_call_current_index += 1
+
+        serialized_transcript = [
+            message
+            for message in serialized_transcript
+            if message.get("role") in {"user", "assistant", "tool_call"}
+        ]
+
+        if end_reason:
+            serialized_transcript.append(
+                {
+                    "role": "end_reason",
+                    "content": end_reason,
+                }
+            )
+
+        return serialized_transcript
+
+    def _save_transcript(self, transcript: list[dict]):
+        """Save transcript to file.
+
+        Args:
+            transcript: The serialized transcript to save
+        """
+        self._output_dir.mkdir(parents=True, exist_ok=True)
+        self._serialized_transcript = transcript
+
+        with open(
+            os.path.join(self._output_dir, "transcript.json"), "w"
+        ) as transcripts_file:
+            json.dump(transcript, transcripts_file, indent=4)
+
+    async def _save_intermediate_state(self, concluded_turn: int):
+        """Save intermediate transcript and combine audio chunks for the concluded turn."""
+        try:
+            transcript = self._build_serialized_transcript()
+            self._save_transcript(transcript)
+            eval_logger.info(
+                f"Saved intermediate transcript after turn {concluded_turn}"
+            )
+
+            # Combine audio chunks for the concluded turn
+            if os.path.exists(self._audio_save_dir):
+                combine_turn_audio_chunks_for_turn(self._audio_save_dir, concluded_turn)
+                eval_logger.info(f"Combined audio chunks for turn {concluded_turn}")
+
+        except Exception as exc:
+            traceback.print_exc()
+            eval_logger.error(
+                f"Failed to save intermediate state for turn {concluded_turn}",
+                extra={"error": str(exc)},
+            )
 
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
@@ -405,77 +516,10 @@ class RTVIMessageFrameAdapter(FrameProcessor):
 
         if isinstance(frame, EndFrame) or isinstance(frame, CancelFrame):
             try:
-                self._output_dir.mkdir(parents=True, exist_ok=True)
-
-                serialized_transcript: list[dict] = []
-
-                tool_call_current_index = 0
-
-                for index, message in enumerate(self._context.get_messages()):
-                    if not isinstance(message, dict):
-                        continue
-                    role = message.get("role")
-
-                    if (
-                        tool_call_current_index < len(self._tool_calls)
-                        and self._tool_calls[tool_call_current_index].get("position")
-                        == index
-                    ):
-                        serialized_transcript.append(
-                            {
-                                "role": "tool_call",
-                                "content": self._tool_calls[
-                                    tool_call_current_index
-                                ].get("data"),
-                            }
-                        )
-                        tool_call_current_index += 1
-
-                    # flip the role as the user for the transcript is the agent and vice versa
-                    if role == "user":
-                        role = "assistant"
-                    elif role == "assistant":
-                        role = "user"
-
-                    serialized_transcript.append(
-                        {
-                            "role": role,
-                            "content": message.get("content", ""),
-                        }
-                    )
-
-                while tool_call_current_index < len(self._tool_calls):
-                    serialized_transcript.append(
-                        {
-                            "role": "tool_call",
-                            "content": self._tool_calls[tool_call_current_index].get(
-                                "data"
-                            ),
-                        }
-                    )
-                    tool_call_current_index += 1
-
-                serialized_transcript = [
-                    message
-                    for message in serialized_transcript
-                    if message.get("role") in {"user", "assistant", "tool_call"}
-                ]
-
-                if self._ended_due_to_max_turns:
-                    serialized_transcript.append(
-                        {
-                            "role": "end_reason",
-                            "content": "max_turns",
-                        }
-                    )
-
-                # Store transcripts for return
-                self._serialized_transcript = serialized_transcript
-
-                with open(
-                    os.path.join(self._output_dir, "transcript.json"), "w"
-                ) as transcripts_file:
-                    json.dump(serialized_transcript, transcripts_file, indent=4)
+                # Build and save final transcript
+                end_reason = "max_turns" if self._ended_due_to_max_turns else None
+                transcript = self._build_serialized_transcript(end_reason=end_reason)
+                self._save_transcript(transcript)
 
                 with open(
                     os.path.join(self._output_dir, "tool_calls.json"), "w"
@@ -486,6 +530,13 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     os.path.join(self._output_dir, "stt_outputs.json"), "w"
                 ) as stt_outputs_file:
                     json.dump(self._stt_outputs, stt_outputs_file, indent=4)
+
+                # Final cleanup: combine any remaining audio chunks that weren't processed
+                if os.path.exists(self._audio_save_dir):
+                    combine_turn_audio_chunks(self._audio_save_dir)
+                    eval_logger.info(
+                        "Final cleanup: combined any remaining audio chunks"
+                    )
 
             except Exception as exc:
                 traceback.print_exc()

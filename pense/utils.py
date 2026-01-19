@@ -125,6 +125,110 @@ async def save_audio_chunk(
             await file.flush()
 
 
+def combine_turn_audio_chunks_for_turn(audio_dir: str, turn_index: int) -> bool:
+    """Combine audio chunks for a specific turn into single turn audio files.
+
+    Groups files like {turn_index}_{role}_{chunk_index}.wav and combines them
+    into {turn_index}_{role}.wav, then deletes the original chunks.
+
+    Args:
+        audio_dir: Directory containing the audio chunk files
+        turn_index: The specific turn index to combine chunks for
+
+    Returns:
+        True if successful, False otherwise
+    """
+    import glob
+    import re
+
+    # Pattern to match chunk files for the specific turn: {turn_index}_{role}_{chunk_index}.wav
+    chunk_pattern = re.compile(rf"^{turn_index}_(bot|user)_(\d+)\.wav$")
+
+    audio_files = glob.glob(os.path.join(audio_dir, f"{turn_index}_*_*.wav"))
+
+    if not audio_files:
+        logger.info(f"No audio chunks found for turn {turn_index} in {audio_dir}")
+        return True
+
+    # Group files by role
+    role_groups = defaultdict(list)
+    for audio_file in audio_files:
+        filename = os.path.basename(audio_file)
+        match = chunk_pattern.match(filename)
+        if match:
+            role = match.group(1)
+            chunk_index = int(match.group(2))
+            role_groups[role].append((chunk_index, audio_file))
+
+    if not role_groups:
+        logger.info(f"No chunk files found to combine for turn {turn_index}")
+        return True
+
+    # Combine each role group
+    for role, chunks in role_groups.items():
+        # Sort by chunk index
+        chunks.sort(key=lambda x: x[0])
+        chunk_files = [f for _, f in chunks]
+
+        output_path = os.path.join(audio_dir, f"{turn_index}_{role}.wav")
+
+        # Read and combine audio data
+        combined_audio = b""
+        sample_rate = None
+        num_channels = None
+        sample_width = None
+
+        for chunk_file in chunk_files:
+            try:
+                with wave.open(chunk_file, "rb") as wf:
+                    if sample_rate is None:
+                        sample_rate = wf.getframerate()
+                        num_channels = wf.getnchannels()
+                        sample_width = wf.getsampwidth()
+                    else:
+                        # Verify audio parameters match
+                        if (
+                            wf.getframerate() != sample_rate
+                            or wf.getnchannels() != num_channels
+                            or wf.getsampwidth() != sample_width
+                        ):
+                            logger.warning(
+                                f"Audio parameters mismatch in {chunk_file}, skipping"
+                            )
+                            continue
+
+                    combined_audio += wf.readframes(wf.getnframes())
+            except Exception as e:
+                logger.error(f"Error reading {chunk_file}: {e}")
+                continue
+
+        if not combined_audio or sample_rate is None:
+            logger.warning(f"No valid audio data for turn {turn_index} {role}")
+            continue
+
+        # Write combined audio
+        try:
+            with wave.open(output_path, "wb") as wf:
+                wf.setsampwidth(sample_width)
+                wf.setnchannels(num_channels)
+                wf.setframerate(sample_rate)
+                wf.writeframes(combined_audio)
+            logger.info(f"Combined turn audio saved to {output_path}")
+
+            # Delete the original chunk files
+            for chunk_file in chunk_files:
+                try:
+                    os.remove(chunk_file)
+                except Exception as e:
+                    logger.warning(f"Failed to delete chunk file {chunk_file}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error writing combined turn audio: {e}")
+            continue
+
+    return True
+
+
 def combine_turn_audio_chunks(audio_dir: str) -> bool:
     """Combine audio chunks for each turn into single turn audio files.
 
