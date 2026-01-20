@@ -560,7 +560,10 @@ async def run_single_simulation_task(
         except Exception as e:
             traceback.print_exc()
         finally:
-            logger.remove(log_file_id)
+            try:
+                logger.remove(log_file_id)
+            except ValueError:
+                pass  # Handler was already removed by another task
 
 
 async def main():

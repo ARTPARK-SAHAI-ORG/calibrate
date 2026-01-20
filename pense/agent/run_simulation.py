@@ -25,7 +25,6 @@ from pense.utils import (
     log_and_print,
     save_audio_chunk,
     combine_turn_audio_chunks,
-    combine_turn_audio_chunks_for_turn,
     combine_audio_files,
 )
 from pense.llm.metrics import evaluate_simuation
@@ -54,7 +53,8 @@ from pipecat.transcriptions.language import Language
 
 from pipecat.frames.frames import (
     EndFrame,
-    AggregatedTextFrame,
+    BotSpeakingFrame,
+    UserSpeakingFrame,
     EndTaskFrame,
     LLMContextFrame,
     StopFrame,
@@ -114,7 +114,7 @@ from pense.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
 from pipecat.utils.time import time_now_iso8601
 
 
-PIPELINE_IDLE_TIMEOUT_SECS = 60
+PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
 
 
@@ -258,26 +258,36 @@ class RTVIMessageFrameAdapter(FrameProcessor):
             List of transcript entries with roles flipped (user becomes assistant and vice versa)
         """
         serialized_transcript: list[dict] = []
-        tool_call_current_index = 0
+
+        # Group tool calls by position
+        tool_calls_by_position = defaultdict(list)
+        for tool_call in self._tool_calls:
+            position = tool_call.get("position")
+            data = tool_call.get("data", {})
+            tool_calls_by_position[position].append(
+                {
+                    "id": data.get("tool_call_id"),
+                    "function": {
+                        "name": data.get("function_name"),
+                        "arguments": json.dumps(data.get("args", {})),
+                    },
+                    "type": "function",
+                }
+            )
 
         for index, message in enumerate(self._context.get_messages()):
             if not isinstance(message, dict):
                 continue
             role = message.get("role")
 
-            if (
-                tool_call_current_index < len(self._tool_calls)
-                and self._tool_calls[tool_call_current_index].get("position") == index
-            ):
+            # Add tool calls that occurred at this position
+            if index in tool_calls_by_position:
                 serialized_transcript.append(
                     {
-                        "role": "tool_call",
-                        "content": self._tool_calls[tool_call_current_index].get(
-                            "data"
-                        ),
+                        "role": "assistant",
+                        "tool_calls": tool_calls_by_position[index],
                     }
                 )
-                tool_call_current_index += 1
 
             # flip the role as the user for the transcript is the agent and vice versa
             if role == "user":
@@ -292,19 +302,21 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 }
             )
 
-        while tool_call_current_index < len(self._tool_calls):
-            serialized_transcript.append(
-                {
-                    "role": "tool_call",
-                    "content": self._tool_calls[tool_call_current_index].get("data"),
-                }
-            )
-            tool_call_current_index += 1
+        # Add any remaining tool calls that occurred after all messages
+        max_message_index = len(self._context.get_messages())
+        for position in sorted(tool_calls_by_position.keys()):
+            if position >= max_message_index:
+                serialized_transcript.append(
+                    {
+                        "role": "assistant",
+                        "tool_calls": tool_calls_by_position[position],
+                    }
+                )
 
         serialized_transcript = [
             message
             for message in serialized_transcript
-            if message.get("role") in {"user", "assistant", "tool_call"}
+            if message.get("role") in {"user", "assistant"}
         ]
 
         if end_reason:
@@ -332,18 +344,13 @@ class RTVIMessageFrameAdapter(FrameProcessor):
             json.dump(transcript, transcripts_file, indent=4)
 
     async def _save_intermediate_state(self, concluded_turn: int):
-        """Save intermediate transcript and combine audio chunks for the concluded turn."""
+        """Save intermediate transcript after the concluded turn."""
         try:
             transcript = self._build_serialized_transcript()
             self._save_transcript(transcript)
             eval_logger.info(
                 f"Saved intermediate transcript after turn {concluded_turn}"
             )
-
-            # Combine audio chunks for the concluded turn
-            if os.path.exists(self._audio_save_dir):
-                combine_turn_audio_chunks_for_turn(self._audio_save_dir, concluded_turn)
-                eval_logger.info(f"Combined audio chunks for turn {concluded_turn}")
 
         except Exception as exc:
             traceback.print_exc()
@@ -1019,7 +1026,17 @@ async def run_simulation(
             allow_interruptions=True,
         ),
         observers=[LLMLogObserver()],
-        cancel_on_idle_timeout=False,
+        idle_timeout_secs=PIPELINE_IDLE_TIMEOUT_SECS,
+        idle_timeout_frames=(
+            UserSpeakingFrame,
+            BotSpeakingFrame,  # Bot speaking
+            TextFrame,  # LLM generating text
+            TTSTextFrame,  # TTS processing
+            LLMFullResponseStartFrame,  # LLM started responding
+            LLMFullResponseEndFrame,  # LLM finished responding
+            OutputAudioRawFrame,  # Audio being sent out
+        ),
+        cancel_on_idle_timeout=True,
     )
 
     function_call_handler.set_frame_sender(task.queue_frame)

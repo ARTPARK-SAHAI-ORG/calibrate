@@ -9,17 +9,15 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
     Frame,
-    InterruptionTaskFrame,
+    BotSpeakingFrame,
+    UserSpeakingFrame,
+    LLMFullResponseStartFrame,
+    LLMFullResponseEndFrame,
+    TextFrame,
+    TTSTextFrame,
     LLMRunFrame,
     MetricsFrame,
-    TranscriptionFrame,
-    InputAudioRawFrame,
-    VADUserStartedSpeakingFrame,
-    VADUserStoppedSpeakingFrame,
-    InterruptionFrame,
     OutputAudioRawFrame,
-    OutputTransportMessageUrgentFrame,
-    InputTransportMessageFrame,
     FunctionCallResultFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
@@ -608,7 +606,17 @@ async def run_bot(
             LLMLogObserver(),
             UserBotLatencyLogObserver(),
         ],  # RTVI protocol events
-        cancel_on_idle_timeout=False,
+        idle_timeout_secs=120,  # 2 minutes idle timeout
+        idle_timeout_frames=(
+            UserSpeakingFrame,
+            BotSpeakingFrame,  # Bot speaking
+            TextFrame,  # LLM generating text
+            TTSTextFrame,  # TTS processing
+            LLMFullResponseStartFrame,  # LLM started responding
+            LLMFullResponseEndFrame,  # LLM finished responding
+            OutputAudioRawFrame,  # Audio being sent out
+        ),
+        cancel_on_idle_timeout=True,
     )
 
     @transport.event_handler("on_client_connected")

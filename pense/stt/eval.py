@@ -221,7 +221,6 @@ async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port
             allow_interruptions=True,
         ),
         idle_timeout_secs=60,
-        enable_tracing=True,
         observers=[RTVIObserver(rtvi), DebugLogObserver()],
     )
 
