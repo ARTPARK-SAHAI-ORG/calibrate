@@ -786,8 +786,6 @@ async def main():
             existing_df = pd.read_csv(results_csv_path)
             processed_ids = set(existing_df["id"].tolist())
             existing_results = existing_df[["id", "gt", "pred"]].to_dict("records")
-
-            # Filter to only unprocessed files
             gt_for_pending = gt[~gt["id"].isin(processed_ids)].reset_index(drop=True)
 
             if gt_for_pending.empty:
@@ -796,40 +794,39 @@ async def main():
                 pred_transcripts = []
                 break
 
-            current_unprocessed_count = len(gt_for_pending)
-
-            # Check if no progress was made since last attempt
-            if (
-                previous_unprocessed_count is not None
-                and current_unprocessed_count == previous_unprocessed_count
-            ):
-                log_and_print(
-                    f"No progress made - {current_unprocessed_count} files still unprocessed. "
-                    f"Saving empty transcripts for failed files and exiting."
-                )
-                # Add empty transcripts for failed files
-                for _, row in gt_for_pending.iterrows():
-                    existing_results.append(
-                        {
-                            "id": row["id"],
-                            "gt": row["text"],
-                            "pred": "",
-                        }
-                    )
-                # Save updated results with empty transcripts
-                pd.DataFrame(existing_results).to_csv(results_csv_path, index=False)
-                audio_files = []
-                pred_transcripts = []
-                break
-
-            previous_unprocessed_count = current_unprocessed_count
-
             log_and_print(
                 f"Resuming: {len(processed_ids)} processed, {len(gt_for_pending)} remaining"
             )
         else:
             gt_for_pending = gt
-            previous_unprocessed_count = len(gt_for_pending)
+
+        current_unprocessed_count = len(gt_for_pending)
+
+        # Check if no progress was made since last attempt
+        if (
+            previous_unprocessed_count is not None
+            and current_unprocessed_count == previous_unprocessed_count
+        ):
+            log_and_print(
+                f"No progress made - {current_unprocessed_count} files still unprocessed. "
+                f"Saving empty transcripts for failed files and exiting."
+            )
+            # Add empty transcripts for failed files
+            for _, row in gt_for_pending.iterrows():
+                existing_results.append(
+                    {
+                        "id": row["id"],
+                        "gt": row["text"],
+                        "pred": "",
+                    }
+                )
+            # Save results with empty transcripts
+            pd.DataFrame(existing_results).to_csv(results_csv_path, index=False)
+            audio_files = []
+            pred_transcripts = []
+            break
+
+        previous_unprocessed_count = current_unprocessed_count
 
         audio_files = [
             Path(audio_dir) / f"{audio_name}.wav"
