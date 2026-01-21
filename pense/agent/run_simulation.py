@@ -1108,7 +1108,9 @@ async def run_simulation(
         f"Evaluating the conversation based on the criteria:\n\n{evaluation_criteria}"
     )
     # Get evaluation results from LLM judge
-    llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
+    llm_judge_result = await evaluate_simuation(
+        transcript, evaluation_criteria, agent_system_prompt=system_prompt
+    )
 
     evaluation_results = [
         {

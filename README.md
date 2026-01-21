@@ -63,8 +63,19 @@ export OPENAI_API_KEY=your_key
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 ```
 
-```bash
-pense stt eval -p <provider> -l <language> -i /path/to/data -o /path/to/output -d
+```python
+import asyncio
+from pense.stt import eval, leaderboard
+
+# Run STT evaluation
+asyncio.run(eval(
+    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, etc.
+    language="english",   # english or hindi
+    input_dir="/path/to/data",
+    output_dir="/path/to/output",
+    debug=True,           # optional: run on first 5 audio files only
+    debug_count=5,        # optional: number of files in debug mode
+))
 ```
 
 You can use the sample inputs provided in [`pense/stt/examples/sample_input`](pense/stt/examples/sample_input) to test the evaluation script.
@@ -150,29 +161,29 @@ The definition of all the metrics we compute are stored in [`pense/stt/metrics.p
 
 You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_output) to see a sample output of the evaluation script.
 
-For more details, run `pense stt eval -h`.
+**Function Parameters:**
 
-```bash
-usage: eval.py [-h] [-p {deepgram,openai,cartesia,groq,google,sarvam}] [-l {english,hindi}] -i
-               INPUT_DIR [-o OUTPUT_DIR] [-d]
-
-options:
-  -h, --help            show this help message and exit
-  -p {deepgram,openai,cartesia,groq,google,sarvam}, --provider {deepgram,openai,cartesia,groq,google,sarvam}
-                        STT provider to use for evaluation
-  -l {english,hindi}, --language {english,hindi}
-                        Language of the audio files
-  -i INPUT_DIR, --input-dir INPUT_DIR
-                        Path to the input directory containing the audio files and gt.json
-  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
-                        Path to the output directory to save the results
-  -d, --debug           Run the evaluation on the first 5 audio files
-```
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
+| `input_dir` | str | Yes | - | Path to input directory containing audio files and stt.csv |
+| `output_dir` | str | No | "./out" | Path to output directory for results |
+| `language` | str | No | "english" | Language of audio files: english or hindi |
+| `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
+| `debug` | bool | No | False | Run on first N audio files only |
+| `debug_count` | int | No | 5 | Number of files in debug mode |
+| `ignore_retry` | bool | No | False | Skip retry if not all audios processed |
+| `port` | int | No | 8765 | WebSocket port for STT bot |
 
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
-```bash
-pense stt leaderboard -o /path/to/output -s ./leaderboards
+```python
+from pense.stt import leaderboard
+
+leaderboard(
+    output_dir="/path/to/output",
+    save_dir="./leaderboards"
+)
 ```
 
 The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`pense/stt/leaderboard.py`).
@@ -209,8 +220,19 @@ export ELEVENLABS_API_KEY=your_key
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 ```
 
-```bash
-pense tts eval -p <provider> -l <language> -i /path/to/input.csv -o /path/to/output
+```python
+import asyncio
+from pense.tts import eval, leaderboard
+
+# Run TTS evaluation
+asyncio.run(eval(
+    provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam
+    language="english",     # english, hindi, or kannada
+    input="/path/to/input.csv",
+    output_dir="/path/to/output",
+    debug=True,             # optional: run on first 5 texts only
+    debug_count=5,          # optional: number of texts in debug mode
+))
 ```
 
 You can use the sample inputs provided in [`pense/tts/examples/sample.csv`](pense/tts/examples/sample.csv) to test the evaluation script.
@@ -277,29 +299,27 @@ row_2,this is a test,./out/audios/2.wav,True,"The audio clearly says 'this is a 
 
 You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_output) to see a sample output of the evaluation script.
 
-For more details, run `pense tts eval -h`.
+**Function Parameters:**
 
-```bash
-usage: eval.py [-h] [-p {cartesia,openai,groq,google,elevenlabs,sarvam}]
-               [-l {english,hindi,kannada}] -i INPUT [-o OUTPUT_DIR] [-d]
-
-options:
-  -h, --help            show this help message and exit
-  -p {cartesia,openai,groq,google,elevenlabs,sarvam}, --provider {cartesia,openai,groq,google,elevenlabs,sarvam}
-                        TTS provider to use for evaluation
-  -l {english,hindi,kannada}, --language {english,hindi,kannada}
-                        Language of the audio files
-  -i INPUT, --input INPUT
-                        Path to the input CSV file containing the texts to synthesize
-  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
-                        Path to the output directory to save the results
-  -d, --debug           Run the evaluation on the first 5 audio files
-```
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `input` | str | Yes | - | Path to input CSV file containing texts to synthesize |
+| `provider` | str | No | "google" | TTS provider: cartesia, openai, groq, google, elevenlabs, sarvam |
+| `language` | str | No | "english" | Language: english, hindi, or kannada |
+| `output_dir` | str | No | "./out" | Path to output directory for results |
+| `debug` | bool | No | False | Run on first N texts only |
+| `debug_count` | int | No | 5 | Number of texts in debug mode |
+| `port` | int | No | 8765 | WebSocket port for TTS bot |
 
 To benchmark several TTS runs, generate the combined workbook and chart with:
 
-```bash
-pense tts leaderboard -o /path/to/output -s ./leaderboards
+```python
+from pense.tts import leaderboard
+
+leaderboard(
+    output_dir="/path/to/output",
+    save_dir="./leaderboards"
+)
 ```
 
 `pense/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
@@ -411,8 +431,17 @@ export OPENAI_API_KEY=your_key
 export OPENROUTER_API_KEY=your_key
 ```
 
-```bash
-pense llm tests run -c /path/to/test_config.json -o /path/to/output_dir -m <model_name> -p <provider>
+```python
+import asyncio
+from pense.llm import tests
+
+# Run LLM tests
+asyncio.run(tests.run(
+    config="/path/to/test_config.json",
+    output_dir="/path/to/output_dir",
+    model="gpt-4.1",           # or "openai/gpt-4.1" for openrouter
+    provider="openrouter",      # openai or openrouter
+))
 ```
 
 **Provider Options:**
@@ -422,12 +451,25 @@ pense llm tests run -c /path/to/test_config.json -o /path/to/output_dir -m <mode
 
 **Examples:**
 
-```bash
+```python
+import asyncio
+from pense.llm import tests
+
 # Using OpenAI provider with OpenAI model name
-pense llm tests run -c /path/to/config.json -o ./out -m gpt-4.1 -p openai
+asyncio.run(tests.run(
+    config="/path/to/config.json",
+    output_dir="./out",
+    model="gpt-4.1",
+    provider="openai"
+))
 
 # Using OpenRouter provider with OpenRouter model name
-pense llm tests run -c /path/to/config.json -o ./out -m openai/gpt-4.1 -p openrouter
+asyncio.run(tests.run(
+    config="/path/to/config.json",
+    output_dir="./out",
+    model="openai/gpt-4.1",
+    provider="openrouter"
+))
 ```
 
 You can use the sample test configuration provided in [`pense/llm/examples/tests/config.json`](pense/llm/examples/tests/config.json) to test the evaluation script.
@@ -510,7 +552,7 @@ Failed test cases:
 History:
 
 
-assistant: Namaste, I’m Nurse Anitha. To start, what name should I write for you?
+assistant: Namaste, I'm Nurse Anitha. To start, what name should I write for you?
 user: My name is Geetha Shankar. I am 24 years old and live in Hosahalli village, Holenarasipura taluk, Hassan district
 
 
@@ -528,8 +570,13 @@ Metrics:
 
 Once you have results for multiple models or scenarios, compile a leaderboard CSV and comparison chart:
 
-```bash
-pense llm tests leaderboard -o /path/to/output -s ./leaderboard
+```python
+from pense.llm import tests
+
+tests.leaderboard(
+    output_dir="/path/to/output",
+    save_dir="./leaderboard"
+)
 ```
 
 `pense/llm/tests_leaderboard.py` walks every `<test_config_name>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
@@ -548,9 +595,43 @@ You can checkout [`pense/llm/examples/tests/leaderboard`](pense/llm/examples/tes
 
 ![Leaderboard example](pense/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
+### Low-level API for Single Test Cases
+
+For more control, you can run individual test cases or inference:
+
+```python
+import asyncio
+from pense.llm import tests
+
+# Run a single test case
+result = asyncio.run(tests.run_test(
+    chat_history=[
+        {"role": "assistant", "content": "Hello! What is your name?"},
+        {"role": "user", "content": "Aman Dalmia"}
+    ],
+    evaluation={
+        "type": "tool_call",
+        "tool_calls": [{"tool": "plan_next_question", "arguments": {...}}]
+    },
+    system_prompt="You are a helpful assistant...",
+    model="gpt-4.1",
+    provider="openrouter",
+    tools=[...]  # optional tool definitions
+))
+
+# Run LLM inference without evaluation
+result = asyncio.run(tests.run_inference(
+    chat_history=[...],
+    system_prompt="You are a helpful assistant...",
+    model="gpt-4.1",
+    provider="openrouter",
+    tools=[...]
+))
+```
+
 ## LLM simulations
 
-Run fully automated, text-only conversations between two LLMs—the “agent” plus multiple users having specific personas to mimic specific scenarios given by you. Prepare a JSON configuration file as shown below:
+Run fully automated, text-only conversations between two LLMs—the "agent" plus multiple users having specific personas to mimic specific scenarios given by you. Prepare a JSON configuration file as shown below:
 
 ```json
 {
@@ -608,12 +689,17 @@ export OPENROUTER_API_KEY=your_key
 
 Then launch simulations:
 
-```bash
-pense llm simulations run \
-  -c /path/to/config.json \
-  -o /path/to/output \
-  -m <model_name> \
-  -p <provider>
+```python
+import asyncio
+from pense.llm import simulations
+
+asyncio.run(simulations.run(
+    config="/path/to/config.json",
+    output_dir="/path/to/output",
+    model="gpt-4.1",           # or "openai/gpt-4.1" for openrouter
+    provider="openrouter",      # openai or openrouter
+    parallel=1,                 # number of simulations to run in parallel
+))
 ```
 
 **Provider Options:**
@@ -623,20 +709,25 @@ pense llm simulations run \
 
 **Examples:**
 
-```bash
+```python
+import asyncio
+from pense.llm import simulations
+
 # Using OpenAI provider with OpenAI model name
-pense llm simulations run \
-  -c pense/llm/examples/simulation/config.json \
-  -o ./out \
-  -m gpt-4.1 \
-  -p openai
+asyncio.run(simulations.run(
+    config="pense/llm/examples/simulation/config.json",
+    output_dir="./out",
+    model="gpt-4.1",
+    provider="openai"
+))
 
 # Using OpenRouter provider with OpenRouter model name
-pense llm simulations run \
-  -c pense/llm/examples/simulation/config.json \
-  -o ./out \
-  -m openai/gpt-4.1 \
-  -p openrouter
+asyncio.run(simulations.run(
+    config="pense/llm/examples/simulation/config.json",
+    output_dir="./out",
+    model="openai/gpt-4.1",
+    provider="openrouter"
+))
 ```
 
 You can use the sample configuration provided in [`pense/llm/examples/simulation/config.json`](pense/llm/examples/simulation/config.json) to test the simulation.
@@ -665,33 +756,7 @@ tool call: plan_next_question invoked with arguments: {'questions_answered': [3]
 tool call: end_call invoked by LLM
 --------------------------------
 Running simulation simulation_persona_1_scenario_2
-Persona:
-You are a mother; name is Geeta Prasad, 39 years old lives at Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar. Phone number is plus nine one, nine eight triple three, forty-seven twenty-nine zero; never had a stillbirth or a baby who died soon after birth, but has had one baby who died on the third day after delivery; never had three or more miscarriages in a row; in her last pregnancy she wasn't admitted for high blood pressure or eclampsia; only carrying one baby as per the scan; blood group is O positive, so there are no Rh-related issues; did experience light vaginal spotting once during this pregnancy but otherwise no pelvic mass or complications; uncertain about her exact blood-pressure reading, but recalls that it was around 150/95 mmHg at booking; does not have diabetes, heart disease, kidney disease, or epilepsy; does have asthma and uses an inhaler daily; has never had tuberculosis or any other serious medical condition; longer drinks alcohol or uses substances, having stopped completely after learning she was pregnant; is very shy and reserved and uses short answers to questions
-Gender: female
-Language: english
-Scenario:
-the mother hesitates in directly answering some questions and wants to skip answering them at first but answers later on further probing
---------------------------------
-[Agent]: Hello! I will help you with filling your antenatal visit form. May I please have your full name, including both your first name and last name?
-[User]: ...Uh... it's Geeta.
-
-(pause)
-
-Geeta Prasad.
-tool call: plan_next_question invoked with arguments: {'questions_answered': [1], 'next_unanswered_question_index': 2}
-[Agent]: Thank you, Geeta Prasad. Could you please share your full address, including your specific place of residence?
-[User]: It’s in Indiranagar.
-
-…Flat 302, Sri Venkateshwara Nilaya, near Hanuman Temple, Indiranagar.
-tool call: plan_next_question invoked with arguments: {'questions_answered': [2], 'next_unanswered_question_index': 3}
-[Agent]: Thank you. Could you please provide your telephone number?
-[User]: Do I have to?
-
-(pause)
-
-It’s plus nine one, nine eight triple three, forty-seven twenty-nine zero.
-tool call: plan_next_question invoked with arguments: {'questions_answered': [3], 'next_unanswered_question_index': 4}
-tool call: end_call invoked by LLM
+...
 ```
 
 The output of the simulation will be saved in the output directory:
@@ -762,6 +827,42 @@ simulation_persona_1_scenario_3,1.0,1.0
 `logs` contains the full logs of the simulation including all the pipecat logs whereas `results.log` contains only the terminal output of the simulation as shown in the sample output above.
 
 You can checkout [`pense/llm/examples/simulation/sample_output`](pense/llm/examples/simulation/sample_output) to see a sample output of the simulation.
+
+Once you have results for multiple models, compile a leaderboard:
+
+```python
+from pense.llm import simulations
+
+simulations.leaderboard(
+    output_dir="/path/to/output",
+    save_dir="./leaderboard"
+)
+```
+
+### Low-level API for Single Simulations
+
+For more control, you can run a single simulation directly:
+
+```python
+import asyncio
+from pense.llm import simulations
+
+result = asyncio.run(simulations.run_simulation(
+    bot_system_prompt="You are a helpful assistant...",
+    tools=[...],
+    user_system_prompt="You are simulating a user with persona...",
+    evaluation_criteria=[
+        {"name": "completeness", "description": "..."},
+    ],
+    bot_model="gpt-4.1",
+    user_model="gpt-4.1",
+    bot_provider="openrouter",
+    user_provider="openrouter",
+    agent_speaks_first=True,
+    max_turns=50,
+    output_dir="./out"  # optional
+))
+```
 
 ## Voice agent simulations
 
@@ -881,14 +982,28 @@ export ELEVENLABS_API_KEY=your_key
 export SARVAM_API_KEY=your_key
 ```
 
-```bash
-pense agent simulation -c /path/to/config.json -o /path/to/output
+```python
+import asyncio
+from pense.agent import simulation
+
+# Run voice agent simulations
+asyncio.run(simulation.run(
+    config="/path/to/config.json",
+    output_dir="/path/to/output",
+    port=8765,  # optional: base WebSocket port
+))
 ```
 
 You can use the sample configuration provided in [`pense/agent/examples/simulation/sample_short_english.json`](pense/agent/examples/simulation/sample_short_english.json) to test the voice agent simulation.
 
-```bash
-pense agent simulation -c pense/agent/examples/simulation/sample_short_english.json -o ./out
+```python
+import asyncio
+from pense.agent import simulation
+
+asyncio.run(simulation.run(
+    config="pense/agent/examples/simulation/sample_short_english.json",
+    output_dir="./out"
+))
 ```
 
 Sample output:
@@ -909,7 +1024,7 @@ Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/
 [User (transcribed)]: Hi.
 Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/1_bot.wav
 Appending audio chunk to out/agent-sim/simulation_persona_1_scenario_1/audios/1_bot.wav
-[Agent]: Hello! I’m here to help you with your antenatal visit. May I please have your full name, including both first and last name?
+[Agent]: Hello! I'm here to help you with your antenatal visit. May I please have your full name, including both first and last name?
 Appending audio chunk to out/agent-sim/simulation_persona_1_scenario_1/audios/1_bot.wav
 [User]: Geeta Prasad.
 Creating new audio file at out/agent-sim/simulation_persona_1_scenario_1/audios/1_user.wav
@@ -1039,6 +1154,30 @@ simulation_persona_1_scenario_3,1.0,1.0,0.98
 
 You can checkout [`pense/agent/examples/simulation/sample_output`](pense/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
 
+### Low-level API for Single Simulations
+
+For more control, you can run a single voice agent simulation directly:
+
+```python
+import asyncio
+from pense.agent import simulation
+
+# Run a single simulation with custom parameters
+result = asyncio.run(simulation.run_single(
+    system_prompt="You are simulating a user with persona...",
+    language="english",
+    gender="female",
+    evaluation_criteria=[
+        {"name": "completeness", "description": "..."},
+    ],
+    output_dir="./out",
+    interrupt_probability=0.5,  # 0.0 to 1.0
+    port=8765,
+    agent_speaks_first=True,
+    max_turns=50,
+))
+```
+
 ## Talk to the agent
 
 `pense/agent/test.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
@@ -1086,7 +1225,7 @@ You can checkout [`pense/agent/examples/simulation/sample_output`](pense/agent/e
    }
    ```
 
-3. Start the runner:
+3. Start the runner (this feature is CLI-only as it requires an interactive browser session):
 
 ```bash
 pense agent test -c pense/agent/examples/test/config.json -o ./out/run

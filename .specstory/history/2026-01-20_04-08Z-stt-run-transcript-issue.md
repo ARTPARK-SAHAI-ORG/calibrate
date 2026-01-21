@@ -1112,7 +1112,536 @@ Wait, that's strange. In goodlogs, the VAD detection happens much later. Let me 
 Looking at the code in eval.py lines 552-567, there's 1 second of silence padding added after streaming. But that shouldn't cause a 3.7 second delay.
 
 
-The pipeline timestamps reveal the real difference: goodlogs triggers VAD at 5.73s while badlogs triggers at 2.21s. This indicates the audio content itself differs significantly. The badlogs audio likely contains very weak or minimal speech that barely crosses the VAD threshold, whereas goodlogs has clearer, more substantial speech content that takes longer to fully accumulate before triggering detection.</details></think>
+The pipeline timestamps reveal the real difference: goodlogs triggers VAD at 5.73s while badlogs triggers at 2.21s. This indicates the audio content itself differs significantly. The badlogs audio likely contains very weak or minimal speech that barely crosses the VAD threshold, whereas goodlogs has clearer, more substantial speech content that takes longer to fully accumulate before triggering detection.
+
+Since Google STT requires sufficient audio duration and clarity to generate a transcript, the short or faint speech in audio_12.wav probably doesn't meet that threshold. The turn completes before any meaningful transcription can be produced. I should examine whether there are any connection or service-level issues in the badlogs that might compound this problem.</details></think>
+
+---
+
+Now I can see the key difference:
+
+**In goodlogs:**
+- Line 593: `appending to last user transcript: bot`
+- Line 491-509: `TranscriptionFrame` with text: 'bot' was received
+
+**In badlogs:**
+- **NO TranscriptionFrame or `user-transcription` message at all!**
+
+Let me check when Google STT produces output in the bad log:
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "GoogleSTTService.*processing time|Disconnecting from Google" in "/Users/aman/Documents/repos/artpark/agentloop/badlogs" • 40 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `badlogs` | `2026-01-20 09:55:36.288 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#0 processing time: 0.04159688949584961` | L301 |
+| `badlogs` | `2026-01-20 09:55:37.368 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#0 processing time: 0.041977882385253906` | L591 |
+| `badlogs` | `2026-01-20 09:55:39.208 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#0 processing time: 0.041687726974487305` | L1017 |
+| `badlogs` | `2026-01-20 09:55:46.293 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L1481 |
+| `badlogs` | `2026-01-20 09:55:48.706 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#1 processing time: 0.041383981704711914` | L1801 |
+| `badlogs` | `2026-01-20 09:55:49.787 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#1 processing time: 0.04195094108581543` | L2087 |
+| `badlogs` | `2026-01-20 09:55:51.627 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#1 processing time: 0.04245877265930176` | L2517 |
+| `badlogs` | `2026-01-20 09:55:58.709 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L2981 |
+| `badlogs` | `2026-01-20 09:56:01.122 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#2 processing time: 0.0415191650390625` | L3297 |
+| `badlogs` | `2026-01-20 09:56:02.202 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#2 processing time: 0.042044878005981445` | L3591 |
+| `badlogs` | `2026-01-20 09:56:04.072 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#2 processing time: 0.06363105773925781` | L4017 |
+| `badlogs` | `2026-01-20 09:56:11.136 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L4481 |
+| `badlogs` | `2026-01-20 09:56:13.554 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#3 processing time: 0.04162001609802246` | L4797 |
+| `badlogs` | `2026-01-20 09:56:14.634 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#3 processing time: 0.04158616065979004` | L5087 |
+| `badlogs` | `2026-01-20 09:56:16.475 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#3 processing time: 0.04250526428222656` | L5517 |
+| `badlogs` | `2026-01-20 09:56:23.559 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L5981 |
+| `badlogs` | `2026-01-20 09:56:25.970 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#4 processing time: 0.04176211357116699` | L6301 |
+| `badlogs` | `2026-01-20 09:56:27.050 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#4 processing time: 0.04189300537109375` | L6591 |
+| `badlogs` | `2026-01-20 09:56:28.889 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#4 processing time: 0.041708946228027344` | L7017 |
+| `badlogs` | `2026-01-20 09:56:35.972 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L7481 |
+| `badlogs` | `2026-01-20 09:56:38.401 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#5 processing time: 0.041661977767944336` | L7801 |
+| `badlogs` | `2026-01-20 09:56:39.481 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#5 processing time: 0.04270005226135254` | L8091 |
+| `badlogs` | `2026-01-20 09:56:41.321 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#5 processing time: 0.04160284996032715` | L8517 |
+| `badlogs` | `2026-01-20 09:56:48.403 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L8981 |
+| `badlogs` | `2026-01-20 09:56:50.814 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#6 processing time: 0.04168081283569336` | L9301 |
+| `badlogs` | `2026-01-20 09:56:51.894 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#6 processing time: 0.04231595993041992` | L9591 |
+| `badlogs` | `2026-01-20 09:56:53.734 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#6 processing time: 0.043064117431640625` | L10017 |
+| `badlogs` | `2026-01-20 09:57:00.815 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L10481 |
+| `badlogs` | `2026-01-20 09:57:03.230 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#7 processing time: 0.04240989685058594` | L10801 |
+| `badlogs` | `2026-01-20 09:57:04.310 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#7 processing time: 0.04134511947631836` | L11087 |
+| `badlogs` | `2026-01-20 09:57:06.149 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#7 processing time: 0.04136204719543457` | L11517 |
+| `badlogs` | `2026-01-20 09:57:13.235 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L11981 |
+| `badlogs` | `2026-01-20 09:57:15.825 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#8 processing time: 0.041619062423706055` | L12301 |
+| `badlogs` | `2026-01-20 09:57:16.905 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#8 processing time: 0.04224205017089844` | L12587 |
+| `badlogs` | `2026-01-20 09:57:18.745 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#8 processing time: 0.0415341854095459` | L13017 |
+| `badlogs` | `2026-01-20 09:57:19.332 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L13193 |
+| `badlogs` | `2026-01-20 10:00:03.332 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#0 processing time: 0.04145407676696777` | L13637 |
+| `badlogs` | `2026-01-20 10:00:04.413 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#0 processing time: 0.039694786071777344` | L13927 |
+| `badlogs` | `2026-01-20 10:00:06.252 \| DEBUG    \| [BOT-SYS] \| GoogleSTTService#0 processing time: 0.04126381874084473` | L14353 |
+| `badlogs` | `2026-01-20 10:00:13.335 \| DEBUG    \| [BOT-SYS] \| Disconnecting from Google Speech-to-Text` | L14817 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Interesting! Looking at the badlogs, I see:
+1. Multiple GoogleSTTService instances (0, 1, 2, 3, etc.) - this means it's retrying multiple times
+2. Each time there's "processing time" logged, but NO TranscriptionFrame with actual text
+3. The connection keeps being disconnected and reconnected
+
+In goodlogs, Google STT produced:
+```
+GoogleSTTService#0 processing time: 0.8090879917144775  
+GoogleSTTService#0 → UserTranscriptProcessor#0: TranscriptionFrame id: 878, name: 'TranscriptionFrame#0', text: 'bot'
+```
+
+In badlogs, there are many `GoogleSTTService processing time` logs but they're all around 0.04 seconds (40ms) - which is just the time to acknowledge audio, not to produce a transcript. The actual transcript processing time in goodlogs was 0.809 seconds (809ms).
+
+**The root cause:** The audio file `audio_12.wav` appears to have content that Google STT cannot transcribe - either:
+1. The audio is too short
+2. The speech is unclear/inaudible
+3. There's background noise that makes speech unrecognizable
+4. The audio might be mostly silence
+
+The code keeps retrying but the same audio keeps failing because the audio content itself is problematic for Google STT.
+
+This is NOT a code bug in eval.py - it's a data quality issue with that specific audio file. The audio_12.wav file doesn't contain recognizable speech that Google STT can transcribe.
+
+The solution already implemented (saving empty transcripts after no progress) is the right approach for handling this case.</details></think>
+
+---
+
+Now I can see the **root cause**:
+
+## Key Difference
+
+**GOODLOGS (audio_1.wav - succeeds):**
+- Line 489: `GoogleSTTService#0 processing time: 0.8090879917144775` (809ms)
+- Line 491-509: Produces `TranscriptionFrame` with text: `'bot'`
+
+**BADLOGS (audio_12.wav - fails):**
+- Line 301: `GoogleSTTService#0 processing time: 0.04159688949584961` (41ms)
+- **NO TranscriptionFrame produced at all**
+- The system retries ~7 times (GoogleSTTService#0 through #6), each time disconnecting after 12 seconds with no transcript
+
+## Root Cause
+
+The audio file `audio_12.wav` contains content that **Google STT cannot recognize as speech**. The 40ms processing time vs 809ms shows Google STT is just acknowledging the audio but not detecting any transcribable speech.
+
+Possible reasons for the audio file:
+1. **Audio is too quiet** - the speech level is below detection threshold
+2. **Poor audio quality** - noise, distortion, or encoding issues
+3. **Speech is unintelligible** - the words are unclear or in an unexpected format
+4. **Very short speech segments** - not enough audio for the STT model to process
+
+## This is NOT a code bug
+
+This is a **data quality issue** with that specific audio file. The retry logic you added is the correct solution - when certain files consistently fail to produce transcripts, the code now:
+1. Detects no progress was made
+2. Saves empty transcripts for those failed files
+3. Exits the loop instead of retrying forever
+
+The audio file itself needs to be inspected - you may want to listen to `audio_12.wav` and check if it contains clear, audible speech.
+
+---
+
+_**User (2026-01-18 04:28Z)**_
+
+update this @metrics.py (66-73)  to accept tool call params and include that in the conversation prompt. also include the system prompt for the agent in @pense/llm/run_simulation.py and @run_simulation.py (262-277) to the evaluate_simuation function and update the llm judge system prompt by adding the instructions of the agent as wel
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to:
+1. Update `evaluate_simuation` in `metrics.py` to accept tool call params and include them in the conversation prompt
+2. Include the system prompt for the agent in the evaluation
+3. Update the LLM judge system prompt to include the agent's instructions
+
+Let me read the full metrics.py file first to understand the current implementation.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/llm/metrics.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to:1. Update `evaluate_simuation` to accept:
+   - `agent_system_prompt` - the system prompt for the agent   - `tool_calls` - the tool calls made during the conversation2. Include tool calls in the conversation prompt
+3. Update the LLM judge system prompt to include the agent's instructions
+
+Let me also check how `evaluate_simuation` is called in `run_simulation.py` to understand what data is available.
+
+Looking at the current code:
+- In `pense/llm/run_simulation.py` line 439: `llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)`
+- The transcript contains messages without system prompt
+- There's no tool calls being passed
+
+I need to:
+1. Update metrics.py to accept new parameters
+2. Update the calls in run_simulation.py to pass the system prompt and tool calls
+
+For `pense/agent/run_simulation.py`, I need to find where `evaluate_simuation` is called and update it similarly.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "evaluate_simuation" in "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py" • 2 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `pense/agent/run_simulation.py` | `from pense.llm.metrics import evaluate_simuation` | L30 |
+| `pense/agent/run_simulation.py` | `llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)` | L1111 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to find where the tool calls are collected in `pense/agent/run_simulation.py` and understand the structure. Let me look at the context around line 262-277 that the user mentioned.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to understand:
+1. Where the system prompt comes from in pense/agent/run_simulation.py - I need to find it
+2. Where the transcript and tool_calls are passed to evaluate_simuation
+
+Let me look at more of the agent/run_simulation.py to find the system prompt and the evaluate_simuation call context.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to find where the bot_system_prompt is defined in the agent/run_simulation.py. Let me search for it.</details></think>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="grep">
+<details>
+<summary>Tool use: **grep** • Grep for "bot_system_prompt|system_prompt" in "/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py" • 9 matches</summary>
+
+Output mode: content
+
+
+| File | Content | Line |
+|------|------|------|
+| `pense/agent/run_simulation.py` | `system_prompt: str,` | L164 |
+| `pense/agent/run_simulation.py` | `system_prompt=system_prompt,` | L194 |
+| `pense/agent/run_simulation.py` | `system_prompt: str,` | L842 |
+| `pense/agent/run_simulation.py` | `simulation_system_prompt = system_prompt` | L949 |
+| `pense/agent/run_simulation.py` | `simulation_system_prompt = f"\{system_prompt\}.\n\nBegin the conversation by saying 'Hello' to the agent."` | L951 |
+| `pense/agent/run_simulation.py` | `"content": simulation_system_prompt,` | L956 |
+| `pense/agent/run_simulation.py` | `user_system_prompt = f"You are a simulated human user engaging in a natural spoken conversation with another agent.\nYour output will be converted to speech through a Text to Speech (TTS) system before the agent hears it. The entity you are responding to will hear only the output of the TTS system and will not be reading your text. Optimise for the hearing experience and not the reading experience.\n\nYour job is to produce text that:\n\n1. **sounds like natural speech when spoken aloud**\n2. **is easy for TTS to pronounce correctly**\n3. **avoids symbols and formatting that degrade TTS output**\n4. **expresses values like numbers, names, phone numbers and email addresses in a TTS-friendly spoken format**\n5. **never acknowledges or references these rules explicitly**\n\n### **Speech style**\n\n* write in **spoken language**, not written language\n* use **shorter sentences**\n* use **natural fillers** when appropriate (e.g. “umm”, “you know”, “let me think”)\n* simulate personality [... omitted end of long line]` | L1272 |
+| `pense/agent/run_simulation.py` | `config["system_prompt"] + f"\n\nYou must always speak in \{language\}.",` | L1351 |
+| `pense/agent/run_simulation.py` | `user_system_prompt,` | L1365 |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have the full picture. Let me look at the function signature at line 842 to see all the parameters passed to the simulation function.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file">
+<details><summary>Tool use: **read_file** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have the full picture. Let me implement the changes:1. Update `evaluate_simuation` in `metrics.py` to:   - Accept `agent_system_prompt` parameter   - Accept `tool_calls` parameter (optional)   - Include tool calls in the conversation prompt   - Update the system prompt to include agent instructions2. Update the calls in `pense/llm/run_simulation.py` (line 439)3. Update the calls in `pense/agent/run_simulation.py` (line 1111)Let me start with the metrics.py update.</details></think>
+
+---
+
+Now I'll make the changes. Let me update the files:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/llm/metrics.py</summary>
+
+**Chunk 1**
+Lines added: 27, lines removed: 4
+
+```diff
+@@ -65,10 +65,33 @@
+  
+  
+- async def evaluate_simuation(conversation: list[dict], evaluation_criteria: list[dict]):
++ def format_conversation_with_tool_calls(conversation: list[dict]) -&gt; str:
++     """Format conversation including tool calls in a readable format."""
++     lines = []
++     for msg in conversation:
++         role = msg.get("role", "")
++         content = msg.get("content", "")
++         tool_calls = msg.get("tool_calls", [])
++ 
++         if content:
++             lines.append(f"{role}: {content}")
++ 
++         if tool_calls:
++             for tc in tool_calls:
++                 func = tc.get("function", {})
++                 func_name = func.get("name", "unknown")
++                 func_args = func.get("arguments", "{}")
++                 lines.append(f"[Tool Call] {func_name}({func_args})")
++ 
++     return "\n".join(lines)
++ 
++ 
++ async def evaluate_simuation(
++     conversation: list[dict],
++     evaluation_criteria: list[dict],
++     agent_system_prompt: str = "",
++ ):
+      client = AsyncOpenAI()
+  
+-     conversation_as_prompt = "\n".join(
+-         [f'{msg["role"]}: {msg["content"]}' for msg in conversation if "content" in msg]
+-     )
++     conversation_as_prompt = format_conversation_with_tool_calls(conversation)
+  
+      class CriterionOutput(BaseModel):
+```
+
+**Chunk 2**
+Lines added: 13, lines removed: 2
+
+```diff
+@@ -94,7 +117,18 @@
+      Output = make_output_model([criterion["name"] for criterion in evaluation_criteria])
+  
+-     system_prompt = """You are a highly accurate grader. 
++     agent_instructions_section = ""
++     if agent_system_prompt:
++         agent_instructions_section = f"""
++ 
++ The agent was given the following instructions:
++ &lt;agent_instructions&gt;
++ {agent_system_prompt}
++ &lt;/agent_instructions&gt;
++ 
++ Use these instructions to understand what the agent was supposed to do and evaluate if the agent followed its instructions correctly."""
++ 
++     system_prompt = f"""You are a highly accurate grader. 
+  
+- You will be given a conversation between a user and an agent along with an evaluation criteria to use for evaluating the agent's behaviour. 
++ You will be given a conversation between a user and an agent along with an evaluation criteria to use for evaluating the agent's behaviour.{agent_instructions_section}
+  
+  You need to evaluate if the agent's behaviour adheres to the evaluation criteria."""
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the call in `pense/llm/run_simulation.py` to pass the system prompt to `evaluate_simuation`.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/llm/run_simulation.py</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 1
+
+```diff
+@@ -437,5 +437,7 @@
+          f"Evaluating the conversation based on the criteria:\n\n{evaluation_criteria}"
+      )
+-     llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
++     llm_judge_result = await evaluate_simuation(
++         transcript, evaluation_criteria, agent_system_prompt=bot_system_prompt
++     )
+  
+      evaluation_results = [
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update the call in `pense/agent/run_simulation.py` to pass the system prompt. The system_prompt parameter is passed to `run_simulation` at line 842.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="search_replace">
+
+<details><summary>Tool use: **search_replace** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py</summary>
+
+**Chunk 1**
+Lines added: 3, lines removed: 1
+
+```diff
+@@ -1109,5 +1109,7 @@
+      )
+      # Get evaluation results from LLM judge
+-     llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
++     llm_judge_result = await evaluate_simuation(
++         transcript, evaluation_criteria, agent_system_prompt=system_prompt
++     )
+  
+      evaluation_results = [
+```
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check for any lint errors in all the modified files.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="read_lints">
+<details>
+          <summary>Tool use: **read_lints** • Read lints for 3 files</summary>
+      
+Lint paths:
+
+- `/Users/aman/Documents/repos/artpark/agentloop/pense/llm/metrics.py`
+- `/Users/aman/Documents/repos/artpark/agentloop/pense/llm/run_simulation.py`
+- `/Users/aman/Documents/repos/artpark/agentloop/pense/agent/run_simulation.py`
+
+Lint results
+
+Lint errors for `pense/agent/run_simulation.py`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| Import "datetime" is not accessed | 10:22-10:30 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "List" is not accessed | 12:25-12:29 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "Tuple" is not accessed | 12:41-12:46 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "LiveOptions" is not accessed | 14:22-14:33 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "ImageFile" is not accessed | 16:27-16:36 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "dataclass" is not accessed | 17:25-17:34 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "FunctionSchema" is not accessed | 48:54-48:68 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "ToolsSchema" is not accessed | 49:51-49:62 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "LLMContextFrame" is not accessed | 59:5-59:20 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "StopFrame" is not accessed | 60:5-60:14 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "BotStartedSpeakingFrame" is not accessed | 67:5-67:28 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "BotStoppedSpeakingFrame" is not accessed | 68:5-68:28 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "LLMMessagesAppendFrame" is not accessed | 73:5-73:27 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "Frame" is not accessed | 79:5-79:10 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "InterruptionFrame" is not accessed | 80:5-80:22 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "CartesiaTTSService" is not accessed | 94:43-94:61 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "DeepgramSTTService" is not accessed | 95:43-95:61 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "FunctionCallParams" is not accessed | 96:42-96:60 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "on_connected" is not accessed | 1073:15-1073:27 | DIAGNOSTIC_SEVERITY_HINT |
+| "transport" is not accessed | 1073:28-1073:37 | DIAGNOSTIC_SEVERITY_HINT |
+| "client" is not accessed | 1073:39-1073:45 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "on_disconnected" is not accessed | 1081:15-1081:30 | DIAGNOSTIC_SEVERITY_HINT |
+| "transport" is not accessed | 1081:31-1081:40 | DIAGNOSTIC_SEVERITY_HINT |
+| "client" is not accessed | 1081:42-1081:48 | DIAGNOSTIC_SEVERITY_HINT |
+| Function "handle_transcript_update" is not accessed | 1086:15-1086:39 | DIAGNOSTIC_SEVERITY_HINT |
+| "processor" is not accessed | 1086:40-1086:49 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+Lint errors for `pense/llm/metrics.py`
+
+
+| Message | Range | Severity |
+|-------|-------|----------|
+| Import "system_memory_pool" is not accessed | 2:21-2:39 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "List" is not accessed | 4:20-4:24 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "os" is not accessed | 5:8-5:10 | DIAGNOSTIC_SEVERITY_HINT |
+| Import "json" is not accessed | 7:8-7:12 | DIAGNOSTIC_SEVERITY_HINT |
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All changes are complete. Let me verify by reading the updated metrics.py to show the user the changes.</details></think>
+
+---
+
+Done. Here's a summary of the changes:
+
+**`pense/llm/metrics.py`:**
+1. Added `format_conversation_with_tool_calls()` helper function that formats conversation including tool calls
+2. Updated `evaluate_simuation()` to accept `agent_system_prompt` parameter
+3. Updated the LLM judge system prompt to include agent instructions when provided:
+
+```python
+async def evaluate_simuation(
+    conversation: list[dict],
+    evaluation_criteria: list[dict],
+    agent_system_prompt: str = "",
+):
+```
+
+The system prompt now includes:
+```
+The agent was given the following instructions:
+<agent_instructions>
+{agent_system_prompt}
+</agent_instructions>
+
+Use these instructions to understand what the agent was supposed to do and evaluate if the agent followed its instructions correctly.
+```
+
+**`pense/llm/run_simulation.py`:**
+- Updated the call to pass `agent_system_prompt=bot_system_prompt`
+
+**`pense/agent/run_simulation.py`:**
+- Updated the call to pass `agent_system_prompt=system_prompt`
+
+The tool calls are now included in the conversation prompt via the `format_conversation_with_tool_calls()` function, which formats them as:
+```
+[Tool Call] function_name({"arg": "value"})
+```
 
 ---
 

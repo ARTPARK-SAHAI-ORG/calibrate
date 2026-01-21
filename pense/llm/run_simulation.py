@@ -436,7 +436,9 @@ async def run_simulation(
     log_and_print(
         f"Evaluating the conversation based on the criteria:\n\n{evaluation_criteria}"
     )
-    llm_judge_result = await evaluate_simuation(transcript, evaluation_criteria)
+    llm_judge_result = await evaluate_simuation(
+        transcript, evaluation_criteria, agent_system_prompt=bot_system_prompt
+    )
 
     evaluation_results = [
         {

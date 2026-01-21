@@ -64,12 +64,35 @@ def convert_evaluation_criteria_to_prompt(evaluation_criteria: list[dict]) -> st
     )
 
 
-async def evaluate_simuation(conversation: list[dict], evaluation_criteria: list[dict]):
+def format_conversation_with_tool_calls(conversation: list[dict]) -> str:
+    """Format conversation including tool calls in a readable format."""
+    lines = []
+    for msg in conversation:
+        role = msg.get("role", "")
+        content = msg.get("content", "")
+        tool_calls = msg.get("tool_calls", [])
+
+        if content:
+            lines.append(f"{role}: {content}")
+
+        if tool_calls:
+            for tc in tool_calls:
+                func = tc.get("function", {})
+                func_name = func.get("name", "unknown")
+                func_args = func.get("arguments", "{}")
+                lines.append(f"[Tool Call] {func_name}({func_args})")
+
+    return "\n".join(lines)
+
+
+async def evaluate_simuation(
+    conversation: list[dict],
+    evaluation_criteria: list[dict],
+    agent_system_prompt: str = "",
+):
     client = AsyncOpenAI()
 
-    conversation_as_prompt = "\n".join(
-        [f'{msg["role"]}: {msg["content"]}' for msg in conversation if "content" in msg]
-    )
+    conversation_as_prompt = format_conversation_with_tool_calls(conversation)
 
     class CriterionOutput(BaseModel):
         reasoning: str = Field(
@@ -93,9 +116,20 @@ async def evaluate_simuation(conversation: list[dict], evaluation_criteria: list
 
     Output = make_output_model([criterion["name"] for criterion in evaluation_criteria])
 
-    system_prompt = """You are a highly accurate grader. 
+    agent_instructions_section = ""
+    if agent_system_prompt:
+        agent_instructions_section = f"""
 
-You will be given a conversation between a user and an agent along with an evaluation criteria to use for evaluating the agent's behaviour. 
+The agent was given the following instructions:
+<agent_instructions>
+{agent_system_prompt}
+</agent_instructions>
+
+Use these instructions to understand what the agent was supposed to do and evaluate if the agent followed its instructions correctly."""
+
+    system_prompt = f"""You are a highly accurate grader. 
+
+You will be given a conversation between a user and an agent along with an evaluation criteria to use for evaluating the agent's behaviour.{agent_instructions_section}
 
 You need to evaluate if the agent's behaviour adheres to the evaluation criteria."""
 
