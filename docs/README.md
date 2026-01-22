@@ -1,16 +1,6 @@
-# Mintlify Starter Kit
+# Pense Documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
-
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
-
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
-
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+This is the documentation for Pense, an open-source simulation and testing framework for voice agents.
 
 ## Development
 

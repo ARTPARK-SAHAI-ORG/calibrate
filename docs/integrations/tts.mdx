@@ -1,0 +1,56 @@
+---
+title: "Text to speech"
+description: "Supported Text-to-Speech providers in Pense."
+---
+
+Pense supports the following Text-to-Speech (TTS) providers for evaluation and voice agent simulations.
+
+| Provider | Languages | Notes |
+|----------|-----------|-------|
+| **Cartesia** | Multiple languages | Ultra-low latency, high quality |
+| **Google** | 40+ languages | Cloud Text-to-Speech API |
+| **OpenAI** | Multiple languages | Natural-sounding voices |
+| **ElevenLabs** | 29+ languages | Premium voice quality |
+| **Sarvam** | Indian languages | Optimized for Indian languages |
+| **Deepgram** | Multiple languages | Real-time synthesis |
+| **Groq** | Multiple languages | Fast inference |
+
+## Configuration
+
+Set the required environment variable for your chosen provider:
+
+```bash
+# Cartesia
+export CARTESIA_API_KEY=your_key
+
+# Google
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+# OpenAI
+export OPENAI_API_KEY=your_key
+
+# ElevenLabs
+export ELEVENLABS_API_KEY=your_key
+
+# Sarvam
+export SARVAM_API_KEY=your_key
+
+# Deepgram
+export DEEPGRAM_API_KEY=your_key
+
+# Groq
+export GROQ_API_KEY=your_key
+```
+
+## Usage
+
+```python
+from pense.tts import eval
+
+await eval(
+    provider="google",  # or cartesia, openai, elevenlabs, sarvam, deepgram, groq
+    language="english",
+    input="/path/to/texts.csv",
+    output_dir="./out",
+)
+```

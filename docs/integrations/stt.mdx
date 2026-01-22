@@ -1,0 +1,59 @@
+---
+title: "Speech to text"
+description: "Speech-to-Text services receive audio input and output transcriptions"
+---
+
+| Provider | Languages | Notes |
+|----------|-----------|-------|
+| **Deepgram** | English, Hindi, and more | Real-time streaming support |
+| **Google** | 100+ languages | Cloud Speech-to-Text API |
+| **OpenAI** | Multiple languages | Whisper-based transcription |
+| **ElevenLabs** | Multiple languages | High-quality transcription |
+| **Sarvam** | Indian languages | Optimized for Indian accents |
+| **Cartesia** | Multiple languages | Low-latency streaming |
+| **Groq** | Multiple languages | Fast inference |
+| **Smallest** | Multiple languages | Lightweight option |
+
+## Configuration
+
+Set the required environment variable for your chosen provider:
+
+```bash
+# Deepgram
+export DEEPGRAM_API_KEY=your_key
+
+# Google
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+# OpenAI
+export OPENAI_API_KEY=your_key
+
+# ElevenLabs
+export ELEVENLABS_API_KEY=your_key
+
+# Sarvam
+export SARVAM_API_KEY=your_key
+
+# Cartesia
+export CARTESIA_API_KEY=your_key
+
+# Groq
+export GROQ_API_KEY=your_key
+```
+
+## Usage
+
+```python
+import asyncio
+from pense.stt import eval, leaderboard
+
+# Run STT evaluation
+asyncio.run(eval(
+    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, etc.
+    language="english",   # english, hindi, or kannada
+    input_dir="/path/to/data",  # should contain stt.csv and audios/wav/, audios/pcm16/ folders
+    output_dir="/path/to/output",
+    debug=True,           # optional: run on first 5 audio files only
+    debug_count=5,        # optional: number of files in debug mode
+))
+```

@@ -1,0 +1,163 @@
+---
+title: "Core Concepts"
+description: "Understand the key concepts behind Pense."
+---
+
+This page covers the fundamental concepts you need to understand when working with Pense.
+
+## Components
+
+Pense evaluates voice agents at two levels: **component-level** and **end-to-end**.
+
+### Component-Level Evaluation
+
+Test individual components in isolation:
+
+<CardGroup cols={3}>
+  <Card title="STT" icon="microphone">
+    Speech-to-Text converts audio to text. Evaluated on accuracy (WER, string similarity) and latency.
+  </Card>
+  <Card title="TTS" icon="volume-high">
+    Text-to-Speech converts text to audio. Evaluated on pronunciation quality and latency.
+  </Card>
+  <Card title="LLM" icon="brain">
+    Large Language Models generate responses and call tools. Evaluated on correctness and behavior.
+  </Card>
+</CardGroup>
+
+### End-to-End Evaluation
+
+Test the full voice agent pipeline (STT → LLM → TTS) through simulated conversations.
+
+## Metrics
+
+### Accuracy Metrics
+
+| Metric | Description | Used In |
+|--------|-------------|---------|
+| **WER** | Word Error Rate - measures transcription accuracy | STT |
+| **String Similarity** | Character-level similarity between strings | STT |
+| **LLM Judge Score** | AI-evaluated quality score (0-1) | STT, TTS, LLM |
+
+### Latency Metrics
+
+| Metric | Description |
+|--------|-------------|
+| **TTFB** | Time to First Byte - latency before first response chunk |
+| **Processing Time** | Total time to process the request |
+
+## Simulations
+
+### Personas
+
+Personas define the simulated user's characteristics:
+
+```python
+persona = {
+    "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
+    "gender": "female",
+    "language": "english",
+    "interruption_sensitivity": "medium"  # none, low, medium, high
+}
+```
+
+### Scenarios
+
+Scenarios define the conversation context:
+
+```python
+scenario = {
+    "description": "User completes the form without any issues"
+}
+```
+
+### Evaluation Criteria
+
+Define what success looks like for each simulation:
+
+```python
+evaluation_criteria = [
+    {
+        "name": "question_completeness",
+        "description": "Whether all the questions in the form were covered"
+    },
+    {
+        "name": "assistant_behavior", 
+        "description": "Whether the assistant asks one concise question per turn"
+    }
+]
+```
+
+## Tools
+
+Tools are functions the LLM can call during conversations:
+
+```python
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question to ask",
+        "parameters": [
+            {
+                "id": "next_question_index",
+                "type": "integer",
+                "description": "Index of next question",
+                "required": True
+            }
+        ]
+    }
+]
+```
+
+Tool calls are tracked and can be evaluated as part of test cases.
+
+## Test Cases
+
+For LLM testing, define explicit test cases with expected outputs:
+
+```python
+test_case = {
+    "history": [
+        {"role": "assistant", "content": "What is your name?"},
+        {"role": "user", "content": "John Doe"}
+    ],
+    "evaluation": {
+        "type": "tool_call",  # or "response"
+        "tool_calls": [
+            {
+                "tool": "save_name",
+                "arguments": {"name": "John Doe"}
+            }
+        ]
+    }
+}
+```
+
+## Leaderboards
+
+After running evaluations across multiple providers, generate comparative leaderboards:
+
+```python
+from pense.stt import leaderboard
+
+leaderboard(
+    output_dir="/path/to/outputs",
+    save_dir="./leaderboards"
+)
+```
+
+This creates:
+- Excel spreadsheets with metrics comparison
+- Visualization charts for quick comparison
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Ecosystem" icon="puzzle-piece" href="/getting-started/ecosystem">
+    Learn about integrations and supported providers.
+  </Card>
+  <Card title="Guides" icon="book" href="/guides/overview">
+    Detailed guides for each evaluation type.
+  </Card>
+</CardGroup>

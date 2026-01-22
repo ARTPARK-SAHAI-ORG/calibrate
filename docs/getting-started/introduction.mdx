@@ -1,0 +1,67 @@
+---
+title: "Introduction"
+description: "Learn about Pense and how to get started."
+---
+
+Pense is an open-source Python framework for simulation and testing of voice agents. It enables automated, repeatable testing at scale.
+
+The framework provides tools to evaluate individual components (STT, TTS, LLM) and run end-to-end voice agent simulations that verify conversational responses and tool usage across thousands of scenarios.
+
+Want to dive right in? Check out the [Quickstart](/getting-started/quickstart) to run your first Pense evaluation.
+
+<Card
+  title="Quickstart"
+  icon="rocket"
+  href="/getting-started/quickstart"
+  horizontal
+>
+  Get started with Pense in under 5 minutes.
+</Card>
+
+## What can you do with Pense?
+
+<CardGroup cols={2}>
+  <Card title="Evaluate STT Providers" icon="microphone">
+    Compare speech-to-text accuracy and latency across multiple providers like Deepgram, OpenAI, Google, Sarvam, and more.
+  </Card>
+  <Card title="Evaluate TTS Providers" icon="volume-high">
+    Benchmark text-to-speech quality and performance across Cartesia, ElevenLabs, Google, and other providers.
+  </Card>
+  <Card title="Test LLM Behavior" icon="brain">
+    Create test suites that verify LLM responses and tool calling behavior against expected outputs.
+  </Card>
+  <Card title="Simulate Conversations" icon="comments">
+    Run automated end-to-end voice agent simulations with customizable personas and scenarios.
+  </Card>
+</CardGroup>
+
+## Why Pense?
+
+Testing voice agents manually is slow, inconsistent, and doesn't scale. Pense solves this by providing:
+
+- **Component-level evaluation**: Test STT, TTS, and LLM independently to identify bottlenecks
+- **Comprehensive metrics**: WER, string similarity, LLM judge scores, TTFB, and processing time
+- **Persona-based simulations**: Define user personas and scenarios to test diverse conversation flows
+- **Automated evaluation**: LLM judges assess transcript quality and agent behavior
+- **Leaderboards**: Compare providers side-by-side with generated reports and visualizations
+
+## Built on Pipecat
+
+Pense is built on top of [Pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents. This means Pense inherits Pipecat's robust audio processing pipeline and provider integrations while adding testing and evaluation capabilities on top.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/getting-started/quickstart">
+    Install Pense and run your first evaluation.
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/getting-started/core-concepts">
+    Understand the key concepts behind Pense.
+  </Card>
+  <Card title="Ecosystem" icon="puzzle-piece" href="/getting-started/ecosystem">
+    Learn about the Pense ecosystem and integrations.
+  </Card>
+  <Card title="Examples" icon="code" href="/examples/overview">
+    Explore example configurations and use cases.
+  </Card>
+</CardGroup>

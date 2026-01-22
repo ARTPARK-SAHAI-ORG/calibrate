@@ -1,0 +1,60 @@
+---
+title: "Text to text"
+description: "Supported Large Language Model providers in Pense."
+---
+
+Pense supports the following LLM providers for testing and simulations.
+
+| Provider | Models | Notes |
+|----------|--------|-------|
+| **OpenAI** | GPT-4.1, GPT-4o, GPT-4, GPT-3.5 | Direct API access |
+| **OpenRouter** | Claude, Gemini, Llama, Mistral, and more | Access 100+ models through a single API |
+
+## Configuration
+
+Set the required environment variable for your chosen provider:
+
+```bash
+# OpenAI
+export OPENAI_API_KEY=your_key
+
+# OpenRouter
+export OPENROUTER_API_KEY=your_key
+```
+
+## Usage
+
+### LLM Tests
+
+```python
+from pense.llm import tests
+
+await tests.run(
+    system_prompt="You are a helpful assistant.",
+    tools=[],
+    test_cases=[...],
+    model="openai/gpt-4.1",  # or "gpt-4.1" for direct OpenAI
+    provider="openrouter",   # or "openai"
+)
+```
+
+### LLM Simulations
+
+```python
+from pense.llm import simulations
+
+await simulations.run(
+    system_prompt="You are a helpful assistant.",
+    tools=[],
+    personas=[...],
+    scenarios=[...],
+    evaluation_criteria=[...],
+    model="openai/gpt-4.1",
+    provider="openrouter",
+)
+```
+
+## Model Naming
+
+- **OpenAI provider**: Use OpenAI model names directly (e.g., `gpt-4.1`, `gpt-4o`)
+- **OpenRouter provider**: Use the `provider/model` format (e.g., `openai/gpt-4.1`, `anthropic/claude-3-opus`)

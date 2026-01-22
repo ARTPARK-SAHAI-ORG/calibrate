@@ -78,7 +78,9 @@ from pense.stt.metrics import (
 import pandas as pd
 
 
-async def run_stt_bot(provider: str, language: Literal["english", "hindi"], port: int):
+async def run_stt_bot(
+    provider: str, language: Literal["english", "hindi", "kannada"], port: int
+):
     """Starts an STT-only bot that reports RTVI transcription messages."""
     current_context.set("BOT")
 
@@ -672,7 +674,7 @@ async def main():
         "--language",
         type=str,
         default="english",
-        choices=["english", "hindi"],
+        choices=["english", "hindi", "kannada"],
         help="Language of the audio files",
     )
     parser.add_argument(

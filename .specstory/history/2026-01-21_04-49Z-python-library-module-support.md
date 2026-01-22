@@ -613,3 +613,75 @@ The user wants me to update the README.md to show Python SDK usage instead of CL
 
 ---
 
+<think><details><summary>Thought Process</summary>
+Now I'll update the README to use Python SDK instead of CLI commands. I need to replace all the CLI examples with Python SDK equivalents while keeping all the explanatory content and output format documentation.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The README has been updated to use Python SDK instead of CLI commands. Let me verify it by checking for any remaining CLI commands that should have been converted.</details></think>
+
+---
+
+I've updated the README to use the Python SDK instead of CLI commands. Here's a summary of the changes:
+
+1. **STT Evaluation** - Converted from `pense stt eval -p <provider> ...` to:
+   ```python
+   from pense.stt import eval, leaderboard
+   asyncio.run(eval(provider="deepgram", input_dir="./data", ...))
+   leaderboard(output_dir="./out", save_dir="./leaderboard")
+   ```
+
+2. **TTS Evaluation** - Converted from `pense tts eval -p <provider> ...` to:
+   ```python
+   from pense.tts import eval, leaderboard
+   asyncio.run(eval(provider="google", input="./sample.csv", ...))
+   leaderboard(output_dir="./out", save_dir="./leaderboard")
+   ```
+
+3. **LLM Tests** - Converted from `pense llm tests run -c ...` to:
+   ```python
+   from pense.llm import tests
+   asyncio.run(tests.run(config="./config.json", model="gpt-4.1", ...))
+   tests.leaderboard(output_dir="./out", save_dir="./leaderboard")
+   ```
+
+4. **LLM Simulations** - Converted from `pense llm simulations run -c ...` to:
+   ```python
+   from pense.llm import simulations
+   asyncio.run(simulations.run(config="./config.json", model="gpt-4.1", ...))
+   simulations.leaderboard(output_dir="./out", save_dir="./leaderboard")
+   ```
+
+5. **Agent Simulations** - Converted from `pense agent simulation -c ...` to:
+   ```python
+   from pense.agent import simulation
+   asyncio.run(simulation.run(config="./config.json", output_dir="./out"))
+   ```
+
+6. **Added parameter tables** for STT and TTS eval functions documenting all available options
+
+7. **Added low-level API sections** for LLM tests, LLM simulations, and agent simulations showing how to run individual test cases or simulations with full control
+
+8. **Kept CLI for interactive testing** (`pense agent test`) since it requires a browser session
+
+---
+
+_**User**_
+
+update the python sdk to not use a config.json file and instead pass in the config params as direct inputs to the function 
+
+and update REAMDE as well
+
+---
+

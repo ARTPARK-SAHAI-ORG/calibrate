@@ -8,7 +8,9 @@ Library Usage:
     # Run LLM tests
     import asyncio
     result = asyncio.run(tests.run(
-        config="./config.json",
+        system_prompt="You are a helpful assistant...",
+        tools=[...],
+        test_cases=[...],
         output_dir="./out",
         model="gpt-4.1",
         provider="openrouter"
@@ -19,7 +21,11 @@ Library Usage:
     
     # Run LLM simulations
     result = asyncio.run(simulations.run(
-        config="./config.json",
+        system_prompt="You are a helpful assistant...",
+        tools=[...],
+        personas=[...],
+        scenarios=[...],
+        evaluation_criteria=[...],
         output_dir="./out",
         model="gpt-4.1",
         provider="openrouter"
@@ -29,7 +35,13 @@ Library Usage:
     simulations.leaderboard(output_dir="./out", save_dir="./leaderboard")
 """
 
-from typing import Literal, Optional, List
+from typing import Literal, Optional, List, Dict, Any
+import os
+import json
+import asyncio
+from collections import defaultdict
+import numpy as np
+import pandas as pd
 
 
 class _Tests:
@@ -37,19 +49,25 @@ class _Tests:
 
     @staticmethod
     async def run(
-        config: str,
+        system_prompt: str,
+        tools: List[dict],
+        test_cases: List[dict],
         output_dir: str = "./out",
         model: str = "gpt-4.1",
         provider: Literal["openai", "openrouter"] = "openrouter",
+        run_name: Optional[str] = None,
     ) -> dict:
         """
-        Run LLM tests from a configuration file.
+        Run LLM tests with the given configuration.
 
         Args:
-            config: Path to JSON configuration file containing test cases
+            system_prompt: System prompt for the LLM
+            tools: List of tool definitions available to the LLM
+            test_cases: List of test case dicts, each containing 'history', 'evaluation', and optional 'settings'
             output_dir: Path to output directory for results (default: ./out)
             model: Model name to use for evaluation
             provider: LLM provider (openai or openrouter)
+            run_name: Optional name for this run (used in output folder name)
 
         Returns:
             dict: Results containing test outcomes and metrics
@@ -58,36 +76,104 @@ class _Tests:
             >>> import asyncio
             >>> from pense.llm import tests
             >>> result = asyncio.run(tests.run(
-            ...     config="./config.json",
+            ...     system_prompt="You are a helpful assistant...",
+            ...     tools=[{
+            ...         "type": "client",
+            ...         "name": "get_weather",
+            ...         "description": "Get weather",
+            ...         "parameters": [{"id": "location", "type": "string", "description": "City", "required": True}]
+            ...     }],
+            ...     test_cases=[{
+            ...         "history": [{"role": "user", "content": "What's the weather in NYC?"}],
+            ...         "evaluation": {"type": "tool_call", "tool_calls": [{"tool": "get_weather"}]}
+            ...     }],
             ...     output_dir="./out",
             ...     model="gpt-4.1",
             ...     provider="openrouter"
             ... ))
         """
-        from pense.llm.run_tests import main as _llm_tests_main
-        import sys
+        from pense.llm.run_tests import run_test as _run_test
+        from pense.utils import configure_print_logger, log_and_print
 
-        # Build argument list
-        argv = [
-            "pense",
-            "--config",
-            config,
-            "--output-dir",
-            output_dir,
-            "--model",
-            model,
-            "--provider",
-            provider,
-        ]
+        # Create output directory
+        save_folder_name = (
+            f"{provider}/{model}" if provider == "openai" else f"{model}"
+        )
+        save_folder_name = save_folder_name.replace("/", "__")
+        
+        if run_name:
+            final_output_dir = os.path.join(output_dir, run_name, save_folder_name)
+        else:
+            final_output_dir = os.path.join(output_dir, save_folder_name)
 
-        # Save original sys.argv and restore after
-        original_argv = sys.argv
-        try:
-            sys.argv = argv
-            await _llm_tests_main()
-            return {"status": "completed", "output_dir": output_dir}
-        finally:
-            sys.argv = original_argv
+        os.makedirs(final_output_dir, exist_ok=True)
+
+        log_save_path = os.path.join(final_output_dir, "logs")
+        if os.path.exists(log_save_path):
+            os.remove(log_save_path)
+
+        print_log_save_path = os.path.join(final_output_dir, "results.log")
+        if os.path.exists(print_log_save_path):
+            os.remove(print_log_save_path)
+
+        configure_print_logger(print_log_save_path)
+
+        results = []
+        results_file_path = os.path.join(final_output_dir, "results.json")
+
+        for test_case_index, test_case in enumerate(test_cases):
+            agent_language = test_case.get("settings", {}).get("language", "english")
+            result = await _run_test(
+                chat_history=test_case["history"],
+                evaluation=test_case["evaluation"],
+                system_prompt=system_prompt + f"\n\nYou must always speak in {agent_language}.",
+                model=model,
+                provider=provider,
+                tools=tools,
+            )
+
+            if result["metrics"]["passed"]:
+                log_and_print(f"✅ Test case {test_case_index + 1} passed")
+            else:
+                log_and_print(f"❌ Test case {test_case_index + 1} failed")
+                if "reasoning" in result["metrics"]:
+                    log_and_print(result["metrics"]["reasoning"])
+
+            result["test_case"] = test_case
+            results.append(result)
+
+            # Save intermediate results
+            with open(results_file_path, "w") as f:
+                json.dump(results, f, indent=4)
+
+            log_and_print("-" * 40)
+
+        total_passed = sum(1 for r in results if r["metrics"]["passed"])
+        total_tests = len(results)
+        failed_count = total_tests - total_passed
+
+        if total_passed == total_tests:
+            log_and_print("🎉 All tests passed!")
+        elif failed_count == total_tests:
+            log_and_print("❌ All tests failed!")
+        else:
+            log_and_print(f"✅ Total Passed: {total_passed}/{total_tests} ({(total_passed/total_tests)*100:.1f}%)")
+            log_and_print(f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)")
+
+        # Save final results
+        with open(os.path.join(final_output_dir, "results.json"), "w") as f:
+            json.dump(results, f, indent=4)
+
+        metrics = {"total": total_tests, "passed": total_passed}
+        with open(os.path.join(final_output_dir, "metrics.json"), "w") as f:
+            json.dump(metrics, f, indent=4)
+
+        return {
+            "status": "completed",
+            "output_dir": final_output_dir,
+            "results": results,
+            "metrics": metrics,
+        }
 
     @staticmethod
     def leaderboard(output_dir: str, save_dir: str) -> None:
@@ -106,7 +192,6 @@ class _Tests:
 
         generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
 
-    # Allow calling run_test and run_inference directly for more control
     @staticmethod
     async def run_test(
         chat_history: List[dict],
@@ -178,21 +263,33 @@ class _Simulations:
 
     @staticmethod
     async def run(
-        config: str,
+        system_prompt: str,
+        tools: List[dict],
+        personas: List[dict],
+        scenarios: List[dict],
+        evaluation_criteria: List[dict],
         output_dir: str = "./out",
         model: str = "gpt-4.1",
         provider: Literal["openai", "openrouter"] = "openrouter",
         parallel: int = 1,
+        agent_speaks_first: bool = True,
+        max_turns: int = 50,
     ) -> dict:
         """
-        Run LLM simulations from a configuration file.
+        Run LLM simulations with the given configuration.
 
         Args:
-            config: Path to JSON configuration file containing simulation config
+            system_prompt: System prompt for the bot/agent
+            tools: List of tool definitions available to the agent
+            personas: List of persona dicts with 'characteristics', 'gender', 'language'
+            scenarios: List of scenario dicts with 'description'
+            evaluation_criteria: List of criteria dicts with 'name' and 'description'
             output_dir: Path to output directory for results (default: ./out)
             model: Model name to use for both agent and user LLMs
             provider: LLM provider (openai or openrouter)
             parallel: Number of simulations to run in parallel (default: 1)
+            agent_speaks_first: Whether the agent initiates the conversation (default: True)
+            max_turns: Maximum number of assistant turns (default: 50)
 
         Returns:
             dict: Results containing simulation outcomes and metrics
@@ -201,38 +298,98 @@ class _Simulations:
             >>> import asyncio
             >>> from pense.llm import simulations
             >>> result = asyncio.run(simulations.run(
-            ...     config="./config.json",
+            ...     system_prompt="You are a helpful nurse...",
+            ...     tools=[...],
+            ...     personas=[{"characteristics": "...", "gender": "female", "language": "english"}],
+            ...     scenarios=[{"description": "User completes the form"}],
+            ...     evaluation_criteria=[{"name": "completeness", "description": "All questions answered"}],
             ...     output_dir="./out",
             ...     model="gpt-4.1",
             ...     provider="openrouter"
             ... ))
         """
-        from pense.llm.run_simulation import main as _llm_simulation_main
-        import sys
+        from pense.llm.run_simulation import run_single_simulation_task
 
-        # Build argument list
-        argv = [
-            "pense",
-            "--config",
-            config,
-            "--output-dir",
-            output_dir,
-            "--model",
-            model,
-            "--provider",
-            provider,
-            "--parallel",
-            str(parallel),
-        ]
+        os.makedirs(output_dir, exist_ok=True)
 
-        # Save original sys.argv and restore after
-        original_argv = sys.argv
-        try:
-            sys.argv = argv
-            await _llm_simulation_main()
-            return {"status": "completed", "output_dir": output_dir}
-        finally:
-            sys.argv = original_argv
+        # Build config dict for run_single_simulation_task
+        config = {
+            "system_prompt": system_prompt,
+            "tools": tools,
+            "personas": personas,
+            "scenarios": scenarios,
+            "evaluation_criteria": evaluation_criteria,
+            "settings": {"agent_speaks_first": agent_speaks_first},
+            "max_turns": max_turns,
+        }
+
+        # Create a mock args object
+        class Args:
+            pass
+        args = Args()
+        args.model = model
+        args.provider = provider
+
+        # Create semaphore for parallel execution
+        semaphore = asyncio.Semaphore(parallel)
+
+        # Create all simulation tasks
+        tasks = []
+        for persona_index, user_persona in enumerate(personas):
+            for scenario_index, scenario in enumerate(scenarios):
+                task = run_single_simulation_task(
+                    semaphore=semaphore,
+                    config=config,
+                    persona_index=persona_index,
+                    user_persona=user_persona,
+                    scenario_index=scenario_index,
+                    scenario=scenario,
+                    output_dir=output_dir,
+                    args=args,
+                )
+                tasks.append(task)
+
+        # Run all tasks
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Collect metrics
+        metrics_by_criterion = defaultdict(list)
+        all_simulation_metrics = []
+
+        for result in results:
+            if isinstance(result, Exception):
+                continue
+            if result is None:
+                continue
+
+            simulation_metrics, evaluation_results = result
+            if simulation_metrics:
+                all_simulation_metrics.append(simulation_metrics)
+                for eval_result in evaluation_results:
+                    metrics_by_criterion[eval_result["name"]].append(float(eval_result["value"]))
+
+        # Compute summary
+        metrics_summary = {}
+        for criterion_name, values in metrics_by_criterion.items():
+            metrics_summary[criterion_name] = {
+                "mean": float(np.mean(values)),
+                "std": float(np.std(values)),
+                "values": values,
+            }
+
+        # Save results
+        if all_simulation_metrics:
+            df = pd.DataFrame(all_simulation_metrics)
+            df.to_csv(os.path.join(output_dir, "results.csv"), index=False)
+
+        with open(os.path.join(output_dir, "metrics.json"), "w") as f:
+            json.dump(metrics_summary, f, indent=4)
+
+        return {
+            "status": "completed",
+            "output_dir": output_dir,
+            "metrics": metrics_summary,
+        }
 
     @staticmethod
     def leaderboard(output_dir: str, save_dir: str) -> None:
@@ -251,7 +408,6 @@ class _Simulations:
 
         generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
 
-    # Allow calling run_simulation directly for more control
     @staticmethod
     async def run_simulation(
         bot_system_prompt: str,

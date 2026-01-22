@@ -70,8 +70,8 @@ from pense.stt import eval, leaderboard
 # Run STT evaluation
 asyncio.run(eval(
     provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, etc.
-    language="english",   # english or hindi
-    input_dir="/path/to/data",
+    language="english",   # english, hindi, or kannada
+    input_dir="/path/to/data",  # should contain stt.csv and audios/wav/, audios/pcm16/ folders
     output_dir="/path/to/output",
     debug=True,           # optional: run on first 5 audio files only
     debug_count=5,        # optional: number of files in debug mode
@@ -168,7 +168,7 @@ You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_
 | `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
 | `input_dir` | str | Yes | - | Path to input directory containing audio files and stt.csv |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
-| `language` | str | No | "english" | Language of audio files: english or hindi |
+| `language` | str | No | "english" | Language of audio files: english, hindi, or kannada |
 | `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
 | `debug` | bool | No | False | Run on first N audio files only |
 | `debug_count` | int | No | 5 | Number of files in debug mode |
@@ -330,96 +330,7 @@ You can checkout [`pense/tts/examples/leaderboard`](pense/tts/examples/leaderboa
 
 ## LLM tests
 
-To evaluate LLM behavior through test cases, prepare a JSON configuration file with test cases and evaluation criteria.
-
-The test configuration file should have the following structure:
-
-```json
-{
-  "params": {
-    "model": "gpt-4.1" // the name of the openai model
-  },
-  "system_prompt": "You are a helpful assistant...", // the system prompt for the LLM.
-  "tools": [
-    // array of tools that the LLM can call. Each tool should have:
-    {
-      "type": "client", // the type of the tool. Currently only "client" is supported
-      "name": "plan_next_question", // the name of the tool
-      "description": "Tool description...", // the description of the tool
-      "parameters": [
-        // array of parameters that the tool accepts
-        {
-          "id": "next_unanswered_question_index", // the id of the parameter
-          "type": "integer", // the type of the parameter
-          "description": "Parameter description...", // the description of the parameter
-          "required": true // whether the parameter is required
-        }
-      ]
-    }
-  ],
-  "test_cases": [
-    // array of test cases, each containing:
-    {
-      "history": [
-        // the conversation history uptil the point of the test
-        {
-          "role": "assistant",
-          "content": "Hello! What is your name?"
-        },
-        {
-          "role": "user",
-          "content": "Aman Dalmia"
-        }
-      ],
-      "evaluation": {
-        // the evaluation criteria for the test
-        "type": "tool_call", // the type of evaluation. Either "tool_call" or "response". "tool_call" means that the LLM's tool calls will be evaluated against the expected tool calls.
-        "tool_calls": [
-          // array of tool calls that the LLM is expected to make. Each tool call should have:
-          {
-            "tool": "plan_next_question", // the name of the tool
-            "arguments": {
-              // the arguments that the tool accepts
-              "next_unanswered_question_index": 2, // the value of the parameter
-              "questions_answered": [1] // the value of the parameter
-            }
-          }
-        ]
-      },
-      "settings": {
-        // optional settings for this test case
-        "language": "hindi" // language for the LLM to respond in (defaults to "english")
-      }
-    },
-    {
-      "history": [
-        {
-          "role": "assistant",
-          "content": "Hello! Let's fill out your ANC form. What is your name?"
-        },
-        {
-          "role": "user",
-          "content": "Aman Dalmia"
-        },
-        {
-          "role": "assistant",
-          "content": "Thanks, what is your phone number?"
-        },
-        {
-          "role": "user",
-          "content": "Can I skip this question?"
-        }
-      ],
-      "evaluation": {
-        "type": "response", // `response` means that the LLM response will be evaluated using an LLM judge with custom criteria
-        "criteria": "The assistant should allow the user to skip giving their phone number if asked to skip, and not press them further to answer or call the plan_next_question tool for that question.", // the criteria for evaluating the agent response
-        "positive_examples": [], // array of positive examples that the LLM is expected to respond with
-        "negative_examples": [] // array of negative examples that the LLM is expected to respond with
-      }
-    }
-  ]
-}
-```
+To evaluate LLM behavior through test cases, define your system prompt, tools, and test cases directly in Python.
 
 Set the required environment variables:
 
@@ -435,12 +346,72 @@ export OPENROUTER_API_KEY=your_key
 import asyncio
 from pense.llm import tests
 
+# Define your tools
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question to ask",
+        "parameters": [
+            {
+                "id": "next_unanswered_question_index",
+                "type": "integer",
+                "description": "Index of next question",
+                "required": True
+            },
+            {
+                "id": "questions_answered",
+                "type": "array",
+                "description": "List of answered question indices",
+                "items": {"type": "integer"},
+                "required": True
+            }
+        ]
+    }
+]
+
+# Define your test cases
+test_cases = [
+    {
+        "history": [
+            {"role": "assistant", "content": "Hello! What is your name?"},
+            {"role": "user", "content": "Aman Dalmia"}
+        ],
+        "evaluation": {
+            "type": "tool_call",
+            "tool_calls": [
+                {
+                    "tool": "plan_next_question",
+                    "arguments": {
+                        "next_unanswered_question_index": 2,
+                        "questions_answered": [1]
+                    }
+                }
+            ]
+        },
+        "settings": {"language": "english"}
+    },
+    {
+        "history": [
+            {"role": "assistant", "content": "What is your phone number?"},
+            {"role": "user", "content": "Can I skip this question?"}
+        ],
+        "evaluation": {
+            "type": "response",
+            "criteria": "The assistant should allow the user to skip giving their phone number."
+        }
+    }
+]
+
 # Run LLM tests
-asyncio.run(tests.run(
-    config="/path/to/test_config.json",
-    output_dir="/path/to/output_dir",
-    model="gpt-4.1",           # or "openai/gpt-4.1" for openrouter
-    provider="openrouter",      # openai or openrouter
+result = asyncio.run(tests.run(
+    system_prompt="You are a helpful assistant filling out a form...",
+    tools=tools,
+    test_cases=test_cases,
+    output_dir="./out",
+    model="openai/gpt-4.1",
+    provider="openrouter",
+    run_name="my_test_run",  # optional: name for this run
 ))
 ```
 
@@ -449,30 +420,19 @@ asyncio.run(tests.run(
 - `openai`: Use OpenAI's API directly. Model names should match OpenAI's naming convention (e.g., `gpt-4.1`, `gpt-4o`).
 - `openrouter`: Use OpenRouter's API to access multiple LLM providers. Model names should match OpenRouter's naming convention (e.g., `openai/gpt-4.1`, `anthropic/claude-3-opus`).
 
-**Examples:**
+**Function Parameters:**
 
-```python
-import asyncio
-from pense.llm import tests
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `system_prompt` | str | Yes | - | System prompt for the LLM |
+| `tools` | list | Yes | - | List of tool definitions |
+| `test_cases` | list | Yes | - | List of test case dicts with 'history', 'evaluation', optional 'settings' |
+| `output_dir` | str | No | "./out" | Output directory for results |
+| `model` | str | No | "gpt-4.1" | Model name |
+| `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
+| `run_name` | str | No | None | Optional name for output folder |
 
-# Using OpenAI provider with OpenAI model name
-asyncio.run(tests.run(
-    config="/path/to/config.json",
-    output_dir="./out",
-    model="gpt-4.1",
-    provider="openai"
-))
-
-# Using OpenRouter provider with OpenRouter model name
-asyncio.run(tests.run(
-    config="/path/to/config.json",
-    output_dir="./out",
-    model="openai/gpt-4.1",
-    provider="openrouter"
-))
-```
-
-You can use the sample test configuration provided in [`pense/llm/examples/tests/config.json`](pense/llm/examples/tests/config.json) to test the evaluation script.
+You can reference the sample configuration in [`pense/llm/examples/tests/config.json`](pense/llm/examples/tests/config.json) for test case structure examples.
 
 The script will run each test case for each variable value (e.g., for each language) and output:
 
@@ -631,51 +591,11 @@ result = asyncio.run(tests.run_inference(
 
 ## LLM simulations
 
-Run fully automated, text-only conversations between two LLMs—the "agent" plus multiple users having specific personas to mimic specific scenarios given by you. Prepare a JSON configuration file as shown below:
+Run fully automated, text-only conversations between two LLMs—the "agent" plus multiple users having specific personas to mimic specific scenarios given by you.
 
-```json
-{
-  "system_prompt": "instructions for the bot",
-  "tools": [...], // tool schemas available to the agent LLM
-  "personas": [
-    // array of persona objects for users in the simulation
-    {
-      "characteristics": "description of user personality, background, and behavior",
-      "gender": "female", // gender of the persona (used in user system prompt)
-      "language": "english" // language for both agent and user in the simulation
-    }
-  ],
-  "scenarios": [
-    // array of scenario objects to be run with each user persona
-    {
-      "description": "description of the scenario to be played out"
-    }
-  ],
-  "evaluation_criteria": [
-    // array of criteria to evaluate each simulation against
-    {
-      "name": "question_completeness", // unique name for the criterion
-      "description": "Whether all the questions in the form were covered in the conversation" // description used by LLM judge to evaluate
-    },
-    {
-      "name": "assistant_behavior",
-      "description": "Whether the assistant asks one concise question per turn; is empathetic and does not repeat the user's answer back to them."
-    }
-  ],
-  "settings": {
-    "agent_speaks_first": true // optional: if true (default), the agent initiates the conversation. If false, the simulated user speaks first.
-  },
-  "max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, an end_reason message is added to the transcript.
-}
-```
+Each simulation pairs every persona with every scenario. The runner fans out into separate folders named `simulation_persona_<n>_scenario_<m>` and saves transcripts, evaluation results, plus logs for inspection. Use these artifacts to verify that the agent follows your instructions (e.g., responds appropriately, calls the right tools at the right times, and terminates the call correctly), then iterate on the prompts/config as needed.
 
-Each simulation pairs every persona with every scenario. The runner fans out into separate folders named `simulation_persona_<n>_scenario_<m>` and saves transcripts, evaluation results, plus logs for inspection. Use the sample persona/scenario set from the example config or replace them with your own scripted behaviors (e.g., "refuses to share phone number until probed twice"). Use these artifacts to verify that the agent follows your instructions (e.g., responds appropriately, calls the right tools at the right times, and terminates the call correctly), then iterate on the prompts/config as needed.
-
-After each simulation, an LLM judge evaluates the transcript against all `evaluation_criteria` defined in the config. Each criterion produces a match (true/false) and reasoning. The results are aggregated across all simulations at the end of the run.
-
-**Max Turns:** You can optionally specify `max_turns` in the config to limit the maximum number of assistant turns in a conversation. When `max_turns` is reached, the conversation will end gracefully after the current turn completes, and an `end_reason` message with `"role": "end_reason"` and `"content": "max_turns"` will be added to the transcript. The default value is 50 turns.
-
-**Agent Speaks First:** You can optionally specify `agent_speaks_first` in the `settings` section to control who initiates the conversation. When set to `true` (default), the agent starts the conversation. When set to `false`, the simulated user speaks first.
+After each simulation, an LLM judge evaluates the transcript against all `evaluation_criteria`. Each criterion produces a match (true/false) and reasoning. The results are aggregated across all simulations at the end of the run.
 
 Set the required environment variables:
 
@@ -687,18 +607,62 @@ export OPENAI_API_KEY=your_key
 export OPENROUTER_API_KEY=your_key
 ```
 
-Then launch simulations:
-
 ```python
 import asyncio
 from pense.llm import simulations
 
-asyncio.run(simulations.run(
-    config="/path/to/config.json",
-    output_dir="/path/to/output",
-    model="gpt-4.1",           # or "openai/gpt-4.1" for openrouter
-    provider="openrouter",      # openai or openrouter
+# Define personas
+personas = [
+    {
+        "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
+        "gender": "female",
+        "language": "english"
+    }
+]
+
+# Define scenarios
+scenarios = [
+    {"description": "User completes the form without any issues"},
+    {"description": "User hesitates and wants to skip some questions"}
+]
+
+# Define evaluation criteria
+evaluation_criteria = [
+    {
+        "name": "question_completeness",
+        "description": "Whether all the questions in the form were covered"
+    },
+    {
+        "name": "assistant_behavior",
+        "description": "Whether the assistant asks one concise question per turn"
+    }
+]
+
+# Define tools available to the agent
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question",
+        "parameters": [
+            {"id": "next_unanswered_question_index", "type": "integer", "description": "Next question index", "required": True}
+        ]
+    }
+]
+
+# Run simulations
+result = asyncio.run(simulations.run(
+    system_prompt="You are a helpful nurse filling out a form...",
+    tools=tools,
+    personas=personas,
+    scenarios=scenarios,
+    evaluation_criteria=evaluation_criteria,
+    output_dir="./out",
+    model="openai/gpt-4.1",
+    provider="openrouter",
     parallel=1,                 # number of simulations to run in parallel
+    agent_speaks_first=True,    # agent initiates conversation
+    max_turns=50,               # max assistant turns
 ))
 ```
 
@@ -707,30 +671,23 @@ asyncio.run(simulations.run(
 - `openai`: Use OpenAI's API directly. Model names should match OpenAI's naming convention (e.g., `gpt-4.1`, `gpt-4o`).
 - `openrouter`: Use OpenRouter's API to access multiple LLM providers. Model names should match OpenRouter's naming convention (e.g., `openai/gpt-4.1`, `anthropic/claude-3-opus`).
 
-**Examples:**
+**Function Parameters:**
 
-```python
-import asyncio
-from pense.llm import simulations
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `system_prompt` | str | Yes | - | System prompt for the bot/agent |
+| `tools` | list | Yes | - | List of tool definitions |
+| `personas` | list | Yes | - | List of persona dicts with 'characteristics', 'gender', 'language' |
+| `scenarios` | list | Yes | - | List of scenario dicts with 'description' |
+| `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
+| `output_dir` | str | No | "./out" | Output directory for results |
+| `model` | str | No | "gpt-4.1" | Model name for both agent and user |
+| `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
+| `parallel` | int | No | 1 | Number of parallel simulations |
+| `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
+| `max_turns` | int | No | 50 | Maximum assistant turns |
 
-# Using OpenAI provider with OpenAI model name
-asyncio.run(simulations.run(
-    config="pense/llm/examples/simulation/config.json",
-    output_dir="./out",
-    model="gpt-4.1",
-    provider="openai"
-))
-
-# Using OpenRouter provider with OpenRouter model name
-asyncio.run(simulations.run(
-    config="pense/llm/examples/simulation/config.json",
-    output_dir="./out",
-    model="openai/gpt-4.1",
-    provider="openrouter"
-))
-```
-
-You can use the sample configuration provided in [`pense/llm/examples/simulation/config.json`](pense/llm/examples/simulation/config.json) to test the simulation.
+You can reference the sample configuration in [`pense/llm/examples/simulation/config.json`](pense/llm/examples/simulation/config.json) for structure examples.
 
 Sample output:
 
@@ -866,90 +823,9 @@ result = asyncio.run(simulations.run_simulation(
 
 ## Voice agent simulations
 
-To run agent simulations with all the three components - STT, LLM, and TTS - prepare a JSON configuration file as shown below.
+Run full voice agent simulations with STT, LLM, and TTS components.
 
-```json
-{
-  "system_prompt": "You are a helpful nurse speaking to a pregnant mother who has come for an Antenatal visit (ANC visit).\n\nYou are helping her with filling the ANC visit form which has the following questions:\n\n1: Name of patient (string)\n2: Address (string)\n3: Telephone (number)\n\nYour goal is to get the answer for all these questions from the user. Ask the questions sequentially, one at a time. Make sure to always speak out the next question for the user. They don't know what the next question will be. It is your responsibility to ask them the next question.\n\nDo not repeat the user's answer back to them.\n\nExcept for the questions where a type has been explicitly given beside it, the rest of the questions are boolean questions (yes/no).\n\nIf the user gives an answer that is not valid for a question, then, don't call the `plan_next_question` tool at all.\n\nOnly if the user gives a valid answer to a question, then, call the `plan_next_question` tool.\n\nOnce all the questions have been answered, end the call by calling the `end_call` tool immediately without asking or saying anything else to the user.\n\n# Important instructions\nFor each field, you must make sure that you get valid and complete answers from the user.\n\nName: the full name including both the first name and last name (users might have initials as part of their name - don't ask them to expand it)\nAddress: the full address of the user's specific place of residence\nTelephone: must be a valid 10-digit phone number (don't bug the user to say the number in 10 digits or without spaces or without hyphens or to repeat it as long you can infer the number from your message, irrespective of whatever format it may have been given in - asking for repeating information that is already clear is not a good user experience)\n\nUntil you get a valid and complete response for a specific question from the user, keep probing for more details until you have extracted all the details required to meet the criteria of completeness for that question.\n\nFor the boolean questions, just look for whether the user has that symptom or not. If the user is not able to give a definitive answer to any the boolean questions, try probing once to help them arrive at a definitive answer. If they are still not able to give a definitive true/false answer, mark that response as null.\n\n# Skipping already answered questions\nIt is possible that even though you have asked a particular question, the user's response may end up answering some of the future questions you were going to ask. If the user's response already definitively answers those questions, then, don't repeat those questions again and skip them to move to the next unanswered question.\n\nAfter every valid and complete response given by the user to a question, call the `plan_next_question` tool with the indices of the questions in the list of questions above that the user's response has already answered and the index of the next unanswered question that you are going to ask.\n\nIf the user's response only answers the exact question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_that_question>]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers more questions beyond the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_first_question_answered>, <index_of_the_second_question_answered>, ....]` and `next_unanswered_question_index` as the index of the next unanswered question based on the conversation history so far.\n\nIf the user's response answers some other question from the form but not the question you asked, then, call `plan_next_question` with `questions_answered` as `[<index_of_the_question_answered>]` and `next_unanswered_question_index` as the index of the question you had originally asked but the user did not answer.\n\nIf the user's response is completely irrelevant to any of the questions in the form, don't call this tool and steer the user back to the conversation.\n\nUse the same index values as mentioned in the list above: from 1-22. So, 1-indexed. Not, 0-indexed.\n\n# Ensuring completion of all questions\n- If the user insists on skipping any question when you asked it, make sure to ask it again later. Before ending the call, make sure to ask all the questions that you asked. Only when all the questions have been asked and answered, then, call the `end_call` tool.\n\n# Style\n- Keep the conversation clear, warm, friendly and empathetic. It should feel like a natural and realistic conversation between a nurse and a mother who is pregnant. Make sure each question that you ask is concise and to the point.\n- Speak in an empathetic, friendly tone like a nurse at a government hospital.\n- Always stay gender neutral and don't say anything that might indicate any gender or name for you or anthropomorphise you in any way.\n", // prompt for the voice agent
-  "stt": {
-    "provider": "google" // optional: STT provider to use. Supported: deepgram, google, openai, cartesia, elevenlabs, sarvam. Default: google
-  },
-  "tts": {
-    "provider": "google" // optional: TTS provider to use. Supported: cartesia, google, openai, elevenlabs, sarvam. Default: google
-  },
-  "llm": {
-    "provider": "openrouter", // optional: LLM provider to use. Supported: openai, openrouter. Default: openrouter
-    "model": "openai/gpt-4.1" // optional: model name. For openai provider, use OpenAI model names (e.g., "gpt-4.1", "gpt-4o"). For openrouter provider, use OpenRouter model names (e.g., "openai/gpt-4.1", "anthropic/claude-3-opus"). Default: openai/gpt-4.1
-  },
-  "tools": [
-    {
-      "type": "client",
-      "name": "plan_next_question",
-      "description": "Optional, only call this tool if the user gave a valid answer to a valid question that you asked; if yes, then which questions have been answered and which question needs to be asked next; if not, don't call this tool at all",
-      "disable_interruptions": false,
-      "force_pre_tool_speech": "auto",
-      "assignments": [],
-      "tool_call_sound": null,
-      "tool_call_sound_behavior": "auto",
-      "execution_mode": "immediate",
-      "expects_response": false,
-      "response_timeout_secs": 1,
-      "parameters": [
-        {
-          "id": "next_unanswered_question_index",
-          "type": "integer",
-          "value_type": "llm_prompt",
-          "description": "the index of the next unanswered question that should be asked to the user next. don't repeat questions that have been asked before already in the previous responses.",
-          "dynamic_variable": "",
-          "constant_value": "",
-          "required": true
-        },
-        {
-          "id": "questions_answered",
-          "type": "array",
-          "description": "Optional, the indices of the questions in the full list of questions that have been answered by the user's last response",
-          "items": {
-            "type": "integer",
-            "description": "the index of each question that got answered by the current response of the user"
-          },
-          "required": true,
-          "value_type": "llm_prompt"
-        }
-      ]
-    }
-  ], // tools that the voice agent has access to
-  "personas": [
-    // array of persona objects for users in the simulation
-    {
-      "characteristics": "description of user personality, background, and behavior",
-      "gender": "female", // gender of the persona (used in user system prompt)
-      "language": "english", // language for both agent and user in the simulation
-      "interruption_sensitivity": "medium" // interruption sensitivity: "none", "low", "medium", or "high" (maps to probabilities: 0, 0.25, 0.5, 0.8)
-    }
-  ], // different user personas to evaluate for the voice agent
-  "scenarios": [
-    // array of scenario objects to be run with each user persona
-    {
-      "description": "description of the scenario to be played out"
-    }
-  ], // the different scenarios to evaluate for each persona
-  "evaluation_criteria": [
-    // array of criteria to evaluate each simulation against
-    {
-      "name": "question_completeness", // unique name for the criterion
-      "description": "Whether all the questions in the form were covered in the conversation" // description used by LLM judge to evaluate
-    }
-  ],
-  "settings": {
-    "agent_speaks_first": true // optional: if true (default), the agent initiates the conversation. If false, the simulated user speaks first.
-  },
-  "max_turns": 50 // optional: maximum number of assistant turns before ending the conversation (default: 50). When max_turns is reached, the conversation ends gracefully after the current turn completes, and an end_reason message is added to the transcript.
-}
-```
-
-You can configure the STT, TTS, and LLM providers directly in the config JSON file using the `stt`, `tts`, and `llm` sections. If these sections are omitted, the defaults are Google for STT, Google for TTS, and GPT-4.1 for LLM.
-
-**Agent Speaks First:** You can optionally specify `agent_speaks_first` in the `settings` section to control who initiates the conversation. When set to `true` (default), the agent starts the conversation. When set to `false`, the simulated user speaks first by saying "Hello" to the agent.
+Each simulation pairs every persona with every scenario. The runner saves transcripts, audio files, evaluation results, and logs for inspection.
 
 **Supported Providers:**
 
@@ -984,27 +860,84 @@ export SARVAM_API_KEY=your_key
 
 ```python
 import asyncio
-from pense.agent import simulation
+from pense.agent import simulation, STTConfig, TTSConfig, LLMConfig
+
+# Define personas
+personas = [
+    {
+        "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
+        "gender": "female",
+        "language": "english",
+        "interruption_sensitivity": "medium"  # none, low, medium, high
+    }
+]
+
+# Define scenarios
+scenarios = [
+    {"description": "User completes the form without any issues"},
+    {"description": "User hesitates and wants to skip some questions"}
+]
+
+# Define evaluation criteria
+evaluation_criteria = [
+    {
+        "name": "question_completeness",
+        "description": "Whether all the questions in the form were covered"
+    },
+    {
+        "name": "assistant_behavior",
+        "description": "Whether the assistant asks one concise question per turn"
+    }
+]
+
+# Define tools available to the agent
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question",
+        "parameters": [
+            {"id": "next_unanswered_question_index", "type": "integer", "description": "Next question index", "required": True},
+            {"id": "questions_answered", "type": "array", "description": "Answered indices", "items": {"type": "integer"}, "required": True}
+        ]
+    }
+]
 
 # Run voice agent simulations
-asyncio.run(simulation.run(
-    config="/path/to/config.json",
-    output_dir="/path/to/output",
-    port=8765,  # optional: base WebSocket port
+result = asyncio.run(simulation.run(
+    system_prompt="You are a helpful nurse filling out a form...",
+    tools=tools,
+    personas=personas,
+    scenarios=scenarios,
+    evaluation_criteria=evaluation_criteria,
+    output_dir="./out",
+    stt=STTConfig(provider="google"),
+    tts=TTSConfig(provider="google"),
+    llm=LLMConfig(provider="openrouter", model="openai/gpt-4.1"),
+    agent_speaks_first=True,
+    max_turns=50,
+    port=8765,
 ))
 ```
 
-You can use the sample configuration provided in [`pense/agent/examples/simulation/sample_short_english.json`](pense/agent/examples/simulation/sample_short_english.json) to test the voice agent simulation.
+**Function Parameters:**
 
-```python
-import asyncio
-from pense.agent import simulation
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `system_prompt` | str | Yes | - | System prompt for the voice agent |
+| `tools` | list | Yes | - | List of tool definitions |
+| `personas` | list | Yes | - | List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_sensitivity' |
+| `scenarios` | list | Yes | - | List of scenario dicts with 'description' |
+| `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
+| `output_dir` | str | No | "./out" | Output directory for results |
+| `stt` | STTConfig | No | Google | STT configuration |
+| `tts` | TTSConfig | No | Google | TTS configuration |
+| `llm` | LLMConfig | No | OpenRouter/gpt-4.1 | LLM configuration |
+| `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
+| `max_turns` | int | No | 50 | Maximum assistant turns |
+| `port` | int | No | 8765 | Base WebSocket port |
 
-asyncio.run(simulation.run(
-    config="pense/agent/examples/simulation/sample_short_english.json",
-    output_dir="./out"
-))
-```
+You can reference the sample configuration in [`pense/agent/examples/simulation/sample_short_english.json`](pense/agent/examples/simulation/sample_short_english.json) for structure examples.
 
 Sample output:
 
