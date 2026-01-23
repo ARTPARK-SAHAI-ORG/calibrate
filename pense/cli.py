@@ -95,7 +95,6 @@ Examples:
     stt_eval_parser.add_argument("-d", "--debug", action="store_true")
     stt_eval_parser.add_argument("-dc", "--debug_count", type=int, default=5)
     stt_eval_parser.add_argument("--ignore_retry", action="store_true")
-    stt_eval_parser.add_argument("--port", type=int, default=8765)
 
     stt_leaderboard_parser = stt_subparsers.add_parser(
         "leaderboard", help="Generate STT leaderboard"

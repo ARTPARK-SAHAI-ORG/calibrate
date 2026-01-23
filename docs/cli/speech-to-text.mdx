@@ -12,10 +12,7 @@ Organize your input data in the following structure:
 ```
 ├── /path/to/data
 │   └── stt.csv
-│   └── audios/wav
-│       └── audio_1.wav
-│       └── audio_2.wav
-│   └── audios/pcm16
+│   └── audios/
 │       └── audio_1.wav
 │       └── audio_2.wav
 ```
@@ -28,7 +25,7 @@ The `stt.csv` file should have the following format:
 | audio_2 | Madam, my name is Geeta Shankar |
 
 <Note>
-Store audios in both `wav` and `pcm16` formats as different providers support different formats. The evaluation script automatically selects the right format for your chosen provider.
+All audio files should be in WAV format. The evaluation script expects files at `audios/<id>.wav` where `<id>` matches the `id` column in your CSV.
 </Note>
 
 <Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
@@ -49,15 +46,15 @@ pense stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
 
 | Flag | Long | Type | Required | Default | Description |
 |------|------|------|----------|---------|-------------|
-| `-p` | `--provider` | string | Yes | - | Provider: `deepgram`, `openai`, `cartesia`, `google`, `sarvam`, `elevenlabs`, `smallest`, `groq` |
+| `-p` | `--provider` | string | Yes | - | Provider: `deepgram`, `openai`, `cartesia`, `google`, `gemini`, `sarvam`, `elevenlabs`, `smallest`, `groq` |
 | `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, or `kannada` |
-| `-i` | `--input-dir` | string | Yes | - | Path to input directory containing `stt.csv` and `audios/` folders |
+| `-i` | `--input-dir` | string | Yes | - | Path to input directory containing `stt.csv` and `audios/` folder |
 | `-o` | `--output-dir` | string | No | `./out` | Path to output directory for results |
 | `-f` | `--input-file-name` | string | No | `stt.csv` | Name of input CSV file |
 | `-d` | `--debug` | flag | No | `false` | Run on first N audio files only |
 | `-dc` | `--debug_count` | int | No | `5` | Number of files in debug mode |
 | | `--ignore_retry` | flag | No | `false` | Skip retry if not all audios processed |
-| | `--port` | int | No | `8765` | WebSocket port |
+| | `--overwrite` | flag | No | `false` | Overwrite existing results instead of resuming |
 
 ### Examples
 
@@ -82,11 +79,10 @@ pense stt eval -p deepgram -l english -i ./data -o ./out -d -dc 5
 ### Output Structure
 
 ```
-/path/to/output/<provider>_<language>
+/path/to/output/<provider>
 ├── results.csv       # Per-file results with metrics
-├── metrics.json      # Aggregated metrics (WER, similarity, latency)
-├── results.log       # Terminal output summary
-└── logs              # Full pipecat logs
+├── metrics.json      # Aggregated metrics (WER, similarity, LLM judge)
+└── results.log       # Full logs including terminal output
 ```
 
 ### Output Files
@@ -132,16 +128,17 @@ The leaderboard command generates:
 
 ## Supported Providers
 
-| Provider | Languages | Audio Format |
-|----------|-----------|--------------|
-| `deepgram` | English, Hindi | WAV |
-| `openai` | English, Hindi | WAV |
-| `google` | English, Hindi, Kannada | WAV |
-| `sarvam` | English, Hindi, Kannada | PCM16 |
-| `elevenlabs` | English | WAV |
-| `cartesia` | English | WAV |
-| `smallest` | English, Hindi | WAV |
-| `groq` | English | WAV |
+| Provider | Languages |
+|----------|-----------|
+| `deepgram` | English, Hindi |
+| `openai` | English, Hindi |
+| `google` | English, Hindi, Kannada |
+| `gemini` | English, Hindi, Kannada |
+| `sarvam` | English, Hindi, Kannada |
+| `elevenlabs` | English |
+| `cartesia` | English |
+| `smallest` | English, Hindi |
+| `groq` | English |
 
 ## Required Environment Variables
 
@@ -151,7 +148,10 @@ Set the appropriate API key for your chosen provider:
 export DEEPGRAM_API_KEY=your_key
 export OPENAI_API_KEY=your_key
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+export GOOGLE_API_KEY=your_key  # For Gemini
 export SARVAM_API_KEY=your_key
 export ELEVENLABS_API_KEY=your_key
 export CARTESIA_API_KEY=your_key
+export GROQ_API_KEY=your_key
+export SMALLEST_API_KEY=your_key
 ```

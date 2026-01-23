@@ -11,8 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from typing import Literal
 
-from pense.utils import save_audio_chunk
-from pipecat.audio.turn.smart_turn.base_smart_turn import SmartTurnParams
+from pense.utils import save_audio_chunk, create_stt_service, create_tts_service
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -26,13 +25,8 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
-from pipecat.transcriptions.language import Language
 from pipecat.runner.types import RunnerArguments
 from pipecat.runner.utils import create_transport
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOptions
-from pipecat.services.deepgram.stt import DeepgramSTTService, LiveOptions
-from pipecat.services.deepgram.tts import DeepgramTTSService
 from pipecat.services.llm_service import FunctionCallParams
 
 from pipecat.services.openai.llm import OpenAILLMService
@@ -42,22 +36,8 @@ from pipecat.transports.base_transport import BaseTransport, TransportParams
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
-from pipecat.services.google.tts import GoogleTTSService
-from pipecat.services.google.stt import GoogleSTTService
-from pipecat.services.openai.stt import OpenAISTTService
-from pipecat.services.openai.tts import OpenAITTSService
-from pense.integrations.smallest.stt import SmallestSTTService
-from pense.integrations.smallest.tts import SmallestTTSService
-from pipecat.services.sarvam.stt import SarvamSTTService
-from pipecat.services.sarvam.tts import SarvamTTSService
-
-from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
-from pipecat.services.elevenlabs.tts import (
-    ElevenLabsTTSService,
-)
 from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
-
 
 from pipecat.observers.loggers.user_bot_latency_log_observer import (
     UserBotLatencyLogObserver,
@@ -187,139 +167,21 @@ async def run_bot(
 ):
     logger.info(f"Starting bot")
 
-    # Helper for language mapping
-    def get_language_enum(lang_str: str) -> Language:
-        if lang_str == "hindi":
-            return Language.HI
-        elif lang_str == "kannada":
-            return Language.KN
-        return Language.EN
-
     # --- STT Setup ---
-    stt_config = config.stt
-    stt_language = get_language_enum(config.language)
-
-    if stt_config.provider == "deepgram":
-        stt = DeepgramSTTService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"),
-            live_options=LiveOptions(language=stt_language.value),
-        )
-    elif stt_config.provider == "google":
-        stt = GoogleSTTService(
-            params=GoogleSTTService.InputParams(languages=stt_language),
-            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-        )
-    elif stt_config.provider == "openai":
-        stt = OpenAISTTService(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model=stt_config.model or "gpt-4o-transcribe",
-            language=stt_language,
-        )
-    elif stt_config.provider == "elevenlabs":
-        stt = ElevenLabsRealtimeSTTService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
-            params=ElevenLabsRealtimeSTTService.InputParams(
-                language_code=stt_language.value,
-            ),
-        )
-    elif stt_config.provider == "sarvam":
-        sarvam_lang = (
-            Language.KN_IN
-            if config.language == "kannada"
-            else Language.HI_IN if config.language == "hindi" else Language.EN_IN
-        )
-        stt = SarvamSTTService(
-            api_key=os.getenv("SARVAM_API_KEY"),
-            params=SarvamSTTService.InputParams(language=sarvam_lang.value),
-        )
-    elif stt_config.provider == "cartesia":
-        stt = CartesiaSTTService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            live_options=CartesiaLiveOptions(language=stt_language.value),
-        )
-    elif stt_config.provider == "smallest":
-        stt = SmallestSTTService(
-            api_key=os.getenv("SMALLEST_API_KEY"),
-            url="wss://waves-api.smallest.ai/api/v1/asr",
-            params=SmallestSTTService.SmallestInputParams(
-                audioLanguage=stt_language.value,
-            ),
-        )
-    else:
-        raise ValueError(f"Unknown STT provider: {stt_config.provider}")
+    stt = create_stt_service(
+        provider=config.stt.provider,
+        language=config.language,
+        model=config.stt.model,
+    )
 
     # --- TTS Setup ---
-    tts_config = config.tts
-    tts_language = get_language_enum(config.language)
-
-    if tts_config.provider == "elevenlabs":
-        default_voice = (
-            "jUjRbhZWoMK4aDciW36V"
-            if config.language == "hindi"
-            else "90ipbRoKi4CpHXvKVtl0"
-        )
-        voice_id = tts_config.voice_id or default_voice
-        tts = ElevenLabsTTSService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
-            voice_id=voice_id,
-            params=ElevenLabsTTSService.InputParams(language=tts_language),
-        )
-    elif tts_config.provider == "cartesia":
-        default_voice = (
-            "28ca2041-5dda-42df-8123-f58ea9c3da00"
-            if config.language == "hindi"
-            else "66c6b81c-ddb7-4892-bdd5-19b5a7be38e7"
-        )
-        voice_id = tts_config.voice_id or default_voice
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id=voice_id,
-            model=tts_config.model or "sonic-3",
-            params=CartesiaTTSService.InputParams(language=tts_language),
-        )
-    elif tts_config.provider == "google":
-        default_voice = (
-            "hi-IN-Chirp3-HD-Achernar"
-            if config.language == "hindi"
-            else "en-US-Chirp3-HD-Achernar"
-        )
-        tts = GoogleTTSService(
-            voice_id=tts_config.voice_id or default_voice,
-            params=GoogleTTSService.InputParams(language=tts_language),
-            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-        )
-    elif tts_config.provider == "openai":
-        tts = OpenAITTSService(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            voice=tts_config.voice_id or "fable",
-            params=OpenAITTSService.InputParams(instructions=tts_config.instructions),
-        )
-    elif tts_config.provider == "smallest":
-        default_voice = "aarushi"
-        tts = SmallestTTSService(
-            api_key=os.getenv("SMALLEST_API_KEY"),
-            voice_id=tts_config.voice_id or default_voice,
-            params=SmallestTTSService.InputParams(language=tts_language),
-        )
-    elif tts_config.provider == "deepgram":
-        tts = DeepgramTTSService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"),
-            voice=tts_config.voice_id or "aura-2-andromeda-en",
-        )
-    elif tts_config.provider == "sarvam":
-        sarvam_lang = (
-            Language.KN_IN
-            if config.language == "kannada"
-            else Language.HI_IN if config.language == "hindi" else Language.EN_IN
-        )
-        tts = SarvamTTSService(
-            api_key=os.getenv("SARVAM_API_KEY"),
-            model=tts_config.model or "bulbul:v2",
-            voice_id=tts_config.voice_id or "abhilash",
-            params=SarvamTTSService.InputParams(language=sarvam_lang),
-        )
-    else:
-        raise ValueError(f"Unknown TTS provider: {tts_config.provider}")
+    tts = create_tts_service(
+        provider=config.tts.provider,
+        language=config.language,
+        voice_id=config.tts.voice_id,
+        model=config.tts.model,
+        instructions=config.tts.instructions,
+    )
 
     # --- LLM Setup ---
     llm_config = config.llm

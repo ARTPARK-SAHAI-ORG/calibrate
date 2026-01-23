@@ -15,6 +15,7 @@ from pense.utils import (
     log_and_print,
     save_audio_chunk,
     MetricsLogger,
+    create_tts_service,
 )
 
 from pipecat.frames.frames import (
@@ -71,15 +72,6 @@ import websockets
 from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
 from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 
-from pense.integrations.smallest.tts import SmallestTTSService
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.openai.tts import OpenAITTSService
-from pipecat.services.groq.tts import GroqTTSService
-from pipecat.services.google.tts import GoogleTTSService
-from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
-from pipecat.services.sarvam.tts import SarvamTTSService
-
-from pipecat.transcriptions.language import Language
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
@@ -219,83 +211,7 @@ async def run_tts_bot(
 
             await self.push_frame(frame, direction)
 
-    tts_language = (
-        Language.EN
-        if language == "english"
-        else Language.HI if language == "hindi" else Language.KN
-    )
-
-    if provider == "smallest":
-        tts = SmallestTTSService(
-            api_key=os.getenv("SMALLEST_API_KEY"),
-            params=SmallestTTSService.InputParams(language=tts_language),
-            voice_id=(
-                "aarushi" if tts_language in [Language.EN, Language.HI] else "vijay"
-            ),
-        )
-    elif provider == "cartesia":
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            voice_id=(
-                "95d51f79-c397-46f9-b49a-23763d3eaa2d"
-                if language == "english"
-                else (
-                    "7c6219d2-e8d2-462c-89d8-7ecba7c75d65"
-                    if language == "kannada"
-                    else "f8f5f1b2-f02d-4d8e-a40d-fd850a487b3d"  # english
-                )
-            ),  # British Reading Lady
-        )
-    elif provider == "openai":
-        tts = OpenAITTSService(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            voice="fable",
-        )
-    elif provider == "groq":
-        tts = GroqTTSService(
-            api_key=os.getenv("GROQ_API_KEY"),
-            model_name="canopylabs/orpheus-v1-english",
-            voice_id="autumn",
-        )
-    elif provider == "google":
-        voice_id = (
-            "en-US-Chirp3-HD-Charon"
-            if language == "english"
-            else (
-                "hi-IN-Chirp3-HD-Charon"
-                if language == "hindi"
-                else "kn-IN-Chirp3-HD-Charon"
-            )
-        )
-        tts = GoogleTTSService(
-            voice_id=voice_id,
-            params=GoogleTTSService.InputParams(language=tts_language),
-            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-        )
-    elif provider == "elevenlabs":
-        tts = ElevenLabsTTSService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
-            voice_id=(
-                "jUjRbhZWoMK4aDciW36V"
-                if language == "hindi"
-                else "90ipbRoKi4CpHXvKVtl0"
-            ),
-            params=ElevenLabsTTSService.InputParams(language=tts_language),
-        )
-    elif provider == "sarvam":
-        tts_language = (
-            Language.KN_IN
-            if language == "kannada"
-            else Language.HI_IN if language == "hindi" else Language.EN_IN
-        )
-        tts = SarvamTTSService(
-            api_key=os.getenv("SARVAM_API_KEY"),
-            model="bulbul:v2",
-            voice_id="abhilash",
-            params=SarvamTTSService.InputParams(language=tts_language),
-        )
-    else:
-        raise ValueError(f"Invalid provider: {provider}")
+    tts = create_tts_service(provider, language)
 
     transcript = TranscriptProcessor()
     processor = Processor()
@@ -632,9 +548,9 @@ async def main():
         "-p",
         "--provider",
         type=str,
-        default="smallest",
+        required=True,
         choices=[
-            # "smallest",
+            "smallest",
             "cartesia",
             "openai",
             "groq",

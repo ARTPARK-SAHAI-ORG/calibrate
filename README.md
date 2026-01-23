@@ -29,10 +29,7 @@ To evaluate different STT providers, first make sure to organize the input data 
 ```bash
 ├── /path/to/data
 │   └── stt.csv
-│   └── audios/wav
-│       └── audio_1.wav
-│       └── audio_2.wav
-│   └── audios/pcm16
+│   └── audios/
 │       └── audio_1.wav
 │       └── audio_2.wav
 ```
@@ -45,7 +42,7 @@ audio_1,"Hi"
 audio_2,"Madam, my name is Geeta Shankar"
 ```
 
-Store the audios in both `wav` and `pcm16` formats as different providers support different formats. The evaluation script will automatically select the right format for the provider you choose to evaluate.
+All audio files should be in WAV format and placed in the `audios/` folder. The file names should match the `id` column in `stt.csv`.
 
 Set the required environment variables for the STT provider you want to evaluate:
 
@@ -69,9 +66,9 @@ from pense.stt import eval, leaderboard
 
 # Run STT evaluation
 asyncio.run(eval(
-    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, etc.
+    provider="deepgram",  # deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
     language="english",   # english, hindi, or kannada
-    input_dir="/path/to/data",  # should contain stt.csv and audios/wav/, audios/pcm16/ folders
+    input_dir="/path/to/data",  # should contain stt.csv and audios/ folder
     output_dir="/path/to/output",
     debug=True,           # optional: run on first 5 audio files only
     debug_count=5,        # optional: number of files in debug mode
@@ -83,27 +80,21 @@ You can use the sample inputs provided in [`pense/stt/examples/sample_input`](pe
 Sample output:
 
 ```
-Created new user transcript
-Starting new audio streaming: /path/to/audio_1.wav
-Finished streaming audio: /path/to/audio_1.wav
-appending to last user transcript: <transcript>.
 --------------------------------
-Created new user transcript
-Starting new audio streaming: /path/to/audio_2.wav
-Finished streaming audio: /path/to/audio_2.wav
-appending to last user transcript: <transcript_part_1>,
-appending to last user transcript: <transcript_part_2>,
+Processing audio [1/2]: audio_1.wav
+Transcript: Hi
+--------------------------------
+Processing audio [2/2]: audio_2.wav
+Transcript: Madam, my name is Geeta Shankar
 ```
 
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
-/path/to/output
-├── sarvam_english
-│   ├── logs
-│   ├── results.log
-│   ├── results.csv
-│   └── metrics.json
+/path/to/output/<provider>
+├── results.log
+├── results.csv
+└── metrics.json
 ```
 
 `results.csv` will have the following columns:
@@ -118,46 +109,18 @@ The definition of all the metrics we compute are stored in [`pense/stt/metrics.p
 `metrics.json` will have the following format:
 
 ```json
-[
-  {
-    "wer": 0.12962962962962962 // mean of the Word Error Rate (WER) across all audio files
-  },
-  {
-    "string_similarity": 0.8792465033551621 // mean of the string similarity score across all audio files
-  },
-  {
-    "llm_judge_score": 1.0 // mean of the LLM Judge score across all audio files
-  },
-  {
-    "metric_name": "ttfb", // Time to First Byte in seconds
-    "processor": "SarvamSTTService#0",
-    "mean": 2.3087445222414456,
-    "std": 2.4340144350359867,
-    "values": [
-      // values for each audio file
-      0.48694515228271484, 0.006701946258544922, 0.4470040798187256, 2.5300347805023193,
-      0.2064838409423828, 6.574702978134155, 3.0182559490203857, 2.9680559635162354,
-      7.94110107421875, 0.08572530746459961, 2.0372867584228516, 0.4102351665496826,
-      3.3011457920074463
-    ]
-  },
-  {
-    "metric_name": "processing_time", // Time taken by the service to respond in seconds
-    "processor": "SarvamSTTService#0",
-    "mean": 2.3089125706599307,
-    "std": 2.4341351775837228,
-    "values": [
-      // values for each audio file
-      0.48702311515808105, 0.006762981414794922, 0.4470367431640625, 2.530163049697876,
-      0.2065589427947998, 6.575268745422363, 3.0185441970825195, 2.9680910110473633,
-      7.941352128982544, 0.08578085899353027, 2.0373899936676025, 0.4102756977081299,
-      3.3016159534454346
-    ]
-  }
-]
+{
+  "wer": 0.12962962962962962,
+  "string_similarity": 0.8792465033551621,
+  "llm_judge_score": 1.0
+}
 ```
 
-`logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
+- `wer`: Mean Word Error Rate (WER) across all audio files
+- `string_similarity`: Mean string similarity score across all audio files
+- `llm_judge_score`: Mean LLM Judge score across all audio files
+
+`results.log` contains the full logs of the evaluation script including terminal output and debug information.
 
 You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_output) to see a sample output of the evaluation script.
 
@@ -165,15 +128,15 @@ You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
-| `input_dir` | str | Yes | - | Path to input directory containing audio files and stt.csv |
+| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq |
+| `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
 | `language` | str | No | "english" | Language of audio files: english, hindi, or kannada |
 | `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
 | `debug` | bool | No | False | Run on first N audio files only |
 | `debug_count` | int | No | 5 | Number of files in debug mode |
 | `ignore_retry` | bool | No | False | Skip retry if not all audios processed |
-| `port` | int | No | 8765 | WebSocket port for STT bot |
+| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
 
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
