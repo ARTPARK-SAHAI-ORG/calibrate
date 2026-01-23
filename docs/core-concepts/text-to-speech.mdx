@@ -59,23 +59,19 @@ Contains detailed results for each text:
 Contains aggregated metrics:
 
 ```json
-[
-  {"llm_judge_score": 1.0},
-  {
-    "metric_name": "ttfb",
-    "processor": "GoogleTTSService#0",
+{
+  "llm_judge_score": 1.0,
+  "ttfb": {
     "mean": 0.35,
     "std": 0.03,
     "values": [0.38, 0.33, 0.34]
   },
-  {
-    "metric_name": "processing_time",
-    "processor": "GoogleTTSService#0",
+  "processing_time": {
     "mean": 0.0002,
     "std": 0.00003,
     "values": [0.0002, 0.00025]
   }
-]
+}
 ```
 
 ### audios/

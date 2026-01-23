@@ -1,0 +1,3 @@
+id,text,audio_path,llm_judge_score,llm_judge_reasoning
+row_1,hello world,pense/tts/examples/sample_output/elevenlabs/audios/row_1.wav,True,"The audio clearly says 'hello world' exactly as the reference text indicates. There are no discrepancies in pronunciation, wording, or content. The text is easily understandable from the audio."
+row_2,this is a test,pense/tts/examples/sample_output/elevenlabs/audios/row_2.wav,True,"The audio clearly says 'this is a test' exactly as the reference text. The pronunciation is clear, and there are no deviations, omissions, or additions. The text is easily understandable from the audio."

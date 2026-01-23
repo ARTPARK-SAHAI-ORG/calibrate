@@ -219,13 +219,14 @@ Example summary sheet:
 | openai | 50 | 0.095 | 0.928 | 0.90 |
 | sarvam | 50 | 0.156 | 0.891 | 0.82 |
 
-#### all_metrics_by_run.png
+#### Per-Metric Charts
 
-A bar chart visualization comparing all metrics across providers:
+Individual bar chart visualizations for each metric, comparing all providers:
 
-![Leaderboard Chart](/images/stt_leaderboard_chart.png)
+- `wer.png` - Word Error Rate comparison (lower is better)
+- `string_similarity.png` - String Similarity comparison (higher is better)
+- `llm_judge_score.png` - LLM Judge Score comparison (higher is better)
+- `ttfb.png` - Time to First Byte comparison (lower is better)
+- `processing_time.png` - Processing Time comparison (lower is better)
 
-The chart displays:
-- WER (lower is better)
-- String Similarity (higher is better)
-- LLM Judge Score (higher is better)
+Each chart displays the metric value for each provider with value labels on top of each bar for easy comparison.

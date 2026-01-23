@@ -743,14 +743,26 @@ async def main():
         all_texts = final_df["text"].tolist()
         all_audio_paths = final_df["audio_path"].tolist()
 
-    llm_judge_score = await get_tts_llm_judge_score(all_audio_paths, all_texts)
-    logger.info(f"LLM Judge Score: {llm_judge_score['score']}")
+    llm_judge_results = await get_tts_llm_judge_score(all_audio_paths, all_texts)
+    logger.info(f"LLM Judge Score: {llm_judge_results['score']}")
 
-    metrics_data = [
-        {
-            "llm_judge_score": llm_judge_score["score"],
-        },
-    ]
+    metrics_data = {
+        "llm_judge_score": llm_judge_results["score"],
+    }
+
+    # Add ttfb and processing_time metrics with mean, std, and values
+    for metric_name, metric_values in metrics.items():
+        # Flatten all values across processors
+        all_values = []
+        for processor, values in metric_values.items():
+            all_values.extend(values)
+
+        if all_values:
+            metrics_data[metric_name] = {
+                "mean": float(np.mean(all_values)),
+                "std": float(np.std(all_values)),
+                "values": all_values,
+            }
 
     data = []
     for (
@@ -762,7 +774,7 @@ async def main():
         all_ids,
         all_texts,
         all_audio_paths,
-        llm_judge_score["per_row"],
+        llm_judge_results["per_row"],
     ):
         data.append(
             {
@@ -773,20 +785,6 @@ async def main():
                 "llm_judge_reasoning": llm_judge_score["reasoning"],
             }
         )
-
-    for metric_name, metric_values in metrics.items():
-        for processor, values in metric_values.items():
-            mean = np.mean(values)
-            std = np.std(values)
-            metrics_data.append(
-                {
-                    "metric_name": metric_name,
-                    "processor": processor,
-                    "mean": mean,
-                    "std": std,
-                    "values": values,
-                }
-            )
 
     metrics_save_path = join(output_dir, "metrics.json")
     with open(metrics_save_path, "w") as f:

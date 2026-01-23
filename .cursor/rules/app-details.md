@@ -483,12 +483,22 @@ All modules read from a single `.env` file in the project root.
 ### Metrics JSON (TTS)
 
 ```json
-[
-    {"llm_judge_score": 1.0},
-    {"metric_name": "ttfb", "processor": "GoogleTTSService#0", "mean": 0.354, "std": 0.027, "values": [...]},
-    {"metric_name": "processing_time", "processor": "GoogleTTSService#0", "mean": 0.0002, "std": 0.00003, "values": [...]}
-]
+{
+    "llm_judge_score": 1.0,
+    "ttfb": {
+        "mean": 0.354,
+        "std": 0.027,
+        "values": [0.38, 0.33]
+    },
+    "processing_time": {
+        "mean": 0.0002,
+        "std": 0.00003,
+        "values": [0.0002, 0.00025]
+    }
+}
 ```
+
+**Note:** TTS metrics.json structure matches the STT format - a flat dict with metric names as keys. For latency metrics (ttfb, processing_time), values are nested dicts with mean, std, and values array.
 
 ### Results JSON (LLM Tests)
 
@@ -522,11 +532,19 @@ All modules read from a single `.env` file in the project root.
 All modules support leaderboard generation that:
 1. Scans output directories for provider results
 2. Aggregates metrics across runs
-3. Generates comparison Excel files and PNG charts
+3. Generates comparison Excel files and per-metric PNG charts
 
 **Output Files:**
 - `stt_leaderboard.xlsx` / `tts_leaderboard.xlsx` / `llm_leaderboard.csv`
-- `all_metrics_by_run.png` / `llm_leaderboard.png`
+- Individual metric charts - one chart per metric for easy comparison:
+  - **STT:** `wer.png`, `string_similarity.png`, `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
+  - **TTS:** `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
+
+**Chart Features:**
+- Each chart shows all providers as bars on the x-axis
+- Value labels displayed on top of each bar (integers shown as integers, decimals with 4 decimal places)
+- Metrics with all NaN values are automatically skipped
+- Charts saved at 300 DPI for high quality
 
 ---
 
@@ -581,3 +599,9 @@ uv pip install -r requirements-docs.txt
 - Use headphones to avoid audio feedback
 - Opens browser UI at `http://localhost:7860/client/`
 - Requires explicit `pense agent test` CLI command (no Python API for interactive mode)
+
+### Metrics JSON Format
+- **Consistent structure:** Both STT and TTS use flat dict format with metric names as keys
+- **Simple metrics:** Stored as direct float values (e.g., `"wer": 0.129`, `"llm_judge_score": 1.0`)
+- **Latency metrics:** Stored as nested dicts with `mean`, `std`, and `values` (e.g., `"ttfb": {"mean": 0.35, "std": 0.03, "values": [...]}`)
+- **Backwards compatibility:** Leaderboard readers support both new dict format and legacy list-of-dicts format for older results

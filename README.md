@@ -149,11 +149,17 @@ leaderboard(
 )
 ```
 
-The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`pense/stt/leaderboard.py`).
+The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus individual metric charts (e.g., `wer.png`, `string_similarity.png`, `llm_judge_score.png`) inside the save directory so you can compare providers side-by-side (`pense/stt/leaderboard.py`).
 
 You can checkout [`pense/stt/examples/leaderboard`](pense/stt/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](pense/stt/examples/leaderboard/all_metrics_by_run.png)
+<table>
+  <tr>
+    <td><img src="pense/stt/examples/leaderboard/wer.png" alt="WER by Provider" width="100%"></td>
+    <td><img src="pense/stt/examples/leaderboard/string_similarity.png" alt="String Similarity by Provider" width="100%"></td>
+    <td><img src="pense/stt/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
+  </tr>
+</table>
 
 ## Text To Speech (TTS)
 
@@ -237,26 +243,24 @@ row_2,this is a test,./out/audios/2.wav,True,"The audio clearly says 'this is a 
 `metrics.json` will have the following format:
 
 ```json
-[
-  {
-    "llm_judge_score": 1.0 // mean of the LLM Judge score across all audio files
-  },
-  {
-    "metric_name": "ttfb", // Time to First Byte in seconds
-    "processor": "GoogleTTSService#0",
+{
+  "llm_judge_score": 1.0,
+  "ttfb": {
     "mean": 0.3538844585418701,
     "std": 0.026930570602416992,
-    "values": [0.3808150291442871, 0.3269538879394531] // values for each text input
+    "values": [0.3808150291442871, 0.3269538879394531]
   },
-  {
-    "metric_name": "processing_time", // Time taken by the service to respond in seconds
-    "processor": "GoogleTTSService#0",
+  "processing_time": {
     "mean": 0.00022804737091064453,
     "std": 2.7060508728027344e-5,
-    "values": [0.0002009868621826172, 0.0002551078796386719] // values for each text input
+    "values": [0.0002009868621826172, 0.0002551078796386719]
   }
-]
+}
 ```
+
+- `llm_judge_score`: Mean LLM Judge score across all audio files
+- `ttfb`: Time to First Byte in seconds (mean, std, and per-text values)
+- `processing_time`: Time taken by the service to respond in seconds (mean, std, and per-text values)
 
 `logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
 
@@ -285,11 +289,17 @@ leaderboard(
 )
 ```
 
-`pense/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
+`pense/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus individual metric charts (e.g., `llm_judge_score.png`, `ttfb.png`, `processing_time.png`) so you can spot which provider balances latency and judge scores best.
 
 You can checkout [`pense/tts/examples/leaderboard`](pense/tts/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](pense/tts/examples/leaderboard/all_metrics_by_run.png)
+<table>
+  <tr>
+    <td><img src="pense/tts/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
+    <td><img src="pense/tts/examples/leaderboard/ttfb.png" alt="TTFB by Provider" width="100%"></td>
+    <td><img src="pense/tts/examples/leaderboard/processing_time.png" alt="Processing Time by Provider" width="100%"></td>
+  </tr>
+</table>
 
 ## LLM tests
 
