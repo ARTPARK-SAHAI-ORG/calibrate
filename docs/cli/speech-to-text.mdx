@@ -1,0 +1,157 @@
+---
+title: "Speech to Text"
+description: "CLI commands for Speech to Text evaluation and benchmarking."
+---
+
+Evaluate Speech to Text providers and generate comparative leaderboards.
+
+## Input Data Structure
+
+Organize your input data in the following structure:
+
+```
+├── /path/to/data
+│   └── stt.csv
+│   └── audios/wav
+│       └── audio_1.wav
+│       └── audio_2.wav
+│   └── audios/pcm16
+│       └── audio_1.wav
+│       └── audio_2.wav
+```
+
+The `stt.csv` file should have the following format:
+
+| id | text |
+|----|------|
+| audio_1 | Hi |
+| audio_2 | Madam, my name is Geeta Shankar |
+
+<Note>
+Store audios in both `wav` and `pcm16` formats as different providers support different formats. The evaluation script automatically selects the right format for your chosen provider.
+</Note>
+
+<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+  Detailed explanation of all metrics, including why LLM Judge is necessary
+</Card>
+
+---
+
+## pense stt eval
+
+Run Speech to Text evaluation against a specific provider.
+
+```bash
+pense stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Default | Description |
+|------|------|------|----------|---------|-------------|
+| `-p` | `--provider` | string | Yes | - | Provider: `deepgram`, `openai`, `cartesia`, `google`, `sarvam`, `elevenlabs`, `smallest`, `groq` |
+| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, or `kannada` |
+| `-i` | `--input-dir` | string | Yes | - | Path to input directory containing `stt.csv` and `audios/` folders |
+| `-o` | `--output-dir` | string | No | `./out` | Path to output directory for results |
+| `-f` | `--input-file-name` | string | No | `stt.csv` | Name of input CSV file |
+| `-d` | `--debug` | flag | No | `false` | Run on first N audio files only |
+| `-dc` | `--debug_count` | int | No | `5` | Number of files in debug mode |
+| | `--ignore_retry` | flag | No | `false` | Skip retry if not all audios processed |
+| | `--port` | int | No | `8765` | WebSocket port |
+
+### Examples
+
+**Basic evaluation:**
+
+```bash
+pense stt eval -p deepgram -l english -i ./data -o ./out
+```
+
+**Evaluate with Hindi language:**
+
+```bash
+pense stt eval -p sarvam -l hindi -i ./data -o ./out
+```
+
+**Debug mode (process only first 5 files):**
+
+```bash
+pense stt eval -p deepgram -l english -i ./data -o ./out -d -dc 5
+```
+
+### Output Structure
+
+```
+/path/to/output/<provider>_<language>
+├── results.csv       # Per-file results with metrics
+├── metrics.json      # Aggregated metrics (WER, similarity, latency)
+├── results.log       # Terminal output summary
+└── logs              # Full pipecat logs
+```
+
+### Output Files
+
+**results.csv** contains per-file evaluation results:
+
+| id | gt | pred | wer | string_similarity | llm_judge_score | llm_judge_reasoning |
+|----|----|------|-----|-------------------|-----------------|---------------------|
+| audio_1 | Hello | Hello | 0.0 | 1.0 | True | Exact match |
+| audio_2 | My name is Geeta | My name is Gita | 0.25 | 0.9 | False | Name spelling differs |
+
+---
+
+## pense stt leaderboard
+
+Generate a comparative leaderboard from multiple evaluation runs.
+
+```bash
+pense stt leaderboard -o <output_dir> -s <save_dir>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Description |
+|------|------|------|----------|-------------|
+| `-o` | `--output-dir` | string | Yes | Directory containing evaluation run folders |
+| `-s` | `--save-dir` | string | Yes | Directory to save leaderboard outputs |
+
+### Example
+
+```bash
+pense stt leaderboard -o ./out -s ./leaderboard
+```
+
+### Output
+
+The leaderboard command generates:
+
+- `stt_leaderboard.xlsx` - Comparative spreadsheet of all providers
+- `all_metrics_by_run.png` - Visual comparison chart
+
+---
+
+## Supported Providers
+
+| Provider | Languages | Audio Format |
+|----------|-----------|--------------|
+| `deepgram` | English, Hindi | WAV |
+| `openai` | English, Hindi | WAV |
+| `google` | English, Hindi, Kannada | WAV |
+| `sarvam` | English, Hindi, Kannada | PCM16 |
+| `elevenlabs` | English | WAV |
+| `cartesia` | English | WAV |
+| `smallest` | English, Hindi | WAV |
+| `groq` | English | WAV |
+
+## Required Environment Variables
+
+Set the appropriate API key for your chosen provider:
+
+```bash
+export DEEPGRAM_API_KEY=your_key
+export OPENAI_API_KEY=your_key
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+export SARVAM_API_KEY=your_key
+export ELEVENLABS_API_KEY=your_key
+export CARTESIA_API_KEY=your_key
+```

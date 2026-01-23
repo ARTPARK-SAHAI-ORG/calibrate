@@ -1,0 +1,623 @@
+---
+title: "Simulations"
+description: "Run end-to-end agent testing with simulated users - text and voice"
+---
+
+# Simulations
+
+Simulations run full conversations between your agent and AI-simulated users. This is the most comprehensive way to test your voice agent before deployment.
+
+## What You'll Learn
+
+- Create an agent with tools
+- Define personas (simulated user personalities)
+- Define scenarios (conversation goals)
+- Define metrics (evaluation criteria)
+- Create and configure a simulation
+- Run text simulations and analyze results
+- Run voice simulations with latency metrics and audio
+
+---
+
+## Part 1: Create an Agent
+
+If you haven't already, create an agent for testing.
+
+### Step 1: Create the Agent
+
+Navigate to **Agents** → **Add agent** → Name it "Customer Support Bot".
+
+### Step 2: Configure System Prompt
+
+```text
+You are a helpful customer support agent for TechCorp.
+
+Your responsibilities:
+- Answer product questions
+- Help with order status
+- Process refund requests
+
+When a customer wants a refund, use the create_refund_request tool 
+to log their request. Always confirm the order number before processing.
+
+Be friendly, professional, and concise.
+```
+
+### Step 3: Select Providers
+
+| Setting | Value |
+|---------|-------|
+| STT | Deepgram |
+| TTS | Cartesia |
+| LLM | GPT-4o-mini |
+
+<Frame>
+  <img src="/images/sim_agent_config.png" alt="Agent Configuration" />
+</Frame>
+
+---
+
+## Part 2: Create a Tool
+
+Create a tool for structured data capture.
+
+### Step 1: Navigate to Tools
+
+Click **Tools** → **Add tool**.
+
+### Step 2: Define the Tool
+
+**Name:** `create_refund_request`
+
+**Description:**
+```text
+Create a refund request for a customer order. Use this when 
+the customer confirms they want a refund and provides their order number.
+```
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `order_number` | string | Yes | The customer's order number |
+| `reason` | string | Yes | Reason for the refund |
+
+### Step 3: Attach to Agent
+
+Go to **Agents** → "Customer Support Bot" → **Tools** tab → **Attach tool** → Select `create_refund_request`.
+
+---
+
+## Part 3: Create Personas
+
+Personas define WHO the simulated user is - their personality and behavior.
+
+### Step 1: Navigate to Personas
+
+From the sidebar under **End-to-End Tests**, click **Personas** → **Add persona**.
+
+### Step 2: Create "Patient Customer" Persona
+
+**Label:** `Patient Customer`
+
+**Characteristics:**
+```text
+You are David, a 45-year-old accountant from Texas. You are calm, 
+patient, and polite. You speak clearly and wait for complete 
+responses before asking follow-up questions. You appreciate 
+detailed explanations and often say "I understand" to acknowledge 
+the agent. You don't interrupt.
+```
+
+**Settings:**
+- Gender: Male
+- Language: English
+- Interruption Sensitivity: None
+
+<Frame>
+  <img src="/images/persona_patient.png" alt="Patient Customer Persona" />
+</Frame>
+
+### Step 3: Create "Frustrated Customer" Persona
+
+**Label:** `Frustrated Customer`
+
+**Characteristics:**
+```text
+You are Karen, a 38-year-old marketing manager who is upset about 
+a billing issue. You speak quickly and may interrupt when 
+explanations are too long. You want quick solutions and express 
+frustration with phrases like "This is ridiculous" or "I've been 
+dealing with this for weeks." You're not rude, but clearly impatient.
+```
+
+**Settings:**
+- Gender: Female
+- Language: English
+- Interruption Sensitivity: High
+
+<Frame>
+  <img src="/images/persona_frustrated.png" alt="Frustrated Customer Persona" />
+</Frame>
+
+---
+
+## Part 4: Create Scenarios
+
+Scenarios define WHAT the simulated user should accomplish.
+
+### Step 1: Navigate to Scenarios
+
+Click **Scenarios** → **Add scenario**.
+
+### Step 2: Create "Refund Request" Scenario
+
+**Label:** `Refund Request`
+
+**Description:**
+```text
+You received a defective product (wireless headphones) and want 
+a full refund. Your order number is #ORD-2024-78432. 
+
+Goals:
+1. Explain that the product arrived broken
+2. Request a refund (not an exchange)
+3. Provide your order number when asked
+4. Confirm the refund request was submitted
+```
+
+<Frame>
+  <img src="/images/scenario_refund.png" alt="Refund Request Scenario" />
+</Frame>
+
+### Step 3: Create "Product Inquiry" Scenario
+
+**Label:** `Product Inquiry`
+
+**Description:**
+```text
+You're interested in buying a laptop and want to know about 
+the warranty options and return policy.
+
+Goals:
+1. Ask about warranty coverage
+2. Ask about the return policy timeframe
+3. Ask if there are any current promotions
+```
+
+---
+
+## Part 5: Create Metrics
+
+Metrics define HOW to evaluate whether the agent performed well.
+
+### Step 1: Navigate to Metrics
+
+Click **Metrics** → **Add metric**.
+
+### Step 2: Create "Tool Calls Accuracy" Metric
+
+**Name:** `tool_calls_accuracy`
+
+**Evaluation Instructions:**
+```text
+Evaluate whether the agent called the appropriate tools during 
+the conversation.
+
+Pass if:
+- Correct tools were invoked for the task
+- Tool parameters contained accurate information from the conversation
+- No unnecessary or incorrect tool calls were made
+
+Fail if:
+- Required tools were not called
+- Tool parameters were incorrect or missing
+- Agent called tools at inappropriate times
+```
+
+<Frame>
+  <img src="/images/metric_tools.png" alt="Tool Calls Metric" />
+</Frame>
+
+### Step 3: Create "Customer Satisfaction" Metric
+
+**Name:** `customer_satisfaction`
+
+**Evaluation Instructions:**
+```text
+Evaluate whether the customer's needs were addressed satisfactorily.
+
+Pass if:
+- The customer's main request was fulfilled or properly escalated
+- The agent was polite and professional throughout
+- All customer questions were answered
+
+Fail if:
+- The customer's issue was not resolved
+- The agent was dismissive or unhelpful
+- Important questions were ignored
+```
+
+---
+
+## Part 6: Create a Simulation
+
+Now combine everything into a simulation.
+
+### Step 1: Navigate to Simulations
+
+Click **Simulations** → **Add simulation**.
+
+### Step 2: Name the Simulation
+
+Enter: "Customer Support Regression Test"
+
+### Step 3: Configure the Simulation
+
+On the **Config** tab, select:
+
+**Agent:** Customer Support Bot
+
+**Personas:** (select both)
+- Patient Customer
+- Frustrated Customer
+
+**Scenarios:** (select both)
+- Refund Request
+- Product Inquiry
+
+**Metrics:** (select both)
+- tool_calls_accuracy
+- customer_satisfaction
+
+<Frame>
+  <img src="/images/simulation_config.png" alt="Simulation Configuration" />
+</Frame>
+
+### Test Matrix
+
+This creates 4 test conversations (2 personas × 2 scenarios):
+
+| # | Persona | Scenario |
+|---|---------|----------|
+| 1 | Patient Customer | Refund Request |
+| 2 | Patient Customer | Product Inquiry |
+| 3 | Frustrated Customer | Refund Request |
+| 4 | Frustrated Customer | Product Inquiry |
+
+---
+
+## Part 7: Run Text Simulation
+
+Text simulations run conversations using only the LLM - no speech-to-text or text-to-speech. This is faster and cheaper, ideal for rapid iteration.
+
+### Start the Run
+
+1. Go to **Simulations** → Click on "Customer Support Regression Test"
+2. Click the **Runs** tab
+3. Click **Run simulation**
+4. Select **Chat** (text-only)
+5. Click **Start**
+
+<Frame>
+  <img src="/images/sim_run_start.png" alt="Start Text Simulation" />
+</Frame>
+
+### Monitor Progress
+
+Results appear as each conversation completes:
+
+- 🔄 **Spinner**: Conversation in progress
+- ✅ **Checkmark**: Completed successfully
+- ❌ **X**: Failed
+
+<Frame>
+  <img src="/images/sim_text_progress.png" alt="Text Simulation Progress" />
+</Frame>
+
+### View Per-Conversation Metrics
+
+Each row shows:
+
+| Column | Description |
+|--------|-------------|
+| **Persona × Scenario** | The test case combination |
+| **Metric columns** | Pass/Fail for each defined metric |
+| **Actions** | Button to view transcript |
+
+<Frame>
+  <img src="/images/sim_text_results.png" alt="Text Simulation Results" />
+</Frame>
+
+**Example Results:**
+
+| Persona × Scenario | tool_calls_accuracy | customer_satisfaction |
+|--------------------|---------------------|----------------------|
+| Patient × Refund | ✅ Pass | ✅ Pass |
+| Patient × Inquiry | ✅ Pass | ✅ Pass |
+| Frustrated × Refund | ✅ Pass | ❌ Fail |
+| Frustrated × Inquiry | ✅ Pass | ✅ Pass |
+
+<Tip>
+Hover over any metric result to see the evaluation reasoning.
+</Tip>
+
+### View Overall Metrics
+
+After all conversations complete, aggregated metrics appear:
+
+| Metric | Mean | Std Dev |
+|--------|------|---------|
+| tool_calls_accuracy | 1.00 | 0.00 |
+| customer_satisfaction | 0.75 | 0.43 |
+
+- **Mean**: Average pass rate (1.0 = 100%)
+- **Std Dev**: Consistency (lower = more consistent)
+
+<Frame>
+  <img src="/images/sim_overall_metrics.png" alt="Overall Metrics" />
+</Frame>
+
+### View Transcripts
+
+Click the **play button** (▶) on any row to view the full conversation:
+
+| Element | Description |
+|---------|-------------|
+| **User messages** | What the simulated persona said |
+| **Agent messages** | Your agent's responses |
+| **Tool calls** | Tools invoked with parameters |
+| **Tool results** | What the tool returned |
+
+<Frame>
+  <img src="/images/sim_transcript.png" alt="Conversation Transcript" />
+</Frame>
+
+**Example Transcript:**
+
+```
+[User - Patient Customer]
+Hi, I received a defective product and would like a refund.
+
+[Agent]
+I'm sorry to hear that! I'd be happy to help you with a refund. 
+Could you please provide your order number?
+
+[User]
+Sure, it's ORD-2024-78432
+
+[Agent]
+Thank you. What was the issue with the product?
+
+[User]
+The wireless headphones arrived broken - they won't turn on at all.
+
+[Agent]
+I understand how frustrating that must be. Let me create a refund 
+request for you.
+
+[Tool Call: create_refund_request]
+{
+  "order_number": "ORD-2024-78432",
+  "reason": "defective product - headphones arrived broken"
+}
+
+[Tool Result]
+{ "status": "success", "refund_id": "REF-98765" }
+
+[Agent]
+I've submitted your refund request. Your refund ID is REF-98765. 
+You should receive the refund within 5-7 business days.
+```
+
+---
+
+## Part 8: Run Voice Simulation
+
+Voice simulations run complete conversations using the full pipeline: STT → LLM → TTS. This tests your agent exactly as it will perform in production.
+
+### Start the Run
+
+1. Go to **Simulations** → Click on "Customer Support Regression Test"
+2. Click the **Runs** tab
+3. Click **Run simulation**
+4. Select **Voice**
+5. Click **Start**
+
+<Frame>
+  <img src="/images/sim_voice_start.png" alt="Start Voice Simulation" />
+</Frame>
+
+<Note>
+Voice simulations take longer (1-3 minutes per conversation) because they process audio through STT and TTS providers.
+</Note>
+
+### View Per-Conversation Metrics
+
+Each row shows performance metrics plus latency:
+
+| Column | Description |
+|--------|-------------|
+| **Persona × Scenario** | The test case |
+| **Metric columns** | Pass/Fail for each metric |
+| **Latency columns** | Voice-specific timing metrics |
+| **Actions** | Button to view transcript with audio |
+
+<Frame>
+  <img src="/images/sim_voice_results.png" alt="Voice Simulation Results" />
+</Frame>
+
+### View Latency Metrics
+
+Voice simulations include timing metrics for each pipeline component:
+
+| Metric | Description | Good Target |
+|--------|-------------|-------------|
+| **STT TTFB** | Time for speech recognition to start | < 200ms |
+| **LLM TTFT** | Time to first LLM token | < 500ms |
+| **TTS TTFB** | Time for voice synthesis to start | < 200ms |
+| **Total Latency** | End-to-end response time | < 1.5s |
+
+<Frame>
+  <img src="/images/sim_voice_latency.png" alt="Voice Latency Metrics" />
+</Frame>
+
+**Example Latency Data:**
+
+| Conversation | STT TTFB | LLM TTFT | TTS TTFB | Total |
+|--------------|----------|----------|----------|-------|
+| Patient × Refund | 145ms | 380ms | 120ms | 1.2s |
+| Patient × Inquiry | 152ms | 420ms | 115ms | 1.3s |
+| Frustrated × Refund | 138ms | 395ms | 125ms | 1.1s |
+| Frustrated × Inquiry | 160ms | 410ms | 118ms | 1.4s |
+
+### View Overall Metrics (Voice)
+
+After completion, aggregated metrics include both performance and latency:
+
+**Performance Metrics:**
+
+| Metric | Mean | Std Dev |
+|--------|------|---------|
+| tool_calls_accuracy | 1.00 | 0.00 |
+| customer_satisfaction | 0.75 | 0.43 |
+
+**Latency Metrics:**
+
+| Metric | Mean | Std Dev |
+|--------|------|---------|
+| STT TTFB | 149ms | 8ms |
+| LLM TTFT | 401ms | 18ms |
+| TTS TTFB | 120ms | 4ms |
+| Total Latency | 1.25s | 0.11s |
+
+<Frame>
+  <img src="/images/sim_voice_overall.png" alt="Voice Overall Metrics" />
+</Frame>
+
+### Listen to Audio Transcripts
+
+Click the **play button** (▶) on any row to open the transcript with audio:
+
+| Element | Description |
+|---------|-------------|
+| **Audio player** | Play each message's audio |
+| **User audio** | Synthesized persona voice |
+| **Agent audio** | Your agent's TTS output |
+| **Full conversation audio** | Play entire conversation |
+
+<Frame>
+  <img src="/images/sim_voice_transcript.png" alt="Voice Transcript with Audio" />
+</Frame>
+
+**Example Voice Transcript:**
+
+```
+▶ [User - Patient Customer] (0:00 - 0:04)
+   "Hi, I received a defective product and would like a refund."
+
+▶ [Agent] (0:04 - 0:10)
+   "I'm sorry to hear that! I'd be happy to help you with a refund. 
+    Could you please provide your order number?"
+
+▶ [User] (0:10 - 0:13)
+   "Sure, it's ORD-2024-78432"
+
+[Tool Call: create_refund_request]
+   { "order_number": "ORD-2024-78432", "reason": "defective product" }
+
+▶ [Agent] (0:13 - 0:22)
+   "I've submitted your refund request. Your refund ID is REF-98765..."
+```
+
+---
+
+## Text vs Voice Comparison
+
+| Aspect | Text Simulation | Voice Simulation |
+|--------|-----------------|------------------|
+| **Speed** | Fast (seconds) | Slower (1-3 min per conversation) |
+| **Cost** | Lower | Higher (STT/TTS API calls) |
+| **Performance metrics** | ✅ Yes | ✅ Yes |
+| **Latency metrics** | ❌ No | ✅ Yes (STT, LLM, TTS timing) |
+| **Audio playback** | ❌ No | ✅ Yes |
+| **Interruption testing** | ❌ No | ✅ Yes |
+
+<Tip>
+Start with text simulations for rapid iteration, then validate with voice simulations before deployment.
+</Tip>
+
+---
+
+## Analyzing Results
+
+### Identify Patterns
+
+| Pattern | Possible Cause |
+|---------|----------------|
+| Same metric fails across personas | Metric criteria too strict or agent logic issue |
+| Same persona always fails | Agent doesn't handle that personality well |
+| Same scenario always fails | Scenario requirements unclear to agent |
+| Text passes but voice fails | STT misinterpreting speech |
+
+### Troubleshooting High Latency
+
+| Symptom | Solution |
+|---------|----------|
+| STT TTFB > 300ms | Try Deepgram or Whisper (Groq) |
+| LLM TTFT > 1s | Switch to GPT-4o-mini or Gemini Flash |
+| TTS TTFB > 300ms | Try Cartesia or Orpheus (Groq) |
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Run text simulations first">
+    Fix logic issues with fast text simulations before running expensive voice simulations.
+  </Accordion>
+  <Accordion title="Review failed transcripts">
+    Always read the full conversation for failed metrics to understand why.
+  </Accordion>
+  <Accordion title="Listen to voice outputs">
+    Audio often reveals issues metrics miss: unnatural pauses, pronunciation problems.
+  </Accordion>
+  <Accordion title="Track metrics over time">
+    Compare overall metrics across runs to measure improvement.
+  </Accordion>
+  <Accordion title="Test with challenging personas">
+    If a frustrated persona fails, fix that first - easier personas will likely pass.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Summary
+
+You've completed the full simulation workflow:
+
+1. ✅ Created an agent with system prompt and providers
+2. ✅ Created a tool for structured output
+3. ✅ Attached the tool to the agent
+4. ✅ Created 2 personas (Patient and Frustrated)
+5. ✅ Created 2 scenarios (Refund and Inquiry)
+6. ✅ Created 2 metrics (Tool Accuracy and Satisfaction)
+7. ✅ Created a simulation with all components
+8. ✅ Ran text simulation and analyzed metrics
+9. ✅ Ran voice simulation with latency metrics and audio
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="STT Evaluation" icon="microphone" href="/guides/stt">
+    Optimize your speech-to-text provider based on latency results.
+  </Card>
+  <Card title="TTS Evaluation" icon="volume-high" href="/guides/tts">
+    Optimize your text-to-speech provider based on latency results.
+  </Card>
+  <Card title="LLM Testing" icon="flask" href="/guides/llm-testing">
+    Benchmark across LLM models to improve response quality.
+  </Card>
+</CardGroup>

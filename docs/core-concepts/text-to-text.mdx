@@ -1,0 +1,183 @@
+---
+title: "Text to Text"
+description: "Understanding Text to Text evaluation metrics and concepts."
+---
+
+Text to Text models generate responses and call tools. Pense evaluates them through **test cases** with expected outputs.
+
+## Pass Rate
+
+Pass rate measures the percentage of test cases where the model output matches the expected behavior.
+
+- **Range**: 0 to 100%
+- **Calculation**: (Passed tests / Total tests) × 100
+
+## Evaluation Types
+
+### Tool Call Evaluation
+
+Expects specific tool calls with matching arguments.
+
+```python
+{
+    "history": [
+        {"role": "assistant", "content": "What is your name?"},
+        {"role": "user", "content": "John Doe"}
+    ],
+    "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+            {
+                "tool": "save_name",
+                "arguments": {"name": "John Doe"}
+            }
+        ]
+    }
+}
+```
+
+**Matching Rules:**
+- Tool name must match exactly
+- All specified arguments must be present and match
+- Extra arguments in the actual output are allowed
+
+### Response Evaluation
+
+Evaluates the response against criteria using LLM Judge.
+
+```python
+{
+    "history": [
+        {"role": "assistant", "content": "What is your phone number?"},
+        {"role": "user", "content": "Can I skip this question?"}
+    ],
+    "evaluation": {
+        "type": "response",
+        "criteria": "The assistant should allow the user to skip giving their phone number."
+    }
+}
+```
+
+**LLM Judge evaluates:**
+- Whether the response satisfies the stated criteria
+- Returns True/False with reasoning
+
+## Test Case Structure
+
+Each test case consists of:
+
+### History
+
+The conversation context leading up to the model's response:
+
+```python
+"history": [
+    {"role": "assistant", "content": "Hello! What is your name?"},
+    {"role": "user", "content": "Aman Dalmia"}
+]
+```
+
+### Evaluation
+
+What you expect the model to do:
+
+```python
+# Tool call expectation
+"evaluation": {
+    "type": "tool_call",
+    "tool_calls": [
+        {"tool": "plan_next_question", "arguments": {"index": 2}}
+    ]
+}
+
+# Response criteria expectation
+"evaluation": {
+    "type": "response",
+    "criteria": "The assistant should acknowledge the name."
+}
+```
+
+### Settings (Optional)
+
+Additional configuration for the test:
+
+```python
+"settings": {
+    "language": "english"
+}
+```
+
+## Tools
+
+Tools are functions the Text to Text model can call during conversations:
+
+```python
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question to ask",
+        "parameters": [
+            {
+                "id": "next_question_index",
+                "type": "integer",
+                "description": "Index of next question",
+                "required": True
+            },
+            {
+                "id": "questions_answered",
+                "type": "array",
+                "description": "List of answered question indices",
+                "items": {"type": "integer"},
+                "required": True
+            }
+        ]
+    }
+]
+```
+
+## Output Files
+
+### results.json
+
+Contains detailed results for each test case:
+
+```json
+[
+  {
+    "output": {
+      "response": "Nice to meet you, Aman!",
+      "tool_calls": [
+        {"tool": "plan_next_question", "arguments": {"index": 2}}
+      ]
+    },
+    "metrics": {"passed": true},
+    "test_case": {
+      "history": [...],
+      "evaluation": {...}
+    }
+  }
+]
+```
+
+### metrics.json
+
+Contains summary statistics:
+
+```json
+{
+  "total": 10,
+  "passed": 8
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Text to Text Quickstart" icon="play" href="/quickstart/text-to-text">
+    Run your first Text to Text evaluation.
+  </Card>
+  <Card title="Simulation Concepts" icon="robot" href="/core-concepts/simulations">
+    Learn about automated conversations.
+  </Card>
+</CardGroup>

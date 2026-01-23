@@ -1,0 +1,144 @@
+---
+title: "Text to Speech"
+description: "CLI commands for Text to Speech evaluation and benchmarking."
+---
+
+Evaluate Text to Speech providers and generate comparative leaderboards.
+
+## Input Data Format
+
+Prepare a CSV file with text samples to synthesize:
+
+| id | text |
+|----|------|
+| row_1 | hello world |
+| row_2 | this is a test |
+| row_3 | how are you doing today |
+
+The CSV should have two columns:
+- `id` - Unique identifier for each text
+- `text` - The text to synthesize into speech
+
+<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+  Detailed explanation of all metrics and how LLM Judge works
+</Card>
+
+---
+
+## pense tts eval
+
+Run Text to Speech evaluation against a specific provider.
+
+```bash
+pense tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Default | Description |
+|------|------|------|----------|---------|-------------|
+| `-p` | `--provider` | string | No | `smallest` | Provider: `cartesia`, `openai`, `groq`, `google`, `elevenlabs`, `sarvam` |
+| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, or `kannada` |
+| `-i` | `--input` | string | Yes | - | Path to input CSV file |
+| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
+| `-d` | `--debug` | flag | No | `false` | Run on first N texts only |
+| `-dc` | `--debug_count` | int | No | `5` | Number of texts in debug mode |
+| | `--port` | int | No | `8765` | WebSocket port |
+
+### Examples
+
+**Basic evaluation:**
+
+```bash
+pense tts eval -p google -l english -i ./sample.csv -o ./out
+```
+
+**Evaluate with Cartesia:**
+
+```bash
+pense tts eval -p cartesia -i ./sample.csv -o ./out
+```
+
+**Debug mode (process only first 3 texts):**
+
+```bash
+pense tts eval -p google -i ./sample.csv -o ./out -d -dc 3
+```
+
+### Output Structure
+
+```
+/path/to/output/<provider>
+├── audios/
+│   ├── 1.wav
+│   ├── 2.wav
+│   └── 3.wav
+├── results.csv       # LLM judge scores for pronunciation
+├── metrics.json      # Latency metrics (TTFB, processing time)
+├── results.log       # Terminal output summary
+└── logs              # Full pipecat logs
+```
+
+### Output Files
+
+**results.csv** contains per-text evaluation results:
+
+| id | text | audio_path | llm_judge_score | llm_judge_reasoning |
+|----|------|------------|-----------------|---------------------|
+| row_1 | hello world | ./out/audios/1.wav | True | The audio clearly says 'hello world' with correct pronunciation. |
+| row_2 | this is a test | ./out/audios/2.wav | True | Clear pronunciation matching the input text. |
+
+---
+
+## pense tts leaderboard
+
+Generate a comparative leaderboard from multiple evaluation runs.
+
+```bash
+pense tts leaderboard -o <output_dir> -s <save_dir>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Description |
+|------|------|------|----------|-------------|
+| `-o` | `--output-dir` | string | Yes | Directory containing evaluation run folders |
+| `-s` | `--save-dir` | string | Yes | Directory to save leaderboard outputs |
+
+### Example
+
+```bash
+pense tts leaderboard -o ./out -s ./leaderboard
+```
+
+### Output
+
+The leaderboard command generates:
+
+- `tts_leaderboard.xlsx` - Comparative spreadsheet of all providers
+- `all_metrics_by_run.png` - Visual comparison chart
+
+---
+
+## Supported Providers
+
+| Provider | Languages |
+|----------|-----------|
+| `google` | English, Hindi, Kannada |
+| `openai` | English |
+| `cartesia` | English |
+| `elevenlabs` | English |
+| `sarvam` | Hindi, Kannada |
+| `groq` | English |
+
+## Required Environment Variables
+
+Set the appropriate API key for your chosen provider:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+export OPENAI_API_KEY=your_key
+export CARTESIA_API_KEY=your_key
+export ELEVENLABS_API_KEY=your_key
+export SARVAM_API_KEY=your_key
+```

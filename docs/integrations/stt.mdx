@@ -1,18 +1,17 @@
 ---
-title: "Speech to text"
-description: "Speech-to-Text services receive audio input and output transcriptions"
+title: "Speech to Text"
+description: "Speech to Text services receive audio input and output transcriptions"
 ---
 
-| Provider | Languages | Notes |
-|----------|-----------|-------|
-| **Deepgram** | English, Hindi, and more | Real-time streaming support |
-| **Google** | 100+ languages | Cloud Speech-to-Text API |
-| **OpenAI** | Multiple languages | Whisper-based transcription |
-| **ElevenLabs** | Multiple languages | High-quality transcription |
-| **Sarvam** | Indian languages | Optimized for Indian accents |
-| **Cartesia** | Multiple languages | Low-latency streaming |
-| **Groq** | Multiple languages | Fast inference |
-| **Smallest** | Multiple languages | Lightweight option |
+| Provider |
+|----------|
+| **Deepgram** |
+| **Google** |
+| **OpenAI** |
+| **ElevenLabs** |
+| **Sarvam** |
+| **Cartesia** |
+| **Groq** |
 
 ## Configuration
 
@@ -41,19 +40,19 @@ export CARTESIA_API_KEY=your_key
 export GROQ_API_KEY=your_key
 ```
 
-## Usage
+## Next Steps
 
-```python
-import asyncio
-from pense.stt import eval, leaderboard
-
-# Run STT evaluation
-asyncio.run(eval(
-    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, etc.
-    language="english",   # english, hindi, or kannada
-    input_dir="/path/to/data",  # should contain stt.csv and audios/wav/, audios/pcm16/ folders
-    output_dir="/path/to/output",
-    debug=True,           # optional: run on first 5 audio files only
-    debug_count=5,        # optional: number of files in debug mode
-))
-```
+<CardGroup cols={2}>
+  <Card title="Run Speech to Text Evaluation" icon="play" href="/guides/stt-evaluation">
+    Learn how to run Speech to Text evaluation across different providers
+  </Card>
+  <Card title="Configure Speech to Text in Agent" icon="gear" href="/guides/agent-stt-configuration">
+    Set up your Speech to Text provider in agent configuration
+  </Card>
+  <Card title="Python SDK - Evaluation" icon="code" href="/python-sdk/speech-to-text#run-evaluation">
+    Run evaluation for any Speech to Text provider using the Python SDK
+  </Card>
+  <Card title="Python SDK - Leaderboard" icon="chart-bar" href="/python-sdk/speech-to-text#generate-leaderboard">
+    Benchmark multiple Speech to Text providers on your dataset
+  </Card>
+</CardGroup>

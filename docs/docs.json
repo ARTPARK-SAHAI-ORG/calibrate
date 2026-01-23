@@ -16,22 +16,25 @@
           {
             "group": "Get Started",
             "pages": [
-              "getting-started/introduction",
-              "getting-started/quickstart",
-              "getting-started/core-concepts",
-              "getting-started/ecosystem",
-              "getting-started/continue-learning"
+              "getting-started/introduction"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Guides",
-        "groups": [
+          },
           {
-            "group": "Overview",
+            "group": "Quickstart",
             "pages": [
-              "guides/overview"
+              "quickstart/speech-to-text",
+              "quickstart/text-to-text",
+              "quickstart/text-to-speech",
+              "quickstart/simulations"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/speech-to-text",
+              "core-concepts/text-to-text",
+              "core-concepts/text-to-speech",
+              "core-concepts/simulations"
             ]
           }
         ]
@@ -43,8 +46,8 @@
             "group": "Providers",
             "pages": [
               "integrations/stt",
-              "integrations/tts",
-              "integrations/llm"
+              "integrations/llm",
+              "integrations/tts"
             ]
           }
         ]
@@ -57,6 +60,21 @@
             "pages": [
               "python-sdk/overview"
             ]
+          },
+          {
+            "group": "Component Testing",
+            "pages": [
+              "python-sdk/speech-to-text",
+              "python-sdk/text-to-text",
+              "python-sdk/text-to-speech"
+            ]
+          },
+          {
+            "group": "End to End Tests",
+            "pages": [
+              "python-sdk/text-simulations",
+              "python-sdk/voice-simulations"
+            ]
           }
         ]
       },
@@ -64,26 +82,30 @@
         "tab": "CLI",
         "groups": [
           {
-            "group": "CLI Reference",
+            "group": "CLI",
             "pages": [
               "cli/overview"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Deployment",
-        "groups": [
+          },
           {
-            "group": "Deployment",
+            "group": "Component Testing",
             "pages": [
-              "deployment/overview"
+              "cli/speech-to-text",
+              "cli/text-to-text",
+              "cli/text-to-speech"
+            ]
+          },
+          {
+            "group": "End to End Tests",
+            "pages": [
+              "cli/text-simulations",
+              "cli/voice-simulations"
             ]
           }
         ]
       },
       {
-        "tab": "Examples & Recipes",
+        "tab": "Examples",
         "groups": [
           {
             "group": "Examples",
@@ -116,8 +138,12 @@
   "navbar": {
     "links": [
       {
-        "label": "Support",
-        "href": "mailto:support@artpark.in"
+        "label": "Join the Discord",
+        "href": "https://discord.gg/pense"
+      },
+      {
+        "label": "Github",
+        "href": "https://github.com/artpark/pense"
       }
     ]
   },

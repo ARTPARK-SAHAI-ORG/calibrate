@@ -1,0 +1,158 @@
+---
+title: "Text to Text"
+description: "CLI commands for Text to Text tests."
+---
+
+Run Text to Text tests against predefined test cases with expected outputs. Useful for validating tool calls and response patterns.
+
+<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+  Detailed explanation of metrics and evaluation types
+</Card>
+
+---
+
+## pense ttt tests run
+
+Run Text to Text test cases from a configuration file.
+
+```bash
+pense ttt tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Default | Description |
+|------|------|------|----------|---------|-------------|
+| `-c` | `--config` | string | No | `examples/tests.json` | Path to test configuration JSON file |
+| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
+| `-m` | `--model` | string | No | `gpt-4.1` | Model name (e.g., `gpt-4.1`, `openai/gpt-4.1`) |
+| `-p` | `--provider` | string | No | `openrouter` | Provider: `openai` or `openrouter` |
+
+### Examples
+
+**Basic test run:**
+
+```bash
+pense ttt tests run -c ./config.json -o ./out
+```
+
+**Run with specific model:**
+
+```bash
+pense ttt tests run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
+```
+
+**Use OpenAI directly:**
+
+```bash
+pense ttt tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
+```
+
+### Configuration File Structure
+
+```json
+{
+  "system_prompt": "You are a helpful assistant filling out a form...",
+  "tools": [
+    {
+      "type": "client",
+      "name": "plan_next_question",
+      "description": "Plan the next question to ask",
+      "parameters": [
+        {
+          "id": "next_unanswered_question_index",
+          "type": "integer",
+          "description": "Index of next question",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "test_cases": [
+    {
+      "history": [
+        {"role": "assistant", "content": "Hello! What is your name?"},
+        {"role": "user", "content": "Aman Dalmia"}
+      ],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          {
+            "tool": "plan_next_question",
+            "arguments": {
+              "next_unanswered_question_index": 2,
+              "questions_answered": [1]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "history": [
+        {"role": "assistant", "content": "What is your phone number?"},
+        {"role": "user", "content": "Can I skip this question?"}
+      ],
+      "evaluation": {
+        "type": "response",
+        "criteria": "The assistant should allow the user to skip."
+      }
+    }
+  ]
+}
+```
+
+### Output Structure
+
+```
+/path/to/output/<test_config_name>/<model_name>
+├── results.json      # Detailed results for each test case
+├── metrics.json      # Summary statistics (total, passed)
+└── logs
+```
+
+---
+
+## pense ttt tests leaderboard
+
+Generate a leaderboard comparing multiple test runs.
+
+```bash
+pense ttt tests leaderboard -o <output_dir> -s <save_dir>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Description |
+|------|------|------|----------|-------------|
+| `-o` | `--output-dir` | string | Yes | Directory containing test run folders |
+| `-s` | `--save-dir` | string | Yes | Directory to save leaderboard outputs |
+
+### Example
+
+```bash
+pense ttt tests leaderboard -o ./out -s ./leaderboard
+```
+
+### Output
+
+- `ttt_leaderboard.csv` - Pass percentages by model and test config
+- `ttt_leaderboard.png` - Visual comparison chart
+
+---
+
+## Provider Options
+
+| Provider | Model Format | Example |
+|----------|--------------|---------|
+| `openai` | OpenAI naming | `gpt-4.1`, `gpt-4o` |
+| `openrouter` | Provider/model | `openai/gpt-4.1`, `anthropic/claude-3-opus` |
+
+## Required Environment Variables
+
+```bash
+# For OpenAI provider
+export OPENAI_API_KEY=your_key
+
+# For OpenRouter provider
+export OPENROUTER_API_KEY=your_key
+```

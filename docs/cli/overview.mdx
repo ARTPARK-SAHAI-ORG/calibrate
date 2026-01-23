@@ -1,0 +1,83 @@
+---
+title: "Overview"
+description: "Command-line interface for Pense evaluation and simulation tools."
+---
+
+The Pense CLI provides commands for evaluating Speech to Text, Text to Speech, Text to Text, and running simulations directly from your terminal.
+
+## Installation
+
+<Tabs>
+  <Tab title="pip">
+    ```bash
+    pip install pense
+    ```
+  </Tab>
+  <Tab title="uv">
+    ```bash
+    uv add pense
+    ```
+  </Tab>
+  <Tab title="From Source">
+    Clone the repository and install dependencies:
+
+    ```bash
+    git clone https://github.com/artpark/pense.git
+    cd pense
+    uv sync --frozen
+    ```
+  </Tab>
+</Tabs>
+
+## Environment Variables
+
+Create a `.env` file in your project root and add the API keys for the providers you want to use. All modules (STT, TTS, LLM, Agent) use this single `.env` file.
+
+```bash
+# Speech to Text / Text to Speech Providers
+DEEPGRAM_API_KEY=your_key
+SARVAM_API_KEY=your_key
+OPENAI_API_KEY=your_key
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+CARTESIA_API_KEY=your_key
+ELEVENLABS_API_KEY=your_key
+
+# Text to Text Providers
+OPENROUTER_API_KEY=your_key
+```
+
+<Note>
+You only need to set API keys for the providers you plan to use.
+</Note>
+
+## Available Commands
+
+### Component Testing
+
+| Command | Description |
+|---------|-------------|
+| `pense stt eval` | Evaluate Speech to Text provider |
+| `pense stt leaderboard` | Generate Speech to Text comparison |
+| `pense ttt tests run` | Run Text to Text test cases |
+| `pense ttt tests leaderboard` | Generate Text to Text tests comparison |
+| `pense tts eval` | Evaluate Text to Speech provider |
+| `pense tts leaderboard` | Generate Text to Speech comparison |
+
+### End to End Tests
+
+| Command | Description |
+|---------|-------------|
+| `pense ttt simulations run` | Run text-only simulations |
+| `pense ttt simulations leaderboard` | Generate simulation comparison |
+| `pense agent simulation` | Run voice agent simulations |
+| `pense agent test` | Interactive voice agent session |
+
+## Getting Help
+
+Get help for any command by adding `--help`:
+
+```bash
+pense --help
+pense stt --help
+pense stt eval --help
+```

@@ -1,0 +1,147 @@
+---
+title: "Speech to Text"
+description: "Learn how to evaluate and compare Speech to Text providers with your audio data"
+---
+
+Pense allows you to evaluate multiple Speech to Text providers simultaneously using your own audio data. This guide will walk you through creating and analyzing an evaluation.
+
+## Overview
+
+Speech to Text evaluation helps you:
+- Compare transcription accuracy across providers
+- Measure latency and processing time
+- Identify the best provider for your specific use case and language
+
+## Step 1: Navigate to Speech to Text Evaluations
+
+From the sidebar, click on **Speech to Text** to view all your evaluations. Click the **New evaluation** button to create a new evaluation.
+
+<Frame>
+  <img src="./images/stt_overview.png" alt="Speech to Text Evaluations List" />
+</Frame>
+
+## Step 2: Configure Settings
+
+On the **Settings** tab, configure your evaluation:
+
+### Select Language
+
+Choose the language of your audio files:
+- **English**
+- **Hindi**
+
+### Select Providers
+
+Choose up to **3 providers** to compare simultaneously:
+
+| Provider | Description |
+|----------|-------------|
+| Deepgram | High-accuracy speech recognition |
+| OpenAI | Whisper-based transcription |
+| Cartesia | Low-latency streaming |
+| ElevenLabs | Multi-language support |
+| Whisper (Groq) | Fast Whisper inference |
+| Google | Google Cloud Speech-to-Text |
+| Sarvam | Indic language specialist |
+
+<Frame>
+  <img src="./images/stt_new.png" alt="Speech to Text Settings - Provider Selection" />
+</Frame>
+
+## Step 3: Upload Your Dataset
+
+Switch to the **Dataset** tab to add your audio samples.
+
+### Option A: Manual Upload
+
+1. Click **Upload .wav** to select an audio file
+2. Enter the **reference transcription** (ground truth)
+3. Click **Add another sample** to add more audio-text pairs
+
+<Frame>
+  <img src="./images/stt-dataset.png" alt="Speech to Text Dataset Upload" />
+</Frame>
+
+### Option B: Bulk Upload via ZIP
+
+For larger datasets, upload a ZIP file containing:
+
+```
+your_dataset.zip
+├── audios/
+│   ├── sample_1.wav
+│   ├── sample_2.wav
+│   └── sample_3.wav
+└── data.csv
+```
+
+The `data.csv` should have two columns:
+
+| audio_file | text |
+|------------|------|
+| sample_1.wav | This is the reference transcription for sample 1. |
+| sample_2.wav | This is the reference transcription for sample 2. |
+| sample_3.wav | This is the reference transcription for sample 3. |
+
+<Tip>
+Click **Download sample ZIP** to get a template with the correct structure.
+</Tip>
+
+## Step 4: Run Evaluation
+
+Click the **Evaluate** button to start the evaluation. You'll be redirected to the results page where you can monitor progress in real-time.
+
+## Step 5: View Results
+
+### Outputs Tab
+
+The **Outputs** tab shows results as each provider completes:
+
+- **Left panel**: List of providers with status indicators
+  - Yellow dot: In progress
+  - Green checkmark: Completed successfully
+  - Red X: Failed
+
+- **Right panel**: Detailed results for the selected provider
+  - Overall metrics (WER, String Similarity, LLM Judge Score)
+  - Per-sample comparison of ground truth vs. prediction
+
+<Frame>
+  <img src="./images/stt_outputs.png" alt="Speech to Text Outputs View" />
+</Frame>
+
+### Leaderboard Tab
+
+Once all providers complete, the **Leaderboard** tab shows a comparative analysis:
+
+<Frame>
+  <img src="./images/stt_leaderboard.png" alt="Speech to Text Leaderboard View" />
+</Frame>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use representative audio samples">
+    Include audio that matches your production environment - background noise levels, speaker accents, and audio quality should be similar.
+  </Accordion>
+  <Accordion title="Include edge cases">
+    Add samples with numbers, proper nouns, technical terms, and other challenging content to thoroughly test each provider.
+  </Accordion>
+  <Accordion title="Test multiple languages">
+    If your application supports multiple languages, run separate evaluations for each language to find the best provider per language.
+  </Accordion>
+  <Accordion title="Consider latency requirements">
+    If your use case is latency-sensitive (like real-time voice agents), pay close attention to TTFB and processing time metrics.
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Speech to Text Metrics" icon="chart-bar" href="/core-concepts/speech-to-text">
+    Learn about WER, String Similarity, LLM Judge, and latency metrics.
+  </Card>
+  <Card title="Text to Speech" icon="volume-high" href="/quickstart/text-to-speech">
+    Evaluate Text to Speech providers.
+  </Card>
+</CardGroup>

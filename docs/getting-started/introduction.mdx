@@ -3,35 +3,24 @@ title: "Introduction"
 description: "Learn about Pense and how to get started."
 ---
 
-Pense is an open-source Python framework for simulation and testing of voice agents. It enables automated, repeatable testing at scale.
+Pense is an open-source framework for automated, repeatable and systematic evaluation of voice agents at scale.
 
-The framework provides tools to evaluate individual components (STT, TTS, LLM) and run end-to-end voice agent simulations that verify conversational responses and tool usage across thousands of scenarios.
-
-Want to dive right in? Check out the [Quickstart](/getting-started/quickstart) to run your first Pense evaluation.
-
-<Card
-  title="Quickstart"
-  icon="rocket"
-  href="/getting-started/quickstart"
-  horizontal
->
-  Get started with Pense in under 5 minutes.
-</Card>
+You can evaluate individual components (Speech to Text, Text to Text, Text to Speech) and run end-to-end voice agent simulations across thousands of scenarios with user personas defined by you to identify where your agent fails before deploying it to production, continuously improve it and ensure a bug never repeats as you make changes.
 
 ## What can you do with Pense?
 
 <CardGroup cols={2}>
-  <Card title="Evaluate STT Providers" icon="microphone">
-    Compare speech-to-text accuracy and latency across multiple providers like Deepgram, OpenAI, Google, Sarvam, and more.
+  <Card title="Evaluate Speech to Text" icon="microphone">
+    Compare transcription accuracy and latency across providers like Deepgram, OpenAI, Google, Sarvam, and more.
   </Card>
-  <Card title="Evaluate TTS Providers" icon="volume-high">
-    Benchmark text-to-speech quality and performance across Cartesia, ElevenLabs, Google, and other providers.
+  <Card title="Test Text to Text" icon="brain">
+    Create test suites that verify model responses and tool calling behavior against expected outputs.
   </Card>
-  <Card title="Test LLM Behavior" icon="brain">
-    Create test suites that verify LLM responses and tool calling behavior against expected outputs.
+  <Card title="Evaluate Text to Speech" icon="volume-high">
+    Benchmark pronunciation quality and performance across Cartesia, ElevenLabs, Google, and other providers.
   </Card>
-  <Card title="Simulate Conversations" icon="comments">
-    Run automated end-to-end voice agent simulations with customizable personas and scenarios.
+  <Card title="Run Simulations" icon="comments">
+    Run automated text and voice agent simulations with customizable personas and scenarios.
   </Card>
 </CardGroup>
 
@@ -39,29 +28,42 @@ Want to dive right in? Check out the [Quickstart](/getting-started/quickstart) t
 
 Testing voice agents manually is slow, inconsistent, and doesn't scale. Pense solves this by providing:
 
-- **Component-level evaluation**: Test STT, TTS, and LLM independently to identify bottlenecks
-- **Comprehensive metrics**: WER, string similarity, LLM judge scores, TTFB, and processing time
+- **Component-level evaluation**: Test Speech to Text, Text to Text, and Text to Speech independently to identify bottlenecks
+- **Comprehensive metrics**: WER, string similarity, LLM Judge scores, TTFB, and processing time
 - **Persona-based simulations**: Define user personas and scenarios to test diverse conversation flows
 - **Automated evaluation**: LLM judges assess transcript quality and agent behavior
 - **Leaderboards**: Compare providers side-by-side with generated reports and visualizations
 
-## Built on Pipecat
-
-Pense is built on top of [Pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents. This means Pense inherits Pipecat's robust audio processing pipeline and provider integrations while adding testing and evaluation capabilities on top.
-
-## Next Steps
+## Get Started
 
 <CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/getting-started/quickstart">
-    Install Pense and run your first evaluation.
+  <Card title="Speech to Text" icon="microphone" href="/quickstart/speech-to-text">
+    Evaluate and compare Speech to Text providers.
   </Card>
-  <Card title="Core Concepts" icon="book" href="/getting-started/core-concepts">
-    Understand the key concepts behind Pense.
+  <Card title="Text to Text" icon="brain" href="/quickstart/text-to-text">
+    Test model behavior with test cases.
   </Card>
-  <Card title="Ecosystem" icon="puzzle-piece" href="/getting-started/ecosystem">
-    Learn about the Pense ecosystem and integrations.
+  <Card title="Text to Speech" icon="volume-high" href="/quickstart/text-to-speech">
+    Evaluate Text to Speech providers.
   </Card>
-  <Card title="Examples" icon="code" href="/examples/overview">
-    Explore example configurations and use cases.
+  <Card title="Simulations" icon="robot" href="/quickstart/simulations">
+    Run automated conversations.
+  </Card>
+</CardGroup>
+
+## Learn More
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/core-concepts/speech-to-text">
+    Understand metrics and evaluation concepts.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/python-sdk/overview">
+    Use Pense programmatically.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Run evaluations from the command line.
+  </Card>
+  <Card title="Integrations" icon="plug" href="/integrations/stt">
+    See all supported providers.
   </Card>
 </CardGroup>

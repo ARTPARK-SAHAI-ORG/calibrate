@@ -1,14 +1,12 @@
 ---
-title: "Text to text"
-description: "Supported Large Language Model providers in Pense."
+title: "Text to Text"
+description: "Supported Text to Text providers in Pense."
 ---
 
-Pense supports the following LLM providers for testing and simulations.
-
-| Provider | Models | Notes |
-|----------|--------|-------|
-| **OpenAI** | GPT-4.1, GPT-4o, GPT-4, GPT-3.5 | Direct API access |
-| **OpenRouter** | Claude, Gemini, Llama, Mistral, and more | Access 100+ models through a single API |
+| Provider |
+|----------|
+| **OpenAI** |
+| **OpenRouter** |
 
 ## Configuration
 
@@ -22,39 +20,25 @@ export OPENAI_API_KEY=your_key
 export OPENROUTER_API_KEY=your_key
 ```
 
-## Usage
+## Next Steps
 
-### LLM Tests
-
-```python
-from pense.llm import tests
-
-await tests.run(
-    system_prompt="You are a helpful assistant.",
-    tools=[],
-    test_cases=[...],
-    model="openai/gpt-4.1",  # or "gpt-4.1" for direct OpenAI
-    provider="openrouter",   # or "openai"
-)
-```
-
-### LLM Simulations
-
-```python
-from pense.llm import simulations
-
-await simulations.run(
-    system_prompt="You are a helpful assistant.",
-    tools=[],
-    personas=[...],
-    scenarios=[...],
-    evaluation_criteria=[...],
-    model="openai/gpt-4.1",
-    provider="openrouter",
-)
-```
-
-## Model Naming
-
-- **OpenAI provider**: Use OpenAI model names directly (e.g., `gpt-4.1`, `gpt-4o`)
-- **OpenRouter provider**: Use the `provider/model` format (e.g., `openai/gpt-4.1`, `anthropic/claude-3-opus`)
+<CardGroup cols={2}>
+  <Card title="Run Text to Text Tests" icon="play" href="/guides/ttt-tests">
+    Learn how to run Text to Text tests across different providers
+  </Card>
+  <Card title="Configure Text to Text in Agent" icon="gear" href="/guides/agent-ttt-configuration">
+    Set up your Text to Text provider in agent configuration
+  </Card>
+  <Card title="Benchmark Multiple Providers" icon="scale-balanced" href="/guides/ttt-benchmarking">
+    Benchmark multiple Text to Text providers across your test suite
+  </Card>
+  <Card title="Python SDK - Tests" icon="code" href="/python-sdk/text-to-text#running-tests">
+    Run tests for any Text to Text provider using the Python SDK
+  </Card>
+  <Card title="Python SDK - Simulations" icon="chart-bar" href="/python-sdk/text-to-text#running-simulations">
+    Run simulations with multiple personas and scenarios
+  </Card>
+  <Card title="Python SDK - Leaderboard" icon="trophy" href="/python-sdk/text-to-text#generating-leaderboard">
+    Generate leaderboard across multiple Text to Text providers
+  </Card>
+</CardGroup>

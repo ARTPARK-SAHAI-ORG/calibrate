@@ -1,0 +1,235 @@
+---
+title: "Voice Simulations"
+description: "CLI commands for voice agent simulations and interactive testing."
+---
+
+Run full voice agent simulations with Speech to Text, Text to Text, and Text to Speech components, or interact with an agent in real-time.
+
+## Supported Providers
+
+| Component | Providers |
+|-----------|-----------|
+| **Speech to Text** | `deepgram`, `google`, `openai`, `elevenlabs`, `sarvam`, `cartesia` |
+| **Text to Text** | `openrouter`, `openai` |
+| **Text to Speech** | `elevenlabs`, `cartesia`, `google`, `openai`, `deepgram`, `sarvam` |
+
+<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+  Detailed explanation of all metrics and LLM Judge
+</Card>
+
+---
+
+## pense agent simulation
+
+Run automated voice agent simulations with multiple personas and scenarios. Each simulation pairs every persona with every scenario, generating audio files and transcripts for inspection.
+
+```bash
+pense agent simulation -c <config_file> -o <output_dir> --port <port>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Default | Description |
+|------|------|------|----------|---------|-------------|
+| `-c` | `--config` | string | Yes | - | Path to simulation configuration JSON file |
+| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
+| | `--port` | int | No | `8765` | Base WebSocket port |
+
+### Examples
+
+**Basic simulation:**
+
+```bash
+pense agent simulation -c ./config.json -o ./out
+```
+
+**Custom port:**
+
+```bash
+pense agent simulation -c ./config.json -o ./out --port 9000
+```
+
+### Configuration File Structure
+
+```json
+{
+  "system_prompt": "You are a helpful nurse filling out a form...",
+  "tools": [
+    {
+      "type": "client",
+      "name": "plan_next_question",
+      "description": "Plan the next question",
+      "parameters": [
+        {
+          "id": "next_unanswered_question_index",
+          "type": "integer",
+          "description": "Next question index",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "personas": [
+    {
+      "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
+      "gender": "female",
+      "language": "english",
+      "interruption_sensitivity": "medium"
+    }
+  ],
+  "scenarios": [
+    {"description": "User completes the form without any issues"},
+    {"description": "User hesitates and wants to skip some questions"}
+  ],
+  "evaluation_criteria": [
+    {
+      "name": "question_completeness",
+      "description": "Whether all the questions in the form were covered"
+    }
+  ],
+  "stt": {"provider": "google"},
+  "tts": {"provider": "google"},
+  "llm": {"provider": "openrouter", "model": "openai/gpt-4.1"},
+  "agent_speaks_first": true,
+  "max_turns": 50
+}
+```
+
+### Persona Configuration
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `characteristics` | string | Yes | Description of personality, background, behavior |
+| `gender` | string | Yes | `male` or `female` |
+| `language` | string | Yes | `english`, `hindi`, or `kannada` |
+| `interruption_sensitivity` | string | No | `none`, `low`, `medium`, or `high` |
+
+### Output Structure
+
+```
+/path/to/output/
+├── simulation_persona_1_scenario_1/
+│   ├── audios/
+│   │   ├── 0_user.wav
+│   │   ├── 1_bot.wav
+│   │   └── ...
+│   ├── conversation.wav         # Combined audio
+│   ├── transcript.json          # Full conversation
+│   ├── stt_outputs.json         # Speech to Text transcriptions
+│   ├── tool_calls.json          # Tool calls made
+│   ├── evaluation_results.csv   # Evaluation + latency metrics
+│   ├── stt_results.csv          # Speech to Text accuracy evaluation
+│   ├── metrics.json             # Per-processor latency
+│   ├── config.json              # Persona and scenario
+│   ├── results.log
+│   └── logs
+├── simulation_persona_1_scenario_2/
+│   └── ...
+├── results.csv                  # Aggregated results
+└── metrics.json                 # Summary statistics
+```
+
+### Output Files
+
+**audios/** contains alternating user and bot audio files for each turn.
+
+**conversation.wav** is a combined audio file of the entire conversation.
+
+**evaluation_results.csv** contains evaluation criteria, latency metrics, and Speech to Text scores:
+
+| name | value | reasoning |
+|------|-------|-----------|
+| question_completeness | 1 | All questions were covered... |
+| assistant_behavior | 1 | One question per turn... |
+| ttft | 0.62 | |
+| processing_time | 0.62 | |
+| stt_llm_judge_score | 0.95 | |
+
+**stt_results.csv** contains per-turn Speech to Text evaluation:
+
+| reference | prediction | score | reasoning |
+|-----------|------------|-------|-----------|
+| Geeta Prasad. | Gita Prasad. | 0 | Name 'Geeta' transcribed as 'Gita' |
+
+**results.csv** aggregates match scores across all simulations:
+
+| name | question_completeness | assistant_behavior | stt_llm_judge_score |
+|------|-----------------------|--------------------|---------------------|
+| simulation_persona_1_scenario_1 | 1.0 | 1.0 | 0.95 |
+| simulation_persona_1_scenario_2 | 1.0 | 0.0 | 0.92 |
+
+---
+
+## pense agent test
+
+Run an interactive voice agent session where you can talk to the agent through your browser in real-time.
+
+```bash
+pense agent test -c <config_file> -o <output_dir>
+```
+
+### Arguments
+
+| Flag | Long | Type | Required | Default | Description |
+|------|------|------|----------|---------|-------------|
+| `-c` | `--config` | string | Yes | - | Path to agent configuration JSON file |
+| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
+
+### Example
+
+```bash
+pense agent test -c ./config.json -o ./out/run
+```
+
+### Configuration File Structure
+
+```json
+{
+  "system_prompt": "You are a helpful assistant.",
+  "language": "english",
+  "stt": {"provider": "deepgram"},
+  "tts": {
+    "provider": "cartesia",
+    "voice_id": "YOUR_VOICE_ID"
+  },
+  "llm": {
+    "provider": "openrouter",
+    "model": "openai/gpt-4o-2024-11-20"
+  },
+  "tools": []
+}
+```
+
+### Usage
+
+1. Run the command to start the agent server
+2. Open `http://localhost:7860/client/` in your browser
+3. Click **Connect** and start talking to the agent
+
+<Warning>
+Avoid using your laptop's speaker and microphone at the same time. Audio from the speaker can be picked up by the microphone, interrupting the agent with its own voice. **Use a headphone with a built-in microphone.**
+</Warning>
+
+---
+
+## Required Environment Variables
+
+Set the API keys for your chosen providers:
+
+```bash
+# Speech to Text Providers
+export DEEPGRAM_API_KEY=your_key
+export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+export OPENAI_API_KEY=your_key
+export ELEVENLABS_API_KEY=your_key
+export SARVAM_API_KEY=your_key
+export CARTESIA_API_KEY=your_key
+
+# Text to Text Providers
+export OPENAI_API_KEY=your_key
+export OPENROUTER_API_KEY=your_key
+```
+
+<Note>
+You only need to set API keys for the providers you configure in your config file.
+</Note>

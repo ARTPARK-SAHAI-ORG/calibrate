@@ -1,0 +1,246 @@
+---
+title: "Voice Simulations"
+description: "Run full voice simulations with Speech to Text, Text to Text, and Text to Speech components."
+---
+
+Run full voice simulations that combine Speech to Text, Text to Text, and Text to Speech components.
+
+Each simulation pairs every persona with every scenario. The runner saves transcripts, audio files, evaluation results, and logs for inspection.
+
+## Running Simulations
+
+```python
+import asyncio
+from pense.agent import simulation, STTConfig, TTSConfig, LLMConfig
+
+# Define personas
+personas = [
+    {
+        "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
+        "gender": "female",
+        "language": "english",
+        "interruption_sensitivity": "medium"  # none, low, medium, high
+    }
+]
+
+# Define scenarios
+scenarios = [
+    {"description": "User completes the form without any issues"},
+    {"description": "User hesitates and wants to skip some questions"}
+]
+
+# Define evaluation criteria
+evaluation_criteria = [
+    {
+        "name": "question_completeness",
+        "description": "Whether all the questions in the form were covered"
+    },
+    {
+        "name": "assistant_behavior",
+        "description": "Whether the assistant asks one concise question per turn"
+    }
+]
+
+# Define tools
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question",
+        "parameters": [
+            {"id": "next_unanswered_question_index", "type": "integer", "description": "Next question index", "required": True},
+            {"id": "questions_answered", "type": "array", "description": "Answered indices", "items": {"type": "integer"}, "required": True}
+        ]
+    }
+]
+
+# Run voice agent simulations
+result = asyncio.run(simulation.run(
+    system_prompt="You are a helpful nurse filling out a form...",
+    tools=tools,
+    personas=personas,
+    scenarios=scenarios,
+    evaluation_criteria=evaluation_criteria,
+    output_dir="./out",
+    stt=STTConfig(provider="google"),
+    tts=TTSConfig(provider="google"),
+    llm=LLMConfig(provider="openrouter", model="openai/gpt-4.1"),
+    agent_speaks_first=True,
+    max_turns=50,
+    port=8765,
+))
+```
+
+**Function Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `system_prompt` | str | Yes | - | System prompt for the voice agent |
+| `tools` | list | Yes | - | List of tool definitions |
+| `personas` | list | Yes | - | List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_sensitivity' |
+| `scenarios` | list | Yes | - | List of scenario dicts with 'description' |
+| `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
+| `output_dir` | str | No | "./out" | Output directory for results |
+| `stt` | STTConfig | No | Google | Speech to Text configuration |
+| `tts` | TTSConfig | No | Google | Text to Speech configuration |
+| `llm` | LLMConfig | No | OpenRouter/gpt-4.1 | Text to Text configuration |
+| `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
+| `max_turns` | int | No | 50 | Maximum assistant turns |
+| `port` | int | No | 8765 | Base WebSocket port |
+
+**Supported Providers:**
+
+- **Speech to Text**: deepgram, google, openai, elevenlabs, sarvam, cartesia
+- **Text to Text**: openrouter, openai
+- **Text to Speech**: cartesia, google, openai, elevenlabs, sarvam, deepgram
+
+## Metrics
+
+Voice simulations evaluate multiple aspects:
+
+- **Evaluation Criteria Match**: Each criterion evaluated as True/False with reasoning
+- **Speech to Text LLM Judge Score**: Accuracy of transcriptions during simulation
+- **Latency Metrics**: TTFB and processing time for each component
+
+<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+  Detailed explanation of all metrics and LLM Judge
+</Card>
+
+## Output Structure
+
+```
+/path/to/output/
+├── simulation_persona_1_scenario_1
+│   ├── audios/
+│   │    ├── 0_user.wav
+│   │    ├── 1_bot.wav
+│   │    └── ...
+│   ├── logs
+│   ├── results.log
+│   ├── evaluation_results.csv
+│   ├── stt_results.csv
+│   ├── metrics.json
+│   ├── stt_outputs.json
+│   ├── tool_calls.json
+│   ├── transcript.json
+│   ├── config.json
+│   └── conversation.wav
+├── simulation_persona_1_scenario_2
+├── results.csv
+└── metrics.json
+```
+
+### Directory Contents
+
+Each `simulation_persona_*_scenario_*` directory contains:
+
+| File | Description |
+|------|-------------|
+| `audios/` | Alternating `*_user.wav` and `*_bot.wav` clips for every turn |
+| `logs` | Full logs of the simulation including all pipecat logs |
+| `results.log` | Terminal output of the simulation |
+| `evaluation_results.csv` | Per-criterion evaluation results including latency metrics |
+| `stt_results.csv` | Detailed per-row Speech to Text evaluation results |
+| `metrics.json` | Latency traces for Speech to Text, Text to Text, and Text to Speech providers |
+| `stt_outputs.json` | Output of the Speech to Text step for each turn |
+| `tool_calls.json` | Chronologically ordered tool calls made by the agent |
+| `transcript.json` | Full conversation transcript |
+| `config.json` | Persona and scenario used for this simulation |
+| `conversation.wav` | Combined audio of the entire conversation |
+
+### config.json
+
+Contains the persona and scenario used for each simulation:
+
+```json
+{
+  "persona": {
+    "characteristics": "description of user personality, background, and behavior",
+    "gender": "female",
+    "language": "english",
+    "interruption_sensitivity": "medium"
+  },
+  "scenario": {
+    "description": "the scenario description for this simulation"
+  }
+}
+```
+
+### evaluation_results.csv
+
+Contains evaluation results for each criterion, latency metrics, and Speech to Text score:
+
+| name | value | reasoning |
+|------|-------|-----------|
+| question_completeness | 1 | The assistant asked for the user's full name, address, and telephone number... |
+| assistant_behavior | 1 | The assistant asked one concise question per turn... |
+| ttft | 0.6209 | |
+| processing_time | 0.6209 | |
+| stt_llm_judge_score | 0.95 | |
+
+For latency metrics (`ttft` and `processing_time`), one row is added per processor with the mean value. Evaluation criteria use `value` of 1 for True (match) and 0 for False (no match).
+
+### stt_results.csv
+
+Contains detailed per-row Speech to Text evaluation results:
+
+| reference | prediction | score | reasoning |
+|-----------|------------|-------|-----------|
+| Hi. | Hi. | 1 | The transcription matches exactly. |
+| Geeta Prasad. | Gita Prasad. | 0 | The name 'Geeta' was transcribed as 'Gita'... |
+
+### results.csv
+
+Aggregates match scores across all simulations:
+
+| name | question_completeness | assistant_behavior | stt_llm_judge_score |
+|------|-----------------------|--------------------|---------------------|
+| simulation_persona_1_scenario_1 | 1.0 | 1.0 | 0.95 |
+| simulation_persona_1_scenario_2 | 1.0 | 0.0 | 0.92 |
+
+### metrics.json
+
+Provides summary statistics for each evaluation criterion:
+
+```json
+{
+  "question_completeness": {
+    "mean": 1.0,
+    "std": 0.0,
+    "values": [1.0, 1.0, 1.0]
+  },
+  "assistant_behavior": {
+    "mean": 0.6666666666666666,
+    "std": 0.5773502691896257,
+    "values": [1.0, 0.0, 1.0]
+  },
+  "stt_llm_judge": {
+    "mean": 0.95,
+    "std": 0.03,
+    "values": [0.95, 0.92, 0.98]
+  }
+}
+```
+
+## Low-level API
+
+For more control, run a single voice agent simulation directly:
+
+```python
+import asyncio
+from pense.agent import simulation
+
+result = asyncio.run(simulation.run_single(
+    system_prompt="You are simulating a user with persona...",
+    language="english",
+    gender="female",
+    evaluation_criteria=[
+        {"name": "completeness", "description": "..."},
+    ],
+    output_dir="./out",
+    interrupt_probability=0.5,  # 0.0 to 1.0
+    port=8765,
+    agent_speaks_first=True,
+    max_turns=50,
+))
+```

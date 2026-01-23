@@ -1,0 +1,125 @@
+---
+title: "Speech to Text"
+description: "Understanding Speech to Text evaluation metrics and concepts."
+---
+
+Speech to Text converts audio to text. Pense evaluates Speech to Text providers on both **accuracy** and **latency**.
+
+## Accuracy Metrics
+
+### Word Error Rate (WER)
+
+WER measures the edit distance between the predicted and reference transcripts at the word level. It calculates the minimum number of word insertions, deletions, and substitutions needed to transform the prediction into the reference, divided by the number of words in the reference.
+
+- **Range**: 0 to infinity (0 is perfect, lower is better)
+- **Limitation**: WER treats all word differences equally, even when the semantic meaning is preserved
+
+**Example:**
+
+| Reference | Prediction | WER |
+|-----------|------------|-----|
+| "Hello world" | "Hello world" | 0.0 |
+| "Hello world" | "Hello there" | 0.5 |
+| "one two three" | "1 2 3" | 1.0 |
+
+### String Similarity
+
+String similarity uses the SequenceMatcher algorithm to compute the ratio of matching characters between the normalized reference and prediction.
+
+- **Range**: 0 to 1 (1 is perfect match, higher is better)
+- **Use case**: Useful for catching character-level differences
+
+**Example:**
+
+| Reference | Prediction | String Similarity |
+|-----------|------------|-------------------|
+| "Geeta" | "Geeta" | 1.0 |
+| "Geeta" | "Gita" | 0.8 |
+| "Geeta" | "John" | 0.2 |
+
+### LLM Judge Score
+
+The LLM Judge uses a powerful LLM to semantically evaluate whether the transcription matches the source text. Unlike WER, it understands context and meaning.
+
+- **Range**: 0 to 1 (1 means all transcriptions semantically match, higher is better)
+- **Output**: Returns both a match (True/False) and reasoning for each audio file
+
+**Why LLM Judge is necessary:**
+
+Traditional metrics like WER fail in cases where the transcription is semantically correct but textually different:
+
+| Source | Transcription | WER | LLM Judge |
+|--------|---------------|-----|-----------|
+| "1, 2, 3" | "one, two, three" | 1.0 (100% error) | True (same values) |
+| "Rs. 500" | "Rupees five hundred" | 1.0 (100% error) | True (same amount) |
+| "Phone: 9833472990" | "Phone number is 98334 72990" | 0.67 (67% error) | True (same number) |
+| "Please write Rekha Kumari, sister." | "Please write Reha Kumari's sister." | 0.4 (40% error) | False (name is different: Rekha vs Reha) |
+
+**LLM Judge Guidelines:**
+- Numbers in different formats (digits vs words) are considered equivalent
+- Word spacing differences are ignored
+- Actual value differences (names, addresses, key details) are flagged as mismatches
+
+## Latency Metrics
+
+### Time to First Byte (TTFB)
+
+Measures the time (in seconds) from when audio streaming begins until the first transcription response is received from the provider.
+
+- **Importance**: Critical for real-time voice agents where responsiveness matters
+- **Reported**: Mean, standard deviation, and per-item values
+
+### Processing Time
+
+Total time taken (in seconds) to process the audio and return the complete transcription.
+
+- **Importance**: Affects overall conversation latency
+- **Reported**: Mean, standard deviation, and per-item values
+
+## Output Files
+
+### results.csv
+
+Contains detailed results for each audio file:
+
+| id | gt | pred | wer | string_similarity | llm_judge_score | llm_judge_reasoning |
+|----|----|------|-----|-------------------|-----------------|---------------------|
+| audio_1 | Hi | Hi. | 0.0 | 0.95 | True | The transcription matches the source exactly. |
+| audio_2 | Please write Rekha Kumari | Please write Reha Kumari | 0.25 | 0.93 | False | The name 'Rekha' was transcribed as 'Reha' |
+
+### metrics.json
+
+Contains aggregated metrics:
+
+```json
+[
+  {"wer": 0.13},
+  {"string_similarity": 0.88},
+  {"llm_judge_score": 0.85},
+  {
+    "metric_name": "ttfb",
+    "processor": "DeepgramSTTService#0",
+    "mean": 0.487,
+    "std": 0.234,
+    "values": [0.486, 0.512, 0.463]
+  },
+  {
+    "metric_name": "processing_time",
+    "processor": "DeepgramSTTService#0",
+    "mean": 0.489,
+    "std": 0.235,
+    "values": [0.487, 0.514, 0.465]
+  }
+]
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Speech to Text Quickstart" icon="play" href="/quickstart/speech-to-text">
+    Run your first Speech to Text evaluation.
+  </Card>
+  <Card title="Text to Text Metrics" icon="brain" href="/core-concepts/text-to-text">
+    Learn about test case evaluation.
+  </Card>
+</CardGroup>

@@ -1,0 +1,156 @@
+---
+title: "Text to Speech"
+description: "Compare and evaluate TTS providers on your dataset"
+---
+
+# Text-to-Speech Evaluation
+
+Pense allows you to evaluate multiple Text-to-Speech (TTS) providers simultaneously using your own text samples. This helps you find the best provider for voice quality and latency.
+
+## What You'll Learn
+
+- Add text samples for synthesis
+- Compare multiple TTS providers side-by-side
+- Listen to generated audio
+- Analyze quality metrics (LLM Judge) and latency (TTFB, Processing Time)
+
+---
+
+## Step 1: Navigate to TTS Evaluations
+
+From the sidebar, click on **Text-to-Speech** to view all your TTS evaluations. Click **New TTS evaluation** to create a new one.
+
+<Frame>
+  <img src="/images/tts_overview.png" alt="TTS Evaluations List" />
+</Frame>
+
+---
+
+## Step 2: Configure Your Evaluation
+
+### Settings Tab
+
+**Select Language:**
+- English
+- Hindi
+
+**Select Providers** (up to 3):
+
+| Provider | Description |
+|----------|-------------|
+| Cartesia | High-quality, low-latency synthesis |
+| OpenAI | Natural-sounding voices |
+| Orpheus (Groq) | Fast inference TTS |
+| Google | Google Cloud Text-to-Speech |
+| ElevenLabs | Premium voice cloning and synthesis |
+| Sarvam | Indic language specialist |
+
+<Frame>
+  <img src="/images/tts_new.png" alt="TTS Settings" />
+</Frame>
+
+---
+
+## Step 3: Add Text Samples
+
+### Dataset Tab
+
+**Option A: Manual Input**
+
+1. Enter text in the input field
+2. Click **Add another sample** for more
+3. Each sample will be synthesized by all selected providers
+
+**Option B: CSV Upload**
+
+```csv
+text
+Hello, how can I help you today?
+Your appointment is confirmed for tomorrow at 3 PM.
+Thank you for calling. Have a great day!
+```
+
+<Tip>
+Click **Download sample CSV** to get a template.
+</Tip>
+
+<Frame>
+  <img src="/images/tts_dataset.png" alt="TTS Dataset" />
+</Frame>
+
+---
+
+## Step 4: Run Evaluation
+
+Click **Evaluate** to start. You'll be redirected to the results page.
+
+---
+
+## Step 5: View Results
+
+### Outputs Tab
+
+Results appear as each provider completes:
+
+- **Left panel**: Provider list with status
+- **Right panel**: Audio playback for each synthesized sample
+  - Play button to listen
+  - LLM Judge evaluation (Pass/Fail)
+
+<Frame>
+  <img src="/images/tts_outputs.png" alt="TTS Outputs" />
+</Frame>
+
+### Leaderboard Tab
+
+After all providers complete, comparative charts appear:
+
+<Frame>
+  <img src="/images/tts_leaderboard.png" alt="TTS Leaderboard" />
+</Frame>
+
+---
+
+## Understanding the Metrics
+
+| Metric | Description | Preference |
+|--------|-------------|------------|
+| **LLM Judge Score** | Evaluates if audio accurately represents text | Pass is better |
+| **TTFB** | Time to First Byte - initial latency | Lower is better |
+| **Processing Time** | Total time to generate audio | Lower is better |
+
+<Info>
+The **LLM Judge** evaluates synthesized audio for accuracy, pronunciation, and naturalness. It checks if the spoken content matches the input text semantically.
+</Info>
+
+---
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use diverse text samples">
+    Include questions, statements, numbers, and proper nouns to thoroughly test each provider.
+  </Accordion>
+  <Accordion title="Test domain-specific content">
+    Include technical terms, names, or specialized vocabulary from your use case.
+  </Accordion>
+  <Accordion title="Listen to the outputs">
+    Automated metrics are helpful, but always listen to assess voice quality subjectively.
+  </Accordion>
+  <Accordion title="Consider latency for real-time use">
+    For voice agents, TTFB is critical for natural conversation flow.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="STT Evaluation" icon="microphone" href="/guides/stt">
+    Evaluate Speech-to-Text providers.
+  </Card>
+  <Card title="LLM Testing" icon="flask" href="/guides/llm-testing">
+    Test your agent's responses and tool calls.
+  </Card>
+</CardGroup>

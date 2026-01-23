@@ -1,23 +1,67 @@
 ---
 title: "Overview"
-description: "Python SDK reference for Pense."
+description: "Complete reference for the Python SDK of Pense"
 ---
 
 The Pense Python SDK provides programmatic access to all evaluation and simulation features.
 
 ## Installation
 
+Install using pip:
+
 ```bash
-git clone https://github.com/artpark/pense.git
-cd pense
-uv sync --frozen
+pip install pense
 ```
 
-## Modules
+Or using uv:
 
-| Module | Description |
-|--------|-------------|
-| `pense.stt` | Speech-to-Text evaluation |
-| `pense.tts` | Text-to-Speech evaluation |
-| `pense.llm` | LLM tests and simulations |
-| `pense.agent` | Voice agent simulations |
+```bash
+uv add pense
+```
+
+## Configuration
+
+Create a `.env` file in your project root and add the API keys for the providers you want to use. All modules (agent, stt, tts, llm) will use this single `.env` file.
+
+```bash
+# Speech to Text providers
+DEEPGRAM_API_KEY=your_key
+OPENAI_API_KEY=your_key
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+SARVAM_API_KEY=your_key
+ELEVENLABS_API_KEY=your_key
+CARTESIA_API_KEY=your_key
+GROQ_API_KEY=your_key
+
+# Text to Text providers
+OPENROUTER_API_KEY=your_key
+```
+
+## Component Testing
+
+Evaluate individual components of your voice agent in isolation.
+
+<CardGroup cols={3}>
+  <Card title="Speech to Text" icon="microphone" href="/python-sdk/speech-to-text">
+    Evaluate Speech to Text providers on your dataset
+  </Card>
+  <Card title="Text to Text" icon="brain" href="/python-sdk/text-to-text">
+    Run automated tests to evaluate Text to Text model behavior
+  </Card>
+  <Card title="Text to Speech" icon="volume-high" href="/python-sdk/text-to-speech">
+    Evaluate Text to Speech providers on your dataset
+  </Card>
+</CardGroup>
+
+## End to End Tests
+
+Run full simulations with realistic scenarios and user personas.
+
+<CardGroup cols={2}>
+  <Card title="Text Simulations" icon="comments" href="/python-sdk/text-simulations">
+    Run text-only simulations between two Text to Text models
+  </Card>
+  <Card title="Voice Simulations" icon="robot" href="/python-sdk/voice-simulations">
+    Run end-to-end voice simulations with Speech to Text, Text to Text, and Text to Speech
+  </Card>
+</CardGroup>

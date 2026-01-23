@@ -1,0 +1,233 @@
+---
+title: "Text to Text"
+description: "Run Text to Text tests to evaluate model behavior."
+---
+
+Evaluate Text to Text model behavior through test cases.
+
+## Running Tests
+
+Define your system prompt, tools, and test cases to evaluate Text to Text model behavior:
+
+```python
+import asyncio
+from pense.llm import tests
+
+# Define your tools
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question to ask",
+        "parameters": [
+            {
+                "id": "next_unanswered_question_index",
+                "type": "integer",
+                "description": "Index of next question",
+                "required": True
+            },
+            {
+                "id": "questions_answered",
+                "type": "array",
+                "description": "List of answered question indices",
+                "items": {"type": "integer"},
+                "required": True
+            }
+        ]
+    }
+]
+
+# Define your test cases
+test_cases = [
+    {
+        "history": [
+            {"role": "assistant", "content": "Hello! What is your name?"},
+            {"role": "user", "content": "Aman Dalmia"}
+        ],
+        "evaluation": {
+            "type": "tool_call",
+            "tool_calls": [
+                {
+                    "tool": "plan_next_question",
+                    "arguments": {
+                        "next_unanswered_question_index": 2,
+                        "questions_answered": [1]
+                    }
+                }
+            ]
+        },
+        "settings": {"language": "english"}
+    },
+    {
+        "history": [
+            {"role": "assistant", "content": "What is your phone number?"},
+            {"role": "user", "content": "Can I skip this question?"}
+        ],
+        "evaluation": {
+            "type": "response",
+            "criteria": "The assistant should allow the user to skip giving their phone number."
+        }
+    }
+]
+
+# Run tests
+result = asyncio.run(tests.run(
+    system_prompt="You are a helpful assistant filling out a form...",
+    tools=tools,
+    test_cases=test_cases,
+    output_dir="./out",
+    model="openai/gpt-4.1",
+    provider="openrouter",
+    run_name="my_test_run",
+))
+```
+
+**Function Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `system_prompt` | str | Yes | - | System prompt for the Text to Text model |
+| `tools` | list | Yes | - | List of tool definitions |
+| `test_cases` | list | Yes | - | List of test case dicts with 'history', 'evaluation', optional 'settings' |
+| `output_dir` | str | No | "./out" | Output directory for results |
+| `model` | str | No | "gpt-4.1" | Model name |
+| `provider` | str | No | "openrouter" | Text to Text provider: openai or openrouter |
+| `run_name` | str | No | None | Optional name for output folder |
+
+**Provider Options:**
+
+- `openai`: Use OpenAI's API directly. Model names: `gpt-4.1`, `gpt-4o`
+- `openrouter`: Access multiple Text to Text providers. Model names: `openai/gpt-4.1`, `anthropic/claude-3-opus`
+
+## Metrics
+
+Text to Text tests measure pass/fail for each test case:
+
+- **Pass Rate**: Percentage of test cases that match expected behavior
+- **Evaluation types**: Tool call matching or response criteria matching (via LLM Judge)
+
+<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+  Detailed explanation of metrics and evaluation types
+</Card>
+
+## Output Structure
+
+```
+/path/to/output/<test_config_name>/<model_name>
+├── results.json
+├── metrics.json
+└── logs
+```
+
+### results.json
+
+Contains detailed results for each test case:
+
+```json
+[
+  {
+    "output": {
+      "response": "Sure, I can help you with that.",
+      "tool_calls": [
+        {
+          "tool": "plan_next_question",
+          "arguments": {
+            "next_unanswered_question_index": 2,
+            "questions_answered": [1]
+          }
+        }
+      ]
+    },
+    "metrics": {
+      "passed": true
+    },
+    "test_case": {
+      "history": [...],
+      "evaluation": {...}
+    }
+  }
+]
+```
+
+### metrics.json
+
+Contains summary statistics:
+
+```json
+{
+  "total": 5,
+  "passed": 4
+}
+```
+
+## Generating Leaderboard
+
+After running tests for multiple models, compile a leaderboard:
+
+```python
+from pense.llm import tests
+
+tests.leaderboard(
+    output_dir="/path/to/output",
+    save_dir="./leaderboard"
+)
+```
+
+This generates:
+- `llm_leaderboard.csv`: CSV file with pass percentages by model
+- `llm_leaderboard.png`: Visual comparison chart
+
+**leaderboard.csv format:**
+
+| model | test_config_name | overall |
+|-------|------------------|---------|
+| openai__gpt-4.1 | 80.0 | 80.0 |
+| openai__gpt-4o | 100.0 | 100.0 |
+
+**Function Parameters:**
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `output_dir` | str | Yes | - | Directory containing test results |
+| `save_dir` | str | Yes | - | Directory to save leaderboard files |
+
+## Low-level APIs
+
+For more control, run individual test cases:
+
+### Run a Single Test Case
+
+```python
+import asyncio
+from pense.llm import tests
+
+result = asyncio.run(tests.run_test(
+    chat_history=[
+        {"role": "assistant", "content": "Hello! What is your name?"},
+        {"role": "user", "content": "Aman Dalmia"}
+    ],
+    evaluation={
+        "type": "tool_call",
+        "tool_calls": [{"tool": "plan_next_question", "arguments": {...}}]
+    },
+    system_prompt="You are a helpful assistant...",
+    model="gpt-4.1",
+    provider="openrouter",
+    tools=[...]
+))
+```
+
+### Run Text to Text Inference Without Evaluation
+
+```python
+import asyncio
+from pense.llm import tests
+
+result = asyncio.run(tests.run_inference(
+    chat_history=[...],
+    system_prompt="You are a helpful assistant...",
+    model="gpt-4.1",
+    provider="openrouter",
+    tools=[...]
+))
+```

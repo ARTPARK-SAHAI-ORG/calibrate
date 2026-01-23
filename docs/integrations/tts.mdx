@@ -1,19 +1,17 @@
 ---
-title: "Text to speech"
-description: "Supported Text-to-Speech providers in Pense."
+title: "Text to Speech"
+description: "Supported Text to Speech providers in Pense."
 ---
 
-Pense supports the following Text-to-Speech (TTS) providers for evaluation and voice agent simulations.
-
-| Provider | Languages | Notes |
-|----------|-----------|-------|
-| **Cartesia** | Multiple languages | Ultra-low latency, high quality |
-| **Google** | 40+ languages | Cloud Text-to-Speech API |
-| **OpenAI** | Multiple languages | Natural-sounding voices |
-| **ElevenLabs** | 29+ languages | Premium voice quality |
-| **Sarvam** | Indian languages | Optimized for Indian languages |
-| **Deepgram** | Multiple languages | Real-time synthesis |
-| **Groq** | Multiple languages | Fast inference |
+| Provider |
+|----------|
+| **Cartesia** |
+| **Google** |
+| **OpenAI** |
+| **ElevenLabs** |
+| **Sarvam** |
+| **Deepgram** |
+| **Groq** |
 
 ## Configuration
 
@@ -42,15 +40,19 @@ export DEEPGRAM_API_KEY=your_key
 export GROQ_API_KEY=your_key
 ```
 
-## Usage
+## Next Steps
 
-```python
-from pense.tts import eval
-
-await eval(
-    provider="google",  # or cartesia, openai, elevenlabs, sarvam, deepgram, groq
-    language="english",
-    input="/path/to/texts.csv",
-    output_dir="./out",
-)
-```
+<CardGroup cols={2}>
+  <Card title="Run Text to Speech Evaluation" icon="play" href="/guides/tts-evaluation">
+    Learn how to run Text to Speech evaluation across different providers
+  </Card>
+  <Card title="Configure Text to Speech in Agent" icon="gear" href="/guides/agent-tts-configuration">
+    Set up your Text to Speech provider in agent configuration
+  </Card>
+  <Card title="Python SDK - Evaluation" icon="code" href="/python-sdk/text-to-speech#running-provider-evaluation">
+    Run evaluation for any Text to Speech provider using the Python SDK
+  </Card>
+  <Card title="Python SDK - Leaderboard" icon="chart-bar" href="/python-sdk/text-to-speech#provider-leaderboard">
+    Benchmark multiple Text to Speech providers on your dataset
+  </Card>
+</CardGroup>
