@@ -92,26 +92,16 @@ Contains detailed results for each audio file:
 Contains aggregated metrics:
 
 ```json
-[
-  {"wer": 0.13},
-  {"string_similarity": 0.88},
-  {"llm_judge_score": 0.85},
-  {
-    "metric_name": "ttfb",
-    "processor": "DeepgramSTTService#0",
-    "mean": 0.487,
-    "std": 0.234,
-    "values": [0.486, 0.512, 0.463]
-  },
-  {
-    "metric_name": "processing_time",
-    "processor": "DeepgramSTTService#0",
-    "mean": 0.489,
-    "std": 0.235,
-    "values": [0.487, 0.514, 0.465]
-  }
-]
+{
+  "wer": 0.13,
+  "string_similarity": 0.88,
+  "llm_judge_score": 0.85
+}
 ```
+
+- `wer`: Mean Word Error Rate across all audio files
+- `string_similarity`: Mean string similarity score across all audio files
+- `llm_judge_score`: Mean LLM Judge score across all audio files
 
 ## Next Steps
 

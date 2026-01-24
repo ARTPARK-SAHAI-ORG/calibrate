@@ -10,10 +10,7 @@ Organize your input data in the following structure:
 ```
 ├── /path/to/data
 │   └── stt.csv
-│   └── audios/wav
-│       └── audio_1.wav
-│       └── audio_2.wav
-│   └── audios/pcm16
+│   └── audios/
 │       └── audio_1.wav
 │       └── audio_2.wav
 ```
@@ -25,7 +22,7 @@ Organize your input data in the following structure:
 | audio_1 | Hi |
 | audio_2 | Madam, my name is Geeta Shankar |
 
-Store the audios in both `wav` and `pcm16` formats as different providers support different formats. The evaluation script will automatically select the right format for each provider.
+All audio files should be in WAV format. The file names should match the `id` column in `stt.csv`.
 
 ## Run evaluation
 
@@ -34,8 +31,8 @@ import asyncio
 from pense.stt import eval
 
 asyncio.run(eval(
-    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, groq
-    language="english",   # english, hindi, or kannada
+    provider="deepgram",  # deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
+    language="english",   # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
     input_dir="/path/to/data",
     output_dir="/path/to/output",
     debug=True,           # optional: run on first 5 audio files only
@@ -47,32 +44,27 @@ asyncio.run(eval(
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `provider` | str | Yes | - | Speech to Text provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, groq |
-| `input_dir` | str | Yes | - | Path to input directory containing audio files and stt.csv |
+| `provider` | str | Yes | - | Speech to Text provider: deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq |
+| `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
-| `language` | str | No | "english" | Language of audio files: english, hindi, or kannada |
+| `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
 | `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
 | `debug` | bool | No | False | Run on first N audio files only |
 | `debug_count` | int | No | 5 | Number of files in debug mode |
 | `ignore_retry` | bool | No | False | Skip retry if not all audios processed |
-| `port` | int | No | 8765 | WebSocket port for Speech to Text bot |
+| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
 
 ## Evaluation process
 
-When you run the evaluation, each audio file is streamed to the Speech to Text provider and the received transcript is displayed in real-time:
+When you run the evaluation, each audio file is sent to the Speech to Text provider and the received transcript is displayed:
 
 ```
 --------------------------------
-Created new user transcript
-Starting new audio streaming 1/13: /path/to/audio_1.wav
-Finished streaming audio: /path/to/audio_1.wav
-appending to last user transcript: Hi.
+Processing audio [1/13]: audio_1.wav
+Transcript: Hi.
 --------------------------------
-Created new user transcript
-Starting new audio streaming 2/13: /path/to/audio_2.wav
-Finished streaming audio: /path/to/audio_2.wav
-appending to last user transcript: Madam,
-appending to last user transcript: my name is Geeta Shankar.
+Processing audio [2/13]: audio_2.wav
+Transcript: Madam, my name is Geeta Shankar.
 ```
 
 ### Intermediate saves and crash recovery
@@ -104,16 +96,11 @@ asyncio.run(eval(
 
 ## Metrics
 
-Speech to Text evaluation measures both accuracy and latency:
+Speech to Text evaluation measures accuracy using the following metrics:
 
-**Accuracy metrics:**
 - **WER (Word Error Rate)**: Edit distance between predicted and reference transcripts
 - **String Similarity**: Character-level similarity ratio
 - **LLM Judge Score**: Semantic evaluation using an LLM
-
-**Latency metrics:**
-- **TTFB (Time to First Byte)**: Time until first transcription response
-- **Processing Time**: Total time to complete transcription
 
 <Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
   Detailed explanation of all metrics, including why LLM Judge is necessary
@@ -125,8 +112,7 @@ Speech to Text evaluation measures both accuracy and latency:
 /path/to/output/provider
 ├── results.csv
 ├── metrics.json
-├── results.log
-└── logs
+└── results.log
 ```
 
 ### results.csv
@@ -143,53 +129,30 @@ Contains detailed results for each audio file:
 Contains aggregated metrics for the entire evaluation run:
 
 ```json
-[
-  {
-    "wer": 0.12962962962962962
-  },
-  {
-    "string_similarity": 0.8792465033551621
-  },
-  {
-    "llm_judge_score": 0.85
-  },
-  {
-    "metric_name": "ttfb",
-    "processor": "DeepgramSTTService#0",
-    "mean": 0.487,
-    "std": 0.234,
-    "values": [0.486, 0.512, 0.463, ...]
-  },
-  {
-    "metric_name": "processing_time",
-    "processor": "DeepgramSTTService#0",
-    "mean": 0.489,
-    "std": 0.235,
-    "values": [0.487, 0.514, 0.465, ...]
-  }
-]
+{
+  "wer": 0.12962962962962962,
+  "string_similarity": 0.8792465033551621,
+  "llm_judge_score": 0.85
+}
 ```
+
+- `wer`: Mean Word Error Rate across all audio files
+- `string_similarity`: Mean string similarity score across all audio files
+- `llm_judge_score`: Mean LLM Judge score across all audio files
 
 ### results.log
 
-Contains only the terminal output shown during evaluation - the human-readable progress of audio streaming and transcript generation. This is what you see in your terminal while running the evaluation:
+Contains the full logs of the evaluation including terminal output and debug information. Useful for debugging issues with specific providers or audio files.
 
 ```
-Running on port: 8765
 --------------------------------
 Running command: pense stt eval -p deepgram -i /path/to/data -o /path/to/output
 --------------------------------
-Created new user transcript
-Starting new audio streaming 1/13: /path/to/audio_1.wav
-Finished streaming audio: /path/to/audio_1.wav
-appending to last user transcript: Hi.
+Processing audio [1/13]: audio_1.wav
+Transcript: Hi.
 --------------------------------
 ...
 ```
-
-### logs
-
-Contains the full debug logs of the evaluation including all pipecat pipeline logs, frame processing details, and WebSocket communication. Useful for debugging issues with specific providers or audio files.
 
 ## Generate leaderboard
 
@@ -202,22 +165,18 @@ For the leaderboard to work correctly, all provider evaluations must use the **s
 ```
 /path/to/output/          # This is the output_dir you pass to leaderboard()
 ├── deepgram/
-│   ├── logs
 │   ├── results.log
 │   ├── results.csv
 │   └── metrics.json
 ├── google/
-│   ├── logs
 │   ├── results.log
 │   ├── results.csv
 │   └── metrics.json
 ├── openai/
-│   ├── logs
 │   ├── results.log
 │   ├── results.csv
 │   └── metrics.json
 └── sarvam/
-    ├── logs
     ├── results.log
     ├── results.csv
     └── metrics.json
@@ -253,22 +212,21 @@ An Excel workbook with:
 
 Example summary sheet:
 
-| run | count | wer | string_similarity | llm_judge_score | ttfb | processing_time |
-|-----|-------|-----|-------------------|-----------------|------|-----------------|
-| deepgram | 50 | 0.089 | 0.934 | 0.92 | 0.487 | 0.489 |
-| google | 50 | 0.112 | 0.912 | 0.88 | 0.654 | 0.656 |
-| openai | 50 | 0.095 | 0.928 | 0.90 | 0.823 | 0.825 |
-| sarvam | 50 | 0.156 | 0.891 | 0.82 | 2.308 | 2.309 |
+| run | count | wer | string_similarity | llm_judge_score |
+|-----|-------|-----|-------------------|-----------------|
+| deepgram | 50 | 0.089 | 0.934 | 0.92 |
+| google | 50 | 0.112 | 0.912 | 0.88 |
+| openai | 50 | 0.095 | 0.928 | 0.90 |
+| sarvam | 50 | 0.156 | 0.891 | 0.82 |
 
-#### all_metrics_by_run.png
+#### Per-Metric Charts
 
-A bar chart visualization comparing all metrics across providers:
+Individual bar chart visualizations for each metric, comparing all providers:
 
-![Leaderboard Chart](/images/stt_leaderboard_chart.png)
+- `wer.png` - Word Error Rate comparison (lower is better)
+- `string_similarity.png` - String Similarity comparison (higher is better)
+- `llm_judge_score.png` - LLM Judge Score comparison (higher is better)
+- `ttfb.png` - Time to First Byte comparison (lower is better)
+- `processing_time.png` - Processing Time comparison (lower is better)
 
-The chart displays:
-- WER (lower is better)
-- String Similarity (higher is better)
-- LLM Judge Score (higher is better)
-- TTFB in seconds (lower is better)
-- Processing Time in seconds (lower is better)
+Each chart displays the metric value for each provider with value labels on top of each bar for easy comparison.

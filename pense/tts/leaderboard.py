@@ -17,7 +17,6 @@ except ImportError:  # pragma: no cover
 TARGET_METRICS = [
     "llm_judge_score",
     "ttfb",
-    "processing_time",
 ]
 INVALID_SHEET_CHARS = set("[]:*?/\\")
 
@@ -68,6 +67,18 @@ def _read_metrics(metrics_path: Path) -> Dict[str, float]:
     with metrics_path.open("r", encoding="utf-8") as fp:
         data = json.load(fp)
 
+    # Handle new dict format (preferred)
+    if isinstance(data, dict) and "metric_name" not in data:
+        for key, value in data.items():
+            if isinstance(value, dict) and "mean" in value:
+                # Nested dict with mean/std/values (e.g., ttfb, processing_time)
+                metrics[key] = value["mean"]
+            elif isinstance(value, (int, float)):
+                # Simple float value (e.g., llm_judge_score)
+                metrics[key] = float(value)
+        return metrics
+
+    # Handle legacy list format for backwards compatibility
     if isinstance(data, dict):
         data = [data]
 
@@ -81,7 +92,8 @@ def _read_metrics(metrics_path: Path) -> Dict[str, float]:
             continue
 
         for key, value in entry.items():
-            metrics[key] = float(value)
+            if isinstance(value, (int, float)):
+                metrics[key] = float(value)
 
     return metrics
 
@@ -104,64 +116,68 @@ def _create_metric_charts(summary_df: pd.DataFrame, output_dir: Path) -> None:
         print("No metrics available to plot.")
         return
 
-    plot_df = summary_df[["run"] + available_metrics].copy()
-    plot_df = plot_df.melt(
-        id_vars="run",
-        value_vars=available_metrics,
-        var_name="metric",
-        value_name="value",
-    )
-    plot_df = plot_df.dropna(subset=["value"])
-    if plot_df.empty:
-        print("No metric values available to plot.")
-        return
-
-    runs = plot_df["run"].unique()
-    metrics = plot_df["metric"].unique()
-
     import numpy as np  # local import to avoid dependency if charts not needed
 
-    x = np.arange(len(metrics))
+    runs = summary_df["run"].tolist()
     total_runs = len(runs)
-    bar_width = min(0.8 / total_runs, 0.2)
-    offsets = (np.arange(total_runs) - (total_runs - 1) / 2) * bar_width
 
-    fig, ax = plt.subplots(figsize=(max(6, len(metrics) * 0.9), 5.5))
+    if total_runs == 0:
+        print("No runs available to plot.")
+        return
 
-    pivot_df = plot_df.pivot(index="metric", columns="run", values="value").reindex(
-        metrics
-    )
+    # Create a separate chart for each metric
+    for metric in available_metrics:
+        metric_values = summary_df[metric].tolist()
 
-    for idx, run in enumerate(runs):
-        heights = pivot_df[run].to_numpy()
-        ax.bar(
-            x + offsets[idx],
-            heights,
-            width=bar_width,
-            label=run,
-        )
+        # Skip if all values are NaN
+        if all(pd.isna(v) for v in metric_values):
+            print(f"Skipping {metric} chart - no values available.")
+            continue
 
-    ax.set_title("Metrics by Run")
-    ax.set_ylabel("Value")
-    ax.set_xlabel("Metric")
-    ax.set_xticks(x)
-    ax.set_xticklabels(
-        [metric.replace("_", " ").title() for metric in metrics],
-        rotation=45,
-        ha="right",
-    )
-    ax.set_ylim(bottom=0)
-    # ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(0.05))
-    ax.grid(axis="y", linestyle="--", alpha=0.4)
-    ax.legend(title="Run", bbox_to_anchor=(1.02, 1), loc="upper left")
+        # Replace NaN with 0 for plotting
+        metric_values = [0 if pd.isna(v) else v for v in metric_values]
 
-    fig.tight_layout()
+        fig, ax = plt.subplots(figsize=(max(6, total_runs * 0.8), 5))
 
-    chart_path = output_dir / "all_metrics_by_run.png"
-    fig.savefig(chart_path, dpi=300)
-    plt.close(fig)
+        x = np.arange(total_runs)
+        bar_width = 0.6
 
-    print(f"Saved combined chart at {chart_path}")
+        bars = ax.bar(x, metric_values, width=bar_width, color="steelblue")
+
+        # Add value labels on top of bars
+        for bar, value in zip(bars, metric_values):
+            height = bar.get_height()
+            # Format as integer if it's a whole number, otherwise show decimals
+            if value == int(value):
+                label = f"{int(value)}"
+            else:
+                label = f"{value:.4f}"
+            ax.annotate(
+                label,
+                xy=(bar.get_x() + bar.get_width() / 2, height),
+                xytext=(0, 3),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=9,
+            )
+
+        metric_title = metric.replace("_", " ").title()
+        ax.set_title(f"{metric_title} by Provider")
+        ax.set_ylabel(metric_title)
+        ax.set_xlabel("Provider")
+        ax.set_xticks(x)
+        ax.set_xticklabels(runs, rotation=45, ha="right")
+        ax.set_ylim(bottom=0)
+        ax.grid(axis="y", linestyle="--", alpha=0.4)
+
+        fig.tight_layout()
+
+        chart_path = output_dir / f"{metric}.png"
+        fig.savefig(chart_path, dpi=300)
+        plt.close(fig)
+
+        print(f"Saved {metric} chart at {chart_path}")
 
 
 def _write_workbook(

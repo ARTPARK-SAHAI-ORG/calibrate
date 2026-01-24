@@ -29,10 +29,7 @@ To evaluate different STT providers, first make sure to organize the input data 
 ```bash
 ├── /path/to/data
 │   └── stt.csv
-│   └── audios/wav
-│       └── audio_1.wav
-│       └── audio_2.wav
-│   └── audios/pcm16
+│   └── audios/
 │       └── audio_1.wav
 │       └── audio_2.wav
 ```
@@ -45,7 +42,7 @@ audio_1,"Hi"
 audio_2,"Madam, my name is Geeta Shankar"
 ```
 
-Store the audios in both `wav` and `pcm16` formats as different providers support different formats. The evaluation script will automatically select the right format for the provider you choose to evaluate.
+All audio files should be in WAV format and placed in the `audios/` folder. The file names should match the `id` column in `stt.csv`.
 
 Set the required environment variables for the STT provider you want to evaluate:
 
@@ -69,9 +66,9 @@ from pense.stt import eval, leaderboard
 
 # Run STT evaluation
 asyncio.run(eval(
-    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, etc.
-    language="english",   # english, hindi, or kannada
-    input_dir="/path/to/data",  # should contain stt.csv and audios/wav/, audios/pcm16/ folders
+    provider="deepgram",  # deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
+    language="english",   # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
+    input_dir="/path/to/data",  # should contain stt.csv and audios/ folder
     output_dir="/path/to/output",
     debug=True,           # optional: run on first 5 audio files only
     debug_count=5,        # optional: number of files in debug mode
@@ -83,27 +80,21 @@ You can use the sample inputs provided in [`pense/stt/examples/sample_input`](pe
 Sample output:
 
 ```
-Created new user transcript
-Starting new audio streaming: /path/to/audio_1.wav
-Finished streaming audio: /path/to/audio_1.wav
-appending to last user transcript: <transcript>.
 --------------------------------
-Created new user transcript
-Starting new audio streaming: /path/to/audio_2.wav
-Finished streaming audio: /path/to/audio_2.wav
-appending to last user transcript: <transcript_part_1>,
-appending to last user transcript: <transcript_part_2>,
+Processing audio [1/2]: audio_1.wav
+Transcript: Hi
+--------------------------------
+Processing audio [2/2]: audio_2.wav
+Transcript: Madam, my name is Geeta Shankar
 ```
 
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
-/path/to/output
-├── sarvam_english
-│   ├── logs
-│   ├── results.log
-│   ├── results.csv
-│   └── metrics.json
+/path/to/output/<provider>
+├── results.log
+├── results.csv
+└── metrics.json
 ```
 
 `results.csv` will have the following columns:
@@ -118,46 +109,18 @@ The definition of all the metrics we compute are stored in [`pense/stt/metrics.p
 `metrics.json` will have the following format:
 
 ```json
-[
-  {
-    "wer": 0.12962962962962962 // mean of the Word Error Rate (WER) across all audio files
-  },
-  {
-    "string_similarity": 0.8792465033551621 // mean of the string similarity score across all audio files
-  },
-  {
-    "llm_judge_score": 1.0 // mean of the LLM Judge score across all audio files
-  },
-  {
-    "metric_name": "ttfb", // Time to First Byte in seconds
-    "processor": "SarvamSTTService#0",
-    "mean": 2.3087445222414456,
-    "std": 2.4340144350359867,
-    "values": [
-      // values for each audio file
-      0.48694515228271484, 0.006701946258544922, 0.4470040798187256, 2.5300347805023193,
-      0.2064838409423828, 6.574702978134155, 3.0182559490203857, 2.9680559635162354,
-      7.94110107421875, 0.08572530746459961, 2.0372867584228516, 0.4102351665496826,
-      3.3011457920074463
-    ]
-  },
-  {
-    "metric_name": "processing_time", // Time taken by the service to respond in seconds
-    "processor": "SarvamSTTService#0",
-    "mean": 2.3089125706599307,
-    "std": 2.4341351775837228,
-    "values": [
-      // values for each audio file
-      0.48702311515808105, 0.006762981414794922, 0.4470367431640625, 2.530163049697876,
-      0.2065589427947998, 6.575268745422363, 3.0185441970825195, 2.9680910110473633,
-      7.941352128982544, 0.08578085899353027, 2.0373899936676025, 0.4102756977081299,
-      3.3016159534454346
-    ]
-  }
-]
+{
+  "wer": 0.12962962962962962,
+  "string_similarity": 0.8792465033551621,
+  "llm_judge_score": 1.0
+}
 ```
 
-`logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
+- `wer`: Mean Word Error Rate (WER) across all audio files
+- `string_similarity`: Mean string similarity score across all audio files
+- `llm_judge_score`: Mean LLM Judge score across all audio files
+
+`results.log` contains the full logs of the evaluation script including terminal output and debug information.
 
 You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_output) to see a sample output of the evaluation script.
 
@@ -165,15 +128,15 @@ You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
-| `input_dir` | str | Yes | - | Path to input directory containing audio files and stt.csv |
+| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq |
+| `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
-| `language` | str | No | "english" | Language of audio files: english, hindi, or kannada |
+| `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
 | `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
 | `debug` | bool | No | False | Run on first N audio files only |
 | `debug_count` | int | No | 5 | Number of files in debug mode |
 | `ignore_retry` | bool | No | False | Skip retry if not all audios processed |
-| `port` | int | No | 8765 | WebSocket port for STT bot |
+| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
 
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
@@ -186,11 +149,17 @@ leaderboard(
 )
 ```
 
-The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus `all_metrics_by_run.png` inside the save directory so you can compare providers side-by-side (`pense/stt/leaderboard.py`).
+The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus individual metric charts (e.g., `wer.png`, `string_similarity.png`, `llm_judge_score.png`) inside the save directory so you can compare providers side-by-side (`pense/stt/leaderboard.py`).
 
 You can checkout [`pense/stt/examples/leaderboard`](pense/stt/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](pense/stt/examples/leaderboard/all_metrics_by_run.png)
+<table>
+  <tr>
+    <td><img src="pense/stt/examples/leaderboard/wer.png" alt="WER by Provider" width="100%"></td>
+    <td><img src="pense/stt/examples/leaderboard/string_similarity.png" alt="String Similarity by Provider" width="100%"></td>
+    <td><img src="pense/stt/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
+  </tr>
+</table>
 
 ## Text To Speech (TTS)
 
@@ -226,8 +195,8 @@ from pense.tts import eval, leaderboard
 
 # Run TTS evaluation
 asyncio.run(eval(
-    provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam
-    language="english",     # english, hindi, or kannada
+    provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam, smallest
+    language="english",     # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
     input="/path/to/input.csv",
     output_dir="/path/to/output",
     debug=True,             # optional: run on first 5 texts only
@@ -241,23 +210,30 @@ Sample output:
 
 ```
 --------------------------------
-Streaming text [1/2]: <text_1>
-Creating new audio file at /path/to/audio_1.wav
-Appending audio chunk to /path/to/audio_1.wav
+Running command: pense tts eval -p elevenlabs -l english -i pense/tts/examples/sample.csv -o pense/tts/examples/sample_output
+Processing 2 texts with provider: elevenlabs
 --------------------------------
-Streaming text [2/2]: <text_2>
-Creating new audio file at /path/to/audio_2.wav
-Appending audio chunk to /path/to/audio_2.wav
+Processing [1/2]: row_1
+
+  TTFB: 1.511s
+Processing [2/2]: row_2
+
+  TTFB: 1.215s
+--------------------------------
+Successfully synthesized: 2 texts
+Running LLM judge evaluation...
+LLM Judge Score: 1.0
+Metrics saved to: pense/tts/examples/sample_output/elevenlabs/metrics.json
+Results saved to: pense/tts/examples/sample_output/elevenlabs/results.csv
 ```
 
 The output of the evaluation script will be saved in the output directory.
 
 ```bash
-/path/to/output/provider
+/path/to/output/<provider>
 ├── audios
-│   ├── 1.wav
-│   ├── 2.wav
-├── logs
+│   ├── row_1.wav
+│   ├── row_2.wav
 ├── results.log
 ├── results.csv
 └── metrics.json
@@ -266,36 +242,28 @@ The output of the evaluation script will be saved in the output directory.
 `results.csv` will have the following columns:
 
 ```csv
-id,text,audio_path,llm_judge_score,llm_judge_reasoning
-row_1,hello world,./out/audios/1.wav,True,"The provided audio says 'hello world'. The pronunciation is clear, and the words match exactly."
-row_2,this is a test,./out/audios/2.wav,True,"The audio clearly says 'this is a test' without any deviations or mispronunciations."
+id,text,audio_path,ttfb,llm_judge_score,llm_judge_reasoning
+row_1,hello world,./out/elevenlabs/audios/row_1.wav,1.5105640888214111,True,"The audio says 'hello world' clearly and matches the reference text exactly."
+row_2,this is a test,./out/elevenlabs/audios/row_2.wav,1.2153360843658447,True,"The audio clearly says 'this is a test,' which matches exactly with the provided reference text."
 ```
 
 `metrics.json` will have the following format:
 
 ```json
-[
-  {
-    "llm_judge_score": 1.0 // mean of the LLM Judge score across all audio files
-  },
-  {
-    "metric_name": "ttfb", // Time to First Byte in seconds
-    "processor": "GoogleTTSService#0",
-    "mean": 0.3538844585418701,
-    "std": 0.026930570602416992,
-    "values": [0.3808150291442871, 0.3269538879394531] // values for each text input
-  },
-  {
-    "metric_name": "processing_time", // Time taken by the service to respond in seconds
-    "processor": "GoogleTTSService#0",
-    "mean": 0.00022804737091064453,
-    "std": 2.7060508728027344e-5,
-    "values": [0.0002009868621826172, 0.0002551078796386719] // values for each text input
+{
+  "llm_judge_score": 1.0,
+  "ttfb": {
+    "mean": 1.362950086593628,
+    "std": 0.1476140022277832,
+    "values": [1.5105640888214111, 1.2153360843658447]
   }
-]
+}
 ```
 
-`logs` contain the full logs of the evaluation script including all the pipecat logs whereas `results.log` contains only the terminal output of the evaluation script as shown in the sample output above.
+- `llm_judge_score`: Mean LLM Judge score across all audio files
+- `ttfb`: Time to First Byte in seconds (mean, std, and per-text values)
+
+`results.log` contains the terminal output of the evaluation script as shown in the sample output above.
 
 You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_output) to see a sample output of the evaluation script.
 
@@ -304,12 +272,12 @@ You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `input` | str | Yes | - | Path to input CSV file containing texts to synthesize |
-| `provider` | str | No | "google" | TTS provider: cartesia, openai, groq, google, elevenlabs, sarvam |
-| `language` | str | No | "english" | Language: english, hindi, or kannada |
+| `provider` | str | No | "google" | TTS provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest |
+| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
 | `debug` | bool | No | False | Run on first N texts only |
 | `debug_count` | int | No | 5 | Number of texts in debug mode |
-| `port` | int | No | 8765 | WebSocket port for TTS bot |
+| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
 
 To benchmark several TTS runs, generate the combined workbook and chart with:
 
@@ -322,11 +290,16 @@ leaderboard(
 )
 ```
 
-`pense/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus `all_metrics_by_run.png` so you can spot which provider balances latency and judge scores best.
+`pense/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus individual metric charts (e.g., `llm_judge_score.png`, `ttfb.png`) so you can spot which provider balances latency and judge scores best.
 
 You can checkout [`pense/tts/examples/leaderboard`](pense/tts/examples/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](pense/tts/examples/leaderboard/all_metrics_by_run.png)
+<table>
+  <tr>
+    <td><img src="pense/tts/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
+    <td><img src="pense/tts/examples/leaderboard/ttfb.png" alt="TTFB by Provider" width="100%"></td>
+  </tr>
+</table>
 
 ## LLM tests
 
@@ -1184,38 +1157,6 @@ You can checkout `pense/agent/examples/test/sample_output` as a sample output of
 
 ## Documentation
 
-Pense documentation is built using [MkDocs](https://www.mkdocs.org) with the [Material theme](https://squidfunk.github.io/mkdocs-material/).
+Pense documentation is built using [Mintlify](https://mintlify.com). The documentation source files are located in the `docs/` directory.
 
-### Building Documentation Locally
-
-1. **Install documentation dependencies:**
-
-```bash
-uv pip install -r requirements-docs.txt
-```
-
-2. **Preview documentation locally:**
-
-```bash
-mkdocs serve
-```
-
-This will start a local server at `http://127.0.0.1:8000` where you can preview the documentation.
-
-## TODOs
-
-- Add support for running openai STT on the TTS outputs and evaluating it.
-- Add multiple dialects and accents in the voice agent simulation
-- Support for adding knowledge base to agent/llm simulations
-- Generate test cases instead of manually having to create them.
-- Build a UI to go along with this.
-- Currently, only user can speak first. Add support for the agent to speak first as well. Configurable.
-- Store transcripts and tool calls in the output directory when talking to an agent.
-- Support for adding custom config for each provider for each component to override the defaults.
-- Support for other telephony providers and be able to connect to a given agent.
-- Instructions on how to evaluate someone's own models not added to pipecat yet.
-- Evaluate even non-pipecat models
-
-## Bugs
-
-- EL is getting affected for one audio file based on the index of the audio file in the list of audio files to be run!
+Visit the [documentation site](https://docs.pense.dev) for the full documentation.

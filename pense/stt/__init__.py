@@ -34,7 +34,19 @@ async def eval(
     ],
     input_dir: str,
     output_dir: str = "./out",
-    language: Literal["english", "hindi"] = "english",
+    language: Literal[
+        "english",
+        "hindi",
+        "kannada",
+        "bengali",
+        "malayalam",
+        "marathi",
+        "odia",
+        "punjabi",
+        "tamil",
+        "telugu",
+        "gujarati",
+    ] = "english",
     input_file_name: str = "stt.csv",
     debug: bool = False,
     debug_count: int = 5,
@@ -48,7 +60,7 @@ async def eval(
         provider: STT provider to evaluate (deepgram, openai, cartesia, smallest, groq, google, sarvam, elevenlabs)
         input_dir: Path to input directory containing audio files and stt.csv
         output_dir: Path to output directory for results (default: ./out)
-        language: Language of the audio files (english or hindi)
+        language: Language of the audio files (english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati)
         input_file_name: Name of the input CSV file (default: stt.csv)
         debug: Run evaluation on first N audio files only
         debug_count: Number of audio files to run in debug mode (default: 5)

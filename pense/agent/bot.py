@@ -5,6 +5,7 @@ from loguru import logger
 import asyncio
 
 from pydantic import BaseModel
+from pense.utils import create_stt_service, create_tts_service
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
@@ -38,40 +39,10 @@ from pipecat.processors.aggregators.llm_response_universal import (
 )
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import RunnerArguments
-from pipecat.runner.utils import create_transport
-
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOptions
-
-from pipecat.services.deepgram.stt import DeepgramSTTService, Language, LiveOptions
-from pipecat.services.deepgram.tts import DeepgramTTSService
 
 from pipecat.services.openrouter.llm import OpenRouterLLMService
-
-from pipecat.services.openai.stt import OpenAISTTService
-from pipecat.services.openai.tts import OpenAITTSService
-
-from pense.integrations.smallest.stt import SmallestSTTService
-from pense.integrations.smallest.tts import SmallestTTSService
-
-from pipecat.services.groq.llm import GroqLLMService
-from pipecat.services.groq.stt import GroqSTTService
-from pipecat.services.groq.tts import GroqTTSService
-
-from pipecat.services.google.llm import GoogleLLMService
-from pipecat.services.google.stt import GoogleSTTService
-from pipecat.services.google.tts import GoogleTTSService
-
-from pipecat.services.sarvam.stt import SarvamSTTService
-from pipecat.services.sarvam.tts import SarvamTTSService
-
-from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService, Language
-from pipecat.services.elevenlabs.tts import (
-    ElevenLabsTTSService,
-)
-
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.transports.base_transport import BaseTransport, TransportParams
+from pipecat.transports.base_transport import BaseTransport
 
 # from pipecat.transports.daily.transport import DailyParams
 from pipecat.processors.transcript_processor import TranscriptProcessor
@@ -148,164 +119,15 @@ async def run_bot(
 
     bot_logger.info(f"Starting bot")
 
-    stt_language = (
-        Language.KN
-        if language == "kannada"
-        else Language.HI if language == "hindi" else Language.EN
+    # Create STT service using common utility
+    stt = create_stt_service(stt_config.provider, language)
+
+    # Create TTS service using common utility
+    tts = create_tts_service(
+        tts_config.provider,
+        language,
+        instructions=tts_config.instructions,
     )
-
-    if stt_config.provider == "deepgram":
-        stt = DeepgramSTTService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"),
-            live_options=LiveOptions(language=stt_language.value),
-        )
-    elif stt_config.provider == "groq":
-        stt = GroqSTTService(
-            api_key=os.getenv("GROQ_API_KEY"),
-            model="whisper-large-v3",
-            language=stt_language,
-        )
-    elif stt_config.provider == "google":
-        stt = GoogleSTTService(
-            sample_rate=16000,
-            location="us",
-            params=GoogleSTTService.InputParams(
-                languages=stt_language,
-                model="chirp_3",
-            ),
-            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-        )
-    elif stt_config.provider == "openai":
-        stt = OpenAISTTService(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            model="gpt-4o-mini-transcribe",
-            # prompt=prompt,
-            language=stt_language,
-        )
-    elif stt_config.provider == "elevenlabs":
-        stt = ElevenLabsRealtimeSTTService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
-            params=ElevenLabsRealtimeSTTService.InputParams(
-                language_code=stt_language.value,
-            ),
-        )
-    elif stt_config.provider == "sarvam":
-        stt_language = (
-            Language.KN_IN
-            if language == "kannada"
-            else Language.HI_IN if language == "hindi" else Language.EN_IN
-        )
-        stt = SarvamSTTService(
-            api_key=os.getenv("SARVAM_API_KEY"),
-            params=SarvamSTTService.InputParams(
-                language=stt_language.value,
-            ),
-        )
-    elif stt_config.provider == "cartesia":
-        stt = CartesiaSTTService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            live_options=CartesiaLiveOptions(language=stt_language.value),
-        )
-    elif stt_config.provider == "smallest":
-        stt = SmallestSTTService(
-            api_key=os.getenv("SMALLEST_API_KEY"),
-            url="wss://waves-api.smallest.ai/api/v1/asr",
-            params=SmallestSTTService.SmallestInputParams(
-                audioLanguage=stt_language,
-            ),
-        )
-
-    tts_language = (
-        Language.KN
-        if language == "kannada"
-        else Language.HI if language == "hindi" else Language.EN
-    )
-
-    language_to_voice_id = {
-        "english": {
-            "cartesia": "66c6b81c-ddb7-4892-bdd5-19b5a7be38e7",
-            "google": "en-US-Chirp3-HD-Achernar",
-        },
-        "hindi": {
-            "cartesia": "28ca2041-5dda-42df-8123-f58ea9c3da00",
-            "google": "hi-IN-Chirp3-HD-Achernar",
-        },
-        "kannada": {
-            "cartesia": "7c6219d2-e8d2-462c-89d8-7ecba7c75d65",
-            "google": "kn-IN-Chirp3-HD-Achernar",
-        },
-    }
-
-    if tts_config.provider == "cartesia":
-        tts = CartesiaTTSService(
-            api_key=os.getenv("CARTESIA_API_KEY"),
-            model="sonic-3",
-            params=CartesiaTTSService.InputParams(
-                language=tts_language,
-            ),
-            voice_id=language_to_voice_id[language][tts_config.provider],
-        )
-    elif tts_config.provider == "groq":
-        tts = GroqTTSService(
-            api_key=os.getenv("GROQ_API_KEY"),
-            model_name="canopylabs/orpheus-v1-english",
-            voice_id="autumn",
-        )
-    elif tts_config.provider == "google":
-        tts = GoogleTTSService(
-            voice_id=language_to_voice_id[language][tts_config.provider],
-            params=GoogleTTSService.InputParams(language=tts_language),
-            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-        )
-
-    elif tts_config.provider == "deepgram":
-        tts = DeepgramTTSService(
-            api_key=os.getenv("DEEPGRAM_API_KEY"), voice="aura-2-andromeda-en"
-        )
-
-    elif tts_config.provider == "elevenlabs":
-        tts = ElevenLabsTTSService(
-            api_key=os.getenv("ELEVENLABS_API_KEY"),
-            params=ElevenLabsTTSService.InputParams(
-                language=tts_language,
-            ),
-            voice_id="Ui0HFqLn4HkcAenlJJVJ",
-        )
-    elif tts_config.provider == "sarvam":
-        tts_language = (
-            Language.KN_IN
-            if language == "kannada"
-            else Language.HI_IN if language == "hindi" else Language.EN_IN
-        )
-        tts = SarvamTTSService(
-            api_key=os.getenv("SARVAM_API_KEY"),
-            model="bulbul:v2",
-            voice_id="abhilash",
-            params=SarvamTTSService.InputParams(language=tts_language),
-        )
-    elif tts_config.provider == "openai":
-
-        # You are an indian nurse in a public health clinic. Speak in a natural, conversational tone. Have an indian accent and you should sound indian. {extra_instructions}
-        tts = OpenAITTSService(
-            api_key=os.getenv("OPENAI_API_KEY"),
-            voice="fable",
-            instructions=tts_config.instructions,
-        )
-
-    elif tts_config.provider == "smallest":
-        tts = SmallestTTSService(
-            api_key=os.getenv("SMALLEST_API_KEY"),
-            voice_id=language_to_voice_id[language][tts_config.provider],
-            params=SmallestTTSService.InputParams(
-                language=tts_language,
-            ),
-        )
-
-    # tts = ElevenLabsHttpTTSService(
-    #         api_key=os.getenv("ELEVENLABS_API_KEY"),
-    #         voice_id="Ui0HFqLn4HkcAenlJJVJ",
-    #         aiohttp_session=session,
-    #     )
 
     if llm_config.provider == "openai":
         llm = OpenAILLMService(

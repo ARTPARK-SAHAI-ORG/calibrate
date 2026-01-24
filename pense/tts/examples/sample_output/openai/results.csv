@@ -1,0 +1,3 @@
+id,text,audio_path,ttfb,llm_judge_score,llm_judge_reasoning
+row_1,hello world,pense/tts/examples/sample_output/openai/audios/row_1.wav,1.8035879135131836,True,"The audio clearly says 'hello world' exactly as the reference text. The pronunciation is clear, and there are no extra words or missing words. The text is easily understandable from the audio."
+row_2,this is a test,pense/tts/examples/sample_output/openai/audios/row_2.wav,1.735213041305542,True,"The audio says 'this is a test,' which exactly matches the provided reference text. The pronunciation is clear, and the words are easily understandable. There are no discrepancies between the audio and the text."
