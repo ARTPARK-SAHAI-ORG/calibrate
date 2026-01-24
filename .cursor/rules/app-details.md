@@ -20,7 +20,7 @@ The framework enables:
 - **End-to-end simulations** - Run automated conversations with simulated users
 - **Benchmarking** - Compare performance across different AI providers
 
-Pense is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
+Pense uses direct API calls for STT and TTS provider evaluations, and [pipecat](https://github.com/pipecat-ai/pipecat) for voice agent simulations.
 
 ---
 
@@ -132,6 +132,8 @@ Evaluates STT providers by transcribing audio files and comparing against ground
 
 **Supported Providers:** deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
 
+**Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati (all Indian languages supported by Sarvam)
+
 **Metrics:**
 - **WER (Word Error Rate):** Measures transcription accuracy
 - **String Similarity:** Character-level similarity score
@@ -158,21 +160,22 @@ output_dir/provider/
 
 Evaluates TTS providers by synthesizing speech and measuring quality.
 
-**Supported Providers:** cartesia, openai, groq, google, elevenlabs, sarvam
+**Supported Providers:** cartesia, openai, groq, google, elevenlabs, sarvam, smallest
+
+**Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati (all Indian languages supported by Sarvam)
 
 **Metrics:**
 - **LLM Judge:** AI evaluation of pronunciation accuracy
-- **TTFB (Time to First Byte):** Latency measurement
-- **Processing Time:** Total synthesis time
+- **TTFB (Time to First Byte):** Latency measurement (time to receive first audio chunk)
 
 **Input:** CSV file with `id,text` columns
 
 **Output Structure:**
 ```
 output_dir/provider/
-├── audios/          # Generated audio files
-├── results.csv      # Per-text results
-├── metrics.json     # Aggregated metrics
+├── audios/          # Generated audio files (named after id: row_1.wav, row_2.wav, etc.)
+├── results.csv      # Per-text results (id, text, audio_path, ttfb, llm_judge_score, llm_judge_reasoning)
+├── metrics.json     # Aggregated metrics (llm_judge_score, ttfb with mean/std/values)
 └── results.log      # Terminal output
 ```
 
@@ -433,11 +436,18 @@ pense agent test -c ./config.json -o ./out
 
 - **Language:** Python 3.10+
 - **Package Manager:** uv
-- **Core Framework:** pipecat-ai
 - **Key Dependencies:**
-  - `pipecat-ai` - Voice pipeline framework
+  - `pipecat-ai` - Voice pipeline framework (used for voice agent simulations only)
+  - `openai` - OpenAI STT/TTS API
+  - `google-cloud-speech`, `google-cloud-texttospeech` - Google Cloud APIs
+  - `elevenlabs` - ElevenLabs STT/TTS API
+  - `cartesia` - Cartesia STT/TTS API
+  - `sarvamai` - Sarvam STT/TTS API
+  - `groq` - Groq STT/TTS API
+  - `deepgram-sdk` - Deepgram STT API
   - `instructor` - Structured LLM outputs
   - `jiwer` - WER calculation
+  - `pydub` - Audio format conversion (MP3 to WAV, etc.)
   - `numpy`, `pandas` - Data processing
   - `matplotlib` - Visualization
   - `openpyxl` - Excel exports
@@ -489,16 +499,11 @@ All modules read from a single `.env` file in the project root.
         "mean": 0.354,
         "std": 0.027,
         "values": [0.38, 0.33]
-    },
-    "processing_time": {
-        "mean": 0.0002,
-        "std": 0.00003,
-        "values": [0.0002, 0.00025]
     }
 }
 ```
 
-**Note:** TTS metrics.json structure matches the STT format - a flat dict with metric names as keys. For latency metrics (ttfb, processing_time), values are nested dicts with mean, std, and values array.
+**Note:** TTS metrics.json uses a flat dict with metric names as keys. The `ttfb` metric is a nested dict with mean, std, and values array.
 
 ### Results JSON (LLM Tests)
 
@@ -538,7 +543,7 @@ All modules support leaderboard generation that:
 - `stt_leaderboard.xlsx` / `tts_leaderboard.xlsx` / `llm_leaderboard.csv`
 - Individual metric charts - one chart per metric for easy comparison:
   - **STT:** `wer.png`, `string_similarity.png`, `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
-  - **TTS:** `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
+  - **TTS:** `llm_judge_score.png`, `ttfb.png`
 
 **Chart Features:**
 - Each chart shows all providers as bars on the x-axis
@@ -586,7 +591,24 @@ uv pip install -r requirements-docs.txt
 - Voice simulation audio uses 1-based indexing: `1_user.wav`, `1_bot.wav`, etc.
 
 ### Provider-Specific
-- Different providers may have different language support
+- **Separate STT/TTS language codes:** STT and TTS providers often support different languages. Language codes are managed separately in `pense/utils.py`:
+  - `get_stt_language_code(language, provider)` - For STT providers
+  - `get_tts_language_code(language, provider)` - For TTS providers
+  - `get_language_code()` - Deprecated, defaults to STT codes for backwards compatibility
+- **STT-specific dictionaries:** `DEEPGRAM_STT_LANGUAGE_CODES`, `OPENAI_STT_LANGUAGE_CODES`, `GOOGLE_STT_LANGUAGE_CODES`, `CARTESIA_STT_LANGUAGE_CODES`, `ELEVENLABS_STT_LANGUAGE_CODES`, `SMALLEST_STT_LANGUAGE_CODES`, `GROQ_STT_LANGUAGE_CODES`
+- **TTS-specific dictionaries:** `GOOGLE_TTS_LANGUAGE_CODES`, `CARTESIA_TTS_LANGUAGE_CODES`, `ELEVENLABS_TTS_LANGUAGE_CODES`, `GROQ_TTS_LANGUAGE_CODES`, `OPENAI_TTS_LANGUAGE_CODES`, `SMALLEST_TTS_LANGUAGE_CODES`
+- **Shared dictionaries:** `SARVAM_LANGUAGE_CODES` (same for both STT and TTS)
+- **Key differences between STT and TTS language support:**
+  - Groq TTS only supports English (Orpheus model), while Groq STT supports 50+ languages (Whisper)
+  - Cartesia TTS supports ~42 languages, STT supports 100+ languages
+  - Google TTS supports ~47 languages, STT supports 70+ languages
+  - ElevenLabs TTS supports ~29 languages, STT supports 90+ languages
+- **Language code formats vary by provider:**
+  - Sarvam uses BCP-47 Indian codes: `hi-IN`, `kn-IN`, `bn-IN`, etc.
+  - Google uses BCP-47 codes: `en-US`, `hi-IN`, etc.
+  - ElevenLabs uses ISO 639-3 codes: `eng`, `hin`, etc.
+  - Most others use ISO 639-1 codes: `en`, `hi`, `kn`, etc.
+- Not all providers support all 11 Indian languages - Sarvam has the most comprehensive support
 - Some providers require specific voice IDs for TTS
 - OpenRouter model names use `provider/model` format (e.g., `openai/gpt-4.1`)
 
@@ -599,6 +621,20 @@ uv pip install -r requirements-docs.txt
 - Use headphones to avoid audio feedback
 - Opens browser UI at `http://localhost:7860/client/`
 - Requires explicit `pense agent test` CLI command (no Python API for interactive mode)
+
+### STT/TTS Evaluation Architecture
+- **Direct API calls:** Both STT and TTS evaluations use direct provider SDK/API calls (not pipecat)
+- **Streaming TTFB:** Most TTS providers use streaming APIs and measure true TTFB (time to first audio chunk): OpenAI, ElevenLabs, Cartesia, Google, Sarvam, Smallest
+- **Non-streaming:** Groq does not support streaming and does not return TTFB
+- **Pipecat usage:** Only voice agent simulations use pipecat for the full STT→LLM→TTS pipeline
+- **Language validation:** `validate_stt_language()` and `validate_tts_language()` in `pense/utils.py` check if a language is supported by a provider before evaluation starts. Each function uses the appropriate STT or TTS language dictionaries. If invalid, the run stops with an error listing all supported languages for that provider.
+- **TTS audio saving patterns:** All TTS synthesize functions accept `audio_path` and save audio:
+  - Streaming providers (OpenAI, Cartesia) write chunks directly to file as they arrive
+  - Streaming providers (Google, Sarvam, Smallest) collect chunks then save combined audio (Google uses PCM encoding)
+  - ElevenLabs streams MP3, then converts to WAV using `convert_mp3_to_wav()` helper function (uses pydub)
+- **Optional TTFB:** TTS synthesize functions may return an empty dict `{}` if TTFB cannot be measured (e.g., Groq). The evaluation script handles this gracefully:
+  - Missing TTFB values are stored as `None` in results.csv
+  - Only valid TTFB values are included in metrics.json aggregation
 
 ### Metrics JSON Format
 - **Consistent structure:** Both STT and TTS use flat dict format with metric names as keys

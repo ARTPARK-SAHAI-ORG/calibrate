@@ -32,7 +32,7 @@ from pense.stt import eval
 
 asyncio.run(eval(
     provider="deepgram",  # deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
-    language="english",   # english, hindi, or kannada
+    language="english",   # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
     input_dir="/path/to/data",
     output_dir="/path/to/output",
     debug=True,           # optional: run on first 5 audio files only
@@ -47,7 +47,7 @@ asyncio.run(eval(
 | `provider` | str | Yes | - | Speech to Text provider: deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq |
 | `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
-| `language` | str | No | "english" | Language of audio files: english, hindi, or kannada |
+| `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
 | `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
 | `debug` | bool | No | False | Run on first N audio files only |
 | `debug_count` | int | No | 5 | Number of files in debug mode |

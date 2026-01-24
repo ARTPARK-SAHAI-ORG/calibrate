@@ -445,7 +445,7 @@ class MetricsLogger(FrameProcessor):
 # Language Code Utilities
 # =============================================================================
 
-# Sarvam supported language codes (Indian languages)
+# Sarvam supported language codes (Indian languages) - Same for STT and TTS
 SARVAM_LANGUAGE_CODES = {
     "english": "en-IN",
     "hindi": "hi-IN",
@@ -475,175 +475,12 @@ DEFAULT_LANGUAGE_CODES = {
     "gujarati": "gu",
 }
 
-# Google Speech-to-Text language codes (BCP-47)
-GOOGLE_LANGUAGE_CODES = {
-    # GA (Generally Available)
-    "catalan": "ca-ES",
-    "chinese": "cmn-Hans-CN",
-    "mandarin": "cmn-Hans-CN",
-    "croatian": "hr-HR",
-    "danish": "da-DK",
-    "dutch": "nl-NL",
-    "english": "en-US",
-    "finnish": "fi-FI",
-    "french": "fr-FR",
-    "german": "de-DE",
-    "greek": "el-GR",
-    "hindi": "hi-IN",
-    "italian": "it-IT",
-    "japanese": "ja-JP",
-    "korean": "ko-KR",
-    "polish": "pl-PL",
-    "portuguese": "pt-BR",
-    "romanian": "ro-RO",
-    "russian": "ru-RU",
-    "spanish": "es-ES",
-    "swedish": "sv-SE",
-    "turkish": "tr-TR",
-    "ukrainian": "uk-UA",
-    "vietnamese": "vi-VN",
-    # Preview
-    "arabic": "ar-XA",
-    "armenian": "hy-AM",
-    "bengali": "bn-IN",
-    "bulgarian": "bg-BG",
-    "burmese": "my-MM",
-    "cantonese": "yue-Hant-HK",
-    "czech": "cs-CZ",
-    "estonian": "et-EE",
-    "filipino": "fil-PH",
-    "gujarati": "gu-IN",
-    "hebrew": "iw-IL",
-    "hungarian": "hu-HU",
-    "indonesian": "id-ID",
-    "kannada": "kn-IN",
-    "khmer": "km-KH",
-    "lao": "lo-LA",
-    "latvian": "lv-LV",
-    "lithuanian": "lt-LT",
-    "malay": "ms-MY",
-    "malayalam": "ml-IN",
-    "marathi": "mr-IN",
-    "nepali": "ne-NP",
-    "norwegian": "no-NO",
-    "persian": "fa-IR",
-    "punjabi": "pa-Guru-IN",
-    "serbian": "sr-RS",
-    "slovak": "sk-SK",
-    "slovenian": "sl-SI",
-    "swahili": "sw",
-    "tamil": "ta-IN",
-    "telugu": "te-IN",
-    "thai": "th-TH",
-    "uzbek": "uz-UZ",
-}
+# =============================================================================
+# STT Provider Language Codes
+# =============================================================================
 
-# ElevenLabs supported language codes (ISO 639-3)
-ELEVENLABS_LANGUAGE_CODES = {
-    "afrikaans": "afr",
-    "amharic": "amh",
-    "arabic": "ara",
-    "armenian": "hye",
-    "assamese": "asm",
-    "asturian": "ast",
-    "azerbaijani": "aze",
-    "belarusian": "bel",
-    "bengali": "ben",
-    "bosnian": "bos",
-    "bulgarian": "bul",
-    "burmese": "mya",
-    "cantonese": "yue",
-    "catalan": "cat",
-    "cebuano": "ceb",
-    "chichewa": "nya",
-    "croatian": "hrv",
-    "czech": "ces",
-    "danish": "dan",
-    "dutch": "nld",
-    "english": "eng",
-    "estonian": "est",
-    "filipino": "fil",
-    "finnish": "fin",
-    "french": "fra",
-    "fulah": "ful",
-    "galician": "glg",
-    "ganda": "lug",
-    "georgian": "kat",
-    "german": "deu",
-    "greek": "ell",
-    "gujarati": "guj",
-    "hausa": "hau",
-    "hebrew": "heb",
-    "hindi": "hin",
-    "hungarian": "hun",
-    "icelandic": "isl",
-    "igbo": "ibo",
-    "indonesian": "ind",
-    "irish": "gle",
-    "italian": "ita",
-    "japanese": "jpn",
-    "javanese": "jav",
-    "kabuverdianu": "kea",
-    "kannada": "kan",
-    "kazakh": "kaz",
-    "khmer": "khm",
-    "korean": "kor",
-    "kurdish": "kur",
-    "kyrgyz": "kir",
-    "lao": "lao",
-    "latvian": "lav",
-    "lingala": "lin",
-    "lithuanian": "lit",
-    "luo": "luo",
-    "luxembourgish": "ltz",
-    "macedonian": "mkd",
-    "malay": "msa",
-    "malayalam": "mal",
-    "maltese": "mlt",
-    "mandarin": "zho",
-    "chinese": "zho",
-    "maori": "mri",
-    "marathi": "mar",
-    "mongolian": "mon",
-    "nepali": "nep",
-    "northern_sotho": "nso",
-    "norwegian": "nor",
-    "occitan": "oci",
-    "odia": "ori",
-    "pashto": "pus",
-    "persian": "fas",
-    "polish": "pol",
-    "portuguese": "por",
-    "punjabi": "pan",
-    "romanian": "ron",
-    "russian": "rus",
-    "serbian": "srp",
-    "shona": "sna",
-    "sindhi": "snd",
-    "slovak": "slk",
-    "slovenian": "slv",
-    "somali": "som",
-    "spanish": "spa",
-    "swahili": "swa",
-    "swedish": "swe",
-    "tamil": "tam",
-    "tajik": "tgk",
-    "telugu": "tel",
-    "thai": "tha",
-    "turkish": "tur",
-    "ukrainian": "ukr",
-    "umbundu": "umb",
-    "urdu": "urd",
-    "uzbek": "uzb",
-    "vietnamese": "vie",
-    "welsh": "cym",
-    "wolof": "wol",
-    "xhosa": "xho",
-    "zulu": "zul",
-}
-
-# Deepgram supported language codes
-DEEPGRAM_LANGUAGE_CODES = {
+# Deepgram STT supported language codes (STT only)
+DEEPGRAM_STT_LANGUAGE_CODES = {
     "belarusian": "be",
     "bengali": "bn",
     "bosnian": "bs",
@@ -690,8 +527,8 @@ DEEPGRAM_LANGUAGE_CODES = {
     "vietnamese": "vi",
 }
 
-# OpenAI/Groq Whisper supported language codes (ISO 639-1)
-OPENAI_LANGUAGE_CODES = {
+# OpenAI STT (Whisper) supported language codes (ISO 639-1)
+OPENAI_STT_LANGUAGE_CODES = {
     "afrikaans": "af",
     "arabic": "ar",
     "armenian": "hy",
@@ -751,209 +588,644 @@ OPENAI_LANGUAGE_CODES = {
     "welsh": "cy",
 }
 
-# Groq uses the same Whisper model as OpenAI
-GROQ_LANGUAGE_CODES = OPENAI_LANGUAGE_CODES
+# Groq STT uses the same Whisper model as OpenAI
+GROQ_STT_LANGUAGE_CODES = OPENAI_STT_LANGUAGE_CODES
 
-# Cartesia supported language codes
-CARTESIA_LANGUAGE_CODES = {
-    "english": "en",
-    "chinese": "zh",
-    "german": "de",
-    "spanish": "es",
-    "russian": "ru",
-    "korean": "ko",
-    "french": "fr",
-    "japanese": "ja",
-    "portuguese": "pt",
-    "turkish": "tr",
-    "polish": "pl",
-    "catalan": "ca",
-    "dutch": "nl",
-    "arabic": "ar",
-    "swedish": "sv",
-    "italian": "it",
-    "indonesian": "id",
-    "hindi": "hi",
-    "finnish": "fi",
-    "vietnamese": "vi",
-    "hebrew": "he",
-    "ukrainian": "uk",
-    "greek": "el",
-    "malay": "ms",
-    "czech": "cs",
-    "romanian": "ro",
-    "danish": "da",
-    "hungarian": "hu",
-    "tamil": "ta",
-    "norwegian": "no",
-    "thai": "th",
-    "urdu": "ur",
-    "croatian": "hr",
-    "bulgarian": "bg",
-    "lithuanian": "lt",
-    "latin": "la",
-    "maori": "mi",
-    "malayalam": "ml",
-    "welsh": "cy",
-    "slovak": "sk",
-    "telugu": "te",
-    "persian": "fa",
-    "latvian": "lv",
-    "bengali": "bn",
-    "serbian": "sr",
-    "azerbaijani": "az",
-    "slovenian": "sl",
-    "kannada": "kn",
-    "estonian": "et",
-    "macedonian": "mk",
-    "breton": "br",
-    "basque": "eu",
-    "icelandic": "is",
-    "armenian": "hy",
-    "nepali": "ne",
-    "mongolian": "mn",
-    "bosnian": "bs",
-    "kazakh": "kk",
+# Cartesia STT supported language codes (Whisper-based, very extensive)
+CARTESIA_STT_LANGUAGE_CODES = {
+    "afrikaans": "af",
     "albanian": "sq",
-    "swahili": "sw",
-    "galician": "gl",
-    "marathi": "mr",
-    "punjabi": "pa",
-    "sinhala": "si",
-    "khmer": "km",
-    "shona": "sn",
-    "yoruba": "yo",
-    "somali": "so",
-    "afrikaans": "af",
-    "occitan": "oc",
-    "georgian": "ka",
-    "belarusian": "be",
-    "tajik": "tg",
-    "sindhi": "sd",
-    "gujarati": "gu",
     "amharic": "am",
-    "yiddish": "yi",
-    "lao": "lo",
-    "uzbek": "uz",
-    "faroese": "fo",
-    "haitian": "ht",
-    "pashto": "ps",
-    "turkmen": "tk",
-    "nynorsk": "nn",
-    "maltese": "mt",
-    "sanskrit": "sa",
-    "luxembourgish": "lb",
-    "burmese": "my",
-    "tibetan": "bo",
-    "tagalog": "tl",
-    "malagasy": "mg",
+    "arabic": "ar",
+    "armenian": "hy",
     "assamese": "as",
-    "tatar": "tt",
-    "hawaiian": "haw",
-    "lingala": "ln",
-    "hausa": "ha",
+    "azerbaijani": "az",
     "bashkir": "ba",
+    "basque": "eu",
+    "belarusian": "be",
+    "bengali": "bn",
+    "bosnian": "bs",
+    "breton": "br",
+    "bulgarian": "bg",
+    "burmese": "my",
+    "catalan": "ca",
+    "chinese": "zh",
+    "croatian": "hr",
+    "czech": "cs",
+    "danish": "da",
+    "dutch": "nl",
+    "english": "en",
+    "estonian": "et",
+    "faroese": "fo",
+    "finnish": "fi",
+    "french": "fr",
+    "galician": "gl",
+    "georgian": "ka",
+    "german": "de",
+    "greek": "el",
+    "gujarati": "gu",
+    "haitian": "ht",
+    "hausa": "ha",
+    "hawaiian": "haw",
+    "hebrew": "he",
+    "hindi": "hi",
+    "hungarian": "hu",
+    "icelandic": "is",
+    "indonesian": "id",
+    "italian": "it",
+    "japanese": "ja",
     "javanese": "jw",
+    "kannada": "kn",
+    "kazakh": "kk",
+    "khmer": "km",
+    "korean": "ko",
+    "lao": "lo",
+    "latin": "la",
+    "latvian": "lv",
+    "lingala": "ln",
+    "lithuanian": "lt",
+    "luxembourgish": "lb",
+    "macedonian": "mk",
+    "malagasy": "mg",
+    "malay": "ms",
+    "malayalam": "ml",
+    "maltese": "mt",
+    "maori": "mi",
+    "marathi": "mr",
+    "mongolian": "mn",
+    "nepali": "ne",
+    "norwegian": "no",
+    "nynorsk": "nn",
+    "occitan": "oc",
+    "pashto": "ps",
+    "persian": "fa",
+    "polish": "pl",
+    "portuguese": "pt",
+    "punjabi": "pa",
+    "romanian": "ro",
+    "russian": "ru",
+    "sanskrit": "sa",
+    "serbian": "sr",
+    "shona": "sn",
+    "sindhi": "sd",
+    "sinhala": "si",
+    "slovak": "sk",
+    "slovenian": "sl",
+    "somali": "so",
+    "spanish": "es",
     "sundanese": "su",
+    "swahili": "sw",
+    "swedish": "sv",
+    "tagalog": "tl",
+    "tajik": "tg",
+    "tamil": "ta",
+    "tatar": "tt",
+    "telugu": "te",
+    "thai": "th",
+    "tibetan": "bo",
+    "turkish": "tr",
+    "turkmen": "tk",
+    "ukrainian": "uk",
+    "urdu": "ur",
+    "uzbek": "uz",
+    "vietnamese": "vi",
+    "welsh": "cy",
+    "yiddish": "yi",
+    "yoruba": "yo",
     "cantonese": "yue",
-    "odia": "or",  # Adding odia with standard code
 }
 
-# Smallest supported language codes
-SMALLEST_LANGUAGE_CODES = {
-    "italian": "it",
-    "spanish": "es",
-    "english": "en",
-    "portuguese": "pt",
-    "hindi": "hi",
-    "german": "de",
-    "french": "fr",
-    "ukrainian": "uk",
-    "russian": "ru",
-    "kannada": "kn",
-    "malayalam": "ml",
-    "polish": "pl",
-    "marathi": "mr",
-    "gujarati": "gu",
-    "czech": "cs",
-    "slovak": "sk",
-    "telugu": "te",
-    "odia": "or",  # Smallest uses 'or' for Odia
-    "dutch": "nl",
+# Smallest STT supported language codes
+SMALLEST_STT_LANGUAGE_CODES = {
     "bengali": "bn",
-    "latvian": "lv",
-    "estonian": "et",
-    "romanian": "ro",
-    "punjabi": "pa",
-    "finnish": "fi",
-    "swedish": "sv",
     "bulgarian": "bg",
-    "tamil": "ta",
-    "hungarian": "hu",
+    "czech": "cs",
     "danish": "da",
+    "dutch": "nl",
+    "english": "en",
+    "estonian": "et",
+    "finnish": "fi",
+    "french": "fr",
+    "german": "de",
+    "gujarati": "gu",
+    "hindi": "hi",
+    "hungarian": "hu",
+    "italian": "it",
+    "kannada": "kn",
+    "latvian": "lv",
     "lithuanian": "lt",
+    "malayalam": "ml",
     "maltese": "mt",
+    "marathi": "mr",
+    "odia": "or",
+    "polish": "pl",
+    "portuguese": "pt",
+    # "punjabi": "pa",
+    "romanian": "ro",
+    "russian": "ru",
+    "slovak": "sk",
+    "spanish": "es",
+    "swedish": "sv",
+    "tamil": "ta",
+    "telugu": "te",
+    "ukrainian": "uk",
 }
+
+# Google STT supported language codes (BCP-47)
+GOOGLE_STT_LANGUAGE_CODES = {
+    "afrikaans": "af-ZA",
+    "amharic": "am-ET",
+    "arabic": "ar-XA",
+    "armenian": "hy-AM",
+    "assamese": "as-IN",
+    "azerbaijani": "az-AZ",
+    "bengali": "bn-IN",
+    "bulgarian": "bg-BG",
+    "burmese": "my-MM",
+    "catalan": "ca-ES",
+    "chinese": "cmn-Hans-CN",
+    "croatian": "hr-HR",
+    "czech": "cs-CZ",
+    "danish": "da-DK",
+    "dutch": "nl-NL",
+    "english": "en-US",
+    "estonian": "et-EE",
+    "filipino": "fil-PH",
+    "finnish": "fi-FI",
+    "french": "fr-FR",
+    "galician": "gl-ES",
+    "georgian": "ka-GE",
+    "german": "de-DE",
+    "greek": "el-GR",
+    "gujarati": "gu-IN",
+    "hebrew": "iw-IL",
+    "hindi": "hi-IN",
+    "hungarian": "hu-HU",
+    "icelandic": "is-IS",
+    "indonesian": "id-ID",
+    "italian": "it-IT",
+    "japanese": "ja-JP",
+    "javanese": "jv-ID",
+    "kannada": "kn-IN",
+    "kazakh": "kk-KZ",
+    "khmer": "km-KH",
+    "korean": "ko-KR",
+    "lao": "lo-LA",
+    "latvian": "lv-LV",
+    "lithuanian": "lt-LT",
+    "macedonian": "mk-MK",
+    "malay": "ms-MY",
+    "malayalam": "ml-IN",
+    "marathi": "mr-IN",
+    "mongolian": "mn-MN",
+    "nepali": "ne-NP",
+    "norwegian": "no-NO",
+    "odia": "or-IN",
+    "persian": "fa-IR",
+    "polish": "pl-PL",
+    "portuguese": "pt-BR",
+    "punjabi": "pa-Guru-IN",
+    "romanian": "ro-RO",
+    "russian": "ru-RU",
+    "sepedi": "nso-ZA",
+    "serbian": "sr-RS",
+    "slovak": "sk-SK",
+    "slovenian": "sl-SI",
+    "spanish": "es-ES",
+    "swahili": "sw-KE",
+    "swedish": "sv-SE",
+    "tamil": "ta-IN",
+    "telugu": "te-IN",
+    "thai": "th-TH",
+    "turkish": "tr-TR",
+    "ukrainian": "uk-UA",
+    "urdu": "ur-PK",
+    "uzbek": "uz-UZ",
+    "vietnamese": "vi-VN",
+    "xhosa": "xh-ZA",
+    "zulu": "zu-ZA",
+}
+
+# ElevenLabs STT supported language codes (ISO 639-3, extensive)
+ELEVENLABS_STT_LANGUAGE_CODES = {
+    "afrikaans": "afr",
+    "amharic": "amh",
+    "arabic": "ara",
+    "armenian": "hye",
+    "assamese": "asm",
+    "asturian": "ast",
+    "azerbaijani": "aze",
+    "belarusian": "bel",
+    "bengali": "ben",
+    "bosnian": "bos",
+    "bulgarian": "bul",
+    "burmese": "mya",
+    "cantonese": "yue",
+    "catalan": "cat",
+    "croatian": "hrv",
+    "czech": "ces",
+    "danish": "dan",
+    "dutch": "nld",
+    "english": "eng",
+    "estonian": "est",
+    "filipino": "fil",
+    "finnish": "fin",
+    "french": "fra",
+    "galician": "glg",
+    "ganda": "lug",
+    "georgian": "kat",
+    "german": "deu",
+    "greek": "ell",
+    "gujarati": "guj",
+    "hausa": "hau",
+    "hebrew": "heb",
+    "hindi": "hin",
+    "hungarian": "hun",
+    "icelandic": "isl",
+    "igbo": "ibo",
+    "indonesian": "ind",
+    "irish": "gle",
+    "italian": "ita",
+    "japanese": "jpn",
+    "javanese": "jav",
+    "kannada": "kan",
+    "kazakh": "kaz",
+    "khmer": "khm",
+    "korean": "kor",
+    "kurdish": "kur",
+    "kyrgyz": "kir",
+    "lao": "lao",
+    "latvian": "lav",
+    "lithuanian": "lit",
+    "luxembourgish": "ltz",
+    "macedonian": "mkd",
+    "malay": "msa",
+    "malayalam": "mal",
+    "maltese": "mlt",
+    "mandarin": "zho",
+    "chinese": "zho",
+    "maori": "mri",
+    "marathi": "mar",
+    "mongolian": "mon",
+    "nepali": "nep",
+    "northern_sotho": "nso",
+    "norwegian": "nor",
+    "occitan": "oci",
+    "odia": "ori",
+    "pashto": "pus",
+    "persian": "fas",
+    "polish": "pol",
+    "portuguese": "por",
+    "punjabi": "pan",
+    "romanian": "ron",
+    "russian": "rus",
+    "serbian": "srp",
+    "shona": "sna",
+    "sindhi": "snd",
+    "slovak": "slk",
+    "slovenian": "slv",
+    "somali": "som",
+    "spanish": "spa",
+    "swahili": "swa",
+    "swedish": "swe",
+    "tajik": "tgk",
+    "tamil": "tam",
+    "telugu": "tel",
+    "thai": "tha",
+    "turkish": "tur",
+    "ukrainian": "ukr",
+    "urdu": "urd",
+    "uzbek": "uzb",
+    "vietnamese": "vie",
+    "welsh": "cym",
+    "wolof": "wol",
+    "xhosa": "xho",
+    "yoruba": "yor",
+    "zulu": "zul",
+}
+
+# =============================================================================
+# TTS Provider Language Codes
+# =============================================================================
+
+# Cartesia TTS supported language codes (more limited than STT)
+CARTESIA_TTS_LANGUAGE_CODES = {
+    "arabic": "ar",
+    "bengali": "bn",
+    "bulgarian": "bg",
+    "chinese": "zh",
+    "croatian": "hr",
+    "czech": "cs",
+    "danish": "da",
+    "dutch": "nl",
+    "english": "en",
+    "finnish": "fi",
+    "french": "fr",
+    "georgian": "ka",
+    "german": "de",
+    "greek": "el",
+    "gujarati": "gu",
+    "hebrew": "he",
+    "hindi": "hi",
+    "hungarian": "hu",
+    "indonesian": "id",
+    "italian": "it",
+    "japanese": "ja",
+    "kannada": "kn",
+    "korean": "ko",
+    "malayalam": "ml",
+    "marathi": "mr",
+    "norwegian": "no",
+    "polish": "pl",
+    "portuguese": "pt",
+    "punjabi": "pa",
+    "romanian": "ro",
+    "russian": "ru",
+    "slovak": "sk",
+    "spanish": "es",
+    "swedish": "sv",
+    "tagalog": "tl",
+    "tamil": "ta",
+    "telugu": "te",
+    "thai": "th",
+    "turkish": "tr",
+    "ukrainian": "uk",
+    "vietnamese": "vi",
+}
+
+# Google TTS supported language codes (BCP-47, more limited than STT)
+GOOGLE_TTS_LANGUAGE_CODES = {
+    "arabic": "ar-XA",
+    "bengali": "bn-IN",
+    "bulgarian": "bg-BG",
+    "chinese": "cmn-Hans-CN",
+    "croatian": "hr-HR",
+    "czech": "cs-CZ",
+    "danish": "da-DK",
+    "dutch": "nl-NL",
+    "english": "en-US",
+    "estonian": "et-EE",
+    "finnish": "fi-FI",
+    "french": "fr-FR",
+    "german": "de-DE",
+    "greek": "el-GR",
+    "gujarati": "gu-IN",
+    "hebrew": "iw-IL",
+    "hindi": "hi-IN",
+    "hungarian": "hu-HU",
+    "indonesian": "id-ID",
+    "italian": "it-IT",
+    "japanese": "ja-JP",
+    "kannada": "kn-IN",
+    "korean": "ko-KR",
+    "latvian": "lv-LV",
+    "lithuanian": "lt-LT",
+    "malayalam": "ml-IN",
+    "marathi": "mr-IN",
+    "norwegian": "no-NO",
+    "polish": "pl-PL",
+    "portuguese": "pt-BR",
+    "punjabi": "pa-Guru-IN",
+    "romanian": "ro-RO",
+    "russian": "ru-RU",
+    "serbian": "sr-RS",
+    "slovak": "sk-SK",
+    "slovenian": "sl-SI",
+    "spanish": "es-ES",
+    "swahili": "sw-KE",
+    "swedish": "sv-SE",
+    "tamil": "ta-IN",
+    "telugu": "te-IN",
+    "thai": "th-TH",
+    "turkish": "tr-TR",
+    "ukrainian": "uk-UA",
+    "urdu": "ur-PK",
+    "vietnamese": "vi-VN",
+}
+
+# ElevenLabs TTS supported language codes (more limited than STT)
+ELEVENLABS_TTS_LANGUAGE_CODES = {
+    "arabic": "ara",
+    "bulgarian": "bul",
+    "chinese": "zho",
+    "croatian": "hrv",
+    "czech": "ces",
+    "danish": "dan",
+    "dutch": "nld",
+    "english": "eng",
+    "filipino": "fil",
+    "finnish": "fin",
+    "french": "fra",
+    "german": "deu",
+    "greek": "ell",
+    "hindi": "hin",
+    "indonesian": "ind",
+    "italian": "ita",
+    "japanese": "jpn",
+    "korean": "kor",
+    "malay": "msa",
+    "polish": "pol",
+    "portuguese": "por",
+    "romanian": "ron",
+    "russian": "rus",
+    "slovak": "slk",
+    "spanish": "spa",
+    "swedish": "swe",
+    "tamil": "tam",
+    "turkish": "tur",
+    "ukrainian": "ukr",
+}
+
+# OpenAI TTS supported language codes (similar to STT)
+OPENAI_TTS_LANGUAGE_CODES = OPENAI_STT_LANGUAGE_CODES
+
+# Groq TTS supported language codes (only English for Orpheus)
+GROQ_TTS_LANGUAGE_CODES = {
+    "english": "en",
+}
+
+# Smallest TTS supported language codes (same as STT)
+SMALLEST_TTS_LANGUAGE_CODES = SMALLEST_STT_LANGUAGE_CODES
+
+# =============================================================================
+# Legacy aliases for backwards compatibility
+# =============================================================================
+DEEPGRAM_LANGUAGE_CODES = DEEPGRAM_STT_LANGUAGE_CODES
+OPENAI_LANGUAGE_CODES = OPENAI_STT_LANGUAGE_CODES
+GROQ_LANGUAGE_CODES = GROQ_STT_LANGUAGE_CODES
+CARTESIA_LANGUAGE_CODES = CARTESIA_STT_LANGUAGE_CODES
+GOOGLE_LANGUAGE_CODES = GOOGLE_STT_LANGUAGE_CODES
+ELEVENLABS_LANGUAGE_CODES = ELEVENLABS_STT_LANGUAGE_CODES
+SMALLEST_LANGUAGE_CODES = SMALLEST_STT_LANGUAGE_CODES
+
+
+def get_stt_language_code(language: str, provider: str) -> str:
+    """Get the appropriate language code string for an STT provider.
+
+    Args:
+        language: The language name (e.g., english, hindi, kannada)
+        provider: The STT provider name (sarvam, google, deepgram, openai, etc.)
+
+    Returns:
+        The appropriate language code string for the STT provider
+
+    Examples:
+        >>> get_stt_language_code("hindi", "sarvam")
+        'hi-IN'
+        >>> get_stt_language_code("hindi", "deepgram")
+        'hi'
+        >>> get_stt_language_code("english", "google")
+        'en-US'
+    """
+    language = language.lower()
+
+    if provider == "sarvam":
+        return SARVAM_LANGUAGE_CODES.get(language, "en-IN")
+    elif provider == "google":
+        return GOOGLE_STT_LANGUAGE_CODES.get(language, "en-US")
+    elif provider == "smallest":
+        return SMALLEST_STT_LANGUAGE_CODES.get(language, "multi")
+    elif provider == "cartesia":
+        return CARTESIA_STT_LANGUAGE_CODES.get(language, "en")
+    elif provider == "elevenlabs":
+        return ELEVENLABS_STT_LANGUAGE_CODES.get(language, "eng")
+    elif provider == "openai":
+        return OPENAI_STT_LANGUAGE_CODES.get(language, "en")
+    elif provider == "groq":
+        return GROQ_STT_LANGUAGE_CODES.get(language, "en")
+    elif provider == "deepgram":
+        return DEEPGRAM_STT_LANGUAGE_CODES.get(language, "en")
+
+    # Default: use ISO 639-1 codes
+    return DEFAULT_LANGUAGE_CODES.get(language, "en")
+
+
+def get_tts_language_code(language: str, provider: str) -> str:
+    """Get the appropriate language code string for a TTS provider.
+
+    Args:
+        language: The language name (e.g., english, hindi, kannada)
+        provider: The TTS provider name (sarvam, google, cartesia, openai, etc.)
+
+    Returns:
+        The appropriate language code string for the TTS provider
+
+    Examples:
+        >>> get_tts_language_code("hindi", "sarvam")
+        'hi-IN'
+        >>> get_tts_language_code("hindi", "cartesia")
+        'hi'
+        >>> get_tts_language_code("english", "groq")
+        'en'
+    """
+    language = language.lower()
+
+    if provider == "sarvam":
+        return SARVAM_LANGUAGE_CODES.get(language, "en-IN")
+    elif provider == "google":
+        return GOOGLE_TTS_LANGUAGE_CODES.get(language, "en-US")
+    elif provider == "smallest":
+        return SMALLEST_TTS_LANGUAGE_CODES.get(language, "en")
+    elif provider == "cartesia":
+        return CARTESIA_TTS_LANGUAGE_CODES.get(language, "en")
+    elif provider == "elevenlabs":
+        return ELEVENLABS_TTS_LANGUAGE_CODES.get(language, "eng")
+    elif provider == "openai":
+        return OPENAI_TTS_LANGUAGE_CODES.get(language, "en")
+    elif provider == "groq":
+        return GROQ_TTS_LANGUAGE_CODES.get(language, "en")
+
+    # Default: use ISO 639-1 codes
+    return DEFAULT_LANGUAGE_CODES.get(language, "en")
 
 
 def get_language_code(language: str, provider: str) -> str:
     """Get the appropriate language code string for a provider.
 
-    This is a global utility function that returns string language codes
-    suitable for direct API calls to various STT/TTS providers.
+    DEPRECATED: Use get_stt_language_code() or get_tts_language_code() instead.
+    This function defaults to STT language codes for backwards compatibility.
 
     Args:
-        language: The language name (english, hindi, kannada, bengali, malayalam,
-                  marathi, odia, punjabi, tamil, telugu, gujarati)
+        language: The language name (english, hindi, kannada, etc.)
         provider: The provider name (sarvam, google, deepgram, openai, etc.)
 
     Returns:
         The appropriate language code string for the provider
+    """
+    return get_stt_language_code(language, provider)
 
-    Examples:
-        >>> get_language_code("hindi", "sarvam")
-        'hi-IN'
-        >>> get_language_code("hindi", "deepgram")
-        'hi'
-        >>> get_language_code("english", "google")
-        'en-US'
+
+def validate_stt_language(language: str, provider: str) -> None:
+    """Validate that a language is supported by the given STT provider.
+
+    Args:
+        language: The language name (e.g., english, hindi, kannada)
+        provider: The STT provider name
+
+    Raises:
+        ValueError: If the language is not supported by the provider
     """
     language = language.lower()
 
-    # Sarvam uses Indian regional codes
-    if provider == "sarvam":
-        return SARVAM_LANGUAGE_CODES.get(language, "en-IN")
+    # Map providers to their STT language code dictionaries
+    provider_languages = {
+        "sarvam": SARVAM_LANGUAGE_CODES,
+        "google": GOOGLE_STT_LANGUAGE_CODES,
+        "smallest": SMALLEST_STT_LANGUAGE_CODES,
+        "cartesia": CARTESIA_STT_LANGUAGE_CODES,
+        "elevenlabs": ELEVENLABS_STT_LANGUAGE_CODES,
+        "openai": OPENAI_STT_LANGUAGE_CODES,
+        "groq": GROQ_STT_LANGUAGE_CODES,
+        "deepgram": DEEPGRAM_STT_LANGUAGE_CODES,
+    }
 
-    # Google uses BCP-47 codes
-    if provider == "google":
-        return GOOGLE_LANGUAGE_CODES.get(language, "en-US")
+    if provider not in provider_languages:
+        raise ValueError(f"Unknown STT provider: {provider}")
 
-    # Smallest uses ISO 639-1 codes with 'or' for Odia
-    if provider == "smallest":
-        return SMALLEST_LANGUAGE_CODES.get(language, "en")
+    supported_languages = provider_languages[provider]
 
-    # Cartesia uses ISO 639-1 codes
-    if provider == "cartesia":
-        return CARTESIA_LANGUAGE_CODES.get(language, "en")
+    if language not in supported_languages:
+        supported_list = sorted(supported_languages.keys())
+        raise ValueError(
+            f"Language '{language}' is not supported by {provider} STT.\n"
+            f"Supported languages for {provider} STT: {', '.join(supported_list)}"
+        )
 
-    # ElevenLabs uses ISO 639-3 codes
-    if provider == "elevenlabs":
-        return ELEVENLABS_LANGUAGE_CODES.get(language, "eng")
 
-    # OpenAI uses ISO 639-1 codes
-    if provider == "openai":
-        return OPENAI_LANGUAGE_CODES.get(language, "en")
+def validate_tts_language(language: str, provider: str) -> None:
+    """Validate that a language is supported by the given TTS provider.
 
-    # Groq uses same codes as OpenAI (Whisper model)
-    if provider == "groq":
-        return GROQ_LANGUAGE_CODES.get(language, "en")
+    Args:
+        language: The language name (e.g., english, hindi, kannada)
+        provider: The TTS provider name
 
-    # Deepgram uses ISO 639-1 codes
-    if provider == "deepgram":
-        return DEEPGRAM_LANGUAGE_CODES.get(language, "en")
+    Raises:
+        ValueError: If the language is not supported by the provider
+    """
+    language = language.lower()
 
-    # Default: use ISO 639-1 codes
-    return DEFAULT_LANGUAGE_CODES.get(language, "en")
+    # Map providers to their TTS language code dictionaries
+    provider_languages = {
+        "sarvam": SARVAM_LANGUAGE_CODES,
+        "google": GOOGLE_TTS_LANGUAGE_CODES,
+        "cartesia": CARTESIA_TTS_LANGUAGE_CODES,
+        "elevenlabs": ELEVENLABS_TTS_LANGUAGE_CODES,
+        "openai": OPENAI_TTS_LANGUAGE_CODES,
+        "groq": GROQ_TTS_LANGUAGE_CODES,
+        "smallest": SMALLEST_TTS_LANGUAGE_CODES,
+    }
+
+    if provider not in provider_languages:
+        raise ValueError(f"Unknown TTS provider: {provider}")
+
+    supported_languages = provider_languages[provider]
+
+    if language not in supported_languages:
+        supported_list = sorted(supported_languages.keys())
+        raise ValueError(
+            f"Language '{language}' is not supported by {provider} TTS.\n"
+            f"Supported languages for {provider} TTS: {', '.join(supported_list)}"
+        )
 
 
 # =============================================================================

@@ -30,7 +30,8 @@ from natsort import natsorted
 
 from pense.utils import (
     log_and_print,
-    get_language_code,
+    get_stt_language_code,
+    validate_stt_language,
 )
 from pense.stt.metrics import (
     get_wer_score,
@@ -89,7 +90,7 @@ async def transcribe_deepgram(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("DEEPGRAM_API_KEY environment variable not set")
 
-    lang_code = get_language_code(language, "deepgram")
+    lang_code = get_stt_language_code(language, "deepgram")
 
     client = DeepgramClient(api_key=api_key)
 
@@ -137,7 +138,7 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable not set")
 
-    lang_code = get_language_code(language, "groq")
+    lang_code = get_stt_language_code(language, "groq")
 
     client = AsyncGroq(api_key=api_key)
 
@@ -182,10 +183,12 @@ def _transcribe_google_streaming(
     audio_content = load_audio(audio_path)
 
     # In practice, stream should be a generator yielding chunks of audio data
-    chunk_length = len(audio_content) // 5
+    # Chunk size must be < 25KB per Google STT API limitations
+    # Use 24KB for a safe margin
+    max_chunk_size = 24 * 1024  # 24KB = 24 * 1024 bytes
     stream = [
-        audio_content[start : start + chunk_length]
-        for start in range(0, len(audio_content), chunk_length)
+        audio_content[start : start + max_chunk_size]
+        for start in range(0, len(audio_content), max_chunk_size)
     ]
     audio_requests = (
         cloud_speech_types.StreamingRecognizeRequest(audio=audio) for audio in stream
@@ -233,7 +236,7 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
     if not credentials_path:
         raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
 
-    lang_code = get_language_code(language, "google")
+    lang_code = get_stt_language_code(language, "google")
 
     transcript = _transcribe_google_streaming(audio_path, lang_code)
 
@@ -248,7 +251,7 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("SARVAM_API_KEY environment variable not set")
 
-    lang_code = get_language_code(language, "sarvam")
+    lang_code = get_stt_language_code(language, "sarvam")
 
     audio_data = base64.b64encode(load_audio(audio_path)).decode("utf-8")
 
@@ -285,7 +288,7 @@ async def transcribe_elevenlabs(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("ELEVENLABS_API_KEY environment variable not set")
 
-    lang_code = get_language_code(language, "elevenlabs")
+    lang_code = get_stt_language_code(language, "elevenlabs")
 
     elevenlabs = AsyncElevenLabs(api_key=api_key)
 
@@ -310,7 +313,7 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("CARTESIA_API_KEY environment variable not set")
 
-    lang_code = get_language_code(language, "cartesia")
+    lang_code = get_stt_language_code(language, "cartesia")
 
     client = AsyncCartesia(api_key=api_key)
 
@@ -413,7 +416,7 @@ async def transcribe_smallest(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("SMALLEST_API_KEY environment variable not set")
 
-    lang_code = get_language_code(language, "smallest")
+    lang_code = get_stt_language_code(language, "smallest")
 
     endpoint = "https://waves-api.smallest.ai/api/v1/pulse/get_text"
     params = {
@@ -562,7 +565,19 @@ async def main():
         "--language",
         type=str,
         default="english",
-        choices=["english", "hindi", "kannada"],
+        choices=[
+            "english",
+            "hindi",
+            "kannada",
+            "bengali",
+            "malayalam",
+            "marathi",
+            "odia",
+            "punjabi",
+            "tamil",
+            "telugu",
+            "gujarati",
+        ],
         help="Language of the audio files",
     )
     parser.add_argument(
@@ -634,6 +649,13 @@ async def main():
 
     command = " ".join(sys.argv)
     log_and_print(f"\033[33mRunning command\033[0m: {command}")
+
+    # Validate language is supported by the provider
+    try:
+        validate_stt_language(args.language, args.provider)
+    except ValueError as e:
+        log_and_print(f"\033[31mError: {e}\033[0m")
+        sys.exit(1)
 
     # Audio files are expected in audios/*.wav
     audio_dir = Path(args.input_dir) / "audios"

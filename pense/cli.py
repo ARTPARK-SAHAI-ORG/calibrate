@@ -95,6 +95,11 @@ Examples:
     stt_eval_parser.add_argument("-d", "--debug", action="store_true")
     stt_eval_parser.add_argument("-dc", "--debug_count", type=int, default=5)
     stt_eval_parser.add_argument("--ignore_retry", action="store_true")
+    stt_eval_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing results instead of resuming from last checkpoint",
+    )
 
     stt_leaderboard_parser = stt_subparsers.add_parser(
         "leaderboard", help="Generate STT leaderboard"
@@ -108,13 +113,17 @@ Examples:
     tts_subparsers.required = True
 
     tts_eval_parser = tts_subparsers.add_parser("eval", help="Run TTS evaluation")
-    tts_eval_parser.add_argument("-p", "--provider", type=str, default="smallest")
+    tts_eval_parser.add_argument("-p", "--provider", type=str, default="google")
     tts_eval_parser.add_argument("-l", "--language", type=str, default="english")
     tts_eval_parser.add_argument("-i", "--input", type=str, required=True)
     tts_eval_parser.add_argument("-o", "--output-dir", type=str, default="./out")
     tts_eval_parser.add_argument("-d", "--debug", action="store_true")
     tts_eval_parser.add_argument("-dc", "--debug_count", type=int, default=5)
-    tts_eval_parser.add_argument("--port", type=int, default=8765)
+    tts_eval_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing results instead of resuming from last checkpoint",
+    )
 
     tts_leaderboard_parser = tts_subparsers.add_parser(
         "leaderboard", help="Generate TTS leaderboard"
@@ -227,6 +236,7 @@ Examples:
             flag_mapping = {
                 "debug_count": "--debug_count",
                 "ignore_retry": "--ignore_retry",
+                "overwrite": "--overwrite",
             }
             sys.argv = ["pense"] + _args_to_argv(
                 args, exclude_keys={"component", "command"}, flag_mapping=flag_mapping
@@ -246,6 +256,7 @@ Examples:
             # Map attribute names to their original flag names (preserve underscores)
             flag_mapping = {
                 "debug_count": "--debug_count",
+                "overwrite": "--overwrite",
             }
             sys.argv = ["pense"] + _args_to_argv(
                 args, exclude_keys={"component", "command"}, flag_mapping=flag_mapping

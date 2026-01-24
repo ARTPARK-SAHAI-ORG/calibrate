@@ -36,23 +36,16 @@ Measures the time (in seconds) from when the synthesis request is made until the
 - **Importance**: Critical for real-time voice agents where responsiveness matters
 - **Reported**: Mean, standard deviation, and per-item values
 
-### Processing Time
-
-Total time taken (in seconds) to synthesize the complete audio.
-
-- **Importance**: Affects overall conversation latency
-- **Reported**: Mean, standard deviation, and per-item values
-
 ## Output Files
 
 ### results.csv
 
 Contains detailed results for each text:
 
-| id | text | audio_path | llm_judge_score | llm_judge_reasoning |
-|----|------|------------|-----------------|---------------------|
-| row_1 | hello world | ./out/audios/1.wav | True | The audio clearly says 'hello world'. |
-| row_2 | this is a test | ./out/audios/2.wav | True | Clear pronunciation matching the input. |
+| id | text | audio_path | ttfb | llm_judge_score | llm_judge_reasoning |
+|----|------|------------|------|-----------------|---------------------|
+| row_1 | hello world | ./out/elevenlabs/audios/row_1.wav | 1.511 | True | The audio says 'hello world' clearly and matches the reference text exactly. |
+| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
 
 ### metrics.json
 
@@ -62,14 +55,9 @@ Contains aggregated metrics:
 {
   "llm_judge_score": 1.0,
   "ttfb": {
-    "mean": 0.35,
-    "std": 0.03,
-    "values": [0.38, 0.33, 0.34]
-  },
-  "processing_time": {
-    "mean": 0.0002,
-    "std": 0.00003,
-    "values": [0.0002, 0.00025]
+    "mean": 1.362950086593628,
+    "std": 0.1476140022277832,
+    "values": [1.5105640888214111, 1.2153360843658447]
   }
 }
 ```
@@ -77,7 +65,7 @@ Contains aggregated metrics:
 ### audios/
 
 Generated audio files:
-- `1.wav`, `2.wav`, etc.
+- `row_1.wav`, `row_2.wav`, etc. (named after the `id` column in the input CSV)
 - WAV format for easy playback and analysis
 
 ## Provider Considerations

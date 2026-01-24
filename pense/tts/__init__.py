@@ -24,25 +24,35 @@ from typing import Literal
 async def eval(
     input: str,
     provider: Literal[
-        "cartesia", "openai", "groq", "google", "elevenlabs", "sarvam"
+        "cartesia", "openai", "groq", "google", "elevenlabs", "sarvam", "smallest"
     ] = "google",
-    language: Literal["english", "hindi", "kannada"] = "english",
+    language: Literal[
+        "english",
+        "hindi",
+        "kannada",
+        "bengali",
+        "malayalam",
+        "marathi",
+        "odia",
+        "punjabi",
+        "tamil",
+        "telugu",
+        "gujarati",
+    ] = "english",
     output_dir: str = "./out",
     debug: bool = False,
     debug_count: int = 5,
-    port: int = 8765,
 ) -> dict:
     """
     Run TTS evaluation for a given provider.
 
     Args:
         input: Path to input CSV file containing texts to synthesize
-        provider: TTS provider to evaluate (cartesia, openai, groq, google, elevenlabs, sarvam)
-        language: Language for synthesis (english, hindi, or kannada)
+        provider: TTS provider to evaluate (cartesia, openai, groq, google, elevenlabs, sarvam, smallest)
+        language: Language for synthesis (english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati)
         output_dir: Path to output directory for results (default: ./out)
         debug: Run evaluation on first N texts only
         debug_count: Number of texts to run in debug mode (default: 5)
-        port: WebSocket port for TTS bot (default: 8765)
 
     Returns:
         dict: Results containing audio paths and metrics
@@ -73,8 +83,6 @@ async def eval(
         output_dir,
         "--debug_count",
         str(debug_count),
-        "--port",
-        str(port),
     ]
 
     if debug:

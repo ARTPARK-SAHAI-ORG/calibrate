@@ -37,13 +37,13 @@ pense tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
 
 | Flag | Long | Type | Required | Default | Description |
 |------|------|------|----------|---------|-------------|
-| `-p` | `--provider` | string | No | `smallest` | Provider: `cartesia`, `openai`, `groq`, `google`, `elevenlabs`, `sarvam` |
-| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, or `kannada` |
+| `-p` | `--provider` | string | No | `google` | Provider: `cartesia`, `openai`, `groq`, `google`, `elevenlabs`, `sarvam`, `smallest` |
+| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati` |
 | `-i` | `--input` | string | Yes | - | Path to input CSV file |
 | `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
 | `-d` | `--debug` | flag | No | `false` | Run on first N texts only |
 | `-dc` | `--debug_count` | int | No | `5` | Number of texts in debug mode |
-| | `--port` | int | No | `8765` | WebSocket port |
+| | `--overwrite` | flag | No | `false` | Overwrite existing results instead of resuming |
 
 ### Examples
 
@@ -70,23 +70,22 @@ pense tts eval -p google -i ./sample.csv -o ./out -d -dc 3
 ```
 /path/to/output/<provider>
 ├── audios/
-│   ├── 1.wav
-│   ├── 2.wav
-│   └── 3.wav
-├── results.csv       # LLM judge scores for pronunciation
-├── metrics.json      # Latency metrics (TTFB, processing time)
-├── results.log       # Terminal output summary
-└── logs              # Full pipecat logs
+│   ├── row_1.wav
+│   ├── row_2.wav
+│   └── row_3.wav
+├── results.csv       # Per-text results with TTFB and LLM judge scores
+├── metrics.json      # Aggregated metrics (TTFB mean/std, LLM judge score)
+└── results.log       # Terminal output summary
 ```
 
 ### Output Files
 
 **results.csv** contains per-text evaluation results:
 
-| id | text | audio_path | llm_judge_score | llm_judge_reasoning |
-|----|------|------------|-----------------|---------------------|
-| row_1 | hello world | ./out/audios/1.wav | True | The audio clearly says 'hello world' with correct pronunciation. |
-| row_2 | this is a test | ./out/audios/2.wav | True | Clear pronunciation matching the input text. |
+| id | text | audio_path | ttfb | llm_judge_score | llm_judge_reasoning |
+|----|------|------------|------|-----------------|---------------------|
+| row_1 | hello world | ./out/elevenlabs/audios/row_1.wav | 1.511 | True | The audio says 'hello world' clearly and matches the reference text exactly. |
+| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
 
 ---
 
@@ -116,7 +115,7 @@ pense tts leaderboard -o ./out -s ./leaderboard
 The leaderboard command generates:
 
 - `tts_leaderboard.xlsx` - Comparative spreadsheet of all providers
-- Individual metric charts: `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
+- Individual metric charts: `llm_judge_score.png`, `ttfb.png`
 
 ---
 

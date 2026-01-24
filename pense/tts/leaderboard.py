@@ -17,7 +17,6 @@ except ImportError:  # pragma: no cover
 TARGET_METRICS = [
     "llm_judge_score",
     "ttfb",
-    "processing_time",
 ]
 INVALID_SHEET_CHARS = set("[]:*?/\\")
 

@@ -21,8 +21,8 @@ import asyncio
 from pense.tts import eval
 
 asyncio.run(eval(
-    provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam
-    language="english",     # english, hindi, or kannada
+    provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam, smallest
+    language="english",     # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
     input="/path/to/input.csv",
     output_dir="/path/to/output",
     debug=True,             # optional: run on first 5 texts only
@@ -35,21 +35,20 @@ asyncio.run(eval(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `input` | str | Yes | - | Path to input CSV file containing texts to synthesize |
-| `provider` | str | No | "google" | Text to Speech provider: cartesia, openai, groq, google, elevenlabs, sarvam |
-| `language` | str | No | "english" | Language: english, hindi, or kannada |
+| `provider` | str | No | "google" | Text to Speech provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest |
+| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
 | `debug` | bool | No | False | Run on first N texts only |
 | `debug_count` | int | No | 5 | Number of texts in debug mode |
-| `port` | int | No | 8765 | WebSocket port for Text to Speech bot |
+| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
 
 ## Output Structure
 
 ```
-/path/to/output/provider
+/path/to/output/<provider>
 ├── audios
-│   ├── 1.wav
-│   ├── 2.wav
-├── logs
+│   ├── row_1.wav
+│   ├── row_2.wav
 ├── results.log
 ├── results.csv
 └── metrics.json
@@ -59,10 +58,10 @@ asyncio.run(eval(
 
 Contains detailed results for each text:
 
-| id | text | audio_path | llm_judge_score | llm_judge_reasoning |
-|----|------|------------|-----------------|---------------------|
-| row_1 | hello world | ./out/audios/1.wav | True | The provided audio says 'hello world'. The pronunciation is clear, and the words match exactly. |
-| row_2 | this is a test | ./out/audios/2.wav | True | The audio clearly says 'this is a test' without any deviations or mispronunciations. |
+| id | text | audio_path | ttfb | llm_judge_score | llm_judge_reasoning |
+|----|------|------------|------|-----------------|---------------------|
+| row_1 | hello world | ./out/elevenlabs/audios/row_1.wav | 1.511 | True | The audio says 'hello world' clearly and matches the reference text exactly. |
+| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
 
 ### metrics.json
 
@@ -72,14 +71,9 @@ Contains aggregated metrics:
 {
   "llm_judge_score": 1.0,
   "ttfb": {
-    "mean": 0.3538844585418701,
-    "std": 0.026930570602416992,
-    "values": [0.3808150291442871, 0.3269538879394531]
-  },
-  "processing_time": {
-    "mean": 0.00022804737091064453,
-    "std": 2.7060508728027344e-5,
-    "values": [0.0002009868621826172, 0.0002551078796386719]
+    "mean": 1.362950086593628,
+    "std": 0.1476140022277832,
+    "values": [1.5105640888214111, 1.2153360843658447]
   }
 }
 ```
@@ -92,8 +86,7 @@ Text to Speech evaluation measures both quality and latency:
 - **LLM Judge Score**: Semantic evaluation of pronunciation accuracy
 
 **Latency metrics:**
-- **TTFB (Time to First Byte)**: Time until first audio chunk
-- **Processing Time**: Total time to complete synthesis
+- **TTFB (Time to First Byte)**: Time until first audio chunk is received
 
 <Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
   Detailed explanation of all metrics and how LLM Judge works
@@ -114,7 +107,7 @@ leaderboard(
 
 This scans each run directory, reads `metrics.json` and `results.csv`, then generates:
 - `tts_leaderboard.xlsx`: Excel file with all metrics by provider
-- Individual metric charts: `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
+- Individual metric charts: `llm_judge_score.png`, `ttfb.png`
 
 **Function Parameters:**
 
