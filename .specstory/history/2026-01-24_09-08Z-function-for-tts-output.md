@@ -1412,3 +1412,1257 @@ Keep the files organized and don't remove existing relevant context.
 
 ---
 
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking me to update documentation if I made code changes. In my last interaction, I only updated documentation files (README.md, docs files, and app-details.md) to reflect the actual TTS output format. I did not make any code changes.
+
+Since I only made documentation updates and not code changes, I should not proceed with further updates.</details></think>
+
+---
+
+I did not make any code changes in the last interaction - I only updated documentation files (README.md, docs pages, and app-details.md) to reflect the actual TTS evaluation output format based on the sample outputs. Since no code changes were made, no further documentation updates are needed.
+
+---
+
+_**User**_
+
+remove processing time from leaderboard calc for tts
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to remove processing time from the TTS leaderboard calculation. Let me find the TTS leaderboard code.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "undefined" • **1** result in **1** directory</summary>
+
+Directory: **undefined** (1 file)
+
+| File |
+|------|
+| `./pense/tts/leaderboard.py` |
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me read the TTS leaderboard file to find where processing_time is being used.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/tts/leaderboard.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see that `processing_time` is listed in `TARGET_METRICS` on line 17-21. I need to remove it from this list.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/tts/leaderboard.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I removed `processing_time` from the `TARGET_METRICS` list in the TTS leaderboard calculation. This means `processing_time` will no longer be included in the leaderboard summary or charts.</details></think>
+
+---
+
+Done. Removed `processing_time` from the `TARGET_METRICS` list in `pense/tts/leaderboard.py`. The TTS leaderboard will now only calculate and display `llm_judge_score` and `ttfb` metrics.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made a code change - I removed `processing_time` from the TTS leaderboard TARGET_METRICS. Let me check if any documentation mentions `processing_time` for TTS leaderboard that needs to be updated.
+
+Let me search for references to processing_time in the documentation files.</details></think>
+
+---
+
+I made a code change (removed `processing_time` from TTS leaderboard). Let me check if any documentation references this.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "processing_time",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop",
+  "glob": "*.{md,mdx}",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "processing_time",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "./.cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 545,
+                  "content": "  - **STT:** &#96;wer.png&#96;, &#96;string_similarity.png&#96;, &#96;llm_judge_score.png&#96;, &#96;ttfb.png&#96;, &#96;processing_time.png&#96;"
+                }
+              ]
+            },
+            {
+              "file": "./README.md",
+              "matches": [
+                {
+                  "lineNumber": 982,
+                  "content": "- &#96;evaluation_results.csv&#96;: per-criterion evaluation results including evaluation criteria, latency metrics (ttft and processing_time for each processor), and STT LLM judge score."
+                },
+                {
+                  "lineNumber": 984,
+                  "content": "- &#96;metrics.json&#96;: latency traces grouped by processor for both &#96;ttft&#96; (time to first token) and &#96;processing_time&#96;, reported separately for STT, LLM, and TTS providers."
+                },
+                {
+                  "lineNumber": 1016,
+                  "content": "processing_time,0.6209,\"\""
+                },
+                {
+                  "lineNumber": 1020,
+                  "content": "Note: For latency metrics (&#96;ttft&#96; and &#96;processing_time&#96;), one row is added per processor with the mean value. The &#96;reasoning&#96; column is empty for latency metrics and STT LLM judge score. Evaluation criteria use &#96;value&#96; of 1 for True (match) and 0 for False (no match)."
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-23_11-50Z-codebase-purpose-and-architecture-update.md",
+              "matches": [
+                {
+                  "lineNumber": 2406,
+                  "content": "   - &#96;processing_time.png&#96;"
+                },
+                {
+                  "lineNumber": 2411,
+                  "content": "   - &#96;processing_time.png&#96;"
+                },
+                {
+                  "lineNumber": 2595,
+                  "content": "- For ttfb and processing_time, store mean, std, and values as a nested dict"
+                },
+                {
+                  "lineNumber": 2606,
+                  "content": "    \"processing_time\": {"
+                },
+                {
+                  "lineNumber": 2663,
+                  "content": "    \"processing_time\": {"
+                },
+                {
+                  "lineNumber": 2670,
+                  "content": "I need to update &#96;_read_metrics&#96; to handle this format - extracting the &#96;mean&#96; from nested dicts for ttfb and processing_time."
+                },
+                {
+                  "lineNumber": 2687,
+                  "content": "2. Looking for &#96;metric_name&#96; key to identify ttfb/processing_time"
+                },
+                {
+                  "lineNumber": 2689,
+                  "content": "But the new TTS format is a simple dict where ttfb and processing_time are nested dicts with mean, std, values. I need to update both leaderboard files to handle the new format."
+                },
+                {
+                  "lineNumber": 2700,
+                  "content": "    \"processing_time\": {       // nested dict"
+                },
+                {
+                  "lineNumber": 2717,
+                  "content": "STT doesn't have ttfb and processing_time like TTS does. So the leaderboard needs to handle:"
+                },
+                {
+                  "lineNumber": 2719,
+                  "content": "2. Nested dict values with mean/std/values (ttfb, processing_time) - only for TTS"
+                },
+                {
+                  "lineNumber": 3018,
+                  "content": "The STT core concepts doc also has the old list format. However, the actual STT eval doesn't output ttfb and processing_time - those are only for TTS. Let me check the actual STT eval output to see what format it produces."
+                },
+                {
+                  "lineNumber": 3029,
+                  "content": "So STT only outputs wer, string_similarity, and llm_judge_score as simple floats - no ttfb or processing_time. The doc is incorrect. Let me fix it.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 3033,
+                  "content": "The STT doc has incorrect data - STT eval doesn't output ttfb or processing_time. Let me fix it."
+                },
+                {
+                  "lineNumber": 3061,
+                  "content": "     \"processing_time\": {\"mean\": ..., \"std\": ..., \"values\": [...]}"
+                },
+                {
+                  "lineNumber": 3074,
+                  "content": "- &#96;docs/core-concepts/speech-to-text.mdx&#96; - Fixed incorrect metrics.json (was showing ttfb/processing_time which STT doesn't output)"
+                },
+                {
+                  "lineNumber": 3592,
+                  "content": "        \"name\": \"processing_time.png\""
+                },
+                {
+                  "lineNumber": 3622,
+                  "content": "I see the TTS leaderboard section. I need to add the three images (llm_judge_score.png, ttfb.png, processing_time.png) in a horizontal table layout after line 294, similar to what I did for STT.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 3644,
+                  "content": "- &#96;processing_time.png&#96; - Processing Time by Provider"
+                },
+                {
+                  "lineNumber": 6168,
+                  "content": "Let me also check the metrics and what we need to capture (TTFB, processing_time, llm_judge_score)."
+                },
+                {
+                  "lineNumber": 7136,
+                  "content": "                  \"content\": \"But the new TTS format is a simple dict where ttfb and processing_time are nested dicts with mean, std, values. I need to update both leaderboard files to handle the new format.\""
+                },
+                {
+                  "lineNumber": 10338,
+                  "content": "                  \"content\": \"- **Non-streaming:** Providers without streaming (Google, Groq, Sarvam) report TTFB = processing_time\","
+                },
+                {
+                  "lineNumber": 13220,
+                  "content": "1. Remove processing_time calculation from all synthesize functions"
+                },
+                {
+                  "lineNumber": 13349,
+                  "content": "Now I need to update the &#96;run_tts_eval&#96; function to not reference &#96;processing_time&#96; and update the rest of the main function that deals with ttfb and processing_time. Let me check what else needs to change.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13353,
+                  "content": "Now let me check and update the &#96;run_tts_eval&#96; function and &#96;main&#96; to remove processing_time references."
+                },
+                {
+                  "lineNumber": 13366,
+                  "content": "I see the &#96;run_tts_eval&#96; function still references &#96;processing_time&#96;. I need to remove those references.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13381,
+                  "content": "Now I need to update the main function to remove references to processing_time. Let me read the rest of the main function.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13394,
+                  "content": "I need to update the main function to remove all references to &#96;processing_time&#96;. Let me update it.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13451,
+                  "content": "Done. I've removed &#96;processing_time&#96; calculation and &#96;sample_rate&#96; from all return values. All synthesize functions now only return &#96;{\"ttfb\": ttfb}&#96;:"
+                },
+                {
+                  "lineNumber": 13455,
+                  "content": "2. **&#96;run_tts_eval&#96;** no longer tracks or stores &#96;processing_time&#96;"
+                },
+                {
+                  "lineNumber": 13456,
+                  "content": "3. **Results CSV** no longer includes &#96;processing_time&#96; column"
+                },
+                {
+                  "lineNumber": 13457,
+                  "content": "4. **&#96;metrics.json&#96;** no longer includes &#96;processing_time&#96; metric"
+                },
+                {
+                  "lineNumber": 13486,
+                  "content": "I made code changes to remove &#96;processing_time&#96; from TTS evaluation. This affects:"
+                },
+                {
+                  "lineNumber": 13495,
+                  "content": "I made code changes (removed &#96;processing_time&#96; from TTS evaluation). Let me update the documentation."
+                },
+                {
+                  "lineNumber": 13516,
+                  "content": "  \"pattern\": \"processing_time|processing time\","
+                },
+                {
+                  "lineNumber": 13526,
+                  "content": "    \"pattern\": \"processing_time|processing time\","
+                },
+                {
+                  "lineNumber": 13538,
+                  "content": "                  \"content\": \"  \\\"processing_time\\\": {\""
+                },
+                {
+                  "lineNumber": 13542,
+                  "content": "                  \"content\": \"- &amp;#96;processing_time&amp;#96;: Time taken by the service to respond in seconds (mean, std, and per-text values)\""
+                },
+                {
+                  "lineNumber": 13546,
+                  "content": "                  \"content\": \"&amp;#96;pense/tts/leaderboard.py&amp;#96; mirrors the STT workflow, emitting &amp;#96;tts_leaderboard.xlsx&amp;#96; plus individual metric charts (e.g., &amp;#96;llm_judge_score.png&amp;#96;, &amp;#96;ttfb.png&amp;#96;, &amp;#96;processing_time.png&amp;#96;) so you can spot which provider balances latency and judge scores best.\""
+                },
+                {
+                  "lineNumber": 13550,
+                  "content": "                  \"content\": \"    &amp;lt;td&amp;gt;&amp;lt;img src=\\\"pense/tts/examples/leaderboard/processing_time.png\\\" alt=\\\"Processing Time by Provider\\\" width=\\\"100%\\\"&amp;gt;&amp;lt;/td&amp;gt;\""
+                },
+                {
+                  "lineNumber": 13554,
+                  "content": "                  \"content\": \"- &amp;#96;evaluation_results.csv&amp;#96;: per-criterion evaluation results including evaluation criteria, latency metrics (ttft and processing_time for each processor), and STT LLM judge score.\""
+                },
+                {
+                  "lineNumber": 13558,
+                  "content": "                  \"content\": \"- &amp;#96;metrics.json&amp;#96;: latency traces grouped by processor for both &amp;#96;ttft&amp;#96; (time to first token) and &amp;#96;processing_time&amp;#96;, reported separately for STT, LLM, and TTS providers.\""
+                },
+                {
+                  "lineNumber": 13562,
+                  "content": "                  \"content\": \"processing_time,0.6209,\\\"\\\"\""
+                },
+                {
+                  "lineNumber": 13566,
+                  "content": "                  \"content\": \"Note: For latency metrics (&amp;#96;ttft&amp;#96; and &amp;#96;processing_time&amp;#96;), one row is added per processor with the mean value. The &amp;#96;reasoning&amp;#96; column is empty for latency metrics and STT LLM judge score. Evaluation criteria use &amp;#96;value&amp;#96; of 1 for True (match) and 0 for False (no match).\""
+                },
+                {
+                  "lineNumber": 13596,
+                  "content": "  \"pattern\": \"processing_time|processing time\","
+                },
+                {
+                  "lineNumber": 13606,
+                  "content": "    \"pattern\": \"processing_time|processing time\","
+                },
+                {
+                  "lineNumber": 13618,
+                  "content": "                  \"content\": \"  \\\"processing_time\\\": {\""
+                },
+                {
+                  "lineNumber": 13626,
+                  "content": "                  \"content\": \"- Individual metric charts: &amp;#96;llm_judge_score.png&amp;#96;, &amp;#96;ttfb.png&amp;#96;, &amp;#96;processing_time.png&amp;#96;\""
+                },
+                {
+                  "lineNumber": 13639,
+                  "content": "                  \"content\": \"- Individual metric charts: &amp;#96;llm_judge_score.png&amp;#96;, &amp;#96;ttfb.png&amp;#96;, &amp;#96;processing_time.png&amp;#96;\""
+                },
+                {
+                  "lineNumber": 13648,
+                  "content": "                  \"content\": \"| processing_time | 0.62 | |\""
+                },
+                {
+                  "lineNumber": 13666,
+                  "content": "                  \"content\": \"- &amp;#96;processing_time.png&amp;#96; - Processing Time comparison (lower is better)\""
+                },
+                {
+                  "lineNumber": 13675,
+                  "content": "                  \"content\": \"- Individual metric charts: &amp;#96;wer.png&amp;#96;, &amp;#96;string_similarity.png&amp;#96;, &amp;#96;llm_judge_score.png&amp;#96;, &amp;#96;ttfb.png&amp;#96;, &amp;#96;processing_time.png&amp;#96;\""
+                },
+                {
+                  "lineNumber": 13697,
+                  "content": "                  \"content\": \"  \\\"processing_time\\\": {\""
+                },
+                {
+                  "lineNumber": 13745,
+                  "content": "                  \"content\": \"| processing_time | 0.6209 | |\""
+                },
+                {
+                  "lineNumber": 13749,
+                  "content": "                  \"content\": \"For latency metrics (&amp;#96;ttft&amp;#96; and &amp;#96;processing_time&amp;#96;), one row is added per processor with the mean value. Evaluation criteria use &amp;#96;value&amp;#96; of 1 for True (match) and 0 for False (no match).\""
+                },
+                {
+                  "lineNumber": 13771,
+                  "content": "This is a significant change - removing &#96;processing_time&#96; from TTS evaluation affects many places in the documentation. I need to:"
+                },
+                {
+                  "lineNumber": 13773,
+                  "content": "1. Update app-details.md to remove processing_time from TTS metrics"
+                },
+                {
+                  "lineNumber": 13774,
+                  "content": "2. Update README.md to remove processing_time references for TTS"
+                },
+                {
+                  "lineNumber": 13775,
+                  "content": "3. Update docs to remove processing_time references for TTS"
+                },
+                {
+                  "lineNumber": 13777,
+                  "content": "However, I notice that processing_time is still used in:- STT evaluation (which I didn't change)"
+                },
+                {
+                  "lineNumber": 13780,
+                  "content": "So I need to be careful to only remove TTS-specific processing_time references, not the ones related to STT or voice simulations."
+                },
+                {
+                  "lineNumber": 13786,
+                  "content": "I need to update documentation to remove &#96;processing_time&#96; from TTS evaluation (but keep it for STT and voice simulations where it's still used)."
+                },
+                {
+                  "lineNumber": 13814,
+                  "content": "I need to update the TTS metrics JSON section to remove processing_time.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13829,
+                  "content": "Now I need to update the Leaderboard Generation section which mentions processing_time charts.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13842,
+                  "content": "I need to update the leaderboard section to remove processing_time.png from TTS charts.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13857,
+                  "content": "Now I need to update README.md to remove processing_time from TTS sections. Let me read the relevant parts.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13861,
+                  "content": "Now let me update the README.md for TTS-specific &#96;processing_time&#96; references."
+                },
+                {
+                  "lineNumber": 13874,
+                  "content": "I need to update:1. The metrics.json example to remove processing_time"
+                },
+                {
+                  "lineNumber": 13877,
+                  "content": "4. The image table to remove the processing_time image&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 14109,
+                  "content": "This mentions \"processing time\" in a general context that applies to both STT and TTS. Since STT still has processing_time, I should leave this as is. It's a general overview statement."
+                },
+                {
+                  "lineNumber": 14111,
+                  "content": "Let me verify my changes by checking if there are any more TTS-specific processing_time references I might have missed.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 14165,
+                  "content": "Done. I've updated all documentation to remove &#96;processing_time&#96; from TTS evaluation:"
+                },
+                {
+                  "lineNumber": 14176,
+                  "content": "   - Removed processing_time from metrics description"
+                },
+                {
+                  "lineNumber": 14178,
+                  "content": "   - Removed processing_time.png from image table"
+                },
+                {
+                  "lineNumber": 14197,
+                  "content": "Note: &#96;processing_time&#96; is still used in STT evaluation and voice simulations, so those references were left intact."
+                }
+              ]
+            },
+            {
+              "file": "./docs/cli/voice-simulations.mdx",
+              "matches": [
+                {
+                  "lineNumber": 145,
+                  "content": "| processing_time | 0.62 | |"
+                }
+              ]
+            },
+            {
+              "file": "./docs/python-sdk/speech-to-text.mdx",
+              "matches": [
+                {
+                  "lineNumber": 230,
+                  "content": "- &#96;processing_time.png&#96; - Processing Time comparison (lower is better)"
+                }
+              ]
+            },
+            {
+              "file": "./docs/cli/speech-to-text.mdx",
+              "matches": [
+                {
+                  "lineNumber": 125,
+                  "content": "- Individual metric charts: &#96;wer.png&#96;, &#96;string_similarity.png&#96;, &#96;llm_judge_score.png&#96;, &#96;ttfb.png&#96;, &#96;processing_time.png&#96;"
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-23_08-02Z-stt-eval-py-pipecat-removal-and-simplification.md",
+              "matches": [
+                {
+                  "lineNumber": 1791,
+                  "content": "                  \"content\": \"- &amp;#96;evaluation_results.csv&amp;#96;: per-criterion evaluation results including evaluation criteria, latency metrics (ttft and processing_time for each processor), and STT LLM judge score.\","
+                },
+                {
+                  "lineNumber": 1834,
+                  "content": "Now let me also update the sample output section in README to remove references to ttfb and processing_time metrics since those come from pipecat. Let me check if there's more that needs updating around the metrics.json output.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 1838,
+                  "content": "Let me also update the README's sample output section to reflect that we no longer have ttfb/processing_time metrics from pipecat."
+                },
+                {
+                  "lineNumber": 1851,
+                  "content": "I need to update the sample output to reflect simpler structure (no streaming messages) and the metrics.json to not include ttfb and processing_time since those are pipecat-specific metrics.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 2381,
+                  "content": "- Removed latency metrics (ttfb, processing_time) from metrics section and examples"
+                },
+                {
+                  "lineNumber": 2390,
+                  "content": "- Simplified metrics.json example (removed ttfb/processing_time)"
+                }
+              ]
+            },
+            {
+              "file": "./docs/python-sdk/voice-simulations.mdx",
+              "matches": [
+                {
+                  "lineNumber": 178,
+                  "content": "| processing_time | 0.6209 | |"
+                },
+                {
+                  "lineNumber": 181,
+                  "content": "For latency metrics (&#96;ttft&#96; and &#96;processing_time&#96;), one row is added per processor with the mean value. Evaluation criteria use &#96;value&#96; of 1 for True (match) and 0 for False (no match)."
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-20_04-00Z-audio-processing-completion-bug.md",
+              "matches": [
+                {
+                  "lineNumber": 355,
+                  "content": "I can see metrics is coming from ttfb and processing_time which are defaultdict(list). Let me find where the function returns.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 370,
+                  "content": "- &#96;processing_time&#96;: Processing time (per processor)"
+                },
+                {
+                  "lineNumber": 378,
+                  "content": "The loop at line 925-935 adds the timing metrics (ttfb, processing_time) to &#96;metrics_data&#96;. When nothing was processed, there's no timing data to add."
+                },
+                {
+                  "lineNumber": 411,
+                  "content": "You're right to be concerned! Looking at the code, I can see that &#96;metrics&#96; contains **timing data** (ttfb, processing_time) from the actual STT processing run:"
+                },
+                {
+                  "lineNumber": 418,
+                  "content": "            \"processing_time\": processing_time,"
+                },
+                {
+                  "lineNumber": 430,
+                  "content": "The timing metrics (ttfb, processing_time) are only meaningful for files processed *in this run*. When resuming with all files done, there's nothing new to time."
+                },
+                {
+                  "lineNumber": 454,
+                  "content": "The user wants the timing metrics (ttfb, processing_time) to also be saved intermittently and resumed when a run is resumed. This way, the final metrics.json will contain timing data from ALL processing runs, not just the last one."
+                },
+                {
+                  "lineNumber": 471,
+                  "content": "I understand now. You want the timing metrics (ttfb, processing_time) to persist across runs so the final &#96;metrics.json&#96; reflects the complete simulation. Let me implement this:"
+                },
+                {
+                  "lineNumber": 637,
+                  "content": "2. After each processing run, it merges new timing data (ttfb, processing_time) with the accumulated metrics3. It saves the merged metrics to &#96;timing_metrics.json&#96; after each run4. When all files are already processed, &#96;metrics&#96; already contains all the previously saved timing data"
+                },
+                {
+                  "lineNumber": 646,
+                  "content": "2. **Merge new metrics with existing** (lines 847-854): After each processing run, new timing data (ttfb, processing_time) is merged with the accumulated metrics"
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-18_10-28Z-simulation-audio-chunk-file-naming.md",
+              "matches": [
+                {
+                  "lineNumber": 514,
+                  "content": "          processing_time: defaultdict,"
+                },
+                {
+                  "lineNumber": 674,
+                  "content": "          processing_time,"
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-15_03-29Z-simulation-stt-tts-configuration-handling.md",
+              "matches": [
+                {
+                  "lineNumber": 2432,
+                  "content": "2026-01-15 10:31:07.980 | DEBUG    | [BOT-SYS] | WebsocketServerInputTransport#0 → RTVIProcessor#0: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.33s"
+                },
+                {
+                  "lineNumber": 2444,
+                  "content": "2026-01-15 10:31:07.980 | DEBUG    | [BOT-SYS] | RTVIProcessor#0 → IOLogger#0: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.33s"
+                },
+                {
+                  "lineNumber": 2449,
+                  "content": "2026-01-15 10:31:07.980 | DEBUG    | [BOT-SYS] | IOLogger#0 → SarvamSTTService#0: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.33s"
+                },
+                {
+                  "lineNumber": 2454,
+                  "content": "2026-01-15 10:31:07.981 | DEBUG    | [BOT-SYS] | SarvamSTTService#0 → UserTranscriptProcessor#0: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.33s"
+                },
+                {
+                  "lineNumber": 2459,
+                  "content": "2026-01-15 10:31:07.981 | DEBUG    | [BOT-SYS] | UserTranscriptProcessor#0 → IOLogger#1: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.34s"
+                },
+                {
+                  "lineNumber": 2469,
+                  "content": "2026-01-15 10:31:07.981 | DEBUG    | [BOT-SYS] | IOLogger#1 → WebsocketServerOutputTransport#0: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.34s"
+                },
+                {
+                  "lineNumber": 2472,
+                  "content": "2026-01-15 10:31:07.982 | DEBUG    | [BOT-SYS] | WebsocketServerOutputTransport#0 → Pipeline#0::Sink: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.34s"
+                },
+                {
+                  "lineNumber": 2473,
+                  "content": "2026-01-15 10:31:07.982 | DEBUG    | [BOT-SYS] | Pipeline#0 → PipelineTask#0::Sink: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.34s"
+                },
+                {
+                  "lineNumber": 3567,
+                  "content": "2026-01-15 10:31:09.030 | DEBUG    | [BOT-SYS] | WebsocketServerInputTransport#0 → RTVIProcessor#0: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.38s"
+                },
+                {
+                  "lineNumber": 3573,
+                  "content": "2026-01-15 10:31:09.031 | DEBUG    | [BOT-SYS] | RTVIProcessor#0 → IOLogger#0: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.38s"
+                },
+                {
+                  "lineNumber": 3576,
+                  "content": "2026-01-15 10:31:09.031 | DEBUG    | [BOT-SYS] | IOLogger#0 → SarvamSTTService#0: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.38s"
+                },
+                {
+                  "lineNumber": 3579,
+                  "content": "2026-01-15 10:31:09.031 | DEBUG    | [BOT-SYS] | SarvamSTTService#0 → UserTranscriptProcessor#0: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.39s"
+                },
+                {
+                  "lineNumber": 3582,
+                  "content": "2026-01-15 10:31:09.031 | DEBUG    | [BOT-SYS] | UserTranscriptProcessor#0 → IOLogger#1: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.39s"
+                },
+                {
+                  "lineNumber": 3588,
+                  "content": "2026-01-15 10:31:09.032 | DEBUG    | [BOT-SYS] | IOLogger#1 → WebsocketServerOutputTransport#0: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.39s"
+                },
+                {
+                  "lineNumber": 3590,
+                  "content": "2026-01-15 10:31:09.032 | DEBUG    | [BOT-SYS] | WebsocketServerOutputTransport#0 → Pipeline#0::Sink: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.39s"
+                },
+                {
+                  "lineNumber": 3591,
+                  "content": "2026-01-15 10:31:09.032 | DEBUG    | [BOT-SYS] | Pipeline#0 → PipelineTask#0::Sink: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.39s"
+                },
+                {
+                  "lineNumber": 7322,
+                  "content": "2026-01-15 10:31:12.297 | DEBUG    | [BOT-SYS] | WebsocketServerInputTransport#0 → RTVIProcessor#0: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7334,
+                  "content": "2026-01-15 10:31:12.298 | DEBUG    | [BOT-SYS] | RTVIProcessor#0 → IOLogger#0: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7339,
+                  "content": "2026-01-15 10:31:12.298 | DEBUG    | [BOT-SYS] | IOLogger#0 → SarvamSTTService#0: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7344,
+                  "content": "2026-01-15 10:31:12.299 | DEBUG    | [BOT-SYS] | SarvamSTTService#0 → UserTranscriptProcessor#0: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7349,
+                  "content": "2026-01-15 10:31:12.299 | DEBUG    | [BOT-SYS] | UserTranscriptProcessor#0 → IOLogger#1: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7359,
+                  "content": "2026-01-15 10:31:12.300 | DEBUG    | [BOT-SYS] | IOLogger#1 → WebsocketServerOutputTransport#0: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7363,
+                  "content": "2026-01-15 10:31:12.300 | DEBUG    | [BOT-SYS] | WebsocketServerOutputTransport#0 → Pipeline#0::Sink: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7364,
+                  "content": "2026-01-15 10:31:12.300 | DEBUG    | [BOT-SYS] | Pipeline#0 → PipelineTask#0::Sink: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-14_10-27Z-pense-stt-examples,-eval,-readme-synchronization.md",
+              "matches": [
+                {
+                  "lineNumber": 506,
+                  "content": "-       \"metric_name\": \"processing_time\", // Time taken by the service to respond in seconds"
+                },
+                {
+                  "lineNumber": 544,
+                  "content": "+     \"metric_name\": \"processing_time\", // Time taken by the service to respond in seconds"
+                },
+                {
+                  "lineNumber": 1237,
+                  "content": "| &#96;README.md&#96; | &#96;- &#96;metrics.json&#96;: latency traces grouped by processor for both &#96;ttft&#96; (time to first token) and &#96;processing_time&#96;, reported separately for STT, LLM, and TTS providers.&#96; | L954 |"
+                },
+                {
+                  "lineNumber": 2226,
+                  "content": "          processing_time: defaultdict,"
+                },
+                {
+                  "lineNumber": 2356,
+                  "content": "          processing_time,"
+                },
+                {
+                  "lineNumber": 2757,
+                  "content": "+     for processor, values in processing_time_dict.items():"
+                },
+                {
+                  "lineNumber": 2760,
+                  "content": "+                 \"name\": f\"processing_time_{processor}\","
+                },
+                {
+                  "lineNumber": 2860,
+                  "content": "+ - &amp;#96;evaluation_results.csv&amp;#96;: per-criterion evaluation results including evaluation criteria, latency metrics (ttft and processing_time for each processor), and STT LLM judge score."
+                },
+                {
+                  "lineNumber": 2861,
+                  "content": "  - &amp;#96;metrics.json&amp;#96;: latency traces grouped by processor for both &amp;#96;ttft&amp;#96; (time to first token) and &amp;#96;processing_time&amp;#96;, reported separately for STT, LLM, and TTS providers."
+                },
+                {
+                  "lineNumber": 2911,
+                  "content": "+ processing_time_DeepgramSTTService#0,0.0006,\"Mean: 0.0006s, Std: 0.0004s, Values: [0.0008, 0.0004, 0.0010, ...]\""
+                },
+                {
+                  "lineNumber": 2912,
+                  "content": "+ processing_time_OpenAILLMService#0,0.6209,\"Mean: 0.6209s, Std: 0.2571s, Values: [0.6209, 0.6472, 0.8669, ...]\""
+                },
+                {
+                  "lineNumber": 2913,
+                  "content": "+ processing_time_GoogleTTSService#0,0.3183,\"Mean: 0.3183s, Std: 0.0834s, Values: [0.4417, 0.3832, 0.2975, ...]\""
+                },
+                {
+                  "lineNumber": 3051,
+                  "content": "     - Latency metrics: &#96;ttft&#96; and &#96;processing_time&#96; for each processor (STT, LLM, TTS) with mean, std, and values in the reasoning column"
+                },
+                {
+                  "lineNumber": 4444,
+                  "content": "  - &amp;#96;evaluation_results.csv&amp;#96;: per-criterion evaluation results including evaluation criteria, latency metrics (ttft and processing_time for each processor), and STT LLM judge score."
+                },
+                {
+                  "lineNumber": 4446,
+                  "content": "  - &amp;#96;metrics.json&amp;#96;: latency traces grouped by processor for both &amp;#96;ttft&amp;#96; (time to first token) and &amp;#96;processing_time&amp;#96;, reported separately for STT, LLM, and TTS providers."
+                },
+                {
+                  "lineNumber": 4522,
+                  "content": "processing_time,0.6209,\"\""
+                },
+                {
+                  "lineNumber": 4526,
+                  "content": "Note: For latency metrics (&#96;ttft&#96; and &#96;processing_time&#96;), one row is added per processor with the mean value. The &#96;reasoning&#96; column is empty for latency metrics and STT LLM judge score. Evaluation criteria use &#96;value&#96; of 1 for True (match) and 0 for False (no match)."
+                }
+              ]
+            }
+          ],
+          "totalLines": 144,
+          "totalMatchedLines": 144
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Looking at the results, I see that `processing_time` references in the TTS-related documentation have already been removed in a previous session (according to the specstory history). The remaining references are:
+
+1. **app-details.md line 545**: STT leaderboard charts - this is correct, STT still has processing_time
+2. **README.md lines 982, 984, 1016, 1020**: These are in the voice agent simulations section, NOT the TTS section, so they should stay
+3. **docs/cli/voice-simulations.mdx line 145**: Voice simulations, should stay
+4. **docs/python-sdk/speech-to-text.mdx line 230**: STT leaderboard, should stay  
+5. **docs/cli/speech-to-text.mdx line 125**: STT leaderboard, should stay
+6. **docs/python-sdk/voice-simulations.mdx lines 178, 181**: Voice simulations, should stay
+
+So the remaining `processing_time` references are either for STT or voice simulations, not TTS eval/leaderboard.
+
+My change was specifically to the TTS leaderboard to remove `processing_time` from `TARGET_METRICS`. Let me check if there are any TTS-specific documentation that still references `processing_time` for the leaderboard.
+
+Looking at the README and app-details, I see that the TTS leaderboard already only mentions `llm_judge_score.png` and `ttfb.png` - there's no `processing_time.png` for TTS. So the documentation is already correct.
+
+Actually, let me double-check the app-details.md line 545 more carefully - it mentions STT charts include processing_time.png, but I need to verify the TTS section doesn't mention it.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "TTS.*processing_time|processing_time.*TTS",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop",
+  "glob": "*.{md,mdx}",
+  "caseInsensitive": true
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "TTS.*processing_time|processing_time.*TTS",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "./README.md",
+              "matches": [
+                {
+                  "lineNumber": 984,
+                  "content": "- &#96;metrics.json&#96;: latency traces grouped by processor for both &#96;ttft&#96; (time to first token) and &#96;processing_time&#96;, reported separately for STT, LLM, and TTS providers."
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-23_11-50Z-codebase-purpose-and-architecture-update.md",
+              "matches": [
+                {
+                  "lineNumber": 2689,
+                  "content": "But the new TTS format is a simple dict where ttfb and processing_time are nested dicts with mean, std, values. I need to update both leaderboard files to handle the new format."
+                },
+                {
+                  "lineNumber": 2717,
+                  "content": "STT doesn't have ttfb and processing_time like TTS does. So the leaderboard needs to handle:"
+                },
+                {
+                  "lineNumber": 2719,
+                  "content": "2. Nested dict values with mean/std/values (ttfb, processing_time) - only for TTS"
+                },
+                {
+                  "lineNumber": 3018,
+                  "content": "The STT core concepts doc also has the old list format. However, the actual STT eval doesn't output ttfb and processing_time - those are only for TTS. Let me check the actual STT eval output to see what format it produces."
+                },
+                {
+                  "lineNumber": 3622,
+                  "content": "I see the TTS leaderboard section. I need to add the three images (llm_judge_score.png, ttfb.png, processing_time.png) in a horizontal table layout after line 294, similar to what I did for STT.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 7136,
+                  "content": "                  \"content\": \"But the new TTS format is a simple dict where ttfb and processing_time are nested dicts with mean, std, values. I need to update both leaderboard files to handle the new format.\""
+                },
+                {
+                  "lineNumber": 13349,
+                  "content": "Now I need to update the &#96;run_tts_eval&#96; function to not reference &#96;processing_time&#96; and update the rest of the main function that deals with ttfb and processing_time. Let me check what else needs to change.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13353,
+                  "content": "Now let me check and update the &#96;run_tts_eval&#96; function and &#96;main&#96; to remove processing_time references."
+                },
+                {
+                  "lineNumber": 13366,
+                  "content": "I see the &#96;run_tts_eval&#96; function still references &#96;processing_time&#96;. I need to remove those references.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13455,
+                  "content": "2. **&#96;run_tts_eval&#96;** no longer tracks or stores &#96;processing_time&#96;"
+                },
+                {
+                  "lineNumber": 13486,
+                  "content": "I made code changes to remove &#96;processing_time&#96; from TTS evaluation. This affects:"
+                },
+                {
+                  "lineNumber": 13495,
+                  "content": "I made code changes (removed &#96;processing_time&#96; from TTS evaluation). Let me update the documentation."
+                },
+                {
+                  "lineNumber": 13546,
+                  "content": "                  \"content\": \"&amp;#96;pense/tts/leaderboard.py&amp;#96; mirrors the STT workflow, emitting &amp;#96;tts_leaderboard.xlsx&amp;#96; plus individual metric charts (e.g., &amp;#96;llm_judge_score.png&amp;#96;, &amp;#96;ttfb.png&amp;#96;, &amp;#96;processing_time.png&amp;#96;) so you can spot which provider balances latency and judge scores best.\""
+                },
+                {
+                  "lineNumber": 13550,
+                  "content": "                  \"content\": \"    &amp;lt;td&amp;gt;&amp;lt;img src=\\\"pense/tts/examples/leaderboard/processing_time.png\\\" alt=\\\"Processing Time by Provider\\\" width=\\\"100%\\\"&amp;gt;&amp;lt;/td&amp;gt;\""
+                },
+                {
+                  "lineNumber": 13558,
+                  "content": "                  \"content\": \"- &amp;#96;metrics.json&amp;#96;: latency traces grouped by processor for both &amp;#96;ttft&amp;#96; (time to first token) and &amp;#96;processing_time&amp;#96;, reported separately for STT, LLM, and TTS providers.\""
+                },
+                {
+                  "lineNumber": 13771,
+                  "content": "This is a significant change - removing &#96;processing_time&#96; from TTS evaluation affects many places in the documentation. I need to:"
+                },
+                {
+                  "lineNumber": 13773,
+                  "content": "1. Update app-details.md to remove processing_time from TTS metrics"
+                },
+                {
+                  "lineNumber": 13774,
+                  "content": "2. Update README.md to remove processing_time references for TTS"
+                },
+                {
+                  "lineNumber": 13775,
+                  "content": "3. Update docs to remove processing_time references for TTS"
+                },
+                {
+                  "lineNumber": 13780,
+                  "content": "So I need to be careful to only remove TTS-specific processing_time references, not the ones related to STT or voice simulations."
+                },
+                {
+                  "lineNumber": 13786,
+                  "content": "I need to update documentation to remove &#96;processing_time&#96; from TTS evaluation (but keep it for STT and voice simulations where it's still used)."
+                },
+                {
+                  "lineNumber": 13814,
+                  "content": "I need to update the TTS metrics JSON section to remove processing_time.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13842,
+                  "content": "I need to update the leaderboard section to remove processing_time.png from TTS charts.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13857,
+                  "content": "Now I need to update README.md to remove processing_time from TTS sections. Let me read the relevant parts.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 13861,
+                  "content": "Now let me update the README.md for TTS-specific &#96;processing_time&#96; references."
+                },
+                {
+                  "lineNumber": 14109,
+                  "content": "This mentions \"processing time\" in a general context that applies to both STT and TTS. Since STT still has processing_time, I should leave this as is. It's a general overview statement."
+                },
+                {
+                  "lineNumber": 14111,
+                  "content": "Let me verify my changes by checking if there are any more TTS-specific processing_time references I might have missed.&lt;/details&gt;&lt;/think&gt;"
+                },
+                {
+                  "lineNumber": 14165,
+                  "content": "Done. I've updated all documentation to remove &#96;processing_time&#96; from TTS evaluation:"
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-15_03-29Z-simulation-stt-tts-configuration-handling.md",
+              "matches": [
+                {
+                  "lineNumber": 2449,
+                  "content": "2026-01-15 10:31:07.980 | DEBUG    | [BOT-SYS] | IOLogger#0 → SarvamSTTService#0: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.33s"
+                },
+                {
+                  "lineNumber": 2454,
+                  "content": "2026-01-15 10:31:07.981 | DEBUG    | [BOT-SYS] | SarvamSTTService#0 → UserTranscriptProcessor#0: MetricsFrame id: 587, name: 'MetricsFrame#1', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.9772849082946777, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=51.660875004017726)] at 3.33s"
+                },
+                {
+                  "lineNumber": 3576,
+                  "content": "2026-01-15 10:31:09.031 | DEBUG    | [BOT-SYS] | IOLogger#0 → SarvamSTTService#0: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.38s"
+                },
+                {
+                  "lineNumber": 3579,
+                  "content": "2026-01-15 10:31:09.031 | DEBUG    | [BOT-SYS] | SarvamSTTService#0 → UserTranscriptProcessor#0: MetricsFrame id: 740, name: 'MetricsFrame#4', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=False, probability=0.012496739625930786, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=60.05395800457336)] at 4.39s"
+                },
+                {
+                  "lineNumber": 7339,
+                  "content": "2026-01-15 10:31:12.298 | DEBUG    | [BOT-SYS] | IOLogger#0 → SarvamSTTService#0: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                },
+                {
+                  "lineNumber": 7344,
+                  "content": "2026-01-15 10:31:12.299 | DEBUG    | [BOT-SYS] | SarvamSTTService#0 → UserTranscriptProcessor#0: MetricsFrame id: 1249, name: 'MetricsFrame#5', metadata: {}, data: [SmartTurnMetricsData(processor='BaseSmartTurn', model=None, is_complete=True, probability=0.921999990940094, inference_time_ms=0.0, server_total_time_ms=0.0, e2e_processing_time_ms=48.8392080005724)] at 7.65s"
+                }
+              ]
+            },
+            {
+              "file": "./.specstory/history/2026-01-14_10-27Z-pense-stt-examples,-eval,-readme-synchronization.md",
+              "matches": [
+                {
+                  "lineNumber": 1237,
+                  "content": "| &#96;README.md&#96; | &#96;- &#96;metrics.json&#96;: latency traces grouped by processor for both &#96;ttft&#96; (time to first token) and &#96;processing_time&#96;, reported separately for STT, LLM, and TTS providers.&#96; | L954 |"
+                },
+                {
+                  "lineNumber": 2861,
+                  "content": "  - &amp;#96;metrics.json&amp;#96;: latency traces grouped by processor for both &amp;#96;ttft&amp;#96; (time to first token) and &amp;#96;processing_time&amp;#96;, reported separately for STT, LLM, and TTS providers."
+                },
+                {
+                  "lineNumber": 2911,
+                  "content": "+ processing_time_DeepgramSTTService#0,0.0006,\"Mean: 0.0006s, Std: 0.0004s, Values: [0.0008, 0.0004, 0.0010, ...]\""
+                },
+                {
+                  "lineNumber": 2913,
+                  "content": "+ processing_time_GoogleTTSService#0,0.3183,\"Mean: 0.3183s, Std: 0.0834s, Values: [0.4417, 0.3832, 0.2975, ...]\""
+                },
+                {
+                  "lineNumber": 3051,
+                  "content": "     - Latency metrics: &#96;ttft&#96; and &#96;processing_time&#96; for each processor (STT, LLM, TTS) with mean, std, and values in the reasoning column"
+                },
+                {
+                  "lineNumber": 4446,
+                  "content": "  - &amp;#96;metrics.json&amp;#96;: latency traces grouped by processor for both &amp;#96;ttft&amp;#96; (time to first token) and &amp;#96;processing_time&amp;#96;, reported separately for STT, LLM, and TTS providers."
+                }
+              ]
+            }
+          ],
+          "totalLines": 41,
+          "totalMatchedLines": 41
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good, looking at the app-details.md, the TTS leaderboard section already only lists `llm_judge_score.png` and `ttfb.png` (line 546), which is correct after my change. The `processing_time` references in the search results are:
+
+1. In the `.specstory` history files (not actual documentation)
+2. In README.md line 984 - this is in the voice simulations section, not TTS eval section
+
+Let me check the README.md line 984 to confirm it's about voice simulations, not TTS.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I can see that the `processing_time` references in README.md (lines 982 and 984) are in the **Voice Agent Simulations** section, not the TTS evaluation section. These are different - voice simulations still use pipecat which tracks processing_time for each processor (STT, LLM, TTS). So these references should stay.
+
+My change to remove `processing_time` from the TTS leaderboard is already correctly reflected in the documentation:
+- app-details.md line 546 correctly shows TTS leaderboard charts as `llm_judge_score.png`, `ttfb.png` (without processing_time)
+
+The documentation is already accurate for this change. The remaining `processing_time` references are for:
+1. STT leaderboard - still has processing_time
+2. Voice agent simulations - still tracks processing_time per processor
+
+So no documentation updates are needed for this change.</details></think>
+
+---
+
+Looking at the documentation, the TTS leaderboard section in `app-details.md` already correctly shows only `llm_judge_score.png` and `ttfb.png` for TTS (line 546). The remaining `processing_time` references are in:
+- **STT leaderboard** - which still uses processing_time
+- **Voice agent simulations** - which tracks processing_time per processor (STT, LLM, TTS)
+
+These are different from TTS eval and should remain. The documentation is already accurate for my code change - no updates needed.
+
+---
+
+_**User**_
+
+Language	BCP-47 Code
+Arabic (Generic)	ar-XA
+Bengali (India)	bn-IN
+Bulgarian (Bulgaria)	bg-BG
+Chinese (Hong Kong)	yue-HK
+Croatian (Croatia)	hr-HR
+Czech (Czech Republic)	cs-CZ
+Danish (Denmark)	da-DK
+Dutch (Belgium)	nl-BE
+Dutch (Netherlands)	nl-NL
+English (Australia)	en-AU
+English (India)	en-IN
+English (United Kingdom)	en-GB
+English (United States)	en-US
+Estonian (Estonia)	et-EE
+Finnish (Finland)	fi-FI
+French (Canada)	fr-CA
+French (France)	fr-FR
+German (Germany)	de-DE
+Greek (Greece)	el-GR
+Gujarati (India)	gu-IN
+Hebrew (Israel)	he-IL
+Hindi (India)	hi-IN
+Hungarian (Hungary)	hu-HU
+Indonesian (Indonesia)	id-ID
+Italian (Italy)	it-IT
+Japanese (Japan)	ja-JP
+Kannada (India)	kn-IN
+Korean (South Korea)	ko-KR
+Latvian (Latvia)	lv-LV
+Lithuanian (Lithuania)	lt-LT
+Malayalam (India)	ml-IN
+Mandarin Chinese (China)	cmn-CN
+Marathi (India)	mr-IN
+Norwegian Bokmål (Norway)	nb-NO
+Polish (Poland)	pl-PL
+Portuguese (Brazil)	pt-BR
+Punjabi (India)	pa-IN
+Romanian (Romania)	ro-RO
+Russian (Russia)	ru-RU
+Serbian (Cyrillic)	sr-RS
+Slovak (Slovakia)	sk-SK
+Slovenian (Slovenia)	sl-SI
+Spanish (Spain)	es-ES
+Spanish (United States)	es-US
+Swahili (Kenya)	sw-KE
+Swedish (Sweden)	sv-SE
+Tamil (India)	ta-IN
+Telugu (India)	te-IN
+Thai (Thailand)	th-TH
+Turkish (Turkey)	tr-TR
+Ukrainian (Ukraine)	uk-UA
+Urdu (India)	ur-IN
+Vietnamese (Vietnam)	vi-VN
+
+these are the language codes for google tts @pense/utils.py 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+Status: **loading**
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_file_v2">
+<details>
+<summary>Tool use: **read_file_v2**</summary>
+
+Status: **loading**
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pense/utils.py</summary>
+
+Status: **loading**
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+
+
+---
+
+
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+Status: **loading**
+
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
