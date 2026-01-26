@@ -3,7 +3,7 @@ title: "Speech to Text"
 description: "Understanding Speech to Text evaluation metrics and concepts."
 ---
 
-Speech to Text converts audio to text. Pense evaluates Speech to Text providers on both **accuracy** and **latency**.
+Speech to Text converts audio to text. Pense evaluates Speech to Text providers on **accuracy** using multiple metrics.
 
 ## Accuracy Metrics
 
@@ -59,22 +59,6 @@ Traditional metrics like WER fail in cases where the transcription is semantical
 - Numbers in different formats (digits vs words) are considered equivalent
 - Word spacing differences are ignored
 - Actual value differences (names, addresses, key details) are flagged as mismatches
-
-## Latency Metrics
-
-### Time to First Byte (TTFB)
-
-Measures the time (in seconds) from when audio streaming begins until the first transcription response is received from the provider.
-
-- **Importance**: Critical for real-time voice agents where responsiveness matters
-- **Reported**: Mean, standard deviation, and per-item values
-
-### Processing Time
-
-Total time taken (in seconds) to process the audio and return the complete transcription.
-
-- **Importance**: Affects overall conversation latency
-- **Reported**: Mean, standard deviation, and per-item values
 
 ## Output Files
 

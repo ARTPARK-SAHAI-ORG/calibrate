@@ -542,7 +542,7 @@ All modules support leaderboard generation that:
 **Output Files:**
 - `stt_leaderboard.xlsx` / `tts_leaderboard.xlsx` / `llm_leaderboard.csv`
 - Individual metric charts - one chart per metric for easy comparison:
-  - **STT:** `wer.png`, `string_similarity.png`, `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
+  - **STT:** `wer.png`, `string_similarity.png`, `llm_judge_score.png`
   - **TTS:** `llm_judge_score.png`, `ttfb.png`
 
 **Chart Features:**

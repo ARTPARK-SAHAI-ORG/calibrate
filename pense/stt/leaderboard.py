@@ -18,8 +18,6 @@ TARGET_METRICS = [
     "wer",
     "string_similarity",
     "llm_judge_score",
-    "ttfb",
-    "processing_time",
 ]
 INVALID_SHEET_CHARS = set("[]:*?/\\")
 

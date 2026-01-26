@@ -46,7 +46,7 @@ pense stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
 
 | Flag | Long | Type | Required | Default | Description |
 |------|------|------|----------|---------|-------------|
-| `-p` | `--provider` | string | Yes | - | Provider: `deepgram`, `openai`, `cartesia`, `google`, `gemini`, `sarvam`, `elevenlabs`, `smallest`, `groq` |
+| `-p` | `--provider` | string | Yes | - | Provider: `deepgram`, `openai`, `cartesia`, `google`, `sarvam`, `elevenlabs`, `smallest`, `groq` |
 | `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati` |
 | `-i` | `--input-dir` | string | Yes | - | Path to input directory containing `stt.csv` and `audios/` folder |
 | `-o` | `--output-dir` | string | No | `./out` | Path to output directory for results |
@@ -122,7 +122,7 @@ pense stt leaderboard -o ./out -s ./leaderboard
 The leaderboard command generates:
 
 - `stt_leaderboard.xlsx` - Comparative spreadsheet of all providers
-- Individual metric charts: `wer.png`, `string_similarity.png`, `llm_judge_score.png`, `ttfb.png`, `processing_time.png`
+- Individual metric charts: `wer.png`, `string_similarity.png`, `llm_judge_score.png`
 
 ---
 
@@ -133,7 +133,6 @@ The leaderboard command generates:
 | `deepgram` | English, Hindi |
 | `openai` | English, Hindi |
 | `google` | English, Hindi, Kannada |
-| `gemini` | English, Hindi, Kannada |
 | `sarvam` | English, Hindi, Kannada |
 | `elevenlabs` | English |
 | `cartesia` | English |
@@ -148,7 +147,6 @@ Set the appropriate API key for your chosen provider:
 export DEEPGRAM_API_KEY=your_key
 export OPENAI_API_KEY=your_key
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-export GOOGLE_API_KEY=your_key  # For Gemini
 export SARVAM_API_KEY=your_key
 export ELEVENLABS_API_KEY=your_key
 export CARTESIA_API_KEY=your_key

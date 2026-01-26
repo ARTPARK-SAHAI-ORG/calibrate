@@ -31,7 +31,7 @@ import asyncio
 from pense.stt import eval
 
 asyncio.run(eval(
-    provider="deepgram",  # deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
+    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq
     language="english",   # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
     input_dir="/path/to/data",
     output_dir="/path/to/output",
@@ -44,7 +44,7 @@ asyncio.run(eval(
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `provider` | str | Yes | - | Speech to Text provider: deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq |
+| `provider` | str | Yes | - | Speech to Text provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
 | `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
 | `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
@@ -226,7 +226,5 @@ Individual bar chart visualizations for each metric, comparing all providers:
 - `wer.png` - Word Error Rate comparison (lower is better)
 - `string_similarity.png` - String Similarity comparison (higher is better)
 - `llm_judge_score.png` - LLM Judge Score comparison (higher is better)
-- `ttfb.png` - Time to First Byte comparison (lower is better)
-- `processing_time.png` - Processing Time comparison (lower is better)
 
 Each chart displays the metric value for each provider with value labels on top of each bar for easy comparison.

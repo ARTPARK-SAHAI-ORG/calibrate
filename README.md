@@ -66,7 +66,7 @@ from pense.stt import eval, leaderboard
 
 # Run STT evaluation
 asyncio.run(eval(
-    provider="deepgram",  # deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
+    provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq
     language="english",   # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
     input_dir="/path/to/data",  # should contain stt.csv and audios/ folder
     output_dir="/path/to/output",
@@ -128,7 +128,7 @@ You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq |
+| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
 | `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
 | `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
