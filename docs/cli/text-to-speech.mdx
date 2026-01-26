@@ -38,7 +38,7 @@ pense tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
 | Flag | Long | Type | Required | Default | Description |
 |------|------|------|----------|---------|-------------|
 | `-p` | `--provider` | string | No | `google` | Provider: `cartesia`, `openai`, `groq`, `google`, `elevenlabs`, `sarvam`, `smallest` |
-| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati` |
+| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati`, `sindhi` |
 | `-i` | `--input` | string | Yes | - | Path to input CSV file |
 | `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
 | `-d` | `--debug` | flag | No | `false` | Run on first N texts only |
@@ -123,13 +123,17 @@ The leaderboard command generates:
 
 | Provider | Languages |
 |----------|-----------|
-| `google` | English, Hindi, Kannada |
+| `google` | English, Hindi, Kannada, Sindhi |
 | `openai` | English |
 | `cartesia` | English |
-| `elevenlabs` | English |
+| `elevenlabs` | English, Sindhi |
 | `sarvam` | Hindi, Kannada |
 | `groq` | English |
 | `smallest` | English, Hindi |
+
+<Note>
+Sindhi TTS is supported by Google (uses gemini-2.5-flash-lite-preview-tts model) and ElevenLabs (uses eleven_v3 model).
+</Note>
 
 ## Required Environment Variables
 

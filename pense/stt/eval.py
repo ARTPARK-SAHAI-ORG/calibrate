@@ -160,22 +160,25 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
 def _transcribe_google_streaming(
     audio_path: Path,
     lang_code: str,
+    model: str = "chirp_3",
+    region: str = "us",
 ) -> cloud_speech_types.StreamingRecognizeResponse:
     """Transcribes audio from an audio file stream using Google Cloud Speech-to-Text API.
     Args:
         stream_file (str): Path to the local audio file to be transcribed.
             Example: "resources/audio.wav"
+        model (str): The model to use for transcription (default: chirp_3)
+        region (str): The region for the API endpoint (default: us)
     Returns:
         list[cloud_speech_types.StreamingRecognizeResponse]: A list of objects.
             Each response includes the transcription results for the corresponding audio segment.
     """
-    REGION = "us"
     PROJECT_ID = os.getenv("GOOGLE_CLOUD_PROJECT_ID")
 
     # Instantiates a client
     client = SpeechClient(
         client_options=ClientOptions(
-            api_endpoint=f"{REGION}-speech.googleapis.com",
+            api_endpoint=f"{region}-speech.googleapis.com",
         )
     )
 
@@ -197,13 +200,13 @@ def _transcribe_google_streaming(
     recognition_config = cloud_speech_types.RecognitionConfig(
         auto_decoding_config=cloud_speech_types.AutoDetectDecodingConfig(),
         language_codes=[lang_code],
-        model="chirp_3",
+        model=model,
     )
     streaming_config = cloud_speech_types.StreamingRecognitionConfig(
         config=recognition_config
     )
     config_request = cloud_speech_types.StreamingRecognizeRequest(
-        recognizer=f"projects/{PROJECT_ID}/locations/{REGION}/recognizers/_",
+        recognizer=f"projects/{PROJECT_ID}/locations/{region}/recognizers/_",
         streaming_config=streaming_config,
     )
 
@@ -238,7 +241,15 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
 
     lang_code = get_stt_language_code(language, "google")
 
-    transcript = _transcribe_google_streaming(audio_path, lang_code)
+    # Use chirp_2 model and asia-southeast1 region for Sindhi
+    if language.lower() == "sindhi":
+        model = "chirp_2"
+        region = "asia-southeast1"
+    else:
+        model = "chirp_3"
+        region = "us"
+
+    transcript = _transcribe_google_streaming(audio_path, lang_code, model, region)
 
     return {
         "transcript": transcript.strip(),
@@ -577,6 +588,7 @@ async def main():
             "tamil",
             "telugu",
             "gujarati",
+            "sindhi",
         ],
         help="Language of the audio files",
     )

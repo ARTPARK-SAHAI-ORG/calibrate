@@ -117,17 +117,46 @@ async def synthesize_google(text: str, language: str, audio_path: str) -> Dict:
 
     client = texttospeech.TextToSpeechClient()
 
+    # Sindhi requires synchronous API with Gemini-TTS model (streaming API doesn't support Sindhi)
+    # See: https://cloud.google.com/text-to-speech/docs/gemini-tts
+    if language.lower() == "sindhi":
+        synthesis_input = texttospeech.SynthesisInput(text=text)
+
+        voice_params = texttospeech.VoiceSelectionParams(
+            language_code=lang_code,
+            name="Charon",
+            model_name="gemini-2.5-flash-lite-preview-tts",
+        )
+
+        audio_config = texttospeech.AudioConfig(
+            audio_encoding=texttospeech.AudioEncoding.LINEAR16,
+            sample_rate_hertz=24000,
+        )
+
+        start_time = time.time()
+        response = client.synthesize_speech(
+            input=synthesis_input, voice=voice_params, audio_config=audio_config
+        )
+        ttfb = time.time() - start_time
+
+        # Save the audio content
+        save_audio(response.audio_content, audio_path, sample_rate=24000)
+
+        return {}
+
+    # For other languages, use streaming API with Chirp3-HD voices
     streaming_audio_config = texttospeech.StreamingAudioConfig(
         audio_encoding=texttospeech.AudioEncoding.PCM,
         sample_rate_hertz=24000,
     )
 
-    # See https://cloud.google.com/text-to-speech/docs/voices for all voices.
+    voice_params = texttospeech.VoiceSelectionParams(
+        name=f"{lang_code}-Chirp3-HD-Charon",
+        language_code=lang_code,
+    )
+
     streaming_config = texttospeech.StreamingSynthesizeConfig(
-        voice=texttospeech.VoiceSelectionParams(
-            name=f"{lang_code}-Chirp3-HD-Charon",
-            language_code=lang_code,
-        ),
+        voice=voice_params,
         streaming_audio_config=streaming_audio_config,
     )
 
@@ -175,20 +204,39 @@ async def synthesize_elevenlabs(text: str, language: str, audio_path: str) -> Di
 
     elevenlabs = AsyncElevenLabs(api_key=api_key)
 
-    response = elevenlabs.text_to_speech.stream(
-        voice_id="m5qndnI7u4OAdXhH0Mr5",  # Krishna pre-made voice
-        output_format="mp3_24000_48",
-        text=text,
-        model_id="eleven_multilingual_v2",
-        # Optional voice settings that allow you to customize the output
-        voice_settings=VoiceSettings(
-            stability=0.0,
-            similarity_boost=1.0,
-            style=0.0,
-            use_speaker_boost=True,
-            speed=1.0,
-        ),
-    )
+    voice_id = "m5qndnI7u4OAdXhH0Mr5"
+    output_format = "mp3_24000_48"
+
+    if language.lower() == "sindhi":
+        model_id = "eleven_v3"
+
+        response = elevenlabs.text_to_dialogue.stream(
+            output_format=output_format,
+            inputs=[
+                {"text": text, "voice_id": voice_id},
+            ],
+            language_code="sd",
+            model_id="eleven_v3",
+        )
+
+    else:
+        model_id = "eleven_multilingual_v2"
+
+        response = elevenlabs.text_to_speech.stream(
+            voice_id=voice_id,  # Krishna pre-made voice
+            output_format=output_format,
+            text=text,
+            model_id=model_id,
+            # Optional voice settings that allow you to customize the output
+            voice_settings=VoiceSettings(
+                stability=0.0,
+                similarity_boost=1.0,
+                style=0.0,
+                use_speaker_boost=True,
+                speed=1.0,
+            ),
+        )
+
     mp3_path = audio_path.replace(".wav", ".mp3")
     with open(mp3_path, "wb") as f:
         async for chunk in response:
@@ -504,6 +552,7 @@ async def main():
             "tamil",
             "telugu",
             "gujarati",
+            "sindhi",
         ],
         help="Language of the audio files",
     )
