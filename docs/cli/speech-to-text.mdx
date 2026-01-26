@@ -47,7 +47,7 @@ pense stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
 | Flag | Long | Type | Required | Default | Description |
 |------|------|------|----------|---------|-------------|
 | `-p` | `--provider` | string | Yes | - | Provider: `deepgram`, `openai`, `cartesia`, `google`, `sarvam`, `elevenlabs`, `smallest`, `groq` |
-| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati` |
+| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati`, `sindhi` |
 | `-i` | `--input-dir` | string | Yes | - | Path to input directory containing `stt.csv` and `audios/` folder |
 | `-o` | `--output-dir` | string | No | `./out` | Path to output directory for results |
 | `-f` | `--input-file-name` | string | No | `stt.csv` | Name of input CSV file |
@@ -132,12 +132,16 @@ The leaderboard command generates:
 |----------|-----------|
 | `deepgram` | English, Hindi |
 | `openai` | English, Hindi |
-| `google` | English, Hindi, Kannada |
+| `google` | English, Hindi, Kannada, Sindhi |
 | `sarvam` | English, Hindi, Kannada |
-| `elevenlabs` | English |
-| `cartesia` | English |
+| `elevenlabs` | English, Sindhi |
+| `cartesia` | English, Sindhi |
 | `smallest` | English, Hindi |
 | `groq` | English |
+
+<Note>
+Sindhi STT is supported by Google (uses chirp_2 model), Cartesia, and ElevenLabs providers.
+</Note>
 
 ## Required Environment Variables
 

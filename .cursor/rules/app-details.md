@@ -132,7 +132,7 @@ Evaluates STT providers by transcribing audio files and comparing against ground
 
 **Supported Providers:** deepgram, openai, cartesia, google, gemini, sarvam, elevenlabs, smallest, groq
 
-**Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati (all Indian languages supported by Sarvam)
+**Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi (Indian languages)
 
 **Metrics:**
 - **WER (Word Error Rate):** Measures transcription accuracy
@@ -162,7 +162,7 @@ Evaluates TTS providers by synthesizing speech and measuring quality.
 
 **Supported Providers:** cartesia, openai, groq, google, elevenlabs, sarvam, smallest
 
-**Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati (all Indian languages supported by Sarvam)
+**Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi (Indian languages)
 
 **Metrics:**
 - **LLM Judge:** AI evaluation of pronunciation accuracy
@@ -608,7 +608,12 @@ uv pip install -r requirements-docs.txt
   - Google uses BCP-47 codes: `en-US`, `hi-IN`, etc.
   - ElevenLabs uses ISO 639-3 codes: `eng`, `hin`, etc.
   - Most others use ISO 639-1 codes: `en`, `hi`, `kn`, etc.
-- Not all providers support all 11 Indian languages - Sarvam has the most comprehensive support
+- Not all providers support all 12 languages - Sarvam has the most comprehensive support for Indian languages
+- **Sindhi language special handling:**
+  - **STT:** For Google STT, Sindhi requires a different model (`chirp_2`) and region (`asia-southeast1`) compared to the default (`chirp_3` model, `us` region). This is handled automatically in `pense/stt/eval.py` via `transcribe_google()`. Sindhi is supported by Google, Cartesia, and ElevenLabs for STT.
+  - **TTS:** Sindhi TTS requires special handling for both Google and ElevenLabs:
+    - **Google:** Uses streaming API with `gemini-2.5-flash-lite-preview-tts` model. Key difference: voice name is just "Charon" (not locale-prefixed like `sd-IN-Chirp3-HD-Charon`) and requires `model_name` parameter in `VoiceSelectionParams`. See [Google Gemini-TTS docs](https://cloud.google.com/text-to-speech/docs/gemini-tts).
+    - **ElevenLabs:** Uses `eleven_v3` model with `text_to_dialogue` API instead of the standard `text_to_speech` API
 - Some providers require specific voice IDs for TTS
 - OpenRouter model names use `provider/model` format (e.g., `openai/gpt-4.1`)
 
@@ -632,6 +637,9 @@ uv pip install -r requirements-docs.txt
   - Streaming providers (OpenAI, Cartesia) write chunks directly to file as they arrive
   - Streaming providers (Google, Sarvam, Smallest) collect chunks then save combined audio (Google uses PCM encoding)
   - ElevenLabs streams MP3, then converts to WAV using `convert_mp3_to_wav()` helper function (uses pydub)
+- **Google TTS voice naming patterns:**
+  - Default (Chirp3-HD): locale-prefixed name like `"{lang_code}-Chirp3-HD-Charon"` (e.g., `en-US-Chirp3-HD-Charon`)
+  - Gemini-TTS (for Sindhi): just the voice name `"Charon"` with `model_name` parameter set
 - **Optional TTFB:** TTS synthesize functions may return an empty dict `{}` if TTFB cannot be measured (e.g., Groq). The evaluation script handles this gracefully:
   - Missing TTFB values are stored as `None` in results.csv
   - Only valid TTFB values are included in metrics.json aggregation

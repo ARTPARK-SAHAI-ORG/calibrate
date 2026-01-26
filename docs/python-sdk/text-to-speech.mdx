@@ -22,7 +22,7 @@ from pense.tts import eval
 
 asyncio.run(eval(
     provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam, smallest
-    language="english",     # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
+    language="english",     # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi
     input="/path/to/input.csv",
     output_dir="/path/to/output",
     debug=True,             # optional: run on first 5 texts only
@@ -36,7 +36,7 @@ asyncio.run(eval(
 |-----------|------|----------|---------|-------------|
 | `input` | str | Yes | - | Path to input CSV file containing texts to synthesize |
 | `provider` | str | No | "google" | Text to Speech provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest |
-| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
+| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
 | `debug` | bool | No | False | Run on first N texts only |
 | `debug_count` | int | No | 5 | Number of texts in debug mode |

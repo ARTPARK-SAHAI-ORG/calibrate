@@ -67,7 +67,7 @@ from pense.stt import eval, leaderboard
 # Run STT evaluation
 asyncio.run(eval(
     provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq
-    language="english",   # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
+    language="english",   # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi
     input_dir="/path/to/data",  # should contain stt.csv and audios/ folder
     output_dir="/path/to/output",
     debug=True,           # optional: run on first 5 audio files only
@@ -131,7 +131,7 @@ You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_
 | `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
 | `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
-| `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
+| `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
 | `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
 | `debug` | bool | No | False | Run on first N audio files only |
 | `debug_count` | int | No | 5 | Number of files in debug mode |
@@ -196,7 +196,7 @@ from pense.tts import eval, leaderboard
 # Run TTS evaluation
 asyncio.run(eval(
     provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam, smallest
-    language="english",     # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati
+    language="english",     # english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi
     input="/path/to/input.csv",
     output_dir="/path/to/output",
     debug=True,             # optional: run on first 5 texts only
@@ -273,7 +273,7 @@ You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_
 |-----------|------|----------|---------|-------------|
 | `input` | str | Yes | - | Path to input CSV file containing texts to synthesize |
 | `provider` | str | No | "google" | TTS provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest |
-| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati |
+| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
 | `output_dir` | str | No | "./out" | Path to output directory for results |
 | `debug` | bool | No | False | Run on first N texts only |
 | `debug_count` | int | No | 5 | Number of texts in debug mode |
