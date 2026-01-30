@@ -3,14 +3,14 @@ title: "Voice Simulations"
 description: "CLI commands for voice agent simulations and interactive testing."
 ---
 
-Run full voice agent simulations with Speech to Text, Text to Text, and Text to Speech components, or interact with an agent in real-time.
+Run full voice agent simulations with Speech to Text, LLM, and Text to Speech components, or interact with an agent in real-time.
 
 ## Supported Providers
 
 | Component | Providers |
 |-----------|-----------|
 | **Speech to Text** | `deepgram`, `google`, `openai`, `elevenlabs`, `sarvam`, `cartesia` |
-| **Text to Text** | `openrouter`, `openai` |
+| **LLM** | `openrouter`, `openai` |
 | **Text to Speech** | `elevenlabs`, `cartesia`, `google`, `openai`, `deepgram`, `sarvam` |
 
 <Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
@@ -225,7 +225,7 @@ export ELEVENLABS_API_KEY=your_key
 export SARVAM_API_KEY=your_key
 export CARTESIA_API_KEY=your_key
 
-# Text to Text Providers
+# LLM Providers
 export OPENAI_API_KEY=your_key
 export OPENROUTER_API_KEY=your_key
 ```

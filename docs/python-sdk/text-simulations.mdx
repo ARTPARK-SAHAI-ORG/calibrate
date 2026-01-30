@@ -1,9 +1,9 @@
 ---
 title: "Text Simulations"
-description: "Run fully automated text-only simulations between two Text to Text models."
+description: "Run fully automated text-only simulations between two LLMs."
 ---
 
-Run fully automated text-only conversations between two Text to Text models—the "agent" plus multiple users having specific personas to mimic specific scenarios.
+Run fully automated text-only conversations between two LLMs—the "agent" plus multiple users having specific personas to mimic specific scenarios.
 
 Each simulation pairs every persona with every scenario. The runner fans out into separate folders and saves transcripts, evaluation results, plus logs for inspection.
 
@@ -91,7 +91,7 @@ result = asyncio.run(simulations.run(
 | `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
 | `output_dir` | str | No | "./out" | Output directory for results |
 | `model` | str | No | "gpt-4.1" | Model name for both agent and user |
-| `provider` | str | No | "openrouter" | Text to Text provider: openai or openrouter |
+| `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
 | `parallel` | int | No | 1 | Number of parallel simulations |
 | `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
 | `max_turns` | int | No | 50 | Maximum assistant turns |
@@ -99,7 +99,7 @@ result = asyncio.run(simulations.run(
 **Provider Options:**
 
 - `openai`: Use OpenAI's API directly. Model names: `gpt-4.1`, `gpt-4o`
-- `openrouter`: Access multiple Text to Text providers. Model names: `openai/gpt-4.1`, `anthropic/claude-3-opus`
+- `openrouter`: Access multiple LLM providers. Model names: `openai/gpt-4.1`, `anthropic/claude-3-opus`
 
 ## Metrics
 

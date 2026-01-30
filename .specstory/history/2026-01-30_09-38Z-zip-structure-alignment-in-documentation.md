@@ -608,3 +608,402 @@ No further updates required.
 
 ---
 
+_**User**_
+
+update Text to Text everywhere in the docs to consistently say LLM evaluation
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update "Text to Text" to "LLM evaluation" consistently throughout the docs. Let me search for all occurrences of "Text to Text" in the docs folder.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Text to Text|text-to-text",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/docs",
+  "caseInsensitive": true
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Text to Text|text-to-text",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/docs",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "docs/quickstart/text-to-text.mdx",
+              "matches": [
+                {
+                  "lineNumber": 2,
+                  "content": "title: \"Text to Text\""
+                },
+                {
+                  "lineNumber": 14,
+                  "content": "Open the **Text to Text** tab and click on **Add test** to create a new test."
+                }
+              ]
+            },
+            {
+              "file": "docs/quickstart/speech-to-text.mdx",
+              "matches": [
+                {
+                  "lineNumber": 88,
+                  "content": "  &lt;Card title=\"Text to Text\" icon=\"volume-high\" href=\"/quickstart/text-to-text\"&gt;"
+                }
+              ]
+            },
+            {
+              "file": "docs/integrations/llm.mdx",
+              "matches": [
+                {
+                  "lineNumber": 2,
+                  "content": "title: \"Text to Text\""
+                },
+                {
+                  "lineNumber": 3,
+                  "content": "description: \"Supported Text to Text providers in Pense.\""
+                },
+                {
+                  "lineNumber": 26,
+                  "content": "  &lt;Card title=\"Quickstart\" icon=\"rocket\" href=\"/quickstart/text-to-text\"&gt;"
+                },
+                {
+                  "lineNumber": 40,
+                  "content": "    href=\"/python-sdk/text-to-text\""
+                },
+                {
+                  "lineNumber": 47,
+                  "content": "    href=\"/cli/text-to-text\""
+                }
+              ]
+            },
+            {
+              "file": "docs/cli/overview.mdx",
+              "matches": [
+                {
+                  "lineNumber": 6,
+                  "content": "The Pense CLI provides commands for evaluating Speech to Text, Text to Speech, Text to Text, and running simulations directly from your terminal."
+                },
+                {
+                  "lineNumber": 69,
+                  "content": "| &#96;pense llm tests run&#96;         | Run Text to Text test cases            |"
+                },
+                {
+                  "lineNumber": 70,
+                  "content": "| &#96;pense llm tests leaderboard&#96; | Generate Text to Text tests comparison |"
+                }
+              ]
+            },
+            {
+              "file": "docs/cli/text-to-text.mdx",
+              "matches": [
+                {
+                  "lineNumber": 2,
+                  "content": "title: \"Text to Text\""
+                },
+                {
+                  "lineNumber": 3,
+                  "content": "description: \"CLI commands for Text to Text tests.\""
+                },
+                {
+                  "lineNumber": 6,
+                  "content": "Run Text to Text tests against predefined test cases with expected outputs. Useful for validating tool calls and response patterns."
+                },
+                {
+                  "lineNumber": 20,
+                  "content": "Run Text to Text test cases from a configuration file."
+                }
+              ]
+            },
+            {
+              "file": "docs/cli/text-simulations.mdx",
+              "matches": [
+                {
+                  "lineNumber": 3,
+                  "content": "description: \"CLI commands for text-only simulations between two Text to Text models.\""
+                },
+                {
+                  "lineNumber": 6,
+                  "content": "Run text-only automated conversations between two Text to Text models (agent + simulated user). Each simulation pairs every persona with every scenario."
+                },
+                {
+                  "lineNumber": 20,
+                  "content": "Run Text to Text simulations from a configuration file."
+                }
+              ]
+            },
+            {
+              "file": "docs/docs.json",
+              "matches": [
+                {
+                  "lineNumber": 24,
+                  "content": "              \"quickstart/text-to-text\","
+                },
+                {
+                  "lineNumber": 67,
+                  "content": "              \"python-sdk/text-to-text\","
+                },
+                {
+                  "lineNumber": 91,
+                  "content": "              \"cli/text-to-text\","
+                }
+              ]
+            },
+            {
+              "file": "docs/core-concepts/tools.mdx",
+              "matches": [
+                {
+                  "lineNumber": 59,
+                  "content": "    href=\"/quickstart/text-to-text#create-a-tool-invocation-test\""
+                }
+              ]
+            },
+            {
+              "file": "docs/getting-started/introduction.mdx",
+              "matches": [
+                {
+                  "lineNumber": 12,
+                  "content": "- &#96;Component level testing&#96;: Evaluate individual components (&#96;Speech to Text&#96;, &#96;Text to Text&#96;, &#96;Text to Speech&#96;) across multiple providers on your dataset and specific edge cases your agent is likely to face in production."
+                },
+                {
+                  "lineNumber": 27,
+                  "content": "  &lt;Card title=\"Text to Text\" icon=\"brain\" href=\"/quickstart/text-to-text\"&gt;"
+                }
+              ]
+            },
+            {
+              "file": "docs/core-concepts/agents.mdx",
+              "matches": [
+                {
+                  "lineNumber": 73,
+                  "content": "Add tests to the agent to evaluate its performance. See the [LLM Testing guide](/quickstart/text-to-text) for how to create tests."
+                },
+                {
+                  "lineNumber": 90,
+                  "content": "  &lt;Card title=\"Run LLM Tests\" icon=\"flask\" href=\"/quickstart/text-to-text\"&gt;"
+                }
+              ]
+            },
+            {
+              "file": "docs/python-sdk/overview.mdx",
+              "matches": [
+                {
+                  "lineNumber": 34,
+                  "content": "# Text to Text providers"
+                },
+                {
+                  "lineNumber": 50,
+                  "content": "  &lt;Card title=\"Text to Text\" icon=\"brain\" href=\"/python-sdk/text-to-text\"&gt;"
+                },
+                {
+                  "lineNumber": 51,
+                  "content": "    Run automated tests to evaluate Text to Text model behavior"
+                },
+                {
+                  "lineNumber": 72,
+                  "content": "    Run text-only simulations between two Text to Text models"
+                },
+                {
+                  "lineNumber": 79,
+                  "content": "    Run end-to-end voice simulations with Speech to Text, Text to Text, and Text"
+                }
+              ]
+            },
+            {
+              "file": "docs/cli/voice-simulations.mdx",
+              "matches": [
+                {
+                  "lineNumber": 6,
+                  "content": "Run full voice agent simulations with Speech to Text, Text to Text, and Text to Speech components, or interact with an agent in real-time."
+                },
+                {
+                  "lineNumber": 13,
+                  "content": "| **Text to Text** | &#96;openrouter&#96;, &#96;openai&#96; |"
+                },
+                {
+                  "lineNumber": 228,
+                  "content": "# Text to Text Providers"
+                }
+              ]
+            },
+            {
+              "file": "docs/python-sdk/text-to-text.mdx",
+              "matches": [
+                {
+                  "lineNumber": 2,
+                  "content": "title: \"Text to Text\""
+                },
+                {
+                  "lineNumber": 3,
+                  "content": "description: \"Run Text to Text tests to evaluate model behavior.\""
+                },
+                {
+                  "lineNumber": 6,
+                  "content": "Evaluate Text to Text model behavior through test cases."
+                },
+                {
+                  "lineNumber": 10,
+                  "content": "Define your system prompt, tools, and test cases to evaluate Text to Text model behavior:"
+                },
+                {
+                  "lineNumber": 89,
+                  "content": "| &#96;system_prompt&#96; | str | Yes | - | System prompt for the Text to Text model |"
+                },
+                {
+                  "lineNumber": 94,
+                  "content": "| &#96;provider&#96; | str | No | \"openrouter\" | Text to Text provider: openai or openrouter |"
+                },
+                {
+                  "lineNumber": 100,
+                  "content": "- &#96;openrouter&#96;: Access multiple Text to Text providers. Model names: &#96;openai/gpt-4.1&#96;, &#96;anthropic/claude-3-opus&#96;"
+                },
+                {
+                  "lineNumber": 104,
+                  "content": "Text to Text tests measure pass/fail for each test case:"
+                },
+                {
+                  "lineNumber": 220,
+                  "content": "### Run Text to Text Inference Without Evaluation"
+                }
+              ]
+            },
+            {
+              "file": "docs/python-sdk/voice-simulations.mdx",
+              "matches": [
+                {
+                  "lineNumber": 3,
+                  "content": "description: \"Run full voice simulations with Speech to Text, Text to Text, and Text to Speech components.\""
+                },
+                {
+                  "lineNumber": 6,
+                  "content": "Run full voice simulations that combine Speech to Text, Text to Text, and Text to Speech components."
+                },
+                {
+                  "lineNumber": 86,
+                  "content": "| &#96;llm&#96; | LLMConfig | No | OpenRouter/gpt-4.1 | Text to Text configuration |"
+                },
+                {
+                  "lineNumber": 94,
+                  "content": "- **Text to Text**: openrouter, openai"
+                },
+                {
+                  "lineNumber": 144,
+                  "content": "| &#96;metrics.json&#96; | Latency traces for Speech to Text, Text to Text, and Text to Speech providers |"
+                }
+              ]
+            },
+            {
+              "file": "docs/python-sdk/text-simulations.mdx",
+              "matches": [
+                {
+                  "lineNumber": 3,
+                  "content": "description: \"Run fully automated text-only simulations between two Text to Text models.\""
+                },
+                {
+                  "lineNumber": 6,
+                  "content": "Run fully automated text-only conversations between two Text to Text models—the \"agent\" plus multiple users having specific personas to mimic specific scenarios."
+                },
+                {
+                  "lineNumber": 94,
+                  "content": "| &#96;provider&#96; | str | No | \"openrouter\" | Text to Text provider: openai or openrouter |"
+                },
+                {
+                  "lineNumber": 102,
+                  "content": "- &#96;openrouter&#96;: Access multiple Text to Text providers. Model names: &#96;openai/gpt-4.1&#96;, &#96;anthropic/claude-3-opus&#96;"
+                }
+              ]
+            }
+          ],
+          "totalLines": 52,
+          "totalMatchedLines": 52
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+There are many occurrences of "Text to Text" throughout the docs. The user wants to change this to "LLM evaluation" or "LLM" consistently. Let me read some of the key files to understand the context better before making changes.
+
+Looking at the results, I need to be careful about:
+1. File names like `text-to-text.mdx` - these might need to stay as-is for URLs
+2. Titles and descriptions
+3. References in prose text
+4. Menu items in docs.json
+
+Let me categorize the changes needed:
+
+1. **Title changes**: "Text to Text" → "LLM Evaluation"
+2. **Description changes**: "Text to Text" → "LLM" or "LLM Evaluation"
+3. **Prose text changes**: "Text to Text" → "LLM" or "LLM evaluation"
+
+However, I should be careful not to change file paths or URL slugs as that would break links. Let me make the text changes while preserving the file structure.
+
+Let me read a few key files to understand the full context and make appropriate changes.</details></think>
+
+---
+
+Let me read a few key files to understand the context and make appropriate changes.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/llm.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/docs.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand the context. I need to change "Text to Text" to "LLM Evaluation" in the display text throughout the docs, while keeping file paths intact. Let me create a task list and update the files.
+
+Key changes needed:
+1. Title and content updates in various files
+2. Keep file paths (like `/quickstart/text-to-text`) unchanged since those are URLs
+
+Let me update all the files that need changes. I'll focus</details></think>
+
+---
+

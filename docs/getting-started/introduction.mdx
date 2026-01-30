@@ -9,7 +9,7 @@ Testing voice agents manually is slow, inconsistent, and doesn't scale. There is
 
 Pense solves this in two ways:
 
-- `Component level testing`: Evaluate individual components (`Speech to Text`, `Text to Text`, `Text to Speech`) across multiple providers on your dataset and specific edge cases your agent is likely to face in production.
+- `Component level testing`: Evaluate individual components (`Speech to Text`, `LLM`, `Text to Speech`) across multiple providers on your dataset and specific edge cases your agent is likely to face in production.
 - `End-to-end testing`: Simulate conversations with your agent using realistic scenarios and user personas to identify critical pathways where your agent fails before deploying it to production.
 
 This way, Pense lets you continuously improve your agent, ensure a bug never repeats itself and deploy your agent with confidence.
@@ -24,7 +24,7 @@ This way, Pense lets you continuously improve your agent, ensure a bug never rep
   >
     Compare transcription accuracy across multiple providers on your dataset
   </Card>
-  <Card title="Text to Text" icon="brain" href="/quickstart/text-to-text">
+  <Card title="LLM Evaluation" icon="brain" href="/quickstart/text-to-text">
     Create test suites that verify model responses and tool calling behavior
   </Card>
   <Card

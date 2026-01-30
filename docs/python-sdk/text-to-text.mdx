@@ -1,13 +1,13 @@
 ---
-title: "Text to Text"
-description: "Run Text to Text tests to evaluate model behavior."
+title: "LLM Evaluation"
+description: "Run LLM tests to evaluate model behavior."
 ---
 
-Evaluate Text to Text model behavior through test cases.
+Evaluate LLM behavior through test cases.
 
 ## Running Tests
 
-Define your system prompt, tools, and test cases to evaluate Text to Text model behavior:
+Define your system prompt, tools, and test cases to evaluate LLM behavior:
 
 ```python
 import asyncio
@@ -86,22 +86,22 @@ result = asyncio.run(tests.run(
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `system_prompt` | str | Yes | - | System prompt for the Text to Text model |
+| `system_prompt` | str | Yes | - | System prompt for the LLM |
 | `tools` | list | Yes | - | List of tool definitions |
 | `test_cases` | list | Yes | - | List of test case dicts with 'history', 'evaluation', optional 'settings' |
 | `output_dir` | str | No | "./out" | Output directory for results |
 | `model` | str | No | "gpt-4.1" | Model name |
-| `provider` | str | No | "openrouter" | Text to Text provider: openai or openrouter |
+| `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
 | `run_name` | str | No | None | Optional name for output folder |
 
 **Provider Options:**
 
 - `openai`: Use OpenAI's API directly. Model names: `gpt-4.1`, `gpt-4o`
-- `openrouter`: Access multiple Text to Text providers. Model names: `openai/gpt-4.1`, `anthropic/claude-3-opus`
+- `openrouter`: Access multiple LLM providers. Model names: `openai/gpt-4.1`, `anthropic/claude-3-opus`
 
 ## Metrics
 
-Text to Text tests measure pass/fail for each test case:
+LLM tests measure pass/fail for each test case:
 
 - **Pass Rate**: Percentage of test cases that match expected behavior
 - **Evaluation types**: Tool call matching or response criteria matching (via LLM Judge)
@@ -217,7 +217,7 @@ result = asyncio.run(tests.run_test(
 ))
 ```
 
-### Run Text to Text Inference Without Evaluation
+### Run LLM Inference Without Evaluation
 
 ```python
 import asyncio

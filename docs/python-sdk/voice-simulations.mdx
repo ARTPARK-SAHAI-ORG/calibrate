@@ -1,9 +1,9 @@
 ---
 title: "Voice Simulations"
-description: "Run full voice simulations with Speech to Text, Text to Text, and Text to Speech components."
+description: "Run full voice simulations with Speech to Text, LLM, and Text to Speech components."
 ---
 
-Run full voice simulations that combine Speech to Text, Text to Text, and Text to Speech components.
+Run full voice simulations that combine Speech to Text, LLM, and Text to Speech components.
 
 Each simulation pairs every persona with every scenario. The runner saves transcripts, audio files, evaluation results, and logs for inspection.
 
@@ -83,7 +83,7 @@ result = asyncio.run(simulation.run(
 | `output_dir` | str | No | "./out" | Output directory for results |
 | `stt` | STTConfig | No | Google | Speech to Text configuration |
 | `tts` | TTSConfig | No | Google | Text to Speech configuration |
-| `llm` | LLMConfig | No | OpenRouter/gpt-4.1 | Text to Text configuration |
+| `llm` | LLMConfig | No | OpenRouter/gpt-4.1 | LLM configuration |
 | `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
 | `max_turns` | int | No | 50 | Maximum assistant turns |
 | `port` | int | No | 8765 | Base WebSocket port |
@@ -91,7 +91,7 @@ result = asyncio.run(simulation.run(
 **Supported Providers:**
 
 - **Speech to Text**: deepgram, google, openai, elevenlabs, sarvam, cartesia
-- **Text to Text**: openrouter, openai
+- **LLM**: openrouter, openai
 - **Text to Speech**: cartesia, google, openai, elevenlabs, sarvam, deepgram
 
 ## Metrics
@@ -141,7 +141,7 @@ Each `simulation_persona_*_scenario_*` directory contains:
 | `results.log` | Terminal output of the simulation |
 | `evaluation_results.csv` | Per-criterion evaluation results including latency metrics |
 | `stt_results.csv` | Detailed per-row Speech to Text evaluation results |
-| `metrics.json` | Latency traces for Speech to Text, Text to Text, and Text to Speech providers |
+| `metrics.json` | Latency traces for Speech to Text, LLM, and Text to Speech providers |
 | `stt_outputs.json` | Output of the Speech to Text step for each turn |
 | `tool_calls.json` | Chronologically ordered tool calls made by the agent |
 | `transcript.json` | Full conversation transcript |
