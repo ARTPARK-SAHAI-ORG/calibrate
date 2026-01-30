@@ -528,7 +528,9 @@ async def run_single_simulation_task(
                 bot_provider=args.provider,
                 user_provider=args.provider,
                 agent_speaks_first=agent_speaks_first,
-                max_turns=config.get("settings", {}).get("max_turns", DEFAULT_MAX_TURNS),
+                max_turns=config.get("settings", {}).get(
+                    "max_turns", DEFAULT_MAX_TURNS
+                ),
                 output_dir=simulation_output_dir,
             )
 

@@ -82,24 +82,26 @@ Click **Simulations** → **Add simulation** and enter a name.
   <img src="./images/sim_create.png" alt="Create Simulation" />
 </Frame>
 
-Select your agent, personas, scenarios, and metrics. Each persona × scenario combination creates one simulated conversation.
+Select the agent, personas, scenarios, and metrics for your simulation.
 
 <Frame>
-  <img src="./images/sim_config_filled.png" alt="Simulation Configuration" />
+  <img src="./images/sim_config.png" alt="Simulation Configuration" />
 </Frame>
 
-Click **Create** to save the simulation configuration. This creates the simulation but does not run it yet.
+Click **Create** after filling in the details to save the simulation configuration. This creates the simulation but does not run it yet.
 
 ## Run the simulation
 
 After creating, you'll see a **Launch** button. Click it to start a simulation run and choose between:
 
+- **Text simulation** — text-only conversations (faster)
+- **Voice simulation** — full STT/TTS pipeline with latency metrics
+
 <Frame>
   <img src="./images/sim_launch_options.png" alt="Launch Options" />
 </Frame>
 
-- **Text simulation** — text-only conversations (faster)
-- **Voice simulation** — full STT/TTS pipeline with latency metrics
+Each run creates one simulated conversation for each persona × scenario combination.
 
 ### Text simulation
 
@@ -109,19 +111,19 @@ After launching a text simulation, the run page opens showing each conversation 
   <img src="./images/sim_text_running.png" alt="Text Simulation Running" />
 </Frame>
 
-## View results
-
 Once conversations complete, results show the metric evaluations for each row.
 
 <Frame>
   <img src="./images/sim_text_results.png" alt="Text Simulation Results" />
 </Frame>
 
-Click any row to view the full transcript. The **Overall metrics** section shows aggregated pass rates.
+Click any row to view the full transcript.
 
 <Frame>
   <img src="./images/sim_text_transcript.png" alt="Transcript View" />
 </Frame>
+
+The **Overall metrics** show the aggregated values for each metric across all conversations.
 
 ### Voice simulation
 
@@ -134,10 +136,13 @@ Voice simulations use the full STT/TTS pipeline for more realistic testing. Afte
 Click any row to view the transcript with audio playback for each turn and the full conversation.
 
 <Frame>
-  <img src="./images/sim_voice_transcript.png" alt="Voice Transcript with Audio" />
+  <img
+    src="./images/sim_voice_transcript.png"
+    alt="Voice Transcript with Audio"
+  />
 </Frame>
 
-Once complete, voice simulations show results with the **Performance** tab displaying evaluation metrics and STT LLM judge scores.
+Once complete, voice simulations show results with the **Performance** tab displaying aggregated evaluation metrics across all conversations.
 
 <Frame>
   <img src="./images/sim_voice_results.png" alt="Voice Simulation Results" />
@@ -150,11 +155,15 @@ Switch to the **Latency** tab to view detailed timing metrics for each component
 - **tts/ttft** and **tts/processing_time** — Text-to-Speech latency
 
 <Frame>
-  <img src="./images/sim_voice_latency.png" alt="Voice Simulation Latency Metrics" />
+  <img
+    src="./images/sim_voice_latency.png"
+    alt="Voice Simulation Latency Metrics"
+  />
 </Frame>
 
 <Tip>
-  Voice simulations take longer than text simulations due to the full audio pipeline, but provide more realistic testing of your agent's voice experience.
+  Voice simulations take longer than text simulations due to the full audio
+  pipeline, but provide more realistic testing of your agent's voice experience.
 </Tip>
 
 ## Next steps
