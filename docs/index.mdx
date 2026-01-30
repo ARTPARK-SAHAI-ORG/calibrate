@@ -1,97 +1,81 @@
 ---
 title: "Introduction"
-description: "Welcome to the new home for your documentation"
+description: "Learn about Pense and how to get started."
 ---
 
-## Setting up
+Pense is an open-source framework for automated, repeatable and systematic evaluation of voice agents at scale.
 
-Get your documentation site up and running in minutes.
+You can evaluate individual components (Speech to Text, Text to Text, Text to Speech) and run end-to-end voice agent simulations across thousands of scenarios with user personas defined by you to identify where your agent fails before deploying it to production, continuously improve it and ensure a bug never repeats as you make changes.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+## What can you do with Pense?
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Evaluate Speech to Text" icon="microphone">
+    Compare transcription accuracy and latency across providers like Deepgram,
+    OpenAI, Google, Sarvam, and more.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Test Text to Text" icon="brain">
+    Create test suites that verify model responses and tool calling behavior
+    against expected outputs.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Evaluate Text to Speech" icon="volume-high">
+    Benchmark pronunciation quality and performance across Cartesia, ElevenLabs,
+    Google, and other providers.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Run Simulations" icon="comments">
+    Run automated text and voice agent simulations with customizable personas
+    and scenarios.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why Pense?
 
-Everything you need to create world-class documentation.
+Testing voice agents manually is slow, inconsistent, and doesn't scale. Pense solves this by providing:
 
-<Columns cols={2}>
+- **Component-level evaluation**: Test Speech to Text, Text to Text, and Text to Speech independently to identify bottlenecks
+- **Comprehensive metrics**: WER, string similarity, LLM Judge scores, TTFB, and processing time
+- **Persona-based simulations**: Define user personas and scenarios to test diverse conversation flows
+- **Automated evaluation**: LLM judges assess transcript quality and agent behavior
+- **Leaderboards**: Compare providers side-by-side with generated reports and visualizations
+
+## Get Started
+
+<CardGroup cols={2}>
   <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
+    title="Speech to Text"
+    icon="microphone"
+    href="/quickstart/speech-to-text"
   >
-    Use MDX to style your docs pages.
+    Evaluate and compare Speech to Text providers.
+  </Card>
+  <Card title="Text to Text" icon="brain" href="/quickstart/text-to-text">
+    Test model behavior with test cases.
   </Card>
   <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
+    title="Text to Speech"
+    icon="volume-high"
+    href="/quickstart/text-to-speech"
   >
-    Add sample code to demonstrate how to use your product.
+    Evaluate Text to Speech providers.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Simulations" icon="robot" href="/quickstart/simulations">
+    Run automated conversations.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Learn More
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book" href="/core-concepts/speech-to-text">
+    Understand metrics and evaluation concepts.
+  </Card>
+  <Card title="Python SDK" icon="code" href="/python-sdk/overview">
+    Use Pense programmatically.
+  </Card>
+  <Card title="CLI Reference" icon="terminal" href="/cli/overview">
+    Run evaluations from the command line.
+  </Card>
+  <Card title="Integrations" icon="plug" href="/integrations/stt">
+    See all supported providers.
+  </Card>
+</CardGroup>

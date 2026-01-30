@@ -15,9 +15,7 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": [
-              "getting-started/introduction"
-            ]
+            "pages": ["getting-started/introduction"]
           },
           {
             "group": "Quickstart",
@@ -57,9 +55,7 @@
         "groups": [
           {
             "group": "Python SDK",
-            "pages": [
-              "python-sdk/overview"
-            ]
+            "pages": ["python-sdk/overview"]
           },
           {
             "group": "Component Testing",
@@ -83,9 +79,7 @@
         "groups": [
           {
             "group": "CLI",
-            "pages": [
-              "cli/overview"
-            ]
+            "pages": ["cli/overview"]
           },
           {
             "group": "Component Testing",
@@ -97,21 +91,16 @@
           },
           {
             "group": "End to End Tests",
-            "pages": [
-              "cli/text-simulations",
-              "cli/voice-simulations"
-            ]
+            "pages": ["cli/text-simulations", "cli/voice-simulations"]
           }
         ]
       },
       {
-        "tab": "Examples",
+        "tab": "Use cases",
         "groups": [
           {
-            "group": "Examples",
-            "pages": [
-              "examples/overview"
-            ]
+            "group": "Browse use cases",
+            "pages": ["examples/overview"]
           }
         ]
       }
@@ -120,7 +109,7 @@
       "anchors": [
         {
           "anchor": "GitHub",
-          "href": "https://github.com/artpark/pense",
+          "href": "https://github.com/artpark/agentloop",
           "icon": "github"
         },
         {
@@ -143,7 +132,7 @@
       },
       {
         "label": "Github",
-        "href": "https://github.com/artpark/pense"
+        "href": "https://github.com/artpark/agentloop"
       }
     ]
   },
@@ -161,7 +150,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/artpark/pense"
+      "github": "https://github.com/artpark/agentloop"
     }
   }
 }

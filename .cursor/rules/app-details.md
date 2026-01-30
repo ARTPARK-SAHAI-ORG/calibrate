@@ -67,7 +67,8 @@ Pense uses direct API calls for STT and TTS provider evaluations, and [pipecat](
 │   ├── core-concepts/
 │   ├── python-sdk/
 │   ├── cli/
-│   └── integrations/
+│   ├── integrations/
+│   └── examples/           # Use cases and recipes
 ├── pyproject.toml          # Package configuration
 ├── requirements-docs.txt   # Documentation dependencies
 ├── uv.lock                 # Dependency lockfile
@@ -562,6 +563,7 @@ Documentation is built using [Mintlify](https://mintlify.com) with configuration
 - Integrations (STT, LLM, TTS providers)
 - Python SDK
 - CLI
+- Use cases (examples and recipes for common evaluation workflows)
 
 **Local Preview:**
 ```bash
