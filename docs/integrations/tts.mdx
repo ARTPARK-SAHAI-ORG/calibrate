@@ -3,15 +3,22 @@ title: "Text to Speech"
 description: "Supported Text to Speech providers in Pense."
 ---
 
-| Provider |
-|----------|
-| **Cartesia** |
-| **Google** |
-| **OpenAI** |
-| **ElevenLabs** |
-| **Sarvam** |
-| **Groq** |
-| **Smallest** |
+| Provider        | Model                  | Default Voice | Website                                                     |
+| --------------- | ---------------------- | ------------- | ----------------------------------------------------------- |
+| **Cartesia**    | sonic-3                | Riya          | [cartesia.ai](https://cartesia.ai)                          |
+| **OpenAI**      | gpt-4o-mini-tts        | coral         | [openai.com](https://openai.com)                            |
+| **Groq**        | orpheus                | troy          | [groq.com](https://groq.com)                                |
+| **Google**      | chirp_3                | Charon        | [cloud.google.com](https://cloud.google.com/text-to-speech) |
+| **ElevenLabs**  | eleven_multilingual_v2 | Krishna       | [elevenlabs.io](https://elevenlabs.io)                      |
+| **Sarvam**      | bulbul:v3-beta         | aditya        | [sarvam.ai](https://sarvam.ai)                              |
+| **Smallest AI** | lightning              | aditi         | [smallest.ai](https://smallest.ai)                          |
+
+Some providers use different models for specific languages:
+
+| Provider       | Language | Model     |
+| -------------- | -------- | --------- |
+| **Google**     | Sindhi   | gemini    |
+| **ElevenLabs** | Sindhi   | eleven_v3 |
 
 ## Configuration
 
@@ -43,16 +50,32 @@ export SMALLEST_API_KEY=your_key
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Run Text to Speech Evaluation" icon="play" href="/guides/tts-evaluation">
+  <Card
+    title="Run Text to Speech Evaluation"
+    icon="play"
+    href="/guides/tts-evaluation"
+  >
     Learn how to run Text to Speech evaluation across different providers
   </Card>
-  <Card title="Configure Text to Speech in Agent" icon="gear" href="/guides/agent-tts-configuration">
+  <Card
+    title="Configure Text to Speech in Agent"
+    icon="gear"
+    href="/guides/agent-tts-configuration"
+  >
     Set up your Text to Speech provider in agent configuration
   </Card>
-  <Card title="Python SDK - Evaluation" icon="code" href="/python-sdk/text-to-speech#running-provider-evaluation">
+  <Card
+    title="Python SDK - Evaluation"
+    icon="code"
+    href="/python-sdk/text-to-speech#running-provider-evaluation"
+  >
     Run evaluation for any Text to Speech provider using the Python SDK
   </Card>
-  <Card title="Python SDK - Leaderboard" icon="chart-bar" href="/python-sdk/text-to-speech#provider-leaderboard">
+  <Card
+    title="Python SDK - Leaderboard"
+    icon="chart-bar"
+    href="/python-sdk/text-to-speech#provider-leaderboard"
+  >
     Benchmark multiple Text to Speech providers on your dataset
   </Card>
 </CardGroup>

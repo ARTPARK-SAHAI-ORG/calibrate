@@ -136,11 +136,13 @@ Evaluates STT providers by transcribing audio files and comparing against ground
 **Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi (Indian languages)
 
 **Metrics:**
+
 - **WER (Word Error Rate):** Measures transcription accuracy
 - **String Similarity:** Character-level similarity score
 - **LLM Judge:** AI-based evaluation of semantic accuracy
 
 **Input Structure:**
+
 ```
 input_dir/
 ├── stt.csv          # id,text pairs
@@ -150,6 +152,7 @@ input_dir/
 ```
 
 **Output Structure:**
+
 ```
 output_dir/provider/
 ├── results.csv      # Per-audio results with metrics
@@ -166,12 +169,14 @@ Evaluates TTS providers by synthesizing speech and measuring quality.
 **Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi (Indian languages)
 
 **Metrics:**
-- **LLM Judge:** AI evaluation of pronunciation accuracy
+
+- **LLM Judge:** AI evaluation of pronunciation accuracy using an audio-capable model (`gpt-audio`). Directly compares raw audio against input text — does NOT convert speech to text first.
 - **TTFB (Time to First Byte):** Latency measurement (time to receive first audio chunk)
 
 **Input:** CSV file with `id,text` columns
 
 **Output Structure:**
+
 ```
 output_dir/provider/
 ├── audios/          # Generated audio files (named after id: row_1.wav, row_2.wav, etc.)
@@ -185,10 +190,12 @@ output_dir/provider/
 Unit tests for LLM behavior verification.
 
 **Test Types:**
+
 - **Tool Call Tests:** Verify the LLM calls the correct tools with correct arguments
 - **Response Tests:** Verify the LLM response meets criteria (via LLM judge)
 
 **Test Case Structure:**
+
 ```python
 {
     "history": [
@@ -211,11 +218,13 @@ Unit tests for LLM behavior verification.
 Automated text-only conversations between two LLMs (agent + simulated user).
 
 **Key Components:**
+
 - **Personas:** Define simulated user characteristics (age, personality, speaking style)
 - **Scenarios:** Define conversation goals/tasks
 - **Evaluation Criteria:** Define success metrics
 
 **Output per Simulation:**
+
 ```
 simulation_persona_N_scenario_M/
 ├── transcript.json          # Full conversation
@@ -229,11 +238,13 @@ simulation_persona_N_scenario_M/
 Full end-to-end voice pipeline testing with STT, LLM, and TTS components.
 
 **Additional Features:**
+
 - **Interruption Sensitivity:** Simulate users interrupting mid-sentence (none/low/medium/high)
 - **Audio Recording:** All turns saved as WAV files
 - **STT Evaluation:** Compare transcribed speech against intended user messages
 
 **Output per Simulation:**
+
 ```
 simulation_persona_N_scenario_M/
 ├── audios/
@@ -358,24 +369,24 @@ pense agent test -c ./config.json -o ./out
 
 ```json
 {
-    "type": "client",
-    "name": "plan_next_question",
-    "description": "Plan the next question to ask",
-    "parameters": [
-        {
-            "id": "next_unanswered_question_index",
-            "type": "integer",
-            "description": "Index of next question",
-            "required": true
-        },
-        {
-            "id": "questions_answered",
-            "type": "array",
-            "description": "List of answered question indices",
-            "items": {"type": "integer"},
-            "required": true
-        }
-    ]
+  "type": "client",
+  "name": "plan_next_question",
+  "description": "Plan the next question to ask",
+  "parameters": [
+    {
+      "id": "next_unanswered_question_index",
+      "type": "integer",
+      "description": "Index of next question",
+      "required": true
+    },
+    {
+      "id": "questions_answered",
+      "type": "array",
+      "description": "List of answered question indices",
+      "items": { "type": "integer" },
+      "required": true
+    }
+  ]
 }
 ```
 
@@ -383,14 +394,15 @@ pense agent test -c ./config.json -o ./out
 
 ```json
 {
-    "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
-    "gender": "female",
-    "language": "english",
-    "interruption_sensitivity": "medium"  // none, low, medium, high
+  "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
+  "gender": "female",
+  "language": "english",
+  "interruption_sensitivity": "medium" // none, low, medium, high
 }
 ```
 
 **Interruption Sensitivity Mapping:**
+
 - `none`: 0% probability
 - `low`: 25% probability
 - `medium`: 50% probability
@@ -400,7 +412,7 @@ pense agent test -c ./config.json -o ./out
 
 ```json
 {
-    "description": "User completes the form without any issues"
+  "description": "User completes the form without any issues"
 }
 ```
 
@@ -408,8 +420,8 @@ pense agent test -c ./config.json -o ./out
 
 ```json
 {
-    "name": "question_completeness",
-    "description": "Whether all the questions in the form were covered"
+  "name": "question_completeness",
+  "description": "Whether all the questions in the form were covered"
 }
 ```
 
@@ -485,9 +497,9 @@ All modules read from a single `.env` file in the project root.
 
 ```json
 {
-    "wer": 0.129,
-    "string_similarity": 0.879,
-    "llm_judge_score": 1.0
+  "wer": 0.129,
+  "string_similarity": 0.879,
+  "llm_judge_score": 1.0
 }
 ```
 
@@ -495,12 +507,12 @@ All modules read from a single `.env` file in the project root.
 
 ```json
 {
-    "llm_judge_score": 1.0,
-    "ttfb": {
-        "mean": 0.354,
-        "std": 0.027,
-        "values": [0.38, 0.33]
-    }
+  "llm_judge_score": 1.0,
+  "ttfb": {
+    "mean": 0.354,
+    "std": 0.027,
+    "values": [0.38, 0.33]
+  }
 }
 ```
 
@@ -525,9 +537,17 @@ All modules read from a single `.env` file in the project root.
 
 ```json
 {
-    "question_completeness": {"mean": 1.0, "std": 0.0, "values": [1.0, 1.0, 1.0]},
-    "assistant_behavior": {"mean": 0.67, "std": 0.58, "values": [1.0, 0.0, 1.0]},
-    "stt_llm_judge": {"mean": 0.95, "std": 0.03, "values": [0.95, 0.92, 0.98]}
+  "question_completeness": {
+    "mean": 1.0,
+    "std": 0.0,
+    "values": [1.0, 1.0, 1.0]
+  },
+  "assistant_behavior": {
+    "mean": 0.67,
+    "std": 0.58,
+    "values": [1.0, 0.0, 1.0]
+  },
+  "stt_llm_judge": { "mean": 0.95, "std": 0.03, "values": [0.95, 0.92, 0.98] }
 }
 ```
 
@@ -536,17 +556,20 @@ All modules read from a single `.env` file in the project root.
 ## Leaderboard Generation
 
 All modules support leaderboard generation that:
+
 1. Scans output directories for provider results
 2. Aggregates metrics across runs
 3. Generates comparison Excel files and per-metric PNG charts
 
 **Output Files:**
+
 - `stt_leaderboard.xlsx` / `tts_leaderboard.xlsx` / `llm_leaderboard.csv`
 - Individual metric charts - one chart per metric for easy comparison:
   - **STT:** `wer.png`, `string_similarity.png`, `llm_judge_score.png`
   - **TTS:** `llm_judge_score.png`, `ttfb.png`
 
 **Chart Features:**
+
 - Each chart shows all providers as bars on the x-axis
 - Value labels displayed on top of each bar (integers shown as integers, decimals with 4 decimal places)
 - Metrics with all NaN values are automatically skipped
@@ -559,13 +582,26 @@ All modules support leaderboard generation that:
 Documentation is built using [Mintlify](https://mintlify.com) with configuration in `docs/docs.json`.
 
 **Documentation Tabs:**
+
 - Getting Started
 - Integrations (STT, LLM, TTS providers)
 - Python SDK
 - CLI
 - Use cases (examples and recipes for common evaluation workflows)
 
+**Core Concepts Pages (in order):**
+
+- speech-to-text
+- text-to-speech
+- agents
+- tools
+- text-to-text
+- personas
+- scenarios
+- simulations
+
 **Local Preview:**
+
 ```bash
 uv pip install -r requirements-docs.txt
 # Follow Mintlify docs for local preview
@@ -588,11 +624,13 @@ uv pip install -r requirements-docs.txt
 ## Gotchas & Edge Cases
 
 ### Audio Files
+
 - All audio must be WAV format
 - STT input audio should match the file names in `stt.csv`
 - Voice simulation audio uses 1-based indexing: `1_user.wav`, `1_bot.wav`, etc.
 
 ### Provider-Specific
+
 - **Separate STT/TTS language codes:** STT and TTS providers often support different languages. Language codes are managed separately in `pense/utils.py`:
   - `get_stt_language_code(language, provider)` - For STT providers
   - `get_tts_language_code(language, provider)` - For TTS providers
@@ -620,20 +658,24 @@ uv pip install -r requirements-docs.txt
 - OpenRouter model names use `provider/model` format (e.g., `openai/gpt-4.1`)
 
 ### Simulations
+
 - `max_turns` limits assistant turns, not total turns
 - Conversation ends gracefully after max turns (final assistant message recorded)
 - Transcript includes `end_reason` message when max turns reached
 
 ### Interactive Testing
+
 - Use headphones to avoid audio feedback
 - Opens browser UI at `http://localhost:7860/client/`
 - Requires explicit `pense agent test` CLI command (no Python API for interactive mode)
 
 ### STT/TTS Evaluation Architecture
+
 - **Direct API calls:** Both STT and TTS evaluations use direct provider SDK/API calls (not pipecat)
 - **Streaming TTFB:** Most TTS providers use streaming APIs and measure true TTFB (time to first audio chunk): OpenAI, ElevenLabs, Cartesia, Google, Sarvam, Smallest
 - **Non-streaming:** Groq does not support streaming and does not return TTFB
 - **Pipecat usage:** Only voice agent simulations use pipecat for the full STT→LLM→TTS pipeline
+- **TTS LLM Judge accuracy:** The audio-capable model (`gpt-audio`) may have reduced accuracy for low-resource languages like Sindhi due to limited training data
 - **Language validation:** `validate_stt_language()` and `validate_tts_language()` in `pense/utils.py` check if a language is supported by a provider before evaluation starts. Each function uses the appropriate STT or TTS language dictionaries. If invalid, the run stops with an error listing all supported languages for that provider.
 - **TTS audio saving patterns:** All TTS synthesize functions accept `audio_path` and save audio:
   - Streaming providers (OpenAI, Cartesia) write chunks directly to file as they arrive
@@ -647,6 +689,7 @@ uv pip install -r requirements-docs.txt
   - Only valid TTFB values are included in metrics.json aggregation
 
 ### Metrics JSON Format
+
 - **Consistent structure:** Both STT and TTS use flat dict format with metric names as keys
 - **Simple metrics:** Stored as direct float values (e.g., `"wer": 0.129`, `"llm_judge_score": 1.0`)
 - **Latency metrics:** Stored as nested dicts with `mean`, `std`, and `values` (e.g., `"ttfb": {"mean": 0.35, "std": 0.03, "values": [...]}`)

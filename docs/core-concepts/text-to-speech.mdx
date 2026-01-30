@@ -1,93 +1,49 @@
 ---
 title: "Text to Speech"
-description: "Understanding Text to Speech evaluation metrics and concepts."
+description: "Understand the concepts for evaluating Text to Speech providers"
 ---
 
-Text to Speech converts text to audio. Pense evaluates Text to Speech providers on **pronunciation quality** and **latency**.
-
-## Quality Metrics
+## Metrics
 
 ### LLM Judge Score
 
-The LLM Judge listens to the generated audio and evaluates whether the pronunciation matches the input text.
+An audio LLM Judge (`gpt-audio`) listens to the generated audio and evaluates whether the pronunciation matches the input text.
+
+<Note>
+  The LLM Judge directly compares the raw audio against the input text. It does
+  **not** convert the generated speech to text first — it evaluates the audio
+  natively using an audio-capable model.
+</Note>
+
+<Warning>
+  Evaluation accuracy may differ for low-resource languages like Sindhi, as the
+  underlying audio model has limited training data for these languages.
+</Warning>
 
 - **Range**: 0 to 1 (1 means all audio correctly pronounces the text, higher is better)
 - **Output**: Returns both a match (True/False) and reasoning for each audio file
 
-**What LLM Judge evaluates:**
+What the LLM Judge evaluates:
+
 - Correct pronunciation of words
 - Proper handling of numbers, abbreviations, and special characters
-- Clarity and intelligibility
 
-**Example Results:**
+#### Example
 
-| Text | LLM Judge | Reasoning |
-|------|-----------|-----------|
-| "Hello world" | True | The audio clearly says "hello world" with correct pronunciation. |
-| "Call 1-800-555-0123" | True | The phone number is pronounced correctly. |
-| "Dr. Smith" | False | "Dr." was pronounced as "dur" instead of "doctor". |
-
-## Latency Metrics
+| Text                  | Audio                                                              | LLM Judge | Reasoning                                                        |
+| --------------------- | ------------------------------------------------------------------ | --------- | ---------------------------------------------------------------- |
+| "Hello world"         | <audio controls src="/core-concepts/audios/hello_world.wav" />     | True      | The audio clearly says "hello world" with correct pronunciation. |
+| "Call 1-800-555-0123" | <audio controls src="/core-concepts/audios/phone_number.wav" />    | True      | The phone number is pronounced correctly.                        |
+| "Dr. Smith"           | <audio controls src="/core-concepts/audios/dr_smith.wav" />        | False     | "Dr." was pronounced as "dur" instead of "doctor".               |
 
 ### Time to First Byte (TTFB)
 
-Measures the time (in seconds) from when the synthesis request is made until the first audio chunk is received.
-
-- **Importance**: Critical for real-time voice agents where responsiveness matters
-- **Reported**: Mean, standard deviation, and per-item values
-
-## Output Files
-
-### results.csv
-
-Contains detailed results for each text:
-
-| id | text | audio_path | ttfb | llm_judge_score | llm_judge_reasoning |
-|----|------|------------|------|-----------------|---------------------|
-| row_1 | hello world | ./out/elevenlabs/audios/row_1.wav | 1.511 | True | The audio says 'hello world' clearly and matches the reference text exactly. |
-| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
-
-### metrics.json
-
-Contains aggregated metrics:
-
-```json
-{
-  "llm_judge_score": 1.0,
-  "ttfb": {
-    "mean": 1.362950086593628,
-    "std": 0.1476140022277832,
-    "values": [1.5105640888214111, 1.2153360843658447]
-  }
-}
-```
-
-### audios/
-
-Generated audio files:
-- `row_1.wav`, `row_2.wav`, etc. (named after the `id` column in the input CSV)
-- WAV format for easy playback and analysis
-
-## Provider Considerations
-
-Different providers have different strengths:
-
-| Provider | Strengths |
-|----------|-----------|
-| Google | Good multilingual support, consistent quality |
-| OpenAI | High quality neural voices |
-| Cartesia | Very low latency, good for real-time |
-| ElevenLabs | Premium voice quality, natural prosody |
-| Sarvam | Excellent for Indian languages |
-| Groq | Fast inference |
+Measures the time (in seconds) from when the request is made to the provider until the first audio chunk is received. It is critical for real-time voice agents where responsiveness matters.
 
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Text to Speech Quickstart" icon="play" href="/quickstart/text-to-speech">
-    Run your first Text to Speech evaluation.
-  </Card>
-  <Card title="Simulation Concepts" icon="robot" href="/core-concepts/simulations">
-    Learn about voice simulations.
+  <Card title="Quickstart" icon="play" href="/quickstart/text-to-speech">
+    Run your first evaluation on your dataset
   </Card>
 </CardGroup>

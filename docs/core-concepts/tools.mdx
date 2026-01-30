@@ -1,0 +1,86 @@
+---
+title: "Tools"
+description: "Learn how to create tools for your agents"
+---
+
+Tools enable your agents to produce structured outputs. They define the parameters and format for extracting information from conversations.
+
+## Creating a Tool
+
+### Step 1: Navigate to Tools
+
+From the sidebar, click **Tools** to view your existing tools.
+
+### Step 2: Click "Add tool"
+
+Click the **Add tool** button in the top right corner. A sidebar panel will open.
+
+### Step 3: Configure the Tool
+
+#### Configuration Section
+
+| Field           | Required | Description                                                |
+| --------------- | -------- | ---------------------------------------------------------- |
+| **Name**        | Yes      | Tool identifier (e.g., `lookup_customer`, `create_ticket`) |
+| **Description** | Yes      | Explain to the LLM how and when to use this tool           |
+
+**Example Configuration:**
+
+```text
+Name: lookup_customer
+
+Description: Look up customer information by their phone number.
+Use this when the customer provides their phone number
+or you need to verify their identity.
+```
+
+<Tip>
+  Write clear descriptions that help the LLM understand when to invoke the tool.
+  Include specific trigger conditions.
+</Tip>
+
+### Step 4: Add Parameters
+
+Click **Add param** to define the data the tool will capture or send.
+
+#### Parameter Fields
+
+| Field           | Required | Description                                 |
+| --------------- | -------- | ------------------------------------------- |
+| **Name**        | Yes      | Parameter identifier (e.g., `phone_number`) |
+| **Data Type**   | Yes      | string, number, boolean, array, or object   |
+| **Required**    | -        | Whether the parameter must be provided      |
+| **Description** | Yes      | Explain what this parameter represents      |
+
+#### Data Types
+
+| Type        | Use Case          | Example                         |
+| ----------- | ----------------- | ------------------------------- |
+| **string**  | Text values       | Names, phone numbers, addresses |
+| **number**  | Numeric values    | Age, amount, quantity           |
+| **boolean** | True/false values | Confirmation flags, toggles     |
+| **array**   | Lists of items    | Multiple selections, tags       |
+| **object**  | Nested structures | Complex data with sub-fields    |
+
+### Step 5: Save the Tool
+
+Click **Add tool** to create the tool.
+
+## Inbuilt Tools
+
+Some tools are built into the platform and enabled by default:
+
+| Tool                 | Description                      |
+| -------------------- | -------------------------------- |
+| **End conversation** | Allows the agent to end the call |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configure Agents" icon="robot" href="/guides/agents">
+    Learn how to create and configure agents.
+  </Card>
+  <Card title="Run Tests" icon="flask" href="/guides/llm-testing">
+    Test tool invocations with your agent.
+  </Card>
+</CardGroup>

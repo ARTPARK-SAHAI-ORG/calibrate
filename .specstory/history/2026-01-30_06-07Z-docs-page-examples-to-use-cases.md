@@ -477,7 +477,7 @@ I also need to add the examples folder to the project structure in app-details.m
 
 ---
 
-
+Let me also add the examples folder to the docs structure in app-details.md.
 
 ---
 
@@ -485,11 +485,2441 @@ I also need to add the examples folder to the project structure in app-details.m
 
 <details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md</summary>
 
-Status: **loading**
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've updated:
+1. The documentation tabs list to include "Use cases"
+2. The project structure to include the examples folder
+
+The changes I made were:
+- Added "Use cases" tab documentation
+- Created docs/examples/overview.mdx with use case cards
+- Updated GitHub URLs from artpark/pense to artpark/agentloop
+
+All relevant documentation has been updated accordingly.</details></think>
+
+---
+
+Done. Updated `.cursor/rules/app-details.md` with:
+- Added "Use cases" to the Documentation Tabs list
+- Added `examples/` folder to the docs project structure
+
+---
+
+_**User**_
+
+update the text to text integrations page to link to the list of models supported beside each provider
+
+https://openrouter.ai/models 
+
+https://platform.openai.com/docs/models 
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the Text to Text integrations page to add links to the model lists for each provider. Let me first read the current integrations page for LLM.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/llm.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I need to update the provider table to include links to the models documentation for each provider. I'll add a "Supported Models" column with links.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/llm.mdx</summary>
 
 </details>
 
 </tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've updated the Text to Text integrations page to include a "Supported Models" column with links to the model documentation for each provider.</details></think>
+
+---
+
+Done. Updated the Text to Text integrations page to include a "Supported Models" column with links to:
+- OpenAI: https://platform.openai.com/docs/models
+- OpenRouter: https://openrouter.ai/models
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The change I made was updating the Text to Text integrations page to add links to model documentation for OpenAI and OpenRouter. This is a minor documentation-only change that doesn't affect the codebase architecture or patterns.
+
+Let me check if:
+1. app-details.md mentions anything about LLM providers that would need updating - it already lists "openai, openrouter" as supported providers
+2. README.md mentions model links - unlikely
+
+This is a very minor documentation enhancement (adding external links to provider model pages). It doesn't change any patterns, conventions, or core functionality. The app-details.md already correctly lists the supported LLM providers. This change doesn't need any updates to app-details.md or README.md since it's just adding helpful external links to the docs, not changing any core functionality or patterns.
+
+I should not make unnecessary changes. This was a minor docs enhancement that doesn't require updates to app-details.md or README.md.</details></think>
+
+---
+
+The change I made was a minor documentation enhancement - adding external links to model documentation in the Text to Text integrations page. This doesn't affect the codebase architecture, patterns, or core functionality.
+
+The `app-details.md` already correctly lists the supported LLM providers ("openai, openrouter"), and the README.md doesn't need updates since no core functionality changed - just helpful external links were added to the docs.
+
+No updates needed to `app-details.md` or `README.md` for this change.
+
+---
+
+_**User**_
+
+export type LLMModel = {
+  id: string;
+  name: string;
+};
+
+export type LLMProvider = {
+  name: string;
+  models: LLMModel[];
+};
+
+// Deepgram STT supported languages
+export const deepgramSTTSupportedLanguages = [
+  "Belarusian",
+  "Bengali",
+  "Bosnian",
+  "Bulgarian",
+  "Catalan",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Estonian",
+  "Finnish",
+  "Flemish",
+  "French",
+  "German",
+  "Greek",
+  "Hindi",
+  "Hungarian",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Kannada",
+  "Korean",
+  "Latvian",
+  "Lithuanian",
+  "Macedonian",
+  "Malay",
+  "Marathi",
+  "Norwegian",
+  "Polish",
+  "Portuguese",
+  "Romanian",
+  "Russian",
+  "Serbian",
+  "Slovak",
+  "Slovenian",
+  "Spanish",
+  "Swedish",
+  "Tagalog",
+  "Tamil",
+  "Telugu",
+  "Turkish",
+  "Ukrainian",
+  "Vietnamese",
+];
+
+// Cartesia STT supported languages
+export const cartesiaSTTSupportedLanguages = [
+  "Afrikaans",
+  "Albanian",
+  "Amharic",
+  "Arabic",
+  "Armenian",
+  "Assamese",
+  "Azerbaijani",
+  "Bashkir",
+  "Basque",
+  "Belarusian",
+  "Bengali",
+  "Bosnian",
+  "Breton",
+  "Bulgarian",
+  "Burmese",
+  "Catalan",
+  "Chinese",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Estonian",
+  "Faroese",
+  "Finnish",
+  "French",
+  "Galician",
+  "Georgian",
+  "German",
+  "Greek",
+  "Gujarati",
+  "Haitian Creole",
+  "Hausa",
+  "Hawaiian",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Icelandic",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Javanese",
+  "Kannada",
+  "Kazakh",
+  "Khmer",
+  "Korean",
+  "Lao",
+  "Latin",
+  "Latvian",
+  "Lingala",
+  "Lithuanian",
+  "Luxembourgish",
+  "Macedonian",
+  "Malagasy",
+  "Malay",
+  "Malayalam",
+  "Maltese",
+  "Maori",
+  "Marathi",
+  "Mongolian",
+  "Nepali",
+  "Norwegian",
+  "Norwegian Nynorsk",
+  "Occitan",
+  "Pashto",
+  "Persian",
+  "Polish",
+  "Portuguese",
+  "Punjabi",
+  "Romanian",
+  "Russian",
+  "Sanskrit",
+  "Serbian",
+  "Shona",
+  "Sindhi",
+  "Sinhala",
+  "Slovak",
+  "Slovenian",
+  "Somali",
+  "Spanish",
+  "Sundanese",
+  "Swahili",
+  "Swedish",
+  "Tagalog",
+  "Tajik",
+  "Tamil",
+  "Tatar",
+  "Telugu",
+  "Thai",
+  "Tibetan",
+  "Turkish",
+  "Turkmen",
+  "Ukrainian",
+  "Urdu",
+  "Uzbek",
+  "Vietnamese",
+  "Welsh",
+  "Yiddish",
+  "Yoruba",
+  "Yue Chinese",
+];
+
+// Smallest AI STT supported languages
+export const smallestAiSTTSupportedLanguages = [
+  "Bengali",
+  "Bulgarian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Estonian",
+  "Finnish",
+  "French",
+  "German",
+  "Gujarati",
+  "Hindi",
+  "Hungarian",
+  "Italian",
+  "Kannada",
+  "Latvian",
+  "Lithuanian",
+  "Malayalam",
+  "Maltese",
+  "Marathi",
+  "Oriya",
+  "Polish",
+  "Portuguese",
+  // "Punjabi",
+  "Romanian",
+  "Russian",
+  "Slovak",
+  "Spanish",
+  "Swedish",
+  "Tamil",
+  "Telugu",
+  "Ukrainian",
+];
+
+// Google STT supported languages
+export const googleSTTSupportedLanguages = [
+  "Afrikaans",
+  "Amharic",
+  "Arabic",
+  "Armenian",
+  "Assamese",
+  "Azerbaijani",
+  "Bengali",
+  "Bulgarian",
+  "Burmese",
+  "Catalan",
+  "Chinese",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Estonian",
+  "Filipino",
+  "Finnish",
+  "French",
+  "Galician",
+  "Georgian",
+  "German",
+  "Greek",
+  "Gujarati",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Icelandic",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Javanese",
+  "Kannada",
+  "Kazakh",
+  "Khmer",
+  "Korean",
+  "Lao",
+  "Latvian",
+  "Lithuanian",
+  "Macedonian",
+  "Malay",
+  "Malayalam",
+  "Marathi",
+  "Mongolian",
+  "Nepali",
+  "Norwegian",
+  "Odia",
+  "Persian",
+  "Polish",
+  "Portuguese",
+  "Punjabi",
+  "Romanian",
+  "Russian",
+  "Sepedi",
+  "Serbian",
+  "Sindhi",
+  "Slovak",
+  "Slovenian",
+  "Spanish",
+  "Swahili",
+  "Swedish",
+  "Tamil",
+  "Telugu",
+  "Thai",
+  "Turkish",
+  "Ukrainian",
+  "Urdu",
+  "Uzbek",
+  "Vietnamese",
+  "Xhosa",
+  "Zulu",
+];
+
+// ElevenLabs STT supported languages
+export const elevenlabsSTTSupportedLanguages = [
+  "Afrikaans",
+  "Amharic",
+  "Arabic",
+  "Armenian",
+  "Assamese",
+  "Asturian",
+  "Azerbaijani",
+  "Belarusian",
+  "Bengali",
+  "Bosnian",
+  "Bulgarian",
+  "Burmese",
+  "Cantonese",
+  "Catalan",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Estonian",
+  "Filipino",
+  "Finnish",
+  "French",
+  "Galician",
+  "Ganda",
+  "Georgian",
+  "German",
+  "Greek",
+  "Gujarati",
+  "Hausa",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Icelandic",
+  "Igbo",
+  "Indonesian",
+  "Irish",
+  "Italian",
+  "Japanese",
+  "Javanese",
+  "Kannada",
+  "Kazakh",
+  "Khmer",
+  "Korean",
+  "Kurdish",
+  "Kyrgyz",
+  "Lao",
+  "Latvian",
+  "Lithuanian",
+  "Luxembourgish",
+  "Macedonian",
+  "Malay",
+  "Malayalam",
+  "Maltese",
+  "Mandarin",
+  "Maori",
+  "Marathi",
+  "Mongolian",
+  "Nepali",
+  "Northern Sotho",
+  "Norwegian",
+  "Occitan",
+  "Odia",
+  "Pashto",
+  "Persian",
+  "Polish",
+  "Portuguese",
+  "Punjabi",
+  "Romanian",
+  "Russian",
+  "Serbian",
+  "Shona",
+  "Sindhi",
+  "Slovak",
+  "Slovenian",
+  "Somali",
+  "Spanish",
+  "Swahili",
+  "Swedish",
+  "Tajik",
+  "Tamil",
+  "Telugu",
+  "Thai",
+  "Turkish",
+  "Ukrainian",
+  "Urdu",
+  "Uzbek",
+  "Vietnamese",
+  "Welsh",
+  "Wolof",
+  "Xhosa",
+  "Yoruba",
+  "Zulu",
+];
+
+// Sarvam STT supported languages (Indic language specialist)
+export const sarvamSTTSupportedLanguages = [
+  "Bengali",
+  "English",
+  "Gujarati",
+  "Hindi",
+  "Kannada",
+  "Malayalam",
+  "Marathi",
+  "Odia",
+  "Punjabi",
+  "Tamil",
+  "Telugu",
+];
+
+// Groq TTS supported languages (Orpheus)
+export const groqTTSSupportedLanguages = [
+  "English",
+];
+
+// Cartesia TTS supported languages
+export const cartesiaTTSSupportedLanguages = [
+  "Arabic",
+  "Bengali",
+  "Bulgarian",
+  "Chinese",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Finnish",
+  "French",
+  "Georgian",
+  "German",
+  "Greek",
+  "Gujarati",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Kannada",
+  "Korean",
+  "Malayalam",
+  "Marathi",
+  "Norwegian",
+  "Polish",
+  "Portuguese",
+  "Punjabi",
+  "Romanian",
+  "Russian",
+  "Slovak",
+  "Spanish",
+  "Swedish",
+  "Tagalog",
+  "Tamil",
+  "Telugu",
+  "Thai",
+  "Turkish",
+  "Ukrainian",
+  "Vietnamese",
+];
+
+// Google TTS supported languages
+export const googleTTSSupportedLanguages = [
+  "Arabic",
+  "Bengali",
+  "Bulgarian",
+  "Chinese",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Estonian",
+  "Finnish",
+  "French",
+  "German",
+  "Greek",
+  "Gujarati",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Kannada",
+  "Korean",
+  "Latvian",
+  "Lithuanian",
+  "Malayalam",
+  "Marathi",
+  "Norwegian",
+  "Polish",
+  "Portuguese",
+  "Punjabi",
+  "Romanian",
+  "Russian",
+  "Serbian",
+  "Sindhi",
+  "Slovak",
+  "Slovenian",
+  "Spanish",
+  "Swahili",
+  "Swedish",
+  "Tamil",
+  "Telugu",
+  "Thai",
+  "Turkish",
+  "Ukrainian",
+  "Urdu",
+  "Vietnamese",
+];
+
+// ElevenLabs TTS supported languages
+export const elevenlabsTTSSupportedLanguages = [
+  "Arabic",
+  "Bulgarian",
+  "Chinese",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Filipino",
+  "Finnish",
+  "French",
+  "German",
+  "Greek",
+  "Hindi",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Korean",
+  "Malay",
+  "Polish",
+  "Portuguese",
+  "Romanian",
+  "Russian",
+  "Sindhi",
+  "Slovak",
+  "Spanish",
+  "Swedish",
+  "Tamil",
+  "Turkish",
+  "Ukrainian",
+];
+
+// OpenAI STT supported languages
+export const openaiSTTSupportedLanguages = [
+  "Afrikaans",
+  "Arabic",
+  "Armenian",
+  "Azerbaijani",
+  "Belarusian",
+  "Bosnian",
+  "Bulgarian",
+  "Catalan",
+  "Chinese",
+  "Croatian",
+  "Czech",
+  "Danish",
+  "Dutch",
+  "English",
+  "Estonian",
+  "Finnish",
+  "French",
+  "Galician",
+  "German",
+  "Greek",
+  "Hebrew",
+  "Hindi",
+  "Hungarian",
+  "Icelandic",
+  "Indonesian",
+  "Italian",
+  "Japanese",
+  "Kannada",
+  "Kazakh",
+  "Korean",
+  "Latvian",
+  "Lithuanian",
+  "Macedonian",
+  "Malay",
+  "Marathi",
+  "Maori",
+  "Nepali",
+  "Norwegian",
+  "Persian",
+  "Polish",
+  "Portuguese",
+  "Romanian",
+  "Russian",
+  "Serbian",
+  "Slovak",
+  "Slovenian",
+  "Spanish",
+  "Swahili",
+  "Swedish",
+  "Tagalog",
+  "Tamil",
+  "Thai",
+  "Turkish",
+  "Ukrainian",
+  "Urdu",
+  "Vietnamese",
+  "Welsh",
+];
+
+export type STTProvider = {
+  label: string;
+  value: string;
+  model: string;
+  website: string;
+  supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>;
+};
+
+export type TTSProvider = {
+  label: string;
+  value: string;
+  model: string;
+  voiceId: string;
+  website: string;
+  supportedLanguages?: string[];
+  modelOverrides?: Record<string, string>;
+};
+
+export const sttProviders: STTProvider[] = [
+  { label: "Deepgram", value: "deepgram", model: "nova-3", website: "https://deepgram.com", supportedLanguages: deepgramSTTSupportedLanguages },
+  { label: "OpenAI", value: "openai", model: "gpt-4o-transcribe", website: "https://openai.com", supportedLanguages: openaiSTTSupportedLanguages },
+  { label: "Cartesia", value: "cartesia", model: "ink", website: "https://cartesia.ai", supportedLanguages: cartesiaSTTSupportedLanguages },
+  { label: "ElevenLabs", value: "elevenlabs", model: "scribe-v2", website: "https://elevenlabs.io", supportedLanguages: elevenlabsSTTSupportedLanguages },
+  { label: "Groq", value: "groq", model: "whisper-large-v3-turbo", website: "https://groq.com", supportedLanguages: openaiSTTSupportedLanguages },
+  { label: "Google", value: "google", model: "chirp-3", website: "https://cloud.google.com/speech-to-text", supportedLanguages: googleSTTSupportedLanguages, modelOverrides: { "Sindhi": "chirp-2" } },
+  { label: "Sarvam", value: "sarvam", model: "saarika-v2.5", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
+  { label: "Smallest AI", value: "smallest", model: "pulse", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
+];
+
+/*
+┌─────────────┬──────────────────────────┐
+│ Label       │ Model                    │
+├─────────────┼──────────────────────────┤
+│ Deepgram    │ nova-3                   │
+│ OpenAI      │ gpt-4o-transcribe        │
+│ Cartesia    │ ink                      │
+│ ElevenLabs  │ scribe-v2                │
+│ Groq        │ whisper-large-v3-turbo   │
+│ Google      │ chirp-3                  │
+│ Sarvam      │ saarika-v2.5             │
+│ Smallest    │ pulse                    │
+└─────────────┴──────────────────────────┘
+*/
+
+export const ttsProviders: TTSProvider[] = [
+  { label: "Cartesia", value: "cartesia", model: "sonic-3", voiceId: "Riya", website: "https://cartesia.ai", supportedLanguages: cartesiaTTSSupportedLanguages },
+  { label: "OpenAI", value: "openai", model: "gpt-4o-mini-tts", voiceId: "coral", website: "https://openai.com", supportedLanguages: openaiSTTSupportedLanguages },
+  { label: "Groq", value: "groq", model: "orpheus", voiceId: "troy", website: "https://groq.com", supportedLanguages: groqTTSSupportedLanguages },
+  { label: "Google", value: "google", model: "chirp_3", voiceId: "Charon", website: "https://cloud.google.com/text-to-speech", supportedLanguages: googleTTSSupportedLanguages, modelOverrides: { "Sindhi": "gemini" } },
+  { label: "ElevenLabs", value: "elevenlabs", model: "eleven_multilingual_v2", voiceId: "Krishna", website: "https://elevenlabs.io", supportedLanguages: elevenlabsTTSSupportedLanguages, modelOverrides: { "Sindhi": "eleven_v3" } },
+  { label: "Sarvam", value: "sarvam", model: "bulbul:v3-beta", voiceId: "aditya", website: "https://sarvam.ai", supportedLanguages: sarvamSTTSupportedLanguages },
+  { label: "Smallest AI", value: "smallest", model: "lightning", voiceId: "aditi", website: "https://smallest.ai", supportedLanguages: smallestAiSTTSupportedLanguages },
+];
+
+/*
+┌─────────────┬──────────────────────────┬──────────────────────────────────────────┐
+│ Label       │ Model                    │ Voice ID                                 │
+├─────────────┼──────────────────────────┼──────────────────────────────────────────┤
+│ Cartesia    │ sonic-2                  │ 638efaaa-4d0c-442e-b701-3fae16aad012     │
+│ OpenAI      │ gpt-4o-mini-tts          │ coral                                    │
+│ Groq        │ playai-tts               │ Arista-PlayAI                            │
+│ Google      │ chirp-3                  │ Aoede                                    │
+│ ElevenLabs  │ eleven_multilingual_v2   │ IbEzPPGLXlYUvxNGhJQp                     │
+│ Sarvam      │ bulbul:v2                │ meera                                    │
+│ Smallest    │ lightning                │ emily                                    │
+└─────────────┴──────────────────────────┴──────────────────────────────────────────┘
+*/
+
+export const llmProviders: LLMProvider[] = [
+  {
+    name: "OpenAI",
+    models: [
+      { id: "openai/gpt-5.2-chat", name: "GPT-5.2 Chat" },
+      { id: "openai/gpt-5.2-pro", name: "GPT-5.2 Pro" },
+      { id: "openai/gpt-5.2", name: "GPT-5.2" },
+      { id: "openai/gpt-5.1-codex-max", name: "GPT-5.1-Codex-Max" },
+      { id: "openai/gpt-5.1", name: "GPT-5.1" },
+      { id: "openai/gpt-5.1-chat", name: "GPT-5.1 Chat" },
+      { id: "openai/gpt-5.1-codex", name: "GPT-5.1-Codex" },
+      { id: "openai/gpt-5.1-codex-mini", name: "GPT-5.1-Codex-Mini" },
+      { id: "openai/gpt-oss-safeguard-20b", name: "gpt-oss-safeguard-20b" },
+      { id: "openai/gpt-5-image-mini", name: "GPT-5 Image Mini" },
+      { id: "openai/gpt-5-image", name: "GPT-5 Image" },
+      { id: "openai/o3-deep-research", name: "o3 Deep Research" },
+      { id: "openai/o4-mini-deep-research", name: "o4 Mini Deep Research" },
+      { id: "openai/gpt-5-pro", name: "GPT-5 Pro" },
+      { id: "openai/gpt-5-codex", name: "GPT-5 Codex" },
+      { id: "openai/gpt-4o-audio-preview", name: "GPT-4o Audio" },
+      { id: "openai/gpt-5-chat", name: "GPT-5 Chat" },
+      { id: "openai/gpt-5", name: "GPT-5" },
+      { id: "openai/gpt-5-mini", name: "GPT-5 Mini" },
+      { id: "openai/gpt-5-nano", name: "GPT-5 Nano" },
+      { id: "openai/gpt-oss-120b:free", name: "gpt-oss-120b (free)" },
+      { id: "openai/gpt-oss-120b", name: "gpt-oss-120b" },
+      { id: "openai/gpt-oss-120b:exacto", name: "gpt-oss-120b (exacto)" },
+      { id: "openai/gpt-oss-20b:free", name: "gpt-oss-20b (free)" },
+      { id: "openai/gpt-oss-20b", name: "gpt-oss-20b" },
+      { id: "openai/o3-pro", name: "o3 Pro" },
+      { id: "openai/codex-mini", name: "Codex Mini" },
+      { id: "openai/o4-mini-high", name: "o4 Mini High" },
+      { id: "openai/o3", name: "o3" },
+      { id: "openai/o4-mini", name: "o4 Mini" },
+      { id: "openai/gpt-4.1", name: "GPT-4.1" },
+      { id: "openai/gpt-4.1-mini", name: "GPT-4.1 Mini" },
+      { id: "openai/gpt-4.1-nano", name: "GPT-4.1 Nano" },
+      { id: "openai/o1-pro", name: "o1-pro" },
+      {
+        id: "openai/gpt-4o-mini-search-preview",
+        name: "GPT-4o-mini Search Preview",
+      },
+      { id: "openai/gpt-4o-search-preview", name: "GPT-4o Search Preview" },
+      { id: "openai/o3-mini-high", name: "o3 Mini High" },
+      { id: "openai/o3-mini", name: "o3 Mini" },
+      { id: "openai/o1", name: "o1" },
+      { id: "openai/gpt-4o-2024-11-20", name: "GPT-4o (2024-11-20)" },
+      { id: "openai/chatgpt-4o-latest", name: "ChatGPT-4o" },
+      { id: "openai/gpt-4o-2024-08-06", name: "GPT-4o (2024-08-06)" },
+      { id: "openai/gpt-4o-mini-2024-07-18", name: "GPT-4o-mini (2024-07-18)" },
+      { id: "openai/gpt-4o-mini", name: "GPT-4o-mini" },
+      { id: "openai/gpt-4o-2024-05-13", name: "GPT-4o (2024-05-13)" },
+      { id: "openai/gpt-4o", name: "GPT-4o" },
+      { id: "openai/gpt-4o:extended", name: "GPT-4o (extended)" },
+      { id: "openai/gpt-4-turbo", name: "GPT-4 Turbo" },
+      { id: "openai/gpt-3.5-turbo-0613", name: "GPT-3.5 Turbo (older v0613)" },
+      { id: "openai/gpt-4-turbo-preview", name: "GPT-4 Turbo Preview" },
+      { id: "openai/gpt-4-1106-preview", name: "GPT-4 Turbo (older v1106)" },
+      { id: "openai/gpt-3.5-turbo-instruct", name: "GPT-3.5 Turbo Instruct" },
+      { id: "openai/gpt-3.5-turbo-16k", name: "GPT-3.5 Turbo 16k" },
+      { id: "openai/gpt-4-0314", name: "GPT-4 (older v0314)" },
+      { id: "openai/gpt-4", name: "GPT-4" },
+      { id: "openai/gpt-3.5-turbo", name: "GPT-3.5 Turbo" },
+    ],
+  },
+  {
+    name: "Google",
+    models: [
+      { id: "google/gemini-3-flash-preview", name: "Gemini 3 Flash Preview" },
+      {
+        id: "google/gemini-3-pro-image-preview",
+        name: "Nano Banana Pro (Gemini 3 Pro Image Preview)",
+      },
+      { id: "google/gemini-3-pro-preview", name: "Gemini 3 Pro Preview" },
+      {
+        id: "google/gemini-2.5-flash-image",
+        name: "Gemini 2.5 Flash Image (Nano Banana)",
+      },
+      {
+        id: "google/gemini-2.5-flash-preview-09-2025",
+        name: "Gemini 2.5 Flash Preview 09-2025",
+      },
+      {
+        id: "google/gemini-2.5-flash-lite-preview-09-2025",
+        name: "Gemini 2.5 Flash Lite Preview 09-2025",
+      },
+      {
+        id: "google/gemini-2.5-flash-image-preview",
+        name: "Gemini 2.5 Flash Image Preview (Nano Banana)",
+      },
+      { id: "google/gemini-2.5-flash-lite", name: "Gemini 2.5 Flash Lite" },
+      { id: "google/gemma-3n-e2b-it:free", name: "Gemma 3n 2B (free)" },
+      { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+      { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+      {
+        id: "google/gemini-2.5-pro-preview",
+        name: "Gemini 2.5 Pro Preview 06-05",
+      },
+      { id: "google/gemma-3n-e4b-it:free", name: "Gemma 3n 4B (free)" },
+      { id: "google/gemma-3n-e4b-it", name: "Gemma 3n 4B" },
+      {
+        id: "google/gemini-2.5-pro-preview-05-06",
+        name: "Gemini 2.5 Pro Preview 05-06",
+      },
+      { id: "google/gemma-3-4b-it:free", name: "Gemma 3 4B (free)" },
+      { id: "google/gemma-3-4b-it", name: "Gemma 3 4B" },
+      { id: "google/gemma-3-12b-it:free", name: "Gemma 3 12B (free)" },
+      { id: "google/gemma-3-12b-it", name: "Gemma 3 12B" },
+      { id: "google/gemma-3-27b-it:free", name: "Gemma 3 27B (free)" },
+      { id: "google/gemma-3-27b-it", name: "Gemma 3 27B" },
+      { id: "google/gemini-2.0-flash-lite-001", name: "Gemini 2.0 Flash Lite" },
+      { id: "google/gemini-2.0-flash-001", name: "Gemini 2.0 Flash" },
+      {
+        id: "google/gemini-2.0-flash-exp:free",
+        name: "Gemini 2.0 Flash Experimental (free)",
+      },
+      { id: "google/gemma-2-27b-it", name: "Gemma 2 27B" },
+      { id: "google/gemma-2-9b-it", name: "Gemma 2 9B" },
+    ],
+  },
+  {
+    name: "Anthropic",
+    models: [
+      { id: "anthropic/claude-opus-4.5", name: "Claude Opus 4.5" },
+      { id: "anthropic/claude-haiku-4.5", name: "Claude Haiku 4.5" },
+      { id: "anthropic/claude-sonnet-4.5", name: "Claude Sonnet 4.5" },
+      { id: "anthropic/claude-opus-4.1", name: "Claude Opus 4.1" },
+      { id: "anthropic/claude-opus-4", name: "Claude Opus 4" },
+      { id: "anthropic/claude-sonnet-4", name: "Claude Sonnet 4" },
+      {
+        id: "anthropic/claude-3.7-sonnet:thinking",
+        name: "Claude 3.7 Sonnet (thinking)",
+      },
+      { id: "anthropic/claude-3.7-sonnet", name: "Claude 3.7 Sonnet" },
+      {
+        id: "anthropic/claude-3.5-haiku-20241022",
+        name: "Claude 3.5 Haiku (2024-10-22)",
+      },
+      { id: "anthropic/claude-3.5-haiku", name: "Claude 3.5 Haiku" },
+      { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet" },
+      { id: "anthropic/claude-3-haiku", name: "Claude 3 Haiku" },
+    ],
+  },
+  {
+    name: "DeepSeek",
+    models: [
+      { id: "deepseek/deepseek-v3.2-speciale", name: "DeepSeek V3.2 Speciale" },
+      { id: "deepseek/deepseek-v3.2", name: "DeepSeek V3.2" },
+      { id: "deepseek/deepseek-v3.2-exp", name: "DeepSeek V3.2 Exp" },
+      {
+        id: "deepseek/deepseek-v3.1-terminus:exacto",
+        name: "DeepSeek V3.1 Terminus (exacto)",
+      },
+      { id: "deepseek/deepseek-v3.1-terminus", name: "DeepSeek V3.1 Terminus" },
+      { id: "deepseek/deepseek-chat-v3.1", name: "DeepSeek V3.1" },
+      {
+        id: "deepseek/deepseek-r1-0528-qwen3-8b",
+        name: "DeepSeek R1 0528 Qwen3 8B",
+      },
+      { id: "deepseek/deepseek-r1-0528:free", name: "R1 0528 (free)" },
+      { id: "deepseek/deepseek-r1-0528", name: "R1 0528" },
+      { id: "deepseek/deepseek-prover-v2", name: "DeepSeek Prover V2" },
+      { id: "deepseek/deepseek-chat-v3-0324", name: "DeepSeek V3 0324" },
+      {
+        id: "deepseek/deepseek-r1-distill-qwen-32b",
+        name: "R1 Distill Qwen 32B",
+      },
+      {
+        id: "deepseek/deepseek-r1-distill-qwen-14b",
+        name: "R1 Distill Qwen 14B",
+      },
+      {
+        id: "deepseek/deepseek-r1-distill-llama-70b",
+        name: "R1 Distill Llama 70B",
+      },
+      { id: "deepseek/deepseek-r1", name: "R1" },
+      { id: "deepseek/deepseek-chat", name: "DeepSeek V3" },
+    ],
+  },
+  {
+    name: "Meta",
+    models: [
+      { id: "meta-llama/llama-guard-4-12b", name: "Llama Guard 4 12B" },
+      { id: "meta-llama/llama-4-maverick", name: "Llama 4 Maverick" },
+      { id: "meta-llama/llama-4-scout", name: "Llama 4 Scout" },
+      {
+        id: "meta-llama/llama-3.3-70b-instruct:free",
+        name: "Llama 3.3 70B Instruct (free)",
+      },
+      {
+        id: "meta-llama/llama-3.3-70b-instruct",
+        name: "Llama 3.3 70B Instruct",
+      },
+      {
+        id: "meta-llama/llama-3.2-3b-instruct:free",
+        name: "Llama 3.2 3B Instruct (free)",
+      },
+      { id: "meta-llama/llama-3.2-3b-instruct", name: "Llama 3.2 3B Instruct" },
+      { id: "meta-llama/llama-3.2-1b-instruct", name: "Llama 3.2 1B Instruct" },
+      {
+        id: "meta-llama/llama-3.2-90b-vision-instruct",
+        name: "Llama 3.2 90B Vision Instruct",
+      },
+      {
+        id: "meta-llama/llama-3.2-11b-vision-instruct",
+        name: "Llama 3.2 11B Vision Instruct",
+      },
+      { id: "meta-llama/llama-3.1-405b", name: "Llama 3.1 405B (base)" },
+      { id: "meta-llama/llama-3.1-8b-instruct", name: "Llama 3.1 8B Instruct" },
+      {
+        id: "meta-llama/llama-3.1-405b-instruct:free",
+        name: "Llama 3.1 405B Instruct (free)",
+      },
+      {
+        id: "meta-llama/llama-3.1-405b-instruct",
+        name: "Llama 3.1 405B Instruct",
+      },
+      {
+        id: "meta-llama/llama-3.1-70b-instruct",
+        name: "Llama 3.1 70B Instruct",
+      },
+      { id: "meta-llama/llama-guard-2-8b", name: "LlamaGuard 2 8B" },
+      { id: "meta-llama/llama-3-70b-instruct", name: "Llama 3 70B Instruct" },
+      { id: "meta-llama/llama-3-8b-instruct", name: "Llama 3 8B Instruct" },
+    ],
+  },
+  {
+    name: "Mistral",
+    models: [
+      {
+        id: "mistralai/mistral-small-creative",
+        name: "Mistral Small Creative",
+      },
+      { id: "mistralai/devstral-2512:free", name: "Devstral 2 2512 (free)" },
+      { id: "mistralai/devstral-2512", name: "Devstral 2 2512" },
+      { id: "mistralai/ministral-14b-2512", name: "Ministral 3 14B 2512" },
+      { id: "mistralai/ministral-8b-2512", name: "Ministral 3 8B 2512" },
+      { id: "mistralai/ministral-3b-2512", name: "Ministral 3 3B 2512" },
+      { id: "mistralai/mistral-large-2512", name: "Mistral Large 3 2512" },
+      {
+        id: "mistralai/voxtral-small-24b-2507",
+        name: "Voxtral Small 24B 2507",
+      },
+      { id: "mistralai/mistral-medium-3.1", name: "Mistral Medium 3.1" },
+      { id: "mistralai/codestral-2508", name: "Codestral 2508" },
+      { id: "mistralai/devstral-medium", name: "Devstral Medium" },
+      { id: "mistralai/devstral-small", name: "Devstral Small 1.1" },
+      {
+        id: "mistralai/mistral-small-3.2-24b-instruct",
+        name: "Mistral Small 3.2 24B",
+      },
+      { id: "mistralai/devstral-small-2505", name: "Devstral Small 2505" },
+      { id: "mistralai/mistral-medium-3", name: "Mistral Medium 3" },
+      {
+        id: "mistralai/mistral-small-3.1-24b-instruct:free",
+        name: "Mistral Small 3.1 24B (free)",
+      },
+      {
+        id: "mistralai/mistral-small-3.1-24b-instruct",
+        name: "Mistral Small 3.1 24B",
+      },
+      { id: "mistralai/mistral-saba", name: "Saba" },
+      {
+        id: "mistralai/mistral-small-24b-instruct-2501",
+        name: "Mistral Small 3",
+      },
+      { id: "mistralai/pixtral-large-2411", name: "Pixtral Large 2411" },
+      { id: "mistralai/ministral-8b", name: "Ministral 8B" },
+      { id: "mistralai/ministral-3b", name: "Ministral 3B" },
+      { id: "mistralai/pixtral-12b", name: "Pixtral 12B" },
+      { id: "mistralai/mistral-nemo", name: "Mistral Nemo" },
+      {
+        id: "mistralai/mistral-7b-instruct:free",
+        name: "Mistral 7B Instruct (free)",
+      },
+      { id: "mistralai/mistral-7b-instruct", name: "Mistral 7B Instruct" },
+      {
+        id: "mistralai/mistral-7b-instruct-v0.3",
+        name: "Mistral 7B Instruct v0.3",
+      },
+      {
+        id: "mistralai/mixtral-8x22b-instruct",
+        name: "Mixtral 8x22B Instruct",
+      },
+      {
+        id: "mistralai/mistral-7b-instruct-v0.2",
+        name: "Mistral 7B Instruct v0.2",
+      },
+      { id: "mistralai/mixtral-8x7b-instruct", name: "Mixtral 8x7B Instruct" },
+      {
+        id: "mistralai/mistral-7b-instruct-v0.1",
+        name: "Mistral 7B Instruct v0.1",
+      },
+    ],
+  },
+  {
+    name: "Qwen",
+    models: [
+      { id: "qwen/qwen3-vl-32b-instruct", name: "Qwen3 VL 32B Instruct" },
+      { id: "qwen/qwen3-vl-8b-thinking", name: "Qwen3 VL 8B Thinking" },
+      { id: "qwen/qwen3-vl-8b-instruct", name: "Qwen3 VL 8B Instruct" },
+      {
+        id: "qwen/qwen3-vl-30b-a3b-thinking",
+        name: "Qwen3 VL 30B A3B Thinking",
+      },
+      {
+        id: "qwen/qwen3-vl-30b-a3b-instruct",
+        name: "Qwen3 VL 30B A3B Instruct",
+      },
+      {
+        id: "qwen/qwen3-vl-235b-a22b-thinking",
+        name: "Qwen3 VL 235B A22B Thinking",
+      },
+      {
+        id: "qwen/qwen3-vl-235b-a22b-instruct",
+        name: "Qwen3 VL 235B A22B Instruct",
+      },
+      { id: "qwen/qwen3-max", name: "Qwen3 Max" },
+      { id: "qwen/qwen3-coder-plus", name: "Qwen3 Coder Plus" },
+      { id: "qwen/qwen3-coder-flash", name: "Qwen3 Coder Flash" },
+      {
+        id: "qwen/qwen3-next-80b-a3b-thinking",
+        name: "Qwen3 Next 80B A3B Thinking",
+      },
+      {
+        id: "qwen/qwen3-next-80b-a3b-instruct",
+        name: "Qwen3 Next 80B A3B Instruct",
+      },
+      { id: "qwen/qwen-plus-2025-07-28", name: "Qwen Plus 0728" },
+      {
+        id: "qwen/qwen-plus-2025-07-28:thinking",
+        name: "Qwen Plus 0728 (thinking)",
+      },
+      {
+        id: "qwen/qwen3-30b-a3b-thinking-2507",
+        name: "Qwen3 30B A3B Thinking 2507",
+      },
+      {
+        id: "qwen/qwen3-coder-30b-a3b-instruct",
+        name: "Qwen3 Coder 30B A3B Instruct",
+      },
+      {
+        id: "qwen/qwen3-30b-a3b-instruct-2507",
+        name: "Qwen3 30B A3B Instruct 2507",
+      },
+      {
+        id: "qwen/qwen3-235b-a22b-thinking-2507",
+        name: "Qwen3 235B A22B Thinking 2507",
+      },
+      { id: "qwen/qwen3-coder:free", name: "Qwen3 Coder 480B A35B (free)" },
+      { id: "qwen/qwen3-coder", name: "Qwen3 Coder 480B A35B" },
+      { id: "qwen/qwen3-coder:exacto", name: "Qwen3 Coder 480B A35B (exacto)" },
+      {
+        id: "qwen/qwen3-235b-a22b-2507",
+        name: "Qwen3 235B A22B Instruct 2507",
+      },
+      { id: "qwen/qwen3-4b:free", name: "Qwen3 4B (free)" },
+      { id: "qwen/qwen3-30b-a3b", name: "Qwen3 30B A3B" },
+      { id: "qwen/qwen3-8b", name: "Qwen3 8B" },
+      { id: "qwen/qwen3-14b", name: "Qwen3 14B" },
+      { id: "qwen/qwen3-32b", name: "Qwen3 32B" },
+      { id: "qwen/qwen3-235b-a22b", name: "Qwen3 235B A22B" },
+      {
+        id: "qwen/qwen2.5-coder-7b-instruct",
+        name: "Qwen2.5 Coder 7B Instruct",
+      },
+      { id: "qwen/qwen2.5-vl-32b-instruct", name: "Qwen2.5 VL 32B Instruct" },
+      { id: "qwen/qwq-32b", name: "QwQ 32B" },
+      { id: "qwen/qwen-vl-plus", name: "Qwen VL Plus" },
+      { id: "qwen/qwen-vl-max", name: "Qwen VL Max" },
+      { id: "qwen/qwen-turbo", name: "Qwen-Turbo" },
+      { id: "qwen/qwen2.5-vl-72b-instruct", name: "Qwen2.5 VL 72B Instruct" },
+      { id: "qwen/qwen-plus", name: "Qwen-Plus" },
+      { id: "qwen/qwen-max", name: "Qwen-Max" },
+      { id: "qwen/qwen-2.5-7b-instruct", name: "Qwen2.5 7B Instruct" },
+      {
+        id: "qwen/qwen-2.5-vl-7b-instruct:free",
+        name: "Qwen2.5-VL 7B Instruct (free)",
+      },
+      { id: "qwen/qwen-2.5-vl-7b-instruct", name: "Qwen2.5-VL 7B Instruct" },
+    ],
+  },
+  {
+    name: "xAI",
+    models: [
+      { id: "x-ai/grok-4.1-fast", name: "Grok 4.1 Fast" },
+      { id: "x-ai/grok-4-fast", name: "Grok 4 Fast" },
+      { id: "x-ai/grok-code-fast-1", name: "Grok Code Fast 1" },
+      { id: "x-ai/grok-4", name: "Grok 4" },
+      { id: "x-ai/grok-3-mini", name: "Grok 3 Mini" },
+      { id: "x-ai/grok-3", name: "Grok 3" },
+      { id: "x-ai/grok-3-mini-beta", name: "Grok 3 Mini Beta" },
+      { id: "x-ai/grok-3-beta", name: "Grok 3 Beta" },
+    ],
+  },
+  {
+    name: "Perplexity",
+    models: [
+      { id: "perplexity/sonar-pro-search", name: "Sonar Pro Search" },
+      { id: "perplexity/sonar-reasoning-pro", name: "Sonar Reasoning Pro" },
+      { id: "perplexity/sonar-pro", name: "Sonar Pro" },
+      { id: "perplexity/sonar-deep-research", name: "Sonar Deep Research" },
+      { id: "perplexity/sonar", name: "Sonar" },
+    ],
+  },
+  {
+    name: "MoonshotAI",
+    models: [
+      { id: "moonshotai/kimi-k2-thinking", name: "Kimi K2 Thinking" },
+      { id: "moonshotai/kimi-k2-0905", name: "Kimi K2 0905" },
+      { id: "moonshotai/kimi-k2-0905:exacto", name: "Kimi K2 0905 (exacto)" },
+      { id: "moonshotai/kimi-k2:free", name: "Kimi K2 0711 (free)" },
+      { id: "moonshotai/kimi-k2", name: "Kimi K2 0711" },
+      { id: "moonshotai/kimi-dev-72b", name: "Kimi Dev 72B" },
+    ],
+  },
+  {
+    name: "Cohere",
+    models: [
+      { id: "cohere/command-a", name: "Command A" },
+      { id: "cohere/command-r7b-12-2024", name: "Command R7B (12-2024)" },
+      { id: "cohere/command-r-08-2024", name: "Command R (08-2024)" },
+      { id: "cohere/command-r-plus-08-2024", name: "Command R+ (08-2024)" },
+    ],
+  },
+  {
+    name: "Amazon",
+    models: [
+      { id: "amazon/nova-2-lite-v1", name: "Nova 2 Lite" },
+      { id: "amazon/nova-premier-v1", name: "Nova Premier 1.0" },
+      { id: "amazon/nova-lite-v1", name: "Nova Lite 1.0" },
+      { id: "amazon/nova-micro-v1", name: "Nova Micro 1.0" },
+      { id: "amazon/nova-pro-v1", name: "Nova Pro 1.0" },
+    ],
+  },
+  {
+    name: "NVIDIA",
+    models: [
+      {
+        id: "nvidia/nemotron-3-nano-30b-a3b:free",
+        name: "Nemotron 3 Nano 30B A3B (free)",
+      },
+      { id: "nvidia/nemotron-3-nano-30b-a3b", name: "Nemotron 3 Nano 30B A3B" },
+      {
+        id: "nvidia/nemotron-nano-12b-v2-vl:free",
+        name: "Nemotron Nano 12B 2 VL (free)",
+      },
+      { id: "nvidia/nemotron-nano-12b-v2-vl", name: "Nemotron Nano 12B 2 VL" },
+      {
+        id: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+        name: "Llama 3.3 Nemotron Super 49B V1.5",
+      },
+      {
+        id: "nvidia/nemotron-nano-9b-v2:free",
+        name: "Nemotron Nano 9B V2 (free)",
+      },
+      { id: "nvidia/nemotron-nano-9b-v2", name: "Nemotron Nano 9B V2" },
+      {
+        id: "nvidia/llama-3.1-nemotron-ultra-253b-v1",
+        name: "Llama 3.1 Nemotron Ultra 253B v1",
+      },
+      {
+        id: "nvidia/llama-3.1-nemotron-70b-instruct",
+        name: "Llama 3.1 Nemotron 70B Instruct",
+      },
+    ],
+  },
+  {
+    name: "Microsoft",
+    models: [
+      { id: "microsoft/phi-4-reasoning-plus", name: "Phi 4 Reasoning Plus" },
+      {
+        id: "microsoft/phi-4-multimodal-instruct",
+        name: "Phi 4 Multimodal Instruct",
+      },
+      { id: "microsoft/phi-4", name: "Phi 4" },
+    ],
+  },
+  {
+    name: "ByteDance Seed",
+    models: [
+      { id: "bytedance-seed/seed-1.6-flash", name: "Seed 1.6 Flash" },
+      { id: "bytedance-seed/seed-1.6", name: "Seed 1.6" },
+    ],
+  },
+  {
+    name: "MiniMax",
+    models: [
+      { id: "minimax/minimax-m2.1", name: "MiniMax M2.1" },
+      { id: "minimax/minimax-m2", name: "MiniMax M2" },
+      { id: "minimax/minimax-m1", name: "MiniMax M1" },
+      { id: "minimax/minimax-01", name: "MiniMax-01" },
+    ],
+  },
+  {
+    name: "Z.AI",
+    models: [
+      { id: "z-ai/glm-4.7", name: "GLM 4.7" },
+      { id: "z-ai/glm-4.6v", name: "GLM 4.6V" },
+      { id: "z-ai/glm-4.6", name: "GLM 4.6" },
+      { id: "z-ai/glm-4.6:exacto", name: "GLM 4.6 (exacto)" },
+      { id: "z-ai/glm-4.5v", name: "GLM 4.5V" },
+      { id: "z-ai/glm-4.5", name: "GLM 4.5" },
+      { id: "z-ai/glm-4.5-air:free", name: "GLM 4.5 Air (free)" },
+      { id: "z-ai/glm-4.5-air", name: "GLM 4.5 Air" },
+      { id: "z-ai/glm-4-32b", name: "GLM 4 32B" },
+    ],
+  },
+  {
+    name: "AllenAI",
+    models: [
+      { id: "allenai/olmo-3.1-32b-think", name: "Olmo 3.1 32B Think" },
+      { id: "allenai/olmo-3-32b-think", name: "Olmo 3 32B Think" },
+      { id: "allenai/olmo-3-7b-instruct", name: "Olmo 3 7B Instruct" },
+      { id: "allenai/olmo-3-7b-think", name: "Olmo 3 7B Think" },
+      { id: "allenai/olmo-2-0325-32b-instruct", name: "Olmo 2 32B Instruct" },
+    ],
+  },
+  {
+    name: "Arcee AI",
+    models: [
+      { id: "arcee-ai/trinity-mini:free", name: "Trinity Mini (free)" },
+      { id: "arcee-ai/trinity-mini", name: "Trinity Mini" },
+      { id: "arcee-ai/spotlight", name: "Spotlight" },
+      { id: "arcee-ai/maestro-reasoning", name: "Maestro Reasoning" },
+      { id: "arcee-ai/virtuoso-large", name: "Virtuoso Large" },
+      { id: "arcee-ai/coder-large", name: "Coder Large" },
+    ],
+  },
+  {
+    name: "Deep Cogito",
+    models: [
+      { id: "deepcogito/cogito-v2.1-671b", name: "Cogito v2.1 671B" },
+      {
+        id: "deepcogito/cogito-v2-preview-llama-405b",
+        name: "Cogito V2 Preview Llama 405B",
+      },
+      {
+        id: "deepcogito/cogito-v2-preview-llama-70b",
+        name: "Cogito V2 Preview Llama 70B",
+      },
+    ],
+  },
+  {
+    name: "Baidu",
+    models: [
+      {
+        id: "baidu/ernie-4.5-21b-a3b-thinking",
+        name: "ERNIE 4.5 21B A3B Thinking",
+      },
+      { id: "baidu/ernie-4.5-21b-a3b", name: "ERNIE 4.5 21B A3B" },
+      { id: "baidu/ernie-4.5-vl-28b-a3b", name: "ERNIE 4.5 VL 28B A3B" },
+      { id: "baidu/ernie-4.5-vl-424b-a47b", name: "ERNIE 4.5 VL 424B A47B" },
+      { id: "baidu/ernie-4.5-300b-a47b", name: "ERNIE 4.5 300B A47B" },
+    ],
+  },
+  {
+    name: "Nous",
+    models: [
+      { id: "nousresearch/hermes-4-70b", name: "Hermes 4 70B" },
+      { id: "nousresearch/hermes-4-405b", name: "Hermes 4 405B" },
+      {
+        id: "nousresearch/deephermes-3-mistral-24b-preview",
+        name: "DeepHermes 3 Mistral 24B Preview",
+      },
+      {
+        id: "nousresearch/hermes-3-llama-3.1-70b",
+        name: "Hermes 3 70B Instruct",
+      },
+      {
+        id: "nousresearch/hermes-3-llama-3.1-405b:free",
+        name: "Hermes 3 405B Instruct (free)",
+      },
+      {
+        id: "nousresearch/hermes-3-llama-3.1-405b",
+        name: "Hermes 3 405B Instruct",
+      },
+    ],
+  },
+  {
+    name: "AI21",
+    models: [
+      { id: "ai21/jamba-mini-1.7", name: "Jamba Mini 1.7" },
+      { id: "ai21/jamba-large-1.7", name: "Jamba Large 1.7" },
+    ],
+  },
+  {
+    name: "Inflection",
+    models: [
+      { id: "inflection/inflection-3-pi", name: "Inflection 3 Pi" },
+      {
+        id: "inflection/inflection-3-productivity",
+        name: "Inflection 3 Productivity",
+      },
+    ],
+  },
+  {
+    name: "IBM",
+    models: [
+      { id: "ibm-granite/granite-4.0-h-micro", name: "Granite 4.0 Micro" },
+    ],
+  },
+  {
+    name: "Tencent",
+    models: [
+      { id: "tencent/hunyuan-a13b-instruct", name: "Hunyuan A13B Instruct" },
+    ],
+  },
+  {
+    name: "StepFun",
+    models: [{ id: "stepfun-ai/step3", name: "Step3" }],
+  },
+  {
+    name: "Morph",
+    models: [
+      { id: "morph/morph-v3-large", name: "Morph V3 Large" },
+      { id: "morph/morph-v3-fast", name: "Morph V3 Fast" },
+    ],
+  },
+  {
+    name: "Inception",
+    models: [
+      { id: "inception/mercury", name: "Mercury" },
+      { id: "inception/mercury-coder", name: "Mercury Coder" },
+    ],
+  },
+  {
+    name: "Prime Intellect",
+    models: [{ id: "prime-intellect/intellect-3", name: "INTELLECT-3" }],
+  },
+];
+
+
+use this to update the list of models and voice ids supported for tts in tts integrations and models for stt integrations in the table
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the STT and TTS integrations pages with the detailed model and voice information from the TypeScript data they provided. Let me first read the current STT and TTS integrations pages to understand their structure.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/stt.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/tts.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update both pages with the model information from the TypeScript data provided by the user. Let me extract the relevant info:
+
+**STT Providers:**
+- Deepgram: model "nova-3", website "https://deepgram.com"
+- OpenAI: model "gpt-4o-transcribe", website "https://openai.com"
+- Cartesia: model "ink", website "https://cartesia.ai"
+- ElevenLabs: model "scribe-v2", website "https://elevenlabs.io"
+- Groq: model "whisper-large-v3-turbo", website "https://groq.com"
+- Google: model "chirp-3", website "https://cloud.google.com/speech-to-text"
+- Sarvam: model "saarika-v2.5", website "https://sarvam.ai"
+- Smallest AI: model "pulse", website "https://smallest.ai"
+
+**TTS Providers:**
+- Cartesia: model "sonic-3", voiceId "Riya", website "https://cartesia.ai"
+- OpenAI: model "gpt-4o-mini-tts", voiceId "coral", website "https://openai.com"
+- Groq: model "orpheus", voiceId "troy", website "https://groq.com"
+- Google: model "chirp_3", voiceId "Charon", website "https://cloud.google.com/text-to-speech"
+- ElevenLabs: model "eleven_multilingual_v2", voiceId "Krishna", website "https://elevenlabs.io"
+- Sarvam: model "bulbul:v3-beta", voiceId "aditya", website "https://sarvam.ai"
+- Smallest AI: model "lightning", voiceId "aditi", website "https://smallest.ai"
+
+
+I'll organize this data into tables for both pages.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/stt.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/tts.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've updated:1. **STT integrations page** - Added Model and Website columns with:
+   - Deepgram: nova-3
+   - OpenAI: gpt-4o-transcribe
+   - Cartesia: ink
+   - ElevenLabs: scribe-v2
+   - Groq: whisper-large-v3-turbo
+   - Google: chirp-3
+   - Sarvam: saarika-v2.5
+   - Smallest AI: pulse2. **TTS integrations page** - Added Model, Default Voice, and Website columns with:
+   - Cartesia: sonic-3, Riya
+   - OpenAI: gpt-4o-mini-tts, coral
+   - Groq: orpheus, troy
+   - Google: chirp_3, Charon
+   - ElevenLabs: eleven_multilingual_v2, Krishna
+   - Sarvam: bulbul:v3-beta, aditya
+   - Smallest AI: lightning, aditi</details></think>
+
+---
+
+Done. Updated both integration pages:
+
+**STT integrations** (`docs/integrations/stt.mdx`) - Added Model and Website columns:
+| Provider | Model |
+|----------|-------|
+| Deepgram | nova-3 |
+| OpenAI | gpt-4o-transcribe |
+| Cartesia | ink |
+| ElevenLabs | scribe-v2 |
+| Groq | whisper-large-v3-turbo |
+| Google | chirp-3 |
+| Sarvam | saarika-v2.5 |
+| Smallest AI | pulse |
+
+**TTS integrations** (`docs/integrations/tts.mdx`) - Added Model, Default Voice, and Website columns:
+| Provider | Model | Default Voice |
+|----------|-------|---------------|
+| Cartesia | sonic-3 | Riya |
+| OpenAI | gpt-4o-mini-tts | coral |
+| Groq | orpheus | troy |
+| Google | chirp_3 | Charon |
+| ElevenLabs | eleven_multilingual_v2 | Krishna |
+| Sarvam | bulbul:v3-beta | aditya |
+| Smallest AI | lightning | aditi |
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made changes to the STT and TTS integrations documentation pages - adding model names, default voice IDs, and website links. These are documentation-only changes that don't affect the codebase architecture or patterns.
+
+Let me check if app-details.md mentions the specific model names for STT/TTS providers. If it has outdated model names, I should update them.</details></think>
+
+---
+
+I made documentation changes to the STT and TTS integrations pages. Let me check if `app-details.md` has any outdated model information that needs updating.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "nova-2|sonic-2|bulbul:v2|whisper-large-v3",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "nova-2|sonic-2|bulbul:v2|whisper-large-v3",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+No outdated model references in app-details.md. Let me check if there's any model information in app-details.md at all that might need updating.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "model|Model",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+  "context": 1,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "model|Model",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 288,
+                  "content": "    test_cases=[...],",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 289,
+                  "content": "    model=\"openai/gpt-4.1\","
+                },
+                {
+                  "lineNumber": 290,
+                  "content": "    provider=\"openrouter\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 301,
+                  "content": "    evaluation_criteria=[{\"name\": \"completeness\", \"description\": \"...\"}],",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 302,
+                  "content": "    model=\"openai/gpt-4.1\","
+                },
+                {
+                  "lineNumber": 303,
+                  "content": "    provider=\"openrouter\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 321,
+                  "content": "    tts=TTSConfig(provider=\"google\"),",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 322,
+                  "content": "    llm=LLMConfig(provider=\"openrouter\", model=\"openai/gpt-4.1\"),"
+                },
+                {
+                  "lineNumber": 323,
+                  "content": "    output_dir=\"./out\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 423,
+                  "content": "    \"tts\": {\"provider\": \"cartesia\", \"voice_id\": \"YOUR_VOICE_ID\"},",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 424,
+                  "content": "    \"llm\": {\"provider\": \"openrouter\", \"model\": \"openai/gpt-4.1\"},"
+                },
+                {
+                  "lineNumber": 425,
+                  "content": "    \"tools\": [...],",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 603,
+                  "content": "- **Key differences between STT and TTS language support:**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 604,
+                  "content": "  - Groq TTS only supports English (Orpheus model), while Groq STT supports 50+ languages (Whisper)"
+                },
+                {
+                  "lineNumber": 605,
+                  "content": "  - Cartesia TTS supports ~42 languages, STT supports 100+ languages",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 614,
+                  "content": "- **Sindhi language special handling:**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 615,
+                  "content": "  - **STT:** For Google STT, Sindhi requires a different model (&#96;chirp_2&#96;) and region (&#96;asia-southeast1&#96;) compared to the default (&#96;chirp_3&#96; model, &#96;us&#96; region). This is handled automatically in &#96;pense/stt/eval.py&#96; via &#96;transcribe_google()&#96;. Sindhi is supported by Google, Cartesia, and ElevenLabs for STT."
+                },
+                {
+                  "lineNumber": 616,
+                  "content": "  - **TTS:** Sindhi TTS requires special handling for both Google and ElevenLabs:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 617,
+                  "content": "    - **Google:** Uses streaming API with &#96;gemini-2.5-flash-lite-preview-tts&#96; model. Key difference: voice name is just \"Charon\" (not locale-prefixed like &#96;sd-IN-Chirp3-HD-Charon&#96;) and requires &#96;model_name&#96; parameter in &#96;VoiceSelectionParams&#96;. See [Google Gemini-TTS docs](https://cloud.google.com/text-to-speech/docs/gemini-tts)."
+                },
+                {
+                  "lineNumber": 618,
+                  "content": "    - **ElevenLabs:** Uses &#96;eleven_v3&#96; model with &#96;text_to_dialogue&#96; API instead of the standard &#96;text_to_speech&#96; API"
+                },
+                {
+                  "lineNumber": 619,
+                  "content": "- Some providers require specific voice IDs for TTS",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 620,
+                  "content": "- OpenRouter model names use &#96;provider/model&#96; format (e.g., &#96;openai/gpt-4.1&#96;)"
+                },
+                {
+                  "lineNumber": 621,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 643,
+                  "content": "  - Default (Chirp3-HD): locale-prefixed name like &#96;\"{lang_code}-Chirp3-HD-Charon\"&#96; (e.g., &#96;en-US-Chirp3-HD-Charon&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 644,
+                  "content": "  - Gemini-TTS (for Sindhi): just the voice name &#96;\"Charon\"&#96; with &#96;model_name&#96; parameter set"
+                },
+                {
+                  "lineNumber": 645,
+                  "content": "- **Optional TTFB:** TTS synthesize functions may return an empty dict &#96;{}&#96; if TTFB cannot be measured (e.g., Groq). The evaluation script handles this gracefully:",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 26,
+          "totalMatchedLines": 10
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The app-details.md already has accurate information about:
+- The chirp_3 model (default) and chirp_2 (for Sindhi) for Google STT
+- Groq TTS using Orpheus model
+- ElevenLabs using eleven_v3 for Sindhi
+
+The changes I made to the docs were just adding model names to the integrations pages tables. The app-details.md doesn't need specific model name updates since it focuses on architectural patterns and gotchas rather than specific model versions in tables.
+
+The README.md also doesn't need updates since it doesn't list specific STT/TTS model names - it's more about usage examples.
+
+These were purely documentation enhancement changes (adding model/voice info to integration pages), not core functionality changes. No updates needed to app-details.md or README.md.</details></think>
+
+---
+
+The changes I made were purely documentation enhancements - adding model names, default voices, and website links to the integration pages. The `app-details.md` already has accurate information about the architectural patterns and special cases (like Sindhi language handling, model overrides, etc.).
+
+The README.md also doesn't list specific model versions in tables, so no updates needed there either.
+
+No updates required to `app-details.md` or `README.md` for these documentation table enhancements.
+
+---
+
+_**User**_
+
+include all possible models for tts and stt - e.g. eleven_v3 as a edge case is also there - mention that and other edge cases
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to include all possible models for TTS and STT providers, including edge cases like eleven_v3 for ElevenLabs. Looking at the TypeScript data they provided earlier, I can see:
+
+**STT Providers:**
+- Deepgram: nova-3
+- OpenAI: gpt-4o-transcribe
+- Cartesia: ink
+- ElevenLabs: scribe-v2
+- Groq: whisper-large-v3-turbo
+- Google: chirp-3 (with chirp-2 for Sindhi via modelOverrides)
+- Sarvam: saarika-v2.5
+- Smallest AI: pulse
+
+**TTS Providers:**
+- Cartesia: sonic-3
+- OpenAI: gpt-4o-mini-tts
+- Groq: orpheus
+- Google: chirp_3 (with gemini for Sindhi via modelOverrides)
+- ElevenLabs: eleven_multilingual_v2 (with eleven_v3 for Sindhi via modelOverrides)
+- Sarvam: bulbul:v3-beta
+- Smallest AI: lightning
+
+I need to update the integrations pages to include these edge cases/model overrides.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/stt.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/tts.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update both pages to include the model overrides/edge cases. From the TypeScript data:
+
+**STT Model Overrides:**
+- Google: chirp-2 for Sindhi
+
+**TTS Model Overrides:**
+- Google: gemini for Sindhi
+- ElevenLabs: eleven_v3 for Sindhi
+
+I'll add a "Model Overrides" or "Notes" section to document these edge cases.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/stt.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/tts.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've updated both pages with model overrides sections that document the edge cases:
+
+**STT:**
+- Google uses chirp-2 for Sindhi (instead of chirp-3)
+
+**TTS:**
+- Google uses gemini model for Sindhi
+- ElevenLabs uses eleven_v3 for Sindhi
+- Added note that Groq only supports English</details></think>
+
+---
+
+Done. Updated both integration pages with model overrides sections:
+
+**STT integrations** - Added:
+- Model Overrides table showing Google uses `chirp-2` for Sindhi
+- Note explaining the region difference (`asia-southeast1` vs `us`)
+
+**TTS integrations** - Added:
+- Model Overrides table showing:
+  - Google uses `gemini` model for Sindhi
+  - ElevenLabs uses `eleven_v3` for Sindhi
+- Notes explaining:
+  - Google's Gemini TTS streaming API details for Sindhi
+  - ElevenLabs' `text_to_dialogue` API usage for Sindhi
+  - Groq only supports English (Orpheus limitation)
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made documentation changes to the STT and TTS integrations pages - adding model override sections. These are purely documentation enhancements.
+
+Let me check if the app-details.md already has this information about model overrides documented.</details></think>
+
+---
+
+The changes I made were documentation enhancements - adding model overrides sections to the integration pages. Let me verify that `app-details.md` already has this information documented (since these are known gotchas).
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "chirp-2|eleven_v3|Sindhi",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+  "context": 2,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "chirp-2|eleven_v3|Sindhi",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 612,
+                  "content": "  - Most others use ISO 639-1 codes: &#96;en&#96;, &#96;hi&#96;, &#96;kn&#96;, etc.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 613,
+                  "content": "- Not all providers support all 12 languages - Sarvam has the most comprehensive support for Indian languages",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 614,
+                  "content": "- **Sindhi language special handling:**"
+                },
+                {
+                  "lineNumber": 615,
+                  "content": "  - **STT:** For Google STT, Sindhi requires a different model (&#96;chirp_2&#96;) and region (&#96;asia-southeast1&#96;) compared to the default (&#96;chirp_3&#96; model, &#96;us&#96; region). This is handled automatically in &#96;pense/stt/eval.py&#96; via &#96;transcribe_google()&#96;. Sindhi is supported by Google, Cartesia, and ElevenLabs for STT."
+                },
+                {
+                  "lineNumber": 616,
+                  "content": "  - **TTS:** Sindhi TTS requires special handling for both Google and ElevenLabs:"
+                },
+                {
+                  "lineNumber": 617,
+                  "content": "    - **Google:** Uses streaming API with &#96;gemini-2.5-flash-lite-preview-tts&#96; model. Key difference: voice name is just \"Charon\" (not locale-prefixed like &#96;sd-IN-Chirp3-HD-Charon&#96;) and requires &#96;model_name&#96; parameter in &#96;VoiceSelectionParams&#96;. See [Google Gemini-TTS docs](https://cloud.google.com/text-to-speech/docs/gemini-tts).",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 618,
+                  "content": "    - **ElevenLabs:** Uses &#96;eleven_v3&#96; model with &#96;text_to_dialogue&#96; API instead of the standard &#96;text_to_speech&#96; API"
+                },
+                {
+                  "lineNumber": 619,
+                  "content": "- Some providers require specific voice IDs for TTS",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 620,
+                  "content": "- OpenRouter model names use &#96;provider/model&#96; format (e.g., &#96;openai/gpt-4.1&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 642,
+                  "content": "- **Google TTS voice naming patterns:**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 643,
+                  "content": "  - Default (Chirp3-HD): locale-prefixed name like &#96;\"{lang_code}-Chirp3-HD-Charon\"&#96; (e.g., &#96;en-US-Chirp3-HD-Charon&#96;)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 644,
+                  "content": "  - Gemini-TTS (for Sindhi): just the voice name &#96;\"Charon\"&#96; with &#96;model_name&#96; parameter set"
+                },
+                {
+                  "lineNumber": 645,
+                  "content": "- **Optional TTFB:** TTS synthesize functions may return an empty dict &#96;{}&#96; if TTFB cannot be measured (e.g., Groq). The evaluation script handles this gracefully:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 646,
+                  "content": "  - Missing TTFB values are stored as &#96;None&#96; in results.csv",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 14,
+          "totalMatchedLines": 5
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The `app-details.md` already has comprehensive documentation about the model overrides for Sindhi language handling. The changes I made to the docs pages are consistent with what's already documented in app-details.md. No updates needed.</details></think>
+
+---
+
+The `app-details.md` already has comprehensive documentation about:
+- Sindhi language special handling for STT (chirp_2 model, asia-southeast1 region)
+- Sindhi language special handling for TTS (Google gemini model, ElevenLabs eleven_v3 model)
+- Groq TTFB handling
+
+The documentation changes I made to the integration pages are consistent with what's already in `app-details.md`. No updates needed to `app-details.md` or `README.md`.
+
+---
+
+_**User**_
+
+update @docs/core-concepts/text-to-text.mdx by properly explaining what a test case means as created in for @pense/llm/run_tests.py but following the UI mentioned in @docs/quickstart/text-to-text.mdx 
+
+don't talk about the UI as much as the core concept of a test having a conversation history and then the conversation so far is the input with the agent's next output being tested - the output could be a tool call or a response and to check response quality one needs to define the criteria for what a good response looks like or for tool call test they need to define what tool should be called or not be called and with what params optionally or any params at all.
+
+
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the core-concepts/text-to-text.mdx file to better explain what a test case means. Let me first read the relevant files to understand:
+1. The current core-concepts/text-to-text.mdx
+2. The run_tests.py to understand the test case structure
+3. The quickstart/text-to-text.mdx for context
+
+Let me read these files.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pense/llm/run_tests.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I understand the test case structure. Let me rewrite the core-concepts/text-to-text.mdx to better explain what a test case is:
+
+Key concepts from the code:
+1. A test case has a conversation history (the conversation so far)
+2. The model generates the next output (either a response or tool calls)
+3. Two evaluation types:
+   - `tool_call`: Check if the right tool was called with the right parameters
+   - `response`: Use LLM Judge to evaluate if the response meets criteria
+
+The user wants me to focus on the concept, not the UI. I should explain:
+- What a test case is conceptually
+- The conversation history as input
+- The agent's next output being tested
+- Two types of outputs: tool call or response
+- How to define expectations for each
+
+Let me rewrite the page.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Done. I've rewritten the core-concepts/text-to-text.mdx page to better explain the concept of a test case:1. **What is a Test Case?** - Clear explanation with a visual diagram showing the flow: conversation history (input) → agent generates output → evaluate output → pass/fail2. **Conversation History** - Explained as the context the agent sees before generating output3. **Agent Output Types** - Two types: text response or tool call4. **Evaluation Types:**   - **Tool Call Tests** - When to use, how to specify tool name and arguments, matching rules
+   - **Response Tests** - When to use, how to write good criteria, how LLM Judge evaluates5. **Complete Test Case Structure** - Shows the full structure with all parts6. Kept the existing useful content (Pass Rate, Tools, Output Files, Next Steps)The content now focuses on the core concept rather than the UI, explaining:
+- The conversation history is the input
+- The agent's next output is being tested
+- Output can be a tool call or response
+- For response tests, define criteria for what a good response looks like
+- For tool call tests, define what tool should be called and with what params</details></think>
+
+---
+
+Done. I've rewritten the `docs/core-concepts/text-to-text.mdx` page to properly explain test cases conceptually:
+
+**Key changes:**
+
+1. **What is a Test Case?** - Added a clear explanation with a visual ASCII diagram showing the flow: conversation history → agent generates output → evaluate → pass/fail
+
+2. **Conversation History** - Explained as the context (input) the agent sees before generating its next output
+
+3. **Agent Output Types** - Clearly distinguished between text responses and tool calls
+
+4. **Evaluation Types:**
+   - **Tool Call Tests** - Explained when to use them, how to specify tool names and arguments, with a table showing matching rules (tool only, tool + args, tool NOT called)
+   - **Response Tests** - Explained when to use them, how to write good criteria with examples of good vs bad criteria, how LLM Judge evaluates
+
+5. **Complete Test Case Structure** - Shows the full structure with comments explaining each part
+
+The content now focuses on the core concept rather than UI mechanics, explaining that:
+- The conversation history is the input
+- The agent's next output is what gets tested
+- Output can be either a tool call or text response
+- For response tests: define criteria describing what a good response looks like
+- For tool call tests: define what tool should be called, optionally with specific parameters
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made changes to the docs/core-concepts/text-to-text.mdx file - this was a documentation rewrite to better explain the concept of test cases. This is purely a documentation improvement and doesn't change any codebase architecture, patterns, or functionality.
+
+Let me check if the app-details.md has any relevant content about LLM tests that might need updating or if it's already accurate.</details></think>
+
+---
+
+The change I made was a documentation rewrite to better explain test cases conceptually. Let me verify the `app-details.md` already has accurate information about LLM tests.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Test Case Structure|tool_call|response.*criteria",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+  "context": 3,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Test Case Structure|tool_call|response.*criteria",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": ".cursor/rules/app-details.md",
+              "matches": [
+                {
+                  "lineNumber": 186,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 187,
+                  "content": "**Test Types:**",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 188,
+                  "content": "- **Tool Call Tests:** Verify the LLM calls the correct tools with correct arguments",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 189,
+                  "content": "- **Response Tests:** Verify the LLM response meets criteria (via LLM judge)"
+                },
+                {
+                  "lineNumber": 190,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 191,
+                  "content": "**Test Case Structure:**"
+                },
+                {
+                  "lineNumber": 192,
+                  "content": "&#96;&#96;&#96;python",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 193,
+                  "content": "{",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 194,
+                  "content": "    \"history\": [",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 196,
+                  "content": "        {\"role\": \"user\", \"content\": \"Aman Dalmia\"}",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 197,
+                  "content": "    ],",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 198,
+                  "content": "    \"evaluation\": {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 199,
+                  "content": "        \"type\": \"tool_call\",  # or \"response\""
+                },
+                {
+                  "lineNumber": 200,
+                  "content": "        \"tool_calls\": [{\"tool\": \"plan_next_question\", \"arguments\": {...}}]"
+                },
+                {
+                  "lineNumber": 201,
+                  "content": "        # or \"criteria\": \"The assistant should allow skipping\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 202,
+                  "content": "    },",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 203,
+                  "content": "    \"settings\": {\"language\": \"english\"}  # optional",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 244,
+                  "content": "├── evaluation_results.csv   # Includes latency metrics + STT judge",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 245,
+                  "content": "├── stt_results.csv         # Per-turn STT evaluation",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 246,
+                  "content": "├── metrics.json            # Latency traces",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 247,
+                  "content": "├── tool_calls.json         # Chronological tool calls"
+                },
+                {
+                  "lineNumber": 248,
+                  "content": "├── config.json",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 249,
+                  "content": "├── conversation.wav        # Combined full conversation",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 250,
+                  "content": "└── logs/",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 513,
+                  "content": "    {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 514,
+                  "content": "        \"output\": {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 515,
+                  "content": "            \"response\": \"...\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 516,
+                  "content": "            \"tool_calls\": [{\"tool\": \"...\", \"arguments\": {...}}]"
+                },
+                {
+                  "lineNumber": 517,
+                  "content": "        },",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 518,
+                  "content": "        \"metrics\": {\"passed\": true},",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 519,
+                  "content": "        \"test_case\": {...}",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 31,
+          "totalMatchedLines": 6
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The app-details.md already has accurate information about:
+- Test types (Tool Call Tests and Response Tests)
+- Test Case Structure with history, evaluation, and settings
+- The evaluation types (tool_call or response)
+- Output formats
+
+The documentation change I made was just improving the explanation in the docs site - it doesn't change any patterns or functionality. The app-details.md is still accurate.
+
+No updates needed to app-details.md or README.md.</details></think>
+
+---
+
+The `app-details.md` already has accurate information about LLM test cases:
+- Test types (Tool Call Tests and Response Tests)
+- Test Case Structure with history, evaluation (tool_call or response type), and settings
+- Output formats (results.json with output, metrics, test_case)
+
+The documentation change I made was purely an improvement to the explanation in the docs site - making it clearer conceptually. It doesn't change any patterns, architecture, or functionality in the codebase.
+
+No updates needed to `app-details.md` or `README.md`.
 
 ---
 

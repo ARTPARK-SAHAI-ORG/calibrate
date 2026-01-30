@@ -3,16 +3,27 @@ title: "Speech to Text"
 description: "Speech to Text services receive audio input and output transcriptions"
 ---
 
-| Provider |
-|----------|
-| **Deepgram** |
-| **Google** |
-| **OpenAI** |
-| **ElevenLabs** |
-| **Sarvam** |
-| **Cartesia** |
-| **Groq** |
-| **Smallest** |
+| Provider        | Model                  | Website                                                     |
+| --------------- | ---------------------- | ----------------------------------------------------------- |
+| **Deepgram**    | nova-3                 | [deepgram.com](https://deepgram.com)                        |
+| **OpenAI**      | gpt-4o-transcribe      | [openai.com](https://openai.com)                            |
+| **Cartesia**    | ink                    | [cartesia.ai](https://cartesia.ai)                          |
+| **ElevenLabs**  | scribe-v2              | [elevenlabs.io](https://elevenlabs.io)                      |
+| **Groq**        | whisper-large-v3-turbo | [groq.com](https://groq.com)                                |
+| **Google**      | chirp-3                | [cloud.google.com](https://cloud.google.com/speech-to-text) |
+| **Sarvam**      | saarika-v2.5           | [sarvam.ai](https://sarvam.ai)                              |
+| **Smallest AI** | pulse                  | [smallest.ai](https://smallest.ai)                          |
+
+Some providers use different models for specific languages:
+
+| Provider   | Language | Model   |
+| ---------- | -------- | ------- |
+| **Google** | Sindhi   | chirp-2 |
+
+<Note>
+  Google STT uses `chirp-2` model for Sindhi, instead of the default `chirp-3`.
+  This is handled automatically by Pense.
+</Note>
 
 ## Configuration
 
@@ -47,16 +58,32 @@ export SMALLEST_API_KEY=your_key
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Run Speech to Text Evaluation" icon="play" href="/guides/stt-evaluation">
+  <Card
+    title="Run Speech to Text Evaluation"
+    icon="play"
+    href="/guides/stt-evaluation"
+  >
     Learn how to run Speech to Text evaluation across different providers
   </Card>
-  <Card title="Configure Speech to Text in Agent" icon="gear" href="/guides/agent-stt-configuration">
+  <Card
+    title="Configure Speech to Text in Agent"
+    icon="gear"
+    href="/guides/agent-stt-configuration"
+  >
     Set up your Speech to Text provider in agent configuration
   </Card>
-  <Card title="Python SDK - Evaluation" icon="code" href="/python-sdk/speech-to-text#run-evaluation">
+  <Card
+    title="Python SDK - Evaluation"
+    icon="code"
+    href="/python-sdk/speech-to-text#run-evaluation"
+  >
     Run evaluation for any Speech to Text provider using the Python SDK
   </Card>
-  <Card title="Python SDK - Leaderboard" icon="chart-bar" href="/python-sdk/speech-to-text#generate-leaderboard">
+  <Card
+    title="Python SDK - Leaderboard"
+    icon="chart-bar"
+    href="/python-sdk/speech-to-text#generate-leaderboard"
+  >
     Benchmark multiple Speech to Text providers on your dataset
   </Card>
 </CardGroup>

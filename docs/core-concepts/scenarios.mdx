@@ -1,0 +1,252 @@
+---
+title: "Scenarios"
+description: "Create, update, and delete scenarios for simulation testing"
+---
+
+# Scenarios
+
+Scenarios define the specific task or conversation goal for simulations. They describe WHAT the simulated user should do during the conversation, separate from WHO they are (which is defined by Personas).
+
+## Overview
+
+Scenarios are used in:
+- End-to-end simulations
+- Testing specific user journeys
+- Evaluating agent handling of different requests
+
+---
+
+## Creating a Scenario
+
+### Step 1: Navigate to Scenarios
+
+From the sidebar, click **Scenarios** to view your existing scenarios.
+
+### Step 2: Click "Add scenario"
+
+Click the **Add scenario** button in the top right corner. A sidebar panel will open.
+
+### Step 3: Configure the Scenario
+
+#### Required Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| **Label** | Yes | A name for the scenario (e.g., "Crop Insurance Inquiry") |
+| **Description** | Yes | What the simulated user should do during the conversation |
+
+#### Description Guidelines
+
+Define the task or goal clearly:
+
+1. **State the objective**: What does the user want to achieve?
+2. **Include specific details**: Names, numbers, products to ask about
+3. **Set expectations**: What information should they request?
+
+**Example Description:**
+
+```text
+Call to inquire about crop insurance schemes available for 
+paddy farmers. Ask about the eligibility criteria, premium 
+amounts, and the claim process. Request information about 
+government subsidies for small-scale farmers in Karnataka.
+```
+
+<Note>
+Avoid defining personality traits in scenarios. Use **Personas** to define HOW the simulated user behaves.
+</Note>
+
+### Step 4: Save the Scenario
+
+Click **Add scenario** to create the scenario.
+
+---
+
+## Updating a Scenario
+
+### Step 1: Open the Scenario
+
+1. Navigate to **Scenarios** from the sidebar
+2. Click on the scenario you want to edit
+3. The edit sidebar will open with the current configuration
+
+### Step 2: Modify Configuration
+
+Update any of the following:
+
+- **Label**: Change the scenario name
+- **Description**: Update the task description
+
+### Step 3: Save Changes
+
+Click **Save** to apply your changes.
+
+---
+
+## Deleting a Scenario
+
+<Warning>
+Deleting a scenario will remove it from any simulations that reference it. This action cannot be undone.
+</Warning>
+
+### From the Scenarios List
+
+1. Navigate to **Scenarios**
+2. Find the scenario you want to delete
+3. Click the **delete icon** (🗑️) on the right side
+4. Confirm the deletion in the dialog
+
+---
+
+## Scenario Fields Reference
+
+### Complete Field List
+
+| Field | Required | Type | Description |
+|-------|----------|------|-------------|
+| **Label** | Yes | string | Display name for the scenario |
+| **Description** | Yes | string | Task/goal description for the simulated user |
+
+---
+
+## Example Scenarios
+
+### Insurance Inquiry
+
+```text
+Label: Crop Insurance Inquiry
+
+Description:
+Call to inquire about crop insurance schemes available for 
+paddy farmers. Ask about the eligibility criteria, premium 
+amounts, and the claim process. Request information about 
+government subsidies for small-scale farmers in Karnataka.
+```
+
+### Account Balance Check
+
+```text
+Label: Check Account Balance
+
+Description:
+Call to check the current balance in your savings account. 
+Provide your account number (1234567890) when asked. Also 
+inquire about recent transactions in the last 7 days and 
+ask about the minimum balance requirements.
+```
+
+### Product Return Request
+
+```text
+Label: Request Product Return
+
+Description:
+Call to request a return for a defective laptop purchased 
+last week. Order number is ORD-2024-78945. Explain that the 
+screen has dead pixels and the keyboard has a sticky key. 
+Request a full refund rather than replacement.
+```
+
+### Appointment Scheduling
+
+```text
+Label: Schedule Doctor Appointment
+
+Description:
+Call to schedule an appointment with Dr. Sharma (General 
+Physician). Preferred dates are next Monday or Tuesday, 
+preferably in the morning before 11 AM. Mention that this 
+is a follow-up visit for a previous consultation. Ask about 
+any required documents to bring.
+```
+
+### Bill Payment Inquiry
+
+```text
+Label: Electricity Bill Payment
+
+Description:
+Call to inquire about your pending electricity bill. Consumer 
+number is CON-456789. Ask about the due date, total amount, 
+and available payment methods. Request information about any 
+late payment penalties and ask if partial payment is allowed.
+```
+
+### Complaint Registration
+
+```text
+Label: Register Service Complaint
+
+Description:
+Call to register a complaint about internet service outage 
+that has been ongoing for 3 days. Account number is NET-123456. 
+Mention that you've already tried restarting the router. 
+Request an estimated time for resolution and ask for a 
+reference number for the complaint.
+```
+
+---
+
+## Best Practices
+
+### Writing Effective Scenarios
+
+1. **Be specific**: Include concrete details (order numbers, dates, amounts)
+2. **Set clear objectives**: What should the user achieve?
+3. **Include conversation flow hints**: What questions should they ask?
+4. **Add realistic context**: Why is the user calling?
+
+### Scenarios vs Personas
+
+| Aspect | Scenario | Persona |
+|--------|----------|---------|
+| Focus | WHAT to do | WHO and HOW |
+| Content | Task, goal, situation | Demographics, behavior |
+| Example | "Call to get a refund for order #123" | "A busy professional who speaks quickly" |
+
+### Scenario Complexity Levels
+
+| Level | Description | Example |
+|-------|-------------|---------|
+| **Simple** | Single task, straightforward | "Check account balance" |
+| **Medium** | Multiple questions, some details | "Inquire about insurance and ask about eligibility" |
+| **Complex** | Edge cases, negotiations | "Dispute a charge and escalate if unsatisfied" |
+
+### Testing Coverage
+
+Create scenarios that cover:
+- Common user journeys (happy path)
+- Edge cases and unusual requests
+- Complaint and escalation scenarios
+- Multi-step processes
+
+---
+
+## Using Scenarios in Simulations
+
+Scenarios are combined with Personas to run simulations. See the [Simulations guide](/guides/simulations) for details on:
+
+- Creating simulation configurations
+- Combining personas and scenarios
+- Running and analyzing simulation results
+
+**Example Combination:**
+
+| Persona | Scenario | Test Case |
+|---------|----------|-----------|
+| Rural Farmer | Crop Insurance Inquiry | Farmer asking about insurance in regional language |
+| Busy Professional | Check Account Balance | Quick, efficient balance check |
+| Elderly Customer | Schedule Appointment | Patient, detailed appointment scheduling |
+
+---
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Personas" icon="user" href="/guides/personas">
+    Define who your simulated users are.
+  </Card>
+  <Card title="Run Simulations" icon="comments" href="/guides/simulations">
+    Test your agent with persona-scenario combinations.
+  </Card>
+</CardGroup>

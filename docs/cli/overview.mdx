@@ -31,23 +31,29 @@ The Pense CLI provides commands for evaluating Speech to Text, Text to Speech, T
 
 ## Environment Variables
 
-Create a `.env` file in your project root and add the API keys for the providers you want to use. All modules (STT, TTS, LLM, Agent) use this single `.env` file.
+The CLI requires certain environment variables to be set for the providers you want to use:
 
 ```bash
 # Speech to Text / Text to Speech Providers
 DEEPGRAM_API_KEY=your_key
-SARVAM_API_KEY=your_key
 OPENAI_API_KEY=your_key
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 CARTESIA_API_KEY=your_key
+SMALLEST_API_KEY=your_key
+GROQ_API_KEY=your_key
+SARVAM_API_KEY=your_key
 ELEVENLABS_API_KEY=your_key
 
-# Text to Text Providers
+# Google Cloud (for Google STT/TTS)
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+GOOGLE_API_KEY=your_key
+GOOGLE_CLOUD_PROJECT_ID=your_project_id
+
+# LLM Providers
 OPENROUTER_API_KEY=your_key
 ```
 
 <Note>
-You only need to set API keys for the providers you plan to use.
+You only need to set the environment variables for the providers you plan to use.
 </Note>
 
 ## Available Commands

@@ -3,33 +3,103 @@ title: "Text to Text"
 description: "Understanding Text to Text evaluation metrics and concepts."
 ---
 
-Text to Text models generate responses and call tools. Pense evaluates them through **test cases** with expected outputs.
+## What is a Test Case?
 
-## Pass Rate
+A test case verifies that your agent produces the correct output for a given conversation. Think of it as a unit test for your LLM agent.
 
-Pass rate measures the percentage of test cases where the model output matches the expected behavior.
+The core idea is simple:
+1. **Input**: A conversation history (messages exchanged so far)
+2. **Output**: The agent's next response (either text or a tool call)
+3. **Evaluation**: Does the output match what you expected?
 
-- **Range**: 0 to 100%
-- **Calculation**: (Passed tests / Total tests) × 100
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        TEST CASE                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   Conversation History (Input)                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ Assistant: "What is your name?"                     │   │
+│   │ User: "John Doe"                                    │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                           ↓                                 │
+│                    Agent Generates                          │
+│                     Next Output                             │
+│                           ↓                                 │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ Output: Tool call OR Text response                  │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                           ↓                                 │
+│                    Evaluate Output                          │
+│                           ↓                                 │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ ✅ Pass or ❌ Fail                                  │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Conversation History
+
+The conversation history is the context your agent sees before generating its next output. It's a sequence of messages with roles (`assistant` or `user`):
+
+```python
+"history": [
+    {"role": "assistant", "content": "Hello! I'm here to help you with your insurance."},
+    {"role": "user", "content": "Hi, I need to file a claim"},
+    {"role": "assistant", "content": "I can help with that. What's your phone number?"},
+    {"role": "user", "content": "It's 555-123-4567"}
+]
+```
+
+The agent receives this history and generates the **next output** — which is what your test evaluates.
+
+## Agent Output Types
+
+When an agent processes a conversation, it produces one of two output types:
+
+### 1. Text Response
+
+A natural language reply to continue the conversation:
+
+```
+"Thank you! Let me look up your account."
+```
+
+### 2. Tool Call
+
+A structured function call to perform an action:
+
+```python
+{
+    "tool": "lookup_customer",
+    "arguments": {"phone_number": "555-123-4567"}
+}
+```
+
+Your test case must specify which output type you expect and how to evaluate it.
 
 ## Evaluation Types
 
-### Tool Call Evaluation
+### Tool Call Tests
 
-Expects specific tool calls with matching arguments.
+Use tool call tests when you expect the agent to invoke a specific tool. You define:
+
+- **Which tool** should be called
+- **What arguments** it should receive (optional)
 
 ```python
 {
     "history": [
-        {"role": "assistant", "content": "What is your name?"},
-        {"role": "user", "content": "John Doe"}
+        {"role": "assistant", "content": "What's your phone number?"},
+        {"role": "user", "content": "555-123-4567"}
     ],
     "evaluation": {
         "type": "tool_call",
         "tool_calls": [
             {
-                "tool": "save_name",
-                "arguments": {"name": "John Doe"}
+                "tool": "lookup_customer",
+                "arguments": {"phone_number": "555-123-4567"}
             }
         ]
     }
@@ -37,118 +107,114 @@ Expects specific tool calls with matching arguments.
 ```
 
 **Matching Rules:**
-- Tool name must match exactly
-- All specified arguments must be present and match
-- Extra arguments in the actual output are allowed
 
-### Response Evaluation
+| What to Check | How to Specify | Example |
+|---------------|----------------|---------|
+| Tool is called | Provide tool name only | `{"tool": "lookup_customer"}` |
+| Tool with specific args | Provide tool name + arguments | `{"tool": "lookup_customer", "arguments": {"phone_number": "555-123-4567"}}` |
+| Tool is NOT called | Omit from tool_calls | Agent should respond with text instead |
 
-Evaluates the response against criteria using LLM Judge.
+<Note>
+When you specify arguments, all specified arguments must match exactly. Extra arguments in the actual output are allowed and won't cause a failure.
+</Note>
+
+### Response Tests
+
+Use response tests when you expect the agent to reply with text. Since natural language varies, you define **criteria** that describe what a good response looks like:
 
 ```python
 {
     "history": [
         {"role": "assistant", "content": "What is your phone number?"},
-        {"role": "user", "content": "Can I skip this question?"}
+        {"role": "user", "content": "I'd rather not share that"}
     ],
     "evaluation": {
         "type": "response",
-        "criteria": "The assistant should allow the user to skip giving their phone number."
+        "criteria": "The assistant should respect the user's privacy and not insist on getting the phone number. It should offer to continue without it or provide alternatives."
     }
 }
 ```
 
-**LLM Judge evaluates:**
-- Whether the response satisfies the stated criteria
-- Returns True/False with reasoning
+**Writing Good Criteria:**
 
-## Test Case Structure
+| Good Criteria | Bad Criteria |
+|---------------|--------------|
+| "The assistant should apologize and offer to help with something else" | "The assistant should say sorry" (too vague) |
+| "The response should include the user's name and confirm the appointment time" | "Good response" (no specifics) |
+| "The assistant should NOT reveal pricing information without verifying the customer" | "Don't mention price" (unclear intent) |
 
-Each test case consists of:
+An LLM Judge evaluates whether the agent's response satisfies your criteria, returning:
+- **Pass**: Response meets the criteria
+- **Fail**: Response doesn't meet the criteria (with reasoning)
 
-### History
-
-The conversation context leading up to the model's response:
-
-```python
-"history": [
-    {"role": "assistant", "content": "Hello! What is your name?"},
-    {"role": "user", "content": "Aman Dalmia"}
-]
-```
-
-### Evaluation
-
-What you expect the model to do:
+## Complete Test Case Structure
 
 ```python
-# Tool call expectation
-"evaluation": {
-    "type": "tool_call",
-    "tool_calls": [
-        {"tool": "plan_next_question", "arguments": {"index": 2}}
-    ]
-}
-
-# Response criteria expectation
-"evaluation": {
-    "type": "response",
-    "criteria": "The assistant should acknowledge the name."
+{
+    # The conversation so far (required)
+    "history": [
+        {"role": "assistant", "content": "Hello! What is your name?"},
+        {"role": "user", "content": "Aman Dalmia"}
+    ],
+    
+    # How to evaluate the agent's next output (required)
+    "evaluation": {
+        "type": "tool_call",  # or "response"
+        "tool_calls": [...]   # for tool_call type
+        # OR
+        "criteria": "..."     # for response type
+    },
+    
+    # Optional settings
+    "settings": {
+        "language": "english"
+    }
 }
 ```
 
-### Settings (Optional)
+## Pass Rate
 
-Additional configuration for the test:
+Pass rate measures the percentage of test cases where the agent's output matches expectations:
 
-```python
-"settings": {
-    "language": "english"
-}
-```
+- **Range**: 0% to 100%
+- **Calculation**: (Passed tests / Total tests) × 100
+- **Goal**: Higher is better — aim for 100% on critical behaviors
 
 ## Tools
 
-Tools are functions the Text to Text model can call during conversations:
+Tools are functions your agent can call. Define them with a name, description, and parameters:
 
 ```python
-tools = [
-    {
-        "type": "client",
-        "name": "plan_next_question",
-        "description": "Plan the next question to ask",
-        "parameters": [
-            {
-                "id": "next_question_index",
-                "type": "integer",
-                "description": "Index of next question",
-                "required": True
-            },
-            {
-                "id": "questions_answered",
-                "type": "array",
-                "description": "List of answered question indices",
-                "items": {"type": "integer"},
-                "required": True
-            }
-        ]
-    }
-]
+{
+    "type": "client",
+    "name": "lookup_customer",
+    "description": "Look up customer information by phone number",
+    "parameters": [
+        {
+            "id": "phone_number",
+            "type": "string",
+            "description": "The customer's phone number",
+            "required": True
+        }
+    ]
+}
 ```
+
+The agent sees these tool definitions in its context and decides when to call them based on the conversation.
 
 ## Output Files
 
 ### results.json
 
-Contains detailed results for each test case:
+Detailed results for each test case:
 
 ```json
 [
   {
     "output": {
-      "response": "Nice to meet you, Aman!",
+      "response": "",
       "tool_calls": [
-        {"tool": "plan_next_question", "arguments": {"index": 2}}
+        {"tool": "lookup_customer", "arguments": {"phone_number": "555-123-4567"}}
       ]
     },
     "metrics": {"passed": true},
@@ -162,7 +228,7 @@ Contains detailed results for each test case:
 
 ### metrics.json
 
-Contains summary statistics:
+Summary statistics:
 
 ```json
 {
