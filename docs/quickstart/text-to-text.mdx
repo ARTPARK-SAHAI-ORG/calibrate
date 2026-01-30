@@ -43,21 +43,21 @@ You are a friendly customer support agent for Acme Insurance.
 
 Your role is to help customers with:
 - Policy inquiries
-- Claim submissions  
+- Claim submissions
 - Premium payments
 
-Always be polite and professional. If you need to look up 
-customer information, use the lookup_customer tool with their 
+Always be polite and professional. If you need to look up
+customer information, use the lookup_customer tool with their
 phone number.
 ```
 
 **Select Providers:**
 
-| Setting | Recommended |
-|---------|-------------|
-| **STT Provider** | Deepgram (high accuracy) or Google (multi-language) |
+| Setting          | Recommended                                            |
+| ---------------- | ------------------------------------------------------ |
+| **STT Provider** | Deepgram (high accuracy) or Google (multi-language)    |
 | **TTS Provider** | Cartesia (low latency) or ElevenLabs (premium quality) |
-| **LLM Model** | GPT-4o-mini (fast) or GPT-4o (highest quality) |
+| **LLM Model**    | GPT-4o-mini (fast) or GPT-4o (highest quality)         |
 
 <Frame>
   <img src="/images/agent_config.png" alt="Agent Configuration" />
@@ -72,6 +72,7 @@ Click **Save** to create your agent. The agent is now ready, but let's add a too
 ## Part 2: Create a Tool
 
 Tools enable your agent to return structured data. This is useful for:
+
 - Looking up customer information
 - Creating tickets or records
 - Extracting specific data from conversations
@@ -85,17 +86,18 @@ From the sidebar, click **Tools**. Click **Add tool**.
 **Tool Name:** `lookup_customer`
 
 **Description:**
+
 ```text
-Look up customer information by their phone number. 
-Use this when the customer provides their phone number 
+Look up customer information by their phone number.
+Use this when the customer provides their phone number
 or you need to verify their identity.
 ```
 
 **Parameters:**
 
-| Name | Type | Required | Description |
-|------|------|----------|-------------|
-| `phone_number` | string | Yes | Customer's phone number |
+| Name           | Type   | Required | Description             |
+| -------------- | ------ | -------- | ----------------------- |
+| `phone_number` | string | Yes      | Customer's phone number |
 
 <Frame>
   <img src="/images/tool_create.png" alt="Create Tool" />
@@ -128,7 +130,8 @@ Click the **Tools** tab.
 </Frame>
 
 <Note>
-The **End conversation** toggle allows the agent to hang up calls. Enable this for voice agents.
+  The **End conversation** toggle allows the agent to hang up calls. Enable this
+  for voice agents.
 </Note>
 
 ---
@@ -150,6 +153,7 @@ From the sidebar, click **Tests**. Click **Add test**.
 **Conversation History:**
 
 Add the conversation context:
+
 ```
 User: Hello, I need help with my insurance policy
 ```
@@ -184,12 +188,13 @@ The **Test Runner** dialog shows:
 </Frame>
 
 Click on the result to see:
+
 - The actual agent response
 - The evaluation reasoning
 
 ---
 
-## Part 5: Create a Tool Invocation Test
+## Create a Tool Invocation Test
 
 Tool Invocation tests verify that your agent calls the right tool with correct parameters.
 
@@ -213,9 +218,9 @@ User: Sure, it's 555-123-4567
 
 **Expected Tool Call:**
 
-| Field | Value |
-|-------|-------|
-| Tool Name | `lookup_customer` |
+| Field      | Value                                |
+| ---------- | ------------------------------------ |
+| Tool Name  | `lookup_customer`                    |
 | Parameters | `{ "phone_number": "555-123-4567" }` |
 
 <Frame>
@@ -232,6 +237,7 @@ User: Sure, it's 555-123-4567
 ### Step 4: View Results
 
 The Test Runner shows:
+
 - ✅ **Pass**: Correct tool called with correct parameters
 - ❌ **Fail**: Wrong tool or incorrect parameters
 
@@ -273,10 +279,10 @@ In the agent's **Tests** tab, click **Run all tests**.
 
 The Test Runner dialog shows all tests running:
 
-| Test | Status |
-|------|--------|
+| Test                   | Status  |
+| ---------------------- | ------- |
 | Greeting Response Test | ✅ Pass |
-| Customer Lookup Test | ✅ Pass |
+| Customer Lookup Test   | ✅ Pass |
 
 <Frame>
   <img src="/images/agent_run_all.png" alt="Run All Tests" />
@@ -285,6 +291,7 @@ The Test Runner dialog shows all tests running:
 ### Step 3: Review Past Runs
 
 The **Past runs** panel on the right shows test history:
+
 - Run name (e.g., "2 tests")
 - Type badge: "Test" (blue)
 - Time: "5 min ago"
@@ -306,11 +313,11 @@ In the agent's **Tests** tab, click **Compare models**.
 
 Choose 2-5 models to compare:
 
-| Comparison Type | Models |
-|-----------------|--------|
-| Quality vs Speed | GPT-4o vs GPT-4o-mini |
+| Comparison Type   | Models                       |
+| ----------------- | ---------------------------- |
+| Quality vs Speed  | GPT-4o vs GPT-4o-mini        |
 | Cost Optimization | Gemini Flash vs Claude Haiku |
-| Best Quality | Claude 4 Opus vs GPT-4o |
+| Best Quality      | Claude 4 Opus vs GPT-4o      |
 
 <Frame>
   <img src="/images/benchmark_select.png" alt="Select Models" />
@@ -324,11 +331,11 @@ Click **Run benchmark**. This runs all attached tests against each selected mode
 
 The Benchmark Results dialog shows:
 
-| Model | Pass Rate | Avg Latency |
-|-------|-----------|-------------|
-| GPT-4o | 100% | 1.2s |
-| GPT-4o-mini | 100% | 0.4s |
-| Gemini Flash | 85% | 0.3s |
+| Model        | Pass Rate | Avg Latency |
+| ------------ | --------- | ----------- |
+| GPT-4o       | 100%      | 1.2s        |
+| GPT-4o-mini  | 100%      | 0.4s        |
+| Gemini Flash | 85%       | 0.3s        |
 
 <Frame>
   <img src="/images/benchmark_results.png" alt="Benchmark Results" />
@@ -341,7 +348,8 @@ The Benchmark Results dialog shows:
 - **Per-test breakdown**: See which tests passed/failed per model
 
 <Tip>
-A faster model with slightly lower pass rate may be better for simple queries. Use the best model for complex reasoning.
+  A faster model with slightly lower pass rate may be better for simple queries.
+  Use the best model for complex reasoning.
 </Tip>
 
 ---
@@ -364,7 +372,11 @@ You've completed the LLM testing workflow:
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Run Simulations" icon="comments" href="/guides/simulations/overview">
+  <Card
+    title="Run Simulations"
+    icon="comments"
+    href="/guides/simulations/overview"
+  >
     Test with full end-to-end conversations using simulated users.
   </Card>
   <Card title="STT Evaluation" icon="microphone" href="/guides/stt">

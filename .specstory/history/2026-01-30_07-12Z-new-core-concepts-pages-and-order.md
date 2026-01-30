@@ -3443,3 +3443,502 @@ I made a code change (deleted `docs/index.mdx` to remove duplicate), but this is
 
 ---
 
+_**User**_
+
+remove documentation from header and move it to below the end to end testing section on the sidebar in another section resources
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to:
+1. Remove "documentation" from the header
+2. Move it to below the "End to End Tests" section in the sidebar
+3. Put it in a new section called "resources"
+
+I need to look at the docs.json to understand the current navigation structure and make the changes.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/docs.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I don't see a "documentation" link in the header (navbar) that needs to be removed. Let me check if the user is referring to something specific. Looking at the navbar links, I see "Join the Discord" and "Github". 
+
+Maybe the user is referring to something else - perhaps there's a "Documentation" anchor in the global anchors, or maybe it's in the navbar that I'm not seeing directly.
+
+Looking at the current structure:
+- navbar.links has "Join the Discord" and "Github"
+- global.anchors has "GitHub" and "Community"
+
+I don't see a "Documentation" link. Let me ask the user for clarification, or they might be referring to the entire documentation structure needing to be reorganized. 
+
+Actually wait - let me re-read the user's request. They said "remove documentation from header and move it to below the end to end testing section on the sidebar in another section resources".
+
+Maybe they're talking about a specific tab or section. Or maybe they want to add a "Resources" section that contains documentation links?
+
+Let me check if there's an "ai-tools" folder or similar that contains documentation pages.</details></think>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="list_dir_v2">
+<details>
+<summary>Tool use: **list_dir_v2**</summary>
+
+
+Parameters:
+
+```json
+{
+  "targetDirectory": "/Users/aman/Documents/repos/artpark/agentloop/docs"
+}
+```
+Result:
+
+```json
+{
+  "directoryTreeRoot": {
+    "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs",
+    "childrenDirs": [
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/ai-tools",
+        "childrenFiles": [
+          {
+            "name": "claude-code.mdx"
+          },
+          {
+            "name": "cursor.mdx"
+          },
+          {
+            "name": "windsurf.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/api-reference",
+        "childrenDirs": [
+          {
+            "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/api-reference/endpoint",
+            "childrenFiles": [
+              {
+                "name": "create.mdx"
+              },
+              {
+                "name": "delete.mdx"
+              },
+              {
+                "name": "get.mdx"
+              },
+              {
+                "name": "webhook.mdx"
+              }
+            ],
+            "childrenWereProcessed": true
+          }
+        ],
+        "childrenFiles": [
+          {
+            "name": "introduction.mdx"
+          },
+          {
+            "name": "openapi.json"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/audio",
+        "childrenFiles": [
+          {
+            "name": "hello_world.wav"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/cli",
+        "childrenFiles": [
+          {
+            "name": "overview.mdx"
+          },
+          {
+            "name": "speech-to-text.mdx"
+          },
+          {
+            "name": "text-simulations.mdx"
+          },
+          {
+            "name": "text-to-speech.mdx"
+          },
+          {
+            "name": "text-to-text.mdx"
+          },
+          {
+            "name": "voice-simulations.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts",
+        "childrenDirs": [
+          {
+            "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts/audios",
+            "childrenFiles": [
+              {
+                "name": "dr_smith.wav"
+              },
+              {
+                "name": "hello_world.wav"
+              },
+              {
+                "name": "phone_number.wav"
+              }
+            ],
+            "childrenWereProcessed": true
+          },
+          {
+            "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts/images",
+            "childrenFiles": [
+              {
+                "name": "agents-1.png"
+              },
+              {
+                "name": "agents-2.png"
+              },
+              {
+                "name": "agents-3.png"
+              },
+              {
+                "name": "agents-4.png"
+              },
+              {
+                "name": "agents-5.png"
+              },
+              {
+                "name": "agents-6.png"
+              },
+              {
+                "name": "agents-7.png"
+              },
+              {
+                "name": "personas-1.png"
+              },
+              {
+                "name": "personas-2.png"
+              },
+              {
+                "name": "tests-1.png"
+              },
+              {
+                "name": "tools-1.png"
+              },
+              {
+                "name": "tools-2.png"
+              },
+              {
+                "name": "tools-3.png"
+              },
+              {
+                "name": "tools-4.png"
+              }
+            ],
+            "childrenWereProcessed": true
+          }
+        ],
+        "childrenFiles": [
+          {
+            "name": "agents.mdx"
+          },
+          {
+            "name": "metrics.mdx"
+          },
+          {
+            "name": "personas.mdx"
+          },
+          {
+            "name": "scenarios.mdx"
+          },
+          {
+            "name": "speech-to-text.mdx"
+          },
+          {
+            "name": "text-to-speech.mdx"
+          },
+          {
+            "name": "tools.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/essentials",
+        "childrenFiles": [
+          {
+            "name": "code.mdx"
+          },
+          {
+            "name": "images.mdx"
+          },
+          {
+            "name": "markdown.mdx"
+          },
+          {
+            "name": "navigation.mdx"
+          },
+          {
+            "name": "reusable-snippets.mdx"
+          },
+          {
+            "name": "settings.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/examples",
+        "childrenFiles": [
+          {
+            "name": "overview.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/getting-started",
+        "childrenFiles": [
+          {
+            "name": "introduction.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/images",
+        "childrenFiles": [
+          {
+            "name": "checks-passed.png"
+          },
+          {
+            "name": "hero-dark.png"
+          },
+          {
+            "name": "hero-light.png"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/integrations",
+        "childrenFiles": [
+          {
+            "name": "llm.mdx"
+          },
+          {
+            "name": "stt.mdx"
+          },
+          {
+            "name": "tts.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/logo",
+        "childrenFiles": [
+          {
+            "name": "dark.svg"
+          },
+          {
+            "name": "light.svg"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk",
+        "childrenFiles": [
+          {
+            "name": "overview.mdx"
+          },
+          {
+            "name": "speech-to-text.mdx"
+          },
+          {
+            "name": "text-simulations.mdx"
+          },
+          {
+            "name": "text-to-speech.mdx"
+          },
+          {
+            "name": "text-to-text.mdx"
+          },
+          {
+            "name": "voice-simulations.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/quickstart",
+        "childrenDirs": [
+          {
+            "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/images",
+            "childrenFiles": [
+              {
+                "name": "stt_leaderboard.png"
+              },
+              {
+                "name": "stt_new.png"
+              },
+              {
+                "name": "stt_outputs.png"
+              },
+              {
+                "name": "stt_overview.png"
+              },
+              {
+                "name": "stt-dataset.png"
+              }
+            ],
+            "childrenWereProcessed": true
+          }
+        ],
+        "childrenFiles": [
+          {
+            "name": "simulations.mdx"
+          },
+          {
+            "name": "speech-to-text.mdx"
+          },
+          {
+            "name": "text-to-speech.mdx"
+          },
+          {
+            "name": "text-to-text.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      },
+      {
+        "absPath": "/Users/aman/Documents/repos/artpark/agentloop/docs/snippets",
+        "childrenFiles": [
+          {
+            "name": "snippet-intro.mdx"
+          }
+        ],
+        "childrenWereProcessed": true
+      }
+    ],
+    "childrenFiles": [
+      {
+        "name": "development.mdx"
+      },
+      {
+        "name": "docs.json"
+      },
+      {
+        "name": "favicon.svg"
+      },
+      {
+        "name": "LICENSE"
+      },
+      {
+        "name": "quickstart.mdx"
+      },
+      {
+        "name": "README.md"
+      }
+    ],
+    "childrenWereProcessed": true
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I see there's an `ai-tools/` folder with `claude-code.mdx`, `cursor.mdx`, and `windsurf.mdx`. These might be what the user is referring to as "documentation" - tools/resources for AI coding assistants.
+
+The user wants to:
+1. Remove these from wherever they are in the header/navigation
+2. Add them to a new "Resources" section below "End to End Tests" in the sidebar
+
+Currently these ai-tools pages are not in the docs.json navigation at all (based on my reading). The user might have them somewhere else or wants to add them to a Resources section.
+
+Let me add a "Resources" section to the Python SDK and CLI tabs after "End to End Tests" that includes the ai-tools pages.</details></think>
+
+---
+
+I see there's an `ai-tools/` folder with pages for Cursor, Claude Code, and Windsurf. Let me add a "Resources" section after "End to End Tests" in both Python SDK and CLI tabs with these documentation pages.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/docs.json</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+I've added a "Resources" section with the ai-tools pages to both Python SDK and CLI tabs, after the "End to End Tests" section.
+
+But I should also check if there's something in the header/navbar that needs to be removed related to documentation. Let me check the navbar links again - I only see "Join the Discord" and "Github" there. If there was a "Documentation" link in the navbar, it's not in the current docs.json.</details></think>
+
+---
+
+Done. I've added a "Resources" section with the AI tools documentation (Cursor, Claude Code, Windsurf) after "End to End Tests" in both the Python SDK and CLI tabs.
+
+I didn't see a "Documentation" link in the current navbar/header - the navbar only has "Join the Discord" and "Github". Was there a specific link you wanted removed from the header, or was the ai-tools addition what you needed?
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+I made a code change - added "Resources" section with ai-tools pages to both Python SDK and CLI tabs in docs.json. This is a documentation navigation change. It doesn't require updates to app-details.md or README.md as it's just organizing documentation pages.</details></think>
+
+---
+
+I made a code change (added "Resources" section to docs.json navigation), but this is a documentation navigation organization change. It doesn't require updates to app-details.md or README.md.
+
+---
+

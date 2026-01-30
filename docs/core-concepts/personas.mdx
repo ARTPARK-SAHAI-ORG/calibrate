@@ -1,41 +1,29 @@
 ---
 title: "Personas"
-description: "Create, update, and delete personas for simulated user interactions"
+description: "Create realistic personas matching your target audience"
 ---
 
-# Personas
+Personas define facts for simulated users that interact with your agent in [agent simulations](/quickstart/simulations). They determine `WHO` the simulated user is and `HOW` they behave during conversations.
 
-Personas define the characteristics of simulated users that interact with your agents during testing. They determine WHO the simulated user is and HOW they behave during conversations.
+## Quickstart
 
-## Overview
+### Step 1: Create a new persona
 
-Personas are used in:
-- End-to-end simulations
-- Testing agent responses with different user types
-- Evaluating agent performance across demographics
+From the sidebar, click **Personas** to view your existing personas. Click **Add persona** to create a new persona.
 
----
+<Frame>
+  <img src="./images/personas-1.png" alt="Personas" />
+</Frame>
 
-## Creating a Persona
+### Step 2: Add the label and characteristics
 
-### Step 1: Navigate to Personas
+<Frame>
+  <img src="./images/personas-2.png" alt="Add label and characteristics" />
+</Frame>
 
-From the sidebar, click **Personas** to view your existing personas.
+Give a meaningful label to the persona (e.g. `shy, pregnant mother in her third trimester`) and define its characteristics.
 
-### Step 2: Click "Add persona"
-
-Click the **Add persona** button in the top right corner. A sidebar panel will open.
-
-### Step 3: Configure the Persona
-
-#### Required Fields
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| **Label** | Yes | A name for the persona (e.g., "Rural Farmer - Karnataka") |
-| **Characteristics** | Yes | Detailed description of WHO the persona is and HOW they behave |
-
-#### Characteristics Guidelines
+#### Guidelines for defining characteristics
 
 Define two key aspects:
 
@@ -43,6 +31,7 @@ Define two key aspects:
    - Name, age, occupation
    - Location, background
    - Language proficiency
+   - Any other relevant details required for your agent simulation
 
 2. **HOW**: Behavioral traits
    - Communication style (polite, impatient, formal)
@@ -52,220 +41,67 @@ Define two key aspects:
 **Example Characteristics:**
 
 ```text
-You are Rajesh, a 45-year-old farmer from rural Karnataka who 
-speaks primarily in Kannada with limited English proficiency. 
+You are Rajesh, a 45-year-old farmer from rural Karnataka who
+speaks primarily in Kannada with limited English proficiency.
 
-You are polite and friendly but speak slowly with natural 
-pauses like "uhh" and "umm". You have a calm and patient 
-demeanor but can become frustrated when technical jargon is used. 
+You are polite and friendly but speak slowly with natural
+pauses like "uhh" and "umm". You have a calm and patient
+demeanor but can become frustrated when technical jargon is used.
 
-You prefer simple, straightforward explanations and often ask 
-for clarification. You tend to repeat important information 
+You prefer simple, straightforward explanations and often ask
+for clarification. You tend to repeat important information
 to make sure you understood correctly.
 ```
 
 <Note>
-Avoid including task instructions in characteristics. Use **Scenarios** to define WHAT the persona should do.
+  Avoid including task instructions in characteristics. Use
+  [**Scenarios**](/core-concepts/scenarios) to define WHAT the persona should
+  do.
 </Note>
 
-### Step 4: Configure Voice Settings
+### Step 3: Configure voice settings
 
-#### Gender
+Select the gender and language for the persona.
 
-Select the voice gender for the simulated user:
-
-| Option | Description |
-|--------|-------------|
-| **Male** | Male voice synthesis |
-| **Female** | Female voice synthesis |
-
-#### Language
-
-Select the primary language for the persona:
-
-| Language | Description |
-|----------|-------------|
-| **English** | English voice and speech patterns |
-| **Hindi** | Hindi voice and speech patterns |
-| **Kannada** | Kannada voice and speech patterns |
-
-#### Interruption Sensitivity
+#### Step 4: Define interruption sensitivity
 
 Real users often interrupt agents mid-sentence. Configure how likely this persona is to interrupt:
 
-| Level | Behavior |
-|-------|----------|
-| **None** | Persona never interrupts |
-| **Low** | 25% chance of interrupting |
+| Level      | Behavior                   |
+| ---------- | -------------------------- |
+| **None**   | Persona never interrupts   |
+| **Low**    | 25% chance of interrupting |
 | **Medium** | 50% chance of interrupting |
-| **High** | 80% chance of interrupting |
+| **High**   | 80% chance of interrupting |
 
 ### Step 5: Save the Persona
 
 Click **Add persona** to create the persona.
 
----
-
-## Updating a Persona
-
-### Step 1: Open the Persona
-
-1. Navigate to **Personas** from the sidebar
-2. Click on the persona you want to edit
-3. The edit sidebar will open with the current configuration
-
-### Step 2: Modify Configuration
-
-Update any of the following:
-
-- **Label**: Change the persona name
-- **Characteristics**: Update the persona description
-- **Gender**: Change voice gender
-- **Language**: Change primary language
-- **Interruption sensitivity**: Adjust interruption behavior
-
-### Step 3: Save Changes
-
-Click **Save** to apply your changes.
-
----
-
-## Deleting a Persona
-
-<Warning>
-Deleting a persona will remove it from any simulations that reference it. This action cannot be undone.
-</Warning>
-
-### From the Personas List
-
-1. Navigate to **Personas**
-2. Find the persona you want to delete
-3. Click the **delete icon** (🗑️) on the right side
-4. Confirm the deletion in the dialog
-
----
-
-## Persona Fields Reference
-
-### Complete Field List
-
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| **Label** | Yes | string | Display name for the persona |
-| **Characteristics** | Yes | string | WHO the persona is and HOW they behave |
-| **Gender** | No | male/female | Voice gender (default: male) |
-| **Language** | No | string | Primary language (default: english) |
-| **Interruption Sensitivity** | No | none/low/medium/high | Likelihood of interrupting (default: medium) |
-
----
-
-## Example Personas
-
-### Rural Farmer
-
-```text
-Label: Rural Farmer - Karnataka
-
-Characteristics:
-You are Rajesh, a 45-year-old farmer from rural Karnataka who 
-speaks primarily in Kannada with limited English proficiency. 
-You are polite and friendly but speak slowly with natural pauses 
-like "uhh" and "umm". You have a calm and patient demeanor but 
-can become frustrated when technical jargon is used. You prefer 
-simple, straightforward explanations.
-
-Gender: Male
-Language: Kannada
-Interruption: Medium
-```
-
-### Busy Professional
-
-```text
-Label: Busy Professional - Mumbai
-
-Characteristics:
-You are Priya, a 32-year-old marketing manager in Mumbai. You 
-speak fluent English and Hindi. You are direct and efficient, 
-preferring quick answers over long explanations. You value your 
-time and may express impatience if the conversation goes in 
-circles. You speak quickly and expect the agent to keep up.
-
-Gender: Female
-Language: English
-Interruption: High
-```
-
-### Elderly Customer
-
-```text
-Label: Elderly Customer - Delhi
-
-Characteristics:
-You are Sharma ji, a 68-year-old retired government employee 
-from Delhi. You speak Hindi primarily with some English words 
-mixed in. You are very polite and formal, often using respectful 
-terms. You speak slowly and may ask the agent to repeat things. 
-You appreciate patience and detailed explanations.
-
-Gender: Male
-Language: Hindi
-Interruption: None
-```
-
-### Tech-Savvy Student
-
-```text
-Label: Tech-Savvy Student - Bangalore
-
-Characteristics:
-You are Arjun, a 22-year-old engineering student from Bangalore. 
-You speak fluent English and use technical terminology comfortably. 
-You are informal and casual in your communication style. You get 
-impatient with slow responses and may interrupt to speed things up. 
-You prefer self-service options when available.
-
-Gender: Male
-Language: English
-Interruption: High
-```
-
----
-
 ## Best Practices
 
-### Creating Realistic Personas
+### Creating realistic personas
 
-1. **Be specific**: Include concrete details (name, age, occupation)
+1. **Be specific**: Include concrete details (name, age, occupation, etc.)
 2. **Define communication style**: How do they speak? Fast, slow, formal, casual?
-3. **Include limitations**: Language proficiency, technical knowledge
+3. **Include limitations**: Language proficiency, technical knowledge, etc.
 4. **Add emotional traits**: Patient, impatient, friendly, formal
 
 ### Personas vs Scenarios
 
-| Aspect | Persona | Scenario |
-|--------|---------|----------|
-| Focus | WHO and HOW | WHAT to do |
-| Content | Demographics, behavior | Task, goal, situation |
+| Aspect  | Persona                                  | Scenario                               |
+| ------- | ---------------------------------------- | -------------------------------------- |
+| Focus   | WHO and HOW                              | WHAT to do                             |
+| Content | Demographics, behavior                   | Task, goal, situation                  |
 | Example | "A 45-year-old farmer who speaks slowly" | "Call to inquire about crop insurance" |
-
-### Testing Coverage
-
-Create personas that cover:
-- Different demographics (age, occupation, location)
-- Language proficiency levels
-- Communication styles
-- Patience levels (interruption sensitivity)
-
----
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card title="Create Scenarios" icon="file-lines" href="/guides/scenarios">
-    Define what your personas should do in simulations.
+    Define what your personas should do in simulations
   </Card>
   <Card title="Run Simulations" icon="comments" href="/guides/simulations">
-    Test your agent with persona-scenario combinations.
+    Test your agent with combinations of personas and scenarios
   </Card>
 </CardGroup>

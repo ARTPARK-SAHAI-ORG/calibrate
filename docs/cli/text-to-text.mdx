@@ -5,7 +5,11 @@ description: "CLI commands for Text to Text tests."
 
 Run Text to Text tests against predefined test cases with expected outputs. Useful for validating tool calls and response patterns.
 
-<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/getting-started/core-concepts#metrics"
+>
   Detailed explanation of metrics and evaluation types
 </Card>
 
@@ -21,12 +25,12 @@ pense llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
 
 ### Arguments
 
-| Flag | Long | Type | Required | Default | Description |
-|------|------|------|----------|---------|-------------|
-| `-c` | `--config` | string | No | `examples/tests.json` | Path to test configuration JSON file |
-| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
-| `-m` | `--model` | string | No | `gpt-4.1` | Model name (e.g., `gpt-4.1`, `openai/gpt-4.1`) |
-| `-p` | `--provider` | string | No | `openrouter` | Provider: `openai` or `openrouter` |
+| Flag | Long           | Type   | Required | Default               | Description                                    |
+| ---- | -------------- | ------ | -------- | --------------------- | ---------------------------------------------- |
+| `-c` | `--config`     | string | No       | `examples/tests.json` | Path to test configuration JSON file           |
+| `-o` | `--output-dir` | string | No       | `./out`               | Path to output directory                       |
+| `-m` | `--model`      | string | No       | `gpt-4.1`             | Model name (e.g., `gpt-4.1`, `openai/gpt-4.1`) |
+| `-p` | `--provider`   | string | No       | `openrouter`          | Provider: `openai` or `openrouter`             |
 
 ### Examples
 
@@ -71,8 +75,8 @@ pense llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
   "test_cases": [
     {
       "history": [
-        {"role": "assistant", "content": "Hello! What is your name?"},
-        {"role": "user", "content": "Aman Dalmia"}
+        { "role": "assistant", "content": "Hello! What is your name?" },
+        { "role": "user", "content": "Aman Dalmia" }
       ],
       "evaluation": {
         "type": "tool_call",
@@ -89,8 +93,8 @@ pense llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
     },
     {
       "history": [
-        {"role": "assistant", "content": "What is your phone number?"},
-        {"role": "user", "content": "Can I skip this question?"}
+        { "role": "assistant", "content": "What is your phone number?" },
+        { "role": "user", "content": "Can I skip this question?" }
       ],
       "evaluation": {
         "type": "response",
@@ -122,10 +126,10 @@ pense llm tests leaderboard -o <output_dir> -s <save_dir>
 
 ### Arguments
 
-| Flag | Long | Type | Required | Description |
-|------|------|------|----------|-------------|
-| `-o` | `--output-dir` | string | Yes | Directory containing test run folders |
-| `-s` | `--save-dir` | string | Yes | Directory to save leaderboard outputs |
+| Flag | Long           | Type   | Required | Description                           |
+| ---- | -------------- | ------ | -------- | ------------------------------------- |
+| `-o` | `--output-dir` | string | Yes      | Directory containing test run folders |
+| `-s` | `--save-dir`   | string | Yes      | Directory to save leaderboard outputs |
 
 ### Example
 
@@ -142,9 +146,9 @@ pense llm tests leaderboard -o ./out -s ./leaderboard
 
 ## Provider Options
 
-| Provider | Model Format | Example |
-|----------|--------------|---------|
-| `openai` | OpenAI naming | `gpt-4.1`, `gpt-4o` |
+| Provider     | Model Format   | Example                                     |
+| ------------ | -------------- | ------------------------------------------- |
+| `openai`     | OpenAI naming  | `gpt-4.1`, `gpt-4o`                         |
 | `openrouter` | Provider/model | `openai/gpt-4.1`, `anthropic/claude-3-opus` |
 
 ## Required Environment Variables

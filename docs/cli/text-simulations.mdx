@@ -5,7 +5,11 @@ description: "CLI commands for text-only simulations between two Text to Text mo
 
 Run text-only automated conversations between two Text to Text models (agent + simulated user). Each simulation pairs every persona with every scenario.
 
-<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/getting-started/core-concepts#metrics"
+>
   Detailed explanation of LLM Judge and evaluation criteria
 </Card>
 
@@ -21,13 +25,13 @@ pense llm simulations run -c <config_file> -o <output_dir> -m <model> -p <provid
 
 ### Arguments
 
-| Flag | Long | Type | Required | Default | Description |
-|------|------|------|----------|---------|-------------|
-| `-c` | `--config` | string | Yes | - | Path to simulation configuration JSON file |
-| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
-| `-m` | `--model` | string | No | `gpt-4.1` | Model name for both agent and user |
-| `-p` | `--provider` | string | No | `openrouter` | Provider: `openai` or `openrouter` |
-| `-n` | `--parallel` | int | No | `1` | Number of simulations to run in parallel |
+| Flag | Long           | Type   | Required | Default      | Description                                |
+| ---- | -------------- | ------ | -------- | ------------ | ------------------------------------------ |
+| `-c` | `--config`     | string | Yes      | -            | Path to simulation configuration JSON file |
+| `-o` | `--output-dir` | string | No       | `./out`      | Path to output directory                   |
+| `-m` | `--model`      | string | No       | `gpt-4.1`    | Model name for both agent and user         |
+| `-p` | `--provider`   | string | No       | `openrouter` | Provider: `openai` or `openrouter`         |
+| `-n` | `--parallel`   | int    | No       | `1`          | Number of simulations to run in parallel   |
 
 ### Examples
 
@@ -82,8 +86,8 @@ pense llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrou
     }
   ],
   "scenarios": [
-    {"description": "User completes the form without any issues"},
-    {"description": "User hesitates and wants to skip some questions"}
+    { "description": "User completes the form without any issues" },
+    { "description": "User hesitates and wants to skip some questions" }
   ],
   "evaluation_criteria": [
     {
@@ -122,25 +126,25 @@ pense llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrou
 
 ```json
 [
-  {"role": "assistant", "content": "Hello! What is your name?"},
-  {"role": "user", "content": "My name is Geeta."},
-  {"role": "assistant", "content": "Thank you, Geeta. What is your address?"}
+  { "role": "assistant", "content": "Hello! What is your name?" },
+  { "role": "user", "content": "My name is Geeta." },
+  { "role": "assistant", "content": "Thank you, Geeta. What is your address?" }
 ]
 ```
 
 **evaluation_results.csv** contains per-criterion results:
 
-| name | match | reasoning |
-|------|-------|-----------|
-| question_completeness | True | All questions were asked and answered... |
-| assistant_behavior | True | The assistant asked one question per turn... |
+| name                  | match | reasoning                                    |
+| --------------------- | ----- | -------------------------------------------- |
+| question_completeness | True  | All questions were asked and answered...     |
+| assistant_behavior    | True  | The assistant asked one question per turn... |
 
 **results.csv** aggregates match scores across all simulations:
 
-| name | question_completeness | assistant_behavior |
-|------|-----------------------|--------------------|
-| simulation_persona_1_scenario_1 | 1.0 | 1.0 |
-| simulation_persona_1_scenario_2 | 1.0 | 0.0 |
+| name                            | question_completeness | assistant_behavior |
+| ------------------------------- | --------------------- | ------------------ |
+| simulation_persona_1_scenario_1 | 1.0                   | 1.0                |
+| simulation_persona_1_scenario_2 | 1.0                   | 0.0                |
 
 ---
 
@@ -154,10 +158,10 @@ pense llm simulations leaderboard -o <output_dir> -s <save_dir>
 
 ### Arguments
 
-| Flag | Long | Type | Required | Description |
-|------|------|------|----------|-------------|
-| `-o` | `--output-dir` | string | Yes | Directory containing simulation run folders |
-| `-s` | `--save-dir` | string | Yes | Directory to save leaderboard outputs |
+| Flag | Long           | Type   | Required | Description                                 |
+| ---- | -------------- | ------ | -------- | ------------------------------------------- |
+| `-o` | `--output-dir` | string | Yes      | Directory containing simulation run folders |
+| `-s` | `--save-dir`   | string | Yes      | Directory to save leaderboard outputs       |
 
 ### Example
 
@@ -169,9 +173,9 @@ pense llm simulations leaderboard -o ./out -s ./leaderboard
 
 ## Provider Options
 
-| Provider | Model Format | Example |
-|----------|--------------|---------|
-| `openai` | OpenAI naming | `gpt-4.1`, `gpt-4o` |
+| Provider     | Model Format   | Example                                     |
+| ------------ | -------------- | ------------------------------------------- |
+| `openai`     | OpenAI naming  | `gpt-4.1`, `gpt-4o`                         |
 | `openrouter` | Provider/model | `openai/gpt-4.1`, `anthropic/claude-3-opus` |
 
 ## Required Environment Variables
