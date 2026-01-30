@@ -1,385 +1,139 @@
 ---
 title: "Text to Text"
-description: "Build an agent, create tools, write tests, and benchmark across models"
+description: "Create edge cases to test the LLM component of your agent"
 ---
 
-# LLM Testing
+This guide shows you how to set up automated evaluations for your LLM based on your use case.
 
-This guide walks you through the complete LLM testing workflow: creating an agent, adding tools for structured output, writing tests, and benchmarking across models.
+## Create an agent
 
-## What You'll Learn
+Create your agent using [this guide](/core-concepts/agents).
 
-- Create a simple agent with a system prompt
-- Select STT, TTS, and LLM providers
-- Create a tool (structured output)
-- Attach the tool to your agent
-- Create and run a Next Reply test
-- Create and run a Tool Invocation test
-- Attach tests to an agent and run all tests
-- Benchmark your agent across different LLM models
+## Create your first test case
 
----
-
-## Part 1: Create an Agent
-
-### Step 1: Navigate to Agents
-
-From the sidebar, click **Agents**. Click **Add agent** and enter a name like "Insurance Support Bot".
+Open the **Text to Text** tab and click on **Add test** to create a new test.
 
 <Frame>
-  <img src="/images/agents_overview.png" alt="Agents List" />
+  <img src="./images/tests-all.png" alt="Create a new test" />
 </Frame>
 
-### Step 2: Configure the Agent Tab
+You can create two types of test cases:
 
-The **Agent** tab contains core configuration:
+<AccordionGroup>
+  <Accordion title="Next Reply Test" icon="message">
+    These tests verify your agent responds appropriately to the last user
+    message given a conversation history defined by you by checking if the
+    agent's response meets your criteria (for example, tone, content, or
+    accuracy).
+  </Accordion>
+  <Accordion title="Tool Invocation Test" icon="wrench">
+    These tests verify that your agent calls the correct tools with the right
+    parameters given a conversation history defined by you.
+  </Accordion>
+</AccordionGroup>
 
-**System Prompt:**
+### Create a next reply test
 
-Write clear instructions for your agent:
-
-```text
-You are a friendly customer support agent for Acme Insurance.
-
-Your role is to help customers with:
-- Policy inquiries
-- Claim submissions
-- Premium payments
-
-Always be polite and professional. If you need to look up
-customer information, use the lookup_customer tool with their
-phone number.
-```
-
-**Select Providers:**
-
-| Setting          | Recommended                                            |
-| ---------------- | ------------------------------------------------------ |
-| **STT Provider** | Deepgram (high accuracy) or Google (multi-language)    |
-| **TTS Provider** | Cartesia (low latency) or ElevenLabs (premium quality) |
-| **LLM Model**    | GPT-4o-mini (fast) or GPT-4o (highest quality)         |
+Next reply tests verify that your agent response adheres to your criteria given a conversation history defined by you.
 
 <Frame>
-  <img src="/images/agent_config.png" alt="Agent Configuration" />
+  <img src="./images/tests-new-1.png" alt="Create a next reply test" />
 </Frame>
 
-### Step 3: Save the Agent
+As shown in the image, you need to create the conversation history for the edge case you need to test and add the success criteria for the agent's next response.
 
-Click **Save** to create your agent. The agent is now ready, but let's add a tool for structured output.
+### Create a tool invocation test
 
----
-
-## Part 2: Create a Tool
-
-Tools enable your agent to return structured data. This is useful for:
-
-- Looking up customer information
-- Creating tickets or records
-- Extracting specific data from conversations
-
-### Step 1: Navigate to Tools
-
-From the sidebar, click **Tools**. Click **Add tool**.
-
-### Step 2: Define the Tool
-
-**Tool Name:** `lookup_customer`
-
-**Description:**
-
-```text
-Look up customer information by their phone number.
-Use this when the customer provides their phone number
-or you need to verify their identity.
-```
-
-**Parameters:**
-
-| Name           | Type   | Required | Description             |
-| -------------- | ------ | -------- | ----------------------- |
-| `phone_number` | string | Yes      | Customer's phone number |
+Tool invocation tests verify that your agent calls the correct tools with the right parameters given a conversation history defined by you.
 
 <Frame>
-  <img src="/images/tool_create.png" alt="Create Tool" />
+  <img src="./images/tests-new-2.png" alt="Create a tool invocation test" />
 </Frame>
 
-### Step 3: Save the Tool
+As shown in the image, you need to create the conversation history for the edge case you need to test and select the tools that must be called along with the correct parameters.
 
-Click **Add tool** to save. The tool is now available to attach to agents.
+## Run one test on one agent
 
----
-
-## Part 3: Attach Tool to Agent
-
-### Step 1: Open Your Agent
-
-Navigate to **Agents** and click on "Insurance Support Bot".
-
-### Step 2: Go to Tools Tab
-
-Click the **Tools** tab.
-
-### Step 3: Attach the Tool
-
-1. Click **Attach tool**
-2. Select `lookup_customer` from the list
-3. The tool now appears in the agent's tools list
+Once the test is created, you can click on the play button to run that test.
 
 <Frame>
-  <img src="/images/agent_tools.png" alt="Agent Tools Tab" />
+  <img src="./images/tests-one-test-1.png" alt="Run one test on one agent" />
+</Frame>
+
+Select the agent from the dropdown in the dialog box that appears and hit **Run test**.
+
+<Frame>
+  <img src="./images/tests-one-test-2.png" alt="Run one test on one agent" />
 </Frame>
 
 <Note>
-  The **End conversation** toggle allows the agent to hang up calls. Enable this
-  for voice agents.
+  Selecting the `Attach this test to the agent config` checkbox will attach the
+  test to the list of all tests for the selected agent
 </Note>
 
----
-
-## Part 4: Create a Next Reply Test
-
-Next Reply tests verify that your agent responds appropriately to user messages.
-
-### Step 1: Navigate to Tests
-
-From the sidebar, click **Tests**. Click **Add test**.
-
-### Step 2: Configure the Test
-
-**Test Name:** `Greeting Response Test`
-
-**Test Type:** Select **Next Reply**
-
-**Conversation History:**
-
-Add the conversation context:
-
-```
-User: Hello, I need help with my insurance policy
-```
-
-**Expected Response Criteria:**
-
-```text
-The agent should greet the user warmly and ask how it can help.
-Response should mention insurance or policy-related assistance.
-```
+A test runner will open up with the status of the test updating once it
+completes. By clicking on a test case, you can view the agent's response and whether it passed the test.
 
 <Frame>
-  <img src="/images/test_next_reply.png" alt="Next Reply Test" />
+  <img src="./images/tests-one-test-3.png" alt="Run one test on one agent" />
 </Frame>
 
-### Step 3: Save and Run the Test
+## Run all tests for one agent
 
-1. Click **Add test** to save
-2. On the test row, click the **play button** (▶)
-3. Select "Insurance Support Bot" as the agent
-4. Click **Run**
-
-### Step 4: View Results
-
-The **Test Runner** dialog shows:
-
-- ✅ **Pass**: Agent response met the criteria
-- ❌ **Fail**: Agent response didn't meet expectations
+Navigate to the **Tests** tab of the agent you want to test. You can add new tests by selecting the **Add test** button or run the existing tests by clicking the **Run all tests** button.
 
 <Frame>
-  <img src="/images/test_runner_result.png" alt="Test Runner Result" />
+  <img src="./images/tests-all-1.png" alt="Run all tests for one agent" />
 </Frame>
 
-Click on the result to see:
-
-- The actual agent response
-- The evaluation reasoning
-
----
-
-## Create a Tool Invocation Test
-
-Tool Invocation tests verify that your agent calls the right tool with correct parameters.
-
-### Step 1: Create Another Test
-
-Navigate to **Tests**. Click **Add test**.
-
-### Step 2: Configure the Test
-
-**Test Name:** `Customer Lookup Test`
-
-**Test Type:** Select **Tool Call**
-
-**Conversation History:**
-
-```
-User: Hi, I'm calling about my account
-Agent: I'd be happy to help. Could you provide your phone number?
-User: Sure, it's 555-123-4567
-```
-
-**Expected Tool Call:**
-
-| Field      | Value                                |
-| ---------- | ------------------------------------ |
-| Tool Name  | `lookup_customer`                    |
-| Parameters | `{ "phone_number": "555-123-4567" }` |
+A test runner will open up with the status of each test case updating as it completes. By clicking on a test case, you can view the agent's response and whether it passed the test.
 
 <Frame>
-  <img src="/images/test_tool_call.png" alt="Tool Call Test" />
+  <img src="./images/tests-all-2.png" alt="Results of all tests" />
 </Frame>
 
-### Step 3: Run the Test
-
-1. Click **Add test** to save
-2. Click the **play button** on the test row
-3. Select "Insurance Support Bot"
-4. Click **Run**
-
-### Step 4: View Results
-
-The Test Runner shows:
-
-- ✅ **Pass**: Correct tool called with correct parameters
-- ❌ **Fail**: Wrong tool or incorrect parameters
+You can view all the past test runs for that agent and their results.
 
 <Frame>
-  <img src="/images/test_runner_tool.png" alt="Tool Test Result" />
+  <img src="./images/tests-all-3.png" alt="Past test runs" />
 </Frame>
 
----
+## Find the best LLM for your agent
 
-## Part 6: Attach Tests to Agent
-
-Now let's attach both tests to the agent for easier management.
-
-### Step 1: Open Your Agent
-
-Navigate to **Agents** → "Insurance Support Bot" → **Tests** tab.
-
-### Step 2: Add Tests
-
-1. Click **Add test**
-2. Select both tests:
-   - "Greeting Response Test"
-   - "Customer Lookup Test"
-3. Click **Add**
+The tests above are run using the LLM configured for that agent. But it may not be the optimal model for your use case. You can compare the performance of different LLMs on your tests by clicking the **Compare models** button.
 
 <Frame>
-  <img src="/images/agent_tests_attached.png" alt="Agent with Attached Tests" />
+  <img src="./images/tests-all-1.png" alt="Compare models" />
 </Frame>
 
----
-
-## Part 7: Run All Tests
-
-### Step 1: Run All Tests Button
-
-In the agent's **Tests** tab, click **Run all tests**.
-
-### Step 2: View Results
-
-The Test Runner dialog shows all tests running:
-
-| Test                   | Status  |
-| ---------------------- | ------- |
-| Greeting Response Test | ✅ Pass |
-| Customer Lookup Test   | ✅ Pass |
+You can select upto 5 models that you want to compare and select **Run comparison** to start the evaluation.
 
 <Frame>
-  <img src="/images/agent_run_all.png" alt="Run All Tests" />
+  <img src="./images/tests-benchmark-1.png" alt="Run benchmark" />
 </Frame>
 
-### Step 3: Review Past Runs
-
-The **Past runs** panel on the right shows test history:
-
-- Run name (e.g., "2 tests")
-- Type badge: "Test" (blue)
-- Time: "5 min ago"
-- Result: "2 Success"
-
-Click any past run to view its full results.
-
----
-
-## Part 8: Run a Benchmark
-
-Benchmarks compare your agent's performance across different LLM models.
-
-### Step 1: Start Benchmark
-
-In the agent's **Tests** tab, click **Compare models**.
-
-### Step 2: Select Models
-
-Choose 2-5 models to compare:
-
-| Comparison Type   | Models                       |
-| ----------------- | ---------------------------- |
-| Quality vs Speed  | GPT-4o vs GPT-4o-mini        |
-| Cost Optimization | Gemini Flash vs Claude Haiku |
-| Best Quality      | Claude 4 Opus vs GPT-4o      |
+You will see the status of each test for each provider updating as it completes.
 
 <Frame>
-  <img src="/images/benchmark_select.png" alt="Select Models" />
+  <img src="./images/tests-benchmark-2.png" alt="Benchmark status" />
 </Frame>
 
-### Step 3: Run Benchmark
-
-Click **Run benchmark**. This runs all attached tests against each selected model.
-
-### Step 4: View Results
-
-The Benchmark Results dialog shows:
-
-| Model        | Pass Rate | Avg Latency |
-| ------------ | --------- | ----------- |
-| GPT-4o       | 100%      | 1.2s        |
-| GPT-4o-mini  | 100%      | 0.4s        |
-| Gemini Flash | 85%       | 0.3s        |
+Once the tests for all the providers are complete, a leaderboard will be displayed with the results.
 
 <Frame>
-  <img src="/images/benchmark_results.png" alt="Benchmark Results" />
+  <img src="./images/tests-benchmark-3.png" alt="Benchmark results" />
 </Frame>
 
-### Understanding Results
-
-- **Pass Rate**: Percentage of tests passed
-- **Avg Latency**: Response time (lower is better for real-time)
-- **Per-test breakdown**: See which tests passed/failed per model
-
-<Tip>
-  A faster model with slightly lower pass rate may be better for simple queries.
-  Use the best model for complex reasoning.
-</Tip>
-
----
-
-## Summary
-
-You've completed the LLM testing workflow:
-
-1. ✅ Created an agent with system prompt and providers
-2. ✅ Created a tool for structured output
-3. ✅ Attached the tool to the agent
-4. ✅ Created and ran a Next Reply test
-5. ✅ Created and ran a Tool Invocation test
-6. ✅ Attached tests to the agent
-7. ✅ Ran all tests together
-8. ✅ Benchmarked across LLM models
-
----
+The pass rate for each model indicates the % of tests passed.
 
 ## Next Steps
 
 <CardGroup cols={2}>
   <Card
-    title="Run Simulations"
-    icon="comments"
-    href="/guides/simulations/overview"
+    title="Text to Speech"
+    icon="microphone"
+    href="/quickstart/text-to-speech"
   >
-    Test with full end-to-end conversations using simulated users.
-  </Card>
-  <Card title="STT Evaluation" icon="microphone" href="/guides/stt">
-    Find the best speech-to-text provider.
+    Evaluate TTS providers on your dataset
   </Card>
 </CardGroup>
