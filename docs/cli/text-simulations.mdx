@@ -11,12 +11,12 @@ Run text-only automated conversations between two Text to Text models (agent + s
 
 ---
 
-## pense ttt simulations run
+## pense llm simulations run
 
 Run Text to Text simulations from a configuration file.
 
 ```bash
-pense ttt simulations run -c <config_file> -o <output_dir> -m <model> -p <provider> -n <parallel>
+pense llm simulations run -c <config_file> -o <output_dir> -m <model> -p <provider> -n <parallel>
 ```
 
 ### Arguments
@@ -34,19 +34,19 @@ pense ttt simulations run -c <config_file> -o <output_dir> -m <model> -p <provid
 **Basic simulation:**
 
 ```bash
-pense ttt simulations run -c ./config.json -o ./out
+pense llm simulations run -c ./config.json -o ./out
 ```
 
 **Run with parallel simulations:**
 
 ```bash
-pense ttt simulations run -c ./config.json -o ./out -n 4
+pense llm simulations run -c ./config.json -o ./out -n 4
 ```
 
 **Use specific model:**
 
 ```bash
-pense ttt simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
+pense llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
 ```
 
 ### Configuration File Structure
@@ -144,12 +144,12 @@ pense ttt simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrou
 
 ---
 
-## pense ttt simulations leaderboard
+## pense llm simulations leaderboard
 
 Generate a leaderboard comparing multiple simulation runs.
 
 ```bash
-pense ttt simulations leaderboard -o <output_dir> -s <save_dir>
+pense llm simulations leaderboard -o <output_dir> -s <save_dir>
 ```
 
 ### Arguments
@@ -162,7 +162,7 @@ pense ttt simulations leaderboard -o <output_dir> -s <save_dir>
 ### Example
 
 ```bash
-pense ttt simulations leaderboard -o ./out -s ./leaderboard
+pense llm simulations leaderboard -o ./out -s ./leaderboard
 ```
 
 ---

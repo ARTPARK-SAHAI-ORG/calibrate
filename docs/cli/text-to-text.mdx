@@ -11,12 +11,12 @@ Run Text to Text tests against predefined test cases with expected outputs. Usef
 
 ---
 
-## pense ttt tests run
+## pense llm tests run
 
 Run Text to Text test cases from a configuration file.
 
 ```bash
-pense ttt tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
+pense llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
 ```
 
 ### Arguments
@@ -33,19 +33,19 @@ pense ttt tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
 **Basic test run:**
 
 ```bash
-pense ttt tests run -c ./config.json -o ./out
+pense llm tests run -c ./config.json -o ./out
 ```
 
 **Run with specific model:**
 
 ```bash
-pense ttt tests run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
+pense llm tests run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
 ```
 
 **Use OpenAI directly:**
 
 ```bash
-pense ttt tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
+pense llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
 ```
 
 ### Configuration File Structure
@@ -112,12 +112,12 @@ pense ttt tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
 
 ---
 
-## pense ttt tests leaderboard
+## pense llm tests leaderboard
 
 Generate a leaderboard comparing multiple test runs.
 
 ```bash
-pense ttt tests leaderboard -o <output_dir> -s <save_dir>
+pense llm tests leaderboard -o <output_dir> -s <save_dir>
 ```
 
 ### Arguments
@@ -130,7 +130,7 @@ pense ttt tests leaderboard -o <output_dir> -s <save_dir>
 ### Example
 
 ```bash
-pense ttt tests leaderboard -o ./out -s ./leaderboard
+pense llm tests leaderboard -o ./out -s ./leaderboard
 ```
 
 ### Output
