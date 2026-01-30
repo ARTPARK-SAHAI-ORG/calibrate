@@ -3,10 +3,10 @@ title: "Text to Text"
 description: "Supported Text to Text providers in Pense."
 ---
 
-| Provider | Supported Models |
-|----------|------------------|
-| **OpenAI** | [View models](https://platform.openai.com/docs/models) |
-| **OpenRouter** | [View models](https://openrouter.ai/models) |
+| Provider       | Supported Models                                       |
+| -------------- | ------------------------------------------------------ |
+| **OpenAI**     | [View models](https://platform.openai.com/docs/models) |
+| **OpenRouter** | [View models](https://openrouter.ai/models)            |
 
 ## Configuration
 
@@ -23,22 +23,29 @@ export OPENROUTER_API_KEY=your_key
 ## Next Steps
 
 <CardGroup cols={2}>
-  <Card title="Run Text to Text Tests" icon="play" href="/guides/ttt-tests">
-    Learn how to run Text to Text tests across different providers
+  <Card title="Quickstart" icon="rocket" href="/quickstart/text-to-text">
+    Learn how to evaluate different LLMs across different test cases
   </Card>
-  <Card title="Configure Text to Text in Agent" icon="gear" href="/guides/agent-ttt-configuration">
-    Set up your Text to Text provider in agent configuration
+  <Card
+    title="Configure your agent"
+    icon="gear"
+    href="/core-concepts/agents#create-a-new-agent"
+  >
+    Configure the LLM for your agent
   </Card>
-  <Card title="Benchmark Multiple Providers" icon="scale-balanced" href="/guides/ttt-benchmarking">
-    Benchmark multiple Text to Text providers across your test suite
+
+  <Card
+    title="Python SDK "
+    icon="code"
+    href="/python-sdk/text-to-text"
+  >
+    Use the Python SDK to evaluate any LLM on your test cases
   </Card>
-  <Card title="Python SDK - Tests" icon="code" href="/python-sdk/text-to-text#running-tests">
-    Run tests for any Text to Text provider using the Python SDK
-  </Card>
-  <Card title="Python SDK - Simulations" icon="chart-bar" href="/python-sdk/text-to-text#running-simulations">
-    Run simulations with multiple personas and scenarios
-  </Card>
-  <Card title="Python SDK - Leaderboard" icon="trophy" href="/python-sdk/text-to-text#generating-leaderboard">
-    Generate leaderboard across multiple Text to Text providers
+  <Card
+    title="CLI"
+    icon="trophy"
+    href="/cli/text-to-text"
+  >
+    Run tests for any LLM from the command line
   </Card>
 </CardGroup>
