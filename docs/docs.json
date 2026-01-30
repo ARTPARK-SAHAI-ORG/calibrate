@@ -35,7 +35,8 @@
               "core-concepts/tools",
 
               "core-concepts/personas",
-              "core-concepts/scenarios"
+              "core-concepts/scenarios",
+              "core-concepts/metrics"
             ]
           }
         ]

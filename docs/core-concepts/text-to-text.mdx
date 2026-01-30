@@ -1,0 +1,260 @@
+---
+title: "Text to Text"
+description: "Understanding Text to Text evaluation metrics and concepts."
+---
+
+## What is a Test Case?
+
+A test case verifies that your agent produces the correct output for a given conversation. Think of it as a unit test for your LLM agent.
+
+The core idea is simple:
+
+1. **Input**: A conversation history (messages exchanged so far)
+2. **Output**: The agent's next response (either text or a tool call)
+3. **Evaluation**: Does the output match what you expected?
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        TEST CASE                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│   Conversation History (Input)                              │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ Assistant: "What is your name?"                     │   │
+│   │ User: "John Doe"                                    │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                           ↓                                 │
+│                    Agent Generates                          │
+│                     Next Output                             │
+│                           ↓                                 │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ Output: Tool call OR Text response                  │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                           ↓                                 │
+│                    Evaluate Output                          │
+│                           ↓                                 │
+│   ┌─────────────────────────────────────────────────────┐   │
+│   │ ✅ Pass or ❌ Fail                                  │   │
+│   └─────────────────────────────────────────────────────┘   │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Conversation History
+
+The conversation history is the context your agent sees before generating its next output. It's a sequence of messages with roles (`assistant` or `user`):
+
+```python
+"history": [
+    {"role": "assistant", "content": "Hello! I'm here to help you with your insurance."},
+    {"role": "user", "content": "Hi, I need to file a claim"},
+    {"role": "assistant", "content": "I can help with that. What's your phone number?"},
+    {"role": "user", "content": "It's 555-123-4567"}
+]
+```
+
+The agent receives this history and generates the **next output** — which is what your test evaluates.
+
+## Agent Output Types
+
+When an agent processes a conversation, it produces one of two output types:
+
+### 1. Text Response
+
+A natural language reply to continue the conversation:
+
+```
+"Thank you! Let me look up your account."
+```
+
+### 2. Tool Call
+
+A structured function call to perform an action:
+
+```python
+{
+    "tool": "lookup_customer",
+    "arguments": {"phone_number": "555-123-4567"}
+}
+```
+
+Your test case must specify which output type you expect and how to evaluate it.
+
+## Evaluation Types
+
+### Tool Call Tests
+
+Use tool call tests when you expect the agent to invoke a specific tool. You define:
+
+- **Which tool** should be called
+- **What arguments** it should receive (optional)
+
+```python
+{
+    "history": [
+        {"role": "assistant", "content": "What's your phone number?"},
+        {"role": "user", "content": "555-123-4567"}
+    ],
+    "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+            {
+                "tool": "lookup_customer",
+                "arguments": {"phone_number": "555-123-4567"}
+            }
+        ]
+    }
+}
+```
+
+**Matching Rules:**
+
+| What to Check           | How to Specify                | Example                                                                      |
+| ----------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| Tool is called          | Provide tool name only        | `{"tool": "lookup_customer"}`                                                |
+| Tool with specific args | Provide tool name + arguments | `{"tool": "lookup_customer", "arguments": {"phone_number": "555-123-4567"}}` |
+| Tool is NOT called      | Omit from tool_calls          | Agent should respond with text instead                                       |
+
+<Note>
+  When you specify arguments, all specified arguments must match exactly. Extra
+  arguments in the actual output are allowed and won't cause a failure.
+</Note>
+
+### Response Tests
+
+Use response tests when you expect the agent to reply with text. Since natural language varies, you define **criteria** that describe what a good response looks like:
+
+```python
+{
+    "history": [
+        {"role": "assistant", "content": "What is your phone number?"},
+        {"role": "user", "content": "I'd rather not share that"}
+    ],
+    "evaluation": {
+        "type": "response",
+        "criteria": "The assistant should respect the user's privacy and not insist on getting the phone number. It should offer to continue without it or provide alternatives."
+    }
+}
+```
+
+**Writing Good Criteria:**
+
+| Good Criteria                                                                        | Bad Criteria                                 |
+| ------------------------------------------------------------------------------------ | -------------------------------------------- |
+| "The assistant should apologize and offer to help with something else"               | "The assistant should say sorry" (too vague) |
+| "The response should include the user's name and confirm the appointment time"       | "Good response" (no specifics)               |
+| "The assistant should NOT reveal pricing information without verifying the customer" | "Don't mention price" (unclear intent)       |
+
+An LLM Judge evaluates whether the agent's response satisfies your criteria, returning:
+
+- **Pass**: Response meets the criteria
+- **Fail**: Response doesn't meet the criteria (with reasoning)
+
+## Complete Test Case Structure
+
+```python
+{
+    # The conversation so far (required)
+    "history": [
+        {"role": "assistant", "content": "Hello! What is your name?"},
+        {"role": "user", "content": "Aman Dalmia"}
+    ],
+
+    # How to evaluate the agent's next output (required)
+    "evaluation": {
+        "type": "tool_call",  # or "response"
+        "tool_calls": [...]   # for tool_call type
+        # OR
+        "criteria": "..."     # for response type
+    },
+
+    # Optional settings
+    "settings": {
+        "language": "english"
+    }
+}
+```
+
+## Pass Rate
+
+Pass rate measures the percentage of test cases where the agent's output matches expectations:
+
+- **Range**: 0% to 100%
+- **Calculation**: (Passed tests / Total tests) × 100
+- **Goal**: Higher is better — aim for 100% on critical behaviors
+
+## Tools
+
+Tools are functions your agent can call. Define them with a name, description, and parameters:
+
+```python
+{
+    "type": "client",
+    "name": "lookup_customer",
+    "description": "Look up customer information by phone number",
+    "parameters": [
+        {
+            "id": "phone_number",
+            "type": "string",
+            "description": "The customer's phone number",
+            "required": True
+        }
+    ]
+}
+```
+
+The agent sees these tool definitions in its context and decides when to call them based on the conversation.
+
+## Output Files
+
+### results.json
+
+Detailed results for each test case:
+
+```json
+[
+  {
+    "output": {
+      "response": "",
+      "tool_calls": [
+        {"tool": "lookup_customer", "arguments": {"phone_number": "555-123-4567"}}
+      ]
+    },
+    "metrics": {"passed": true},
+    "test_case": {
+      "history": [...],
+      "evaluation": {...}
+    }
+  }
+]
+```
+
+### metrics.json
+
+Summary statistics:
+
+```json
+{
+  "total": 10,
+  "passed": 8
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Text to Text Quickstart"
+    icon="play"
+    href="/quickstart/text-to-text"
+  >
+    Run your first Text to Text evaluation.
+  </Card>
+  <Card
+    title="Simulation Concepts"
+    icon="robot"
+    href="/core-concepts/simulations"
+  >
+    Learn about automated conversations.
+  </Card>
+</CardGroup>

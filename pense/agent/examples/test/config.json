@@ -94,6 +94,10 @@
             }
         }
     ],
+    "settings": {
+        "agent_speaks_first": true,
+        "max_turns": 10
+    },
     "stt": {
         "provider": "deepgram"
     },

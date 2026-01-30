@@ -39,7 +39,7 @@ TOOL_CALL_COLOR = "\033[33m"  # Magenta, not used for any of the above or below
 GENERAL_LOG_COLOR = "\033[93m"
 RESET_COLOR = "\033[0m"
 INTERRUPTION_COLOR = "\033[91m"
-DEFAULT_MAX_TURNS = 50
+DEFAULT_MAX_TURNS = 10
 DEFAULT_PORT = 8765
 
 # Create a contextual logger with EVAL prefix
@@ -1372,7 +1372,7 @@ async def run_single_simulation_task(
                 interrupt_probability=interrupt_probability,
                 port=port,
                 agent_speaks_first=agent_speaks_first,
-                max_turns=config.get("max_turns", DEFAULT_MAX_TURNS),
+                max_turns=config.get("settings", {}).get("max_turns", DEFAULT_MAX_TURNS),
             )
         )
         simulation_tasks = [bot_task, sim_task]

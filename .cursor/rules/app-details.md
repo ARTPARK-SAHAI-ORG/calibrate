@@ -438,8 +438,7 @@ pense agent test -c ./config.json -o ./out
     "personas": [...],
     "scenarios": [...],
     "evaluation_criteria": [...],
-    "settings": {"agent_speaks_first": true},
-    "max_turns": 50
+    "settings": {"agent_speaks_first": true, "max_turns": 50}
 }
 ```
 
@@ -659,6 +658,7 @@ uv pip install -r requirements-docs.txt
 
 ### Simulations
 
+- `max_turns` is configured in `settings` (e.g., `"settings": {"max_turns": 50}`)
 - `max_turns` limits assistant turns, not total turns
 - Conversation ends gracefully after max turns (final assistant message recorded)
 - Transcript includes `end_reason` message when max turns reached

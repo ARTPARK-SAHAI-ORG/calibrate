@@ -58,6 +58,10 @@
       "description": "the mother is in a rush and ends up answering multiple questions at once that are related to each other when being asked one question; the list of all questions - Name of patient, Address, Telephone"
     }
   ],
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 50
+  },
   "evaluation_criteria": [
     {
       "name": "question_completeness",

@@ -1,58 +1,47 @@
 ---
 title: "Metrics"
-description: "Create, update, and delete metrics for evaluating agent performance"
+description: "Define how to evaluate agent performance in simulations"
 ---
 
-# Metrics
+Metrics define how to evaluate whether a conversation was successful in [agent simulations](/quickstart/simulations).
 
-Metrics define how to evaluate whether a conversation was successful. They provide evaluation instructions for analyzing agent performance in simulations.
+## How metrics work
 
-## Overview
+After each simulated conversation completes, an LLM judge reviews the full conversation transcript and evaluates it against each metric you have defined for the simulation. For every metric, the judge assigns a binary **pass** or **fail** result based on your evaluation instructions.
 
-Metrics are used to:
-- Evaluate agent performance in simulations
-- Define success criteria for conversations
-- Track quality across different scenarios
-- Compare agent effectiveness over time
+This means your evaluation instructions should be written clearly enough for an LLM to make a definitive yes/no decision about whether the criteria were met.
 
----
+## Quickstart
 
-## Creating a Metric
+### Create a new metric
 
-### Step 1: Navigate to Metrics
+From the sidebar, click **Metrics** to view your existing metrics. Click **Add metric** to create a new metric.
 
-From the sidebar, click **Metrics** to view your existing metrics.
+<Frame>
+  <img src="./images/metrics-1.png" alt="Metrics" />
+</Frame>
 
-### Step 2: Click "Add metric"
+### Add the name and evaluation instructions
 
-Click the **Add metric** button in the top right corner. A sidebar panel will open.
+Give a meaningful name to the metric (e.g. `Data collection success`) and define how to evaluate success.
 
-### Step 3: Configure the Metric
+<Frame>
+  <img src="./images/metrics-2.png" alt="Add metric dialog" />
+</Frame>
 
-#### Required Fields
+#### Guidelines for evaluation instructions
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| **Metric name** | Yes | A unique name for the metric (e.g., "Data Collection Success") |
-| **Evaluation instructions** | No | How to evaluate if the conversation was successful |
+Define clear, measurable criteria that an LLM can evaluate with a yes/no answer:
 
-<Note>
-Metric names must be unique. You cannot create two metrics with the same name.
-</Note>
+1. **Success conditions**: what must happen for the metric to pass?
+2. **Failure conditions**: what indicates failure?
+3. **Edge cases**: any special considerations?
 
-#### Evaluation Instructions
-
-Describe how the agent should evaluate success. Be specific about:
-
-1. **What to check**: What conditions indicate success?
-2. **Required outcomes**: What must happen for the metric to pass?
-3. **Edge cases**: Any special considerations?
-
-**Example Evaluation Instructions:**
+**Example evaluation instructions:**
 
 ```text
-The agent should have collected the user's name and phone number 
-during the conversation. 
+The agent should have collected the user's name and phone number
+during the conversation.
 
 Success criteria:
 - Customer's full name was captured
@@ -64,88 +53,26 @@ The metric fails if:
 - Information was not verified with the customer
 ```
 
-### Step 4: Save the Metric
+### Save the metric
 
 Click **Add metric** to create the metric.
 
----
+## Best practices
 
-## Updating a Metric
+### Metrics vs personas vs scenarios
 
-### Step 1: Open the Metric
+| Aspect  | Metric                             | Persona                                  | Scenario                               |
+| ------- | ---------------------------------- | ---------------------------------------- | -------------------------------------- |
+| Focus   | HOW to evaluate                    | WHO and HOW to behave                    | WHAT to do                             |
+| Content | Success criteria, evaluation rules | Demographics, behavior                   | Task, goal, situation                  |
+| Example | "Agent collected name and phone"   | "A 45-year-old farmer who speaks slowly" | "Call to inquire about crop insurance" |
 
-1. Navigate to **Metrics** from the sidebar
-2. Click on the metric you want to edit
-3. The edit sidebar will open with the current configuration
+## Example metrics
 
-### Step 2: Modify Configuration
-
-Update any of the following:
-
-- **Metric name**: Change the metric identifier (must remain unique)
-- **Evaluation instructions**: Update the success criteria
-
-### Step 3: Save Changes
-
-Click **Save** to apply your changes.
-
----
-
-## Duplicating a Metric
-
-Create a copy of an existing metric to use as a starting point:
-
-### Step 1: Find the Metric
-
-1. Navigate to **Metrics** from the sidebar
-2. Locate the metric you want to duplicate
-
-### Step 2: Duplicate
-
-1. Click the **duplicate icon** (📋) next to the metric
-2. Enter a new unique name for the metric
-3. Click **Duplicate**
-
-The new metric will have the same evaluation instructions as the original. You can then edit it to modify the criteria.
-
----
-
-## Deleting a Metric
-
-<Warning>
-Deleting a metric will remove it from any simulations that use it. This action cannot be undone.
-</Warning>
-
-### From the Metrics List
-
-1. Navigate to **Metrics**
-2. Find the metric you want to delete
-3. Click the **delete icon** (🗑️) on the right side
-4. Confirm the deletion in the dialog
-
----
-
-## Metric Fields Reference
-
-### Complete Field List
-
-| Field | Required | Type | Description |
-|-------|----------|------|-------------|
-| **Metric name** | Yes | string | Unique identifier for the metric |
-| **Evaluation instructions** | No | string | Criteria for evaluating conversation success |
-
----
-
-## Example Metrics
-
-### Data Collection Success
+### Data collection success
 
 ```text
-Name: Data Collection Success
-
-Evaluation Instructions:
-The agent should have collected the user's name and phone number 
-during the conversation. 
+The agent should have collected the user's name and phone number.
 
 Success criteria:
 - Customer's full name was captured
@@ -153,151 +80,41 @@ Success criteria:
 - Information was confirmed with the customer
 ```
 
-### Issue Resolution
+### Issue resolution
 
 ```text
-Name: Issue Resolution
-
-Evaluation Instructions:
-The agent should have successfully resolved the customer's issue 
+The agent should have successfully resolved the customer's issue
 or clearly explained the next steps.
 
 Success criteria:
 - The customer's problem was clearly understood
 - A solution was provided OR clear next steps were given
 - The customer expressed satisfaction or understanding
-- No escalation was required for a simple issue
 ```
 
-### Appointment Booking
+### Appointment booking
 
 ```text
-Name: Appointment Booking
-
-Evaluation Instructions:
-The agent should have successfully booked an appointment with 
-all required details.
+The agent should have successfully booked an appointment.
 
 Success criteria:
 - Date and time were confirmed
 - Patient/customer name was collected
 - Purpose of appointment was noted
-- Confirmation details were provided to the customer
+- Confirmation details were provided
 ```
 
-### Product Information Delivery
-
-```text
-Name: Product Information Delivery
-
-Evaluation Instructions:
-The agent should have accurately provided the requested product 
-information.
-
-Success criteria:
-- Correct product details were shared
-- Pricing information was accurate
-- Availability was confirmed
-- Customer questions were fully answered
-```
-
-### Complaint Handling
-
-```text
-Name: Complaint Handling
-
-Evaluation Instructions:
-The agent should have handled the complaint professionally and 
-provided appropriate resolution.
-
-Success criteria:
-- Complaint was acknowledged empathetically
-- Issue details were captured accurately
-- Reference/ticket number was provided
-- Timeline for resolution was communicated
-- Customer felt heard and respected
-```
-
-### Policy Explanation
-
-```text
-Name: Policy Explanation
-
-Evaluation Instructions:
-The agent should have clearly explained the relevant policy 
-details to the customer.
-
-Success criteria:
-- Policy terms were explained in simple language
-- Coverage/limitations were clearly stated
-- Premium/cost information was provided if asked
-- Customer questions were addressed completely
-- No misleading or incorrect information was given
-```
-
----
-
-## Best Practices
-
-### Writing Evaluation Instructions
-
-1. **Be specific**: Define clear, measurable criteria
-2. **List success conditions**: What must happen for success?
-3. **List failure conditions**: What indicates failure?
-4. **Consider partial success**: How to handle edge cases?
-
-### Metric Categories
-
-| Category | Focus | Examples |
-|----------|-------|----------|
-| **Data Collection** | Information gathering | Name, phone, account details |
-| **Task Completion** | Goal achievement | Booking, purchase, cancellation |
-| **Quality** | Interaction quality | Politeness, accuracy, clarity |
-| **Compliance** | Rule adherence | Disclosure, verification |
-
-### Metric Naming Conventions
-
-Use clear, descriptive names:
-
-| Good | Bad |
-|------|-----|
-| `Customer Data Collection` | `Data` |
-| `Issue Resolution Rate` | `Resolution` |
-| `Appointment Booking Success` | `Booking` |
-
-### Combining Metrics
-
-Use multiple metrics to evaluate different aspects:
-
-```text
-Simulation: Customer Support Call
-
-Metrics:
-1. Customer Identification - Was the customer verified?
-2. Issue Understanding - Was the problem clearly captured?
-3. Resolution Provided - Was a solution offered?
-4. Follow-up Scheduled - Were next steps communicated?
-```
-
----
-
-## Using Metrics in Simulations
-
-Metrics are attached to simulations to evaluate agent performance. See the [Simulations guide](/guides/simulations) for details on:
-
-- Attaching metrics to simulations
-- Viewing metric results
-- Analyzing pass/fail rates
-
----
-
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Run Simulations" icon="comments" href="/guides/simulations">
-    Use metrics to evaluate agent performance.
+  <Card title="Create personas" icon="user" href="/core-concepts/personas">
+    Define who your simulated users are
   </Card>
-  <Card title="Create Personas" icon="user" href="/guides/personas">
-    Define simulated users for testing.
+  <Card
+    title="Create scenarios"
+    icon="file-lines"
+    href="/core-concepts/scenarios"
+  >
+    Define what your simulated users should do
   </Card>
 </CardGroup>

@@ -90,8 +90,10 @@ pense agent simulation -c ./config.json -o ./out --port 9000
   "stt": {"provider": "google"},
   "tts": {"provider": "google"},
   "llm": {"provider": "openrouter", "model": "openai/gpt-4.1"},
-  "agent_speaks_first": true,
-  "max_turns": 50
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 50
+  }
 }
 ```
 

@@ -319,8 +319,7 @@ class _Simulations:
             "personas": personas,
             "scenarios": scenarios,
             "evaluation_criteria": evaluation_criteria,
-            "settings": {"agent_speaks_first": agent_speaks_first},
-            "max_turns": max_turns,
+            "settings": {"agent_speaks_first": agent_speaks_first, "max_turns": max_turns},
         }
 
         # Create a mock args object
