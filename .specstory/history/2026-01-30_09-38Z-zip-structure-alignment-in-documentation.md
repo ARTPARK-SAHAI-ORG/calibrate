@@ -1003,7 +1003,679 @@ Key changes needed:
 1. Title and content updates in various files
 2. Keep file paths (like `/quickstart/text-to-text`) unchanged since those are URLs
 
-Let me update all the files that need changes. I'll focus</details></think>
+Let me update all the files that need changes. I'll focus on changing the visible text while preserving file paths.</details></think>
+
+---
+
+I'll update "Text to Text" to "LLM Evaluation" in the display text across all docs while keeping file paths intact. Let me make these changes.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/integrations/llm.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good progress. Now let me update the remaining files that have "Text to Text" references.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/speech-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/overview.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have all the files I need to update. Let me continue with the remaining changes.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/speech-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/overview.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/overview.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good progress. Let me continue with more updates in the python-sdk file and read the other files that need updating.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. Now let me read and update the remaining files that have "Text to Text" references.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/voice-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/overview.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/getting-started/introduction.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I need to update these files as well. Let me make the remaining changes.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/overview.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good progress. Let me continue with more updates.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/overview.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/getting-started/introduction.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/overview.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/overview.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/getting-started/introduction.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good. Now let me read and update the remaining files - python-sdk/text-simulations.mdx and python-sdk/voice-simulations.mdx, and core-concepts/tools.mdx and core-concepts/agents.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts/tools.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Let me update the remaining files.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Good progress. Let me verify if there are any remaining "Text to Text" references I might have missed by running grep again.</details></think>
+
+---
+
+Let me verify there are no remaining "Text to Text" references.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Text to Text",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/docs",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Text to Text",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/docs",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All "Text to Text" references have been updated. Let me also check for lowercase "text to text" or any other variations to make sure I didn't miss anything.</details></think>
+
+---
+
+All "Text to Text" references have been updated. Let me verify the changes are consistent by checking one of the key files.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/quickstart/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+All updates have been made. Let me summarize the changes:
+
+Files updated:
+1. docs/quickstart/text-to-text.mdx - title and tab name
+2. docs/quickstart/speech-to-text.mdx - card title
+3. docs/integrations/llm.mdx - title and description
+4. docs/cli/overview.mdx - intro text and command descriptions
+5. docs/cli/text-to-text.mdx - title, description, and content
+6. docs/cli/text-simulations.mdx - description and content
+7. docs/cli/voice-simulations.mdx - description, table, and comments
+8. docs/python-sdk/overview.mdx - card title, content, and comments
+9. docs/python-sdk/text-to-text.mdx - title, description, and content
+10. docs/python-sdk/text-simulations.mdx - description and content
+11. docs/python-sdk/voice-simulations.mdx - description and content
+12. docs/getting-started/introduction.mdx - component list and card title
+
+File paths (URLs) were kept intact since changing them would break links.</details></think>
+
+---
+
+Done. I updated "Text to Text" to "LLM Evaluation" (or "LLM" where appropriate) across 12 documentation files:
+
+**Updated files:**
+- `docs/quickstart/text-to-text.mdx` - title and tab name
+- `docs/quickstart/speech-to-text.mdx` - card title
+- `docs/integrations/llm.mdx` - title and description
+- `docs/cli/overview.mdx` - intro text and command descriptions
+- `docs/cli/text-to-text.mdx` - title, description, and content
+- `docs/cli/text-simulations.mdx` - description and content
+- `docs/cli/voice-simulations.mdx` - description, tables, and comments
+- `docs/python-sdk/overview.mdx` - card titles, content, and comments
+- `docs/python-sdk/text-to-text.mdx` - title, description, and content
+- `docs/python-sdk/text-simulations.mdx` - description and content
+- `docs/python-sdk/voice-simulations.mdx` - description and content
+- `docs/getting-started/introduction.mdx` - component list and card title
+
+File paths (like `/quickstart/text-to-text`) were kept intact to preserve URLs.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The changes I made were updating "Text to Text" to "LLM Evaluation" or "LLM" across the documentation files. This is a terminology/naming convention change in the docs, not an application code change.
+
+Let me check if there's an app-details.md file and README.md to see if they need updates based on this terminology change.</details></think>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "undefined" • **1** result in **1** directory</summary>
+
+Directory: **undefined** (1 file)
+
+| File |
+|------|
+| `./.cursor/rules/app-details.md` |
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/README.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Looking at the README.md, it already uses "LLM" terminology correctly (e.g., "LLM tests", "LLM simulations", "LLM provider"). It doesn't use "Text to Text" anywhere in a way that conflicts with the docs changes. The README is already consistent with the new terminology.
+
+Let me also check the app-details.md file to see if there's anything to update.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Looking at the README.md and app-details.md:
+
+1. **README.md** - Already uses "LLM" terminology correctly throughout (e.g., "LLM tests", "LLM simulations", "LLM provider"). It doesn't use "Text to Text" anywhere that conflicts with my doc changes. The README is already consistent.
+
+2. **app-details.md** - Looking at line 598, it still references "text-to-text" in the Core Concepts Pages list. However, that's referring to a file path/page name, not a display name. The file paths stayed the same (intentionally to preserve URLs).
+
+Actually, looking more carefully at app-details.md line 598, it says:
+```
+- text-to-text
+```
+
+This is in the context of "Core Concepts Pages (in order)" which appears to list documentation page paths. Since the file paths remained unchanged (`text-to-text.mdx`), this is still accurate.
+
+The app-details.md already uses "LLM" terminology correctly in its descriptions (LLM Tests, LLM Simulations, etc.). The only "text-to-text" reference at line 598 refers to a documentation page path, which is correct.
+
+The README.md is also already using "LLM" terminology consistently.
+
+No updates needed to either file since:
+1. The changes I made were documentation display text changes only
+2. File paths were intentionally preserved
+3. Both files already use "LLM" terminology in their descriptions
+
+Let me confirm there are no conflicts.</details></think>
+
+---
+
+Looking at both files:
+
+**README.md** - Already uses "LLM" terminology correctly throughout (e.g., "LLM tests", "LLM simulations", "LLM provider"). No "Text to Text" display text exists that conflicts with the docs changes.
+
+**app-details.md** - Already uses "LLM" terminology in all descriptions. The only reference to "text-to-text" on line 598 is in the "Core Concepts Pages" list, which refers to the documentation file path (`text-to-text.mdx`), not a display name. Since file paths were intentionally preserved, this is correct.
+
+No updates needed to either file - both are already consistent with the new "LLM Evaluation" terminology.
 
 ---
 
