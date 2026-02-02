@@ -1351,7 +1351,7 @@ def create_stt_service(
     from pipecat.services.groq.stt import GroqSTTService
     from pipecat.services.sarvam.stt import SarvamSTTService
     from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
-    from pense.integrations.smallest.stt import SmallestSTTService
+    from calibrate.integrations.smallest.stt import SmallestSTTService
 
     stt_language = get_stt_language(language, provider)
 
@@ -1441,7 +1441,7 @@ def create_tts_service(
     from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
     from pipecat.services.sarvam.tts import SarvamTTSService
     from pipecat.services.deepgram.tts import DeepgramTTSService
-    from pense.integrations.smallest.tts import SmallestTTSService
+    from calibrate.integrations.smallest.tts import SmallestTTSService
 
     tts_language = get_tts_language(language, provider)
 

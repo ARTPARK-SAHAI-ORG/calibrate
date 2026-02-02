@@ -15,12 +15,12 @@ Run text-only automated conversations between two LLMs (agent + simulated user).
 
 ---
 
-## pense llm simulations run
+## calibrate llm simulations run
 
 Run LLM simulations from a configuration file.
 
 ```bash
-pense llm simulations run -c <config_file> -o <output_dir> -m <model> -p <provider> -n <parallel>
+calibrate llm simulations run -c <config_file> -o <output_dir> -m <model> -p <provider> -n <parallel>
 ```
 
 ### Arguments
@@ -38,19 +38,19 @@ pense llm simulations run -c <config_file> -o <output_dir> -m <model> -p <provid
 **Basic simulation:**
 
 ```bash
-pense llm simulations run -c ./config.json -o ./out
+calibrate llm simulations run -c ./config.json -o ./out
 ```
 
 **Run with parallel simulations:**
 
 ```bash
-pense llm simulations run -c ./config.json -o ./out -n 4
+calibrate llm simulations run -c ./config.json -o ./out -n 4
 ```
 
 **Use specific model:**
 
 ```bash
-pense llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
+calibrate llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
 ```
 
 ### Configuration File Structure
@@ -150,12 +150,12 @@ pense llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrou
 
 ---
 
-## pense llm simulations leaderboard
+## calibrate llm simulations leaderboard
 
 Generate a leaderboard comparing multiple simulation runs.
 
 ```bash
-pense llm simulations leaderboard -o <output_dir> -s <save_dir>
+calibrate llm simulations leaderboard -o <output_dir> -s <save_dir>
 ```
 
 ### Arguments
@@ -168,7 +168,7 @@ pense llm simulations leaderboard -o <output_dir> -s <save_dir>
 ### Example
 
 ```bash
-pense llm simulations leaderboard -o ./out -s ./leaderboard
+calibrate llm simulations leaderboard -o ./out -s ./leaderboard
 ```
 
 ---

@@ -19,12 +19,12 @@ Run full voice agent simulations with Speech to Text, LLM, and Text to Speech co
 
 ---
 
-## pense agent simulation
+## calibrate agent simulation
 
 Run automated voice agent simulations with multiple personas and scenarios. Each simulation pairs every persona with every scenario, generating audio files and transcripts for inspection.
 
 ```bash
-pense agent simulation -c <config_file> -o <output_dir> --port <port>
+calibrate agent simulation -c <config_file> -o <output_dir> --port <port>
 ```
 
 ### Arguments
@@ -40,13 +40,13 @@ pense agent simulation -c <config_file> -o <output_dir> --port <port>
 **Basic simulation:**
 
 ```bash
-pense agent simulation -c ./config.json -o ./out
+calibrate agent simulation -c ./config.json -o ./out
 ```
 
 **Custom port:**
 
 ```bash
-pense agent simulation -c ./config.json -o ./out --port 9000
+calibrate agent simulation -c ./config.json -o ./out --port 9000
 ```
 
 ### Configuration File Structure
@@ -162,12 +162,12 @@ pense agent simulation -c ./config.json -o ./out --port 9000
 
 ---
 
-## pense agent test
+## calibrate agent test
 
 Run an interactive voice agent session where you can talk to the agent through your browser in real-time.
 
 ```bash
-pense agent test -c <config_file> -o <output_dir>
+calibrate agent test -c <config_file> -o <output_dir>
 ```
 
 ### Arguments
@@ -180,7 +180,7 @@ pense agent test -c <config_file> -o <output_dir>
 ### Example
 
 ```bash
-pense agent test -c ./config.json -o ./out/run
+calibrate agent test -c ./config.json -o ./out/run
 ```
 
 ### Configuration File Structure

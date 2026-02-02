@@ -1,10 +1,10 @@
-# pense.llm module
+# calibrate.llm module
 """
 LLM evaluation module for tests and simulations.
 
 Library Usage:
-    from pense.llm import tests, simulations
-    
+    from calibrate.llm import tests, simulations
+
     # Run LLM tests
     import asyncio
     result = asyncio.run(tests.run(
@@ -15,10 +15,10 @@ Library Usage:
         model="gpt-4.1",
         provider="openrouter"
     ))
-    
+
     # Generate tests leaderboard
     tests.leaderboard(output_dir="./out", save_dir="./leaderboard")
-    
+
     # Run LLM simulations
     result = asyncio.run(simulations.run(
         system_prompt="You are a helpful assistant...",
@@ -30,7 +30,7 @@ Library Usage:
         model="gpt-4.1",
         provider="openrouter"
     ))
-    
+
     # Generate simulations leaderboard
     simulations.leaderboard(output_dir="./out", save_dir="./leaderboard")
 """
@@ -74,7 +74,7 @@ class _Tests:
 
         Example:
             >>> import asyncio
-            >>> from pense.llm import tests
+            >>> from calibrate.llm import tests
             >>> result = asyncio.run(tests.run(
             ...     system_prompt="You are a helpful assistant...",
             ...     tools=[{
@@ -92,15 +92,13 @@ class _Tests:
             ...     provider="openrouter"
             ... ))
         """
-        from pense.llm.run_tests import run_test as _run_test
-        from pense.utils import configure_print_logger, log_and_print
+        from calibrate.llm.run_tests import run_test as _run_test
+        from calibrate.utils import configure_print_logger, log_and_print
 
         # Create output directory
-        save_folder_name = (
-            f"{provider}/{model}" if provider == "openai" else f"{model}"
-        )
+        save_folder_name = f"{provider}/{model}" if provider == "openai" else f"{model}"
         save_folder_name = save_folder_name.replace("/", "__")
-        
+
         if run_name:
             final_output_dir = os.path.join(output_dir, run_name, save_folder_name)
         else:
@@ -126,7 +124,8 @@ class _Tests:
             result = await _run_test(
                 chat_history=test_case["history"],
                 evaluation=test_case["evaluation"],
-                system_prompt=system_prompt + f"\n\nYou must always speak in {agent_language}.",
+                system_prompt=system_prompt
+                + f"\n\nYou must always speak in {agent_language}.",
                 model=model,
                 provider=provider,
                 tools=tools,
@@ -157,8 +156,12 @@ class _Tests:
         elif failed_count == total_tests:
             log_and_print("❌ All tests failed!")
         else:
-            log_and_print(f"✅ Total Passed: {total_passed}/{total_tests} ({(total_passed/total_tests)*100:.1f}%)")
-            log_and_print(f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)")
+            log_and_print(
+                f"✅ Total Passed: {total_passed}/{total_tests} ({(total_passed/total_tests)*100:.1f}%)"
+            )
+            log_and_print(
+                f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
+            )
 
         # Save final results
         with open(os.path.join(final_output_dir, "results.json"), "w") as f:
@@ -185,10 +188,10 @@ class _Tests:
             save_dir: Path to directory where leaderboard will be saved
 
         Example:
-            >>> from pense.llm import tests
+            >>> from calibrate.llm import tests
             >>> tests.leaderboard(output_dir="./out", save_dir="./leaderboard")
         """
-        from pense.llm.tests_leaderboard import generate_leaderboard
+        from calibrate.llm.tests_leaderboard import generate_leaderboard
 
         generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
 
@@ -215,7 +218,7 @@ class _Tests:
         Returns:
             dict: Test result with output and metrics
         """
-        from pense.llm.run_tests import run_test as _run_test
+        from calibrate.llm.run_tests import run_test as _run_test
 
         return await _run_test(
             chat_history=chat_history,
@@ -247,7 +250,7 @@ class _Tests:
         Returns:
             dict: Response and tool calls from the LLM
         """
-        from pense.llm.run_tests import run_inference as _run_inference
+        from calibrate.llm.run_tests import run_inference as _run_inference
 
         return await _run_inference(
             chat_history=chat_history,
@@ -296,7 +299,7 @@ class _Simulations:
 
         Example:
             >>> import asyncio
-            >>> from pense.llm import simulations
+            >>> from calibrate.llm import simulations
             >>> result = asyncio.run(simulations.run(
             ...     system_prompt="You are a helpful nurse...",
             ...     tools=[...],
@@ -308,7 +311,7 @@ class _Simulations:
             ...     provider="openrouter"
             ... ))
         """
-        from pense.llm.run_simulation import run_single_simulation_task
+        from calibrate.llm.run_simulation import run_single_simulation_task
 
         os.makedirs(output_dir, exist_ok=True)
 
@@ -319,12 +322,16 @@ class _Simulations:
             "personas": personas,
             "scenarios": scenarios,
             "evaluation_criteria": evaluation_criteria,
-            "settings": {"agent_speaks_first": agent_speaks_first, "max_turns": max_turns},
+            "settings": {
+                "agent_speaks_first": agent_speaks_first,
+                "max_turns": max_turns,
+            },
         }
 
         # Create a mock args object
         class Args:
             pass
+
         args = Args()
         args.model = model
         args.provider = provider
@@ -365,7 +372,9 @@ class _Simulations:
             if simulation_metrics:
                 all_simulation_metrics.append(simulation_metrics)
                 for eval_result in evaluation_results:
-                    metrics_by_criterion[eval_result["name"]].append(float(eval_result["value"]))
+                    metrics_by_criterion[eval_result["name"]].append(
+                        float(eval_result["value"])
+                    )
 
         # Compute summary
         metrics_summary = {}
@@ -400,10 +409,10 @@ class _Simulations:
             save_dir: Path to directory where leaderboard will be saved
 
         Example:
-            >>> from pense.llm import simulations
+            >>> from calibrate.llm import simulations
             >>> simulations.leaderboard(output_dir="./out", save_dir="./leaderboard")
         """
-        from pense.llm.simulation_leaderboard import generate_leaderboard
+        from calibrate.llm.simulation_leaderboard import generate_leaderboard
 
         generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
 
@@ -440,7 +449,7 @@ class _Simulations:
         Returns:
             dict: Simulation result with transcript and evaluation
         """
-        from pense.llm.run_simulation import run_simulation as _run_simulation
+        from calibrate.llm.run_simulation import run_simulation as _run_simulation
 
         return await _run_simulation(
             bot_system_prompt=bot_system_prompt,

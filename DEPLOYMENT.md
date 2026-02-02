@@ -1,6 +1,6 @@
 # Deploying Documentation to Netlify
 
-This guide explains how to deploy the Pense documentation to Netlify.
+This guide explains how to deploy the Calibrate documentation to Netlify.
 
 ## Prerequisites
 
@@ -39,8 +39,8 @@ If not auto-detected, manually configure:
 ### 4. Customize Site Name (Optional)
 
 1. Go to Site settings → General
-2. Change "Site name" to something like `pense-docs`
-3. Your site will be available at `https://pense-docs.netlify.app`
+2. Change "Site name" to something like `calibrate-docs`
+3. Your site will be available at `https://calibrate-docs.netlify.app`
 
 ### 5. Update mkdocs.yml
 
@@ -54,7 +54,7 @@ Also update `repo_url` and `repo_name` if you want GitHub links:
 
 ```yaml
 repo_url: https://github.com/your-username/agentloop
-repo_name: pense
+repo_name: calibrate
 ```
 
 ## Automatic Deployments

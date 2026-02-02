@@ -28,7 +28,7 @@ All audio files should be in WAV format. The file names should match the `id` co
 
 ```python
 import asyncio
-from pense.stt import eval
+from calibrate.stt import eval
 
 asyncio.run(eval(
     provider="deepgram",  # deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq
@@ -146,7 +146,7 @@ Contains the full logs of the evaluation including terminal output and debug inf
 
 ```
 --------------------------------
-Running command: pense stt eval -p deepgram -i /path/to/data -o /path/to/output
+Running command: calibrate stt eval -p deepgram -i /path/to/data -o /path/to/output
 --------------------------------
 Processing audio [1/13]: audio_1.wav
 Transcript: Hi.
@@ -185,7 +185,7 @@ For the leaderboard to work correctly, all provider evaluations must use the **s
 ### Generate the leaderboard
 
 ```python
-from pense.stt import leaderboard
+from calibrate.stt import leaderboard
 
 leaderboard(
     output_dir="/path/to/output",  # Same directory used for all provider evaluations

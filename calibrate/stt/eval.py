@@ -28,12 +28,12 @@ import pandas as pd
 import numpy as np
 from natsort import natsorted
 
-from pense.utils import (
+from calibrate.utils import (
     log_and_print,
     get_stt_language_code,
     validate_stt_language,
 )
-from pense.stt.metrics import (
+from calibrate.stt.metrics import (
     get_wer_score,
     get_llm_judge_score,
     get_string_similarity,

@@ -1,17 +1,17 @@
 """
-CLI entry point for pense package.
+CLI entry point for calibrate package.
 
 Usage:
     # New style (recommended) - with subcommands:
-    pense stt eval -p deepgram -l english -i ./data -o ./out
-    pense stt leaderboard -o ./out -s ./leaderboard
-    pense tts eval -p openai -i ./data -o ./out
-    pense tts leaderboard -o ./out -s ./leaderboard
-    pense llm tests run -c ./config.json -o ./out
-    pense llm tests leaderboard -o ./out -s ./leaderboard
-    pense llm simulations run -c ./config.json -o ./out
-    pense llm simulations leaderboard -o ./out -s ./leaderboard
-    pense agent simulation -c ./config.json -o ./out
+    calibrate stt eval -p deepgram -l english -i ./data -o ./out
+    calibrate stt leaderboard -o ./out -s ./leaderboard
+    calibrate tts eval -p openai -i ./data -o ./out
+    calibrate tts leaderboard -o ./out -s ./leaderboard
+    calibrate llm tests run -c ./config.json -o ./out
+    calibrate llm tests leaderboard -o ./out -s ./leaderboard
+    calibrate llm simulations run -c ./config.json -o ./out
+    calibrate llm simulations leaderboard -o ./out -s ./leaderboard
+    calibrate agent simulation -c ./config.json -o ./out
 """
 
 import sys
@@ -61,20 +61,20 @@ def main():
     load_dotenv(override=True)
 
     parser = argparse.ArgumentParser(
-        prog="pense",
+        prog="calibrate",
         description="Voice agent evaluation and benchmarking toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    pense stt eval -p deepgram -l english -i ./data -o ./out
-    pense stt leaderboard -o ./out -s ./leaderboard
-    pense tts eval -p openai -i ./data -o ./out
-    pense llm tests run -c ./config.json -o ./out
-    pense llm tests leaderboard -o ./out -s ./leaderboard
-    pense llm simulations run -c ./config.json -o ./out
-    pense llm simulations leaderboard -o ./out -s ./leaderboard
-    pense agent test -c ./config.json -o ./out
-    pense agent simulation -c ./config.json -o ./out
+    calibrate stt eval -p deepgram -l english -i ./data -o ./out
+    calibrate stt leaderboard -o ./out -s ./leaderboard
+    calibrate tts eval -p openai -i ./data -o ./out
+    calibrate llm tests run -c ./config.json -o ./out
+    calibrate llm tests leaderboard -o ./out -s ./leaderboard
+    calibrate llm simulations run -c ./config.json -o ./out
+    calibrate llm simulations leaderboard -o ./out -s ./leaderboard
+    calibrate agent test -c ./config.json -o ./out
+    calibrate agent simulation -c ./config.json -o ./out
         """,
     )
 
@@ -230,7 +230,7 @@ Examples:
     # The submodule parsers will parse the remaining arguments
     if args.component == "stt":
         if args.command == "eval":
-            from pense.stt.eval import main as stt_main
+            from calibrate.stt.eval import main as stt_main
 
             # Map attribute names to their original flag names (preserve underscores)
             flag_mapping = {
@@ -238,67 +238,67 @@ Examples:
                 "ignore_retry": "--ignore_retry",
                 "overwrite": "--overwrite",
             }
-            sys.argv = ["pense"] + _args_to_argv(
+            sys.argv = ["calibrate"] + _args_to_argv(
                 args, exclude_keys={"component", "command"}, flag_mapping=flag_mapping
             )
             asyncio.run(stt_main())
         elif args.command == "leaderboard":
-            from pense.stt.leaderboard import main as leaderboard_main
+            from calibrate.stt.leaderboard import main as leaderboard_main
 
-            sys.argv = ["pense"] + _args_to_argv(
+            sys.argv = ["calibrate"] + _args_to_argv(
                 args, exclude_keys={"component", "command"}
             )
             leaderboard_main()
     elif args.component == "tts":
         if args.command == "eval":
-            from pense.tts.eval import main as tts_main
+            from calibrate.tts.eval import main as tts_main
 
             # Map attribute names to their original flag names (preserve underscores)
             flag_mapping = {
                 "debug_count": "--debug_count",
                 "overwrite": "--overwrite",
             }
-            sys.argv = ["pense"] + _args_to_argv(
+            sys.argv = ["calibrate"] + _args_to_argv(
                 args, exclude_keys={"component", "command"}, flag_mapping=flag_mapping
             )
             asyncio.run(tts_main())
         elif args.command == "leaderboard":
-            from pense.tts.leaderboard import main as leaderboard_main
+            from calibrate.tts.leaderboard import main as leaderboard_main
 
-            sys.argv = ["pense"] + _args_to_argv(
+            sys.argv = ["calibrate"] + _args_to_argv(
                 args, exclude_keys={"component", "command"}
             )
             leaderboard_main()
     elif args.component == "llm":
         if args.llm_type == "tests":
             if args.command == "run":
-                from pense.llm.run_tests import main as llm_tests_main
+                from calibrate.llm.run_tests import main as llm_tests_main
 
-                sys.argv = ["pense"] + _args_to_argv(
+                sys.argv = ["calibrate"] + _args_to_argv(
                     args, exclude_keys={"component", "llm_type", "command"}
                 )
                 asyncio.run(llm_tests_main())
             elif args.command == "leaderboard":
-                from pense.llm.tests_leaderboard import main as leaderboard_main
+                from calibrate.llm.tests_leaderboard import main as leaderboard_main
 
-                sys.argv = ["pense"] + _args_to_argv(
+                sys.argv = ["calibrate"] + _args_to_argv(
                     args, exclude_keys={"component", "llm_type", "command"}
                 )
                 leaderboard_main()
         elif args.llm_type == "simulations":
             if args.command == "run":
-                from pense.llm.run_simulation import main as llm_simulation_main
+                from calibrate.llm.run_simulation import main as llm_simulation_main
 
-                sys.argv = ["pense"] + _args_to_argv(
+                sys.argv = ["calibrate"] + _args_to_argv(
                     args, exclude_keys={"component", "llm_type", "command"}
                 )
                 asyncio.run(llm_simulation_main())
             elif args.command == "leaderboard":
-                from pense.llm.simulation_leaderboard import (
+                from calibrate.llm.simulation_leaderboard import (
                     main as leaderboard_main,
                 )
 
-                sys.argv = ["pense"] + _args_to_argv(
+                sys.argv = ["calibrate"] + _args_to_argv(
                     args, exclude_keys={"component", "llm_type", "command"}
                 )
                 leaderboard_main()
@@ -315,12 +315,12 @@ Examples:
             test_module_path = os.path.join(
                 os.path.dirname(__file__), "agent", "test.py"
             )
-            sys.argv = ["pense-agent-test"] + test_args
+            sys.argv = ["calibrate-agent-test"] + test_args
             runpy.run_path(test_module_path, run_name="__main__")
         elif args.command == "simulation":
-            from pense.agent.run_simulation import main as agent_main
+            from calibrate.agent.run_simulation import main as agent_main
 
-            sys.argv = ["pense"] + _args_to_argv(
+            sys.argv = ["calibrate"] + _args_to_argv(
                 args, exclude_keys={"component", "command"}
             )
             asyncio.run(agent_main())

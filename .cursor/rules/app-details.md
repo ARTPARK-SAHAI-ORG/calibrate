@@ -3,15 +3,15 @@ description: "Description of the project"
 alwaysApply: true
 ---
 
-# Pense
+# Calibrate
 
 **Open-Source Voice Agent Simulation and Testing Framework**
 
 ---
 
-## What is Pense?
+## What is Calibrate?
 
-Pense is an open-source Python framework for building, testing, and evaluating **voice-based AI agents**. It provides comprehensive tools to move from slow, manual testing to fast, automated, and repeatable testing processes.
+Calibrate is an open-source Python framework for building, testing, and evaluating **voice-based AI agents**. It provides comprehensive tools to move from slow, manual testing to fast, automated, and repeatable testing processes.
 
 The framework enables:
 
@@ -20,7 +20,7 @@ The framework enables:
 - **End-to-end simulations** - Run automated conversations with simulated users
 - **Benchmarking** - Compare performance across different AI providers
 
-Pense uses direct API calls for STT and TTS provider evaluations, and [pipecat](https://github.com/pipecat-ai/pipecat) for voice agent simulations.
+Calibrate uses direct API calls for STT and TTS provider evaluations, and [pipecat](https://github.com/pipecat-ai/pipecat) for voice agent simulations.
 
 ---
 
@@ -28,7 +28,7 @@ Pense uses direct API calls for STT and TTS provider evaluations, and [pipecat](
 
 ```
 /
-├── pense/                    # Main Python package
+├── calibrate/                    # Main Python package
 │   ├── __init__.py
 │   ├── cli.py               # CLI entry point
 │   ├── utils.py             # Shared utilities
@@ -81,15 +81,15 @@ Pense uses direct API calls for STT and TTS provider evaluations, and [pipecat](
 
 ### Module Design
 
-Pense is organized into four main modules, each providing both a Python API and CLI commands:
+Calibrate is organized into four main modules, each providing both a Python API and CLI commands:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                          PENSE ARCHITECTURE                             │
+│                          CALIBRATE ARCHITECTURE                             │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐        │
-│   │   pense.stt     │  │   pense.tts     │  │   pense.llm     │        │
+│   │   calibrate.stt     │  │   calibrate.tts     │  │   calibrate.llm     │        │
 │   │                 │  │                 │  │                 │        │
 │   │  eval()         │  │  eval()         │  │  tests.run()    │        │
 │   │  leaderboard()  │  │  leaderboard()  │  │  tests.leaderboard()    │
@@ -100,7 +100,7 @@ Pense is organized into four main modules, each providing both a Python API and 
 │            └──────────────────┬─┴────────────────────┘                  │
 │                               │                                         │
 │                    ┌──────────▼──────────┐                              │
-│                    │   pense.agent       │                              │
+│                    │   calibrate.agent       │                              │
 │                    │                     │                              │
 │                    │  simulation.run()   │  Full STT → LLM → TTS        │
 │                    │  simulation.run_single()  pipeline testing         │
@@ -121,7 +121,7 @@ User Speech → [STT] → Text → [LLM] → Response Text → [TTS] → Agent S
                        External APIs
 ```
 
-Pense allows testing and benchmarking each component individually or end-to-end.
+Calibrate allows testing and benchmarking each component individually or end-to-end.
 
 ---
 
@@ -269,10 +269,10 @@ simulation_persona_N_scenario_M/
 
 ```python
 import asyncio
-from pense.stt import eval as stt_eval, leaderboard as stt_leaderboard
-from pense.tts import eval as tts_eval, leaderboard as tts_leaderboard
-from pense.llm import tests, simulations
-from pense.agent import simulation, STTConfig, TTSConfig, LLMConfig
+from calibrate.stt import eval as stt_eval, leaderboard as stt_leaderboard
+from calibrate.tts import eval as tts_eval, leaderboard as tts_leaderboard
+from calibrate.llm import tests, simulations
+from calibrate.agent import simulation, STTConfig, TTSConfig, LLMConfig
 
 # STT Evaluation
 asyncio.run(stt_eval(
@@ -339,26 +339,26 @@ asyncio.run(simulation.run(
 
 ```bash
 # STT Evaluation
-pense stt eval -p deepgram -l english -i ./data -o ./out
-pense stt leaderboard -o ./out -s ./leaderboard
+calibrate stt eval -p deepgram -l english -i ./data -o ./out
+calibrate stt leaderboard -o ./out -s ./leaderboard
 
 # TTS Evaluation
-pense tts eval -p google -l english -i ./data/texts.csv -o ./out
-pense tts leaderboard -o ./out -s ./leaderboard
+calibrate tts eval -p google -l english -i ./data/texts.csv -o ./out
+calibrate tts leaderboard -o ./out -s ./leaderboard
 
 # LLM Tests
-pense llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openrouter
-pense llm tests leaderboard -o ./out -s ./leaderboard
+calibrate llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openrouter
+calibrate llm tests leaderboard -o ./out -s ./leaderboard
 
 # LLM Simulations
-pense llm simulations run -c ./config.json -o ./out -m gpt-4.1 -p openrouter -n 1
-pense llm simulations leaderboard -o ./out -s ./leaderboard
+calibrate llm simulations run -c ./config.json -o ./out -m gpt-4.1 -p openrouter -n 1
+calibrate llm simulations leaderboard -o ./out -s ./leaderboard
 
 # Voice Agent Simulations
-pense agent simulation -c ./config.json -o ./out --port 8765
+calibrate agent simulation -c ./config.json -o ./out --port 8765
 
 # Interactive Agent Testing
-pense agent test -c ./config.json -o ./out
+calibrate agent test -c ./config.json -o ./out
 ```
 
 ---
@@ -630,7 +630,7 @@ uv pip install -r requirements-docs.txt
 
 ### Provider-Specific
 
-- **Separate STT/TTS language codes:** STT and TTS providers often support different languages. Language codes are managed separately in `pense/utils.py`:
+- **Separate STT/TTS language codes:** STT and TTS providers often support different languages. Language codes are managed separately in `calibrate/utils.py`:
   - `get_stt_language_code(language, provider)` - For STT providers
   - `get_tts_language_code(language, provider)` - For TTS providers
   - `get_language_code()` - Deprecated, defaults to STT codes for backwards compatibility
@@ -649,7 +649,7 @@ uv pip install -r requirements-docs.txt
   - Most others use ISO 639-1 codes: `en`, `hi`, `kn`, etc.
 - Not all providers support all 12 languages - Sarvam has the most comprehensive support for Indian languages
 - **Sindhi language special handling:**
-  - **STT:** For Google STT, Sindhi requires a different model (`chirp_2`) and region (`asia-southeast1`) compared to the default (`chirp_3` model, `us` region). This is handled automatically in `pense/stt/eval.py` via `transcribe_google()`. Sindhi is supported by Google, Cartesia, and ElevenLabs for STT.
+  - **STT:** For Google STT, Sindhi requires a different model (`chirp_2`) and region (`asia-southeast1`) compared to the default (`chirp_3` model, `us` region). This is handled automatically in `calibrate/stt/eval.py` via `transcribe_google()`. Sindhi is supported by Google, Cartesia, and ElevenLabs for STT.
   - **TTS:** Sindhi TTS requires special handling for both Google and ElevenLabs:
     - **Google:** Uses streaming API with `gemini-2.5-flash-lite-preview-tts` model. Key difference: voice name is just "Charon" (not locale-prefixed like `sd-IN-Chirp3-HD-Charon`) and requires `model_name` parameter in `VoiceSelectionParams`. See [Google Gemini-TTS docs](https://cloud.google.com/text-to-speech/docs/gemini-tts).
     - **ElevenLabs:** Uses `eleven_v3` model with `text_to_dialogue` API instead of the standard `text_to_speech` API
@@ -667,7 +667,7 @@ uv pip install -r requirements-docs.txt
 
 - Use headphones to avoid audio feedback
 - Opens browser UI at `http://localhost:7860/client/`
-- Requires explicit `pense agent test` CLI command (no Python API for interactive mode)
+- Requires explicit `calibrate agent test` CLI command (no Python API for interactive mode)
 
 ### STT/TTS Evaluation Architecture
 
@@ -676,7 +676,7 @@ uv pip install -r requirements-docs.txt
 - **Non-streaming:** Groq does not support streaming and does not return TTFB
 - **Pipecat usage:** Only voice agent simulations use pipecat for the full STT→LLM→TTS pipeline
 - **TTS LLM Judge accuracy:** The audio-capable model (`gpt-audio`) may have reduced accuracy for low-resource languages like Sindhi due to limited training data
-- **Language validation:** `validate_stt_language()` and `validate_tts_language()` in `pense/utils.py` check if a language is supported by a provider before evaluation starts. Each function uses the appropriate STT or TTS language dictionaries. If invalid, the run stops with an error listing all supported languages for that provider.
+- **Language validation:** `validate_stt_language()` and `validate_tts_language()` in `calibrate/utils.py` check if a language is supported by a provider before evaluation starts. Each function uses the appropriate STT or TTS language dictionaries. If invalid, the run stops with an error listing all supported languages for that provider.
 - **TTS audio saving patterns:** All TTS synthesize functions accept `audio_path` and save audio:
   - Streaming providers (OpenAI, Cartesia) write chunks directly to file as they arrive
   - Streaming providers (Google, Sarvam, Smallest) collect chunks then save combined audio (Google uses PCM encoding)

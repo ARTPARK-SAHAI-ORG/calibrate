@@ -11,7 +11,7 @@ Each simulation pairs every persona with every scenario. The runner fans out int
 
 ```python
 import asyncio
-from pense.llm import simulations
+from calibrate.llm import simulations
 
 # Define your tools
 tools = [
@@ -187,7 +187,7 @@ Provides summary statistics for each evaluation criterion:
 After running simulations for multiple models, compile a leaderboard:
 
 ```python
-from pense.llm import simulations
+from calibrate.llm import simulations
 
 simulations.leaderboard(
     output_dir="/path/to/output",
@@ -219,7 +219,7 @@ For more control, run a single simulation directly:
 
 ```python
 import asyncio
-from pense.llm import simulations
+from calibrate.llm import simulations
 
 result = asyncio.run(simulations.run_simulation(
     bot_system_prompt="You are a helpful assistant...",

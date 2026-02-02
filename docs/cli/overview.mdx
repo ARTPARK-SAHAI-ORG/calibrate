@@ -1,21 +1,21 @@
 ---
 title: "Overview"
-description: "Command-line interface for Pense evaluation and simulation tools."
+description: "Command-line interface for Calibrate evaluation and simulation tools."
 ---
 
-The Pense CLI provides commands for evaluating Speech to Text, Text to Speech, LLM, and running simulations directly from your terminal.
+The Calibrate CLI provides commands for evaluating Speech to Text, Text to Speech, LLM, and running simulations directly from your terminal.
 
 ## Installation
 
 <Tabs>
   <Tab title="pip">
     ```bash
-    pip install pense
+    pip install calibrate
     ```
   </Tab>
   <Tab title="uv">
     ```bash
-    uv add pense
+    uv add calibrate
     ```
   </Tab>
   <Tab title="From Source">
@@ -23,7 +23,7 @@ The Pense CLI provides commands for evaluating Speech to Text, Text to Speech, L
 
     ```bash
     git clone https://github.com/artpark/agentloop.git
-    cd pense
+    cd calibrate
     uv sync --frozen
     ```
 
@@ -64,28 +64,28 @@ OPENROUTER_API_KEY=your_key
 
 | Command                       | Description                            |
 | ----------------------------- | -------------------------------------- |
-| `pense stt eval`              | Evaluate Speech to Text provider       |
-| `pense stt leaderboard`       | Generate Speech to Text comparison     |
-| `pense llm tests run`         | Run LLM test cases                     |
-| `pense llm tests leaderboard` | Generate LLM tests comparison          |
-| `pense tts eval`              | Evaluate Text to Speech provider       |
-| `pense tts leaderboard`       | Generate Text to Speech comparison     |
+| `calibrate stt eval`              | Evaluate Speech to Text provider       |
+| `calibrate stt leaderboard`       | Generate Speech to Text comparison     |
+| `calibrate llm tests run`         | Run LLM test cases                     |
+| `calibrate llm tests leaderboard` | Generate LLM tests comparison          |
+| `calibrate tts eval`              | Evaluate Text to Speech provider       |
+| `calibrate tts leaderboard`       | Generate Text to Speech comparison     |
 
 ### End to End Tests
 
 | Command                             | Description                     |
 | ----------------------------------- | ------------------------------- |
-| `pense llm simulations run`         | Run text-only simulations       |
-| `pense llm simulations leaderboard` | Generate simulation comparison  |
-| `pense agent simulation`            | Run voice agent simulations     |
-| `pense agent test`                  | Interactive voice agent session |
+| `calibrate llm simulations run`         | Run text-only simulations       |
+| `calibrate llm simulations leaderboard` | Generate simulation comparison  |
+| `calibrate agent simulation`            | Run voice agent simulations     |
+| `calibrate agent test`                  | Interactive voice agent session |
 
 ## Getting Help
 
 Get help for any command by adding `--help`:
 
 ```bash
-pense --help
-pense stt --help
-pense stt eval --help
+calibrate --help
+calibrate stt --help
+calibrate stt eval --help
 ```

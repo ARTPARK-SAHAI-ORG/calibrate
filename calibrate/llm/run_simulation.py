@@ -9,7 +9,7 @@ from os.path import join, exists, splitext, basename
 import shutil
 from collections import defaultdict
 import traceback
-from pense.utils import configure_print_logger, log_and_print
+from calibrate.utils import configure_print_logger, log_and_print
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -36,7 +36,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from pense.llm.metrics import evaluate_simuation
+from calibrate.llm.metrics import evaluate_simuation
 import pandas as pd
 import numpy as np
 

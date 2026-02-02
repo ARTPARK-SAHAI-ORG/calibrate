@@ -1,10 +1,10 @@
-# pense.tts module
+# calibrate.tts module
 """
 Text-to-Speech evaluation and benchmarking module.
 
 Library Usage:
-    from pense.tts import eval, leaderboard
-    
+    from calibrate.tts import eval, leaderboard
+
     # Run TTS evaluation
     import asyncio
     result = asyncio.run(eval(
@@ -13,7 +13,7 @@ Library Usage:
         input="./data/sample.csv",
         output_dir="./out"
     ))
-    
+
     # Generate leaderboard
     leaderboard(output_dir="./out", save_dir="./leaderboard")
 """
@@ -59,7 +59,7 @@ async def eval(
 
     Example:
         >>> import asyncio
-        >>> from pense.tts import eval
+        >>> from calibrate.tts import eval
         >>> result = asyncio.run(eval(
         ...     provider="google",
         ...     language="english",
@@ -67,12 +67,12 @@ async def eval(
         ...     output_dir="./out"
         ... ))
     """
-    from pense.tts.eval import main as _tts_eval_main
+    from calibrate.tts.eval import main as _tts_eval_main
     import sys
 
     # Build argument list
     argv = [
-        "pense",
+        "calibrate",
         "--provider",
         provider,
         "--language",
@@ -107,10 +107,10 @@ def leaderboard(output_dir: str, save_dir: str) -> None:
         save_dir: Path to directory where leaderboard will be saved
 
     Example:
-        >>> from pense.tts import leaderboard
+        >>> from calibrate.tts import leaderboard
         >>> leaderboard(output_dir="./out", save_dir="./leaderboard")
     """
-    from pense.tts.leaderboard import generate_leaderboard
+    from calibrate.tts.leaderboard import generate_leaderboard
 
     generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
 

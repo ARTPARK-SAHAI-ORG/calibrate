@@ -7,7 +7,7 @@ import os
 from os.path import join, exists, splitext, basename
 import json
 
-from pense.utils import configure_print_logger, log_and_print
+from calibrate.utils import configure_print_logger, log_and_print
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -34,7 +34,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from pense.llm.metrics import test_response_llm_judge
+from calibrate.llm.metrics import test_response_llm_judge
 
 
 class Processor(FrameProcessor):

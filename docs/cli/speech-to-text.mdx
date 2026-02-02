@@ -34,12 +34,12 @@ All audio files should be in WAV format. The evaluation script expects files at 
 
 ---
 
-## pense stt eval
+## calibrate stt eval
 
 Run Speech to Text evaluation against a specific provider.
 
 ```bash
-pense stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
+calibrate stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
 ```
 
 ### Arguments
@@ -61,19 +61,19 @@ pense stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
 **Basic evaluation:**
 
 ```bash
-pense stt eval -p deepgram -l english -i ./data -o ./out
+calibrate stt eval -p deepgram -l english -i ./data -o ./out
 ```
 
 **Evaluate with Hindi language:**
 
 ```bash
-pense stt eval -p sarvam -l hindi -i ./data -o ./out
+calibrate stt eval -p sarvam -l hindi -i ./data -o ./out
 ```
 
 **Debug mode (process only first 5 files):**
 
 ```bash
-pense stt eval -p deepgram -l english -i ./data -o ./out -d -dc 5
+calibrate stt eval -p deepgram -l english -i ./data -o ./out -d -dc 5
 ```
 
 ### Output Structure
@@ -96,12 +96,12 @@ pense stt eval -p deepgram -l english -i ./data -o ./out -d -dc 5
 
 ---
 
-## pense stt leaderboard
+## calibrate stt leaderboard
 
 Generate a comparative leaderboard from multiple evaluation runs.
 
 ```bash
-pense stt leaderboard -o <output_dir> -s <save_dir>
+calibrate stt leaderboard -o <output_dir> -s <save_dir>
 ```
 
 ### Arguments
@@ -114,7 +114,7 @@ pense stt leaderboard -o <output_dir> -s <save_dir>
 ### Example
 
 ```bash
-pense stt leaderboard -o ./out -s ./leaderboard
+calibrate stt leaderboard -o ./out -s ./leaderboard
 ```
 
 ### Output

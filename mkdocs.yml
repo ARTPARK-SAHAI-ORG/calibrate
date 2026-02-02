@@ -1,9 +1,9 @@
-site_name: Pense Documentation
-site_description: Documentation for Pense - Voice Agent Testing Framework
-site_url: https://pense-docs.netlify.app
+site_name: Calibrate Documentation
+site_description: Documentation for Calibrate - Voice Agent Testing Framework
+site_url: https://calibrate-docs.netlify.app
 # Update repo_url and repo_name with your actual repository details
 # repo_url: https://github.com/your-username/agentloop
-# repo_name: pense
+# repo_name: calibrate
 
 theme:
   name: material

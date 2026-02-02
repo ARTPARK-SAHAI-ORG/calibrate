@@ -5,7 +5,7 @@ from loguru import logger
 import asyncio
 
 from pydantic import BaseModel
-from pense.utils import create_stt_service, create_tts_service
+from calibrate.utils import create_stt_service, create_tts_service
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (

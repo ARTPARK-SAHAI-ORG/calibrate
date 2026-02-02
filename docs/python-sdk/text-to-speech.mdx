@@ -18,7 +18,7 @@ The CSV should have two columns: `id` (unique identifier for each text) and `tex
 
 ```python
 import asyncio
-from pense.tts import eval
+from calibrate.tts import eval
 
 asyncio.run(eval(
     provider="google",      # cartesia, openai, groq, google, elevenlabs, sarvam, smallest
@@ -97,7 +97,7 @@ Text to Speech evaluation measures both quality and latency:
 After running multiple provider evaluations, generate a combined leaderboard:
 
 ```python
-from pense.tts import leaderboard
+from calibrate.tts import leaderboard
 
 leaderboard(
     output_dir="/path/to/output",

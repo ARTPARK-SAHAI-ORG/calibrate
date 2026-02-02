@@ -11,7 +11,7 @@ Each simulation pairs every persona with every scenario. The runner saves transc
 
 ```python
 import asyncio
-from pense.agent import simulation, STTConfig, TTSConfig, LLMConfig
+from calibrate.agent import simulation, STTConfig, TTSConfig, LLMConfig
 
 # Define personas
 personas = [
@@ -228,7 +228,7 @@ For more control, run a single voice agent simulation directly:
 
 ```python
 import asyncio
-from pense.agent import simulation
+from calibrate.agent import simulation
 
 result = asyncio.run(simulation.run_single(
     system_prompt="You are simulating a user with persona...",

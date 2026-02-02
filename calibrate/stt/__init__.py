@@ -1,10 +1,10 @@
-# pense.stt module
+# calibrate.stt module
 """
 Speech-to-Text evaluation and benchmarking module.
 
 Library Usage:
-    from pense.stt import eval, leaderboard
-    
+    from calibrate.stt import eval, leaderboard
+
     # Run STT evaluation
     import asyncio
     result = asyncio.run(eval(
@@ -13,7 +13,7 @@ Library Usage:
         input_dir="./data",
         output_dir="./out"
     ))
-    
+
     # Generate leaderboard
     leaderboard(output_dir="./out", save_dir="./leaderboard")
 """
@@ -72,7 +72,7 @@ async def eval(
 
     Example:
         >>> import asyncio
-        >>> from pense.stt import eval
+        >>> from calibrate.stt import eval
         >>> result = asyncio.run(eval(
         ...     provider="deepgram",
         ...     language="english",
@@ -81,13 +81,13 @@ async def eval(
         ... ))
     """
     # Import here to avoid circular imports and heavy imports at module load
-    from pense.stt.eval import main as _stt_eval_main
+    from calibrate.stt.eval import main as _stt_eval_main
     import sys
     import argparse
 
     # Build argument list
     argv = [
-        "pense",
+        "calibrate",
         "--provider",
         provider,
         "--language",
@@ -128,10 +128,10 @@ def leaderboard(output_dir: str, save_dir: str) -> None:
         save_dir: Path to directory where leaderboard will be saved
 
     Example:
-        >>> from pense.stt import leaderboard
+        >>> from calibrate.stt import leaderboard
         >>> leaderboard(output_dir="./out", save_dir="./leaderboard")
     """
-    from pense.stt.leaderboard import generate_leaderboard
+    from calibrate.stt.leaderboard import generate_leaderboard
 
     generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
 

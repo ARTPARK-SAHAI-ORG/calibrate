@@ -1,10 +1,10 @@
-# pense.agent module
+# calibrate.agent module
 """
 Voice agent testing and simulation module.
 
 Library Usage:
-    from pense.agent import simulation
-    
+    from calibrate.agent import simulation
+
     # Run agent simulation
     import asyncio
     result = asyncio.run(simulation.run(
@@ -102,7 +102,7 @@ class _Simulation:
 
         Example:
             >>> import asyncio
-            >>> from pense.agent import simulation, STTConfig, TTSConfig, LLMConfig
+            >>> from calibrate.agent import simulation, STTConfig, TTSConfig, LLMConfig
             >>> result = asyncio.run(simulation.run(
             ...     system_prompt="You are a helpful nurse...",
             ...     tools=[...],
@@ -120,7 +120,7 @@ class _Simulation:
             ...     llm=LLMConfig(provider="openrouter", model="openai/gpt-4.1"),
             ... ))
         """
-        from pense.agent.run_simulation import run_single_simulation_task
+        from calibrate.agent.run_simulation import run_single_simulation_task
         import gc
 
         os.makedirs(output_dir, exist_ok=True)
@@ -132,7 +132,10 @@ class _Simulation:
             "personas": personas,
             "scenarios": scenarios,
             "evaluation_criteria": evaluation_criteria,
-            "settings": {"agent_speaks_first": agent_speaks_first, "max_turns": max_turns},
+            "settings": {
+                "agent_speaks_first": agent_speaks_first,
+                "max_turns": max_turns,
+            },
         }
 
         if stt:
@@ -172,6 +175,7 @@ class _Simulation:
                     results.append(result)
                 except Exception as e:
                     import traceback
+
                     traceback.print_exc()
                     results.append(e)
                 finally:
@@ -266,7 +270,7 @@ class _Simulation:
 
         Example:
             >>> import asyncio
-            >>> from pense.agent import simulation
+            >>> from calibrate.agent import simulation
             >>> result = asyncio.run(simulation.run_single(
             ...     system_prompt="You are simulating a user...",
             ...     language="english",
@@ -275,7 +279,7 @@ class _Simulation:
             ...     output_dir="./out"
             ... ))
         """
-        from pense.agent.run_simulation import run_simulation as _run_simulation
+        from calibrate.agent.run_simulation import run_simulation as _run_simulation
 
         return await _run_simulation(
             system_prompt=system_prompt,

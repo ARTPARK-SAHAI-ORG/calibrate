@@ -11,7 +11,7 @@ Define your system prompt, tools, and test cases to evaluate LLM behavior:
 
 ```python
 import asyncio
-from pense.llm import tests
+from calibrate.llm import tests
 
 # Define your tools
 tools = [
@@ -165,7 +165,7 @@ Contains summary statistics:
 After running tests for multiple models, compile a leaderboard:
 
 ```python
-from pense.llm import tests
+from calibrate.llm import tests
 
 tests.leaderboard(
     output_dir="/path/to/output",
@@ -199,7 +199,7 @@ For more control, run individual test cases:
 
 ```python
 import asyncio
-from pense.llm import tests
+from calibrate.llm import tests
 
 result = asyncio.run(tests.run_test(
     chat_history=[
@@ -221,7 +221,7 @@ result = asyncio.run(tests.run_test(
 
 ```python
 import asyncio
-from pense.llm import tests
+from calibrate.llm import tests
 
 result = asyncio.run(tests.run_inference(
     chat_history=[...],

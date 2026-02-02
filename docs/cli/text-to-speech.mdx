@@ -25,12 +25,12 @@ The CSV should have two columns:
 
 ---
 
-## pense tts eval
+## calibrate tts eval
 
 Run Text to Speech evaluation against a specific provider.
 
 ```bash
-pense tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
+calibrate tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
 ```
 
 ### Arguments
@@ -50,19 +50,19 @@ pense tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
 **Basic evaluation:**
 
 ```bash
-pense tts eval -p google -l english -i ./sample.csv -o ./out
+calibrate tts eval -p google -l english -i ./sample.csv -o ./out
 ```
 
 **Evaluate with Cartesia:**
 
 ```bash
-pense tts eval -p cartesia -i ./sample.csv -o ./out
+calibrate tts eval -p cartesia -i ./sample.csv -o ./out
 ```
 
 **Debug mode (process only first 3 texts):**
 
 ```bash
-pense tts eval -p google -i ./sample.csv -o ./out -d -dc 3
+calibrate tts eval -p google -i ./sample.csv -o ./out -d -dc 3
 ```
 
 ### Output Structure
@@ -89,12 +89,12 @@ pense tts eval -p google -i ./sample.csv -o ./out -d -dc 3
 
 ---
 
-## pense tts leaderboard
+## calibrate tts leaderboard
 
 Generate a comparative leaderboard from multiple evaluation runs.
 
 ```bash
-pense tts leaderboard -o <output_dir> -s <save_dir>
+calibrate tts leaderboard -o <output_dir> -s <save_dir>
 ```
 
 ### Arguments
@@ -107,7 +107,7 @@ pense tts leaderboard -o <output_dir> -s <save_dir>
 ### Example
 
 ```bash
-pense tts leaderboard -o ./out -s ./leaderboard
+calibrate tts leaderboard -o ./out -s ./leaderboard
 ```
 
 ### Output

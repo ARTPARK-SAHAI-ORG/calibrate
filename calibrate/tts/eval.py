@@ -23,13 +23,13 @@ import numpy as np
 from loguru import logger
 import pandas as pd
 
-from pense.utils import (
+from calibrate.utils import (
     configure_print_logger,
     log_and_print,
     get_tts_language_code,
     validate_tts_language,
 )
-from pense.tts.metrics import get_tts_llm_judge_score
+from calibrate.tts.metrics import get_tts_llm_judge_score
 
 
 # =============================================================================

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 import numpy as np
 from collections import defaultdict
 
-from pense.utils import (
+from calibrate.utils import (
     current_context,
     add_default_source,
     configure_print_logger,
@@ -27,8 +27,8 @@ from pense.utils import (
     combine_turn_audio_chunks,
     combine_audio_files,
 )
-from pense.llm.metrics import evaluate_simuation
-from pense.stt.metrics import get_llm_judge_score as stt_llm_judge_score
+from calibrate.llm.metrics import evaluate_simuation
+from calibrate.stt.metrics import get_llm_judge_score as stt_llm_judge_score
 import pandas as pd
 
 USER_MESSAGE_COLOR = "\033[94m"
@@ -110,7 +110,7 @@ from pipecat.transports.websocket.client import (
 )
 
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
-from pense.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
+from calibrate.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
 from pipecat.utils.time import time_now_iso8601
 
 
@@ -1372,7 +1372,9 @@ async def run_single_simulation_task(
                 interrupt_probability=interrupt_probability,
                 port=port,
                 agent_speaks_first=agent_speaks_first,
-                max_turns=config.get("settings", {}).get("max_turns", DEFAULT_MAX_TURNS),
+                max_turns=config.get("settings", {}).get(
+                    "max_turns", DEFAULT_MAX_TURNS
+                ),
             )
         )
         simulation_tasks = [bot_task, sim_task]

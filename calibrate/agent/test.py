@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from typing import Literal
 
-from pense.utils import save_audio_chunk, create_stt_service, create_tts_service
+from calibrate.utils import save_audio_chunk, create_stt_service, create_tts_service
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams

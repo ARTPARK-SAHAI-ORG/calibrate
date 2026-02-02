@@ -1,8 +1,8 @@
-# Pense Documentation Structure Plan
+# Calibrate Documentation Structure Plan
 
 ## Overview
 
-This plan outlines a comprehensive, user-focused documentation structure for Pense using MkDocs with Material theme. The structure is designed to help developers quickly understand and use the framework effectively.
+This plan outlines a comprehensive, user-focused documentation structure for Calibrate using MkDocs with Material theme. The structure is designed to help developers quickly understand and use the framework effectively.
 
 ---
 
@@ -10,7 +10,7 @@ This plan outlines a comprehensive, user-focused documentation structure for Pen
 
 ```
 docs/
-├── index.md                    # Landing page - What is Pense?
+├── index.md                    # Landing page - What is Calibrate?
 ├── getting-started/
 │   ├── index.md               # Quick start guide
 │   ├── installation.md        # Installation and setup
@@ -82,7 +82,7 @@ docs/
 
 ### 1. **index.md** (Landing Page)
 
-**Purpose**: First impression - what Pense is and why use it
+**Purpose**: First impression - what Calibrate is and why use it
 
 **Content**:
 
@@ -92,7 +92,7 @@ docs/
   - Evaluate components in isolation
   - Test across multiple vendors
   - Simulate thousands of scenarios
-- Quick visual: What Pense does (diagram showing STT → LLM → TTS pipeline)
+- Quick visual: What Calibrate does (diagram showing STT → LLM → TTS pipeline)
 - Main use cases:
   - Comparing STT/TTS providers
   - Testing LLM behavior
@@ -114,8 +114,8 @@ docs/
 #### **getting-started/installation.md**
 
 - Installing uv (if needed)
-- Installing Pense (`uv sync --frozen`)
-- Verifying installation (`pense --help`)
+- Installing Calibrate (`uv sync --frozen`)
+- Verifying installation (`calibrate --help`)
 - Common installation issues
 
 #### **getting-started/configuration.md**
@@ -143,7 +143,7 @@ docs/
 #### **concepts/index.md**
 
 - Core concepts overview
-- How Pense fits into voice agent development
+- How Calibrate fits into voice agent development
 - Component isolation philosophy
 - Evaluation vs simulation distinction
 
@@ -200,7 +200,7 @@ docs/
 
 #### **guides/stt/running-eval.md**
 
-- Command syntax: `pense stt eval`
+- Command syntax: `calibrate stt eval`
 - All parameters explained:
   - `-p, --provider`: Provider selection
   - `-l, --language`: Language options
@@ -225,7 +225,7 @@ docs/
 
 - What is a leaderboard?
 - When to use it
-- Command: `pense stt leaderboard`
+- Command: `calibrate stt leaderboard`
 - Output files (Excel, PNG charts)
 - Reading leaderboard results
 - Comparing providers
@@ -289,7 +289,7 @@ docs/
 
 #### **guides/llm/tests/running-tests.md**
 
-- Command: `pense llm tests run`
+- Command: `calibrate llm tests run`
 - Parameters explained
 - Example commands
 - Understanding output
@@ -337,7 +337,7 @@ docs/
 
 #### **guides/llm/simulations/running-simulations.md**
 
-- Command: `pense llm simulations run`
+- Command: `calibrate llm simulations run`
 - Parameters
 - Execution flow
 - Understanding output
@@ -359,7 +359,7 @@ docs/
 
 - What is interactive testing?
 - Use case: Manual testing with real audio
-- Command: `pense agent test`
+- Command: `calibrate agent test`
 - Configuration file
 - Starting the server
 - Using the web UI
@@ -371,7 +371,7 @@ docs/
 
 - What are agent simulations?
 - Use case: Automated voice agent testing
-- Command: `pense agent simulation`
+- Command: `calibrate agent simulation`
 - Configuration structure
 - Personas and scenarios
 - Execution flow
@@ -521,11 +521,11 @@ docs/
 
 ```yaml
 # mkdocs.yml structure
-site_name: Pense Documentation
-site_description: Documentation for Pense - Voice Agent Testing Framework
+site_name: Calibrate Documentation
+site_description: Documentation for Calibrate - Voice Agent Testing Framework
 site_url: https://your-site-url.com
-repo_url: https://github.com/your-repo/pense
-repo_name: pense
+repo_url: https://github.com/your-repo/calibrate
+repo_name: calibrate
 
 theme:
   name: material

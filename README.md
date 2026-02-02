@@ -1,14 +1,14 @@
-# Pense
+# Calibrate
 
 An open-source simulation and testing framework for voice agents.
 
-With Pense, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
+With Calibrate, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
 
 - Evaluate different components of your voice agents across multiple vendors in isolation
 - Create comprehensive test suites that verify both conversational responses and tool usage
 - Simulate entire conversations spanning thousands of scenarios across multiple user personas
 
-Pense is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
+Calibrate is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building voice agents.
 
 ## Setup
 
@@ -62,7 +62,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 
 ```python
 import asyncio
-from pense.stt import eval, leaderboard
+from calibrate.stt import eval, leaderboard
 
 # Run STT evaluation
 asyncio.run(eval(
@@ -75,7 +75,7 @@ asyncio.run(eval(
 ))
 ```
 
-You can use the sample inputs provided in [`pense/stt/examples/sample_input`](pense/stt/examples/sample_input) to test the evaluation script.
+You can use the sample inputs provided in [`calibrate/stt/examples/sample_input`](calibrate/stt/examples/sample_input) to test the evaluation script.
 
 Sample output:
 
@@ -104,7 +104,7 @@ id,gt,pred,wer,string_similarity,llm_judge_score,llm_judge_reasoning
 3_1_english_baseline,"Please write Rekha Kumari, sister.", Please write Reha Kumari's sister.,0.4,0.927536231884058,False,"The source says 'Rekha Kumari, sister' which indicates the name is 'Rekha Kumari' and she is a sister. The transcription says 'Reha Kumari's sister', which changes the name to 'Reha Kumari' and refers to her sister, not Rekha Kumari herself. The name is different ('Rekha' vs 'Reha') and the relationship is also changed (from identifying Rekha Kumari as the sister to referring to the sister of Reha Kumari). Therefore, the values do not match."
 ```
 
-The definition of all the metrics we compute are stored in [`pense/stt/metrics.py`](pense/stt/metrics.py).
+The definition of all the metrics we compute are stored in [`calibrate/stt/metrics.py`](calibrate/stt/metrics.py).
 
 `metrics.json` will have the following format:
 
@@ -122,7 +122,7 @@ The definition of all the metrics we compute are stored in [`pense/stt/metrics.p
 
 `results.log` contains the full logs of the evaluation script including terminal output and debug information.
 
-You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_output) to see a sample output of the evaluation script.
+You can checkout [`calibrate/stt/examples/sample_output`](calibrate/stt/examples/sample_output) to see a sample output of the evaluation script.
 
 **Function Parameters:**
 
@@ -141,7 +141,7 @@ You can checkout [`pense/stt/examples/sample_output`](pense/stt/examples/sample_
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
 ```python
-from pense.stt import leaderboard
+from calibrate.stt import leaderboard
 
 leaderboard(
     output_dir="/path/to/output",
@@ -149,15 +149,15 @@ leaderboard(
 )
 ```
 
-The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus individual metric charts (e.g., `wer.png`, `string_similarity.png`, `llm_judge_score.png`) inside the save directory so you can compare providers side-by-side (`pense/stt/leaderboard.py`).
+The script scans each run directory, reads `metrics.json` and `results.csv`, then writes `stt_leaderboard.xlsx` plus individual metric charts (e.g., `wer.png`, `string_similarity.png`, `llm_judge_score.png`) inside the save directory so you can compare providers side-by-side (`calibrate/stt/leaderboard.py`).
 
-You can checkout [`pense/stt/examples/leaderboard`](pense/stt/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`calibrate/stt/examples/leaderboard`](calibrate/stt/examples/leaderboard) to see a sample output of the leaderboard script.
 
 <table>
   <tr>
-    <td><img src="pense/stt/examples/leaderboard/wer.png" alt="WER by Provider" width="100%"></td>
-    <td><img src="pense/stt/examples/leaderboard/string_similarity.png" alt="String Similarity by Provider" width="100%"></td>
-    <td><img src="pense/stt/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
+    <td><img src="calibrate/stt/examples/leaderboard/wer.png" alt="WER by Provider" width="100%"></td>
+    <td><img src="calibrate/stt/examples/leaderboard/string_similarity.png" alt="String Similarity by Provider" width="100%"></td>
+    <td><img src="calibrate/stt/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
   </tr>
 </table>
 
@@ -191,7 +191,7 @@ export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
 
 ```python
 import asyncio
-from pense.tts import eval, leaderboard
+from calibrate.tts import eval, leaderboard
 
 # Run TTS evaluation
 asyncio.run(eval(
@@ -204,13 +204,13 @@ asyncio.run(eval(
 ))
 ```
 
-You can use the sample inputs provided in [`pense/tts/examples/sample.csv`](pense/tts/examples/sample.csv) to test the evaluation script.
+You can use the sample inputs provided in [`calibrate/tts/examples/sample.csv`](calibrate/tts/examples/sample.csv) to test the evaluation script.
 
 Sample output:
 
 ```
 --------------------------------
-Running command: pense tts eval -p elevenlabs -l english -i pense/tts/examples/sample.csv -o pense/tts/examples/sample_output
+Running command: calibrate tts eval -p elevenlabs -l english -i calibrate/tts/examples/sample.csv -o calibrate/tts/examples/sample_output
 Processing 2 texts with provider: elevenlabs
 --------------------------------
 Processing [1/2]: row_1
@@ -223,8 +223,8 @@ Processing [2/2]: row_2
 Successfully synthesized: 2 texts
 Running LLM judge evaluation...
 LLM Judge Score: 1.0
-Metrics saved to: pense/tts/examples/sample_output/elevenlabs/metrics.json
-Results saved to: pense/tts/examples/sample_output/elevenlabs/results.csv
+Metrics saved to: calibrate/tts/examples/sample_output/elevenlabs/metrics.json
+Results saved to: calibrate/tts/examples/sample_output/elevenlabs/results.csv
 ```
 
 The output of the evaluation script will be saved in the output directory.
@@ -265,7 +265,7 @@ row_2,this is a test,./out/elevenlabs/audios/row_2.wav,1.2153360843658447,True,"
 
 `results.log` contains the terminal output of the evaluation script as shown in the sample output above.
 
-You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_output) to see a sample output of the evaluation script.
+You can checkout [`calibrate/tts/examples/sample_output`](calibrate/tts/examples/sample_output) to see a sample output of the evaluation script.
 
 **Function Parameters:**
 
@@ -282,7 +282,7 @@ You can checkout [`pense/tts/examples/sample_output`](pense/tts/examples/sample_
 To benchmark several TTS runs, generate the combined workbook and chart with:
 
 ```python
-from pense.tts import leaderboard
+from calibrate.tts import leaderboard
 
 leaderboard(
     output_dir="/path/to/output",
@@ -290,14 +290,14 @@ leaderboard(
 )
 ```
 
-`pense/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus individual metric charts (e.g., `llm_judge_score.png`, `ttfb.png`) so you can spot which provider balances latency and judge scores best.
+`calibrate/tts/leaderboard.py` mirrors the STT workflow, emitting `tts_leaderboard.xlsx` plus individual metric charts (e.g., `llm_judge_score.png`, `ttfb.png`) so you can spot which provider balances latency and judge scores best.
 
-You can checkout [`pense/tts/examples/leaderboard`](pense/tts/examples/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`calibrate/tts/examples/leaderboard`](calibrate/tts/examples/leaderboard) to see a sample output of the leaderboard script.
 
 <table>
   <tr>
-    <td><img src="pense/tts/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
-    <td><img src="pense/tts/examples/leaderboard/ttfb.png" alt="TTFB by Provider" width="100%"></td>
+    <td><img src="calibrate/tts/examples/leaderboard/llm_judge_score.png" alt="LLM Judge Score by Provider" width="100%"></td>
+    <td><img src="calibrate/tts/examples/leaderboard/ttfb.png" alt="TTFB by Provider" width="100%"></td>
   </tr>
 </table>
 
@@ -317,7 +317,7 @@ export OPENROUTER_API_KEY=your_key
 
 ```python
 import asyncio
-from pense.llm import tests
+from calibrate.llm import tests
 
 # Define your tools
 tools = [
@@ -405,7 +405,7 @@ result = asyncio.run(tests.run(
 | `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
 | `run_name` | str | No | None | Optional name for output folder |
 
-You can reference the sample configuration in [`pense/llm/examples/tests/config.json`](pense/llm/examples/tests/config.json) for test case structure examples.
+You can reference the sample configuration in [`calibrate/llm/examples/tests/config.json`](calibrate/llm/examples/tests/config.json) for test case structure examples.
 
 The script will run each test case for each variable value (e.g., for each language) and output:
 
@@ -459,7 +459,7 @@ The output of the script will be saved in the output directory.
 }
 ```
 
-You can checkout [`pense/llm/examples/tests/sample_output`](pense/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
+You can checkout [`calibrate/llm/examples/tests/sample_output`](calibrate/llm/examples/tests/sample_output) to see a sample output of the evaluation script.
 
 Sample output 1:
 
@@ -504,7 +504,7 @@ Metrics:
 Once you have results for multiple models or scenarios, compile a leaderboard CSV and comparison chart:
 
 ```python
-from pense.llm import tests
+from calibrate.llm import tests
 
 tests.leaderboard(
     output_dir="/path/to/output",
@@ -512,7 +512,7 @@ tests.leaderboard(
 )
 ```
 
-`pense/llm/tests_leaderboard.py` walks every `<test_config_name>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
+`calibrate/llm/tests_leaderboard.py` walks every `<test_config_name>/<model>` folder under the output root, computes pass percentages, and saves `llm_leaderboard.csv` plus `llm_leaderboard.png` to the chosen save directory for quick reporting.
 
 `llm_leaderboard.csv` has the following format:
 
@@ -524,9 +524,9 @@ openai__gpt-4o,100.0,100.0
 
 Each column after `model` represents a test config (scenario), and `overall` is the aggregate pass percentage across all configs.
 
-You can checkout [`pense/llm/examples/tests/leaderboard`](pense/llm/examples/tests/leaderboard) to see a sample output of the leaderboard script.
+You can checkout [`calibrate/llm/examples/tests/leaderboard`](calibrate/llm/examples/tests/leaderboard) to see a sample output of the leaderboard script.
 
-![Leaderboard example](pense/llm/examples/tests/leaderboard/llm_leaderboard.png)
+![Leaderboard example](calibrate/llm/examples/tests/leaderboard/llm_leaderboard.png)
 
 ### Low-level API for Single Test Cases
 
@@ -534,7 +534,7 @@ For more control, you can run individual test cases or inference:
 
 ```python
 import asyncio
-from pense.llm import tests
+from calibrate.llm import tests
 
 # Run a single test case
 result = asyncio.run(tests.run_test(
@@ -582,7 +582,7 @@ export OPENROUTER_API_KEY=your_key
 
 ```python
 import asyncio
-from pense.llm import simulations
+from calibrate.llm import simulations
 
 # Define personas
 personas = [
@@ -660,7 +660,7 @@ result = asyncio.run(simulations.run(
 | `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
 | `max_turns` | int | No | 50 | Maximum assistant turns |
 
-You can reference the sample configuration in [`pense/llm/examples/simulation/config.json`](pense/llm/examples/simulation/config.json) for structure examples.
+You can reference the sample configuration in [`calibrate/llm/examples/simulation/config.json`](calibrate/llm/examples/simulation/config.json) for structure examples.
 
 Sample output:
 
@@ -756,12 +756,12 @@ simulation_persona_1_scenario_3,1.0,1.0
 
 `logs` contains the full logs of the simulation including all the pipecat logs whereas `results.log` contains only the terminal output of the simulation as shown in the sample output above.
 
-You can checkout [`pense/llm/examples/simulation/sample_output`](pense/llm/examples/simulation/sample_output) to see a sample output of the simulation.
+You can checkout [`calibrate/llm/examples/simulation/sample_output`](calibrate/llm/examples/simulation/sample_output) to see a sample output of the simulation.
 
 Once you have results for multiple models, compile a leaderboard:
 
 ```python
-from pense.llm import simulations
+from calibrate.llm import simulations
 
 simulations.leaderboard(
     output_dir="/path/to/output",
@@ -775,7 +775,7 @@ For more control, you can run a single simulation directly:
 
 ```python
 import asyncio
-from pense.llm import simulations
+from calibrate.llm import simulations
 
 result = asyncio.run(simulations.run_simulation(
     bot_system_prompt="You are a helpful assistant...",
@@ -833,7 +833,7 @@ export SARVAM_API_KEY=your_key
 
 ```python
 import asyncio
-from pense.agent import simulation, STTConfig, TTSConfig, LLMConfig
+from calibrate.agent import simulation, STTConfig, TTSConfig, LLMConfig
 
 # Define personas
 personas = [
@@ -910,7 +910,7 @@ result = asyncio.run(simulation.run(
 | `max_turns` | int | No | 50 | Maximum assistant turns |
 | `port` | int | No | 8765 | Base WebSocket port |
 
-You can reference the sample configuration in [`pense/agent/examples/simulation/sample_short_english.json`](pense/agent/examples/simulation/sample_short_english.json) for structure examples.
+You can reference the sample configuration in [`calibrate/agent/examples/simulation/sample_short_english.json`](calibrate/agent/examples/simulation/sample_short_english.json) for structure examples.
 
 Sample output:
 
@@ -1058,7 +1058,7 @@ simulation_persona_1_scenario_3,1.0,1.0,0.98
 }
 ```
 
-You can checkout [`pense/agent/examples/simulation/sample_output`](pense/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
+You can checkout [`calibrate/agent/examples/simulation/sample_output`](calibrate/agent/examples/simulation/sample_output) to see a sample output of the voice agent simulation.
 
 ### Low-level API for Single Simulations
 
@@ -1066,7 +1066,7 @@ For more control, you can run a single voice agent simulation directly:
 
 ```python
 import asyncio
-from pense.agent import simulation
+from calibrate.agent import simulation
 
 # Run a single simulation with custom parameters
 result = asyncio.run(simulation.run_single(
@@ -1086,10 +1086,10 @@ result = asyncio.run(simulation.run_single(
 
 ## Talk to the agent
 
-`pense/agent/test.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
+`calibrate/agent/test.py` spins up the fully interactive STT → LLM → TTS pipeline so you can speak with the agent in real time.
 
 1. Make sure your `.env` file has the required API keys (defaults use OpenAI STT + LLM and Google TTS).
-2. Pick or edit a config file. `pense/agent/examples/test/config.json` is a ready-to-use config file.
+2. Pick or edit a config file. `calibrate/agent/examples/test/config.json` is a ready-to-use config file.
    You can configure the providers for STT, LLM, and TTS in the config file as shown below:
 
    **Supported Providers:**
@@ -1134,7 +1134,7 @@ result = asyncio.run(simulation.run_single(
 3. Start the runner (this feature is CLI-only as it requires an interactive browser session):
 
 ```bash
-pense agent test -c pense/agent/examples/test/config.json -o ./out/run
+calibrate agent test -c calibrate/agent/examples/test/config.json -o ./out/run
 ```
 
 Once you run it, you can open `http://localhost:7860/client/` in your browser. Click **Connect**, and begin talking to the agent through your browser.
@@ -1153,10 +1153,10 @@ Every user/bot audio turn is persisted inside `<output_dir>/audios` (see a sampl
 
 `transcript.json` in the output directory has the full transcript with function calls.
 
-You can checkout `pense/agent/examples/test/sample_output` as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
+You can checkout `calibrate/agent/examples/test/sample_output` as a sample output of the agent conversation which contains all the audio turns and logs from the conversation.
 
 ## Documentation
 
-Pense documentation is built using [Mintlify](https://mintlify.com). The documentation source files are located in the `docs/` directory.
+Calibrate documentation is built using [Mintlify](https://mintlify.com). The documentation source files are located in the `docs/` directory.
 
-Visit the [documentation site](https://docs.pense.dev) for the full documentation.
+Visit the [documentation site](https://docs.calibrate.dev) for the full documentation.

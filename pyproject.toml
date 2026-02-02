@@ -1,5 +1,5 @@
 [project]
-name = "pense"
+name = "calibrate"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -32,7 +32,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pense = "pense.cli:main"
+calibrate = "calibrate.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

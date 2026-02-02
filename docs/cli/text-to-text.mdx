@@ -15,12 +15,12 @@ Run LLM tests against predefined test cases with expected outputs. Useful for va
 
 ---
 
-## pense llm tests run
+## calibrate llm tests run
 
 Run LLM test cases from a configuration file.
 
 ```bash
-pense llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
+calibrate llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
 ```
 
 ### Arguments
@@ -37,19 +37,19 @@ pense llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
 **Basic test run:**
 
 ```bash
-pense llm tests run -c ./config.json -o ./out
+calibrate llm tests run -c ./config.json -o ./out
 ```
 
 **Run with specific model:**
 
 ```bash
-pense llm tests run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
+calibrate llm tests run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
 ```
 
 **Use OpenAI directly:**
 
 ```bash
-pense llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
+calibrate llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
 ```
 
 ### Configuration File Structure
@@ -116,12 +116,12 @@ pense llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
 
 ---
 
-## pense llm tests leaderboard
+## calibrate llm tests leaderboard
 
 Generate a leaderboard comparing multiple test runs.
 
 ```bash
-pense llm tests leaderboard -o <output_dir> -s <save_dir>
+calibrate llm tests leaderboard -o <output_dir> -s <save_dir>
 ```
 
 ### Arguments
@@ -134,7 +134,7 @@ pense llm tests leaderboard -o <output_dir> -s <save_dir>
 ### Example
 
 ```bash
-pense llm tests leaderboard -o ./out -s ./leaderboard
+calibrate llm tests leaderboard -o ./out -s ./leaderboard
 ```
 
 ### Output
