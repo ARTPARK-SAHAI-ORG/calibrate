@@ -857,6 +857,37 @@ async def run_simulation(
 
     error_sink_id = logger.add(error_capture_sink, level="ERROR")
 
+    try:
+        return await _run_simulation_inner(
+            system_prompt=system_prompt,
+            language=language,
+            gender=gender,
+            evaluation_criteria=evaluation_criteria,
+            output_dir=output_dir,
+            interrupt_probability=interrupt_probability,
+            port=port,
+            agent_speaks_first=agent_speaks_first,
+            max_turns=max_turns,
+            tools=tools,
+            captured_errors=captured_errors,
+        )
+    finally:
+        logger.remove(error_sink_id)
+
+
+async def _run_simulation_inner(
+    system_prompt: str,
+    language: Literal["english", "hindi"],
+    gender: Literal["male", "female"],
+    evaluation_criteria: list[dict],
+    output_dir: str,
+    interrupt_probability: float,
+    port: int,
+    agent_speaks_first: bool,
+    max_turns: int,
+    tools: list[dict],
+    captured_errors: list[str],
+) -> dict:
     # Build webhook configs from tools for function call handling
     webhook_configs = {}
     if tools:
@@ -1108,9 +1139,6 @@ async def run_simulation(
     await runner.run(task)
 
     transcript = rtvi_message_adapter._serialized_transcript
-
-    # Remove the error capture sink
-    logger.remove(error_sink_id)
 
     # Check if the simulation completed with a meaningful transcript
     # Only fail if there's no meaningful conversation - benign errors like STT timeouts
