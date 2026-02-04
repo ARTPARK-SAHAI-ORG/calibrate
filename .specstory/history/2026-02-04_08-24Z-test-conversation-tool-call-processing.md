@@ -2806,7 +2806,449 @@ Let me update this section.</details></think>
 ---
 
 <think><details><summary>Thought Process</summary>
-The documentation has been updated. The README and docs don't need changes since this is an internal implementation detail that doesn't affect the user-facing API</details></think>
+The documentation has been updated. The README and docs don't need changes since this is an internal implementation detail that doesn't affect the user-facing API or configuration.</details></think>
+
+---
+
+I've updated `.cursor/rules/app-details.md` to reflect the UUID-based logger identification. The key changes documented:
+
+1. **Added explanation** of why UUIDs are used instead of folder names (multiple parallel runs can have the same folder name pattern)
+
+2. **Updated code examples** to show:
+   - Generating `simulation_run_id = str(uuid.uuid4())`
+   - Using the UUID in `simulation_filter`, `logger.contextualize`, `configure_print_logger`, `current_simulation_name.set`, and `cleanup_print_logger`
+
+3. **Added new gotcha**: "Use UUIDs for logger IDs, folder names for file paths" - clarifying the distinction between `simulation_name` (for display/paths) and `simulation_run_id` (for logger isolation)
+
+The README and docs don't need updates since this is an internal implementation detail that doesn't affect the user-facing API.
+
+---
+
+_**User**_
+
+based on the changes, update the docs for tools on python sdk and cli
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to update the documentation for tools based on the changes made. Let me first check what the current documentation looks like for tools in the Python SDK and CLI sections.
+
+From the git diff I saw earlier, the major changes related to tools are:
+1. New webhook tool type support with `build_tools_schema()` function
+2. Webhook tools can make actual HTTP calls via `make_webhook_call()`
+3. Different handling for webhook vs structured_output tools
+
+Let me read the relevant documentation files.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts/tools.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "undefined" • **6** results in **1** directory</summary>
+
+Directory: **undefined** (6 files)
+
+| File |
+|------|
+| `./docs/python-sdk/voice-simulations.mdx` |
+| `./docs/python-sdk/overview.mdx` |
+| `./docs/python-sdk/text-simulations.mdx` |
+| `./docs/python-sdk/text-to-text.mdx` |
+| `./docs/python-sdk/speech-to-text.mdx` |
+| `./docs/python-sdk/text-to-speech.mdx` |
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "undefined" • **6** results in **1** directory</summary>
+
+Directory: **undefined** (6 files)
+
+| File |
+|------|
+| `./docs/cli/overview.mdx` |
+| `./docs/cli/text-simulations.mdx` |
+| `./docs/cli/voice-simulations.mdx` |
+| `./docs/cli/text-to-text.mdx` |
+| `./docs/cli/speech-to-text.mdx` |
+| `./docs/cli/text-to-speech.mdx` |
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The current tools.mdx is about a UI-based platform, not the Python SDK. Let me check the Python SDK docs for text-to-text, text-simulations, and voice-simulations to see how tools are currently documented there.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me check the CLI docs for the relevant files.</details></think>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/voice-simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I have all the documentation. The main change I need to document is the **webhook tool type** that was added. Currently, all documentation only shows `"type": "client"` tools with flat `parameters` arrays. The new webhook type has a different structure with `webhook.queryParameters` and `webhook.body.parameters`.
+
+Based on the code changes in the git diff, I need to add:
+1. A section explaining the two tool types (`structured_output`/`client` vs `webhook`)
+2. The webhook tool structure with its required fields (`url`, `method`, `headers`)
+3. How webhook tools make actual HTTP calls vs structured_output tools that just return status
+
+Let me update the tools.mdx core-concepts page first since it's the main reference for tools, then add brief mentions in the Python SDK and CLI docs where tools are defined.
+
+Actually, looking at the tools.mdx, it seems to be for a UI-based platform, not the code SDK. So I should focus on updating the Python SDK docs and CLI docs instead.
+
+Let me create a comprehensive update to the tool definition sections in:
+1. `docs/python-sdk/text-to-text.mdx` - Add webhook tool example
+2. `docs/python-sdk/text-simulations.mdx` - Add webhook tool example  
+3. `docs/python-sdk/voice-simulations.mdx` - Add webhook tool example4. `docs/cli/text-to-text.mdx` - Add webhook tool example in config
+5. `docs/cli/text-simulations.mdx` - Add webhook tool example in config
+6. `docs/cli/voice-simulations.mdx` - Add webhook tool example in config
+
+I'll add a "Tool Types" section after the tool definition in each file that explains both types.</details></think>
+
+---
+
+Now I'll update the documentation to include the webhook tool type. Let me update the Python SDK docs first, then the CLI docs.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add a section explaining the tool types after the initial code example in the text-to-text.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the text-simulations.mdx for the Python SDK.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add the Tool Types section to text-simulations.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update voice-simulations.mdx for the Python SDK.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add the Tool Types section to voice-simulations.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/python-sdk/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update the CLI documentation. Let me start with cli/text-to-text.mdx.</details></think>
+
+---
+
+Now let me update the CLI docs.
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add a Tool Types section to the CLI text-to-text.mdx. I'll add it after the Configuration File Structure section.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update cli/text-simulations.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add a Tool Types section to cli/text-simulations.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me update cli/voice-simulations.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me add the Tool Types section to cli/voice-simulations.mdx.</details></think>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/voice-simulations.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now let me also update the core-concepts/tools.mdx to be more relevant to the Python SDK/CLI rather than a UI-based platform, or at least mention the two tool types.
+
+Let me read the file again to see what would be appropriate.</details></think>
+
+---
+
+Now let me update the core-concepts tools page to be more relevant to the SDK/CLI:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/core-concepts/tools.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Now I've updated all the documentation for tools. Let me verify there are no linter errors and summarize the changes.</details></think>
+
+---
+
+I've updated all the documentation for tools across the Python SDK and CLI. Here's a summary of the changes:
+
+**Updated files:**
+
+1. **`docs/core-concepts/tools.mdx`** - Completely rewritten to document:
+   - Two tool types: `structured_output` and `webhook`
+   - Full webhook configuration example with all fields
+   - Required vs optional webhook fields
+   - Behavior differences by module (tests vs simulations)
+   - Parameter types and examples (arrays, enums)
+
+2. **`docs/python-sdk/text-to-text.mdx`** - Added "Tool Types" section with:
+   - Structured output example
+   - Webhook example with full configuration
+   - Note about webhook behavior in tests vs simulations
+
+3. **`docs/python-sdk/text-simulations.mdx`** - Added "Tool Types" section
+
+4. **`docs/python-sdk/voice-simulations.mdx`** - Added "Tool Types" section
+
+5. **`docs/cli/text-to-text.mdx`** - Added:
+   - Updated config example to use `structured_output`
+   - "Tool Types" section with webhook example
+   - Note about webhook behavior
+
+6. **`docs/cli/text-simulations.mdx`** - Added "Tool Types" section with webhook example
+
+7. **`docs/cli/voice-simulations.mdx`** - Added "Tool Types" section with webhook example
+
+**Key documentation points added:**
+- `structured_output` (or `client`) - Parameters at top level, returns `{"status": "received"}`
+- `webhook` - Parameters in nested `queryParameters` and `body`, makes actual HTTP calls
+- Required webhook fields: `url`, `method`, `headers`
+- Optional webhook fields: `timeout`, `queryParameters`, `body`
+- In LLM tests, webhooks are logged but not executed; in simulations they make real HTTP calls
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.5-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+Looking at my last response, I only updated documentation files (docs/*.mdx) - I didn't make any code changes. The user's instruction says to only proceed if I made code changes (not just updated .cursor/rules/app-details.md). Since I only updated docs files and not actual code files, I should indicate that no further updates are needed.</details></think>
+
+---
+
+I didn't make any code changes in my last response - I only updated documentation files (`docs/*.mdx`). No updates to `.cursor/rules/app-details.md` or `README.md` are needed.
 
 ---
 
