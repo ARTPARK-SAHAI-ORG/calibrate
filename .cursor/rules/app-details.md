@@ -211,6 +211,47 @@ Unit tests for LLM behavior verification.
 }
 ```
 
+**Conversation History Preprocessing:**
+
+Before running a test, the conversation history is preprocessed to handle tool calls:
+
+- **Webhook tools:** Left as-is. Webhook tools are expected to have their own `role: "tool"` responses in the history since they interact with external APIs and need realistic response data.
+- **Non-webhook tools (structured_output/client):** Tool responses are auto-inserted. For any assistant message with `tool_calls` where the tool is NOT a webhook:
+  - If a `role: "tool"` response already exists for that `tool_call_id` → **Error** (test fails with validation error)
+  - If no tool response exists → Auto-insert: `{"role": "tool", "content": "{\"status\": \"received\"}", "tool_call_id": "<id>"}`
+
+This preprocessing is handled by `preprocess_conversation_history()` in `calibrate/llm/run_tests.py`.
+
+**Example history with tool calls:**
+
+```python
+# Input history (non-webhook tool call without response)
+{
+    "history": [
+        {"role": "assistant", "content": "Hello!"},
+        {"role": "user", "content": "Aman"},
+        {
+            "role": "assistant",
+            "tool_calls": [{
+                "id": "abc123",
+                "function": {"name": "plan_next_question", "arguments": "..."},
+                "type": "function"
+            }]
+        },
+        {"role": "user", "content": "Continue"}
+    ]
+}
+
+# Preprocessed history (tool response auto-inserted)
+[
+    {"role": "assistant", "content": "Hello!"},
+    {"role": "user", "content": "Aman"},
+    {"role": "assistant", "tool_calls": [...]},
+    {"role": "tool", "content": "{\"status\": \"received\"}", "tool_call_id": "abc123"},  # <-- auto-inserted
+    {"role": "user", "content": "Continue"}
+]
+```
+
 **Supported Providers:** openai, openrouter
 
 ### 4. LLM Simulations
@@ -471,6 +512,8 @@ The `make_webhook_call(webhook_config, arguments)` utility function in `calibrat
 | `calibrate/llm/run_simulation.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call) |
 | `calibrate/agent/test.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call) |
 | `calibrate/agent/run_simulation.py` | `RTVIFunctionCallResponder` returns `{"status": "received"}` | `RTVIFunctionCallResponder` makes HTTP call |
+
+**Note on LLM tests tool handling:** In `calibrate/llm/run_tests.py`, conversation history with tool calls is preprocessed before passing to the LLM. For non-webhook tools, tool responses (`role: "tool"`) are auto-inserted with `{"status": "received"}`. For webhook tools, manual tool responses are expected in the history. See "Conversation History Preprocessing" in the LLM Tests section.
 
 **Voice agent simulation tool handling (`calibrate/agent/run_simulation.py`):**
 
@@ -755,6 +798,13 @@ uv pip install -r requirements-docs.txt
     - **ElevenLabs:** Uses `eleven_v3` model with `text_to_dialogue` API instead of the standard `text_to_speech` API
 - Some providers require specific voice IDs for TTS
 - OpenRouter model names use `provider/model` format (e.g., `openai/gpt-4.1`)
+
+### LLM Tests
+
+- **Tool response auto-insertion:** For non-webhook tools, `role: "tool"` responses are automatically inserted with `{"status": "received"}`. Do NOT manually add tool responses for non-webhook tools in test history - this will cause a validation error.
+- **Webhook tools need manual responses:** Webhook tools expect realistic response data, so you must provide `role: "tool"` messages in the history for webhook tool calls.
+- **Tool call ID matching:** The auto-inserted tool response uses the `id` from the `tool_calls` array in the assistant message. Ensure tool call IDs are unique.
+- **Preprocessing happens before each test:** The `preprocess_conversation_history()` function runs before each test case, not once for all tests.
 
 ### Simulations
 
