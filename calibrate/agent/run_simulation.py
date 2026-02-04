@@ -26,6 +26,8 @@ from calibrate.utils import (
     save_audio_chunk,
     combine_turn_audio_chunks,
     combine_audio_files,
+    build_tools_schema,
+    make_webhook_call,
 )
 from calibrate.llm.metrics import evaluate_simuation
 from calibrate.stt.metrics import get_llm_judge_score as stt_llm_judge_score
@@ -366,7 +368,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
             # don't forward bot audio frames after the interruption has been triggered
             return
         elif isinstance(frame, InputAudioRawFrame) and self._turn_index:
-            log_and_print("Received audio frame from agent")
+            # log_and_print("Received audio frame from agent")
             # Save bot audio chunk
             turn_index = self._turn_index
             chunk_index = self._bot_audio_chunk_indices.get(turn_index, 0)
@@ -670,7 +672,7 @@ class SilencePadder(FrameProcessor):
         if isinstance(frame, OutputAudioRawFrame):
             self._last_sample_rate = frame.sample_rate
             self._last_num_channels = frame.num_channels
-            log_and_print("Sending audio frame from simulated user")
+            # log_and_print("Sending audio frame from simulated user")
             # Save user audio chunk
             if self._audio_save_dir and self._rtvi_message_adapter:
                 turn_index = self._rtvi_message_adapter._turn_index
@@ -743,12 +745,18 @@ class MaxTurnsEndProcessor(FrameProcessor):
 
 
 class RTVIFunctionCallResponder(FrameProcessor):
-    def __init__(self, tool_calls: list[dict], context: LLMContext):
+    def __init__(
+        self,
+        tool_calls: list[dict],
+        context: LLMContext,
+        webhook_configs: dict[str, dict] = None,
+    ):
         super().__init__(enable_direct_mode=True, name="RTVIFunctionCallResponder")
         self._send_frame = None
         self._end_call_callback = None
         self._tool_calls = tool_calls
         self._context = context
+        self._webhook_configs = webhook_configs or {}
 
     def set_frame_sender(self, sender):
         self._send_frame = sender
@@ -807,10 +815,14 @@ class RTVIFunctionCallResponder(FrameProcessor):
                 result["reason"] = reason
             return result, _post_callback
 
-        if function_name == "plan_next_question":
-            return {"status": "received"}, None
+        # Check if this is a webhook tool
+        if function_name in self._webhook_configs:
+            webhook_config = self._webhook_configs[function_name]
+            result = await make_webhook_call(webhook_config, arguments or {})
+            return result, None
 
-        return {"status": "unhandled"}, None
+        # For all other (non-webhook) tools, return status received
+        return {"status": "received"}, None
 
     async def _send_result_message(
         self, function_name, tool_call_id, arguments, result
@@ -851,9 +863,15 @@ async def run_simulation(
     port: int = DEFAULT_PORT,
     agent_speaks_first: bool = True,
     max_turns: int = DEFAULT_MAX_TURNS,
+    tools: list[dict] = None,
 ) -> dict:
     # Set context for EVAL logs
     current_context.set("EVAL")
+
+    # Build webhook configs from tools for function call handling
+    webhook_configs = {}
+    if tools:
+        _, webhook_configs = build_tools_schema(tools)
 
     eval_logger.info(f"Starting evaluation pipeline")
 
@@ -963,7 +981,9 @@ async def run_simulation(
     audio_buffer = AudioBufferProcessor(enable_turn_audio=True)
 
     tool_calls = []
-    function_call_handler = RTVIFunctionCallResponder(tool_calls, context)
+    function_call_handler = RTVIFunctionCallResponder(
+        tool_calls, context, webhook_configs
+    )
 
     rtvi_message_adapter = RTVIMessageFrameAdapter(
         context,
@@ -1328,6 +1348,8 @@ async def run_single_simulation_task(
     )
     agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
 
+    max_turns = config.get("settings", {}).get("max_turns", DEFAULT_MAX_TURNS)
+
     command = " ".join(sys.argv)
     log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
@@ -1342,6 +1364,7 @@ async def run_single_simulation_task(
     log_and_print(f"\033[93mTTS Config:\033[0m {tts_config}")
     log_and_print(f"\033[93mLLM Config:\033[0m {llm_config}")
     log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
+    log_and_print(f"\033[93mMax Turns:\033[0m {max_turns}")
     log_and_print("--------------------------------")
 
     simulation_result = None
@@ -1372,9 +1395,8 @@ async def run_single_simulation_task(
                 interrupt_probability=interrupt_probability,
                 port=port,
                 agent_speaks_first=agent_speaks_first,
-                max_turns=config.get("settings", {}).get(
-                    "max_turns", DEFAULT_MAX_TURNS
-                ),
+                max_turns=max_turns,
+                tools=config.get("tools", []),
             )
         )
         simulation_tasks = [bot_task, sim_task]

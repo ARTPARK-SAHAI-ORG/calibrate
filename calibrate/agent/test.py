@@ -11,7 +11,13 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from typing import Literal
 
-from calibrate.utils import save_audio_chunk, create_stt_service, create_tts_service
+from calibrate.utils import (
+    save_audio_chunk,
+    create_stt_service,
+    create_tts_service,
+    build_tools_schema,
+    make_webhook_call,
+)
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
@@ -238,33 +244,33 @@ async def run_bot(
         },
         required=[],
     )
-    standard_tools = [end_call_tool]
+
+    # Build tool schemas using common utility
+    tool_schemas, webhook_configs = build_tools_schema(config.tools)
+    standard_tools = [end_call_tool] + tool_schemas
+
+    def create_webhook_function_call(webhook_config: dict):
+        async def webhook_function_call(params: FunctionCallParams):
+            print(
+                f"{params.function_name} (webhook) invoked with arguments: {params.arguments}"
+            )
+
+            result = await make_webhook_call(webhook_config, params.arguments or {})
+            await params.result_callback(result)
+            return
+
+        return webhook_function_call
+
+    # Register function handlers
     llm.register_function("end_call", end_call)
-
-    for tool in config.tools:
-        properties = {}
-        for parameter in tool["parameters"]:
-            prop = {
-                "type": parameter["type"],
-                "description": parameter["description"],
-            }
-
-            if "items" in parameter:
-                prop["items"] = parameter["items"]
-
-            if "enum" in parameter:
-                prop["enum"] = parameter["enum"]
-
-            properties[parameter["id"]] = prop
-
-        tool_function = FunctionSchema(
-            name=tool["name"],
-            description=tool["description"],
-            properties=properties,
-            required=[],
-        )
-        standard_tools.append(tool_function)
-        llm.register_function(tool["name"], generic_function_call)
+    for tool_schema in tool_schemas:
+        if tool_schema.name in webhook_configs:
+            llm.register_function(
+                tool_schema.name,
+                create_webhook_function_call(webhook_configs[tool_schema.name]),
+            )
+        else:
+            llm.register_function(tool_schema.name, generic_function_call)
 
     tools = ToolsSchema(standard_tools=standard_tools)
     context = LLMContext(messages, tools)

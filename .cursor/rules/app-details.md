@@ -367,9 +367,15 @@ calibrate agent test -c ./config.json -o ./out
 
 ### Tool Definition Format
 
+Tools can be defined in two formats: `structured_output` (default) and `webhook`.
+
+**Structured Output Format (default):**
+
+Parameters are defined at the top level in a `parameters` array:
+
 ```json
 {
-  "type": "client",
+  "type": "structured_output",
   "name": "plan_next_question",
   "description": "Plan the next question to ask",
   "parameters": [
@@ -387,6 +393,99 @@ calibrate agent test -c ./config.json -o ./out
       "required": true
     }
   ]
+}
+```
+
+**Webhook Format:**
+
+Parameters are extracted from `webhook.queryParameters` and `webhook.body.parameters`.
+
+**Required fields** in `webhook` object (raises `ValueError` if missing):
+- `url` - The webhook endpoint URL
+- `method` - HTTP method (GET, POST, PUT, etc.)
+- `headers` - Array of header objects (can be empty `[]`)
+
+```json
+{
+  "type": "webhook",
+  "name": "submit_form",
+  "description": "Submit form data to external API",
+  "parameters": [],
+  "webhook": {
+    "method": "POST",
+    "url": "https://api.example.com/submit",
+    "timeout": 20,
+    "headers": [
+      {"name": "Authorization", "value": "Bearer X"}
+    ],
+    "queryParameters": [
+      {"id": "key", "type": "string", "description": "API key", "required": true}
+    ],
+    "body": {
+      "description": "Request body",
+      "parameters": [
+        {"id": "data", "type": "string", "description": "Form data", "required": true}
+      ]
+    }
+  }
+}
+```
+
+**How tool parameters are processed:**
+
+Tool schema building is centralized in `calibrate/utils.py` via the `build_tools_schema(tools)` function, which returns `tuple[list[FunctionSchema], dict[str, dict]]` (schemas and webhook configs).
+
+This function is used by all files that handle tools:
+- `calibrate/llm/run_tests.py` - Uses webhook configs to log webhook details (no actual HTTP call)
+- `calibrate/agent/bot.py` - Uses webhook configs to make actual HTTP calls
+- `calibrate/llm/run_simulation.py` - Uses webhook configs to make actual HTTP calls
+- `calibrate/agent/test.py` - Uses webhook configs to make actual HTTP calls
+
+**For `structured_output` type (or when `type` is not specified):**
+- Parameters from `tool["parameters"]` are added as flat properties to the FunctionSchema
+- `required` list contains parameter IDs where `"required": true`
+
+**For `webhook` type:**
+- Parameters are structured as nested `query` and `body` objects in the FunctionSchema:
+  - `query`: object containing properties from `webhook.queryParameters` with its own `required` list
+  - `body`: object containing properties from `webhook.body.parameters` with its own `required` list
+- Top-level `required` list contains `"query"` and/or `"body"` if they have any required params
+- Webhook configs (url, method, headers, timeout) are returned separately for handler registration
+
+**Webhook HTTP calls:**
+
+The `make_webhook_call(webhook_config, arguments)` utility function in `calibrate/utils.py` makes actual HTTP requests:
+- Uses `aiohttp` for async HTTP calls
+- Converts headers list to dict format
+- Extracts query params from `arguments["query"]` and body from `arguments["body"]`
+- Supports GET, POST, PUT, PATCH, DELETE methods (body only sent for POST/PUT/PATCH)
+- Returns `{status, status_code, response}` on success or `{status: "error", error: "..."}` on failure
+- Handles timeouts (configurable, defaults to 20s) and client errors gracefully
+
+**Handler registration:**
+
+| File | structured_output | webhook |
+|------|-------------------|---------|
+| `calibrate/llm/run_tests.py` | `generic_tool_call` (logs only) | `webhook_tool_call` (logs only, no HTTP) |
+| `calibrate/agent/bot.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call in "run" mode) |
+| `calibrate/llm/run_simulation.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call) |
+| `calibrate/agent/test.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call) |
+| `calibrate/agent/run_simulation.py` | `RTVIFunctionCallResponder` returns `{"status": "received"}` | `RTVIFunctionCallResponder` makes HTTP call |
+
+**Voice agent simulation tool handling (`calibrate/agent/run_simulation.py`):**
+
+The `RTVIFunctionCallResponder` class handles function calls received via RTVI protocol in voice agent simulations:
+- Accepts `webhook_configs` parameter built from tools via `build_tools_schema`
+- `end_call`: Returns `{"acknowledged": true}` and triggers end call callback
+- Webhook tools: Makes actual HTTP call via `make_webhook_call` and returns response
+- Non-webhook tools: Returns `{"status": "received"}`
+- Tools are passed from `run_single_simulation_task` → `run_simulation` → `RTVIFunctionCallResponder`
+
+**Example LLM arguments for webhook tool:**
+```json
+{
+  "query": {"key": "abc123"},
+  "body": {"data": "form data"}
 }
 ```
 
@@ -450,6 +549,7 @@ calibrate agent test -c ./config.json -o ./out
 - **Package Manager:** uv
 - **Key Dependencies:**
   - `pipecat-ai` - Voice pipeline framework (used for voice agent simulations only)
+  - `aiohttp` - Async HTTP client for webhook calls
   - `openai` - OpenAI STT/TTS API
   - `google-cloud-speech`, `google-cloud-texttospeech` - Google Cloud APIs
   - `elevenlabs` - ElevenLabs STT/TTS API
@@ -614,7 +714,7 @@ uv pip install -r requirements-docs.txt
 2. **Type Hints:** Use `Literal` for constrained string parameters
 3. **Module Structure:** Each module exposes a clean public API via `__init__.py`
 4. **Output Organization:** Consistent directory structure across all modules
-5. **Logging:** Dual logging to terminal and log files
+5. **Logging:** Dual logging to terminal and log files with parallel-safe per-simulation loggers
 6. **Error Handling:** Graceful failure with detailed error messages
 7. **Checkpointing:** Resume from interruption using existing results
 
@@ -662,6 +762,61 @@ uv pip install -r requirements-docs.txt
 - `max_turns` limits assistant turns, not total turns
 - Conversation ends gracefully after max turns (final assistant message recorded)
 - Transcript includes `end_reason` message when max turns reached
+
+### Parallel Simulation Logging
+
+When multiple simulations run in parallel (e.g., via `asyncio.gather`), each simulation needs its own isolated logging to prevent logs from mixing. There are two logging systems that need isolation:
+
+#### 1. Loguru (`logs` file) - Uses `logger.contextualize()`
+
+Loguru's `contextualize()` context manager binds extra data to ALL log calls within its scope, including logs from libraries like pipecat. Combined with a strict filter, this ensures each simulation's `logs` file only contains its own logs.
+
+```python
+# Create sink with strict filter (only accepts logs from this simulation)
+def simulation_filter(record):
+    sim_name = record["extra"].get("simulation")
+    return sim_name == simulation_name
+
+log_file_id = logger.add(logs_file_path, filter=simulation_filter, ...)
+
+# Wrap ALL simulation code in contextualize
+with logger.contextualize(simulation=simulation_name):
+    # All logger calls here (including from pipecat) have simulation in extra
+    await run_simulation(...)
+
+# Cleanup
+logger.remove(log_file_id)
+```
+
+#### 2. Print Logger (`results.log` file) - Uses per-simulation loggers
+
+- **`calibrate/utils.py` logging utilities:**
+  - `_simulation_print_loggers: dict[str, logging.Logger]` - Stores per-simulation print loggers
+  - `current_simulation_name: ContextVar[str]` - Context variable to track active simulation
+  - `configure_print_logger(log_path, simulation_name="")` - Creates unique logger per simulation
+  - `cleanup_print_logger(simulation_name)` - Closes file handlers and removes logger from dict
+  - `log_and_print(message)` - Uses context variable to find correct print logger
+
+```python
+# Setup
+configure_print_logger(print_log_save_path, simulation_name=simulation_name)
+current_simulation_name.set(simulation_name)
+
+# During simulation - log_and_print uses context var automatically
+log_and_print("message")  # Goes to correct simulation's results.log
+
+# Cleanup (in finally block)
+cleanup_print_logger(simulation_name)
+```
+
+- **Gotchas:**
+  - Call `logger.remove()` once at the start of `main()` to remove the default stderr handler - this prevents all loguru logs from appearing on terminal
+  - The `logger.contextualize()` block MUST wrap all simulation code including the `run_simulation()` call
+  - The filter must be strict (`return sim_name == simulation_name`) - do NOT use `or sim_name is None` fallback
+  - Always call `cleanup_print_logger` in a `finally` block to avoid resource leaks
+  - Always call `logger.remove(log_file_id)` in a `finally` block
+  - The global `_print_logger` is used for backwards compatibility when `simulation_name` is not provided
+  - Only `log_and_print` output appears on terminal (via `print()`); loguru logs go only to file sinks
 
 ### Interactive Testing
 

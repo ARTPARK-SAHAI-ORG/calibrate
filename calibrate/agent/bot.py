@@ -5,7 +5,12 @@ from loguru import logger
 import asyncio
 
 from pydantic import BaseModel
-from calibrate.utils import create_stt_service, create_tts_service
+from calibrate.utils import (
+    create_stt_service,
+    create_tts_service,
+    build_tools_schema,
+    make_webhook_call,
+)
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.frames.frames import (
@@ -19,6 +24,7 @@ from pipecat.frames.frames import (
     LLMRunFrame,
     MetricsFrame,
     OutputAudioRawFrame,
+    TranscriptionFrame,
     FunctionCallResultFrame,
     UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
@@ -281,33 +287,72 @@ async def run_bot(
         },
         required=[],
     )
-    standard_tools = [end_call_tool]
+
+    # Build tool schemas using common utility
+    tool_schemas, webhook_configs = build_tools_schema(tools)
+    standard_tools = [end_call_tool] + tool_schemas
+
+    def create_webhook_function_call(webhook_config: dict):
+        async def webhook_function_call(params: FunctionCallParams):
+            bot_logger.info(
+                f"{params.function_name} (webhook) invoked with arguments: {params.arguments}"
+            )
+
+            # In "run" mode, make the actual webhook call
+            if mode == "run":
+                result = await make_webhook_call(webhook_config, params.arguments or {})
+                await params.result_callback(result)
+                return
+
+            # In eval mode, forward to client like generic function call
+            tool_call_id = params.tool_call_id
+            pending_tool_calls[tool_call_id] = params
+
+            result_event = asyncio.Event()
+            pending_tool_call_events[tool_call_id] = result_event
+
+            try:
+                await rtvi.handle_function_call(params)
+
+                try:
+                    await asyncio.wait_for(result_event.wait(), timeout=30.0)
+                except asyncio.TimeoutError:
+                    bot_logger.warning(
+                        f"Timeout waiting for function call result for {params.function_name}:{tool_call_id}"
+                    )
+                    pending_tool_calls.pop(tool_call_id, None)
+                    pending_tool_call_events.pop(tool_call_id, None)
+                    return
+
+                result = pending_tool_call_results.pop(tool_call_id, None)
+                pending_tool_calls.pop(tool_call_id, None)
+                pending_tool_call_events.pop(tool_call_id, None)
+
+                await params.result_callback(result)
+                bot_logger.debug(
+                    f"Delivered function call result for {params.function_name}:{tool_call_id}"
+                )
+
+            except Exception as exc:
+                pending_tool_calls.pop(tool_call_id, None)
+                pending_tool_call_events.pop(tool_call_id, None)
+                pending_tool_call_results.pop(tool_call_id, None)
+                bot_logger.warning(
+                    f"Unable to forward {params.function_name} to client: {exc}"
+                )
+
+        return webhook_function_call
+
+    # Register function handlers
     llm.register_function("end_call", end_call)
-
-    for tool in tools:
-        properties = {}
-        for parameter in tool["parameters"]:
-            prop = {
-                "type": parameter["type"],
-                "description": parameter["description"],
-            }
-
-            if "items" in parameter:
-                prop["items"] = parameter["items"]
-
-            if "enum" in parameter:
-                prop["enum"] = parameter["enum"]
-
-            properties[parameter["id"]] = prop
-
-        tool_function = FunctionSchema(
-            name=tool["name"],
-            description=tool["description"],
-            properties=properties,
-            required=[],
-        )
-        standard_tools.append(tool_function)
-        llm.register_function(tool["name"], generic_function_call)
+    for tool_schema in tool_schemas:
+        if tool_schema.name in webhook_configs:
+            llm.register_function(
+                tool_schema.name,
+                create_webhook_function_call(webhook_configs[tool_schema.name]),
+            )
+        else:
+            llm.register_function(tool_schema.name, generic_function_call)
 
     tools = ToolsSchema(standard_tools=standard_tools)
 
