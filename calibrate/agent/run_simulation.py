@@ -17,6 +17,7 @@ from PIL.ImageFile import ImageFile
 from dataclasses import dataclass
 import numpy as np
 from collections import defaultdict
+import sentry_sdk
 
 from calibrate.utils import (
     current_context,
@@ -360,6 +361,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 f"Failed to save intermediate state for turn {concluded_turn}",
                 extra={"error": str(exc)},
             )
+            sentry_sdk.capture_exception(exc)
 
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
@@ -553,6 +555,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     "Failed to persist RTVI transcripts",
                     extra={"error": str(exc)},
                 )
+                sentry_sdk.capture_exception(exc)
 
         await self.push_frame(frame, direction)
 
@@ -1420,9 +1423,11 @@ async def run_single_simulation_task(
             except Exception as e:
                 traceback.print_exc()
                 eval_logger.error(f"ERROR: Failed to get simulation result: {e}")
+                sentry_sdk.capture_exception(e)
     except Exception as e:
         traceback.print_exc()
         eval_logger.error(f"ERROR: Unable to run: {e}")
+        sentry_sdk.capture_exception(e)
     finally:
         # Ensure all tasks are fully cancelled and cleaned up
         for task in [bot_task, sim_task]:
@@ -1537,6 +1542,7 @@ async def main():
             except Exception as e:
                 traceback.print_exc()
                 logger.error(f"Simulation failed with error: {e}")
+                sentry_sdk.capture_exception(e)
                 results.append(e)
             finally:
                 # Cleanup between simulations to prevent state leakage
