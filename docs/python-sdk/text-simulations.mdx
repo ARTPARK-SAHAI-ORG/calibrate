@@ -13,10 +13,10 @@ Each simulation pairs every persona with every scenario. The runner fans out int
 import asyncio
 from calibrate.llm import simulations
 
-# Define your tools
+# Define your tools (see Tool Types section below for webhook tools)
 tools = [
     {
-        "type": "client",
+        "type": "structured_output",  # or "client" - both work the same
         "name": "plan_next_question",
         "description": "Plan the next question to ask",
         "parameters": [
@@ -78,6 +78,53 @@ result = asyncio.run(simulations.run(
     agent_speaks_first=True,
     max_turns=50,
 ))
+```
+
+## Tool Types
+
+Calibrate supports two tool types:
+
+### Structured Output (Default)
+
+Use `"type": "structured_output"` (or `"client"`) for tools that extract structured data. Parameters are defined at the top level.
+
+```python
+{
+    "type": "structured_output",
+    "name": "plan_next_question",
+    "description": "Plan the next question",
+    "parameters": [
+        {"id": "question_index", "type": "integer", "description": "Next question", "required": True}
+    ]
+}
+```
+
+### Webhook
+
+Use `"type": "webhook"` for tools that call external APIs. Webhook tools make actual HTTP calls during simulations.
+
+```python
+{
+    "type": "webhook",
+    "name": "submit_form",
+    "description": "Submit form data to external API",
+    "parameters": [],
+    "webhook": {
+        "method": "POST",
+        "url": "https://api.example.com/submit",
+        "timeout": 20,
+        "headers": [{"name": "Authorization", "value": "Bearer TOKEN"}],
+        "queryParameters": [
+            {"id": "key", "type": "string", "description": "API key", "required": True}
+        ],
+        "body": {
+            "description": "Request body",
+            "parameters": [
+                {"id": "data", "type": "string", "description": "Form data", "required": True}
+            ]
+        }
+    }
+}
 ```
 
 **Function Parameters:**

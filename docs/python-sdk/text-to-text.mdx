@@ -13,10 +13,10 @@ Define your system prompt, tools, and test cases to evaluate LLM behavior:
 import asyncio
 from calibrate.llm import tests
 
-# Define your tools
+# Define your tools (structured_output type - default)
 tools = [
     {
-        "type": "client",
+        "type": "structured_output",  # or "client" - both work the same
         "name": "plan_next_question",
         "description": "Plan the next question to ask",
         "parameters": [
@@ -81,6 +81,59 @@ result = asyncio.run(tests.run(
     run_name="my_test_run",
 ))
 ```
+
+## Tool Types
+
+Calibrate supports two tool types:
+
+### Structured Output (Default)
+
+Use `"type": "structured_output"` (or `"client"`) for tools that extract structured data from conversations. Parameters are defined at the top level.
+
+```python
+{
+    "type": "structured_output",
+    "name": "plan_next_question",
+    "description": "Plan the next question to ask",
+    "parameters": [
+        {"id": "question_index", "type": "integer", "description": "Next question", "required": True}
+    ]
+}
+```
+
+### Webhook
+
+Use `"type": "webhook"` for tools that call external APIs. Parameters are nested under `webhook.queryParameters` and `webhook.body.parameters`.
+
+```python
+{
+    "type": "webhook",
+    "name": "submit_form",
+    "description": "Submit form data to external API",
+    "parameters": [],  # Empty - params defined in webhook
+    "webhook": {
+        "method": "POST",
+        "url": "https://api.example.com/submit",
+        "timeout": 20,  # Optional, defaults to 20s
+        "headers": [
+            {"name": "Authorization", "value": "Bearer YOUR_TOKEN"}
+        ],
+        "queryParameters": [
+            {"id": "key", "type": "string", "description": "API key", "required": True}
+        ],
+        "body": {
+            "description": "Request body",
+            "parameters": [
+                {"id": "data", "type": "string", "description": "Form data", "required": True}
+            ]
+        }
+    }
+}
+```
+
+<Note>
+Webhook tools make actual HTTP calls during simulations. In LLM tests, webhook calls are logged but not executed.
+</Note>
 
 **Function Parameters:**
 

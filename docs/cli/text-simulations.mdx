@@ -60,7 +60,7 @@ calibrate llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p ope
   "system_prompt": "You are a helpful nurse filling out a form...",
   "tools": [
     {
-      "type": "client",
+      "type": "structured_output",
       "name": "plan_next_question",
       "description": "Plan the next question",
       "parameters": [
@@ -102,6 +102,38 @@ calibrate llm simulations run -c ./config.json -o ./out -m openai/gpt-4.1 -p ope
   "settings": {
     "agent_speaks_first": true,
     "max_turns": 50
+  }
+}
+```
+
+### Tool Types
+
+Two tool types are supported:
+
+**Structured Output (Default):** Use `"type": "structured_output"` (or `"client"`) for tools that extract structured data.
+
+**Webhook:** Use `"type": "webhook"` for tools that call external APIs. Webhook tools make actual HTTP calls during simulations:
+
+```json
+{
+  "type": "webhook",
+  "name": "submit_form",
+  "description": "Submit form data",
+  "parameters": [],
+  "webhook": {
+    "method": "POST",
+    "url": "https://api.example.com/submit",
+    "timeout": 20,
+    "headers": [{"name": "Authorization", "value": "Bearer TOKEN"}],
+    "queryParameters": [
+      {"id": "key", "type": "string", "description": "API key", "required": true}
+    ],
+    "body": {
+      "description": "Request body",
+      "parameters": [
+        {"id": "data", "type": "string", "description": "Form data", "required": true}
+      ]
+    }
   }
 }
 ```

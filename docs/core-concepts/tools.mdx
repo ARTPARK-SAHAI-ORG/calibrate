@@ -3,49 +3,149 @@ title: "Tools"
 description: "Learn how to create tools for your agents"
 ---
 
-Tools enable your agents to produce structured outputs. They define the parameters and format for extracting information from conversations.
+Tools enable your agents to produce structured outputs or call external APIs. They define the parameters and format for extracting information from conversations.
 
-## Creating a Tool
+## Tool Types
 
-### Navigate to Tools
+Calibrate supports two types of tools:
 
-From the sidebar, click **Tools** to view your existing tools.
+### Structured Output (Default)
 
-<Frame>
-  <img src="./images/tools-1.png" alt="Tools" />
-</Frame>
+Use `"type": "structured_output"` (or `"client"`) for tools that extract structured data from conversations. The LLM calls the tool with the specified parameters, and Calibrate returns a status acknowledgment.
 
-### Click "Add tool"
+```json
+{
+  "type": "structured_output",
+  "name": "plan_next_question",
+  "description": "Plan the next question to ask the user",
+  "parameters": [
+    {
+      "id": "next_unanswered_question_index",
+      "type": "integer",
+      "description": "Index of the next question to ask",
+      "required": true
+    },
+    {
+      "id": "questions_answered",
+      "type": "array",
+      "description": "List of question indices that have been answered",
+      "items": {"type": "integer"},
+      "required": true
+    }
+  ]
+}
+```
 
-Click the **Add tool** button in the top right corner. A sidebar panel will open.
+### Webhook
 
-<Frame>
-  <img src="./images/tools-2.png" alt="Add tool" />
-</Frame>
+Use `"type": "webhook"` for tools that call external APIs. When the LLM invokes a webhook tool, Calibrate makes an actual HTTP request to the specified endpoint and returns the response to the LLM.
 
-### Configure the Tool
+```json
+{
+  "type": "webhook",
+  "name": "submit_form",
+  "description": "Submit collected form data to the backend API",
+  "parameters": [],
+  "webhook": {
+    "method": "POST",
+    "url": "https://api.example.com/submit",
+    "timeout": 20,
+    "headers": [
+      {"name": "Authorization", "value": "Bearer YOUR_API_TOKEN"},
+      {"name": "Content-Type", "value": "application/json"}
+    ],
+    "queryParameters": [
+      {
+        "id": "api_key",
+        "type": "string",
+        "description": "API key for authentication",
+        "required": true
+      }
+    ],
+    "body": {
+      "description": "Form data to submit",
+      "parameters": [
+        {
+          "id": "patient_name",
+          "type": "string",
+          "description": "Patient's full name",
+          "required": true
+        },
+        {
+          "id": "patient_age",
+          "type": "integer",
+          "description": "Patient's age",
+          "required": false
+        }
+      ]
+    }
+  }
+}
+```
 
-Add the name and description of the tool describing when to call it along with the parameters which define the structure of the output that the agent should return.
+**Required webhook fields:**
+- `url` - The endpoint URL
+- `method` - HTTP method (GET, POST, PUT, PATCH, DELETE)
+- `headers` - Array of header objects (can be empty `[]`)
 
-<Frame>
-  <img src="./images/tools-3.png" alt="Configure tool" />
-</Frame>
+**Optional webhook fields:**
+- `timeout` - Request timeout in seconds (default: 20)
+- `queryParameters` - URL query parameters
+- `body` - Request body parameters (for POST, PUT, PATCH)
 
-### Save the Tool
+## Webhook Behavior by Module
 
-Click **Add tool** to create the tool.
-
-<Frame>
-  <img src="./images/tools-4.png" alt="Save tool" />
-</Frame>
+| Module | Structured Output | Webhook |
+|--------|-------------------|---------|
+| **LLM Tests** | Returns `{"status": "received"}` | Logs details only (no HTTP call) |
+| **Text Simulations** | Returns `{"status": "received"}` | Makes actual HTTP call |
+| **Voice Simulations** | Returns `{"status": "received"}` | Makes actual HTTP call |
+| **Interactive Testing** | Returns `{"status": "received"}` | Makes actual HTTP call |
 
 ## Inbuilt Tools
 
-Some tools are built into the platform and enabled by default:
+The following tool is built-in and enabled by default:
 
-| Tool                 | Description                      |
-| -------------------- | -------------------------------- |
-| **End conversation** | Allows the agent to end the call |
+| Tool | Description |
+|------|-------------|
+| **end_call** | Allows the agent to end the conversation |
+
+## Parameter Types
+
+Tools support the following parameter types:
+
+| Type | Description | Example |
+|------|-------------|---------|
+| `string` | Text value | `"hello"` |
+| `integer` | Whole number | `42` |
+| `number` | Decimal number | `3.14` |
+| `boolean` | True/false | `true` |
+| `array` | List of values | `[1, 2, 3]` |
+| `object` | Nested object | `{"key": "value"}` |
+
+For arrays, specify the item type with `"items"`:
+
+```json
+{
+  "id": "tags",
+  "type": "array",
+  "description": "List of tags",
+  "items": {"type": "string"},
+  "required": false
+}
+```
+
+For enums, specify allowed values with `"enum"`:
+
+```json
+{
+  "id": "priority",
+  "type": "string",
+  "description": "Task priority",
+  "enum": ["low", "medium", "high"],
+  "required": true
+}
+```
 
 ## Next Steps
 
