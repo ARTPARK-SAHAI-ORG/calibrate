@@ -591,7 +591,8 @@ The `RTVIFunctionCallResponder` class handles function calls received via RTVI p
 - **Language:** Python 3.10+
 - **Package Manager:** uv
 - **Key Dependencies:**
-  - `pipecat-ai` - Voice pipeline framework (used for voice agent simulations only)
+  - `pipecat-ai` - Voice pipeline framework (used for voice agent simulations only). **MUST be pinned to exact version** (e.g., `==0.0.98`) in `pyproject.toml` because the library is distributed as a wheel and loose constraints (`>=`) will install latest version on servers, causing version mismatches and breaking changes.
+  - `pipecat-ai-small-webrtc-prebuilt` - WebRTC support for pipecat. **MUST also be pinned** to exact version.
   - `aiohttp` - Async HTTP client for webhook calls
   - `openai` - OpenAI STT/TTS API
   - `google-cloud-speech`, `google-cloud-texttospeech` - Google Cloud APIs
@@ -758,7 +759,7 @@ uv pip install -r requirements-docs.txt
 3. **Module Structure:** Each module exposes a clean public API via `__init__.py`
 4. **Output Organization:** Consistent directory structure across all modules
 5. **Logging:** Dual logging to terminal and log files with parallel-safe per-simulation loggers
-6. **Error Handling:** Graceful failure with detailed error messages
+6. **Error Handling:** Let errors propagate (no silent catching) so Sentry captures them automatically
 7. **Checkpointing:** Resume from interruption using existing results
 
 ---

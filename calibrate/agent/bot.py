@@ -3,7 +3,6 @@ from typing import Any, Dict, Literal
 
 from loguru import logger
 import asyncio
-import sentry_sdk
 
 from pydantic import BaseModel
 from calibrate.utils import (
@@ -121,8 +120,7 @@ async def run_bot(
     agent_speaks_first: bool = True,
 ):
     if language not in ["english", "hindi", "kannada"]:
-        bot_logger.error(f"Invalid language: {language}")
-        return
+        raise ValueError(f"Invalid language: {language}")
 
     bot_logger.info(f"Starting bot")
 
@@ -156,13 +154,7 @@ async def run_bot(
     ]
 
     async def _exec_call_call():
-        try:
-            await task.cancel()
-        except Exception as exc:
-            bot_logger.warning(
-                f"Unable to cancel task after end_call (no tool_call_id): {exc}"
-            )
-            sentry_sdk.capture_exception(exc)
+        await task.cancel()
 
     async def end_call(params: FunctionCallParams):
         reason = params.arguments.get("reason") if params.arguments else None
@@ -185,40 +177,30 @@ async def run_bot(
         result_event = asyncio.Event()
         pending_tool_call_events[tool_call_id] = result_event
 
+        await rtvi.handle_function_call(params)
+
+        # Wait for the result from the eval side (with timeout)
         try:
-            await rtvi.handle_function_call(params)
-
-            # Wait for the result from the eval side (with timeout)
-            try:
-                await asyncio.wait_for(result_event.wait(), timeout=30.0)
-            except asyncio.TimeoutError:
-                bot_logger.warning(
-                    f"Timeout waiting for function call result for end_call:{tool_call_id}"
-                )
-                pending_tool_calls.pop(tool_call_id, None)
-                pending_tool_call_events.pop(tool_call_id, None)
-                return
-
-            # Get the result and call the callback
-            result = pending_tool_call_results.pop(tool_call_id, None)
+            await asyncio.wait_for(result_event.wait(), timeout=30.0)
+        except asyncio.TimeoutError:
+            bot_logger.warning(
+                f"Timeout waiting for function call result for end_call:{tool_call_id}"
+            )
             pending_tool_calls.pop(tool_call_id, None)
             pending_tool_call_events.pop(tool_call_id, None)
+            raise
 
-            await params.result_callback(
-                result, properties=FunctionCallResultProperties(run_llm=False)
-            )
-            bot_logger.debug(
-                f"Delivered function call result for end_call:{tool_call_id}"
-            )
+        # Get the result and call the callback
+        result = pending_tool_call_results.pop(tool_call_id, None)
+        pending_tool_calls.pop(tool_call_id, None)
+        pending_tool_call_events.pop(tool_call_id, None)
 
-            await _exec_call_call()
+        await params.result_callback(
+            result, properties=FunctionCallResultProperties(run_llm=False)
+        )
+        bot_logger.debug(f"Delivered function call result for end_call:{tool_call_id}")
 
-        except Exception as exc:
-            pending_tool_calls.pop(tool_call_id, None)
-            pending_tool_call_events.pop(tool_call_id, None)
-            pending_tool_call_results.pop(tool_call_id, None)
-            bot_logger.warning(f"Unable to forward end_call to client: {exc}")
-            sentry_sdk.capture_exception(exc)
+        await _exec_call_call()
 
     async def generic_function_call(params: FunctionCallParams):
         bot_logger.info(
@@ -238,47 +220,37 @@ async def run_bot(
         result_event = asyncio.Event()
         pending_tool_call_events[tool_call_id] = result_event
 
+        await rtvi.handle_function_call(params)
+
+        # Wait for the result from the eval side (with timeout)
         try:
-            await rtvi.handle_function_call(params)
-
-            # Wait for the result from the eval side (with timeout)
-            try:
-                await asyncio.wait_for(result_event.wait(), timeout=30.0)
-            except asyncio.TimeoutError:
-                bot_logger.warning(
-                    f"Timeout waiting for function call result for {params.function_name}:{tool_call_id}"
-                )
-                pending_tool_calls.pop(tool_call_id, None)
-                pending_tool_call_events.pop(tool_call_id, None)
-                return
-
-            # Get the result and call the callback
-            result = pending_tool_call_results.pop(tool_call_id, None)
-            pending_tool_calls.pop(tool_call_id, None)
-            pending_tool_call_events.pop(tool_call_id, None)
-
-            properties = (
-                FunctionCallResultProperties(run_llm=False)
-                if params.function_name == "end_call"
-                else None
-            )
-
-            await params.result_callback(result, properties=properties)
-            bot_logger.debug(
-                f"Delivered function call result for {params.function_name}:{tool_call_id}"
-            )
-
-            if params.function_name == "end_call":
-                await _exec_call_call()
-
-        except Exception as exc:
-            pending_tool_calls.pop(tool_call_id, None)
-            pending_tool_call_events.pop(tool_call_id, None)
-            pending_tool_call_results.pop(tool_call_id, None)
+            await asyncio.wait_for(result_event.wait(), timeout=30.0)
+        except asyncio.TimeoutError:
             bot_logger.warning(
-                f"Unable to forward {params.function_name} to client: {exc}"
+                f"Timeout waiting for function call result for {params.function_name}:{tool_call_id}"
             )
-            sentry_sdk.capture_exception(exc)
+            pending_tool_calls.pop(tool_call_id, None)
+            pending_tool_call_events.pop(tool_call_id, None)
+            raise
+
+        # Get the result and call the callback
+        result = pending_tool_call_results.pop(tool_call_id, None)
+        pending_tool_calls.pop(tool_call_id, None)
+        pending_tool_call_events.pop(tool_call_id, None)
+
+        properties = (
+            FunctionCallResultProperties(run_llm=False)
+            if params.function_name == "end_call"
+            else None
+        )
+
+        await params.result_callback(result, properties=properties)
+        bot_logger.debug(
+            f"Delivered function call result for {params.function_name}:{tool_call_id}"
+        )
+
+        if params.function_name == "end_call":
+            await _exec_call_call()
 
     end_call_tool = FunctionSchema(
         name="end_call",
@@ -315,36 +287,26 @@ async def run_bot(
             result_event = asyncio.Event()
             pending_tool_call_events[tool_call_id] = result_event
 
+            await rtvi.handle_function_call(params)
+
             try:
-                await rtvi.handle_function_call(params)
-
-                try:
-                    await asyncio.wait_for(result_event.wait(), timeout=30.0)
-                except asyncio.TimeoutError:
-                    bot_logger.warning(
-                        f"Timeout waiting for function call result for {params.function_name}:{tool_call_id}"
-                    )
-                    pending_tool_calls.pop(tool_call_id, None)
-                    pending_tool_call_events.pop(tool_call_id, None)
-                    return
-
-                result = pending_tool_call_results.pop(tool_call_id, None)
-                pending_tool_calls.pop(tool_call_id, None)
-                pending_tool_call_events.pop(tool_call_id, None)
-
-                await params.result_callback(result)
-                bot_logger.debug(
-                    f"Delivered function call result for {params.function_name}:{tool_call_id}"
-                )
-
-            except Exception as exc:
-                pending_tool_calls.pop(tool_call_id, None)
-                pending_tool_call_events.pop(tool_call_id, None)
-                pending_tool_call_results.pop(tool_call_id, None)
+                await asyncio.wait_for(result_event.wait(), timeout=30.0)
+            except asyncio.TimeoutError:
                 bot_logger.warning(
-                    f"Unable to forward {params.function_name} to client: {exc}"
+                    f"Timeout waiting for function call result for {params.function_name}:{tool_call_id}"
                 )
-                sentry_sdk.capture_exception(exc)
+                pending_tool_calls.pop(tool_call_id, None)
+                pending_tool_call_events.pop(tool_call_id, None)
+                raise
+
+            result = pending_tool_call_results.pop(tool_call_id, None)
+            pending_tool_calls.pop(tool_call_id, None)
+            pending_tool_call_events.pop(tool_call_id, None)
+
+            await params.result_callback(result)
+            bot_logger.debug(
+                f"Delivered function call result for {params.function_name}:{tool_call_id}"
+            )
 
         return webhook_function_call
 

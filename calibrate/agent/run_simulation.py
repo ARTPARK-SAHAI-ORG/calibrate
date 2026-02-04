@@ -6,7 +6,6 @@ import sys
 import socket
 from os.path import join, exists
 import shutil
-import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Literal
@@ -17,7 +16,6 @@ from PIL.ImageFile import ImageFile
 from dataclasses import dataclass
 import numpy as np
 from collections import defaultdict
-import sentry_sdk
 
 from calibrate.utils import (
     current_context,
@@ -348,20 +346,9 @@ class RTVIMessageFrameAdapter(FrameProcessor):
 
     async def _save_intermediate_state(self, concluded_turn: int):
         """Save intermediate transcript after the concluded turn."""
-        try:
-            transcript = self._build_serialized_transcript()
-            self._save_transcript(transcript)
-            eval_logger.info(
-                f"Saved intermediate transcript after turn {concluded_turn}"
-            )
-
-        except Exception as exc:
-            traceback.print_exc()
-            eval_logger.error(
-                f"Failed to save intermediate state for turn {concluded_turn}",
-                extra={"error": str(exc)},
-            )
-            sentry_sdk.capture_exception(exc)
+        transcript = self._build_serialized_transcript()
+        self._save_transcript(transcript)
+        eval_logger.info(f"Saved intermediate transcript after turn {concluded_turn}")
 
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
@@ -526,36 +513,25 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     await self.push_frame(generated_frame, direction)
 
         if isinstance(frame, EndFrame) or isinstance(frame, CancelFrame):
-            try:
-                # Build and save final transcript
-                end_reason = "max_turns" if self._ended_due_to_max_turns else None
-                transcript = self._build_serialized_transcript(end_reason=end_reason)
-                self._save_transcript(transcript)
+            # Build and save final transcript
+            end_reason = "max_turns" if self._ended_due_to_max_turns else None
+            transcript = self._build_serialized_transcript(end_reason=end_reason)
+            self._save_transcript(transcript)
 
-                with open(
-                    os.path.join(self._output_dir, "tool_calls.json"), "w"
-                ) as tool_calls_file:
-                    json.dump(self._tool_calls, tool_calls_file, indent=4)
+            with open(
+                os.path.join(self._output_dir, "tool_calls.json"), "w"
+            ) as tool_calls_file:
+                json.dump(self._tool_calls, tool_calls_file, indent=4)
 
-                with open(
-                    os.path.join(self._output_dir, "stt_outputs.json"), "w"
-                ) as stt_outputs_file:
-                    json.dump(self._stt_outputs, stt_outputs_file, indent=4)
+            with open(
+                os.path.join(self._output_dir, "stt_outputs.json"), "w"
+            ) as stt_outputs_file:
+                json.dump(self._stt_outputs, stt_outputs_file, indent=4)
 
-                # Final cleanup: combine any remaining audio chunks that weren't processed
-                if os.path.exists(self._audio_save_dir):
-                    combine_turn_audio_chunks(self._audio_save_dir)
-                    eval_logger.info(
-                        "Final cleanup: combined any remaining audio chunks"
-                    )
-
-            except Exception as exc:
-                traceback.print_exc()
-                eval_logger.error(
-                    "Failed to persist RTVI transcripts",
-                    extra={"error": str(exc)},
-                )
-                sentry_sdk.capture_exception(exc)
+            # Final cleanup: combine any remaining audio chunks that weren't processed
+            if os.path.exists(self._audio_save_dir):
+                combine_turn_audio_chunks(self._audio_save_dir)
+                eval_logger.info("Final cleanup: combined any remaining audio chunks")
 
         await self.push_frame(frame, direction)
 
@@ -871,6 +847,47 @@ async def run_simulation(
     # Set context for EVAL logs
     current_context.set("EVAL")
 
+    # Capture ERROR-level logs to surface pipecat internal errors
+    captured_errors: list[str] = []
+
+    def error_capture_sink(message):
+        record = message.record
+        if record["level"].name in ("ERROR", "CRITICAL"):
+            captured_errors.append(record["message"])
+
+    error_sink_id = logger.add(error_capture_sink, level="ERROR")
+
+    try:
+        return await _run_simulation_inner(
+            system_prompt=system_prompt,
+            language=language,
+            gender=gender,
+            evaluation_criteria=evaluation_criteria,
+            output_dir=output_dir,
+            interrupt_probability=interrupt_probability,
+            port=port,
+            agent_speaks_first=agent_speaks_first,
+            max_turns=max_turns,
+            tools=tools,
+            captured_errors=captured_errors,
+        )
+    finally:
+        logger.remove(error_sink_id)
+
+
+async def _run_simulation_inner(
+    system_prompt: str,
+    language: Literal["english", "hindi"],
+    gender: Literal["male", "female"],
+    evaluation_criteria: list[dict],
+    output_dir: str,
+    interrupt_probability: float,
+    port: int,
+    agent_speaks_first: bool,
+    max_turns: int,
+    tools: list[dict],
+    captured_errors: list[str],
+) -> dict:
     # Build webhook configs from tools for function call handling
     webhook_configs = {}
     if tools:
@@ -916,7 +933,6 @@ async def run_simulation(
                 try:
                     return await original_connect(*args, **kwargs)
                 except (OSError, ConnectionError) as exc:
-                    traceback.print_exc()
                     last_error = exc
                     delay = min(base_delay * (2 ** (attempt - 1)), 5.0)
                     eval_logger.warning(
@@ -928,9 +944,6 @@ async def run_simulation(
                         },
                     )
                     await asyncio.sleep(delay)
-                except Exception as exc:
-                    traceback.print_exc()
-                    raise exc
 
             raise (
                 last_error
@@ -1126,6 +1139,22 @@ async def run_simulation(
     await runner.run(task)
 
     transcript = rtvi_message_adapter._serialized_transcript
+
+    # Check if the simulation completed with a meaningful transcript
+    # Only fail if there's no meaningful conversation - benign errors like STT timeouts
+    # after conversation ends should not cause failure
+    meaningful_messages = [
+        msg
+        for msg in transcript
+        if msg.get("role") in ("user", "assistant") and msg.get("content")
+    ]
+    if not meaningful_messages:
+        error_details = ""
+        if captured_errors:
+            error_details = f" Captured errors: {'; '.join(captured_errors)}"
+        raise RuntimeError(
+            f"Simulation failed: no meaningful conversation occurred.{error_details}"
+        )
 
     log_and_print(
         f"Evaluating the conversation based on the criteria:\n\n{evaluation_criteria}"
@@ -1388,6 +1417,17 @@ async def run_single_simulation_task(
         )
         # Give the bot a moment to start listening before connecting
         await asyncio.sleep(1.0)
+
+        # Check if bot_task failed during startup - if so, get its result to surface the error
+        if bot_task.done():
+            # This will raise if the bot task failed with an exception
+            bot_task.result()
+            # If we get here, bot completed without exception but also without starting server
+            # this is still wrong because the bot should be running, not completed
+            raise RuntimeError(
+                "Bot task completed unexpectedly before simulation could connect"
+            )
+
         sim_task = asyncio.create_task(
             run_simulation(
                 user_system_prompt,
@@ -1417,17 +1457,16 @@ async def run_single_simulation_task(
             await asyncio.gather(*pending, return_exceptions=True)
 
         # Get result from simulation task
-        if sim_task in done and not sim_task.cancelled():
-            try:
+        if sim_task in done:
+            if sim_task.cancelled():
+                # Simulation was cancelled (likely due to websocket disconnect from error)
+                # Check if bot_task has an exception that caused this
+                if bot_task in done and not bot_task.cancelled():
+                    # This will raise if bot_task failed with an exception
+                    bot_task.result()
+                raise RuntimeError("Simulation task was cancelled unexpectedly")
+            else:
                 simulation_result = sim_task.result()
-            except Exception as e:
-                traceback.print_exc()
-                eval_logger.error(f"ERROR: Failed to get simulation result: {e}")
-                sentry_sdk.capture_exception(e)
-    except Exception as e:
-        traceback.print_exc()
-        eval_logger.error(f"ERROR: Unable to run: {e}")
-        sentry_sdk.capture_exception(e)
     finally:
         # Ensure all tasks are fully cancelled and cleaned up
         for task in [bot_task, sim_task]:
@@ -1527,38 +1566,32 @@ async def main():
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
             simulation_count += 1
-            try:
-                result = await run_single_simulation_task(
-                    config=config,
-                    persona_index=persona_index,
-                    user_persona=user_persona,
-                    scenario_index=scenario_index,
-                    scenario=scenario,
-                    output_dir=args.output_dir,
-                    interrupt_sensitivity_map=interrupt_sensitivity_map,
-                    base_port=args.port,
-                )
-                results.append(result)
-            except Exception as e:
-                traceback.print_exc()
-                logger.error(f"Simulation failed with error: {e}")
-                sentry_sdk.capture_exception(e)
-                results.append(e)
-            finally:
-                # Cleanup between simulations to prevent state leakage
-                # This is critical when running multiple simulations sequentially
-                if simulation_count < total_simulations:
-                    # Force garbage collection to clean up lingering objects
-                    # (WebSocket connections, STT streams, turn analyzer state, etc.)
-                    gc.collect()
+            result = await run_single_simulation_task(
+                config=config,
+                persona_index=persona_index,
+                user_persona=user_persona,
+                scenario_index=scenario_index,
+                scenario=scenario,
+                output_dir=args.output_dir,
+                interrupt_sensitivity_map=interrupt_sensitivity_map,
+                base_port=args.port,
+            )
+            results.append(result)
 
-                    # Wait for ports to be fully released (TIME_WAIT state)
-                    # and for async cleanup tasks to complete
-                    cleanup_delay = 3.0  # seconds
-                    log_and_print(
-                        f"Waiting {cleanup_delay}s for cleanup before next simulation..."
-                    )
-                    await asyncio.sleep(cleanup_delay)
+            # Cleanup between simulations to prevent state leakage
+            # This is critical when running multiple simulations sequentially
+            if simulation_count < total_simulations:
+                # Force garbage collection to clean up lingering objects
+                # (WebSocket connections, STT streams, turn analyzer state, etc.)
+                gc.collect()
+
+                # Wait for ports to be fully released (TIME_WAIT state)
+                # and for async cleanup tasks to complete
+                cleanup_delay = 3.0  # seconds
+                log_and_print(
+                    f"Waiting {cleanup_delay}s for cleanup before next simulation..."
+                )
+                await asyncio.sleep(cleanup_delay)
 
     # Aggregated metrics across all simulations
     all_simulation_metrics = []
@@ -1567,9 +1600,6 @@ async def main():
 
     # Collect metrics from results
     for result in results:
-        if isinstance(result, Exception):
-            continue
-
         sim_metrics_row, evaluation_results, stt_judge = result
         if sim_metrics_row is None:
             continue
