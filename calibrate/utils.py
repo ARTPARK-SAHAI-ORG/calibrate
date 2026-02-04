@@ -1735,6 +1735,7 @@ async def make_webhook_call(
                 )
 
                 return {
+                    "type": "webhook_response",
                     "status": "success" if 200 <= status_code < 300 else "error",
                     "status_code": status_code,
                     "response": response_data,
@@ -1743,18 +1744,21 @@ async def make_webhook_call(
     except asyncio.TimeoutError:
         logger.error(f"Webhook call timed out after {timeout}s")
         return {
+            "type": "webhook_response",
             "status": "error",
             "error": f"Request timed out after {timeout}s",
         }
     except aiohttp.ClientError as e:
         logger.error(f"Webhook call failed: {e}")
         return {
+            "type": "webhook_response",
             "status": "error",
             "error": str(e),
         }
     except Exception as e:
         logger.error(f"Unexpected error during webhook call: {e}")
         return {
+            "type": "webhook_response",
             "status": "error",
             "error": str(e),
         }
