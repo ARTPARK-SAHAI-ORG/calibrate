@@ -1600,7 +1600,7 @@ def build_tools_schema(
             webhook = tool.get("webhook", {})
 
             # Validate required webhook fields
-            for field in ["url", "method", "headers"]:
+            for field in ["url", "method"]:
                 if field not in webhook:
                     raise ValueError(
                         f"Webhook tool '{tool['name']}' is missing required '{field}' field"
@@ -1609,7 +1609,7 @@ def build_tools_schema(
             webhook_configs[tool["name"]] = {
                 "url": webhook["url"],
                 "method": webhook["method"],
-                "headers": webhook["headers"],
+                "headers": webhook.get("headers", []),
                 "timeout": webhook.get("timeout", 20),
             }
 
