@@ -2,6 +2,7 @@ import asyncio
 import argparse
 import json
 import sys
+import uuid
 from typing import List, Optional, Literal
 from loguru import logger
 import os
@@ -497,11 +498,15 @@ async def run_single_simulation_task(
 
         logs_file_path = f"{output_dir}/{simulation_name}/logs"
 
+        # Generate a unique ID for this simulation run to avoid conflicts
+        # when multiple simulations with the same name run in parallel
+        simulation_run_id = str(uuid.uuid4())
+
         # Create a unique loguru sink for this simulation with a strict filter
         # that only accepts logs from this simulation's context
         def simulation_filter(record):
-            sim_name = record["extra"].get("simulation")
-            return sim_name == simulation_name
+            sim_id = record["extra"].get("simulation")
+            return sim_id == simulation_run_id
 
         log_file_id = logger.add(
             logs_file_path,
@@ -512,14 +517,14 @@ async def run_single_simulation_task(
 
         agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
 
-        # Configure print logger with unique name for parallel execution
+        # Configure print logger with unique ID for parallel execution
         print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
-        configure_print_logger(print_log_save_path, simulation_name=simulation_name)
-        current_simulation_name.set(simulation_name)
+        configure_print_logger(print_log_save_path, simulation_name=simulation_run_id)
+        current_simulation_name.set(simulation_run_id)
 
-        # Use contextualize to bind simulation name to ALL log calls within this context
+        # Use contextualize to bind simulation ID to ALL log calls within this context
         # This includes logs from libraries like pipecat
-        with logger.contextualize(simulation=simulation_name):
+        with logger.contextualize(simulation=simulation_run_id):
             command = " ".join(sys.argv)
             log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
@@ -586,8 +591,8 @@ async def run_single_simulation_task(
                     logger.remove(log_file_id)
                 except ValueError:
                     pass  # Handler was already removed by another task
-                # Clean up the print logger for this simulation
-                cleanup_print_logger(simulation_name)
+                # Clean up the print logger for this simulation using the unique run ID
+                cleanup_print_logger(simulation_run_id)
 
 
 async def main():

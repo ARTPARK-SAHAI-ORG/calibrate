@@ -815,22 +815,27 @@ uv pip install -r requirements-docs.txt
 
 ### Parallel Simulation Logging
 
-When multiple simulations run in parallel (e.g., via `asyncio.gather`), each simulation needs its own isolated logging to prevent logs from mixing. There are two logging systems that need isolation:
+When multiple simulations run in parallel (e.g., via `asyncio.gather`), each simulation needs its own isolated logging to prevent logs from mixing. There are two logging systems that need isolation.
+
+**Important:** Logger identification uses UUIDs, not simulation folder names. Multiple parallel runs can have the same folder name pattern (e.g., `simulation_persona_1_scenario_2` from different batches), so a UUID ensures each run has a unique logger identity.
 
 #### 1. Loguru (`logs` file) - Uses `logger.contextualize()`
 
 Loguru's `contextualize()` context manager binds extra data to ALL log calls within its scope, including logs from libraries like pipecat. Combined with a strict filter, this ensures each simulation's `logs` file only contains its own logs.
 
 ```python
+# Generate unique ID for this simulation run (NOT the folder name)
+simulation_run_id = str(uuid.uuid4())
+
 # Create sink with strict filter (only accepts logs from this simulation)
 def simulation_filter(record):
-    sim_name = record["extra"].get("simulation")
-    return sim_name == simulation_name
+    sim_id = record["extra"].get("simulation")
+    return sim_id == simulation_run_id
 
 log_file_id = logger.add(logs_file_path, filter=simulation_filter, ...)
 
-# Wrap ALL simulation code in contextualize
-with logger.contextualize(simulation=simulation_name):
+# Wrap ALL simulation code in contextualize using the UUID
+with logger.contextualize(simulation=simulation_run_id):
     # All logger calls here (including from pipecat) have simulation in extra
     await run_simulation(...)
 
@@ -841,32 +846,36 @@ logger.remove(log_file_id)
 #### 2. Print Logger (`results.log` file) - Uses per-simulation loggers
 
 - **`calibrate/utils.py` logging utilities:**
-  - `_simulation_print_loggers: dict[str, logging.Logger]` - Stores per-simulation print loggers
-  - `current_simulation_name: ContextVar[str]` - Context variable to track active simulation
-  - `configure_print_logger(log_path, simulation_name="")` - Creates unique logger per simulation
-  - `cleanup_print_logger(simulation_name)` - Closes file handlers and removes logger from dict
+  - `_simulation_print_loggers: dict[str, logging.Logger]` - Stores per-simulation print loggers (keyed by UUID)
+  - `current_simulation_name: ContextVar[str]` - Context variable to track active simulation (stores UUID)
+  - `configure_print_logger(log_path, simulation_name="")` - Creates unique logger per simulation (pass UUID)
+  - `cleanup_print_logger(simulation_name)` - Closes file handlers and removes logger from dict (pass UUID)
   - `log_and_print(message)` - Uses context variable to find correct print logger
 
 ```python
-# Setup
-configure_print_logger(print_log_save_path, simulation_name=simulation_name)
-current_simulation_name.set(simulation_name)
+# Generate unique ID for this simulation run
+simulation_run_id = str(uuid.uuid4())
+
+# Setup - use UUID for logger identification, but log_path uses folder name
+configure_print_logger(print_log_save_path, simulation_name=simulation_run_id)
+current_simulation_name.set(simulation_run_id)
 
 # During simulation - log_and_print uses context var automatically
 log_and_print("message")  # Goes to correct simulation's results.log
 
-# Cleanup (in finally block)
-cleanup_print_logger(simulation_name)
+# Cleanup (in finally block) - use UUID
+cleanup_print_logger(simulation_run_id)
 ```
 
 - **Gotchas:**
   - Call `logger.remove()` once at the start of `main()` to remove the default stderr handler - this prevents all loguru logs from appearing on terminal
   - The `logger.contextualize()` block MUST wrap all simulation code including the `run_simulation()` call
-  - The filter must be strict (`return sim_name == simulation_name`) - do NOT use `or sim_name is None` fallback
+  - The filter must be strict (`return sim_id == simulation_run_id`) - do NOT use `or sim_id is None` fallback
   - Always call `cleanup_print_logger` in a `finally` block to avoid resource leaks
   - Always call `logger.remove(log_file_id)` in a `finally` block
   - The global `_print_logger` is used for backwards compatibility when `simulation_name` is not provided
   - Only `log_and_print` output appears on terminal (via `print()`); loguru logs go only to file sinks
+  - **Use UUIDs for logger IDs, folder names for file paths** - `simulation_name` (folder) is for display and file paths, `simulation_run_id` (UUID) is for logger isolation
 
 ### Interactive Testing
 
