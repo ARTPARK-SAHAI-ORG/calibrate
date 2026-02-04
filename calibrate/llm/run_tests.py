@@ -7,7 +7,7 @@ import os
 from os.path import join, exists, splitext, basename
 import json
 
-from calibrate.utils import configure_print_logger, log_and_print
+from calibrate.utils import configure_print_logger, log_and_print, build_tools_schema
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -78,6 +78,8 @@ class Processor(FrameProcessor):
                 logger.info(f"Received text chunk: {text}")
 
         if isinstance(frame, FunctionCallInProgressFrame):
+            log_and_print(f"Function call in progress: {frame.function_name}")
+            log_and_print(f"Arguments: {frame.arguments}")
             self._tool_calls.append(
                 {
                     "tool": frame.function_name,
@@ -128,49 +130,48 @@ async def run_inference(
         },
         required=[],
     )
-    standard_tools = [end_call_tool]
 
-    for tool in tools:
-        properties = {}
-        required = []
-        for parameter in tool["parameters"]:
-            # if parameter["required"]:
-            # required.append(parameter["id"])
+    # Build tool schemas using common utility
+    tool_schemas, webhook_tool_configs = build_tools_schema(tools)
+    standard_tools = [end_call_tool] + tool_schemas
 
-            prop = {
-                "type": parameter["type"],
-                "description": parameter["description"],
-            }
+    tools_schema = ToolsSchema(standard_tools=standard_tools)
 
-            if "items" in parameter:
-                prop["items"] = parameter["items"]
-
-            if "enum" in parameter:
-                prop["enum"] = parameter["enum"]
-
-            properties[parameter["id"]] = prop
-
-        tool_function = FunctionSchema(
-            name=tool["name"],
-            description=tool["description"],
-            properties=properties,
-            required=[],
-        )
-        standard_tools.append(tool_function)
-
-    tools = ToolsSchema(standard_tools=standard_tools)
-
-    async def tool_call(params: FunctionCallParams):
+    async def generic_tool_call(params: FunctionCallParams):
         logger.info(f"tool call: {params}")
         await params.result_callback(
             None, properties=FunctionCallResultProperties(run_llm=False)
         )
         return
 
-    for tool in standard_tools:
-        llm.register_function(tool.name, tool_call)
+    def create_webhook_tool_call(webhook_config: dict):
+        async def webhook_tool_call(params: FunctionCallParams):
+            logger.info(
+                f"webhook tool call: {params.function_name}\n"
+                f"  method: {webhook_config['method']}\n"
+                f"  url: {webhook_config['url']}\n"
+                f"  headers: {webhook_config['headers']}\n"
+                f"  query: {params.arguments.get('query', {})}\n"
+                f"  body: {params.arguments.get('body', {})}"
+            )
+            await params.result_callback(
+                None, properties=FunctionCallResultProperties(run_llm=False)
+            )
+            return
 
-    context = LLMContext(messages, tools=tools)
+        return webhook_tool_call
+
+    # Register appropriate handler for each tool
+    for tool_schema in standard_tools:
+        if tool_schema.name in webhook_tool_configs:
+            llm.register_function(
+                tool_schema.name,
+                create_webhook_tool_call(webhook_tool_configs[tool_schema.name]),
+            )
+        else:
+            llm.register_function(tool_schema.name, generic_tool_call)
+
+    context = LLMContext(messages, tools=tools_schema)
     context_aggregator = LLMContextAggregatorPair(context)
 
     # Create processors (text_output needs to be created first for reference)
@@ -219,9 +220,89 @@ def sort_tool_calls(tool_calls):
     return sorted(tool_calls, key=lambda val: val["tool"])
 
 
+def get_webhook_tool_names(tools: List[dict]) -> set:
+    """
+    Extract names of webhook tools from the tools configuration.
+
+    Args:
+        tools: List of tool definition dicts
+
+    Returns:
+        Set of webhook tool names
+    """
+    return {tool["name"] for tool in tools if tool.get("type") == "webhook"}
+
+
+def preprocess_conversation_history(
+    chat_history: List[dict], tools: List[dict]
+) -> List[dict]:
+    """
+    Preprocess conversation history to add tool responses for non-webhook tools.
+
+    For non-webhook tools that have tool calls but no corresponding tool response,
+    this function inserts a default tool response with {"status": "received"}.
+
+    For non-webhook tools that already have a tool response, this function raises
+    an error since tool responses should not be manually added for non-webhook tools.
+
+    Args:
+        chat_history: The conversation history to preprocess
+        tools: List of tool definition dicts
+
+    Returns:
+        Preprocessed conversation history with tool responses inserted
+
+    Raises:
+        ValueError: If a non-webhook tool has a manually added tool response
+    """
+    webhook_tool_names = get_webhook_tool_names(tools)
+
+    # Build a set of existing tool response IDs
+    existing_tool_response_ids = set()
+    for message in chat_history:
+        if message.get("role") == "tool" and "tool_call_id" in message:
+            existing_tool_response_ids.add(message["tool_call_id"])
+
+    # Process conversation history and collect tool calls that need responses
+    processed_history = []
+    for message in chat_history:
+        processed_history.append(message)
+
+        # Check for assistant messages with tool calls
+        if message.get("role") == "assistant" and "tool_calls" in message:
+            for tool_call in message["tool_calls"]:
+                tool_call_id = tool_call.get("id")
+                tool_name = tool_call.get("function", {}).get("name")
+
+                # Skip webhook tools - they handle their own responses
+                if tool_name in webhook_tool_names:
+                    continue
+
+                # Check if this non-webhook tool already has a response
+                if tool_call_id in existing_tool_response_ids:
+                    raise ValueError(
+                        f"Structured output tool '{tool_name}' (tool_call_id: {tool_call_id}) "
+                        f"should not have a manually added tool response in the conversation history. "
+                    )
+
+                # Insert a default tool response for non-webhook tools
+                tool_response = {
+                    "role": "tool",
+                    "content": '{"status": "received"}',
+                    "tool_call_id": tool_call_id,
+                }
+                processed_history.append(tool_response)
+                logger.info(
+                    f"Inserted tool response for structured output tool '{tool_name}' "
+                    f"(tool_call_id: {tool_call_id})"
+                )
+
+    return processed_history
+
+
 def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
     if not output_tool_calls:
-        return False
+        return {"passed": False, "reasoning": "No tool calls were generated by the LLM"}
 
     output_tool_calls = sort_tool_calls(output_tool_calls)
     evaluation_tool_calls = sort_tool_calls(evaluation_tool_calls)
@@ -230,7 +311,10 @@ def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
         output_tool_calls, evaluation_tool_calls
     ):
         if output_tool_call["tool"] != evaluation_tool_call["tool"]:
-            return False
+            return {
+                "passed": False,
+                "reasoning": f"Tool call mismatch - expected tool call: {evaluation_tool_call['tool']} but got: {output_tool_call['tool']}",
+            }
 
         # if the "arguments" key is not present in the evaluation_tool_call, then we don't need to check the arguments
         if "arguments" not in evaluation_tool_call:
@@ -241,9 +325,14 @@ def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
             evaluation_tool_call["arguments"] is not None
             and output_tool_call["arguments"] != evaluation_tool_call["arguments"]
         ):
-            return False
+            return {
+                "passed": False,
+                "reasoning": f"Tool call arguments mismatch - expected arguments: {evaluation_tool_call['arguments']} but got: {output_tool_call['arguments']}",
+            }
 
-    return True
+    return {
+        "passed": True,
+    }
 
 
 async def run_test(
@@ -262,10 +351,9 @@ async def run_test(
         tools=tools,
     )
     metrics = {"passed": False}
+
     if evaluation["type"] == "tool_call":
-        metrics["passed"] = evaluate_tool_calls(
-            output["tool_calls"], evaluation["tool_calls"]
-        )
+        metrics = evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     elif evaluation["type"] == "response":
         if output["response"]:
             result = await test_response_llm_judge(
@@ -276,7 +364,12 @@ async def run_test(
             metrics["passed"] = result["match"]
             metrics["reasoning"] = result["reasoning"]
         else:
-            metrics["reasoning"] = "No response was generated by the LLM"
+            if output["tool_calls"]:
+                metrics["reasoning"] = (
+                    f"The LLM generated tool calls: {output['tool_calls']}, but no reply was generated"
+                )
+            else:
+                metrics["reasoning"] = "No reply was generated by the LLM"
     else:
         raise ValueError(f"Invalid evaluation type: {evaluation['type']}")
 
@@ -364,8 +457,14 @@ async def main():
     results_file_path = join(output_dir, "results.json")
     for test_case_index, test_case in enumerate(config["test_cases"]):
         agent_language = test_case.get("settings", {}).get("language", "english")
+
+        # Preprocess conversation history to add tool responses for non-webhook tools
+        preprocessed_history = preprocess_conversation_history(
+            test_case["history"], config["tools"]
+        )
+
         result = await run_test(
-            chat_history=test_case["history"],
+            chat_history=preprocessed_history,
             evaluation=test_case["evaluation"],
             system_prompt=config["system_prompt"]
             + f"\n\nYou must always speak in {agent_language}.",

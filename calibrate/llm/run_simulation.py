@@ -2,6 +2,7 @@ import asyncio
 import argparse
 import json
 import sys
+import uuid
 from typing import List, Optional, Literal
 from loguru import logger
 import os
@@ -9,7 +10,14 @@ from os.path import join, exists, splitext, basename
 import shutil
 from collections import defaultdict
 import traceback
-from calibrate.utils import configure_print_logger, log_and_print
+from calibrate.utils import (
+    configure_print_logger,
+    log_and_print,
+    build_tools_schema,
+    make_webhook_call,
+    cleanup_print_logger,
+    current_simulation_name,
+)
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -321,33 +329,34 @@ async def run_simulation(
         },
         required=[],
     )
-    standard_tools = [end_call_tool]
+
+    # Build tool schemas using common utility
+    tool_schemas, webhook_configs = build_tools_schema(tools)
+    standard_tools = [end_call_tool] + tool_schemas
+
+    def create_webhook_function_call(webhook_config: dict):
+        async def webhook_function_call(params: FunctionCallParams):
+            log_and_print(
+                f"tool call: {params.function_name} (webhook) invoked with arguments: {params.arguments}"
+            )
+
+            result = await make_webhook_call(webhook_config, params.arguments or {})
+
+            await params.result_callback(result)
+            return
+
+        return webhook_function_call
+
+    # Register function handlers
     bot_llm.register_function("end_call", end_call)
-
-    for tool in tools:
-        properties = {}
-        for parameter in tool["parameters"]:
-            prop = {
-                "type": parameter["type"],
-                "description": parameter["description"],
-            }
-
-            if "items" in parameter:
-                prop["items"] = parameter["items"]
-
-            if "enum" in parameter:
-                prop["enum"] = parameter["enum"]
-
-            properties[parameter["id"]] = prop
-
-        tool_function = FunctionSchema(
-            name=tool["name"],
-            description=tool["description"],
-            properties=properties,
-            required=[],
-        )
-        standard_tools.append(tool_function)
-        bot_llm.register_function(tool["name"], generic_function_call)
+    for tool_schema in tool_schemas:
+        if tool_schema.name in webhook_configs:
+            bot_llm.register_function(
+                tool_schema.name,
+                create_webhook_function_call(webhook_configs[tool_schema.name]),
+            )
+        else:
+            bot_llm.register_function(tool_schema.name, generic_function_call)
 
     tools = ToolsSchema(standard_tools=standard_tools)
 
@@ -489,88 +498,108 @@ async def run_single_simulation_task(
 
         logs_file_path = f"{output_dir}/{simulation_name}/logs"
 
-        # Remove default logger to prevent logs from being printed to terminal
-        logger.remove()
+        # Generate a unique ID for this simulation run to avoid conflicts
+        # when multiple simulations with the same name run in parallel
+        simulation_run_id = str(uuid.uuid4())
 
-        # Create a unique logger for this simulation
+        # Create a unique loguru sink for this simulation with a strict filter
+        # that only accepts logs from this simulation's context
+        def simulation_filter(record):
+            sim_id = record["extra"].get("simulation")
+            return sim_id == simulation_run_id
+
         log_file_id = logger.add(
             logs_file_path,
             level="DEBUG",
             colorize=False,
+            filter=simulation_filter,
         )
 
         agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
 
+        # Configure print logger with unique ID for parallel execution
         print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
-        configure_print_logger(print_log_save_path)
+        configure_print_logger(print_log_save_path, simulation_name=simulation_run_id)
+        current_simulation_name.set(simulation_run_id)
 
-        command = " ".join(sys.argv)
-        log_and_print(f"\033[33mRunning command\033[0m: {command}")
+        # Use contextualize to bind simulation ID to ALL log calls within this context
+        # This includes logs from libraries like pipecat
+        with logger.contextualize(simulation=simulation_run_id):
+            command = " ".join(sys.argv)
+            log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
-        log_and_print("--------------------------------")
-        log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
-        log_and_print(f"\033[93mPersona:\033[0m\n{characteristics}")
-        log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
-        log_and_print(f"\033[93mLanguage:\033[0m {language}")
-        log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
-        log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
-        log_and_print("--------------------------------")
+            log_and_print("--------------------------------")
+            log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
+            log_and_print(f"\033[93mPersona:\033[0m\n{characteristics}")
+            log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
+            log_and_print(f"\033[93mLanguage:\033[0m {language}")
+            log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
+            log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
+            log_and_print("--------------------------------")
 
-        try:
-            output = await run_simulation(
-                bot_system_prompt=config["system_prompt"]
-                + f"\n\nYou must always speak in {language}.",
-                tools=config["tools"],
-                user_system_prompt=user_system_prompt,
-                evaluation_criteria=config["evaluation_criteria"],
-                bot_model=args.model,
-                user_model=args.model,
-                bot_provider=args.provider,
-                user_provider=args.provider,
-                agent_speaks_first=agent_speaks_first,
-                max_turns=config.get("settings", {}).get(
-                    "max_turns", DEFAULT_MAX_TURNS
-                ),
-                output_dir=simulation_output_dir,
-            )
-
-            simulation_metrics = {
-                "name": simulation_name,
-            }
-
-            for metric_dict in output["evaluation_results"]:
-                simulation_metrics[metric_dict["name"]] = float(metric_dict["value"])
-
-            with open(join(simulation_output_dir, "transcript.json"), "w") as f:
-                json.dump(output["transcript"], f, indent=4)
-
-            df = pd.DataFrame(output["evaluation_results"])
-            df.to_csv(
-                join(simulation_output_dir, "evaluation_results.csv"), index=False
-            )
-
-            # Save persona dict and scenario dict
-            with open(join(simulation_output_dir, "config.json"), "w") as f:
-                json.dump(
-                    {
-                        "persona": user_persona,
-                        "scenario": scenario,
-                    },
-                    f,
-                    indent=4,
+            try:
+                output = await run_simulation(
+                    bot_system_prompt=config["system_prompt"]
+                    + f"\n\nYou must always speak in {language}.",
+                    tools=config["tools"],
+                    user_system_prompt=user_system_prompt,
+                    evaluation_criteria=config["evaluation_criteria"],
+                    bot_model=args.model,
+                    user_model=args.model,
+                    bot_provider=args.provider,
+                    user_provider=args.provider,
+                    agent_speaks_first=agent_speaks_first,
+                    max_turns=config.get("settings", {}).get(
+                        "max_turns", DEFAULT_MAX_TURNS
+                    ),
+                    output_dir=simulation_output_dir,
                 )
 
-            return simulation_metrics, output["evaluation_results"]
-        except Exception as e:
-            traceback.print_exc()
-        finally:
-            try:
-                logger.remove(log_file_id)
-            except ValueError:
-                pass  # Handler was already removed by another task
+                simulation_metrics = {
+                    "name": simulation_name,
+                }
+
+                for metric_dict in output["evaluation_results"]:
+                    simulation_metrics[metric_dict["name"]] = float(
+                        metric_dict["value"]
+                    )
+
+                with open(join(simulation_output_dir, "transcript.json"), "w") as f:
+                    json.dump(output["transcript"], f, indent=4)
+
+                df = pd.DataFrame(output["evaluation_results"])
+                df.to_csv(
+                    join(simulation_output_dir, "evaluation_results.csv"), index=False
+                )
+
+                # Save persona dict and scenario dict
+                with open(join(simulation_output_dir, "config.json"), "w") as f:
+                    json.dump(
+                        {
+                            "persona": user_persona,
+                            "scenario": scenario,
+                        },
+                        f,
+                        indent=4,
+                    )
+
+                return simulation_metrics, output["evaluation_results"]
+            except Exception as e:
+                traceback.print_exc()
+            finally:
+                try:
+                    logger.remove(log_file_id)
+                except ValueError:
+                    pass  # Handler was already removed by another task
+                # Clean up the print logger for this simulation using the unique run ID
+                cleanup_print_logger(simulation_run_id)
 
 
 async def main():
+    # Remove default loguru handler (stderr) to prevent all logs from showing on terminal
+    # This is done once at startup, not per-simulation
+    logger.remove()
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "-c",

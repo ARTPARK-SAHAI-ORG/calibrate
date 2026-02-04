@@ -7,10 +7,12 @@ import wave
 from collections import defaultdict
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 import aiofiles
+import aiohttp
 from loguru import logger
+from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import InputTransportMessageFrame
 from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.transcriptions.language import Language
@@ -27,42 +29,91 @@ def add_default_source(record):
     return True
 
 
-# Global print logger instance
+# Global print logger instance (for backwards compatibility with single simulation)
 _print_logger: Optional[logging.Logger] = None
 
+# Thread-local storage for per-simulation print loggers
+_simulation_print_loggers: dict[str, logging.Logger] = {}
 
-def configure_print_logger(log_path: str, logger_name: str = "print_logger"):
+# Context variable for current simulation name (for log_and_print to know which logger to use)
+current_simulation_name: ContextVar[str] = ContextVar(
+    "current_simulation_name", default=""
+)
+
+
+def configure_print_logger(
+    log_path: str,
+    logger_name: str = "print_logger",
+    simulation_name: str = "",
+):
     """Configure a dedicated logger for console print mirroring.
 
     Args:
         log_path: Path to the log file
         logger_name: Name for the logger instance (default: "print_logger")
+        simulation_name: Unique name for this simulation (for parallel execution)
     """
     global _print_logger
-    _print_logger = logging.getLogger(logger_name)
-    _print_logger.setLevel(logging.INFO)
-    _print_logger.propagate = False
 
-    for handler in list(_print_logger.handlers):
-        _print_logger.removeHandler(handler)
+    # Use unique logger name for parallel simulations
+    unique_logger_name = (
+        f"{logger_name}_{simulation_name}" if simulation_name else logger_name
+    )
+    sim_logger = logging.getLogger(unique_logger_name)
+    sim_logger.setLevel(logging.INFO)
+    sim_logger.propagate = False
+
+    for handler in list(sim_logger.handlers):
+        sim_logger.removeHandler(handler)
 
     handler = logging.FileHandler(log_path)
     handler.setFormatter(logging.Formatter("%(message)s"))
-    _print_logger.addHandler(handler)
+    sim_logger.addHandler(handler)
+
+    if simulation_name:
+        _simulation_print_loggers[simulation_name] = sim_logger
+        current_simulation_name.set(simulation_name)
+    else:
+        _print_logger = sim_logger
+
+    return sim_logger
 
 
-def log_and_print(message: object = "", use_loguru: bool = True):
+def cleanup_print_logger(simulation_name: str = ""):
+    """Clean up the print logger for a simulation.
+
+    Args:
+        simulation_name: Name of the simulation to clean up
+    """
+    if simulation_name and simulation_name in _simulation_print_loggers:
+        sim_logger = _simulation_print_loggers.pop(simulation_name)
+        for handler in list(sim_logger.handlers):
+            handler.close()
+            sim_logger.removeHandler(handler)
+
+
+def log_and_print(
+    message: object = "", use_loguru: bool = True, simulation_name: str = ""
+):
     """Print to stdout and mirror the message to both loguru and file logger.
 
     Args:
         message: Message to print and log
         use_loguru: Whether to also log via loguru (default: True)
+        simulation_name: Override simulation name (uses context var if not provided)
     """
     text = str(message)
     print(text)
+
     if use_loguru:
+        # logger.info will inherit the simulation context from logger.contextualize()
         logger.info(text)
-    if _print_logger:
+
+    # Determine which print logger to use
+    sim_name = simulation_name or current_simulation_name.get()
+    if sim_name and sim_name in _simulation_print_loggers:
+        _simulation_print_loggers[sim_name].info(text)
+    elif _print_logger:
         _print_logger.info(text)
 
 
@@ -85,7 +136,7 @@ async def save_audio_chunk(
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     if not filepath.exists():
-        log_and_print(f"\033[92mCreating new audio file at {filepath}\033[0m")
+        # log_and_print(f"\033[92mCreating new audio file at {filepath}\033[0m")
         with io.BytesIO() as buffer:
             with wave.open(buffer, "wb") as wf:
                 wf.setsampwidth(2)
@@ -95,7 +146,7 @@ async def save_audio_chunk(
             async with aiofiles.open(filepath, "wb") as file:
                 await file.write(buffer.getvalue())
     else:
-        log_and_print(f"\033[92mAppending audio chunk to {filepath}\033[0m")
+        # log_and_print(f"\033[92mAppending audio chunk to {filepath}\033[0m")
         async with aiofiles.open(filepath, "rb+") as file:
             current_size = await file.seek(0, os.SEEK_END)
             if current_size < 44:
@@ -1503,3 +1554,211 @@ def create_tts_service(
         )
     else:
         raise ValueError(f"Unsupported TTS provider: {provider}")
+
+
+def _build_param_property(param: dict) -> dict:
+    """Build a property dict for a single parameter."""
+    prop = {
+        "type": param["type"],
+        "description": param["description"],
+    }
+    if "items" in param:
+        prop["items"] = param["items"]
+    if "enum" in param:
+        prop["enum"] = param["enum"]
+    return prop
+
+
+def build_tools_schema(
+    tools: list[dict],
+) -> tuple[list[FunctionSchema], dict[str, dict]]:
+    """
+    Build FunctionSchema objects from tool definitions.
+
+    Supports two tool types:
+    - structured_output (default): Parameters at top level in 'parameters' array
+    - webhook: Parameters in nested 'webhook.queryParameters' and 'webhook.body.parameters'
+
+    Args:
+        tools: List of tool definition dicts
+
+    Returns:
+        tuple of (list of FunctionSchema objects, dict of webhook configs keyed by tool name)
+
+    Raises:
+        ValueError: If webhook tool is missing required fields (url, method, headers)
+    """
+    function_schemas = []
+    webhook_configs = {}
+
+    for tool in tools:
+        properties = {}
+        required = []
+
+        if tool.get("type") == "webhook":
+            # For webhook tools, structure params as nested body and query dicts
+            webhook = tool.get("webhook", {})
+
+            # Validate required webhook fields
+            for field in ["url", "method"]:
+                if field not in webhook:
+                    raise ValueError(
+                        f"Webhook tool '{tool['name']}' is missing required '{field}' field"
+                    )
+
+            webhook_configs[tool["name"]] = {
+                "url": webhook["url"],
+                "method": webhook["method"],
+                "headers": webhook.get("headers", []),
+                "timeout": webhook.get("timeout", 20),
+            }
+
+            # Build query parameters schema
+            query_properties = {}
+            query_required = []
+            if "queryParameters" in webhook:
+                for param in webhook["queryParameters"]:
+                    query_properties[param["id"]] = _build_param_property(param)
+                    if param.get("required"):
+                        query_required.append(param["id"])
+
+            # Build body parameters schema
+            body_properties = {}
+            body_required = []
+            if "body" in webhook and "parameters" in webhook["body"]:
+                for param in webhook["body"]["parameters"]:
+                    body_properties[param["id"]] = _build_param_property(param)
+                    if param.get("required"):
+                        body_required.append(param["id"])
+
+            # Create nested structure with query and body as separate objects
+            if query_properties:
+                properties["query"] = {
+                    "type": "object",
+                    "description": "Query parameters for the webhook request",
+                    "properties": query_properties,
+                    "required": query_required,
+                }
+                if query_required:
+                    required.append("query")
+            if body_properties:
+                properties["body"] = {
+                    "type": "object",
+                    "description": webhook.get("body", {}).get(
+                        "description", "Request body parameters"
+                    ),
+                    "properties": body_properties,
+                    "required": body_required,
+                }
+                if body_required:
+                    required.append("body")
+        else:
+            # For structured_output or default type, use tool["parameters"]
+            parameters = tool.get("parameters", [])
+
+            for parameter in parameters:
+                if parameter.get("required"):
+                    required.append(parameter["id"])
+                properties[parameter["id"]] = _build_param_property(parameter)
+
+        function_schema = FunctionSchema(
+            name=tool["name"],
+            description=tool["description"],
+            properties=properties,
+            required=required,
+        )
+        function_schemas.append(function_schema)
+
+    return function_schemas, webhook_configs
+
+
+async def make_webhook_call(
+    webhook_config: dict,
+    arguments: dict,
+) -> dict[str, Any]:
+    """
+    Make an HTTP webhook call with the provided configuration and arguments.
+
+    Args:
+        webhook_config: Dict containing url, method, headers, and timeout
+        arguments: Dict containing 'query' and/or 'body' parameters from LLM
+
+    Returns:
+        Dict with 'status', 'status_code', and 'response' (or 'error')
+    """
+    url = webhook_config["url"]
+    method = webhook_config["method"].upper()
+    headers_list = webhook_config["headers"]
+    timeout = webhook_config.get("timeout", 20)
+
+    # Convert headers list to dict
+    headers = {}
+    for header in headers_list:
+        headers[header["name"]] = header["value"]
+
+    # Extract query params and body from arguments
+    query_params = arguments.get("query", {})
+    body = arguments.get("body", {})
+
+    logger.info(
+        f"Making webhook call:\n"
+        f"  method: {method}\n"
+        f"  url: {url}\n"
+        f"  headers: {headers}\n"
+        f"  query: {query_params}\n"
+        f"  body: {body}\n"
+        f"  timeout: {timeout}s"
+    )
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            request_kwargs = {
+                "url": url,
+                "headers": headers,
+                "params": query_params if query_params else None,
+                "timeout": aiohttp.ClientTimeout(total=timeout),
+            }
+
+            # Add body for methods that support it
+            if method in ["POST", "PUT", "PATCH"] and body:
+                request_kwargs["json"] = body
+
+            async with session.request(method, **request_kwargs) as response:
+                status_code = response.status
+                try:
+                    response_data = await response.json()
+                except Exception:
+                    response_data = await response.text()
+
+                logger.info(
+                    f"Webhook response: status={status_code}, response={response_data}"
+                )
+
+                return {
+                    "type": "webhook_response",
+                    "status": "success" if 200 <= status_code < 300 else "error",
+                    "status_code": status_code,
+                    "response": response_data,
+                }
+
+    except asyncio.TimeoutError:
+        logger.error(f"Webhook call timed out after {timeout}s")
+        return {
+            "type": "webhook_response",
+            "status": "error",
+            "error": f"Request timed out after {timeout}s",
+        }
+    except aiohttp.ClientError as e:
+        logger.error(f"Webhook call failed: {e}")
+        return {
+            "type": "webhook_response",
+            "status": "error",
+            "error": str(e),
+        }
+    except Exception as e:
+        logger.error(f"Unexpected error during webhook call: {e}")
+        return {
+            "type": "webhook_response",
+            "status": "error",
+            "error": str(e),
+        }
