@@ -3,6 +3,7 @@ from typing import Any, Dict, Literal
 
 from loguru import logger
 import asyncio
+import sentry_sdk
 
 from pydantic import BaseModel
 from calibrate.utils import (
@@ -161,6 +162,7 @@ async def run_bot(
             bot_logger.warning(
                 f"Unable to cancel task after end_call (no tool_call_id): {exc}"
             )
+            sentry_sdk.capture_exception(exc)
 
     async def end_call(params: FunctionCallParams):
         reason = params.arguments.get("reason") if params.arguments else None
@@ -216,6 +218,7 @@ async def run_bot(
             pending_tool_call_events.pop(tool_call_id, None)
             pending_tool_call_results.pop(tool_call_id, None)
             bot_logger.warning(f"Unable to forward end_call to client: {exc}")
+            sentry_sdk.capture_exception(exc)
 
     async def generic_function_call(params: FunctionCallParams):
         bot_logger.info(
@@ -275,6 +278,7 @@ async def run_bot(
             bot_logger.warning(
                 f"Unable to forward {params.function_name} to client: {exc}"
             )
+            sentry_sdk.capture_exception(exc)
 
     end_call_tool = FunctionSchema(
         name="end_call",
@@ -340,6 +344,7 @@ async def run_bot(
                 bot_logger.warning(
                     f"Unable to forward {params.function_name} to client: {exc}"
                 )
+                sentry_sdk.capture_exception(exc)
 
         return webhook_function_call
 
