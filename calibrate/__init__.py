@@ -28,7 +28,7 @@ Library Usage:
     asyncio.run(simulation.run(config="./config.json", output_dir="./out"))
 """
 
-__version__ = "0.1.0"
+__version__ = "0.0.1"
 
 # Lazy imports for submodules
 from calibrate import stt

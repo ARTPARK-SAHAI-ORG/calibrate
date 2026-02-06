@@ -1,6 +1,6 @@
 [project]
 name = "calibrate-agent"
-version = "0.1.0"
+version = "0.0.1"
 description = "An open-source evaluation framework for voice agents"
 readme = "README.md"
 license = "CC-BY-SA-4.0"
