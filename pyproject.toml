@@ -53,10 +53,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/artpark/agentloop"
-Documentation = "https://docs.calibrate.dev"
-Repository = "https://github.com/artpark/agentloop"
-Issues = "https://github.com/artpark/agentloop/issues"
+Homepage = "https://github.com/artpark-sahai-org/calibrate"
+Documentation = "https://calibrate.artpark.ai"
+Repository = "https://github.com/artpark-sahai-org/calibrate"
+Issues = "https://github.com/artpark-sahai-org/calibrate/issues"
 
 [project.scripts]
 calibrate = "calibrate.cli:main"

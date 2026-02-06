@@ -113,7 +113,7 @@
       "anchors": [
         {
           "anchor": "GitHub",
-          "href": "https://github.com/artpark/agentloop",
+          "href": "https://github.com/artpark-sahai-org/calibrate",
           "icon": "github"
         },
         {
@@ -145,7 +145,7 @@
       },
       {
         "label": "GitHub",
-        "href": "https://github.com/artpark/agentloop"
+        "href": "https://github.com/artpark-sahai-org/calibrate"
       }
     ]
   },
@@ -163,7 +163,7 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/artpark/agentloop"
+      "github": "https://github.com/artpark-sahai-org/calibrate"
     }
   }
 }
