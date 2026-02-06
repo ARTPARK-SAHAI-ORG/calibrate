@@ -117,9 +117,14 @@
           "icon": "github"
         },
         {
-          "anchor": "Community",
-          "href": "https://discord.gg/calibrate",
+          "anchor": "Discord",
+          "href": "https://discord.gg/9dQB4AngK2",
           "icon": "discord"
+        },
+        {
+          "anchor": "WhatsApp",
+          "href": "https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z",
+          "icon": "whatsapp"
         }
       ]
     }
@@ -131,11 +136,15 @@
   "navbar": {
     "links": [
       {
-        "label": "Join the Discord",
-        "href": "https://discord.gg/calibrate"
+        "label": "Join Discord",
+        "href": "https://discord.gg/9dQB4AngK2"
       },
       {
-        "label": "Github",
+        "label": "Join WhatsApp",
+        "href": "https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z"
+      },
+      {
+        "label": "GitHub",
         "href": "https://github.com/artpark/agentloop"
       }
     ]

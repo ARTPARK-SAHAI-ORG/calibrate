@@ -3,16 +3,32 @@ title: "Introduction"
 description: "Learn about Calibrate and how to get started."
 ---
 
-Calibrate is an open-source framework for automated, repeatable and systematic evaluation of voice agents at scale.
+Calibrate is an open-source evaluation framework for voice agents.
 
-Testing voice agents manually is slow, inconsistent, and doesn't scale. There is no simple way to compare different providers for each component. Even if individual components are working, it's not clear if the agent as a whole will work as expected when you deploy it to production.
+Testing voice agents manually is slow, inconsistent, and doesn't scale. Voice agents require multiple components to work well together:
 
-Calibrate solves this in two ways:
+- Transcribing the user's speech accurately and efficiently
+- Reasoning about the user's response against the context and purpose of the conversation
+- Calling the right tools with the right arguments in the right ordered
+- Generating the right next turn response
+- Producing natural-sounding speech back to the user
+- Detecting if the user has completed speaking or has taken a pause before speaking again
+- Handling interruptions by the user while the agent is speaking
+- Keeping the turnaround time low
+- Handling multiple languages, accents, dialects and code-switching
 
-- `Component level testing`: Evaluate individual components (`Speech to Text`, `LLM`, `Text to Speech`) across multiple providers on your dataset and specific edge cases your agent is likely to face in production.
-- `End-to-end testing`: Simulate conversations with your agent using realistic scenarios and user personas to identify critical pathways where your agent fails before deploying it to production.
+and a lot more.
 
-This way, Calibrate lets you continuously improve your agent, ensure a bug never repeats itself and deploy your agent with confidence.
+There is no simple way to evaluate each component across all the providers on your own dataset. Even if individual components work well, it is hard to tell if the agent as a whole will work as expected when you deploy it to production. This leads to many teams deploying their agents with a lot of uncertainty and risk with their users having to deal with poor experiences.
+
+Calibrate solve this problem by letting you evaluate your entire voice agent stack:
+
+- `Speech to Text (STT)`: Benchmark multiple providers (Google, Sarvam, ElevenLabs and more) on your dataset across 10+ indic languages using metrics optimised for agentic use cases
+- `Text to Speech (TTS)`: Benchmark generated speech by multiple providers automatically using an Audio LLM Judge across 10+ indic languages
+- `Text to Text (LLMs)`: Evaluate the response quality and tool calling of your LLMs for multi-turn conversations and find the find LLM for your agent
+- `Simulations`: Simulate realistic conversations using realistic user personas and scenarios to test failure modes for your agent including interruptions
+
+Calibrate helps you continuously improve your agent, ensure a bug never repeats itself and deploy your agent with confidence.
 
 ## Get Started
 

@@ -1,6 +1,11 @@
 # Calibrate
 
-An open-source simulation and testing framework for voice agents.
+[![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
+
+An open-source evaluation framework for voice agents.
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-7289da?logo=discord&logoColor=white)](https://discord.gg/9dQB4AngK2)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-Join%20Community-25D366?logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z)
 
 With Calibrate, you can move from a slow, manual testing to a fast, automated, and repeatable testing process:
 
@@ -126,17 +131,17 @@ You can checkout [`calibrate/stt/examples/sample_output`](calibrate/stt/examples
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `provider` | str | Yes | - | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq |
-| `input_dir` | str | Yes | - | Path to input directory containing stt.csv and audios/ folder |
-| `output_dir` | str | No | "./out" | Path to output directory for results |
-| `language` | str | No | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
-| `input_file_name` | str | No | "stt.csv" | Name of input CSV file |
-| `debug` | bool | No | False | Run on first N audio files only |
-| `debug_count` | int | No | 5 | Number of files in debug mode |
-| `ignore_retry` | bool | No | False | Skip retry if not all audios processed |
-| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
+| Parameter         | Type | Required | Default   | Description                                                                                                                   |
+| ----------------- | ---- | -------- | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `provider`        | str  | Yes      | -         | STT provider: deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq                                          |
+| `input_dir`       | str  | Yes      | -         | Path to input directory containing stt.csv and audios/ folder                                                                 |
+| `output_dir`      | str  | No       | "./out"   | Path to output directory for results                                                                                          |
+| `language`        | str  | No       | "english" | Language of audio files: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
+| `input_file_name` | str  | No       | "stt.csv" | Name of input CSV file                                                                                                        |
+| `debug`           | bool | No       | False     | Run on first N audio files only                                                                                               |
+| `debug_count`     | int  | No       | 5         | Number of files in debug mode                                                                                                 |
+| `ignore_retry`    | bool | No       | False     | Skip retry if not all audios processed                                                                                        |
+| `overwrite`       | bool | No       | False     | Overwrite existing results instead of resuming from checkpoint                                                                |
 
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 
@@ -269,15 +274,15 @@ You can checkout [`calibrate/tts/examples/sample_output`](calibrate/tts/examples
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `input` | str | Yes | - | Path to input CSV file containing texts to synthesize |
-| `provider` | str | No | "google" | TTS provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest |
-| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
-| `output_dir` | str | No | "./out" | Path to output directory for results |
-| `debug` | bool | No | False | Run on first N texts only |
-| `debug_count` | int | No | 5 | Number of texts in debug mode |
-| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
+| Parameter     | Type | Required | Default   | Description                                                                                                    |
+| ------------- | ---- | -------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| `input`       | str  | Yes      | -         | Path to input CSV file containing texts to synthesize                                                          |
+| `provider`    | str  | No       | "google"  | TTS provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest                                     |
+| `language`    | str  | No       | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
+| `output_dir`  | str  | No       | "./out"   | Path to output directory for results                                                                           |
+| `debug`       | bool | No       | False     | Run on first N texts only                                                                                      |
+| `debug_count` | int  | No       | 5         | Number of texts in debug mode                                                                                  |
+| `overwrite`   | bool | No       | False     | Overwrite existing results instead of resuming from checkpoint                                                 |
 
 To benchmark several TTS runs, generate the combined workbook and chart with:
 
@@ -395,15 +400,15 @@ result = asyncio.run(tests.run(
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `system_prompt` | str | Yes | - | System prompt for the LLM |
-| `tools` | list | Yes | - | List of tool definitions |
-| `test_cases` | list | Yes | - | List of test case dicts with 'history', 'evaluation', optional 'settings' |
-| `output_dir` | str | No | "./out" | Output directory for results |
-| `model` | str | No | "gpt-4.1" | Model name |
-| `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
-| `run_name` | str | No | None | Optional name for output folder |
+| Parameter       | Type | Required | Default      | Description                                                               |
+| --------------- | ---- | -------- | ------------ | ------------------------------------------------------------------------- |
+| `system_prompt` | str  | Yes      | -            | System prompt for the LLM                                                 |
+| `tools`         | list | Yes      | -            | List of tool definitions                                                  |
+| `test_cases`    | list | Yes      | -            | List of test case dicts with 'history', 'evaluation', optional 'settings' |
+| `output_dir`    | str  | No       | "./out"      | Output directory for results                                              |
+| `model`         | str  | No       | "gpt-4.1"    | Model name                                                                |
+| `provider`      | str  | No       | "openrouter" | LLM provider: openai or openrouter                                        |
+| `run_name`      | str  | No       | None         | Optional name for output folder                                           |
 
 You can reference the sample configuration in [`calibrate/llm/examples/tests/config.json`](calibrate/llm/examples/tests/config.json) for test case structure examples.
 
@@ -646,19 +651,19 @@ result = asyncio.run(simulations.run(
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `system_prompt` | str | Yes | - | System prompt for the bot/agent |
-| `tools` | list | Yes | - | List of tool definitions |
-| `personas` | list | Yes | - | List of persona dicts with 'characteristics', 'gender', 'language' |
-| `scenarios` | list | Yes | - | List of scenario dicts with 'description' |
-| `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
-| `output_dir` | str | No | "./out" | Output directory for results |
-| `model` | str | No | "gpt-4.1" | Model name for both agent and user |
-| `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
-| `parallel` | int | No | 1 | Number of parallel simulations |
-| `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
-| `max_turns` | int | No | 50 | Maximum assistant turns |
+| Parameter             | Type | Required | Default      | Description                                                        |
+| --------------------- | ---- | -------- | ------------ | ------------------------------------------------------------------ |
+| `system_prompt`       | str  | Yes      | -            | System prompt for the bot/agent                                    |
+| `tools`               | list | Yes      | -            | List of tool definitions                                           |
+| `personas`            | list | Yes      | -            | List of persona dicts with 'characteristics', 'gender', 'language' |
+| `scenarios`           | list | Yes      | -            | List of scenario dicts with 'description'                          |
+| `evaluation_criteria` | list | Yes      | -            | List of criteria dicts with 'name' and 'description'               |
+| `output_dir`          | str  | No       | "./out"      | Output directory for results                                       |
+| `model`               | str  | No       | "gpt-4.1"    | Model name for both agent and user                                 |
+| `provider`            | str  | No       | "openrouter" | LLM provider: openai or openrouter                                 |
+| `parallel`            | int  | No       | 1            | Number of parallel simulations                                     |
+| `agent_speaks_first`  | bool | No       | True         | Whether agent initiates conversation                               |
+| `max_turns`           | int  | No       | 50           | Maximum assistant turns                                            |
 
 You can reference the sample configuration in [`calibrate/llm/examples/simulation/config.json`](calibrate/llm/examples/simulation/config.json) for structure examples.
 
@@ -895,20 +900,20 @@ result = asyncio.run(simulation.run(
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `system_prompt` | str | Yes | - | System prompt for the voice agent |
-| `tools` | list | Yes | - | List of tool definitions |
-| `personas` | list | Yes | - | List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_sensitivity' |
-| `scenarios` | list | Yes | - | List of scenario dicts with 'description' |
-| `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
-| `output_dir` | str | No | "./out" | Output directory for results |
-| `stt` | STTConfig | No | Google | STT configuration |
-| `tts` | TTSConfig | No | Google | TTS configuration |
-| `llm` | LLMConfig | No | OpenRouter/gpt-4.1 | LLM configuration |
-| `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
-| `max_turns` | int | No | 50 | Maximum assistant turns |
-| `port` | int | No | 8765 | Base WebSocket port |
+| Parameter             | Type      | Required | Default            | Description                                                                                             |
+| --------------------- | --------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `system_prompt`       | str       | Yes      | -                  | System prompt for the voice agent                                                                       |
+| `tools`               | list      | Yes      | -                  | List of tool definitions                                                                                |
+| `personas`            | list      | Yes      | -                  | List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_sensitivity' |
+| `scenarios`           | list      | Yes      | -                  | List of scenario dicts with 'description'                                                               |
+| `evaluation_criteria` | list      | Yes      | -                  | List of criteria dicts with 'name' and 'description'                                                    |
+| `output_dir`          | str       | No       | "./out"            | Output directory for results                                                                            |
+| `stt`                 | STTConfig | No       | Google             | STT configuration                                                                                       |
+| `tts`                 | TTSConfig | No       | Google             | TTS configuration                                                                                       |
+| `llm`                 | LLMConfig | No       | OpenRouter/gpt-4.1 | LLM configuration                                                                                       |
+| `agent_speaks_first`  | bool      | No       | True               | Whether agent initiates conversation                                                                    |
+| `max_turns`           | int       | No       | 50                 | Maximum assistant turns                                                                                 |
+| `port`                | int       | No       | 8765               | Base WebSocket port                                                                                     |
 
 You can reference the sample configuration in [`calibrate/agent/examples/simulation/sample_short_english.json`](calibrate/agent/examples/simulation/sample_short_english.json) for structure examples.
 
@@ -1160,3 +1165,14 @@ You can checkout `calibrate/agent/examples/test/sample_output` as a sample outpu
 Calibrate documentation is built using [Mintlify](https://mintlify.com). The documentation source files are located in the `docs/` directory.
 
 Visit the [documentation site](https://docs.calibrate.dev) for the full documentation.
+
+## License
+
+This work is licensed under a
+[Creative Commons Attribution-ShareAlike 4.0 International License][cc-by-sa].
+
+[![CC BY-SA 4.0][cc-by-sa-image]][cc-by-sa]
+
+[cc-by-sa]: http://creativecommons.org/licenses/by-sa/4.0/
+[cc-by-sa-image]: https://licensebuttons.net/l/by-sa/4.0/88x31.png
+[cc-by-sa-shield]: https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg

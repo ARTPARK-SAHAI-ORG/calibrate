@@ -3,41 +3,99 @@ title: "Tools"
 description: "Learn how to create tools for your agents"
 ---
 
-Tools enable your agents to produce structured outputs. They define the parameters and format for extracting information from conversations.
+Tools extend your agents' capabilities by enabling them to perform actions and produce structured outputs. There are two types of tools available:
 
-## Creating a Tool
+- **Webhook tools** — Call external APIs or services to perform actions
+- **Structured output tools** — Extract information from conversations in a defined format
 
-### Navigate to Tools
+## Navigate to Tools
 
-From the sidebar, click **Tools** to view your existing tools.
+From the sidebar, click **Tools** to view and manage your tools.
 
 <Frame>
-  <img src="./images/tools-1.png" alt="Tools" />
+  <img src="./images/tools-1.png" alt="Tools page" />
 </Frame>
 
-### Click "Add tool"
+## Webhook Tools
 
-Click the **Add tool** button in the top right corner. A sidebar panel will open.
+Webhook tools allow agents to call external APIs or services to perform actions like sending notifications or querying databases.
+
+### Create a Webhook Tool
+
+Click **Add webhook tool** to open the configuration panel.
 
 <Frame>
-  <img src="./images/tools-2.png" alt="Add tool" />
+  <img src="./images/tools-webhook-1.png" alt="Add webhook tool" />
 </Frame>
 
 ### Configure the Tool
 
-Add the name and description of the tool describing when to call it along with the parameters which define the structure of the output that the agent should return.
+Provide the following details:
+
+**Name and Description**
+
+Add a descriptive name and explain when the agent should call this tool.
+
+**Request Configuration**
+
+- **Method** — Select HTTP method (GET, POST, PUT, PATCH, DELETE)
+- **URL** — The webhook endpoint URL
+- **Response timeout** — How long to wait before timing out (default: 20 seconds)
 
 <Frame>
-  <img src="./images/tools-3.png" alt="Configure tool" />
+  <img src="./images/tools-webhook-2.png" alt="Configure webhook tool" />
 </Frame>
 
-### Save the Tool
+**Headers** (Optional)
 
-Click **Add tool** to create the tool.
+Define headers to include in the request.
+
+**Query Parameters** (Optional)
+
+Define parameters the LLM will collect and send as query strings.
+
+**Body Parameters** (Optional)
+
+Define the request body structure with a description and properties the LLM should collect.
+
+Click **Add tool** to save.
+
+## Structured Output Tools
+
+Structured output tools enable agents to extract information from conversations in a defined format, such as user names or order details.
+
+### Create a Structured Output Tool
+
+Click **Add structured output tool** to open the configuration panel.
 
 <Frame>
-  <img src="./images/tools-4.png" alt="Save tool" />
+  <img src="./images/tools-structured-1.png" alt="Add structured output tool" />
 </Frame>
+
+### Configure the Tool
+
+Provide the following details:
+
+**Name and Description**
+
+Add a descriptive name and explain when the agent should call this tool.
+
+**Parameters**
+
+Define the structure of data the agent should extract.
+
+<Frame>
+  <img src="./images/tools-structured-2.png" alt="Configure parameters" />
+</Frame>
+
+For each parameter, specify:
+
+- **Data type** — Boolean, Integer, Number, String, Object, or Array
+- **Name** — The parameter identifier
+- **Required** — Whether this field is mandatory
+- **Description** — Detailed guidance for the LLM on what this parameter represents
+
+Click **Add param** to add more parameters. Click **Add tool** to save.
 
 ## Inbuilt Tools
 
