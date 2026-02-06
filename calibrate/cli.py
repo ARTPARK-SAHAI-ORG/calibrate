@@ -108,9 +108,12 @@ Examples:
     stt_leaderboard_parser.add_argument("-s", "--save-dir", type=str, required=True)
 
     # TTS subcommands
-    tts_parser = subparsers.add_parser("tts", help="Text-to-speech evaluation")
+    tts_parser = subparsers.add_parser(
+        "tts",
+        help="Text-to-speech evaluation (run without subcommand for interactive mode)",
+    )
     tts_subparsers = tts_parser.add_subparsers(dest="command", help="TTS command")
-    tts_subparsers.required = True
+    tts_subparsers.required = False  # Allow `calibrate tts` alone for interactive UI
 
     tts_eval_parser = tts_subparsers.add_parser("eval", help="Run TTS evaluation")
     tts_eval_parser.add_argument("-p", "--provider", type=str, default="google")
@@ -250,7 +253,35 @@ Examples:
             )
             leaderboard_main()
     elif args.component == "tts":
-        if args.command == "eval":
+        if args.command is None:
+            # Interactive mode: launch the bundled Ink UI
+            import shutil
+            from pathlib import Path
+
+            node_bin = shutil.which("node")
+            if not node_bin:
+                print(
+                    "Error: Node.js is required for the interactive TTS UI.\n"
+                    "Install it from https://nodejs.org/ or via your package manager.\n\n"
+                    "Alternatively, use the non-interactive commands:\n"
+                    "  calibrate tts eval -p <provider> -l <language> -i <input.csv> -o <output_dir>\n"
+                    "  calibrate tts leaderboard -o <output_dir> -s <save_dir>"
+                )
+                sys.exit(1)
+
+            bundle_path = Path(__file__).parent / "ui" / "cli.bundle.mjs"
+            if not bundle_path.exists():
+                print(
+                    f"Error: UI bundle not found at {bundle_path}\n"
+                    "Run 'cd ui && npm run bundle' to build it."
+                )
+                sys.exit(1)
+
+            import subprocess
+
+            result = subprocess.run([node_bin, str(bundle_path)])
+            sys.exit(result.returncode)
+        elif args.command == "eval":
             from calibrate.tts.eval import main as tts_main
 
             # Map attribute names to their original flag names (preserve underscores)

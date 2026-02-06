@@ -36,30 +36,34 @@ Calibrate uses direct API calls for STT and TTS provider evaluations, and [pipec
 │   │   ├── __init__.py      # Public API: eval(), leaderboard()
 │   │   ├── eval.py          # STT evaluation implementation
 │   │   ├── leaderboard.py   # STT leaderboard generation
-│   │   ├── metrics.py       # STT metrics (WER, string similarity, LLM judge)
-│   │   └── examples/        # Sample inputs/outputs
+│   │   └── metrics.py       # STT metrics (WER, string similarity, LLM judge)
 │   ├── tts/                 # Text-to-Speech evaluation module
 │   │   ├── __init__.py      # Public API: eval(), leaderboard()
 │   │   ├── eval.py          # TTS evaluation implementation
 │   │   ├── leaderboard.py   # TTS leaderboard generation
-│   │   ├── metrics.py       # TTS metrics (LLM judge, TTFB, processing time)
-│   │   └── examples/        # Sample inputs/outputs
+│   │   └── metrics.py       # TTS metrics (LLM judge, TTFB, processing time)
 │   ├── llm/                 # LLM evaluation module
 │   │   ├── __init__.py      # Public API: tests, simulations
 │   │   ├── run_tests.py     # LLM test runner
 │   │   ├── run_simulation.py # LLM simulation runner
 │   │   ├── tests_leaderboard.py
 │   │   ├── simulation_leaderboard.py
-│   │   ├── metrics.py       # LLM evaluation metrics
-│   │   └── examples/        # Sample configs and outputs
+│   │   └── metrics.py       # LLM evaluation metrics
 │   ├── agent/               # Voice agent simulation module
 │   │   ├── __init__.py      # Public API: simulation, STTConfig, TTSConfig, LLMConfig
 │   │   ├── bot.py           # Voice agent pipeline
 │   │   ├── test.py          # Interactive agent testing
-│   │   ├── run_simulation.py # Voice simulation runner
-│   │   └── examples/        # Sample configs and outputs
+│   │   └── run_simulation.py # Voice simulation runner
+│   ├── ui/                  # Bundled interactive CLI (ships with package)
+│   │   ├── __init__.py
+│   │   └── cli.bundle.mjs   # esbuild output — single file, all deps included
 │   └── integrations/        # Third-party provider integrations
 │       └── smallest/        # Smallest AI STT/TTS integration
+├── examples/                # Sample inputs, configs, and outputs (not shipped with package)
+│   ├── stt/                # STT sample input/output/leaderboard
+│   ├── tts/                # TTS sample CSV/output/leaderboard
+│   ├── llm/                # LLM tests and simulation configs/output
+│   └── agent/              # Voice agent simulation/test configs/output
 ├── docs/                    # Mintlify documentation
 │   ├── docs.json           # Navigation and theme config
 │   ├── getting-started/
@@ -67,9 +71,21 @@ Calibrate uses direct API calls for STT and TTS provider evaluations, and [pipec
 │   ├── core-concepts/
 │   ├── python-sdk/
 │   ├── cli/
-│   ├── integrations/
-│   └── examples/           # Use cases and recipes
+│   └── integrations/
+├── ui/                      # Interactive Ink-based CLI (Node.js/TypeScript)
+│   ├── package.json         # Dependencies (ink, react)
+│   ├── tsconfig.json        # TypeScript config
+│   └── source/
+│       ├── cli.tsx          # Entry point
+│       ├── app.tsx          # Main app flow & step components
+│       ├── components.tsx   # Reusable UI components (Spinner, TextInput, MultiSelect, etc.)
+│       ├── providers.ts     # TTS provider definitions with per-language support
+│       └── credentials.ts   # Secure API key storage (~/.calibrate/credentials.json)
+├── .github/workflows/
+│   ├── docs.yml            # Mintlify docs deployment
+│   └── publish.yml         # PyPI publish on GitHub release
 ├── pyproject.toml          # Package configuration
+├── LICENSE.md              # CC BY-SA 4.0 license
 ├── requirements-docs.txt   # Documentation dependencies
 ├── uv.lock                 # Dependency lockfile
 └── README.md               # Project documentation
@@ -392,7 +408,10 @@ asyncio.run(simulation.run(
 calibrate stt eval -p deepgram -l english -i ./data -o ./out
 calibrate stt leaderboard -o ./out -s ./leaderboard
 
-# TTS Evaluation
+# TTS Evaluation (interactive — requires Node.js)
+calibrate tts
+
+# TTS Evaluation (non-interactive)
 calibrate tts eval -p google -l english -i ./data/texts.csv -o ./out
 calibrate tts leaderboard -o ./out -s ./leaderboard
 
@@ -770,9 +789,83 @@ Documentation is built using [Mintlify](https://mintlify.com) with configuration
 **Local Preview:**
 
 ```bash
-uv pip install -r requirements-docs.txt
-# Follow Mintlify docs for local preview
+npm i -g mintlify
+cd docs
+mintlify dev
 ```
+
+**README.md** is intentionally minimal — it provides installation, links to the Python SDK and CLI docs on the docs site, and local docs setup instructions. All detailed usage documentation lives in `docs/` and on [docs.calibrate.dev](https://docs.calibrate.dev).
+
+---
+
+## Interactive TTS Evaluation CLI (`ui/`)
+
+An Ink-based (React for CLIs) interactive terminal UI for TTS evaluation. Source lives in `ui/`, bundled output ships inside the Python package at `calibrate/ui/cli.bundle.mjs`.
+
+**Run:** `calibrate tts` (no subcommand — requires Node.js on the system)
+
+**Dev mode:** `cd ui && npx tsx source/cli.tsx`
+
+**Flow:**
+
+1. **Language selection** — user picks a language first
+2. **Provider selection** — only providers that support the chosen language are shown (filtered using `ttsLanguages` in `providers.ts`, derived from the TTS language dictionaries in `calibrate/utils.py`)
+3. **Input CSV** — path to `id,text` CSV file
+4. **Output directory** — optional, defaults to `./out` (press Enter to accept)
+5. **API key setup** — checks `~/.calibrate/credentials.json` and env vars; only prompts for missing keys; always requires `OPENAI_API_KEY` for the LLM judge
+6. **Evaluation** — runs `calibrate tts eval` sequentially per provider via `child_process.spawn`, showing live logs
+7. **Leaderboard** — runs `calibrate tts leaderboard`, then displays comparison table + bar charts + output file paths
+
+**Bundling & Distribution:**
+
+- `cd ui && npm run bundle` uses esbuild to compile the entire Ink app (React, ink, all dependencies) into a single self-contained `calibrate/ui/cli.bundle.mjs` (~2MB)
+- `pyproject.toml` includes `cli.bundle.mjs` via `[tool.setuptools.package-data]` so it ships with the Python package
+- `calibrate/cli.py` dispatches `calibrate tts` (no subcommand) by checking for `node` then running `node calibrate/ui/cli.bundle.mjs`
+- Existing `calibrate tts eval` and `calibrate tts leaderboard` subcommands are unaffected
+- If Node.js is not installed, the user gets a clear error with instructions and the non-interactive commands as an alternative
+
+**Key patterns:**
+
+- **Calibrate binary resolution** (`findCalibrateBin()` in `app.tsx`): Checks PATH → `.venv/bin/calibrate` → `uv run calibrate`, in that order. The resolved command is stored in `AppConfig.calibrate` and threaded through all spawn calls.
+- **Credential storage** (`credentials.ts`): Keys saved to `~/.calibrate/credentials.json` with `0o600` permissions. Reads from stored file first, then falls back to env vars.
+- **Language-based provider filtering** (`providers.ts`): Each `ProviderInfo` has a `ttsLanguages: Set<string>` listing the languages it supports for TTS. `getProvidersForLanguage(language)` returns only matching providers. The sets are derived from the TTS language code dictionaries in `calibrate/utils.py`.
+
+**Dependencies:** `ink`, `react`, `react-devtools-core`, `esbuild` (dev), `tsx` (dev), `typescript` (dev). End users only need Node.js — all JS deps are bundled.
+
+**Gotchas:**
+
+- Ink requires a real TTY for interactive input (won't work in piped/non-interactive shells)
+- After changing UI source code, run `cd ui && npm run bundle` to regenerate `calibrate/ui/cli.bundle.mjs` before releasing
+- `ttsLanguages` sets in `providers.ts` must be kept in sync with the TTS language dictionaries in `calibrate/utils.py` if new languages or providers are added
+- The bundle file (`cli.bundle.mjs`) should be committed to the repo so it ships with `pip install`
+
+---
+
+## PyPI Release
+
+**Package name:** `calibrate-agent` (on PyPI)
+
+**Publishing workflow** (`.github/workflows/publish.yml`):
+
+1. Triggered by a GitHub release being published
+2. Builds sdist + wheel using `python -m build`
+3. Publishes to PyPI using trusted publishing (`pypa/gh-action-pypi-publish`) with OIDC `id-token` — no API key needed
+4. Uses a `pypi` GitHub environment for deployment approval control
+
+**`pyproject.toml` key details:**
+
+- `license = "CC-BY-SA-4.0"` — plain SPDX string (not a table; the table format `{text = "..."}` is deprecated by setuptools)
+- `license-files = ["LICENSE.md"]` — explicitly declares the license file
+- `[tool.setuptools.packages.find]` excludes `ui*`, `examples*`, `docs*` to prevent non-package directories from leaking into the wheel
+- `[tool.setuptools.package-data]` includes `calibrate/ui/cli.bundle.mjs` so the bundled Ink UI ships with the package
+- `pipecat-ai` and `pipecat-ai-small-webrtc-prebuilt` are pinned to exact versions (see Tech Stack section)
+
+**Pre-release checklist:**
+
+1. Rebuild the Ink UI bundle: `cd ui && npm run bundle`
+2. Verify build locally: `python -m build` — check no stray files in the wheel
+3. Update version in `calibrate/__init__.py` and `pyproject.toml`
+4. Create a GitHub release — the workflow builds and publishes automatically
 
 ---
 

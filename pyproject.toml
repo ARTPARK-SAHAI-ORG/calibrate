@@ -1,16 +1,31 @@
 [project]
-name = "calibrate"
+name = "calibrate-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "An open-source evaluation framework for voice agents"
 readme = "README.md"
+license = "CC-BY-SA-4.0"
+license-files = ["LICENSE.md"]
 requires-python = ">=3.10"
+authors = [
+    {name = "ARTPARK", email = "calibrate@artpark.in"},
+]
+keywords = ["voice-agents", "evaluation", "benchmarking", "stt", "tts", "llm", "simulation", "pipecat"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "backoff>=2.2.1",
     "elevenlabs>=2.31.0",
     "evaluate>=0.4.6",
     "instructor>=1.13.0",
-    "ipdb>=0.13.13",
-    "ipython>=8.37.0",
     "jiwer>=4.0.0",
     "matplotlib>=3.10.7",
     "natsort>=8.4.0",
@@ -26,16 +41,34 @@ dependencies = [
     "simpleaudio>=1.0.4",
     "smallestai>=4.0.1",
     "sounddevice>=0.5.3",
-    "test-py>=0.3",
     "uvicorn>=0.38.0",
     "whisper-normalizer>=0.1.12",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "ipdb>=0.13.13",
+    "ipython>=8.37.0",
+    "pytest>=7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/artpark/agentloop"
+Documentation = "https://docs.calibrate.dev"
+Repository = "https://github.com/artpark/agentloop"
+Issues = "https://github.com/artpark/agentloop/issues"
 
 [project.scripts]
 calibrate = "calibrate.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
+exclude = ["ui*", "examples*", "docs*"]
+
+[tool.setuptools.package-data]
+"calibrate" = [
+    "ui/cli.bundle.mjs",
+]
 
 [build-system]
 requires = ["setuptools>=61.0"]
