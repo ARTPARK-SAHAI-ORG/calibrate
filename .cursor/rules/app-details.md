@@ -848,9 +848,10 @@ An Ink-based (React for CLIs) interactive terminal UI for TTS evaluation. Source
 **Publishing workflow** (`.github/workflows/publish.yml`):
 
 1. Triggered by a GitHub release being published
-2. Builds sdist + wheel using `python -m build`
-3. Publishes to PyPI using trusted publishing (`pypa/gh-action-pypi-publish`) with OIDC `id-token` — no API key needed
-4. Uses a `pypi` GitHub environment for deployment approval control
+2. Extracts version from the release tag (strips `v` prefix: `v0.2.0` → `0.2.0`) and injects it into `pyproject.toml` via `sed`
+3. Builds sdist + wheel using `python -m build`
+4. Publishes to PyPI using trusted publishing (`pypa/gh-action-pypi-publish`) with OIDC `id-token` — no API key needed
+5. Uses a `pypi` GitHub environment for deployment approval control
 
 **`pyproject.toml` key details:**
 
@@ -860,12 +861,20 @@ An Ink-based (React for CLIs) interactive terminal UI for TTS evaluation. Source
 - `[tool.setuptools.package-data]` includes `calibrate/ui/cli.bundle.mjs` so the bundled Ink UI ships with the package
 - `pipecat-ai` and `pipecat-ai-small-webrtc-prebuilt` are pinned to exact versions (see Tech Stack section)
 
+**Versioning:**
+
+- **Version is set automatically from the GitHub release tag** — no manual version bumping needed anywhere
+- The publish workflow injects the tag version into `pyproject.toml` at build time; the value in the repo is a placeholder
+- **`calibrate/__init__.py`** reads the version dynamically via `importlib.metadata.version("calibrate-agent")` — no hardcoded version string. Falls back to `"0.0.0-dev"` if the package isn't installed (e.g., during local development without `pip install -e .`)
+- **`ui/package.json`** version is independent — the UI is bundled into the Python package and end users never interact with the npm package directly
+- **`uv.lock`** tracks dependency versions, not the project version — auto-updated by `uv sync` / `uv lock`
+- **Release tags must use `v` prefix** (e.g., `v0.1.0`, `v1.0.0`) — the workflow strips it to get the PEP 440 version
+
 **Pre-release checklist:**
 
-1. Rebuild the Ink UI bundle: `cd ui && npm run bundle`
+1. Rebuild the Ink UI bundle if UI changed: `cd ui && npm run bundle`
 2. Verify build locally: `python -m build` — check no stray files in the wheel
-3. Update version in `calibrate/__init__.py` and `pyproject.toml`
-4. Create a GitHub release — the workflow builds and publishes automatically
+3. Create a GitHub release with a `v`-prefixed tag (e.g., `v0.1.0`) — the workflow sets the version, builds, and publishes automatically
 
 ---
 

@@ -28,7 +28,12 @@ Library Usage:
     asyncio.run(simulation.run(config="./config.json", output_dir="./out"))
 """
 
-__version__ = "0.0.1"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("calibrate-agent")
+except PackageNotFoundError:
+    __version__ = "0.0.0-dev"
 
 # Lazy imports for submodules
 from calibrate import stt

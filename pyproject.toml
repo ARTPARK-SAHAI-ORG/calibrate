@@ -53,7 +53,7 @@ dev = [
 ]
 
 [project.urls]
-Documentation = "https://calibrate.artpark.ai"
+Documentation = "https://calibrate.artpark.ai/docs"
 
 [project.scripts]
 calibrate = "calibrate.cli:main"
