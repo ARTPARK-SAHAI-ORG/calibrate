@@ -848,33 +848,39 @@ An Ink-based (React for CLIs) interactive terminal UI for TTS evaluation. Source
 **Publishing workflow** (`.github/workflows/publish.yml`):
 
 1. Triggered by a GitHub release being published
-2. Extracts version from the release tag (strips `v` prefix: `v0.2.0` → `0.2.0`) and injects it into `pyproject.toml` via `sed`
-3. Builds sdist + wheel using `python -m build`
+2. Checks out with `fetch-depth: 0` (full git history required by `setuptools_scm`)
+3. Builds sdist + wheel using `python -m build` — `setuptools_scm` reads the version from the git tag automatically
 4. Publishes to PyPI using trusted publishing (`pypa/gh-action-pypi-publish`) with OIDC `id-token` — no API key needed
 5. Uses a `pypi` GitHub environment for deployment approval control
 
 **`pyproject.toml` key details:**
 
+- `dynamic = ["version"]` — version is not hardcoded; derived by `setuptools_scm` from git tags
 - `license = "CC-BY-SA-4.0"` — plain SPDX string (not a table; the table format `{text = "..."}` is deprecated by setuptools)
 - `license-files = ["LICENSE.md"]` — explicitly declares the license file
-- `[tool.setuptools.packages.find]` excludes `ui*`, `examples*`, `docs*` to prevent non-package directories from leaking into the wheel
+- `[tool.setuptools.packages.find]` excludes `ui*`, `examples*`, `docs*`, `images*` to prevent non-package directories from leaking into the wheel
 - `[tool.setuptools.package-data]` includes `calibrate/ui/cli.bundle.mjs` so the bundled Ink UI ships with the package
 - `pipecat-ai` and `pipecat-ai-small-webrtc-prebuilt` are pinned to exact versions (see Tech Stack section)
+- `[tool.setuptools_scm]` with `local_scheme = "no-local-version"` and `fallback_version = "0.0.0-dev"`
+- Build requires `setuptools>=64` and `setuptools_scm>=8`
 
-**Versioning:**
+**Versioning (via `setuptools_scm`):**
 
-- **Version is set automatically from the GitHub release tag** — no manual version bumping needed anywhere
-- The publish workflow injects the tag version into `pyproject.toml` at build time; the value in the repo is a placeholder
-- **`calibrate/__init__.py`** reads the version dynamically via `importlib.metadata.version("calibrate-agent")` — no hardcoded version string. Falls back to `"0.0.0-dev"` if the package isn't installed (e.g., during local development without `pip install -e .`)
+- **No hardcoded version anywhere** — `setuptools_scm` reads git tags at build time
+- Tag `v0.1.0` on the current commit → version `0.1.0`
+- 3 commits past `v0.1.0` → version `0.1.1.dev3` (dev version)
+- No tags at all → `fallback_version` of `0.0.0-dev`
+- **`calibrate/__init__.py`** reads the version dynamically via `importlib.metadata.version("calibrate-agent")`. Falls back to `"0.0.0-dev"` if the package isn't installed (e.g., during local development without `pip install -e .`)
 - **`ui/package.json`** version is independent — the UI is bundled into the Python package and end users never interact with the npm package directly
-- **`uv.lock`** tracks dependency versions, not the project version — auto-updated by `uv sync` / `uv lock`
-- **Release tags must use `v` prefix** (e.g., `v0.1.0`, `v1.0.0`) — the workflow strips it to get the PEP 440 version
+- **`uv.lock`** tracks dependency versions, not the project version — only needs updating when dependencies change (`uv lock`)
+- **Release tags must use `v` prefix** (e.g., `v0.1.0`, `v1.0.0`)
+- **CI checkout needs `fetch-depth: 0`** — `setuptools_scm` requires full git history to find tags
 
 **Pre-release checklist:**
 
 1. Rebuild the Ink UI bundle if UI changed: `cd ui && npm run bundle`
 2. Verify build locally: `python -m build` — check no stray files in the wheel
-3. Create a GitHub release with a `v`-prefixed tag (e.g., `v0.1.0`) — the workflow sets the version, builds, and publishes automatically
+3. Create a GitHub release with a `v`-prefixed tag (e.g., `v0.1.0`) — `setuptools_scm` reads the tag, builds the correct version, and publishes automatically
 
 ---
 

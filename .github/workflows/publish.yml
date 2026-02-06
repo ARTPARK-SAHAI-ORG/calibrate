@@ -13,17 +13,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Set version from release tag
-        run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
-          echo "Building version: $VERSION"
 
       - name: Install build tools
         run: pip install build

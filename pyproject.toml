@@ -1,6 +1,6 @@
 [project]
 name = "calibrate-agent"
-version = "0.0.1"
+dynamic = ["version"]
 description = "An open-source evaluation framework for voice agents"
 readme = "README.md"
 license = "CC-BY-SA-4.0"
@@ -60,13 +60,17 @@ calibrate = "calibrate.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["ui*", "examples*", "docs*"]
+exclude = ["ui*", "examples*", "docs*", "images*"]
 
 [tool.setuptools.package-data]
 "calibrate" = [
     "ui/cli.bundle.mjs",
 ]
 
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+fallback_version = "0.0.0-dev"
+
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"

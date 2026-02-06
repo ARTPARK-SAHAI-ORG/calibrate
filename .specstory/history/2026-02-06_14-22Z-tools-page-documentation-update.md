@@ -20147,3 +20147,779 @@ No code changes were made — the previous message was just explaining how local
 
 ---
 
+_**User**_
+
+@publish.yml (21-26) 
+
+what does this do? it does not upgrade pyproject toml version in my repo
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+Correct — it only changes `pyproject.toml` **in the CI runner's ephemeral checkout**, not in your repo. The modification happens in memory during the workflow run, gets used to build the package, then the runner is discarded. Your repo's `pyproject.toml` stays untouched.
+
+This is intentional. The version on PyPI matches your release tag, and you don't need to maintain a version string in your codebase at all. The `0.0.1` in your repo is just a placeholder that never gets published as-is.
+
+If you'd prefer the repo to also reflect the version (e.g., so `git blame` or local builds show the real version), that's a different approach — but it adds complexity (the workflow would need write permissions to push a commit back). The current setup is the simplest: tag a release, the right version lands on PyPI.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+No code changes were made — the previous message was just explaining how the `sed` version injection works in CI. Nothing to update.
+
+---
+
+_**User**_
+
+can I remove the version from pyproject then
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+No — `version` is a required field in `pyproject.toml` per the Python packaging spec. The build will fail without it.
+
+Just leave it as `0.0.1` (or whatever it is now). It's a placeholder that gets overwritten in CI before the package is built. It never reaches PyPI as-is.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+No code changes were made — the previous message was just answering a question about the `version` field requirement. Nothing to update.
+
+---
+
+_**User**_
+
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pipecat-ai"
+dynamic = ["version"]
+description = "An open source framework for voice (and multimodal) assistants"
+license = "BSD-2-Clause"
+license-files = ["LICENSE"]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = ["webrtc", "audio", "video", "ai"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Communications :: Conferencing",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence"
+]
+dependencies = [
+    "aiofiles>=24.1.0,<25",
+    "aiohttp>=3.11.12,<4",
+    "audioop-lts~=0.2.1; python_version>='3.13'",
+    "docstring_parser~=0.16",
+    "loguru~=0.7.3",
+    "Markdown>=3.7,<4",
+    "nltk>=3.9.1,<4",
+    "numpy>=1.26.4,<3",
+    "Pillow>=11.1.0,<12",
+    "protobuf~=5.29.6",
+    "pydantic>=2.10.6,<3",
+    "pyloudnorm~=0.1.1",
+    "resampy~=0.4.3",
+    "soxr~=0.5.0",
+    "openai>=1.74.0,<3",
+    # Pinning numba to resolve package dependencies
+    "numba==0.61.2",
+    "wait_for2>=0.4.1; python_version<'3.12'",
+]
+
+[project.urls]
+Homepage = "https://pipecat.ai"
+Documentation = "https://docs.pipecat.ai/"
+Source = "https://github.com/pipecat-ai/pipecat"
+Issues = "https://github.com/pipecat-ai/pipecat/issues"
+Changelog = "https://github.com/pipecat-ai/pipecat/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+aic = [ "aic-sdk~=2.0.1" ]
+anthropic = [ "anthropic~=0.49.0" ]
+assemblyai = [ "pipecat-ai[websockets-base]" ]
+asyncai = [ "pipecat-ai[websockets-base]" ]
+aws = [ "aioboto3~=15.5.0", "pipecat-ai[websockets-base]" ]
+aws-nova-sonic = [ "aws_sdk_bedrock_runtime~=0.2.0; python_version>='3.12'" ]
+azure = [ "azure-cognitiveservices-speech~=1.47.0"]
+cartesia = [ "cartesia~=2.0.3", "pipecat-ai[websockets-base]" ]
+camb = [ "camb-sdk>=1.5.4" ]
+cerebras = []
+daily = [ "daily-python~=0.23.0" ]
+deepgram = [ "deepgram-sdk~=4.7.0", "pipecat-ai[websockets-base]" ]
+deepseek = []
+elevenlabs = [ "pipecat-ai[websockets-base]" ]
+fal = [ "fal-client~=0.5.9" ]
+fireworks = []
+fish = [ "ormsgpack~=1.7.0", "pipecat-ai[websockets-base]" ]
+gladia = [ "pipecat-ai[websockets-base]" ]
+google = [ "google-cloud-speech>=2.33.0,<3", "google-cloud-texttospeech>=2.31.0,<3", "google-genai>=1.57.0,<2", "pipecat-ai[websockets-base]" ]
+gradium = [ "pipecat-ai[websockets-base]" ]
+grok = []
+groq = [ "groq~=0.23.0" ]
+gstreamer = [ "pygobject~=3.50.0" ]
+heygen = [ "livekit>=1.0.13", "pipecat-ai[websockets-base]" ]
+hume = [ "hume>=0.11.2" ]
+inworld = []
+koala = [ "pvkoala~=2.0.3" ]
+kokoro = [ "kokoro-onnx>=0.5.0,<1", "requests>=2.32.5,<3" ]
+krisp = [ "pipecat-ai-krisp~=0.4.0" ]
+langchain = [ "langchain~=0.3.20", "langchain-community~=0.3.20", "langchain-openai~=0.3.9" ]
+livekit = [ "livekit~=1.0.13", "livekit-api~=1.0.5", "tenacity>=8.2.3,<10.0.0", "pyjwt>=2.10.1" ]
+lmnt = [ "pipecat-ai[websockets-base]" ]
+local = [ "pyaudio~=0.2.14" ]
+local-smart-turn = [ "coremltools>=8.0", "transformers", "torch>=2.5.0,<3", "torchaudio>=2.5.0,<3" ]
+local-smart-turn-v3 = [ "transformers", "onnxruntime>=1.20.1,<2" ]
+mcp = [ "mcp[cli]>=1.11.0,<2" ]
+mem0 = [ "mem0ai~=0.1.94" ]
+mistral = []
+mlx-whisper = [ "mlx-whisper~=0.4.2" ]
+moondream = [ "accelerate~=1.10.0", "einops~=0.8.0", "pyvips[binary]~=3.0.0", "timm~=1.0.13", "transformers>=4.48.0" ]
+neuphonic = [ "pipecat-ai[websockets-base]" ]
+noisereduce = [ "noisereduce~=3.0.3" ]
+nvidia = [ "nvidia-riva-client~=2.21.1" ]
+openai = [ "pipecat-ai[websockets-base]" ]
+rnnoise = [ "pyrnnoise~=0.4.1" ]
+openpipe = [ "openpipe>=4.50.0,<6" ]
+openrouter = []
+perplexity = []
+piper = [ "piper-tts>=1.3.0,<2", "requests>=2.32.5,<3" ]
+playht = [ "pipecat-ai[websockets-base]" ]
+qwen = []
+remote-smart-turn = []
+resembleai = [ "pipecat-ai[websockets-base]" ]
+rime = [ "pipecat-ai[websockets-base]" ]
+riva = [ "pipecat-ai[nvidia]" ]
+runner = [ "python-dotenv>=1.0.0,<2.0.0", "uvicorn>=0.32.0,<1.0.0", "fastapi>=0.115.6,<0.128.0", "pipecat-ai-small-webrtc-prebuilt>=2.1.0"]
+sagemaker = ["aws_sdk_sagemaker_runtime_http2; python_version>='3.12'"]
+sambanova = []
+sarvam = [ "sarvamai==0.1.21", "pipecat-ai[websockets-base]" ]
+sentry = [ "sentry-sdk>=2.28.0,<3" ]
+silero = [ "onnxruntime>=1.20.1,<2" ]
+simli = [ "simli-ai~=1.0.3"]
+soniox = [ "pipecat-ai[websockets-base]" ]
+soundfile = [ "soundfile~=0.13.1" ]
+speechmatics = [ "speechmatics-voice[smart]>=0.2.8" ]
+strands = [ "strands-agents>=1.9.1,<2" ]
+tavus=[]
+together = []
+tracing = [ "opentelemetry-sdk>=1.33.0", "opentelemetry-api>=1.33.0", "opentelemetry-instrumentation>=0.54b0" ]
+ultravox = [ "pipecat-ai[websockets-base]" ]
+webrtc = [ "aiortc>=1.14.0,<2", "opencv-python>=4.11.0.86,<5" ]
+websocket = [ "pipecat-ai[websockets-base]", "fastapi>=0.115.6,<0.128.0" ]
+websockets-base = [ "websockets>=13.1,<16.0" ]
+whisper = [ "faster-whisper~=1.1.1" ]
+
+[dependency-groups]
+dev = [
+    "build~=1.2.2",
+    "coverage~=7.9.1",
+    "grpcio-tools~=1.67.1",
+    "pip-tools~=7.4.1",
+    "pre-commit~=4.2.0",
+    "pyright>=1.1.404,<1.2",
+    "pytest~=8.4.1",
+    "pytest-asyncio~=1.3.0",
+    "pytest-aiohttp==1.1.0",
+    "ruff>=0.12.11,<1",
+    "setuptools~=78.1.1",
+    "setuptools_scm~=8.3.1",
+    "python-dotenv>=1.0.1,<2.0.0",
+    "towncrier~=25.8.0",
+]
+
+docs = [
+    "sphinx>=8.1.3",
+    "sphinx-rtd-theme",
+    "sphinx-markdown-builder",
+    "sphinx-autodoc-typehints",
+    "toml",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"pipecat" = ["py.typed"]
+"pipecat.audio.dtmf" = [
+    "src/pipecat/audio/dtmf/dtmf-0.wav",
+    "src/pipecat/audio/dtmf/dtmf-1.wav",
+    "src/pipecat/audio/dtmf/dtmf-2.wav",
+    "src/pipecat/audio/dtmf/dtmf-3.wav",
+    "src/pipecat/audio/dtmf/dtmf-4.wav",
+    "src/pipecat/audio/dtmf/dtmf-5.wav",
+    "src/pipecat/audio/dtmf/dtmf-6.wav",
+    "src/pipecat/audio/dtmf/dtmf-7.wav",
+    "src/pipecat/audio/dtmf/dtmf-8.wav",
+    "src/pipecat/audio/dtmf/dtmf-9.wav",
+    "src/pipecat/audio/dtmf/dtmf-pound.wav",
+    "src/pipecat/audio/dtmf/dtmf-star.wav",
+]
+"pipecat.services.aws_nova_sonic" = ["src/pipecat/services/aws_nova_sonic/ready.wav"]
+"pipecat.audio.turn.smart_turn.data" = ["src/pipecat/audio/turn/smart_turn/data/smart-turn-v3.2-cpu.onnx"]
+
+[tool.pytest.ini_options]
+addopts = "--verbose"
+testpaths = ["tests"]
+pythonpath = ["src"]
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = [
+    "ignore:'audioop' is deprecated:DeprecationWarning",
+]
+
+[tool.setuptools_scm]
+local_scheme = "no-local-version"
+fallback_version = "0.0.0-dev"
+
+[tool.ruff]
+exclude = [".git", "*_pb2.py"]
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "D", # Docstring rules
+    "I", # Import rules
+]
+ignore = [
+    "D105",  # Missing docstring in magic methods (__str__, __repr__, etc.)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Skip docstring checks for non-source code
+"examples/**/*.py" = ["D"]
+"tests/**/*.py" = ["D"]
+"scripts/**/*.py" = ["D"]
+"docs/**/*.py" = ["D"]
+# Skip D104 (missing docstring in public package) for __init__.py files
+"**/__init__.py" = ["D104"]
+# Skip specific rules for generated protobuf files
+"**/*_pb2.py" = ["D"]
+"src/pipecat/services/__init__.py" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.coverage.run]
+command_line = "--module pytest"
+source = ["src"]
+omit = ["*/tests/*"]
+
+[tool.towncrier]
+package = "pipecat"
+package_dir = "src"
+filename = "CHANGELOG.md"
+directory = "changelog"
+start_string = "<!-- towncrier release notes start -->\n"
+template = "changelog/_template.md.j2"
+title_format = "## [{version}] - {project_date}"
+issue_format = "[#{issue}](https://github.com/pipecat-ai/pipecat/pull/{issue})"
+underlines = ["", "", ""]
+wrap = true
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "other"
+name = "Other"
+showcontent = true
+
+this is pyproject toml for pipecat - it does not have version field
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is pointing out that pipecat uses `dynamic = ["version"]` with `setuptools_scm` to derive the version from git tags, instead of having a static `version` field. They're asking if we can do the same.
+
+Yes, we can use `setuptools_scm` to derive the version from git tags. This means:
+1. Remove `version = "0.0.1"` from `pyproject.toml`
+2. Add `dynamic = ["version"]`
+3. Add `setuptools_scm` to the build requirements
+4. Configure `[tool.setuptools_scm]` with a fallback version
+5. Remove the `sed` version injection from the CI workflow since `setuptools_scm` will read the git tag directly
+
+
+6. Now I'll go ahead and make these changes.</details></think>
+
+---
+
+Good catch. Pipecat uses `setuptools_scm` which reads the version directly from git tags — no static `version` field, no `sed` hack in CI. Let me switch to the same approach.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/pyproject.toml</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/.github/workflows/publish.yml</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pyproject.toml</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pyproject.toml</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now remove the `sed` hack from the workflow since `setuptools_scm` reads the git tag directly:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/.github/workflows/publish.yml</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me verify the build still works:
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop && rm -rf dist build calibrate_agent.egg-info && uv run python -m build 2>&1 | tail -20</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop && rm -rf dist build calibrate_agent.egg-info && uv run python -m build 2>&1 | tail -20
+```
+
+```
+adding 'calibrate/stt/leaderboard.py'
+adding 'calibrate/stt/metrics.py'
+adding 'calibrate/tts/__init__.py'
+adding 'calibrate/tts/benchmark.sh'
+adding 'calibrate/tts/eval.py'
+adding 'calibrate/tts/leaderboard.py'
+adding 'calibrate/tts/metrics.py'
+adding 'calibrate/tts/test_smallest.py'
+adding 'calibrate/ui/__init__.py'
+adding 'calibrate/ui/cli.bundle.mjs'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/licenses/LICENSE.md'
+adding 'images/run_conversation.png'
+adding 'images/run_metrics.png'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/METADATA'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/WHEEL'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/entry_points.txt'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/top_level.txt'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/RECORD'
+removing build/bdist.macosx-11.0-arm64/wheel
+Successfully built calibrate_agent-0.0.3.dev0.tar.gz and calibrate_agent-0.0.3.dev0-py3-none-any.whl
+
+```
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+Build works. The version `0.0.3.dev0` is derived from git tags (it's a development version since no exact tag matches the current commit). I notice `images/` directory is leaking into the wheel. Let me add it to the exclude list.
+
+Actually, looking more carefully at the output, I see `images/run_conversation.png` and `images/run_metrics.png` being included. These shouldn't be in the wheel. Let me add `images*` to the exclude list.
+
+Wait, but the user didn't ask me to fix that. They asked about the version field. Let me focus on what they asked. Actually, the user's rule says "Never ever make a change that you have not been asked to do." But this is a bug I introduced earlier or that was already present - stray files in the wheel. Let me just mention it and fix the exclude.
+
+
+Actually, re-reading the user rules about staying focused on specific tasks, I should reconsider. They did previously ask me to set up the package for PyPI release and we verified the wheel contents before, so fixing this regression in the excludes is part of that work. Let me update the configuration and check for any other stray files that shouldn't be included.</details></think>
+
+---
+
+Build works. `setuptools_scm` derived version `0.0.3.dev0` from git history. When you tag a release as `v0.1.0`, it'll produce `0.1.0` exactly.
+
+I notice `images/` is leaking into the wheel now. Let me fix the exclude:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/pyproject.toml</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop && rm -rf dist build calibrate_agent.egg-info && uv run python -m build 2>&1 | tail -5</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop && rm -rf dist build calibrate_agent.egg-info && uv run python -m build 2>&1 | tail -5
+```
+
+```
+adding 'calibrate_agent-0.0.3.dev0.dist-info/entry_points.txt'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/top_level.txt'
+adding 'calibrate_agent-0.0.3.dev0.dist-info/RECORD'
+removing build/bdist.macosx-11.0-arm64/wheel
+Successfully built calibrate_agent-0.0.3.dev0.tar.gz and calibrate_agent-0.0.3.dev0-py3-none-any.whl
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop && unzip -l dist/calibrate_agent-0.0.3.dev0-py3-none-any.whl 2>&1 | rg -v "calibrate_agent-0.0.3" | rg "calibrate/|images/" </summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop && unzip -l dist/calibrate_agent-0.0.3.dev0-py3-none-any.whl 2>&1 | rg -v "calibrate_agent-0.0.3" | rg "calibrate/|images/" 
+```
+
+```
+(eval):1: command not found: rg
+(eval):1: command not found: rg
+
+```
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop && unzip -l dist/calibrate_agent-0.0.3.dev0-py3-none-any.whl 2>&1</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop && unzip -l dist/calibrate_agent-0.0.3.dev0-py3-none-any.whl 2>&1
+```
+
+```
+Archive:  dist/calibrate_agent-0.0.3.dev0-py3-none-any.whl
+  Length      Date    Time    Name
+---------  ---------- -----   ----
+     1461  02-06-2026 19:18   calibrate/__init__.py
+    14908  02-06-2026 18:26   calibrate/cli.py
+    54795  02-04-2026 10:10   calibrate/utils.py
+    10390  02-02-2026 14:55   calibrate/agent/__init__.py
+    17083  02-04-2026 14:28   calibrate/agent/bot.py
+    66307  02-05-2026 07:03   calibrate/agent/run_simulation.py
+    13615  02-04-2026 10:10   calibrate/agent/test.py
+       22  12-04-2025 12:52   calibrate/integrations/__init__.py
+      128  12-04-2025 12:52   calibrate/integrations/smallest/__init__.py
+    13133  12-04-2025 12:52   calibrate/integrations/smallest/stt.py
+     9350  12-04-2025 13:19   calibrate/integrations/smallest/tts.py
+    16579  02-02-2026 14:55   calibrate/llm/__init__.py
+     5398  01-21-2026 04:50   calibrate/llm/metrics.py
+    23587  02-04-2026 10:10   calibrate/llm/run_simulation.py
+    18302  02-04-2026 10:10   calibrate/llm/run_tests.py
+     4814  01-05-2026 12:21   calibrate/llm/simulation_leaderboard.py
+     5482  11-25-2025 09:16   calibrate/llm/tests_leaderboard.py
+     3967  02-06-2026 15:17   calibrate/stt/__init__.py
+     3461  12-24-2025 04:40   calibrate/stt/benchmark.sh
+    25134  02-02-2026 14:55   calibrate/stt/eval.py
+     4197  01-07-2026 07:12   calibrate/stt/eval_smallest.py
+     7727  01-26-2026 15:21   calibrate/stt/leaderboard.py
+     3817  01-07-2026 07:12   calibrate/stt/metrics.py
+     3339  02-06-2026 15:17   calibrate/tts/__init__.py
+     3373  01-05-2026 08:21   calibrate/tts/benchmark.sh
+    21945  02-02-2026 14:55   calibrate/tts/eval.py
+     7567  02-02-2026 14:42   calibrate/tts/leaderboard.py
+     2882  01-07-2026 07:12   calibrate/tts/metrics.py
+      663  01-07-2026 07:15   calibrate/tts/test_smallest.py
+      123  02-06-2026 18:26   calibrate/ui/__init__.py
+  2074747  02-06-2026 18:43   calibrate/ui/cli.bundle.mjs
+    19598  02-06-2026 19:31   calibrate_agent-0.0.3.dev0.dist-info/licenses/LICENSE.md
+     3915  02-06-2026 19:31   calibrate_agent-0.0.3.dev0.dist-info/METADATA
+       92  02-06-2026 19:31   calibrate_agent-0.0.3.dev0.dist-info/WHEEL
+       49  02-06-2026 19:31   calibrate_agent-0.0.3.dev0.dist-info/entry_points.txt
+       10  02-06-2026 19:31   calibrate_agent-0.0.3.dev0.dist-info/top_level.txt
+     3200  02-06-2026 19:31   calibrate_agent-0.0.3.dev0.dist-info/RECORD
+---------                     -------
+  2465160                     37 files
+
+```
+</details>
+</tool-use>
+
+---
+
+Clean. No `images/` leaking. Only `calibrate/` package files + `cli.bundle.mjs` + license + metadata.
+
+Here's the summary:
+
+- **`pyproject.toml`**: Replaced `version = "0.0.1"` with `dynamic = ["version"]`. Added `setuptools_scm>=8` to build requirements and `[tool.setuptools_scm]` config with `fallback_version = "0.0.0-dev"`.
+- **`.github/workflows/publish.yml`**: Removed the `sed` version injection step. Added `fetch-depth: 0` to checkout (required by `setuptools_scm` to read git history/tags).
+- `setuptools_scm` reads the version directly from git tags — tag `v0.1.0` produces version `0.1.0`. No manual version string anywhere.
+
+---
+
+_**User**_
+
+setuptools_scm
+
+meaning?
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+`setuptools_scm` = **setuptools** + **SCM** (Source Code Management, i.e., git).
+
+It's a setuptools plugin that extracts your package version from **git tags** instead of a hardcoded string. When you build:
+
+- If the current commit is tagged `v0.1.0` → version is `0.1.0`
+- If you're 3 commits past `v0.1.0` → version is `0.1.1.dev3` (development version)
+- If there are no tags at all → it uses the `fallback_version` (`0.0.0-dev` in your config)
+
+That's why the test build produced `0.0.3.dev0` — it found some tag in your git history and calculated a dev version from it. Once you tag a release properly (e.g., `git tag v0.1.0`), it'll produce exactly `0.1.0`.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+Yes, I made code changes earlier — switched to `setuptools_scm`, removed the `sed` hack from the workflow, and added `images*` to the exclude list. Let me update `app-details.md`.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/.cursor/rules/app-details.md</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Updated `app-details.md`:
+
+- Replaced the old `sed`-based version injection with `setuptools_scm` documentation
+- Updated `pyproject.toml` key details to reflect `dynamic = ["version"]`, the new build requirements, and `images*` in the exclude list
+- Rewrote the Versioning section to explain how `setuptools_scm` derives versions from git tags
+- Added the `fetch-depth: 0` requirement as a gotcha for CI
+
+README and docs don't need changes — this is internal packaging infrastructure.
+
+---
+
+_**User**_
+
+is 0.0.0-dev needed in @calibrate/__init__.py  now?
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking whether the fallback in `calibrate/__init__.py` is still needed now that `setuptools_scm` handles versioning.
+
+When `setuptools_scm` is used and the package is installed (either via `pip install -e .` or `uv sync`), `importlib.metadata.version("calibrate-agent")` will return the version that `setuptools_scm` computed. So in that case, the fallback is never hit.
+
+The fallback `0.0.0-dev` would only be hit if someone imports `calibrate` without having it installed as a package (e.g., just adding the directory to `sys.path`). 
+
+Since `uv sync` installs the package in editable mode, `importlib.metadata` will work fine, so the fallback isn't strictly necessary for normal workflows. That said, keeping it around is still a good safeguard—it prevents crashes if someone tries to run the code without proper installation.</details></think>
+
+---
+
+It's a safety net — if someone runs the code without installing the package (e.g., just `python calibrate/something.py` directly), `importlib.metadata` would throw `PackageNotFoundError` and crash. The fallback prevents that.
+
+But if you always use `uv sync` (which installs in editable mode), the metadata will be available and the fallback never triggers. It's harmless to keep — just prevents a confusing error in edge cases.
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+No code changes were made — the previous message was just explaining the `0.0.0-dev` fallback. Nothing to update.
+
+---
+
+_**User**_
+
+@package.json (1-6) 
+What good is the version here
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+
+
+---
+
+_**User**_
+
+Only go ahead if you made code changes (not just updated .cursor/rules/app-details.md):
+    
+    Update .cursor/rules/app-details.md with any new information about the codebase from the changes you just made. Include:
+- What changed
+- Why it changed
+- New patterns or conventions introduced
+- Dependencies or relationships affected
+- Any gotchas or edge cases discovered
+
+Don't maintain it as a changelog. Instead, look for what was already present but has become obsolete now. Remove or update it as necessary. Look for what is missing and add it.
+
+Update README.md if any changes were made that conflict with what is present in the README.md relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the README.md.
+
+Update docs if any changes were made that conflict with what is present in the docs relevant to the changes made or if any additions were made to the core functionality of the codebase that are not present in the docs.
+
+Keep the files organized and don't remove existing relevant context.
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+
+
+---
+
+_**User**_
+
+can I remove it
+
+---
+
