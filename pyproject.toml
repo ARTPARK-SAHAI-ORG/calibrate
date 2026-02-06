@@ -7,7 +7,7 @@ license = "CC-BY-SA-4.0"
 license-files = ["LICENSE.md"]
 requires-python = ">=3.10"
 authors = [
-    {name = "ARTPARK", email = "calibrate@artpark.in"},
+    {name = "Aman Dalmia", email = "aman.dalmia@artpark.in"},
 ]
 keywords = ["voice-agents", "evaluation", "benchmarking", "stt", "tts", "llm", "simulation", "pipecat"]
 classifiers = [
@@ -53,10 +53,7 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/artpark-sahai-org/calibrate"
 Documentation = "https://calibrate.artpark.ai"
-Repository = "https://github.com/artpark-sahai-org/calibrate"
-Issues = "https://github.com/artpark-sahai-org/calibrate/issues"
 
 [project.scripts]
 calibrate = "calibrate.cli:main"
