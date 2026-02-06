@@ -1,80 +1,52 @@
 ---
 title: "Overview"
-description: "Command-line interface for Calibrate evaluation and simulation tools."
+description: "Command-line interface for evaluating voice agents and LLMs"
 ---
 
-The Calibrate CLI provides commands for evaluating Speech to Text, Text to Speech, LLM, and running simulations directly from your terminal.
+The Calibrate CLI provides commands for evaluating Speech to Text, Text to Speech, LLMs, and running voice agent simulations.
 
 ## Installation
 
-<Tabs>
-  <Tab title="pip">
-    ```bash
-    pip install calibrate
-    ```
-  </Tab>
-  <Tab title="uv">
-    ```bash
-    uv add calibrate
-    ```
-  </Tab>
-  <Tab title="From Source">
-    Clone the repository and install dependencies:
-
-    ```bash
-    git clone https://github.com/artpark/agentloop.git
-    cd calibrate
-    uv sync --frozen
-    ```
-
-  </Tab>
-</Tabs>
-
-## Environment Variables
-
-The CLI requires certain environment variables to be set for the providers you want to use:
-
 ```bash
-# Speech to Text / Text to Speech Providers
-DEEPGRAM_API_KEY=your_key
-OPENAI_API_KEY=your_key
-CARTESIA_API_KEY=your_key
-SMALLEST_API_KEY=your_key
-GROQ_API_KEY=your_key
-SARVAM_API_KEY=your_key
-ELEVENLABS_API_KEY=your_key
-
-# Google Cloud (for Google STT/TTS)
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-GOOGLE_API_KEY=your_key
-GOOGLE_CLOUD_PROJECT_ID=your_project_id
-
-# LLM Providers
-OPENROUTER_API_KEY=your_key
+pip install calibrate
 ```
 
-<Note>
-  You only need to set the environment variables for the providers you plan to
-  use.
-</Note>
+## Setup
+
+Set environment variables for providers you plan to use:
+
+```bash
+# Speech to Text / Text to Speech
+DEEPGRAM_API_KEY=your_key
+OPENAI_API_KEY=your_key
+GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+SARVAM_API_KEY=your_key
+ELEVENLABS_API_KEY=your_key
+CARTESIA_API_KEY=your_key
+GROQ_API_KEY=your_key
+SMALLEST_API_KEY=your_key
+
+# LLM
+OPENROUTER_API_KEY=your_key
+```
 
 ## Available Commands
 
 ### Component Testing
 
-| Command                       | Description                            |
-| ----------------------------- | -------------------------------------- |
-| `calibrate stt eval`              | Evaluate Speech to Text provider       |
-| `calibrate stt leaderboard`       | Generate Speech to Text comparison     |
-| `calibrate llm tests run`         | Run LLM test cases                     |
-| `calibrate llm tests leaderboard` | Generate LLM tests comparison          |
-| `calibrate tts eval`              | Evaluate Text to Speech provider       |
-| `calibrate tts leaderboard`       | Generate Text to Speech comparison     |
+| Command                           | Description                        |
+| --------------------------------- | ---------------------------------- |
+| `calibrate stt eval`              | Evaluate Speech to Text provider   |
+| `calibrate stt leaderboard`       | Generate Speech to Text comparison |
+| `calibrate llm tests run`         | Run LLM test cases                 |
+| `calibrate llm tests leaderboard` | Generate LLM tests comparison      |
+| `calibrate tts eval`              | Evaluate Text to Speech provider   |
+| `calibrate tts leaderboard`       | Generate Text to Speech comparison |
 
 ### End to End Tests
 
-| Command                             | Description                     |
-| ----------------------------------- | ------------------------------- |
+| Command                                 | Description                     |
+| --------------------------------------- | ------------------------------- |
 | `calibrate llm simulations run`         | Run text-only simulations       |
 | `calibrate llm simulations leaderboard` | Generate simulation comparison  |
 | `calibrate agent simulation`            | Run voice agent simulations     |

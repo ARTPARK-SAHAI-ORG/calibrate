@@ -1,28 +1,22 @@
 ---
 title: "Overview"
-description: "Complete reference for the Python SDK of Calibrate"
+description: "Python SDK for evaluating voice agents and LLMs"
 ---
 
-## Installation
+The Calibrate Python SDK provides programmatic access to evaluate Speech to Text, Text to Speech, LLMs, and run full voice agent simulations.
 
-Install using pip:
+## Installation
 
 ```bash
 pip install calibrate
 ```
 
-Or using uv:
+## Setup
+
+Create a `.env` file with API keys for providers you plan to use:
 
 ```bash
-uv add calibrate
-```
-
-## Configuration
-
-Create a `.env` file in your project root and add the API keys for the providers you want to use. All modules (agent, stt, tts, llm) will use this single `.env` file.
-
-```bash
-# Speech to Text providers
+# Speech to Text / Text to Speech
 DEEPGRAM_API_KEY=your_key
 OPENAI_API_KEY=your_key
 GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
@@ -30,8 +24,9 @@ SARVAM_API_KEY=your_key
 ELEVENLABS_API_KEY=your_key
 CARTESIA_API_KEY=your_key
 GROQ_API_KEY=your_key
+SMALLEST_API_KEY=your_key
 
-# LLM providers
+# LLM
 OPENROUTER_API_KEY=your_key
 ```
 
@@ -76,6 +71,7 @@ Run full simulations with realistic scenarios and user personas.
     icon="robot"
     href="/python-sdk/voice-simulations"
   >
-    Run end-to-end voice simulations with Speech to Text, LLM, and Text to Speech
+    Run end-to-end voice simulations with Speech to Text, LLM, and Text to
+    Speech
   </Card>
 </CardGroup>

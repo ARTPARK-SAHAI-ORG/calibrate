@@ -1,41 +1,254 @@
 ---
 title: "Text Simulations"
-description: "Run fully automated text-only simulations between two LLMs."
+description: "Run text-only simulations between two LLMs"
 ---
 
-Run fully automated text-only conversations between two LLMs—the "agent" plus multiple users having specific personas to mimic specific scenarios.
+Run automated conversations between an agent and simulated users with specific personas and scenarios.
 
-Each simulation pairs every persona with every scenario. The runner fans out into separate folders and saves transcripts, evaluation results, plus logs for inspection.
+<Card
+  title="Learn about simulations"
+  icon="comments"
+  href="/quickstart/simulations"
+>
+  Step-by-step guide to creating and running simulations
+</Card>
 
-## Running Simulations
+## Configuration
+
+Each simulation pairs every persona with every scenario, creating comprehensive test coverage.
+
+### System Prompt
+
+The system prompt defines your agent's role, personality, and instructions. This is what the agent LLM sees.
 
 ```python
-import asyncio
-from calibrate.llm import simulations
+system_prompt = """You are a helpful nurse filling out a medical intake form.
 
-# Define your tools
+Ask questions one at a time and be empathetic with patients. Call the plan_next_question tool after each valid response to track progress."""
+```
+
+**Best Practices:**
+
+- Clearly define the agent's role and context
+- Include instructions for tool usage
+- Specify conversation style and tone
+- Mention any constraints or rules
+
+### Tools
+
+Tools extend your agent's capabilities. The agent decides when to call them based on conversation flow.
+
+<Card title="Understanding Tools" icon="wrench" href="/core-concepts/tools">
+  Learn about webhook and structured output tools
+</Card>
+
+**Structured output tools** help track conversation state:
+
+```python
 tools = [
     {
         "type": "client",
         "name": "plan_next_question",
-        "description": "Plan the next question to ask",
+        "description": "Call this after user answers a question to track which questions were answered and determine the next question to ask",
         "parameters": [
             {
                 "id": "next_unanswered_question_index",
                 "type": "integer",
-                "description": "Index of next question",
+                "description": "Index of the next question to ask (1-indexed)",
                 "required": True
             },
             {
                 "id": "questions_answered",
                 "type": "array",
-                "description": "List of answered question indices",
+                "description": "Indices of questions answered in the last user message",
                 "items": {"type": "integer"},
                 "required": True
             }
         ]
     }
 ]
+```
+
+**Webhook tools** call external APIs:
+
+```python
+tools = [
+    {
+        "type": "webhook",
+        "name": "submit_form",
+        "description": "Submit the completed form data to the backend",
+        "webhook": {
+            "method": "POST",
+            "url": "https://api.example.com/forms/submit",
+            "headers": [{"name": "Authorization", "value": "Bearer TOKEN"}],
+            "body": {
+                "parameters": [
+                    {"id": "patient_name", "type": "string", "required": True},
+                    {"id": "age", "type": "integer", "required": True}
+                ]
+            }
+        }
+    }
+]
+```
+
+### Personas
+
+Personas define WHO the simulated user is and HOW they behave during conversations. Each persona creates a unique simulated user.
+
+<Card title="Understanding Personas" icon="user" href="/core-concepts/personas">
+  Best practices for creating realistic personas
+</Card>
+
+```python
+personas = [
+    {
+        "characteristics": """You are Geeta Prasad, a 39-year-old pregnant mother.
+
+        You are shy and reserved, giving short answers unless asked for more details.
+        You speak slowly and sometimes pause before answering.
+        You are polite but become uncomfortable when asked too many questions quickly.""",
+        "gender": "female",
+        "language": "english"
+    }
+]
+```
+
+**Field Descriptions:**
+
+- `characteristics`: Detailed description of who the person is and how they behave
+  - Include name, age, background
+  - Specify communication style (shy, talkative, formal)
+  - Add personality traits (patient, impatient, friendly)
+  - Mention any limitations or preferences
+- `gender`: Voice gender for voice simulations (`"male"` or `"female"`)
+- `language`: Primary language (`"english"`, `"hindi"`, etc.)
+
+**Best Practices:**
+
+- **Be specific**: Include concrete details (name, age, occupation, location)
+- **Define communication style**: How do they speak? (formal, casual, slow, fast, uses filler words)
+- **Include limitations**: Language proficiency, technical knowledge, hearing difficulties
+- **Add emotional traits**: Patient, impatient, friendly, anxious, confident
+- **Avoid task instructions**: Don't say what they should do—use scenarios for that
+
+**Example Characteristics:**
+
+```python
+# Good - Specific WHO and HOW
+"You are Rajesh, a 45-year-old farmer from rural Karnataka. You speak slowly with natural pauses and prefer simple explanations. You are polite but become frustrated with technical jargon."
+
+# Bad - Includes WHAT to do (task instructions)
+"You are calling to inquire about crop insurance and want to know the premium amount."  # This belongs in scenarios!
+```
+
+### Scenarios
+
+Scenarios define WHAT the simulated user should accomplish in the conversation. They describe the task, goal, or situation.
+
+<Card
+  title="Understanding Scenarios"
+  icon="file-lines"
+  href="/core-concepts/scenarios"
+>
+  How to write effective scenarios
+</Card>
+
+```python
+scenarios = [
+    {
+        "description": """The user completes the intake form smoothly, answering all questions without hesitation."""
+    },
+    {
+        "description": """The user initially hesitates to provide personal information and asks if they can skip certain questions. Eventually provides the information after reassurance."""
+    },
+    {
+        "description": """The user answers multiple questions at once when they are related to each other, forcing the agent to track which questions were already answered."""
+    }
+]
+```
+
+**Field Descriptions:**
+
+- `description`: What the user is trying to accomplish or how they behave in this situation
+  - Define the goal or task
+  - Include conversation flow hints
+  - Specify edge cases or complications
+  - Mention any specific behaviors for this scenario
+
+**Best Practices:**
+
+- **Set clear objectives**: What should the user accomplish?
+- **Include realistic context**: Why is this conversation happening?
+- **Add conversation flow hints**: How should the interaction unfold?
+- **Specify edge cases**: Complications, hesitations, or special situations
+- **Vary complexity**: Mix simple, medium, and complex scenarios
+
+**Complexity Levels:**
+
+| Level       | Description                       | Example                                              |
+| ----------- | --------------------------------- | ---------------------------------------------------- |
+| **Simple**  | Straightforward, single path      | "User provides all information when asked"           |
+| **Medium**  | Some complications or decisions   | "User asks to skip optional fields"                  |
+| **Complex** | Multiple edge cases, negotiations | "User gives partial answers and corrects them later" |
+
+### Evaluation Criteria
+
+Evaluation criteria define how to measure agent success. An LLM judge evaluates each criterion after the conversation ends.
+
+```python
+evaluation_criteria = [
+    {
+        "name": "question_completeness",
+        "description": "The assistant asked all required questions from the form: name, age, address, and phone number."
+    },
+    {
+        "name": "assistant_behavior",
+        "description": "The assistant asked one concise question per turn, was empathetic, and did not repeat the user's answers back to them unnecessarily."
+    },
+    {
+        "name": "tool_usage",
+        "description": "The assistant called plan_next_question after each valid user response with the correct question indices."
+    }
+]
+```
+
+**Field Descriptions:**
+
+- `name`: Short identifier for the metric (used in results)
+- `description`: Detailed criteria for success—be specific!
+  - State exactly what the agent should do or not do
+  - Include measurable behaviors
+  - Specify expected tool calls if relevant
+
+**Best Practices:**
+
+- **Be specific and measurable**: Avoid vague criteria like "agent was helpful"
+- **Focus on one aspect**: Each criterion should test one specific behavior
+- **Include examples**: Mention specific things that should or shouldn't happen
+- **Make it objective**: The LLM judge should be able to clearly determine pass/fail
+
+**Example Criteria:**
+
+```python
+# Good - Specific and measurable
+{
+    "name": "greeting_quality",
+    "description": "The assistant greeted the user warmly at the start and introduced themselves as a nurse. The greeting was friendly and professional."
+}
+
+# Bad - Too vague
+{
+    "name": "communication",
+    "description": "The assistant communicated well."  # What does "well" mean?
+}
+```
+
+## Run Simulations
+
+```python
+import asyncio
+from calibrate.llm import simulations
 
 # Define personas
 personas = [
@@ -64,6 +277,18 @@ evaluation_criteria = [
     }
 ]
 
+# Define tools
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question to ask",
+        "parameters": [
+            {"id": "next_unanswered_question_index", "type": "integer", "required": True}
+        ]
+    }
+]
+
 # Run simulations
 result = asyncio.run(simulations.run(
     system_prompt="You are a helpful nurse filling out a form...",
@@ -82,19 +307,19 @@ result = asyncio.run(simulations.run(
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `system_prompt` | str | Yes | - | System prompt for the bot/agent |
-| `tools` | list | Yes | - | List of tool definitions |
-| `personas` | list | Yes | - | List of persona dicts with 'characteristics', 'gender', 'language' |
-| `scenarios` | list | Yes | - | List of scenario dicts with 'description' |
-| `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
-| `output_dir` | str | No | "./out" | Output directory for results |
-| `model` | str | No | "gpt-4.1" | Model name for both agent and user |
-| `provider` | str | No | "openrouter" | LLM provider: openai or openrouter |
-| `parallel` | int | No | 1 | Number of parallel simulations |
-| `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
-| `max_turns` | int | No | 50 | Maximum assistant turns |
+| Parameter             | Type | Required | Default      | Description                                                        |
+| --------------------- | ---- | -------- | ------------ | ------------------------------------------------------------------ |
+| `system_prompt`       | str  | Yes      | -            | System prompt for the bot/agent                                    |
+| `tools`               | list | Yes      | -            | List of tool definitions                                           |
+| `personas`            | list | Yes      | -            | List of persona dicts with 'characteristics', 'gender', 'language' |
+| `scenarios`           | list | Yes      | -            | List of scenario dicts with 'description'                          |
+| `evaluation_criteria` | list | Yes      | -            | List of criteria dicts with 'name' and 'description'               |
+| `output_dir`          | str  | No       | "./out"      | Output directory for results                                       |
+| `model`               | str  | No       | "gpt-4.1"    | Model name for both agent and user                                 |
+| `provider`            | str  | No       | "openrouter" | LLM provider: openai or openrouter                                 |
+| `parallel`            | int  | No       | 1            | Number of parallel simulations                                     |
+| `agent_speaks_first`  | bool | No       | True         | Whether agent initiates conversation                               |
+| `max_turns`           | int  | No       | 50           | Maximum assistant turns                                            |
 
 **Provider Options:**
 
@@ -105,10 +330,14 @@ result = asyncio.run(simulations.run(
 
 Text simulations evaluate against your defined criteria using LLM Judge:
 
-- **Evaluation Criteria Match**: Each criterion is evaluated as True/False with reasoning
+- **Evaluation Criteria Match**: Each criterion evaluated as True/False with reasoning
 - **Aggregated Stats**: Mean, standard deviation across all simulations
 
-<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/getting-started/core-concepts#metrics"
+>
   Detailed explanation of LLM Judge and evaluation criteria
 </Card>
 
@@ -149,19 +378,19 @@ Contains the persona and scenario used for each simulation:
 
 Contains evaluation results for each criterion:
 
-| name | match | reasoning |
-|------|-------|-----------|
-| question_completeness | True | The assistant asked for the user's full name, address, and telephone number... |
-| assistant_behavior | True | The assistant asked one concise question per turn... |
+| name                  | match | reasoning                                                                      |
+| --------------------- | ----- | ------------------------------------------------------------------------------ |
+| question_completeness | True  | The assistant asked for the user's full name, address, and telephone number... |
+| assistant_behavior    | True  | The assistant asked one concise question per turn...                           |
 
 ### results.csv
 
 Aggregates match scores across all simulations:
 
-| name | question_completeness | assistant_behavior |
-|------|-----------------------|--------------------|
-| simulation_persona_1_scenario_1 | 1.0 | 1.0 |
-| simulation_persona_1_scenario_2 | 1.0 | 1.0 |
+| name                            | question_completeness | assistant_behavior |
+| ------------------------------- | --------------------- | ------------------ |
+| simulation_persona_1_scenario_1 | 1.0                   | 1.0                |
+| simulation_persona_1_scenario_2 | 1.0                   | 1.0                |
 
 ### metrics.json
 
@@ -196,22 +425,23 @@ simulations.leaderboard(
 ```
 
 This generates:
+
 - `llm_leaderboard.csv`: CSV file with pass percentages by model
 - `llm_leaderboard.png`: Visual comparison chart
 
 **leaderboard.csv format:**
 
-| model | test_config_name | overall |
-|-------|------------------|---------|
-| openai__gpt-4.1 | 80.0 | 80.0 |
-| openai__gpt-4o | 100.0 | 100.0 |
+| model             | test_config_name | overall |
+| ----------------- | ---------------- | ------- |
+| openai\_\_gpt-4.1 | 80.0             | 80.0    |
+| openai\_\_gpt-4o  | 100.0            | 100.0   |
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `output_dir` | str | Yes | - | Directory containing simulation results |
-| `save_dir` | str | Yes | - | Directory to save leaderboard files |
+| Parameter    | Type | Required | Default | Description                             |
+| ------------ | ---- | -------- | ------- | --------------------------------------- |
+| `output_dir` | str  | Yes      | -       | Directory containing simulation results |
+| `save_dir`   | str  | Yes      | -       | Directory to save leaderboard files     |
 
 ## Low-level API
 

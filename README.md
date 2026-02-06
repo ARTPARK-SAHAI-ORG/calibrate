@@ -142,6 +142,7 @@ You can checkout [`calibrate/stt/examples/sample_output`](calibrate/stt/examples
 | `debug_count`     | int  | No       | 5         | Number of files in debug mode                                                                                                 |
 | `ignore_retry`    | bool | No       | False     | Skip retry if not all audios processed                                                                                        |
 | `overwrite`       | bool | No       | False     | Overwrite existing results instead of resuming from checkpoint                                                                |
+| `port`            | int  | No       | 8765      | WebSocket port for STT bot                                                                                                    |
 
 After you have multiple provider runs under `/path/to/output`, you can summarize accuracy and latency in one shot:
 

@@ -135,6 +135,11 @@ Evaluates STT providers by transcribing audio files and comparing against ground
 
 **Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi (Indian languages)
 
+**Key Parameters:**
+
+- `overwrite` (bool, default: False): Overwrite existing results instead of resuming from last checkpoint. When False, the evaluation script loads existing results and skips already processed audio files, allowing graceful recovery from interruptions.
+- `port` (int, default: 8765): WebSocket port for STT bot communication during evaluation.
+
 **Metrics:**
 
 - **WER (Word Error Rate):** Measures transcription accuracy
@@ -167,6 +172,10 @@ Evaluates TTS providers by synthesizing speech and measuring quality.
 **Supported Providers:** cartesia, openai, groq, google, elevenlabs, sarvam, smallest
 
 **Supported Languages:** english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi (Indian languages)
+
+**Key Parameters:**
+
+- `overwrite` (bool, default: False): Overwrite existing results instead of resuming from last checkpoint. When False, the evaluation script loads existing results and skips already processed texts, allowing graceful recovery from interruptions.
 
 **Metrics:**
 
@@ -442,6 +451,7 @@ Parameters are defined at the top level in a `parameters` array:
 Parameters are extracted from `webhook.queryParameters` and `webhook.body.parameters`.
 
 **Required fields** in `webhook` object (raises `ValueError` if missing):
+
 - `url` - The webhook endpoint URL
 - `method` - HTTP method (GET, POST, PUT, etc.)
 - `headers` - Array of header objects (can be empty `[]`)
@@ -456,16 +466,24 @@ Parameters are extracted from `webhook.queryParameters` and `webhook.body.parame
     "method": "POST",
     "url": "https://api.example.com/submit",
     "timeout": 20,
-    "headers": [
-      {"name": "Authorization", "value": "Bearer X"}
-    ],
+    "headers": [{ "name": "Authorization", "value": "Bearer X" }],
     "queryParameters": [
-      {"id": "key", "type": "string", "description": "API key", "required": true}
+      {
+        "id": "key",
+        "type": "string",
+        "description": "API key",
+        "required": true
+      }
     ],
     "body": {
       "description": "Request body",
       "parameters": [
-        {"id": "data", "type": "string", "description": "Form data", "required": true}
+        {
+          "id": "data",
+          "type": "string",
+          "description": "Form data",
+          "required": true
+        }
       ]
     }
   }
@@ -477,16 +495,19 @@ Parameters are extracted from `webhook.queryParameters` and `webhook.body.parame
 Tool schema building is centralized in `calibrate/utils.py` via the `build_tools_schema(tools)` function, which returns `tuple[list[FunctionSchema], dict[str, dict]]` (schemas and webhook configs).
 
 This function is used by all files that handle tools:
+
 - `calibrate/llm/run_tests.py` - Uses webhook configs to log webhook details (no actual HTTP call)
 - `calibrate/agent/bot.py` - Uses webhook configs to make actual HTTP calls
 - `calibrate/llm/run_simulation.py` - Uses webhook configs to make actual HTTP calls
 - `calibrate/agent/test.py` - Uses webhook configs to make actual HTTP calls
 
 **For `structured_output` type (or when `type` is not specified):**
+
 - Parameters from `tool["parameters"]` are added as flat properties to the FunctionSchema
 - `required` list contains parameter IDs where `"required": true`
 
 **For `webhook` type:**
+
 - Parameters are structured as nested `query` and `body` objects in the FunctionSchema:
   - `query`: object containing properties from `webhook.queryParameters` with its own `required` list
   - `body`: object containing properties from `webhook.body.parameters` with its own `required` list
@@ -496,6 +517,7 @@ This function is used by all files that handle tools:
 **Webhook HTTP calls:**
 
 The `make_webhook_call(webhook_config, arguments)` utility function in `calibrate/utils.py` makes actual HTTP requests:
+
 - Uses `aiohttp` for async HTTP calls
 - Converts headers list to dict format
 - Extracts query params from `arguments["query"]` and body from `arguments["body"]`
@@ -505,19 +527,20 @@ The `make_webhook_call(webhook_config, arguments)` utility function in `calibrat
 
 **Handler registration:**
 
-| File | structured_output | webhook |
-|------|-------------------|---------|
-| `calibrate/llm/run_tests.py` | `generic_tool_call` (logs only) | `webhook_tool_call` (logs only, no HTTP) |
-| `calibrate/agent/bot.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call in "run" mode) |
-| `calibrate/llm/run_simulation.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call) |
-| `calibrate/agent/test.py` | `generic_function_call` | `webhook_function_call` (makes HTTP call) |
-| `calibrate/agent/run_simulation.py` | `RTVIFunctionCallResponder` returns `{"status": "received"}` | `RTVIFunctionCallResponder` makes HTTP call |
+| File                                | structured_output                                            | webhook                                                 |
+| ----------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
+| `calibrate/llm/run_tests.py`        | `generic_tool_call` (logs only)                              | `webhook_tool_call` (logs only, no HTTP)                |
+| `calibrate/agent/bot.py`            | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call in "run" mode) |
+| `calibrate/llm/run_simulation.py`   | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call)               |
+| `calibrate/agent/test.py`           | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call)               |
+| `calibrate/agent/run_simulation.py` | `RTVIFunctionCallResponder` returns `{"status": "received"}` | `RTVIFunctionCallResponder` makes HTTP call             |
 
 **Note on LLM tests tool handling:** In `calibrate/llm/run_tests.py`, conversation history with tool calls is preprocessed before passing to the LLM. For non-webhook tools, tool responses (`role: "tool"`) are auto-inserted with `{"status": "received"}`. For webhook tools, manual tool responses are expected in the history. See "Conversation History Preprocessing" in the LLM Tests section.
 
 **Voice agent simulation tool handling (`calibrate/agent/run_simulation.py`):**
 
 The `RTVIFunctionCallResponder` class handles function calls received via RTVI protocol in voice agent simulations:
+
 - Accepts `webhook_configs` parameter built from tools via `build_tools_schema`
 - `end_call`: Returns `{"acknowledged": true}` and triggers end call callback
 - Webhook tools: Makes actual HTTP call via `make_webhook_call` and returns response
@@ -525,10 +548,11 @@ The `RTVIFunctionCallResponder` class handles function calls received via RTVI p
 - Tools are passed from `run_single_simulation_task` → `run_simulation` → `RTVIFunctionCallResponder`
 
 **Example LLM arguments for webhook tool:**
+
 ```json
 {
-  "query": {"key": "abc123"},
-  "body": {"data": "form data"}
+  "query": { "key": "abc123" },
+  "body": { "data": "form data" }
 }
 ```
 

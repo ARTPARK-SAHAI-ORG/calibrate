@@ -1,55 +1,210 @@
 ---
 title: "Voice Simulations"
-description: "CLI commands for voice agent simulations and interactive testing."
+description: "Run voice agent simulations via CLI"
 ---
 
-Run full voice agent simulations with Speech to Text, LLM, and Text to Speech components, or interact with an agent in real-time.
+Run voice agent simulations with Speech to Text, LLM, and Text to Speech, or interact with an agent in real-time.
 
-## Supported Providers
-
-| Component | Providers |
-|-----------|-----------|
-| **Speech to Text** | `deepgram`, `google`, `openai`, `elevenlabs`, `sarvam`, `cartesia` |
-| **LLM** | `openrouter`, `openai` |
-| **Text to Speech** | `elevenlabs`, `cartesia`, `google`, `openai`, `deepgram`, `sarvam` |
-
-<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
-  Detailed explanation of all metrics and LLM Judge
+<Card
+  title="Learn about simulations"
+  icon="comments"
+  href="/quickstart/simulations"
+>
+  Step-by-step guide to creating and running simulations
 </Card>
 
----
+## Configuration
 
-## calibrate agent simulation
+Create a JSON configuration file that defines your agent, personas, scenarios, and evaluation criteria.
 
-Run automated voice agent simulations with multiple personas and scenarios. Each simulation pairs every persona with every scenario, generating audio files and transcripts for inspection.
+### System Prompt
 
-```bash
-calibrate agent simulation -c <config_file> -o <output_dir> --port <port>
+Define your agent's role and instructions:
+
+```json
+{
+  "system_prompt": "You are a helpful nurse filling out a medical form. Ask questions one at a time and be empathetic."
+}
 ```
 
-### Arguments
+**Best Practices:**
 
-| Flag | Long | Type | Required | Default | Description |
-|------|------|------|----------|---------|-------------|
-| `-c` | `--config` | string | Yes | - | Path to simulation configuration JSON file |
-| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
-| | `--port` | int | No | `8765` | Base WebSocket port |
+- Clearly define the agent's role
+- Include tool usage instructions
+- Specify conversation style
+- Mention constraints or rules
 
-### Examples
+### Tools
 
-**Basic simulation:**
+Tools extend your agent's capabilities:
 
-```bash
-calibrate agent simulation -c ./config.json -o ./out
+<Card title="Understanding Tools" icon="wrench" href="/core-concepts/tools">
+  Learn about webhook and structured output tools
+</Card>
+
+```json
+{
+  "tools": [
+    {
+      "type": "client",
+      "name": "plan_next_question",
+      "description": "Call after user answers to track progress",
+      "parameters": [
+        {
+          "id": "next_unanswered_question_index",
+          "type": "integer",
+          "description": "Index of next question (1-indexed)",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
 ```
 
-**Custom port:**
+### Personas
 
-```bash
-calibrate agent simulation -c ./config.json -o ./out --port 9000
+Define WHO the simulated user is and HOW they behave:
+
+<Card title="Understanding Personas" icon="user" href="/core-concepts/personas">
+  Best practices for creating realistic personas
+</Card>
+
+```json
+{
+  "personas": [
+    {
+      "characteristics": "You are Geeta Prasad, a 39-year-old pregnant mother. You are shy and reserved, giving short answers.",
+      "gender": "female",
+      "language": "english",
+      "interruption_sensitivity": "medium"
+    }
+  ]
+}
 ```
 
-### Configuration File Structure
+**Field Descriptions:**
+
+- `characteristics`: Who the person is and how they behave (name, age, background, communication style, personality)
+- `gender`: Voice gender (`"male"` or `"female"`)
+- `language`: Primary language (`"english"`, `"hindi"`, `"kannada"`, etc.)
+- `interruption_sensitivity`: How often the user interrupts the agent (optional)
+
+**Interruption Sensitivity:**
+
+- `none`: Never interrupts (0%)
+- `low`: Rarely interrupts (25%)
+- `medium`: Sometimes interrupts (50%)
+- `high`: Frequently interrupts (80%)
+
+**Best Practices:**
+
+- Be specific: Name, age, occupation, location
+- Define communication style: Formal, casual, slow, fast
+- Include limitations: Language proficiency, technical knowledge
+- Set interruption level matching persona type
+
+### Scenarios
+
+Define WHAT the simulated user should accomplish:
+
+<Card
+  title="Understanding Scenarios"
+  icon="file-lines"
+  href="/core-concepts/scenarios"
+>
+  How to write effective scenarios
+</Card>
+
+```json
+{
+  "scenarios": [
+    {
+      "description": "The user completes the form smoothly without hesitation"
+    },
+    {
+      "description": "The user hesitates and asks to skip questions before eventually providing information"
+    }
+  ]
+}
+```
+
+**Field Descriptions:**
+
+- `description`: The goal, task, or situation (what happens, not who the person is)
+
+**Best Practices:**
+
+- Set clear objectives
+- Include realistic context
+- Add conversation flow hints
+- Specify edge cases to test
+
+### Evaluation Criteria
+
+Define how to measure agent success:
+
+```json
+{
+  "evaluation_criteria": [
+    {
+      "name": "question_completeness",
+      "description": "The assistant asked all required questions: name, age, address, phone number"
+    },
+    {
+      "name": "assistant_behavior",
+      "description": "The assistant asked one concise question per turn and was empathetic"
+    }
+  ]
+}
+```
+
+**Field Descriptions:**
+
+- `name`: Short metric identifier
+- `description`: Detailed success criteria (be specific and measurable)
+
+**Best Practices:**
+
+- Be specific and measurable
+- Focus on one aspect per criterion
+- Make it objective for the LLM judge
+
+### Provider Configuration
+
+Configure STT, TTS, and LLM providers:
+
+```json
+{
+  "stt": { "provider": "google" },
+  "tts": { "provider": "google" },
+  "llm": { "provider": "openrouter", "model": "openai/gpt-4.1" }
+}
+```
+
+**Supported Providers:**
+
+- **STT**: deepgram, google, openai, elevenlabs, sarvam, cartesia
+- **LLM**: openrouter, openai
+- **TTS**: elevenlabs, cartesia, google, openai, deepgram, sarvam
+
+### Settings
+
+```json
+{
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 50
+  }
+}
+```
+
+**Field Descriptions:**
+
+- `agent_speaks_first`: Whether agent starts the conversation
+- `max_turns`: Maximum assistant turns (conversation ends after this limit)
+
+### Complete Example
 
 ```json
 {
@@ -63,7 +218,6 @@ calibrate agent simulation -c ./config.json -o ./out --port 9000
         {
           "id": "next_unanswered_question_index",
           "type": "integer",
-          "description": "Next question index",
           "required": true
         }
       ]
@@ -78,8 +232,8 @@ calibrate agent simulation -c ./config.json -o ./out --port 9000
     }
   ],
   "scenarios": [
-    {"description": "User completes the form without any issues"},
-    {"description": "User hesitates and wants to skip some questions"}
+    { "description": "User completes the form without any issues" },
+    { "description": "User hesitates and wants to skip some questions" }
   ],
   "evaluation_criteria": [
     {
@@ -87,9 +241,9 @@ calibrate agent simulation -c ./config.json -o ./out --port 9000
       "description": "Whether all the questions in the form were covered"
     }
   ],
-  "stt": {"provider": "google"},
-  "tts": {"provider": "google"},
-  "llm": {"provider": "openrouter", "model": "openai/gpt-4.1"},
+  "stt": { "provider": "google" },
+  "tts": { "provider": "google" },
+  "llm": { "provider": "openrouter", "model": "openai/gpt-4.1" },
   "settings": {
     "agent_speaks_first": true,
     "max_turns": 50
@@ -97,16 +251,39 @@ calibrate agent simulation -c ./config.json -o ./out --port 9000
 }
 ```
 
-### Persona Configuration
+---
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `characteristics` | string | Yes | Description of personality, background, behavior |
-| `gender` | string | Yes | `male` or `female` |
-| `language` | string | Yes | `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati` |
-| `interruption_sensitivity` | string | No | `none`, `low`, `medium`, or `high` |
+## Run Simulation
 
-### Output Structure
+Run automated voice agent simulations.
+
+```bash
+calibrate agent simulation -c <config_file> -o <output_dir> --port <port>
+```
+
+### Arguments
+
+| Flag | Long           | Type   | Required | Default | Description                                |
+| ---- | -------------- | ------ | -------- | ------- | ------------------------------------------ |
+| `-c` | `--config`     | string | Yes      | -       | Path to simulation configuration JSON file |
+| `-o` | `--output-dir` | string | No       | `./out` | Path to output directory                   |
+|      | `--port`       | int    | No       | `8765`  | Base WebSocket port                        |
+
+### Examples
+
+**Basic:**
+
+```bash
+calibrate agent simulation -c ./config.json -o ./out
+```
+
+**Custom port:**
+
+```bash
+calibrate agent simulation -c ./config.json -o ./out --port 9000
+```
+
+### Output
 
 ```
 /path/to/output/
@@ -131,40 +308,38 @@ calibrate agent simulation -c ./config.json -o ./out --port 9000
 └── metrics.json                 # Summary statistics
 ```
 
-### Output Files
-
 **audios/** contains alternating user and bot audio files for each turn.
 
 **conversation.wav** is a combined audio file of the entire conversation.
 
 **evaluation_results.csv** contains evaluation criteria, latency metrics, and Speech to Text scores:
 
-| name | value | reasoning |
-|------|-------|-----------|
-| question_completeness | 1 | All questions were covered... |
-| assistant_behavior | 1 | One question per turn... |
-| ttft | 0.62 | |
-| processing_time | 0.62 | |
-| stt_llm_judge_score | 0.95 | |
+| name                  | value | reasoning                     |
+| --------------------- | ----- | ----------------------------- |
+| question_completeness | 1     | All questions were covered... |
+| assistant_behavior    | 1     | One question per turn...      |
+| ttft                  | 0.62  |                               |
+| processing_time       | 0.62  |                               |
+| stt_llm_judge_score   | 0.95  |                               |
 
 **stt_results.csv** contains per-turn Speech to Text evaluation:
 
-| reference | prediction | score | reasoning |
-|-----------|------------|-------|-----------|
-| Geeta Prasad. | Gita Prasad. | 0 | Name 'Geeta' transcribed as 'Gita' |
+| reference     | prediction   | score | reasoning                          |
+| ------------- | ------------ | ----- | ---------------------------------- |
+| Geeta Prasad. | Gita Prasad. | 0     | Name 'Geeta' transcribed as 'Gita' |
 
 **results.csv** aggregates match scores across all simulations:
 
-| name | question_completeness | assistant_behavior | stt_llm_judge_score |
-|------|-----------------------|--------------------|---------------------|
-| simulation_persona_1_scenario_1 | 1.0 | 1.0 | 0.95 |
-| simulation_persona_1_scenario_2 | 1.0 | 0.0 | 0.92 |
+| name                            | question_completeness | assistant_behavior | stt_llm_judge_score |
+| ------------------------------- | --------------------- | ------------------ | ------------------- |
+| simulation_persona_1_scenario_1 | 1.0                   | 1.0                | 0.95                |
+| simulation_persona_1_scenario_2 | 1.0                   | 0.0                | 0.92                |
 
 ---
 
-## calibrate agent test
+## Interactive Testing
 
-Run an interactive voice agent session where you can talk to the agent through your browser in real-time.
+Test your agent interactively through your browser.
 
 ```bash
 calibrate agent test -c <config_file> -o <output_dir>
@@ -172,10 +347,10 @@ calibrate agent test -c <config_file> -o <output_dir>
 
 ### Arguments
 
-| Flag | Long | Type | Required | Default | Description |
-|------|------|------|----------|---------|-------------|
-| `-c` | `--config` | string | Yes | - | Path to agent configuration JSON file |
-| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
+| Flag | Long           | Type   | Required | Default | Description                           |
+| ---- | -------------- | ------ | -------- | ------- | ------------------------------------- |
+| `-c` | `--config`     | string | Yes      | -       | Path to agent configuration JSON file |
+| `-o` | `--output-dir` | string | No       | `./out` | Path to output directory              |
 
 ### Example
 
@@ -183,13 +358,13 @@ calibrate agent test -c <config_file> -o <output_dir>
 calibrate agent test -c ./config.json -o ./out/run
 ```
 
-### Configuration File Structure
+### Configuration
 
 ```json
 {
   "system_prompt": "You are a helpful assistant.",
   "language": "english",
-  "stt": {"provider": "deepgram"},
+  "stt": { "provider": "deepgram" },
   "tts": {
     "provider": "cartesia",
     "voice_id": "YOUR_VOICE_ID"
@@ -209,14 +384,16 @@ calibrate agent test -c ./config.json -o ./out/run
 3. Click **Connect** and start talking to the agent
 
 <Warning>
-Avoid using your laptop's speaker and microphone at the same time. Audio from the speaker can be picked up by the microphone, interrupting the agent with its own voice. **Use a headphone with a built-in microphone.**
+  Avoid using your laptop's speaker and microphone at the same time. Audio from
+  the speaker can be picked up by the microphone, interrupting the agent with
+  its own voice. **Use a headphone with a built-in microphone.**
 </Warning>
 
 ---
 
-## Required Environment Variables
+## Environment Variables
 
-Set the API keys for your chosen providers:
+Set API keys for your chosen providers:
 
 ```bash
 # Speech to Text Providers
@@ -233,5 +410,6 @@ export OPENROUTER_API_KEY=your_key
 ```
 
 <Note>
-You only need to set API keys for the providers you configure in your config file.
+  You only need to set API keys for the providers you configure in your config
+  file.
 </Note>

@@ -1,33 +1,33 @@
 ---
 title: "Text to Speech"
-description: "CLI commands for Text to Speech evaluation and benchmarking."
+description: "Evaluate Text to Speech providers via CLI"
 ---
 
-Evaluate Text to Speech providers and generate comparative leaderboards.
+## Input Structure
 
-## Input Data Format
+Prepare a CSV file with this format:
 
-Prepare a CSV file with text samples to synthesize:
-
-| id | text |
-|----|------|
-| row_1 | hello world |
-| row_2 | this is a test |
+| id    | text                    |
+| ----- | ----------------------- |
+| row_1 | hello world             |
+| row_2 | this is a test          |
 | row_3 | how are you doing today |
 
-The CSV should have two columns:
-- `id` - Unique identifier for each text
-- `text` - The text to synthesize into speech
+The CSV requires two columns: `id` (unique identifier) and `text` (text to synthesize).
 
-<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/getting-started/core-concepts#metrics"
+>
   Detailed explanation of all metrics and how LLM Judge works
 </Card>
 
 ---
 
-## calibrate tts eval
+## Run Evaluation
 
-Run Text to Speech evaluation against a specific provider.
+Evaluate a Text to Speech provider on your dataset.
 
 ```bash
 calibrate tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
@@ -35,37 +35,37 @@ calibrate tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
 
 ### Arguments
 
-| Flag | Long | Type | Required | Default | Description |
-|------|------|------|----------|---------|-------------|
-| `-p` | `--provider` | string | No | `google` | Provider: `cartesia`, `openai`, `groq`, `google`, `elevenlabs`, `sarvam`, `smallest` |
-| `-l` | `--language` | string | No | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati`, `sindhi` |
-| `-i` | `--input` | string | Yes | - | Path to input CSV file |
-| `-o` | `--output-dir` | string | No | `./out` | Path to output directory |
-| `-d` | `--debug` | flag | No | `false` | Run on first N texts only |
-| `-dc` | `--debug_count` | int | No | `5` | Number of texts in debug mode |
-| | `--overwrite` | flag | No | `false` | Overwrite existing results instead of resuming |
+| Flag  | Long            | Type   | Required | Default   | Description                                                                                                                            |
+| ----- | --------------- | ------ | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `-p`  | `--provider`    | string | No       | `google`  | Provider: `cartesia`, `openai`, `groq`, `google`, `elevenlabs`, `sarvam`, `smallest`                                                   |
+| `-l`  | `--language`    | string | No       | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati`, `sindhi` |
+| `-i`  | `--input`       | string | Yes      | -         | Path to input CSV file                                                                                                                 |
+| `-o`  | `--output-dir`  | string | No       | `./out`   | Path to output directory                                                                                                               |
+| `-d`  | `--debug`       | flag   | No       | `false`   | Run on first N texts only                                                                                                              |
+| `-dc` | `--debug_count` | int    | No       | `5`       | Number of texts in debug mode                                                                                                          |
+|       | `--overwrite`   | flag   | No       | `false`   | Overwrite existing results instead of resuming                                                                                         |
 
 ### Examples
 
-**Basic evaluation:**
+**Basic:**
 
 ```bash
 calibrate tts eval -p google -l english -i ./sample.csv -o ./out
 ```
 
-**Evaluate with Cartesia:**
+**Specific provider:**
 
 ```bash
 calibrate tts eval -p cartesia -i ./sample.csv -o ./out
 ```
 
-**Debug mode (process only first 3 texts):**
+**Debug mode:**
 
 ```bash
 calibrate tts eval -p google -i ./sample.csv -o ./out -d -dc 3
 ```
 
-### Output Structure
+### Output
 
 ```
 /path/to/output/<provider>
@@ -82,10 +82,10 @@ calibrate tts eval -p google -i ./sample.csv -o ./out -d -dc 3
 
 **results.csv** contains per-text evaluation results:
 
-| id | text | audio_path | ttfb | llm_judge_score | llm_judge_reasoning |
-|----|------|------------|------|-----------------|---------------------|
-| row_1 | hello world | ./out/elevenlabs/audios/row_1.wav | 1.511 | True | The audio says 'hello world' clearly and matches the reference text exactly. |
-| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
+| id    | text           | audio_path                        | ttfb  | llm_judge_score | llm_judge_reasoning                                                                              |
+| ----- | -------------- | --------------------------------- | ----- | --------------- | ------------------------------------------------------------------------------------------------ |
+| row_1 | hello world    | ./out/elevenlabs/audios/row_1.wav | 1.511 | True            | The audio says 'hello world' clearly and matches the reference text exactly.                     |
+| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True            | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
 
 ---
 
@@ -99,10 +99,10 @@ calibrate tts leaderboard -o <output_dir> -s <save_dir>
 
 ### Arguments
 
-| Flag | Long | Type | Required | Description |
-|------|------|------|----------|-------------|
-| `-o` | `--output-dir` | string | Yes | Directory containing evaluation run folders |
-| `-s` | `--save-dir` | string | Yes | Directory to save leaderboard outputs |
+| Flag | Long           | Type   | Required | Description                                 |
+| ---- | -------------- | ------ | -------- | ------------------------------------------- |
+| `-o` | `--output-dir` | string | Yes      | Directory containing evaluation run folders |
+| `-s` | `--save-dir`   | string | Yes      | Directory to save leaderboard outputs       |
 
 ### Example
 
@@ -119,23 +119,24 @@ The leaderboard command generates:
 
 ---
 
-## Supported Providers
+## Providers
 
-| Provider | Languages |
-|----------|-----------|
-| `google` | English, Hindi, Kannada, Sindhi |
-| `openai` | English |
-| `cartesia` | English |
-| `elevenlabs` | English, Sindhi |
-| `sarvam` | Hindi, Kannada |
-| `groq` | English |
-| `smallest` | English, Hindi |
+| Provider     | Languages                       |
+| ------------ | ------------------------------- |
+| `google`     | English, Hindi, Kannada, Sindhi |
+| `openai`     | English                         |
+| `cartesia`   | English                         |
+| `elevenlabs` | English, Sindhi                 |
+| `sarvam`     | Hindi, Kannada                  |
+| `groq`       | English                         |
+| `smallest`   | English, Hindi                  |
 
 <Note>
-Sindhi TTS is supported by Google (uses gemini-2.5-flash-lite-preview-tts model) and ElevenLabs (uses eleven_v3 model).
+  Sindhi TTS is supported by Google (uses gemini-2.5-flash-lite-preview-tts
+  model) and ElevenLabs (uses eleven_v3 model).
 </Note>
 
-## Required Environment Variables
+## Environment Variables
 
 Set the appropriate API key for your chosen provider:
 

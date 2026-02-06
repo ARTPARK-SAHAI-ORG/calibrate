@@ -46,11 +46,13 @@ async def eval(
         "tamil",
         "telugu",
         "gujarati",
+        "sindhi",
     ] = "english",
     input_file_name: str = "stt.csv",
     debug: bool = False,
     debug_count: int = 5,
     ignore_retry: bool = False,
+    overwrite: bool = False,
     port: int = 8765,
 ) -> dict:
     """
@@ -60,11 +62,12 @@ async def eval(
         provider: STT provider to evaluate (deepgram, openai, cartesia, smallest, groq, google, sarvam, elevenlabs)
         input_dir: Path to input directory containing audio files and stt.csv
         output_dir: Path to output directory for results (default: ./out)
-        language: Language of the audio files (english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati)
+        language: Language of the audio files (english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi)
         input_file_name: Name of the input CSV file (default: stt.csv)
         debug: Run evaluation on first N audio files only
         debug_count: Number of audio files to run in debug mode (default: 5)
         ignore_retry: Skip retry if not all audios are processed
+        overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
         port: WebSocket port for STT bot (default: 8765)
 
     Returns:
@@ -108,6 +111,8 @@ async def eval(
         argv.append("--debug")
     if ignore_retry:
         argv.append("--ignore_retry")
+    if overwrite:
+        argv.append("--overwrite")
 
     # Save original sys.argv and restore after
     original_argv = sys.argv

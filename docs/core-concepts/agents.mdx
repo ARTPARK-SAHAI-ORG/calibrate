@@ -27,15 +27,21 @@ Click the **New agent** button in the top right corner, fill the name of the age
   <img src="./images/agents-2.png" alt="Create Agent" />
 </Frame>
 
-Once ready, you'll be taken to the agent page.
+Once ready, you'll be taken to the agent configuration page with multiple tabs.
+
+## Configure your agent
+
+### Add instructions and select providers
+
+Configure the core agent behavior.
 
 <Frame>
-  <img src="./images/agents-3.png" alt="Agent page" />
+  <img src="./images/agents-3.png" alt="Agent tab" />
 </Frame>
 
-### Agent instructions
+**System prompt**
 
-Fill out the **System prompt** field to define the context for the agent, the agent's persona, how it is supposed to behave and any guidelines it should follow. Write clear instructions:
+Define the context for the agent, its persona, how it should behave, and any guidelines it should follow. Write clear instructions.
 
 <Tip>
   Be specific about the agent's tone, capabilities, and limitations in the
@@ -44,43 +50,73 @@ Fill out the **System prompt** field to define the context for the agent, the ag
 
 For detailed guidance on writing effective system prompts, see [ElevenLabs Prompting Guide](https://elevenlabs.io/docs/agents-platform/best-practices/prompting-guide) and [OpenAI Prompt Engineering Guide](https://platform.openai.com/docs/guides/prompt-engineering).
 
-Click **Save** in the top right to save your configuration.
+**Speech To Text**
 
-### Configure providers
+Select the STT provider for the agent.
 
-Select the Speech To Text (STT), Text To Speech (TTS) and LLM model/provider for the agent.
+**Text To Speech**
+
+Select the TTS provider for the agent.
+
+**LLM**
+
+Select the provider and model for the agent.
 
 Click **Save** in the top right to save your configuration.
 
 ### Add tools
 
-Click **Attach tool** to enable structured outputs by the agent. See the [Tools guide](/core-concepts/tools) for how to create tools.
+Add tools to enable structured outputs by the agent.
 
 <Frame>
-  <img src="./images/agents-4.png" alt="Attach tool" />
+  <img src="./images/agents-4.png" alt="Tools tab" />
 </Frame>
 
-### Set up data extraction
+Click **Add tool** to attach tools to your agent. See the [Tools guide](/core-concepts/tools) for how to create tools.
 
-Define fields for extracting structured data from conversations
+**In-built tools**
+
+The platform provides built-in tools like "End conversation" that are automatically available to all agents.
+
+### Define data extraction fields
+
+Define fields for extracting structured data from conversations.
 
 <Frame>
-  <img src="./images/agents-5.png" alt="Data extraction" />
+  <img src="./images/agents-5.png" alt="Data extraction tab" />
 </Frame>
+
+Click **Add field** to define custom data specifications to extract from conversation transcripts.
 
 ### Add tests
 
-Add tests to the agent to evaluate its performance. See the [LLM Testing guide](/quickstart/text-to-text) for how to create tests.
+Add tests to evaluate your agent's performance.
 
 <Frame>
-  <img src="./images/agents-6.png" alt="Add tests" />
+  <img src="./images/agents-6.png" alt="Tests tab" />
 </Frame>
 
-### Advanced Settings
+- Click **Add test** to attach tests to your agent
+- Click **Run all tests** to execute all tests for this agent
+- Click **Compare models** to benchmark different LLMs
+
+See the [LLM Testing guide](/quickstart/text-to-text) for how to create tests.
+
+### Configure advanced settings
+
+Configure advanced agent behavior.
 
 <Frame>
-  <img src="./images/agents-7.png" alt="Advanced settings" />
+  <img src="./images/agents-7.png" alt="Settings tab" />
 </Frame>
+
+**Agent speaks first**
+
+Toggle whether the agent should initiate the conversation.
+
+**Max assistant turns**
+
+Set the maximum number of assistant turns before ending the call.
 
 Click **Save** in the top right to save your configuration.
 

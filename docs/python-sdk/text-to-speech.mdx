@@ -1,20 +1,20 @@
 ---
 title: "Text to Speech"
-description: "Evaluate different Text to Speech providers on your text dataset."
+description: "Evaluate Text to Speech providers on your dataset"
 ---
 
-## Input Data Structure
+## Input Structure
 
-Prepare an input CSV file with the following structure:
+Prepare a CSV file with this format:
 
-| id | text |
-|----|------|
-| row_1 | hello world |
+| id    | text           |
+| ----- | -------------- |
+| row_1 | hello world    |
 | row_2 | this is a test |
 
-The CSV should have two columns: `id` (unique identifier for each text) and `text` (the text strings you want to synthesize into speech).
+The CSV requires two columns: `id` (unique identifier) and `text` (text to synthesize).
 
-## Running Provider Evaluation
+## Run Evaluation
 
 ```python
 import asyncio
@@ -32,15 +32,15 @@ asyncio.run(eval(
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `input` | str | Yes | - | Path to input CSV file containing texts to synthesize |
-| `provider` | str | No | "google" | Text to Speech provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest |
-| `language` | str | No | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
-| `output_dir` | str | No | "./out" | Path to output directory for results |
-| `debug` | bool | No | False | Run on first N texts only |
-| `debug_count` | int | No | 5 | Number of texts in debug mode |
-| `overwrite` | bool | No | False | Overwrite existing results instead of resuming from checkpoint |
+| Parameter     | Type | Required | Default   | Description                                                                                                    |
+| ------------- | ---- | -------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| `input`       | str  | Yes      | -         | Path to input CSV file containing texts to synthesize                                                          |
+| `provider`    | str  | No       | "google"  | Text to Speech provider: cartesia, openai, groq, google, elevenlabs, sarvam, smallest                          |
+| `language`    | str  | No       | "english" | Language: english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi |
+| `output_dir`  | str  | No       | "./out"   | Path to output directory for results                                                                           |
+| `debug`       | bool | No       | False     | Run on first N texts only                                                                                      |
+| `debug_count` | int  | No       | 5         | Number of texts in debug mode                                                                                  |
+| `overwrite`   | bool | No       | False     | Overwrite existing results instead of resuming from checkpoint                                                 |
 
 ## Output Structure
 
@@ -58,10 +58,10 @@ asyncio.run(eval(
 
 Contains detailed results for each text:
 
-| id | text | audio_path | ttfb | llm_judge_score | llm_judge_reasoning |
-|----|------|------------|------|-----------------|---------------------|
-| row_1 | hello world | ./out/elevenlabs/audios/row_1.wav | 1.511 | True | The audio says 'hello world' clearly and matches the reference text exactly. |
-| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
+| id    | text           | audio_path                        | ttfb  | llm_judge_score | llm_judge_reasoning                                                                              |
+| ----- | -------------- | --------------------------------- | ----- | --------------- | ------------------------------------------------------------------------------------------------ |
+| row_1 | hello world    | ./out/elevenlabs/audios/row_1.wav | 1.511 | True            | The audio says 'hello world' clearly and matches the reference text exactly.                     |
+| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True            | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
 
 ### metrics.json
 
@@ -83,12 +83,18 @@ Contains aggregated metrics:
 Text to Speech evaluation measures both quality and latency:
 
 **Quality metrics:**
+
 - **LLM Judge Score**: Semantic evaluation of pronunciation accuracy
 
 **Latency metrics:**
+
 - **TTFB (Time to First Byte)**: Time until first audio chunk is received
 
-<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/getting-started/core-concepts#metrics"
+>
   Detailed explanation of all metrics and how LLM Judge works
 </Card>
 
@@ -106,12 +112,13 @@ leaderboard(
 ```
 
 This scans each run directory, reads `metrics.json` and `results.csv`, then generates:
+
 - `tts_leaderboard.xlsx`: Excel file with all metrics by provider
 - Individual metric charts: `llm_judge_score.png`, `ttfb.png`
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `output_dir` | str | Yes | - | Directory containing provider evaluation results |
-| `save_dir` | str | Yes | - | Directory to save leaderboard files |
+| Parameter    | Type | Required | Default | Description                                      |
+| ------------ | ---- | -------- | ------- | ------------------------------------------------ |
+| `output_dir` | str  | Yes      | -       | Directory containing provider evaluation results |
+| `save_dir`   | str  | Yes      | -       | Directory to save leaderboard files              |

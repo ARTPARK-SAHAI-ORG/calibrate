@@ -1,13 +1,131 @@
 ---
 title: "Voice Simulations"
-description: "Run full voice simulations with Speech to Text, LLM, and Text to Speech components."
+description: "Run voice agent simulations with STT, LLM, and TTS"
 ---
 
-Run full voice simulations that combine Speech to Text, LLM, and Text to Speech components.
+Run end-to-end voice simulations combining Speech to Text, LLM, and Text to Speech.
 
-Each simulation pairs every persona with every scenario. The runner saves transcripts, audio files, evaluation results, and logs for inspection.
+<Card
+  title="Learn about simulations"
+  icon="comments"
+  href="/quickstart/simulations"
+>
+  Step-by-step guide to creating and running simulations
+</Card>
 
-## Running Simulations
+## Configuration
+
+Each simulation pairs every persona with every scenario, testing the full voice pipeline.
+
+### Tools
+
+Define tools that extend your agent's capabilities:
+
+<Card title="Understanding Tools" icon="wrench" href="/core-concepts/tools">
+  Learn about webhook and structured output tools
+</Card>
+
+```python
+tools = [
+    {
+        "type": "client",
+        "name": "plan_next_question",
+        "description": "Plan the next question",
+        "parameters": [
+            {"id": "next_unanswered_question_index", "type": "integer", "required": True}
+        ]
+    }
+]
+```
+
+### Personas
+
+Define WHO the simulated user is and HOW they behave:
+
+<Card title="Understanding Personas" icon="user" href="/core-concepts/personas">
+  Best practices for creating realistic personas
+</Card>
+
+```python
+personas = [
+    {
+        "characteristics": "A shy mother named Geeta, 39 years old, gives short answers",
+        "gender": "female",
+        "language": "english",
+        "interruption_sensitivity": "medium"  # none, low, medium, high
+    }
+]
+```
+
+**Interruption Sensitivity** simulates realistic user interruptions:
+
+- `none`: Never interrupts (0%)
+- `low`: Rarely interrupts (25%)
+- `medium`: Sometimes interrupts (50%)
+- `high`: Frequently interrupts (80%)
+
+**Best Practices:**
+
+- Be specific with demographics (name, age, occupation)
+- Define communication style (formal, casual, slow, fast)
+- Include limitations (language proficiency, technical knowledge)
+- Set appropriate interruption level for persona type
+
+### Scenarios
+
+Define WHAT the simulated user should accomplish:
+
+<Card
+  title="Understanding Scenarios"
+  icon="file-lines"
+  href="/core-concepts/scenarios"
+>
+  How to write effective scenarios
+</Card>
+
+```python
+scenarios = [
+    {"description": "User completes the form without any issues"},
+    {"description": "User hesitates and wants to skip some questions"}
+]
+```
+
+### Evaluation Criteria
+
+Define success metrics for your agent:
+
+```python
+evaluation_criteria = [
+    {
+        "name": "question_completeness",
+        "description": "Whether all the questions in the form were covered"
+    },
+    {
+        "name": "assistant_behavior",
+        "description": "Whether the assistant asks one concise question per turn"
+    }
+]
+```
+
+### Provider Configuration
+
+Configure STT, TTS, and LLM providers:
+
+```python
+from calibrate.agent import STTConfig, TTSConfig, LLMConfig
+
+stt = STTConfig(provider="google")
+tts = TTSConfig(provider="google")
+llm = LLMConfig(provider="openrouter", model="openai/gpt-4.1")
+```
+
+**Supported Providers:**
+
+- **STT**: deepgram, google, openai, elevenlabs, sarvam, cartesia
+- **LLM**: openrouter, openai
+- **TTS**: cartesia, google, openai, elevenlabs, sarvam, deepgram
+
+## Run Simulations
 
 ```python
 import asyncio
@@ -73,20 +191,20 @@ result = asyncio.run(simulation.run(
 
 **Function Parameters:**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `system_prompt` | str | Yes | - | System prompt for the voice agent |
-| `tools` | list | Yes | - | List of tool definitions |
-| `personas` | list | Yes | - | List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_sensitivity' |
-| `scenarios` | list | Yes | - | List of scenario dicts with 'description' |
-| `evaluation_criteria` | list | Yes | - | List of criteria dicts with 'name' and 'description' |
-| `output_dir` | str | No | "./out" | Output directory for results |
-| `stt` | STTConfig | No | Google | Speech to Text configuration |
-| `tts` | TTSConfig | No | Google | Text to Speech configuration |
-| `llm` | LLMConfig | No | OpenRouter/gpt-4.1 | LLM configuration |
-| `agent_speaks_first` | bool | No | True | Whether agent initiates conversation |
-| `max_turns` | int | No | 50 | Maximum assistant turns |
-| `port` | int | No | 8765 | Base WebSocket port |
+| Parameter             | Type      | Required | Default            | Description                                                                                             |
+| --------------------- | --------- | -------- | ------------------ | ------------------------------------------------------------------------------------------------------- |
+| `system_prompt`       | str       | Yes      | -                  | System prompt for the voice agent                                                                       |
+| `tools`               | list      | Yes      | -                  | List of tool definitions                                                                                |
+| `personas`            | list      | Yes      | -                  | List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_sensitivity' |
+| `scenarios`           | list      | Yes      | -                  | List of scenario dicts with 'description'                                                               |
+| `evaluation_criteria` | list      | Yes      | -                  | List of criteria dicts with 'name' and 'description'                                                    |
+| `output_dir`          | str       | No       | "./out"            | Output directory for results                                                                            |
+| `stt`                 | STTConfig | No       | Google             | Speech to Text configuration                                                                            |
+| `tts`                 | TTSConfig | No       | Google             | Text to Speech configuration                                                                            |
+| `llm`                 | LLMConfig | No       | OpenRouter/gpt-4.1 | LLM configuration                                                                                       |
+| `agent_speaks_first`  | bool      | No       | True               | Whether agent initiates conversation                                                                    |
+| `max_turns`           | int       | No       | 50                 | Maximum assistant turns                                                                                 |
+| `port`                | int       | No       | 8765               | Base WebSocket port                                                                                     |
 
 **Supported Providers:**
 
@@ -102,7 +220,11 @@ Voice simulations evaluate multiple aspects:
 - **Speech to Text LLM Judge Score**: Accuracy of transcriptions during simulation
 - **Latency Metrics**: TTFB and processing time for each component
 
-<Card title="Learn more about metrics" icon="chart-bar" href="/getting-started/core-concepts#metrics">
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/getting-started/core-concepts#metrics"
+>
   Detailed explanation of all metrics and LLM Judge
 </Card>
 
@@ -134,19 +256,19 @@ Voice simulations evaluate multiple aspects:
 
 Each `simulation_persona_*_scenario_*` directory contains:
 
-| File | Description |
-|------|-------------|
-| `audios/` | Alternating `*_user.wav` and `*_bot.wav` clips for every turn |
-| `logs` | Full logs of the simulation including all pipecat logs |
-| `results.log` | Terminal output of the simulation |
-| `evaluation_results.csv` | Per-criterion evaluation results including latency metrics |
-| `stt_results.csv` | Detailed per-row Speech to Text evaluation results |
-| `metrics.json` | Latency traces for Speech to Text, LLM, and Text to Speech providers |
-| `stt_outputs.json` | Output of the Speech to Text step for each turn |
-| `tool_calls.json` | Chronologically ordered tool calls made by the agent |
-| `transcript.json` | Full conversation transcript |
-| `config.json` | Persona and scenario used for this simulation |
-| `conversation.wav` | Combined audio of the entire conversation |
+| File                     | Description                                                          |
+| ------------------------ | -------------------------------------------------------------------- |
+| `audios/`                | Alternating `*_user.wav` and `*_bot.wav` clips for every turn        |
+| `logs`                   | Full logs of the simulation including all pipecat logs               |
+| `results.log`            | Terminal output of the simulation                                    |
+| `evaluation_results.csv` | Per-criterion evaluation results including latency metrics           |
+| `stt_results.csv`        | Detailed per-row Speech to Text evaluation results                   |
+| `metrics.json`           | Latency traces for Speech to Text, LLM, and Text to Speech providers |
+| `stt_outputs.json`       | Output of the Speech to Text step for each turn                      |
+| `tool_calls.json`        | Chronologically ordered tool calls made by the agent                 |
+| `transcript.json`        | Full conversation transcript                                         |
+| `config.json`            | Persona and scenario used for this simulation                        |
+| `conversation.wav`       | Combined audio of the entire conversation                            |
 
 ### config.json
 
@@ -170,13 +292,13 @@ Contains the persona and scenario used for each simulation:
 
 Contains evaluation results for each criterion, latency metrics, and Speech to Text score:
 
-| name | value | reasoning |
-|------|-------|-----------|
-| question_completeness | 1 | The assistant asked for the user's full name, address, and telephone number... |
-| assistant_behavior | 1 | The assistant asked one concise question per turn... |
-| ttft | 0.6209 | |
-| processing_time | 0.6209 | |
-| stt_llm_judge_score | 0.95 | |
+| name                  | value  | reasoning                                                                      |
+| --------------------- | ------ | ------------------------------------------------------------------------------ |
+| question_completeness | 1      | The assistant asked for the user's full name, address, and telephone number... |
+| assistant_behavior    | 1      | The assistant asked one concise question per turn...                           |
+| ttft                  | 0.6209 |                                                                                |
+| processing_time       | 0.6209 |                                                                                |
+| stt_llm_judge_score   | 0.95   |                                                                                |
 
 For latency metrics (`ttft` and `processing_time`), one row is added per processor with the mean value. Evaluation criteria use `value` of 1 for True (match) and 0 for False (no match).
 
@@ -184,19 +306,19 @@ For latency metrics (`ttft` and `processing_time`), one row is added per process
 
 Contains detailed per-row Speech to Text evaluation results:
 
-| reference | prediction | score | reasoning |
-|-----------|------------|-------|-----------|
-| Hi. | Hi. | 1 | The transcription matches exactly. |
-| Geeta Prasad. | Gita Prasad. | 0 | The name 'Geeta' was transcribed as 'Gita'... |
+| reference     | prediction   | score | reasoning                                     |
+| ------------- | ------------ | ----- | --------------------------------------------- |
+| Hi.           | Hi.          | 1     | The transcription matches exactly.            |
+| Geeta Prasad. | Gita Prasad. | 0     | The name 'Geeta' was transcribed as 'Gita'... |
 
 ### results.csv
 
 Aggregates match scores across all simulations:
 
-| name | question_completeness | assistant_behavior | stt_llm_judge_score |
-|------|-----------------------|--------------------|---------------------|
-| simulation_persona_1_scenario_1 | 1.0 | 1.0 | 0.95 |
-| simulation_persona_1_scenario_2 | 1.0 | 0.0 | 0.92 |
+| name                            | question_completeness | assistant_behavior | stt_llm_judge_score |
+| ------------------------------- | --------------------- | ------------------ | ------------------- |
+| simulation_persona_1_scenario_1 | 1.0                   | 1.0                | 0.95                |
+| simulation_persona_1_scenario_2 | 1.0                   | 0.0                | 0.92                |
 
 ### metrics.json
 

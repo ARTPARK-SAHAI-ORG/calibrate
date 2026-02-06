@@ -38,10 +38,12 @@ async def eval(
         "tamil",
         "telugu",
         "gujarati",
+        "sindhi",
     ] = "english",
     output_dir: str = "./out",
     debug: bool = False,
     debug_count: int = 5,
+    overwrite: bool = False,
 ) -> dict:
     """
     Run TTS evaluation for a given provider.
@@ -49,10 +51,11 @@ async def eval(
     Args:
         input: Path to input CSV file containing texts to synthesize
         provider: TTS provider to evaluate (cartesia, openai, groq, google, elevenlabs, sarvam, smallest)
-        language: Language for synthesis (english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati)
+        language: Language for synthesis (english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi)
         output_dir: Path to output directory for results (default: ./out)
         debug: Run evaluation on first N texts only
         debug_count: Number of texts to run in debug mode (default: 5)
+        overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
 
     Returns:
         dict: Results containing audio paths and metrics
@@ -87,6 +90,8 @@ async def eval(
 
     if debug:
         argv.append("--debug")
+    if overwrite:
+        argv.append("--overwrite")
 
     # Save original sys.argv and restore after
     original_argv = sys.argv

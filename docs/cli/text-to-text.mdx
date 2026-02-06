@@ -1,58 +1,259 @@
 ---
 title: "LLM Evaluation"
-description: "CLI commands for LLM tests."
+description: "Evaluate LLM behavior via CLI"
 ---
 
-Run LLM tests against predefined test cases with expected outputs. Useful for validating tool calls and response patterns.
+Run LLM tests to validate tool calls and response patterns.
 
 <Card
-  title="Learn more about metrics"
-  icon="chart-bar"
-  href="/getting-started/core-concepts#metrics"
+  title="Learn about LLM tests"
+  icon="flask"
+  href="/quickstart/text-to-text"
 >
-  Detailed explanation of metrics and evaluation types
+  Step-by-step guide to creating and running LLM tests
 </Card>
 
----
+## Configuration
 
-## calibrate llm tests run
+Create a JSON configuration file that defines your agent's behavior and test cases.
 
-Run LLM test cases from a configuration file.
+### System Prompt
 
-```bash
-calibrate llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
+The system prompt defines your agent's behavior, personality, and capabilities. It sets the context for how the LLM should respond.
+
+```json
+{
+  "system_prompt": "You are a helpful assistant filling out a medical form. Ask questions one at a time and be empathetic with patients."
+}
 ```
 
-### Arguments
+**Best Practices:**
 
-| Flag | Long           | Type   | Required | Default               | Description                                    |
-| ---- | -------------- | ------ | -------- | --------------------- | ---------------------------------------------- |
-| `-c` | `--config`     | string | No       | `examples/tests.json` | Path to test configuration JSON file           |
-| `-o` | `--output-dir` | string | No       | `./out`               | Path to output directory                       |
-| `-m` | `--model`      | string | No       | `gpt-4.1`             | Model name (e.g., `gpt-4.1`, `openai/gpt-4.1`) |
-| `-p` | `--provider`   | string | No       | `openrouter`          | Provider: `openai` or `openrouter`             |
+- Be specific about the agent's role and purpose
+- Include any constraints or rules the agent must follow
+- Specify the tone and style of communication
+- Mention when tools should be called
 
-### Examples
+### Tools
 
-**Basic test run:**
+Tools extend your agent's capabilities by enabling structured outputs or external API calls:
 
-```bash
-calibrate llm tests run -c ./config.json -o ./out
+<Card title="Understanding Tools" icon="wrench" href="/core-concepts/tools">
+  Learn about webhook and structured output tools
+</Card>
+
+#### Structured Output Tools
+
+These tools extract information from conversations in a defined format. Use them when you need the LLM to:
+
+- Track conversation state
+- Extract structured data from user responses
+- Make decisions about conversation flow
+
+```json
+{
+  "type": "client",
+  "name": "plan_next_question",
+  "description": "Plan the next question to ask based on user's response",
+  "parameters": [
+    {
+      "id": "next_unanswered_question_index",
+      "type": "integer",
+      "description": "Index of the next question to ask (1-indexed)",
+      "required": true
+    },
+    {
+      "id": "questions_answered",
+      "type": "array",
+      "description": "List of question indices that were answered in the last user response",
+      "items": { "type": "integer" },
+      "required": true
+    }
+  ]
+}
 ```
 
-**Run with specific model:**
+**Key Fields:**
 
-```bash
-calibrate llm tests run -c ./config.json -o ./out -m openai/gpt-4.1 -p openrouter
+- `type`: Set to `"client"` or `"structured_output"` (both work the same)
+- `name`: Unique identifier for the tool
+- `description`: When and why the LLM should call this tool (be specific!)
+- `parameters`: Array of parameter definitions
+
+**Parameter Fields:**
+
+- `id`: Parameter name
+- `type`: Data type (`string`, `integer`, `number`, `boolean`, `array`, `object`)
+- `description`: What this parameter represents and how to populate it
+- `required`: Whether this field is mandatory
+- `items`: For array types, defines the type of array elements
+
+####Webhook Tools
+
+Webhook tools call external APIs to perform actions. Use them when you need to:
+
+- Submit data to external systems
+- Query databases or services
+- Trigger notifications or workflows
+- Integrate with third-party APIs
+
+```json
+{
+  "type": "webhook",
+  "name": "submit_form",
+  "description": "Submit completed form data to the backend API",
+  "webhook": {
+    "method": "POST",
+    "url": "https://api.example.com/forms/submit",
+    "timeout": 20,
+    "headers": [
+      { "name": "Authorization", "value": "Bearer YOUR_TOKEN" },
+      { "name": "Content-Type", "value": "application/json" }
+    ],
+    "body": {
+      "description": "Form data with user information",
+      "parameters": [
+        {
+          "id": "name",
+          "type": "string",
+          "description": "User's full name",
+          "required": true
+        },
+        {
+          "id": "age",
+          "type": "integer",
+          "description": "User's age in years",
+          "required": true
+        }
+      ]
+    }
+  }
+}
 ```
 
-**Use OpenAI directly:**
+**Webhook Configuration:**
 
-```bash
-calibrate llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
+- `method`: HTTP method (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`)
+- `url`: The endpoint URL to call
+- `timeout`: Maximum wait time in seconds (optional, default: 20)
+- `headers`: HTTP headers to include in the request
+- `body.parameters`: Data fields to send in the request body
+
+**Important Notes:**
+
+- Webhook tools make actual HTTP calls during evaluation
+- The LLM provides values for all parameters
+- Failed requests return error details in the response
+- Use headers for authentication tokens
+
+### Test Cases
+
+Test cases define conversation scenarios and expected outcomes. Each test validates specific agent behavior.
+
+#### Test Case Structure
+
+```json
+{
+  "history": [
+    { "role": "assistant", "content": "Hello! What is your name?" },
+    { "role": "user", "content": "Aman Dalmia" }
+  ],
+  "evaluation": {
+    "type": "tool_call"
+  },
+  "settings": { "language": "english" }
+}
 ```
 
-### Configuration File Structure
+**History Array:**
+
+- Defines the conversation context leading up to the test
+- Each message has a `role` (`"assistant"` or `"user"`) and `content`
+- The LLM generates a response based on this history
+- Can include tool call messages for complex scenarios
+
+**Settings (Optional):**
+
+- `language`: Specify the language for the agent's response (e.g., `"english"`, `"hindi"`)
+
+#### Tool Call Tests
+
+Verify that the LLM calls the correct tools with the correct parameters. Use these tests to ensure:
+
+- Tools are invoked at the right time
+- Parameters are populated correctly
+- Multiple tools are called in the right sequence
+
+```json
+{
+  "history": [
+    { "role": "assistant", "content": "What is your name?" },
+    { "role": "user", "content": "Aman Dalmia" }
+  ],
+  "evaluation": {
+    "type": "tool_call",
+    "tool_calls": [
+      {
+        "tool": "plan_next_question",
+        "arguments": {
+          "next_unanswered_question_index": 2,
+          "questions_answered": [1]
+        }
+      }
+    ]
+  }
+}
+```
+
+**Evaluation Fields:**
+
+- `type`: Set to `"tool_call"`
+- `tool_calls`: Array of expected tool invocations
+- Each tool call specifies:
+  - `tool`: Name of the tool that should be called
+  - `arguments`: Expected parameter values (exact match required)
+
+**How It Works:**
+
+- The test passes if the LLM calls all specified tools with matching arguments
+- Order of tool calls matters
+- All specified arguments must match exactly
+
+#### Response Tests
+
+Verify that the LLM's text response meets specific criteria. Use these tests to validate:
+
+- Tone and style of responses
+- Content accuracy
+- Adherence to guidelines
+- Handling of edge cases
+
+```json
+{
+  "history": [
+    { "role": "assistant", "content": "What is your phone number?" },
+    { "role": "user", "content": "Can I skip this question?" }
+  ],
+  "evaluation": {
+    "type": "response",
+    "criteria": "The assistant should politely allow the user to skip providing their phone number and move to the next question."
+  }
+}
+```
+
+**Evaluation Fields:**
+
+- `type`: Set to `"response"`
+- `criteria`: Natural language description of what makes a good response
+
+**How It Works:**
+
+- An LLM judge evaluates whether the response meets the criteria
+- The judge provides pass/fail and reasoning
+- Use specific, measurable criteria for better results
+- Can test for tone, content, completeness, or any text quality
+
+### Complete Example
 
 ```json
 {
@@ -105,7 +306,44 @@ calibrate llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
 }
 ```
 
-### Output Structure
+---
+
+## Run Tests
+
+```bash
+calibrate llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
+```
+
+### Arguments
+
+| Flag | Long           | Type   | Required | Default               | Description                                    |
+| ---- | -------------- | ------ | -------- | --------------------- | ---------------------------------------------- |
+| `-c` | `--config`     | string | No       | `examples/tests.json` | Path to test configuration JSON file           |
+| `-o` | `--output-dir` | string | No       | `./out`               | Path to output directory                       |
+| `-m` | `--model`      | string | No       | `gpt-4.1`             | Model name (e.g., `gpt-4.1`, `openai/gpt-4.1`) |
+| `-p` | `--provider`   | string | No       | `openrouter`          | Provider: `openai` or `openrouter`             |
+
+### Examples
+
+**Basic:**
+
+```bash
+calibrate llm tests run -c ./config.json -o ./out
+```
+
+**Specific model:**
+
+```bash
+calibrate llm tests run -c ./config.json -m openai/gpt-4.1 -p openrouter
+```
+
+**OpenAI direct:**
+
+```bash
+calibrate llm tests run -c ./config.json -m gpt-4.1 -p openai
+```
+
+### Output
 
 ```
 /path/to/output/<test_config_name>/<model_name>
@@ -116,9 +354,9 @@ calibrate llm tests run -c ./config.json -o ./out -m gpt-4.1 -p openai
 
 ---
 
-## calibrate llm tests leaderboard
+## Leaderboard
 
-Generate a leaderboard comparing multiple test runs.
+Generate a comparison of multiple test runs.
 
 ```bash
 calibrate llm tests leaderboard -o <output_dir> -s <save_dir>
@@ -144,14 +382,14 @@ calibrate llm tests leaderboard -o ./out -s ./leaderboard
 
 ---
 
-## Provider Options
+## Providers
 
 | Provider     | Model Format   | Example                                     |
 | ------------ | -------------- | ------------------------------------------- |
 | `openai`     | OpenAI naming  | `gpt-4.1`, `gpt-4o`                         |
 | `openrouter` | Provider/model | `openai/gpt-4.1`, `anthropic/claude-3-opus` |
 
-## Required Environment Variables
+## Environment Variables
 
 ```bash
 # For OpenAI provider
