@@ -61,11 +61,37 @@ interface SimulationResult {
   reasoning: string;
 }
 
+interface TranscriptMessage {
+  role: string;
+  content?: string;
+  tool_calls?: Array<{
+    id: string;
+    function: { name: string; arguments: string };
+    type: string;
+  }>;
+  tool_call_id?: string;
+}
+
+interface PersonaInfo {
+  label?: string;
+  characteristics?: string;
+  gender?: string;
+  language?: string;
+}
+
+interface ScenarioInfo {
+  name?: string;
+  description?: string;
+}
+
 interface EvalResult {
   simulation: string;
   persona_idx: number;
   scenario_idx: number;
   criteria: { name: string; value: number; reasoning: string }[];
+  transcript: TranscriptMessage[];
+  personaInfo?: PersonaInfo;
+  scenarioInfo?: ScenarioInfo;
 }
 
 // ─── Model Examples ───────────────────────────────────────────
@@ -145,6 +171,10 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
   const [metrics, setMetrics] = useState<
     Record<string, { mean: number; std: number; values: number[] }>
   >({});
+
+  // ── config data for personas/scenarios ──
+  const [personas, setPersonas] = useState<PersonaInfo[]>([]);
+  const [scenarios, setScenarios] = useState<ScenarioInfo[]>([]);
 
   // Step navigation helper
   const goBack = () => {
@@ -241,7 +271,9 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     }
     // Scroll in detail view
     if (step === "leaderboard" && view === "sim-detail") {
-      const selectedResult = evalResults.find((r) => r.simulation === selectedSim);
+      const selectedResult = evalResults.find(
+        (r) => r.simulation === selectedSim
+      );
       const itemCount = selectedResult?.criteria.length || 0;
       if (key.upArrow && scrollOffset > 0) {
         setScrollOffset((o) => o - 1);
@@ -368,8 +400,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
 
       // Sort by persona then scenario
       newSlots.sort((a, b) => {
-        if (a.personaIdx !== b.personaIdx)
-          return a.personaIdx - b.personaIdx;
+        if (a.personaIdx !== b.personaIdx) return a.personaIdx - b.personaIdx;
         return a.scenarioIdx - b.scenarioIdx;
       });
 
@@ -545,104 +576,193 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     };
   }, [step, config.type]);
 
-  // ── Load metrics for leaderboard ──
+  // ── Load metrics from metrics.json ──
   const loadMetrics = () => {
-    const results: typeof metrics = [];
-
-    if (config.type === "voice") {
-      // Voice simulation has a single output
-      try {
-        const metricsPath = path.join(config.outputDir, "metrics.json");
-        if (fs.existsSync(metricsPath)) {
-          const raw = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
-          const entry: (typeof metrics)[0] = { model: "voice" };
-          for (const [key, val] of Object.entries(raw)) {
-            if (typeof val === "object" && val !== null && "mean" in val) {
-              entry[key] = (val as { mean: number }).mean;
-            } else if (typeof val === "number") {
-              entry[key] = val;
-            }
+    try {
+      const metricsPath = path.join(config.outputDir, "metrics.json");
+      if (fs.existsSync(metricsPath)) {
+        const raw = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
+        const parsed: typeof metrics = {};
+        for (const [key, val] of Object.entries(raw)) {
+          if (
+            typeof val === "object" &&
+            val !== null &&
+            "mean" in val &&
+            "std" in val &&
+            "values" in val
+          ) {
+            parsed[key] = val as {
+              mean: number;
+              std: number;
+              values: number[];
+            };
           }
-          results.push(entry);
+        }
+        setMetrics(parsed);
+      }
+    } catch {
+      // Ignore
+    }
+  };
+
+  // ── Load personas and scenarios from config file ──
+  const loadConfigData = () => {
+    try {
+      if (!config.configPath || !fs.existsSync(config.configPath)) return;
+      const configData = JSON.parse(
+        fs.readFileSync(config.configPath, "utf-8")
+      );
+      if (configData.personas && Array.isArray(configData.personas)) {
+        setPersonas(configData.personas);
+      }
+      if (configData.scenarios && Array.isArray(configData.scenarios)) {
+        setScenarios(configData.scenarios);
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  };
+
+  // ── Load evaluation results from each simulation directory ──
+  const loadEvalResults = () => {
+    // First load config data to get personas/scenarios
+    loadConfigData();
+
+    const results: EvalResult[] = [];
+
+    try {
+      if (!fs.existsSync(config.outputDir)) return;
+
+      const entries = fs.readdirSync(config.outputDir, { withFileTypes: true });
+      const simDirs = entries
+        .filter(
+          (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
+        )
+        .map((e) => e.name);
+
+      // Load personas/scenarios from config
+      let loadedPersonas: PersonaInfo[] = [];
+      let loadedScenarios: ScenarioInfo[] = [];
+      try {
+        if (config.configPath && fs.existsSync(config.configPath)) {
+          const configData = JSON.parse(
+            fs.readFileSync(config.configPath, "utf-8")
+          );
+          loadedPersonas = configData.personas || [];
+          loadedScenarios = configData.scenarios || [];
         }
       } catch {
         // Ignore
       }
-    } else {
-      // Text simulations with multiple models
-      for (const model of config.models) {
+
+      for (const dirName of simDirs) {
+        const match = dirName.match(/simulation_persona_(\d+)_scenario_(\d+)/);
+        if (!match) continue;
+
+        const personaIdx = parseInt(match[1]!, 10);
+        const scenarioIdx = parseInt(match[2]!, 10);
+
+        // Get persona and scenario info (1-indexed in folder name)
+        const personaInfo = loadedPersonas[personaIdx - 1];
+        const scenarioInfo = loadedScenarios[scenarioIdx - 1];
+
+        // Read evaluation_results.csv
+        const evalPath = path.join(
+          config.outputDir,
+          dirName,
+          "evaluation_results.csv"
+        );
+        if (!fs.existsSync(evalPath)) continue;
+
+        // Read transcript.json
+        let transcript: TranscriptMessage[] = [];
+        const transcriptPath = path.join(
+          config.outputDir,
+          dirName,
+          "transcript.json"
+        );
+        if (fs.existsSync(transcriptPath)) {
+          try {
+            transcript = JSON.parse(fs.readFileSync(transcriptPath, "utf-8"));
+          } catch {
+            // Ignore parse errors
+          }
+        }
+
         try {
-          const modelDir = getModelDir(model);
-          const metricsPath = path.join(
-            config.outputDir,
-            modelDir,
-            "metrics.json"
-          );
-          if (fs.existsSync(metricsPath)) {
-            const raw = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
-            const entry: (typeof metrics)[0] = { model };
-            for (const [key, val] of Object.entries(raw)) {
-              if (typeof val === "object" && val !== null && "mean" in val) {
-                entry[key] = (val as { mean: number }).mean;
-              } else if (typeof val === "number") {
-                entry[key] = val;
+          const content = fs.readFileSync(evalPath, "utf-8");
+          const lines = content.trim().split("\n");
+          if (lines.length < 2) continue;
+
+          // Parse CSV (name,value,reasoning) - handle quoted fields
+          const criteria: { name: string; value: number; reasoning: string }[] =
+            [];
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i]!;
+            // Handle CSV with potential commas and quotes in reasoning
+            const firstComma = line.indexOf(",");
+            if (firstComma === -1) continue;
+
+            const name = line.slice(0, firstComma).trim();
+            const rest = line.slice(firstComma + 1);
+
+            // Find value (number before next comma or quote)
+            let valueStr = "";
+            let reasoningStart = 0;
+            for (let j = 0; j < rest.length; j++) {
+              if (rest[j] === "," || rest[j] === '"') {
+                valueStr = rest.slice(0, j).trim();
+                reasoningStart = rest[j] === "," ? j + 1 : j;
+                break;
               }
             }
-            results.push(entry);
+
+            let reasoning = rest.slice(reasoningStart).trim();
+            // Remove surrounding quotes if present
+            if (reasoning.startsWith('"') && reasoning.endsWith('"')) {
+              reasoning = reasoning.slice(1, -1).replace(/""/g, '"');
+            }
+
+            const value = parseFloat(valueStr);
+
+            if (!isNaN(value)) {
+              criteria.push({ name, value, reasoning });
+            }
           }
-        } catch {
-          // Skip models with no results
-        }
-      }
-    }
 
-    setMetrics(results);
-  };
-
-  // ── Load model results when selected ──
-  useEffect(() => {
-    if (!selectedModel) return;
-    try {
-      let resultsPath: string;
-      if (config.type === "voice") {
-        resultsPath = path.join(config.outputDir, "results.csv");
-      } else {
-        const modelDir = getModelDir(selectedModel);
-        resultsPath = path.join(config.outputDir, modelDir, "results.csv");
-      }
-
-      if (fs.existsSync(resultsPath)) {
-        const csvContent = fs.readFileSync(resultsPath, "utf-8");
-        const lines = csvContent.trim().split("\n");
-        if (lines.length < 2) {
-          setModelResults([]);
-          return;
-        }
-        const headers = lines[0]!.split(",").map((h) => h.trim());
-        const results: SimulationResult[] = [];
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i]!.split(",");
-          const row: SimulationResult = { persona_idx: 0, scenario_idx: 0 };
-          headers.forEach((h, idx) => {
-            const val = values[idx]?.trim() || "";
-            const num = parseFloat(val);
-            row[h] = isNaN(num) ? val : num;
+          results.push({
+            simulation: dirName,
+            persona_idx: personaIdx,
+            scenario_idx: scenarioIdx,
+            criteria,
+            transcript,
+            personaInfo,
+            scenarioInfo,
           });
-          results.push(row);
+        } catch {
+          // Skip files with read errors
         }
-        setModelResults(results);
-        setScrollOffset(0);
-      } else {
-        setModelResults([]);
       }
+
+      // Sort by persona then scenario
+      results.sort((a, b) => {
+        if (a.persona_idx !== b.persona_idx)
+          return a.persona_idx - b.persona_idx;
+        return a.scenario_idx - b.scenario_idx;
+      });
+
+      setEvalResults(results);
     } catch {
-      setModelResults([]);
+      // Ignore
     }
-  }, [selectedModel, config.outputDir, config.type]);
+  };
 
   // ── Cleanup on unmount ──
   useEffect(() => {
     return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
       processRefs.current.forEach((proc) => proc.kill());
     };
   }, []);
@@ -967,15 +1087,15 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     }
 
     case "running": {
-      const modelList = config.type === "voice" ? ["voice"] : config.models;
-      const completedCount = Object.values(modelStates).filter(
-        (s) => s.status === "done" || s.status === "error"
-      ).length;
+      // For text simulations: show simulation slots
+      // For voice simulations: show single voice state
+      const isTextSim = config.type === "text";
 
-      // Get currently running models for log display
-      const runningModels = modelList.filter(
-        (m) => modelStates[m]?.status === "running"
-      );
+      // Get running simulation slots for display (limit to parallel count)
+      const runningSlots = simSlots
+        .filter((s) => s.status === "running")
+        .slice(0, config.parallel);
+      const completedSlots = simSlots.filter((s) => s.status === "done");
 
       return (
         <Box flexDirection="column" padding={1}>
@@ -985,106 +1105,151 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
               Type: {config.type} | Config: {config.configPath}
             </Text>
           </Box>
-          {config.type === "text" && (
-            <Box marginBottom={1}>
-              <Text dimColor>
-                {completedCount}/{config.models.length} models
-                {runningCount > 1 && ` (${runningCount} running in parallel)`}
-                {" | "}Provider: {config.provider}
-              </Text>
-            </Box>
-          )}
 
-          {/* Model status list */}
-          {modelList.map((model) => {
-            const state = modelStates[model];
-            if (!state) return null;
-            return (
-              <Box key={model}>
-                <Box width={4}>
-                  {state.status === "done" ? (
-                    <Text color="green"> + </Text>
-                  ) : state.status === "error" ? (
-                    <Text color="red"> x </Text>
-                  ) : state.status === "running" ? (
-                    <Box>
-                      <Text> </Text>
-                      <Spinner />
-                      <Text> </Text>
-                    </Box>
+          {isTextSim ? (
+            <>
+              {/* Text simulation status */}
+              <Box marginBottom={1}>
+                <Text dimColor>
+                  Model: {config.models[0] || "gpt-4.1"} | Provider:{" "}
+                  {config.provider}
+                  {config.parallel > 1 && ` | Parallel: ${config.parallel}`}
+                </Text>
+              </Box>
+              <Box marginBottom={1}>
+                <Text>
+                  {simProcessRunning ? (
+                    <>
+                      <Spinner /> Running simulations...
+                    </>
                   ) : (
-                    <Text dimColor> - </Text>
+                    <Text color="green">+ Complete</Text>
                   )}
-                </Box>
-                <Box width={30}>
-                  <Text bold={state.status === "running"}>
-                    {config.type === "voice" ? "Voice Simulation" : model}
+                </Text>
+                {simSlots.length > 0 && (
+                  <Text dimColor>
+                    {" "}
+                    ({completedSlots.length}/{simSlots.length} done)
                   </Text>
-                </Box>
-                {state.status === "done" ? (
-                  <Text color="green">Complete</Text>
-                ) : state.status === "running" ? (
-                  <Text color="cyan">Running...</Text>
-                ) : state.status === "error" ? (
-                  <Text color="red">Failed</Text>
-                ) : (
-                  <Text dimColor>Waiting</Text>
                 )}
               </Box>
-            );
-          })}
 
-          {/* Log windows for running models */}
-          {phase === "eval" && runningModels.length > 0 && (
-            <Box flexDirection="row" marginTop={1}>
-              {runningModels.map((model, idx) => (
-                <Box
-                  key={model}
-                  flexDirection="column"
-                  width={config.type === "voice" ? "100%" : "50%"}
-                  marginRight={idx < runningModels.length - 1 ? 1 : 0}
-                >
-                  <Box>
-                    <Text dimColor>{"── "}</Text>
-                    <Text bold color="cyan">
-                      {config.type === "voice"
-                        ? "Voice Simulation"
-                        : model.length > 20
-                        ? model.slice(-20)
-                        : model}
-                    </Text>
-                    <Text dimColor>
-                      {" " +
-                        "\u2500".repeat(
-                          Math.max(
-                            0,
-                            20 -
-                              Math.min(
-                                config.type === "voice" ? 16 : model.length,
-                                20
-                              )
-                          )
-                        )}
+              {/* Simulation slot status list */}
+              {simSlots.map((slot) => (
+                <Box key={slot.name}>
+                  <Box width={4}>
+                    {slot.status === "done" ? (
+                      <Text color="green"> + </Text>
+                    ) : (
+                      <Box>
+                        <Text> </Text>
+                        <Spinner />
+                        <Text> </Text>
+                      </Box>
+                    )}
+                  </Box>
+                  <Box width={35}>
+                    <Text bold={slot.status === "running"}>
+                      Persona {slot.personaIdx} Scenario {slot.scenarioIdx}
                     </Text>
                   </Box>
-                  <Box flexDirection="column" paddingLeft={1}>
-                    {(modelStates[model]?.logs || [])
-                      .slice(-8)
-                      .map((line, i) => (
-                        <Text key={i} dimColor wrap="truncate">
-                          {stripAnsi(line).slice(0, 70)}
-                        </Text>
-                      ))}
-                  </Box>
+                  {slot.status === "done" ? (
+                    <Text color="green">Complete</Text>
+                  ) : (
+                    <Text color="cyan">Running...</Text>
+                  )}
                 </Box>
               ))}
-            </Box>
-          )}
 
-          {phase === "leaderboard" && (
-            <Box marginTop={1}>
-              <Spinner label="Generating leaderboard..." />
-            </Box>
+              {/* Log windows for running slots - side by side */}
+              {phase === "eval" && runningSlots.length > 0 && (
+                <Box flexDirection="row" marginTop={1}>
+                  {runningSlots.map((slot, idx) => (
+                    <Box
+                      key={slot.name}
+                      flexDirection="column"
+                      width={
+                        runningSlots.length === 1
+                          ? "100%"
+                          : `${Math.floor(100 / runningSlots.length)}%`
+                      }
+                      marginRight={idx < runningSlots.length - 1 ? 1 : 0}
+                    >
+                      <Box>
+                        <Text dimColor>{"── "}</Text>
+                        <Text bold color="cyan">
+                          P{slot.personaIdx} S{slot.scenarioIdx}
+                        </Text>
+                        <Text dimColor>{" " + "\u2500".repeat(15)}</Text>
+                      </Box>
+                      <Box flexDirection="column" paddingLeft={1}>
+                        {slot.logs.slice(-8).map((line, i) => (
+                          <Text key={i} dimColor wrap="truncate">
+                            {stripAnsi(line).slice(0, 50)}
+                          </Text>
+                        ))}
+                      </Box>
+                    </Box>
+                  ))}
+                </Box>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Voice simulation status */}
+              {modelStates.voice && (
+                <>
+                  <Box>
+                    <Box width={4}>
+                      {modelStates.voice.status === "done" ? (
+                        <Text color="green"> + </Text>
+                      ) : modelStates.voice.status === "error" ? (
+                        <Text color="red"> x </Text>
+                      ) : (
+                        <Box>
+                          <Text> </Text>
+                          <Spinner />
+                          <Text> </Text>
+                        </Box>
+                      )}
+                    </Box>
+                    <Box width={30}>
+                      <Text bold={modelStates.voice.status === "running"}>
+                        Voice Simulation
+                      </Text>
+                    </Box>
+                    {modelStates.voice.status === "done" ? (
+                      <Text color="green">Complete</Text>
+                    ) : modelStates.voice.status === "error" ? (
+                      <Text color="red">Failed</Text>
+                    ) : (
+                      <Text color="cyan">Running...</Text>
+                    )}
+                  </Box>
+
+                  {/* Voice simulation logs */}
+                  {phase === "eval" &&
+                    modelStates.voice.status === "running" && (
+                      <Box flexDirection="column" marginTop={1}>
+                        <Box>
+                          <Text dimColor>{"── "}</Text>
+                          <Text bold color="cyan">
+                            Voice Simulation
+                          </Text>
+                          <Text dimColor>{" " + "\u2500".repeat(15)}</Text>
+                        </Box>
+                        <Box flexDirection="column" paddingLeft={1}>
+                          {modelStates.voice.logs.slice(-8).map((line, i) => (
+                            <Text key={i} dimColor wrap="truncate">
+                              {stripAnsi(line).slice(0, 70)}
+                            </Text>
+                          ))}
+                        </Box>
+                      </Box>
+                    )}
+                </>
+              )}
+            </>
           )}
 
           {phase === "done" && (
@@ -1111,93 +1276,149 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
       }
 
       const resolvedOutputDir = path.resolve(config.outputDir);
+      const metricKeys = Object.keys(metrics);
+      const truncate = (s: string, max: number) =>
+        s.length > max ? s.slice(0, max - 1) + "…" : s;
 
-      // Model Detail View
-      if (view === "model-detail" && selectedModel) {
-        const visibleRows = modelResults.slice(
-          scrollOffset,
-          scrollOffset + MAX_VISIBLE_ROWS
+      // Simulation Detail View - show transcript and evaluation
+      if (view === "sim-detail" && selectedSim) {
+        const selectedResult = evalResults.find(
+          (r) => r.simulation === selectedSim
         );
-        const truncate = (s: string, max: number) =>
-          s.length > max ? s.slice(0, max - 1) + "…" : s;
+        const criteria = selectedResult?.criteria || [];
+        const transcript = selectedResult?.transcript || [];
 
-        // Get metric columns dynamically (excluding persona_idx, scenario_idx)
-        const metricColumns =
-          modelResults.length > 0
-            ? Object.keys(modelResults[0]!).filter(
-                (k) =>
-                  !["persona_idx", "scenario_idx"].includes(k) &&
-                  typeof modelResults[0]![k] === "number"
-              )
-            : [];
+        // Format tool calls for display
+        const formatToolCall = (
+          tc: TranscriptMessage["tool_calls"]
+        ): string => {
+          if (!tc || tc.length === 0) return "";
+          return tc
+            .map((t) => {
+              try {
+                const args = JSON.parse(t.function.arguments);
+                return `${t.function.name}(${JSON.stringify(args)})`;
+              } catch {
+                return `${t.function.name}(${t.function.arguments})`;
+              }
+            })
+            .join(", ");
+        };
 
         return (
           <Box flexDirection="column" padding={1}>
-            <Box marginBottom={1}>
+            {/* Header with persona/scenario info */}
+            <Box marginBottom={1} flexDirection="column">
               <Text bold color="cyan">
-                {config.type === "voice" ? "Voice Simulation" : selectedModel} —
-                Results
+                Simulation Details
               </Text>
-              <Text dimColor> ({modelResults.length} simulations)</Text>
+              {selectedResult?.personaInfo && (
+                <Box marginTop={1}>
+                  <Text bold>Persona: </Text>
+                  <Text>
+                    {selectedResult.personaInfo.label ||
+                      `Persona ${selectedResult.persona_idx}`}
+                  </Text>
+                </Box>
+              )}
+              {selectedResult?.scenarioInfo && (
+                <Box>
+                  <Text bold>Scenario: </Text>
+                  <Text>
+                    {selectedResult.scenarioInfo.name ||
+                      `Scenario ${selectedResult.scenario_idx}`}
+                  </Text>
+                </Box>
+              )}
             </Box>
 
-            {modelResults.length === 0 ? (
-              <Text color="yellow">No results found.</Text>
-            ) : (
-              <>
-                {/* Results Table */}
-                <Table
-                  columns={[
-                    { key: "persona", label: "Persona", width: 8 },
-                    { key: "scenario", label: "Scenario", width: 10 },
-                    ...metricColumns.slice(0, 4).map((col) => ({
-                      key: col,
-                      label: truncate(col.replace(/_/g, " "), 12),
-                      width: 12,
-                      align: "right" as const,
-                    })),
-                  ]}
-                  data={visibleRows.map((r) => {
-                    const row: Record<string, string> = {
-                      persona: String(r.persona_idx ?? "-"),
-                      scenario: String(r.scenario_idx ?? "-"),
-                    };
-                    for (const col of metricColumns.slice(0, 4)) {
-                      const val = r[col];
-                      row[col] =
-                        typeof val === "number"
-                          ? val.toFixed(2)
-                          : String(val ?? "-");
-                    }
-                    return row;
-                  })}
-                />
+            {/* Transcript Section - show all messages */}
+            <Box marginBottom={1}>
+              <Text bold>Transcript</Text>
+            </Box>
+            <Box
+              flexDirection="column"
+              marginBottom={1}
+              borderStyle="single"
+              borderColor="gray"
+              paddingX={1}
+            >
+              {transcript.length === 0 ? (
+                <Text dimColor>No transcript available</Text>
+              ) : (
+                transcript
+                  .filter((m) => m.role !== "tool") // Skip tool responses for cleaner view
+                  .map((m, idx) => (
+                    <Box key={idx} flexDirection="column" marginBottom={1}>
+                      <Text
+                        color={
+                          m.role === "assistant"
+                            ? "cyan"
+                            : m.role === "user"
+                            ? "yellow"
+                            : "gray"
+                        }
+                        bold
+                      >
+                        {m.role}:
+                      </Text>
+                      <Text wrap="wrap">
+                        {m.content ||
+                          (m.tool_calls ? formatToolCall(m.tool_calls) : "")}
+                      </Text>
+                    </Box>
+                  ))
+              )}
+            </Box>
 
-                {/* Scroll indicator */}
-                {modelResults.length > MAX_VISIBLE_ROWS && (
-                  <Box marginTop={1}>
-                    <Text dimColor>
-                      Showing {scrollOffset + 1}-
-                      {Math.min(
-                        scrollOffset + MAX_VISIBLE_ROWS,
-                        modelResults.length
-                      )}{" "}
-                      of {modelResults.length} | Use ↑↓ to scroll
-                    </Text>
+            {/* Evaluation Metrics Section */}
+            <Box marginBottom={1}>
+              <Text bold>Evaluation</Text>
+            </Box>
+            {criteria.length === 0 ? (
+              <Text color="yellow">No evaluation results found.</Text>
+            ) : (
+              criteria.map((c, idx) => (
+                <Box
+                  key={idx}
+                  flexDirection="column"
+                  marginBottom={1}
+                  borderStyle="single"
+                  borderColor={c.value >= 0.5 ? "green" : "red"}
+                  paddingX={1}
+                >
+                  <Box>
+                    <Text bold>{c.name.replace(/_/g, " ")}</Text>
+                    <Text> </Text>
+                    {c.value >= 0.5 ? (
+                      <Text color="green" bold>
+                        {c.value.toFixed(1)} ✓
+                      </Text>
+                    ) : (
+                      <Text color="red" bold>
+                        {c.value.toFixed(1)} ✗
+                      </Text>
+                    )}
                   </Box>
-                )}
-              </>
+                  <Box marginTop={1}>
+                    <Text wrap="wrap">{c.reasoning}</Text>
+                  </Box>
+                </Box>
+              ))
             )}
 
             <Box marginTop={1}>
-              <Text dimColor>Press q or Esc to go back to leaderboard</Text>
+              <Text dimColor>Press q or Esc to go back to results</Text>
             </Box>
           </Box>
         );
       }
 
-      // Leaderboard View (default)
-      if (metrics.length === 0) {
+      // Main Results View (default)
+      const hasMetrics = metricKeys.length > 0;
+      const hasEvalResults = evalResults.length > 0;
+
+      if (!hasMetrics && !hasEvalResults) {
         return (
           <Box padding={1} flexDirection="column">
             <Text color="green" bold>
@@ -1217,125 +1438,124 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
         );
       }
 
-      // Get metric keys for charts (exclude 'model' and 'overall')
-      const metricKeys =
-        metrics.length > 0
-          ? Object.keys(metrics[0]!).filter(
-              (k) => k !== "model" && typeof metrics[0]![k] === "number"
-            )
-          : [];
-
-      // Build table columns dynamically
-      const tableColumns = [
-        { key: "model", label: "Model", width: 28 },
-        ...metricKeys.slice(0, 4).map((k) => ({
-          key: k,
-          label: k.replace(/_/g, " ").slice(0, 12),
-          width: 12,
-          align: "right" as const,
-        })),
-      ];
-
       return (
         <Box flexDirection="column" padding={1}>
           <Box marginBottom={1}>
             <Text bold color="cyan">
-              {config.type === "text"
-                ? "Simulations Leaderboard"
-                : "Simulation Results"}
+              Simulation Results
+            </Text>
+            <Text dimColor>
+              {" "}
+              — {evalResults.length} simulation
+              {evalResults.length !== 1 ? "s" : ""}
             </Text>
           </Box>
 
-          {/* Comparison Table */}
-          <Table
-            columns={tableColumns}
-            data={metrics.map((m) => {
-              const row: Record<string, string> = { model: String(m.model) };
-              for (const k of metricKeys.slice(0, 4)) {
-                const val = m[k];
-                row[k] =
-                  typeof val === "number" ? val.toFixed(2) : String(val ?? "-");
-              }
-              return row;
-            })}
-          />
-
-          {/* Charts for top metrics */}
-          {metricKeys.slice(0, 2).map((metricKey) => (
-            <Box key={metricKey} marginTop={1} flexDirection="column">
-              <Text bold>{metricKey.replace(/_/g, " ")}</Text>
-              <BarChart
-                data={[...metrics]
-                  .sort(
-                    (a, b) =>
-                      ((b[metricKey] as number) || 0) -
-                      ((a[metricKey] as number) || 0)
-                  )
-                  .map((m) => ({
-                    label:
-                      String(m.model).length > 25
-                        ? String(m.model).slice(-25)
-                        : String(m.model),
-                    value: (m[metricKey] as number) || 0,
-                    color: "green",
-                  }))}
-                maxWidth={40}
-              />
-            </Box>
-          ))}
-
-          {/* Model selection to view details (for text simulations with multiple models) */}
-          {config.type === "text" && config.models.length > 0 && (
-            <Box marginTop={1} flexDirection="column">
-              <Text dimColor>{"\u2500".repeat(50)}</Text>
-              <Box marginTop={1}>
-                <Text bold>View Model Details</Text>
+          {/* Overall Metrics Bar Charts - simplified */}
+          {hasMetrics && (
+            <>
+              <Box marginBottom={1}>
+                <Text bold>Overall Metrics</Text>
               </Box>
-              <Box marginTop={1}>
-                <SelectInput
-                  items={[
-                    ...config.models.map((m) => ({
-                      label: `${m} — View simulation results`,
-                      value: m,
-                    })),
-                    { label: "Exit", value: "__exit__" },
-                  ]}
-                  onSelect={(v) => {
-                    if (v === "__exit__") {
-                      if (onBack) onBack();
-                      else exit();
-                    } else {
-                      setSelectedModel(v);
-                      setView("model-detail");
-                    }
-                  }}
-                />
-              </Box>
-            </Box>
+              {metricKeys.map((metricKey) => {
+                const m = metrics[metricKey]!;
+                return (
+                  <Box key={metricKey} marginBottom={1}>
+                    <BarChart
+                      data={[
+                        {
+                          label: metricKey.replace(/_/g, " "),
+                          value: m.mean,
+                          color: m.mean >= 0.5 ? "green" : "red",
+                        },
+                      ]}
+                      maxWidth={40}
+                    />
+                  </Box>
+                );
+              })}
+            </>
           )}
 
-          {/* Voice simulation detail view option */}
-          {config.type === "voice" && (
-            <Box marginTop={1} flexDirection="column">
-              <Text dimColor>{"\u2500".repeat(50)}</Text>
-              <Box marginTop={1}>
-                <SelectInput
-                  items={[
-                    { label: "View simulation details", value: "voice" },
-                    { label: "Exit", value: "__exit__" },
-                  ]}
-                  onSelect={(v) => {
-                    if (v === "__exit__") {
-                      if (onBack) onBack();
-                      else exit();
-                    } else {
-                      setSelectedModel("voice");
-                      setView("model-detail");
-                    }
-                  }}
-                />
+          {/* Per-Simulation Results - Cards with SelectInput */}
+          {hasEvalResults && (
+            <>
+              <Box marginTop={1} marginBottom={1}>
+                <Text bold>Per-Simulation Results</Text>
               </Box>
-            </Box>
+
+              {/* Cards displayed above */}
+              {evalResults.map((r, idx) => {
+                const personaLabel =
+                  r.personaInfo?.label || `Persona ${r.persona_idx}`;
+                const scenarioLabel =
+                  r.scenarioInfo?.name || `Scenario ${r.scenario_idx}`;
+
+                return (
+                  <Box
+                    key={idx}
+                    flexDirection="column"
+                    marginBottom={1}
+                    borderStyle="single"
+                    borderColor="gray"
+                    paddingX={1}
+                  >
+                    <Box>
+                      <Text bold>Persona: </Text>
+                      <Text>{personaLabel}</Text>
+                    </Box>
+                    <Box>
+                      <Text bold>Scenario: </Text>
+                      <Text>{scenarioLabel}</Text>
+                    </Box>
+                    {r.criteria.length > 0 && (
+                      <Box flexDirection="column" marginTop={1}>
+                        {r.criteria.map((c, cIdx) => (
+                          <Box key={cIdx}>
+                            <Box width={30}>
+                              <Text dimColor>{c.name.replace(/_/g, " ")}</Text>
+                            </Box>
+                            <Text color={c.value >= 0.5 ? "green" : "red"}>
+                              {c.value.toFixed(1)} {c.value >= 0.5 ? "✓" : "✗"}
+                            </Text>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                );
+              })}
+
+              {/* Select to view details */}
+              <Box marginTop={1}>
+                <Text dimColor>Select to view transcript & evaluation:</Text>
+              </Box>
+              <SelectInput
+                items={[
+                  ...evalResults.map((r) => {
+                    const personaLabel =
+                      r.personaInfo?.label || `Persona ${r.persona_idx}`;
+                    const scenarioLabel =
+                      r.scenarioInfo?.name || `Scenario ${r.scenario_idx}`;
+                    return {
+                      label: `${personaLabel} — ${scenarioLabel}`,
+                      value: r.simulation,
+                    };
+                  }),
+                  { label: "Exit", value: "__exit__" },
+                ]}
+                onSelect={(v) => {
+                  if (v === "__exit__") {
+                    if (onBack) onBack();
+                    else exit();
+                  } else {
+                    setSelectedSim(v);
+                    setScrollOffset(0);
+                    setView("sim-detail");
+                  }
+                }}
+              />
+            </>
           )}
 
           {/* Output file paths */}

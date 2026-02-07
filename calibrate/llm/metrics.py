@@ -131,7 +131,7 @@ Use these instructions to understand what the agent was supposed to do and evalu
 
 You will be given a conversation between a user and an agent along with an evaluation criteria to use for evaluating the agent's behaviour.{agent_instructions_section}
 
-You need to evaluate if the agent's behaviour adheres to the evaluation criteria."""
+You need to evaluate if the agent's behaviour adheres to the evaluation criteria. Always give your reasoning in english irrespective of the language of the conversation."""
 
     user_prompt = f"""Chat history: {conversation_as_prompt}\nEvaluation criteria: {convert_evaluation_criteria_to_prompt(evaluation_criteria)}"""
 

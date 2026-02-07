@@ -1,6 +1,6 @@
 {
     "version": 1,
     "hooks": {
-      "stop": [{ "command": "node .cursor/hooks/update-context.js" }]
+      // "stop": [{ "command": "node .cursor/hooks/update-context.js" }]
     }
   }

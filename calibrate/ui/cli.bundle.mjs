@@ -48197,7 +48197,6 @@ var OPENROUTER_MODEL_EXAMPLES2 = [
   "anthropic/claude-sonnet-4",
   "google/gemini-2.0-flash-001"
 ];
-var MAX_PARALLEL_MODELS2 = 2;
 function SimulationsApp({ onBack }) {
   const { exit } = use_app_default();
   const [step, setStep] = (0, import_react24.useState)("init");
@@ -48228,15 +48227,18 @@ function SimulationsApp({ onBack }) {
   const [nextModelIdx, setNextModelIdx] = (0, import_react24.useState)(0);
   const processRefs = (0, import_react24.useRef)(/* @__PURE__ */ new Map());
   const calibrateBin = (0, import_react24.useRef)(null);
+  const [simSlots, setSimSlots] = (0, import_react24.useState)([]);
+  const [simProcessRunning, setSimProcessRunning] = (0, import_react24.useState)(false);
+  const pollingRef = (0, import_react24.useRef)(null);
   const [initError, setInitError] = (0, import_react24.useState)("");
-  const [view, setView] = (0, import_react24.useState)(
-    "leaderboard"
-  );
-  const [selectedModel, setSelectedModel] = (0, import_react24.useState)(null);
-  const [modelResults, setModelResults] = (0, import_react24.useState)([]);
+  const [view, setView] = (0, import_react24.useState)("leaderboard");
+  const [selectedSim, setSelectedSim] = (0, import_react24.useState)(null);
+  const [evalResults, setEvalResults] = (0, import_react24.useState)([]);
   const [scrollOffset, setScrollOffset] = (0, import_react24.useState)(0);
   const MAX_VISIBLE_ROWS = 10;
-  const [metrics, setMetrics] = (0, import_react24.useState)([]);
+  const [metrics, setMetrics] = (0, import_react24.useState)({});
+  const [personas, setPersonas] = (0, import_react24.useState)([]);
+  const [scenarios, setScenarios] = (0, import_react24.useState)([]);
   const goBack = () => {
     switch (step) {
       case "select-type":
@@ -48299,9 +48301,9 @@ function SimulationsApp({ onBack }) {
   use_input_default((input, key) => {
     if (input === "q") {
       if (step === "leaderboard") {
-        if (view === "model-detail") {
+        if (view === "sim-detail") {
           setView("leaderboard");
-          setSelectedModel(null);
+          setSelectedSim(null);
           setScrollOffset(0);
         } else {
           if (onBack) onBack();
@@ -48311,19 +48313,23 @@ function SimulationsApp({ onBack }) {
     }
     if (input === "b" && step === "init" && onBack) onBack();
     if (key.escape) {
-      if (step === "leaderboard" && view === "model-detail") {
+      if (step === "leaderboard" && view === "sim-detail") {
         setView("leaderboard");
-        setSelectedModel(null);
+        setSelectedSim(null);
         setScrollOffset(0);
       } else if (!["init", "running", "leaderboard"].includes(step)) {
         goBack();
       }
     }
-    if (step === "leaderboard" && view === "model-detail") {
+    if (step === "leaderboard" && view === "sim-detail") {
+      const selectedResult = evalResults.find(
+        (r) => r.simulation === selectedSim
+      );
+      const itemCount = selectedResult?.criteria.length || 0;
       if (key.upArrow && scrollOffset > 0) {
         setScrollOffset((o) => o - 1);
       }
-      if (key.downArrow && scrollOffset < modelResults.length - MAX_VISIBLE_ROWS) {
+      if (key.downArrow && scrollOffset < itemCount - MAX_VISIBLE_ROWS) {
         setScrollOffset((o) => o + 1);
       }
     }
@@ -48364,17 +48370,61 @@ function SimulationsApp({ onBack }) {
       setPhase("eval");
       return;
     }
-    const initialStates = {};
-    for (const model of config.models) {
-      initialStates[model] = { status: "waiting", logs: [] };
-    }
-    setModelStates(initialStates);
+    setSimSlots([]);
+    setSimProcessRunning(true);
     setPhase("eval");
-    setRunningCount(0);
-    setNextModelIdx(0);
   }, [step]);
-  const startModel = (model) => {
-    if (!config.calibrate) return;
+  const pollSimulationDirs = () => {
+    try {
+      if (!fs5.existsSync(config.outputDir)) return;
+      const entries = fs5.readdirSync(config.outputDir, { withFileTypes: true });
+      const simDirs = entries.filter(
+        (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
+      ).map((e) => e.name);
+      const newSlots = [];
+      for (const dirName of simDirs) {
+        const match = dirName.match(/simulation_persona_(\d+)_scenario_(\d+)/);
+        if (!match) continue;
+        const personaIdx = parseInt(match[1], 10);
+        const scenarioIdx = parseInt(match[2], 10);
+        const logPath = path4.join(config.outputDir, dirName, "results.log");
+        let logs = [];
+        let status = "running";
+        if (fs5.existsSync(logPath)) {
+          try {
+            const content = fs5.readFileSync(logPath, "utf-8");
+            logs = content.split("\n").filter((l) => l.trim()).slice(-15);
+          } catch {
+          }
+        }
+        const evalPath = path4.join(
+          config.outputDir,
+          dirName,
+          "evaluation_results.csv"
+        );
+        if (fs5.existsSync(evalPath)) {
+          status = "done";
+        }
+        newSlots.push({
+          name: dirName,
+          personaIdx,
+          scenarioIdx,
+          logs,
+          status
+        });
+      }
+      newSlots.sort((a, b) => {
+        if (a.personaIdx !== b.personaIdx) return a.personaIdx - b.personaIdx;
+        return a.scenarioIdx - b.scenarioIdx;
+      });
+      setSimSlots(newSlots);
+    } catch {
+    }
+  };
+  (0, import_react24.useEffect)(() => {
+    if (step !== "running" || config.type !== "text" || !config.calibrate)
+      return;
+    if (!simProcessRunning) return;
     const bin = config.calibrate;
     const env3 = { ...process.env };
     for (const k of ["OPENAI_API_KEY", "OPENROUTER_API_KEY"]) {
@@ -48383,6 +48433,7 @@ function SimulationsApp({ onBack }) {
     }
     Object.assign(env3, config.envVars);
     env3.PYTHONUNBUFFERED = "1";
+    const model = config.models[0] || "gpt-4.1";
     const cmdArgs = [
       ...bin.args,
       "simulations",
@@ -48400,72 +48451,48 @@ function SimulationsApp({ onBack }) {
     if (config.parallel > 1) {
       cmdArgs.push("-n", String(config.parallel));
     }
-    setModelStates((prev) => ({
-      ...prev,
-      [model]: { ...prev[model], status: "running" }
-    }));
-    setRunningCount((c) => c + 1);
     const proc = spawn2(bin.cmd, cmdArgs, {
       env: env3,
       stdio: ["pipe", "pipe", "pipe"]
     });
-    processRefs.current.set(model, proc);
-    const onData = (data) => {
-      const lines = data.toString().split(/[\r\n]+/).filter((l) => l.trim());
-      setModelStates((prev) => ({
-        ...prev,
-        [model]: {
-          ...prev[model],
-          logs: [...prev[model].logs, ...lines].slice(-20)
-        }
-      }));
-    };
-    proc.stdout?.on("data", onData);
-    proc.stderr?.on("data", onData);
-    proc.on("error", () => {
-      setModelStates((prev) => ({
-        ...prev,
-        [model]: { ...prev[model], status: "error" }
-      }));
-      setRunningCount((c) => c - 1);
-      processRefs.current.delete(model);
-    });
+    processRefs.current.set("text-sim", proc);
+    pollingRef.current = setInterval(pollSimulationDirs, 500);
     proc.on("close", (code) => {
-      let metricsData = void 0;
-      if (code === 0) {
-        try {
-          const modelDir = getModelDir(model);
-          const metricsPath = path4.join(
-            config.outputDir,
-            modelDir,
-            "metrics.json"
-          );
-          if (fs5.existsSync(metricsPath)) {
-            const raw = JSON.parse(fs5.readFileSync(metricsPath, "utf-8"));
-            metricsData = {};
-            for (const [key, val] of Object.entries(raw)) {
-              if (typeof val === "object" && val !== null && "mean" in val) {
-                metricsData[key] = val.mean;
-              } else if (typeof val === "number") {
-                metricsData[key] = val;
-              }
-            }
-          }
-        } catch {
-        }
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
-      setModelStates((prev) => ({
-        ...prev,
-        [model]: {
-          ...prev[model],
-          status: code === 0 ? "done" : "error",
-          metrics: metricsData
-        }
-      }));
-      setRunningCount((c) => c - 1);
-      processRefs.current.delete(model);
+      pollSimulationDirs();
+      setSimProcessRunning(false);
+      processRefs.current.delete("text-sim");
+      if (code === 0) {
+        loadMetrics();
+        loadEvalResults();
+        setPhase("done");
+        setTimeout(() => setStep("leaderboard"), 500);
+      } else {
+        setPhase("done");
+        setTimeout(() => setStep("leaderboard"), 500);
+      }
     });
-  };
+    proc.on("error", () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setSimProcessRunning(false);
+      processRefs.current.delete("text-sim");
+      setPhase("done");
+      setTimeout(() => setStep("leaderboard"), 500);
+    });
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      proc.kill();
+    };
+  }, [step, config.type, simProcessRunning]);
   (0, import_react24.useEffect)(() => {
     if (step !== "running" || config.type !== "voice" || !config.calibrate)
       return;
@@ -48510,166 +48537,147 @@ function SimulationsApp({ onBack }) {
         voice: { ...prev.voice, status: code === 0 ? "done" : "error" }
       }));
       processRefs.current.delete("voice");
-      setPhase("leaderboard");
-      const lbDir = path4.join(config.outputDir, "leaderboard");
-      const lbProc = spawn2(
-        bin.cmd,
-        [
-          ...bin.args,
-          "simulations",
-          "leaderboard",
-          "-o",
-          config.outputDir,
-          "-s",
-          lbDir
-        ],
-        { env: env3, stdio: ["pipe", "pipe", "pipe"] }
-      );
-      lbProc.on("close", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
-      lbProc.on("error", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
+      loadMetrics();
+      loadEvalResults();
+      setPhase("done");
+      setTimeout(() => setStep("leaderboard"), 500);
     });
     return () => {
       proc.kill();
     };
   }, [step, config.type]);
-  (0, import_react24.useEffect)(() => {
-    if (step !== "running" || phase !== "eval" || config.type !== "text")
-      return;
-    if (Object.keys(modelStates).length === 0) return;
-    const completedCount = Object.values(modelStates).filter(
-      (s) => s.status === "done" || s.status === "error"
-    ).length;
-    if (completedCount >= config.models.length) {
-      setPhase("leaderboard");
-      const bin = config.calibrate;
-      const env3 = { ...process.env };
-      env3.PYTHONUNBUFFERED = "1";
-      const lbDir = path4.join(config.outputDir, "leaderboard");
-      const proc = spawn2(
-        bin.cmd,
-        [
-          ...bin.args,
-          "simulations",
-          "leaderboard",
-          "-o",
-          config.outputDir,
-          "-s",
-          lbDir
-        ],
-        { env: env3, stdio: ["pipe", "pipe", "pipe"] }
-      );
-      proc.on("close", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
-      proc.on("error", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
-      return;
-    }
-    if (runningCount < MAX_PARALLEL_MODELS2 && nextModelIdx < config.models.length) {
-      const model = config.models[nextModelIdx];
-      setNextModelIdx((idx) => idx + 1);
-      startModel(model);
-    }
-  }, [step, phase, runningCount, nextModelIdx, modelStates, config.type]);
   const loadMetrics = () => {
-    const results = [];
-    if (config.type === "voice") {
-      try {
-        const metricsPath = path4.join(config.outputDir, "metrics.json");
-        if (fs5.existsSync(metricsPath)) {
-          const raw = JSON.parse(fs5.readFileSync(metricsPath, "utf-8"));
-          const entry = { model: "voice" };
-          for (const [key, val] of Object.entries(raw)) {
-            if (typeof val === "object" && val !== null && "mean" in val) {
-              entry[key] = val.mean;
-            } else if (typeof val === "number") {
-              entry[key] = val;
-            }
+    try {
+      const metricsPath = path4.join(config.outputDir, "metrics.json");
+      if (fs5.existsSync(metricsPath)) {
+        const raw = JSON.parse(fs5.readFileSync(metricsPath, "utf-8"));
+        const parsed = {};
+        for (const [key, val] of Object.entries(raw)) {
+          if (typeof val === "object" && val !== null && "mean" in val && "std" in val && "values" in val) {
+            parsed[key] = val;
           }
-          results.push(entry);
+        }
+        setMetrics(parsed);
+      }
+    } catch {
+    }
+  };
+  const loadConfigData = () => {
+    try {
+      if (!config.configPath || !fs5.existsSync(config.configPath)) return;
+      const configData = JSON.parse(
+        fs5.readFileSync(config.configPath, "utf-8")
+      );
+      if (configData.personas && Array.isArray(configData.personas)) {
+        setPersonas(configData.personas);
+      }
+      if (configData.scenarios && Array.isArray(configData.scenarios)) {
+        setScenarios(configData.scenarios);
+      }
+    } catch {
+    }
+  };
+  const loadEvalResults = () => {
+    loadConfigData();
+    const results = [];
+    try {
+      if (!fs5.existsSync(config.outputDir)) return;
+      const entries = fs5.readdirSync(config.outputDir, { withFileTypes: true });
+      const simDirs = entries.filter(
+        (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
+      ).map((e) => e.name);
+      let loadedPersonas = [];
+      let loadedScenarios = [];
+      try {
+        if (config.configPath && fs5.existsSync(config.configPath)) {
+          const configData = JSON.parse(
+            fs5.readFileSync(config.configPath, "utf-8")
+          );
+          loadedPersonas = configData.personas || [];
+          loadedScenarios = configData.scenarios || [];
         }
       } catch {
       }
-    } else {
-      for (const model of config.models) {
+      for (const dirName of simDirs) {
+        const match = dirName.match(/simulation_persona_(\d+)_scenario_(\d+)/);
+        if (!match) continue;
+        const personaIdx = parseInt(match[1], 10);
+        const scenarioIdx = parseInt(match[2], 10);
+        const personaInfo = loadedPersonas[personaIdx - 1];
+        const scenarioInfo = loadedScenarios[scenarioIdx - 1];
+        const evalPath = path4.join(
+          config.outputDir,
+          dirName,
+          "evaluation_results.csv"
+        );
+        if (!fs5.existsSync(evalPath)) continue;
+        let transcript = [];
+        const transcriptPath = path4.join(
+          config.outputDir,
+          dirName,
+          "transcript.json"
+        );
+        if (fs5.existsSync(transcriptPath)) {
+          try {
+            transcript = JSON.parse(fs5.readFileSync(transcriptPath, "utf-8"));
+          } catch {
+          }
+        }
         try {
-          const modelDir = getModelDir(model);
-          const metricsPath = path4.join(
-            config.outputDir,
-            modelDir,
-            "metrics.json"
-          );
-          if (fs5.existsSync(metricsPath)) {
-            const raw = JSON.parse(fs5.readFileSync(metricsPath, "utf-8"));
-            const entry = { model };
-            for (const [key, val] of Object.entries(raw)) {
-              if (typeof val === "object" && val !== null && "mean" in val) {
-                entry[key] = val.mean;
-              } else if (typeof val === "number") {
-                entry[key] = val;
+          const content = fs5.readFileSync(evalPath, "utf-8");
+          const lines = content.trim().split("\n");
+          if (lines.length < 2) continue;
+          const criteria = [];
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i];
+            const firstComma = line.indexOf(",");
+            if (firstComma === -1) continue;
+            const name = line.slice(0, firstComma).trim();
+            const rest = line.slice(firstComma + 1);
+            let valueStr = "";
+            let reasoningStart = 0;
+            for (let j = 0; j < rest.length; j++) {
+              if (rest[j] === "," || rest[j] === '"') {
+                valueStr = rest.slice(0, j).trim();
+                reasoningStart = rest[j] === "," ? j + 1 : j;
+                break;
               }
             }
-            results.push(entry);
+            let reasoning = rest.slice(reasoningStart).trim();
+            if (reasoning.startsWith('"') && reasoning.endsWith('"')) {
+              reasoning = reasoning.slice(1, -1).replace(/""/g, '"');
+            }
+            const value = parseFloat(valueStr);
+            if (!isNaN(value)) {
+              criteria.push({ name, value, reasoning });
+            }
           }
+          results.push({
+            simulation: dirName,
+            persona_idx: personaIdx,
+            scenario_idx: scenarioIdx,
+            criteria,
+            transcript,
+            personaInfo,
+            scenarioInfo
+          });
         } catch {
         }
       }
+      results.sort((a, b) => {
+        if (a.persona_idx !== b.persona_idx)
+          return a.persona_idx - b.persona_idx;
+        return a.scenario_idx - b.scenario_idx;
+      });
+      setEvalResults(results);
+    } catch {
     }
-    setMetrics(results);
   };
   (0, import_react24.useEffect)(() => {
-    if (!selectedModel) return;
-    try {
-      let resultsPath;
-      if (config.type === "voice") {
-        resultsPath = path4.join(config.outputDir, "results.csv");
-      } else {
-        const modelDir = getModelDir(selectedModel);
-        resultsPath = path4.join(config.outputDir, modelDir, "results.csv");
-      }
-      if (fs5.existsSync(resultsPath)) {
-        const csvContent = fs5.readFileSync(resultsPath, "utf-8");
-        const lines = csvContent.trim().split("\n");
-        if (lines.length < 2) {
-          setModelResults([]);
-          return;
-        }
-        const headers = lines[0].split(",").map((h) => h.trim());
-        const results = [];
-        for (let i = 1; i < lines.length; i++) {
-          const values = lines[i].split(",");
-          const row = { persona_idx: 0, scenario_idx: 0 };
-          headers.forEach((h, idx) => {
-            const val = values[idx]?.trim() || "";
-            const num = parseFloat(val);
-            row[h] = isNaN(num) ? val : num;
-          });
-          results.push(row);
-        }
-        setModelResults(results);
-        setScrollOffset(0);
-      } else {
-        setModelResults([]);
-      }
-    } catch {
-      setModelResults([]);
-    }
-  }, [selectedModel, config.outputDir, config.type]);
-  (0, import_react24.useEffect)(() => {
     return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
       processRefs.current.forEach((proc) => proc.kill());
     };
   }, []);
@@ -48935,13 +48943,9 @@ function SimulationsApp({ onBack }) {
       ] });
     }
     case "running": {
-      const modelList = config.type === "voice" ? ["voice"] : config.models;
-      const completedCount = Object.values(modelStates).filter(
-        (s) => s.status === "done" || s.status === "error"
-      ).length;
-      const runningModels = modelList.filter(
-        (m) => modelStates[m]?.status === "running"
-      );
+      const isTextSim = config.type === "text";
+      const runningSlots = simSlots.filter((s) => s.status === "running").slice(0, config.parallel);
+      const completedSlots = simSlots.filter((s) => s.status === "done");
       return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
         header,
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
@@ -48950,55 +48954,84 @@ function SimulationsApp({ onBack }) {
           " | Config: ",
           config.configPath
         ] }) }),
-        config.type === "text" && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
-          completedCount,
-          "/",
-          config.models.length,
-          " models",
-          runningCount > 1 && ` (${runningCount} running in parallel)`,
-          " | ",
-          "Provider: ",
-          config.provider
-        ] }) }),
-        modelList.map((model) => {
-          const state = modelStates[model];
-          if (!state) return null;
-          return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 4, children: state.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: " + " }) : state.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "red", children: " x " }) : state.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+        isTextSim ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
+            "Model: ",
+            config.models[0] || "gpt-4.1",
+            " | Provider:",
+            " ",
+            config.provider,
+            config.parallel > 1 && ` | Parallel: ${config.parallel}`
+          ] }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginBottom: 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: simProcessRunning ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Spinner, {}),
+              " Running simulations..."
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "+ Complete" }) }),
+            simSlots.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
+              " ",
+              "(",
+              completedSlots.length,
+              "/",
+              simSlots.length,
+              " done)"
+            ] })
+          ] }),
+          simSlots.map((slot) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 4, children: slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: " + " }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " }),
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Spinner, {}),
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " })
-            ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " - " }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 30, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: state.status === "running", children: config.type === "voice" ? "Voice Simulation" : model }) }),
-            state.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "Complete" }) : state.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "cyan", children: "Running..." }) : state.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "red", children: "Failed" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Waiting" })
-          ] }, model);
-        }),
-        phase === "eval" && runningModels.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "row", marginTop: 1, children: runningModels.map((model, idx) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
-          Box_default,
-          {
-            flexDirection: "column",
-            width: config.type === "voice" ? "100%" : "50%",
-            marginRight: idx < runningModels.length - 1 ? 1 : 0,
-            children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500\u2500 " }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, color: "cyan", children: config.type === "voice" ? "Voice Simulation" : model.length > 20 ? model.slice(-20) : model }),
-                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " " + "\u2500".repeat(
-                  Math.max(
-                    0,
-                    20 - Math.min(
-                      config.type === "voice" ? 16 : model.length,
-                      20
-                    )
-                  )
-                ) })
-              ] }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "column", paddingLeft: 1, children: (modelStates[model]?.logs || []).slice(-8).map((line, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, wrap: "truncate", children: stripAnsi2(line).slice(0, 70) }, i)) })
-            ]
-          },
-          model
-        )) }),
-        phase === "leaderboard" && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Spinner, { label: "Generating leaderboard..." }) }),
+            ] }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 35, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { bold: slot.status === "running", children: [
+              "Persona ",
+              slot.personaIdx,
+              " Scenario ",
+              slot.scenarioIdx
+            ] }) }),
+            slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "Complete" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "cyan", children: "Running..." })
+          ] }, slot.name)),
+          phase === "eval" && runningSlots.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "row", marginTop: 1, children: runningSlots.map((slot, idx) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+            Box_default,
+            {
+              flexDirection: "column",
+              width: runningSlots.length === 1 ? "100%" : `${Math.floor(100 / runningSlots.length)}%`,
+              marginRight: idx < runningSlots.length - 1 ? 1 : 0,
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500\u2500 " }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { bold: true, color: "cyan", children: [
+                    "P",
+                    slot.personaIdx,
+                    " S",
+                    slot.scenarioIdx
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " " + "\u2500".repeat(15) })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "column", paddingLeft: 1, children: slot.logs.slice(-8).map((line, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, wrap: "truncate", children: stripAnsi2(line).slice(0, 50) }, i)) })
+              ]
+            },
+            slot.name
+          )) })
+        ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_jsx_runtime3.Fragment, { children: modelStates.voice && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 4, children: modelStates.voice.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: " + " }) : modelStates.voice.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "red", children: " x " }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Spinner, {}),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " })
+            ] }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 30, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: modelStates.voice.status === "running", children: "Voice Simulation" }) }),
+            modelStates.voice.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "Complete" }) : modelStates.voice.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "red", children: "Failed" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "cyan", children: "Running..." })
+          ] }),
+          phase === "eval" && modelStates.voice.status === "running" && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { flexDirection: "column", marginTop: 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500\u2500 " }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, color: "cyan", children: "Voice Simulation" }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " " + "\u2500".repeat(15) })
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "column", paddingLeft: 1, children: modelStates.voice.logs.slice(-8).map((line, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, wrap: "truncate", children: stripAnsi2(line).slice(0, 70) }, i)) })
+          ] })
+        ] }) }),
         phase === "done" && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "+ All simulations complete!" }) })
       ] });
     }
@@ -49011,72 +49044,94 @@ function SimulationsApp({ onBack }) {
         ] });
       }
       const resolvedOutputDir = path4.resolve(config.outputDir);
-      if (view === "model-detail" && selectedModel) {
-        const visibleRows = modelResults.slice(
-          scrollOffset,
-          scrollOffset + MAX_VISIBLE_ROWS
+      const metricKeys = Object.keys(metrics);
+      const truncate = (s, max) => s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
+      if (view === "sim-detail" && selectedSim) {
+        const selectedResult = evalResults.find(
+          (r) => r.simulation === selectedSim
         );
-        const truncate = (s, max) => s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
-        const metricColumns = modelResults.length > 0 ? Object.keys(modelResults[0]).filter(
-          (k) => !["persona_idx", "scenario_idx"].includes(k) && typeof modelResults[0][k] === "number"
-        ) : [];
+        const criteria = selectedResult?.criteria || [];
+        const transcript = selectedResult?.transcript || [];
+        const formatToolCall = (tc) => {
+          if (!tc || tc.length === 0) return "";
+          return tc.map((t) => {
+            try {
+              const args = JSON.parse(t.function.arguments);
+              return `${t.function.name}(${JSON.stringify(args)})`;
+            } catch {
+              return `${t.function.name}(${t.function.arguments})`;
+            }
+          }).join(", ");
+        };
         return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginBottom: 1, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { bold: true, color: "cyan", children: [
-              config.type === "voice" ? "Voice Simulation" : selectedModel,
-              " \u2014 Results"
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginBottom: 1, flexDirection: "column", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, color: "cyan", children: "Simulation Details" }),
+            selectedResult?.personaInfo && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Persona: " }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: selectedResult.personaInfo.label || `Persona ${selectedResult.persona_idx}` })
             ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
-              " (",
-              modelResults.length,
-              " simulations)"
+            selectedResult?.scenarioInfo && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Scenario: " }),
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: selectedResult.scenarioInfo.name || `Scenario ${selectedResult.scenario_idx}` })
             ] })
           ] }),
-          modelResults.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "yellow", children: "No results found." }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-              Table,
-              {
-                columns: [
-                  { key: "persona", label: "Persona", width: 8 },
-                  { key: "scenario", label: "Scenario", width: 10 },
-                  ...metricColumns.slice(0, 4).map((col) => ({
-                    key: col,
-                    label: truncate(col.replace(/_/g, " "), 12),
-                    width: 12,
-                    align: "right"
-                  }))
-                ],
-                data: visibleRows.map((r) => {
-                  const row = {
-                    persona: String(r.persona_idx ?? "-"),
-                    scenario: String(r.scenario_idx ?? "-")
-                  };
-                  for (const col of metricColumns.slice(0, 4)) {
-                    const val = r[col];
-                    row[col] = typeof val === "number" ? val.toFixed(2) : String(val ?? "-");
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Transcript" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            Box_default,
+            {
+              flexDirection: "column",
+              marginBottom: 1,
+              borderStyle: "single",
+              borderColor: "gray",
+              paddingX: 1,
+              children: transcript.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "No transcript available" }) : transcript.filter((m) => m.role !== "tool").map((m, idx) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+                  Text,
+                  {
+                    color: m.role === "assistant" ? "cyan" : m.role === "user" ? "yellow" : "gray",
+                    bold: true,
+                    children: [
+                      m.role,
+                      ":"
+                    ]
                   }
-                  return row;
-                })
-              }
-            ),
-            modelResults.length > MAX_VISIBLE_ROWS && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
-              "Showing ",
-              scrollOffset + 1,
-              "-",
-              Math.min(
-                scrollOffset + MAX_VISIBLE_ROWS,
-                modelResults.length
-              ),
-              " ",
-              "of ",
-              modelResults.length,
-              " | Use \u2191\u2193 to scroll"
-            ] }) })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Press q or Esc to go back to leaderboard" }) })
+                ),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { wrap: "wrap", children: m.content || (m.tool_calls ? formatToolCall(m.tool_calls) : "") })
+              ] }, idx))
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Evaluation" }) }),
+          criteria.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "yellow", children: "No evaluation results found." }) : criteria.map((c, idx) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+            Box_default,
+            {
+              flexDirection: "column",
+              marginBottom: 1,
+              borderStyle: "single",
+              borderColor: c.value >= 0.5 ? "green" : "red",
+              paddingX: 1,
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: c.name.replace(/_/g, " ") }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " }),
+                  c.value >= 0.5 ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { color: "green", bold: true, children: [
+                    c.value.toFixed(1),
+                    " \u2713"
+                  ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { color: "red", bold: true, children: [
+                    c.value.toFixed(1),
+                    " \u2717"
+                  ] })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { wrap: "wrap", children: c.reasoning }) })
+              ]
+            },
+            idx
+          )),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Press q or Esc to go back to results" }) })
         ] });
       }
-      if (metrics.length === 0) {
+      const hasMetrics = metricKeys.length > 0;
+      const hasEvalResults = evalResults.length > 0;
+      if (!hasMetrics && !hasEvalResults) {
         return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { padding: 1, flexDirection: "column", children: [
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", bold: true, children: "Simulation complete!" }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
@@ -49089,95 +49144,98 @@ function SimulationsApp({ onBack }) {
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Press q to exit" }) })
         ] });
       }
-      const metricKeys = metrics.length > 0 ? Object.keys(metrics[0]).filter(
-        (k) => k !== "model" && typeof metrics[0][k] === "number"
-      ) : [];
-      const tableColumns = [
-        { key: "model", label: "Model", width: 28 },
-        ...metricKeys.slice(0, 4).map((k) => ({
-          key: k,
-          label: k.replace(/_/g, " ").slice(0, 12),
-          width: 12,
-          align: "right"
-        }))
-      ];
       return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, color: "cyan", children: config.type === "text" ? "Simulations Leaderboard" : "Simulation Results" }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          Table,
-          {
-            columns: tableColumns,
-            data: metrics.map((m) => {
-              const row = { model: String(m.model) };
-              for (const k of metricKeys.slice(0, 4)) {
-                const val = m[k];
-                row[k] = typeof val === "number" ? val.toFixed(2) : String(val ?? "-");
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginBottom: 1, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, color: "cyan", children: "Simulation Results" }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
+            " ",
+            "\u2014 ",
+            evalResults.length,
+            " simulation",
+            evalResults.length !== 1 ? "s" : ""
+          ] })
+        ] }),
+        hasMetrics && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Overall Metrics" }) }),
+          metricKeys.map((metricKey) => {
+            const m = metrics[metricKey];
+            return /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+              BarChart,
+              {
+                data: [
+                  {
+                    label: metricKey.replace(/_/g, " "),
+                    value: m.mean,
+                    color: m.mean >= 0.5 ? "green" : "red"
+                  }
+                ],
+                maxWidth: 40
               }
-              return row;
-            })
-          }
-        ),
-        metricKeys.slice(0, 2).map((metricKey) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: metricKey.replace(/_/g, " ") }),
+            ) }, metricKey);
+          })
+        ] }),
+        hasEvalResults && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Per-Simulation Results" }) }),
+          evalResults.map((r, idx) => {
+            const personaLabel = r.personaInfo?.label || `Persona ${r.persona_idx}`;
+            const scenarioLabel = r.scenarioInfo?.name || `Scenario ${r.scenario_idx}`;
+            return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+              Box_default,
+              {
+                flexDirection: "column",
+                marginBottom: 1,
+                borderStyle: "single",
+                borderColor: "gray",
+                paddingX: 1,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Persona: " }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: personaLabel })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Scenario: " }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: scenarioLabel })
+                  ] }),
+                  r.criteria.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "column", marginTop: 1, children: r.criteria.map((c, cIdx) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 30, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: c.name.replace(/_/g, " ") }) }),
+                    /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { color: c.value >= 0.5 ? "green" : "red", children: [
+                      c.value.toFixed(1),
+                      " ",
+                      c.value >= 0.5 ? "\u2713" : "\u2717"
+                    ] })
+                  ] }, cIdx)) })
+                ]
+              },
+              idx
+            );
+          }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Select to view transcript & evaluation:" }) }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-            BarChart,
+            SelectInput,
             {
-              data: [...metrics].sort(
-                (a, b) => (b[metricKey] || 0) - (a[metricKey] || 0)
-              ).map((m) => ({
-                label: String(m.model).length > 25 ? String(m.model).slice(-25) : String(m.model),
-                value: m[metricKey] || 0,
-                color: "green"
-              })),
-              maxWidth: 40
+              items: [
+                ...evalResults.map((r) => {
+                  const personaLabel = r.personaInfo?.label || `Persona ${r.persona_idx}`;
+                  const scenarioLabel = r.scenarioInfo?.name || `Scenario ${r.scenario_idx}`;
+                  return {
+                    label: `${personaLabel} \u2014 ${scenarioLabel}`,
+                    value: r.simulation
+                  };
+                }),
+                { label: "Exit", value: "__exit__" }
+              ],
+              onSelect: (v) => {
+                if (v === "__exit__") {
+                  if (onBack) onBack();
+                  else exit();
+                } else {
+                  setSelectedSim(v);
+                  setScrollOffset(0);
+                  setView("sim-detail");
+                }
+              }
             }
           )
-        ] }, metricKey)),
-        config.type === "text" && config.models.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500".repeat(50) }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "View Model Details" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-            SelectInput,
-            {
-              items: [
-                ...config.models.map((m) => ({
-                  label: `${m} \u2014 View simulation results`,
-                  value: m
-                })),
-                { label: "Exit", value: "__exit__" }
-              ],
-              onSelect: (v) => {
-                if (v === "__exit__") {
-                  if (onBack) onBack();
-                  else exit();
-                } else {
-                  setSelectedModel(v);
-                  setView("model-detail");
-                }
-              }
-            }
-          ) })
-        ] }),
-        config.type === "voice" && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500".repeat(50) }),
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-            SelectInput,
-            {
-              items: [
-                { label: "View simulation details", value: "voice" },
-                { label: "Exit", value: "__exit__" }
-              ],
-              onSelect: (v) => {
-                if (v === "__exit__") {
-                  if (onBack) onBack();
-                  else exit();
-                } else {
-                  setSelectedModel("voice");
-                  setView("model-detail");
-                }
-              }
-            }
-          ) })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500".repeat(50) }),

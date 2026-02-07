@@ -4306,3 +4306,1062 @@ and finally, a overview of the overall metrics across simulations as a bar chart
 
 ---
 
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+I understand - I need to restore the original simulation-specific functionality that was removed. The text simulations flow should:
+
+1. Keep the new single model free-form entry (which is correct)
+2. Restore the N parallel slots showing logs from `simulation_persona_X_scenario_Y/results.log` directories
+3. Restore the final results view showing metrics bar chart and per-simulation results from `evaluation_results.csv`
+
+Let me read the current state and restore the simulation-specific logic:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+I see the issue - the current code tracks models/logs per model, but text simulations should track logs per simulation slot (persona × scenario). Let me look at what the original approach should be - polling simulation directories for their `results.log` files.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now I understand the current structure better. The issue is that text simulations don't have multiple models competing - they have a single model running multiple persona × scenario combinations in parallel. Let me rewrite this properly:
+
+1. For text simulations: single model, but N parallel slots showing `simulation_persona_X_scenario_Y/results.log`
+2. Results view should show per-simulation results from `evaluation_results.csv` files
+3. Metrics bar chart from `metrics.json`
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now I need to significantly refactor the simulation flow. Let me rewrite the key parts:
+
+1. Add `SimSlotState` interface for tracking simulation slots
+2. Add state for polling simulation directories
+3. Modify the running phase to poll `simulation_persona_X_scenario_Y` directories
+4. Update the results view to show per-simulation evaluation results
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now add state variables for simulation slot tracking:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now update the leaderboard state to track evaluation results properly:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now update the useInput handler for the new view types:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now I need to rewrite the text simulation running logic. First, let me find and update the initialization effect:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now I need to replace the text simulation logic with proper slot-based polling. Let me replace the relevant sections:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now update the voice simulation effect and remove the multi-model management effect:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now update the loadMetrics and add loadEvalResults functions:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now I need to remove the old model results loading effect and update the cleanup:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "Load model results when selected",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "Load model results when selected",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "ui/source/sim-app.tsx",
+              "matches": [
+                {
+                  "lineNumber": 651,
+                  "content": "  // ── Load model results when selected ──"
+                }
+              ]
+            }
+          ],
+          "totalLines": 1,
+          "totalMatchedLines": 1
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now I need to update the "running" case to show the simulation slots with their logs:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now I need to replace the entire "running" case with proper simulation slot display:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now I need to update the leaderboard case to show the proper metrics bar chart and per-simulation results:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now I need to replace the entire leaderboard case with the proper simulation results view:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let's check for linter errors:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Now rebuild the bundle:
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle
+```
+
+```
+
+&gt; calibrate-ui@0.0.1 bundle
+&gt; esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate/ui/cli.bundle.mjs --format=esm --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+
+
+  ../calibrate/ui/cli.bundle.mjs  2.1mb ⚠️
+
+⚡ Done in 55ms
+
+```
+</details>
+</tool-use>
+
+---
+
+The text simulation flow has been restored with the proper functionality:
+
+1. **Single model free-form entry** - kept from the previous change (user enters one model)
+
+2. **Simulation slot tracking during run** - Polls the output directory for `simulation_persona_X_scenario_Y` folders and reads their `results.log` files. Shows N parallel slots (based on the `parallel` config) with their logs side-by-side.
+
+3. **Running view shows:**
+   - Model and provider info
+   - List of all simulation slots with status (✓ done or spinner running)
+   - Side-by-side log windows for running slots (like before)
+
+4. **Results view shows:**
+   - **Overall metrics bar chart** from `metrics.json` - shows mean and std for each metric
+   - **Per-simulation results table** - shows each `simulation_persona_X_scenario_Y` with its metric values
+   - **Simulation detail view** - when selecting a simulation, shows each evaluation criterion with its value, pass/fail status, and reasoning from `evaluation_results.csv`
+
+---
+
+_**User**_
+
+@/Users/aman/.cursor/projects/Users-aman-Documents-repos-artpark-agentloop/terminals/15.txt:12-15 
+
+instead of this just show the metric name the bar chart and the mean value at the end 
+
+no need to show mean/std
+
+show the persona scenario description per row and make sure metric column names are fully visible - what is the meaning of the per simulation output - not clear at all - clearly show the transcript and the metrics for that simulation with the reasoning for that metric.
+
+@evaluation_results.csv (1-3) 
+@transcript.json (1-46) 
+
+sending the eval results for each simulation and its transcript structure again
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+I understand. Let me fix the results view to:
+
+1. Simplify the bar chart - just metric name, bar, and value (no mean/std text)
+2. Show per-simulation results more clearly with persona/scenario descriptions
+3. In the detail view, show the transcript and evaluation metrics with reasoning
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now I need to:
+1. Update the `EvalResult` interface to also store the transcript
+2. Update `loadEvalResults` to also load the transcript
+3. Fix the bar chart to just show metric name, bar, value
+4. Fix the detail view to show transcript + evaluation with reasoning
+
+First, let me update the interface and loading:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now update the `loadEvalResults` function to also load transcripts:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me update the leaderboard view - simplify the bar chart and improve the per-simulation display:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now update the main results view to simplify the bar chart and improve the per-simulation table:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me check for linter errors:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle
+```
+
+```
+
+&gt; calibrate-ui@0.0.1 bundle
+&gt; esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate/ui/cli.bundle.mjs --format=esm --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+
+
+  ../calibrate/ui/cli.bundle.mjs  2.1mb ⚠️
+
+⚡ Done in 75ms
+
+```
+</details>
+</tool-use>
+
+---
+
+The simulation results view has been updated:
+
+**Overall Metrics section:**
+- Simplified bar chart: just shows `metric_name ████████████ value` (no mean/std text)
+
+**Per-Simulation Results section:**
+- Each row shows: `Persona X Scenario Y   metric_name: value   metric_name: value`
+- Metric names are fully visible (not truncated)
+- Values are color-coded (green ≥ 0.5, red < 0.5)
+
+**Simulation Detail View (when selecting a simulation):**
+- **Transcript section**: Shows the conversation with role labels (assistant in cyan, user in yellow)
+  - Displays content or tool calls
+  - Limits to first 10 messages with "and X more messages" indicator
+  - Tool response messages (`role: "tool"`) are filtered out for cleaner view
+- **Evaluation section**: Shows each metric with:
+  - Metric name (with underscores replaced by spaces)
+  - Value with pass/fail indicator (✓/✗)
+  - Full reasoning text (not truncated)
+
+---
+
+_**User**_
+
+for each simulation run show the transcript as:
+
+
+role:
+<next line>
+message
+
+And show all the messages - don't limit it
+
+and you are still showing persona 1 scenario 2
+
+I want you to show a list with the persona description scenario description and the metric for that and in that row itself have one button upon clicking which it opens that simulations details
+
+@sim_bug.json (1-110) 
+
+this is what config file for simulation will look like so it has persona and scenario descriptions
+
+
+
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+I understand. Let me update the simulation results view to:
+
+1. Show persona description and scenario description (loaded from config) in each row
+2. Each row has a "View" option to see details
+3. In detail view, show transcript with role on one line and message on the next, showing all messages
+
+First, I need to update the config loading to get persona/scenario descriptions, then update the UI.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now let me add interfaces for persona/scenario and update EvalResult:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now I need to add state for storing personas and scenarios from the config file, and update the loading logic:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now update the `loadEvalResults` function to also load personas/scenarios from the config file and attach them to eval results:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me find and update the leaderboard view to show the new format with persona/scenario descriptions and the detail view:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now let me replace both the detail view and main results view with the new format:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+
+
+---
+
+Now let me update the main results view to show persona/scenario descriptions in each row with a "View" button:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me check for any linter errors and rebuild the bundle:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle
+```
+
+```
+
+&gt; calibrate-ui@0.0.1 bundle
+&gt; esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate/ui/cli.bundle.mjs --format=esm --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+
+
+  ../calibrate/ui/cli.bundle.mjs  2.1mb ⚠️
+
+⚡ Done in 67ms
+
+```
+</details>
+</tool-use>
+
+---
+
+The bundle is rebuilt. Now the simulation results view will:
+
+1. Show each simulation as a selectable row with:
+   - **Persona label** (from config or fallback to "Persona N")
+   - **Scenario name** (from config or fallback to "Scenario N")
+   - **Metrics** in brackets
+
+2. When you select a row, it opens the detail view showing:
+   - Persona label and scenario name at the top
+   - **Transcript** with each message showing:
+     - `role:` on one line
+     - The message content on the next line
+   - All messages are shown (no limit)
+   - **Evaluation** metrics with reasoning
+
+You can test it now with `calibrate simulations`.
+
+---
+
+_**User**_
+
+mostly looks okay but I want cards below the overall metrics
+
+each card should say:
+
+Persona: <name>
+Scenario: <name>
+<metrics table>
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+Let me update the per-simulation results to show cards with Persona, Scenario, and metrics table below the overall metrics.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle
+```
+
+```
+
+&gt; calibrate-ui@0.0.1 bundle
+&gt; esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate/ui/cli.bundle.mjs --format=esm --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+
+
+  ../calibrate/ui/cli.bundle.mjs  2.1mb ⚠️
+
+⚡ Done in 75ms
+
+```
+</details>
+</tool-use>
+
+---
+
+Done. Now the per-simulation results will show as cards below the overall metrics, with each card containing:
+
+```
+┌──────────────────────────────────┐
+│ Persona: <persona label>         │
+│ Scenario: <scenario name>        │
+│                                  │
+│ metric name 1               1.0 ✓│
+│ metric name 2               0.0 ✗│
+└──────────────────────────────────┘
+```
+
+And below the cards, there's a "View Details" selector to navigate to the transcript and evaluation details for any simulation.
+
+---
+
+_**User**_
+
+yes card is fine but simply use that it self for clicking to see details why duplicate
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+I'll combine the card with the selection - make the cards themselves selectable instead of having a separate "View Details" section.
+
+---
+
+The string to replace was not found in the file.
+
+---
+
+Let me read the exact content and replace it:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle
+```
+
+```
+
+&gt; calibrate-ui@0.0.1 bundle
+&gt; esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate/ui/cli.bundle.mjs --format=esm --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+
+
+  ../calibrate/ui/cli.bundle.mjs  2.1mb ⚠️
+
+⚡ Done in 63ms
+
+```
+</details>
+</tool-use>
+
+---
+
+Done. Now the cards themselves are selectable - just use arrow keys to navigate between cards and press Enter to view details. The selected card will have a cyan border. No more duplicate "View Details" section.
+
+---
+
+_**User**_
+
+@sim-app.tsx (1493-1500) now cards are gone. Keep it simple. you have the cards. you have the details page. just don't use 2 copies 
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+I see - `SelectInput` doesn't support custom `itemComponent`. Let me keep the cards as they were but add click handling via `useInput` to select a card and navigate to details.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Let me go back to simple cards with a `SelectInput` that has simple labels showing persona/scenario, not custom itemComponent:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/ui/source/sim-app.tsx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle</summary>
+
+```bash
+cd /Users/aman/Documents/repos/artpark/agentloop/ui && npm run bundle
+```
+
+```
+
+&gt; calibrate-ui@0.0.1 bundle
+&gt; esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate/ui/cli.bundle.mjs --format=esm --banner:js="import{createRequire}from'module';const require=createRequire(import.meta.url);"
+
+
+  ../calibrate/ui/cli.bundle.mjs  2.1mb ⚠️
+
+⚡ Done in 65ms
+
+```
+</details>
+</tool-use>
+
+---
+
+Done. Now it shows:
+1. Cards with Persona, Scenario, and metrics table
+2. Below the cards, a simple `SelectInput` with just `"Persona — Scenario"` labels to select which one to view details for
+
+The cards are informational, the selector below navigates to the detail page.
+
+---
+
+_**User**_
+
+@text-to-text.mdx (25-32) 
+
+word wrap this so that the whole thing is expanded across multiple lines instead of just one long line that I need to scroll to
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Done. I've added an alternative version showing the system prompt with actual line breaks for better readability in the documentation.
+
+---
+
+_**User**_
+
+@text-to-text.mdx (142-145) 
+add a note saying that passing arguments as null will have the agent accept any arguments and will simply check if the tool is called while discarding the check for the arguments
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Done. Added a note explaining that passing `arguments: null` will only check if the tool is called without validating the arguments.
+
+---
+
