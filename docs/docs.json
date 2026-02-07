@@ -66,6 +66,10 @@
               "cli/text-to-speech",
               "cli/simulations"
             ]
+          },
+          {
+            "group": "Guides",
+            "pages": ["guides/configuring-tools"]
           }
         ]
       },

@@ -1,0 +1,93 @@
+---
+title: "Configuring Tools"
+description: "Define the tools for LLM evaluations and simulations via CLI"
+---
+
+You need to configure the `tools` that your agent uses in production in the config file for running [evaluating your LLM](/cli/text-to-text) and [running simulations](/cli/simulations) via CLI. For a primer on tools, refer to [Tools](/core-concepts/tools).
+
+Each tool has:
+
+| Key           | Type                                 | Description                                                                                                                             |
+| ------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`        | `"structured_output"` or `"webhook"` | Either a [structured output tool](/core-concepts/tools#structured-output-tools) or a [webhook tool](/core-concepts/tools#webhook-tools) |
+| `name`        | string                               | Unique identifier for the tool (ideally, an intuitive name that matches its purpose)                                                    |
+| `description` | string                               | Description shown to the LLM (explains the purpose of the tool and when it should be called)                                            |
+| `parameters`  | array                                | Schema of the expected output (required when `type` is `"structured_output"`)                                                           |
+| `webhook`     | object                               | Configuration for webhook tools (required when `type` is `"webhook"`)                                                                   |
+
+## Structured output tools
+
+Structured output tools extract structured data from the conversation. The agent calls the tool and returns the data in the format defined by the `parameters` schema.
+
+```json
+{
+  "type": "structured_output",
+  "name": "log_interaction",
+  "description": "Log customer interaction details",
+  "parameters": [
+    {
+      "id": "interaction_type",
+      "type": "string",
+      "description": "Type of interaction: order_inquiry, return_request, complaint",
+      "required": true
+    },
+    {
+      "id": "sentiment",
+      "type": "string",
+      "description": "Customer sentiment: positive, neutral, or negative",
+      "required": true
+    }
+  ]
+}
+```
+
+Any valid JSON schema can be used as the `parameters` schema.
+
+## Webhook tools
+
+Webhook tools make HTTP requests to external APIs. When the agent calls a webhook tool, Calibrate makes the HTTP request and returns the response to the agent.
+
+```json
+{
+  "type": "webhook",
+  "name": "check_order",
+  "description": "Check the status of a customer order",
+  "parameters": [],
+  "webhook": {
+    "method": "GET",
+    "url": "https://api.example.com/orders",
+    "timeout": 10,
+    "headers": [{ "name": "Authorization", "value": "Bearer API_KEY" }],
+    "queryParameters": [
+      {
+        "id": "order_id",
+        "type": "string",
+        "description": "The customer's order ID",
+        "required": true
+      }
+    ],
+    "body": {
+      "description": "Request body",
+      "parameters": [
+        {
+          "id": "data",
+          "type": "string",
+          "description": "Form data",
+          "required": true
+        }
+      ]
+    }
+  }
+}
+```
+
+The `webhook` object has:
+
+| Key               | Type   | Description                                                                |
+| ----------------- | ------ | -------------------------------------------------------------------------- |
+| `method`          | string | HTTP method: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`                       |
+| `url`             | string | The endpoint URL                                                           |
+| `timeout`         | number | Time in seconds to wait for the response                                   |
+| `headers`         | array  | (Optional) headers to send with the request                                |
+| `queryParameters` | array  | (Optional) query parameters (each follows the same schema as `parameters`) |
+| `body`            | object | (Optional) request body (required for `POST`, `PUT`, `PATCH` methods)      |

@@ -45,6 +45,7 @@ RESET_COLOR = "\033[0m"
 INTERRUPTION_COLOR = "\033[91m"
 DEFAULT_MAX_TURNS = 10
 DEFAULT_PORT = 8765
+DEFAULT_AGENT_SPEAKS_FIRST = True
 
 # Create a contextual logger with EVAL prefix
 eval_logger = logger.bind(source="EVAL")
@@ -1392,7 +1393,9 @@ async def _run_single_simulation_inner(
         provider=llm_config_data.get("provider", "openrouter"),
         model=llm_config_data.get("model", "openai/gpt-4.1"),
     )
-    agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
+    agent_speaks_first = config.get("settings", {}).get(
+        "agent_speaks_first", DEFAULT_AGENT_SPEAKS_FIRST
+    )
 
     max_turns = config.get("settings", {}).get("max_turns", DEFAULT_MAX_TURNS)
 

@@ -3,6 +3,14 @@ title: "Simulations"
 description: "Run simulated conversations to test your agent end-to-end"
 ---
 
+<iframe
+  className="w-full aspect-video rounded-xl"
+  src="https://www.youtube.com/embed/_7xLEFq_Fso"
+  title="CLI Simulations Walkthrough"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+
 ## Configuration
 
 You need to create a config file that defines the following:
@@ -12,8 +20,9 @@ You need to create a config file that defines the following:
 - Personas that simulate different user types
 - Scenarios that define conversation patterns
 - Evaluation criteria to measure agent performance
+- The STT, TTS, and LLM providers to use (for voice simulations only)
 
-Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_text.json) for a template. This section explains the different keys in the config file.
+This section explains the different keys in the config file.
 
 ### `system_prompt`
 
@@ -30,57 +39,19 @@ You help customers with:
 
 ### `tools`
 
-An array of tools available to your agent. For a primer on tools, refer to [Tools](/core-concepts/tools). Each tool has:
-
-| Key           | Type                                 | Description                                                                                                                             |
-| ------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `type`        | `"structured_output"` or `"webhook"` | Either a [structured output tool](/core-concepts/tools#structured-output-tools) or a [webhook tool](/core-concepts/tools#webhook-tools) |
-| `name`        | string                               | Unique identifier for the tool                                                                                                          |
-| `description` | string                               | Description shown to the LLM (explains the purpose of the tool and when it should be called)                                            |
-| `parameters`  | array                                | Schema of the expected output (required when `type` is `"structured_output"`)                                                           |
-| `webhook`     | object                               | Configuration for webhook tools (required when `type` is `"webhook"`)                                                                   |
-
-**Structured output tool example:**
-
-```json
-{
-  "type": "structured_output",
-  "name": "log_inquiry",
-  "description": "Log and categorize the customer inquiry",
-  "parameters": [
-    {
-      "id": "inquiry_type",
-      "type": "string",
-      "description": "Type of inquiry: order_status, return_request, product_question, or general",
-      "required": true
-    },
-    {
-      "id": "order_id",
-      "type": "string",
-      "description": "The order ID if mentioned by the customer, otherwise null",
-      "required": false
-    },
-    {
-      "id": "sentiment",
-      "type": "string",
-      "description": "Customer sentiment: positive, neutral, or negative",
-      "required": true
-    }
-  ]
-}
-```
+A list of tools available to your agent. See the guide on [Configuring Tools](/guides/configuring-tools) for how to set it up along with examples for different tool types.
 
 ### `personas`
 
-An array of user personas that simulate different types of users interacting with your agent. Each persona has:
+An array of user personas that simulate different types of users interacting with your agent. For a primer on personas, refer to [Personas](/core-concepts/personas). Each persona has:
 
-| Key                        | Type   | Description                                                                |
-| -------------------------- | ------ | -------------------------------------------------------------------------- |
-| `label`                    | string | A short name for the persona                                               |
-| `characteristics`          | string | Detailed description of the persona's behavior, knowledge, and personality |
-| `gender`                   | string | Gender for voice simulations: `male`, `female`, or `neutral`               |
-| `language`                 | string | Language the persona speaks: `english`, `hindi`, etc.                      |
-| `interruption_sensitivity` | string | (Voice only) How likely to interrupt: `none`, `low`, `medium`, `high`      |
+| Key                        | Type   | Description                                                                                                                        |
+| -------------------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `label`                    | string | A short name for the persona                                                                                                       |
+| `characteristics`          | string | Detailed description of **who** the persona represents and **how** they behave                                                     |
+| `gender`                   | string | Gender for voice simulations: `male` or `female`                                                                                   |
+| `language`                 | string | Language the persona speaks: `english`, `hindi`, or `kannada` (more coming soon)                                                   |
+| `interruption_sensitivity` | string | (Voice only) How likely the persona is to interrupt the agent mid-sentence: `none` (0%), `low` (25%), `medium` (50%), `high` (80%) |
 
 **Example:**
 
@@ -105,12 +76,12 @@ An array of user personas that simulate different types of users interacting wit
 
 ### `scenarios`
 
-An array of scenarios that define different conversation patterns to test. Each scenario has:
+An array of scenarios that define different conversation patterns to test. For a primer on scenarios, refer to [Scenarios](/core-concepts/scenarios). Each scenario has:
 
-| Key           | Type   | Description                                           |
-| ------------- | ------ | ----------------------------------------------------- |
-| `name`        | string | A short name for the scenario                         |
-| `description` | string | Instructions for how the simulated user should behave |
+| Key           | Type   | Description                                            |
+| ------------- | ------ | ------------------------------------------------------ |
+| `name`        | string | A short name for the scenario                          |
+| `description` | string | Instructions for **what** the simulated user should do |
 
 **Example:**
 
@@ -159,26 +130,14 @@ An array of criteria used to evaluate the agent's performance. Each criterion ha
 
 Optional settings to control the simulation:
 
-| Key                  | Type    | Description                                                    |
-| -------------------- | ------- | -------------------------------------------------------------- |
-| `agent_speaks_first` | boolean | Whether the agent initiates the conversation (default: `true`) |
-| `max_turns`          | number  | Maximum number of conversation turns (default: `10`)           |
+| Key                  | Type    | Description                                                                                                |
+| -------------------- | ------- | ---------------------------------------------------------------------------------------------------------- |
+| `agent_speaks_first` | boolean | Whether the agent initiates the conversation (default: `true`)                                             |
+| `max_turns`          | number  | Maximum number of agent messages after which the simulated conversation ends automatically (default: `10`) |
 
-### `llm` (optional)
+### `stt`, `llm`, and `tts` (voice simulations only)
 
-For voice simulations, you can specify the LLM model to use:
-
-```json
-{
-  "llm": {
-    "model": "openai/gpt-4.1"
-  }
-}
-```
-
-### `stt` and `tts` (voice simulations only)
-
-For voice simulations, specify the STT and TTS providers:
+For voice simulations, specify the STT, LLM, and TTS providers:
 
 ```json
 {
@@ -187,82 +146,17 @@ For voice simulations, specify the STT and TTS providers:
   },
   "tts": {
     "provider": "google"
+  },
+  "llm": {
+    "provider": "openrouter",
+    "model": "openai/gpt-4.1"
   }
 }
 ```
 
 ### Full example
 
-```json
-{
-  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nAfter each customer message, call the `log_inquiry` tool to categorize the inquiry type and capture any order ID mentioned.\n\nBe friendly, helpful, and concise in your responses.",
-  "tools": [
-    {
-      "type": "structured_output",
-      "name": "log_inquiry",
-      "description": "Log and categorize the customer inquiry",
-      "parameters": [
-        {
-          "id": "inquiry_type",
-          "type": "string",
-          "description": "Type of inquiry: order_status, return_request, product_question, or general",
-          "required": true
-        },
-        {
-          "id": "order_id",
-          "type": "string",
-          "description": "The order ID if mentioned by the customer",
-          "required": false
-        },
-        {
-          "id": "sentiment",
-          "type": "string",
-          "description": "Customer sentiment: positive, neutral, or negative",
-          "required": true
-        }
-      ]
-    }
-  ],
-  "personas": [
-    {
-      "label": "friendly customer",
-      "characteristics": "You are a friendly customer who wants to check your order status. Your order ID is ORD-12345. You are polite and patient.",
-      "gender": "neutral",
-      "language": "english"
-    },
-    {
-      "label": "impatient customer",
-      "characteristics": "You are an impatient customer who has been waiting a long time for your order. Your order ID is ORD-67890. You are frustrated but not rude.",
-      "gender": "neutral",
-      "language": "english"
-    }
-  ],
-  "scenarios": [
-    {
-      "name": "simple order inquiry",
-      "description": "Ask about your order status directly and provide your order ID right away."
-    },
-    {
-      "name": "vague inquiry",
-      "description": "Start by asking about your order without providing the order ID. Only provide it after being asked."
-    }
-  ],
-  "evaluation_criteria": [
-    {
-      "name": "tool_usage",
-      "description": "The agent should call the log_inquiry tool with the correct inquiry_type and order_id when provided by the customer."
-    },
-    {
-      "name": "response_quality",
-      "description": "The agent should be helpful, polite, and guide the customer through the process."
-    }
-  ],
-  "settings": {
-    "agent_speaks_first": true,
-    "max_turns": 10
-  }
-}
-```
+Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_text.json) for a text simulation and [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_voice.json) for a voice simulation.
 
 ## Get started
 
@@ -275,44 +169,40 @@ The interactive UI guides you through the full simulation process:
 1. **Simulation type** — text (LLM-only) or voice (full STT → LLM → TTS pipeline)
 2. **Config file** — path to the config file you created in the [previous](#configuration) section
 3. **Provider** — OpenRouter or OpenAI (text simulations only)
-4. **Model entry** — enter the model you want to use for the simulation
-5. **Parallel count** — run multiple simulations simultaneously (text only, default: 1)
+4. **Model** — enter the model you want to use for the simulation (text simulations only)
+5. **Parallel count** — run multiple simulations simultaneously (default: `1`)
 6. **Output directory** — where results will be saved (defaults to `./out`)
 7. **API keys** — enter the API keys for the selected providers
 
-The simulation runs all persona × scenario combinations. For example, with 2 personas and 2 scenarios, you get 4 simulations.
+Simulated conversations are run for all persona × scenario combinations. For example, with 2 personas and 2 scenarios, you get 4 simulations.
 
 ## Output
 
-Once all simulations complete, it displays:
+Once all simulated conversations complete, it displays the overall metrics aggregated across all simulations along with bar charts for visualization.
 
-- **Overall metrics** — bar charts showing aggregated scores across all simulations
-- **Per-simulation cards** — each card shows persona, scenario, and evaluation scores
-- **Simulation details** — select a card to view the full transcript and detailed evaluation with reasoning
+<Frame>
+  <img src="./images/simulation_overview.png" alt="Simulation overview" />
+</Frame>
 
-Results are saved with this structure:
+You can drill into each simulation to view the full transcript:
 
-```
-/path/to/output/
-├── simulation_persona_1_scenario_1/
-│   ├── transcript.json             # Full conversation
-│   ├── evaluation_results.csv      # Per-criterion results
-│   └── results.log                 # Pipeline logs
-├── simulation_persona_1_scenario_2/
-│   └── ...
-├── simulation_persona_2_scenario_1/
-│   └── ...
-├── simulation_persona_2_scenario_2/
-│   └── ...
-└── metrics.json                    # Aggregated metrics
-```
+<Frame>
+  <img src="./images/simulation_transcript.png" alt="Simulation transcript" />
+</Frame>
+
+and review the reasoning for each evaluation criterion:
+
+<Frame>
+  <img src="./images/simulation_eval.png" alt="Simulation evaluation" />
+</Frame>
 
 ## Resources
 
-<Card title="Personas" icon="user" href="/core-concepts/personas">
-  Learn how to create realistic user personas
-</Card>
-
-<Card title="Scenarios" icon="file-lines" href="/core-concepts/scenarios">
-  Learn how to write effective scenarios
-</Card>
+<CardGroup cols={2}>
+  <Card title="Personas" icon="user" href="/core-concepts/personas">
+    Learn how to create realistic user personas
+  </Card>
+  <Card title="Scenarios" icon="file-lines" href="/core-concepts/scenarios">
+    Learn how to write effective scenarios
+  </Card>
+</CardGroup>
