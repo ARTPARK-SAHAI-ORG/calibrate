@@ -5462,11 +5462,105 @@ You're right. Let me fix this to use `structured_output` for extracting data fro
 
 <details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/examples/agent/simulation/sample_text.json</summary>
 
-Status: **loading**
+</details>
+
+</tool-use>
+
+---
+
+Fixed. Now using `structured_output` type which makes the agent extract structured data (inquiry type, order ID, sentiment) from the conversation before responding. This will work properly in an actual simulation.
+
+---
+
+_**User**_
+
+ now based on your learnings from @docs/cli/text-to-text.mdx @docs/cli/speech-to-text.mdx @docs/cli/text-to-speech.mdx prepare a draft for @docs/cli/simulations.mdx 
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/speech-to-text.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/text-to-speech.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/examples/agent/simulation/sample_text.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now let me check if there's an existing simulations.mdx file:
+
+---
+
+<tool-use data-tool-type="generic" data-tool-name="glob_file_search">
+<details>
+<summary>Tool use: **glob_file_search** • Searched codebase "undefined" • **1** result in **1** directory</summary>
+
+Directory: **undefined** (1 file)
+
+| File |
+|------|
+| `./docs/cli/simulations.mdx` |
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/simulations.mdx</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now let me update this to follow the pattern of the other docs more closely and include the configuration details:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/docs/cli/simulations.mdx</summary>
 
 </details>
 
 </tool-use>
+
+---
+
+Done. I've updated the simulations documentation to follow the same pattern as the other CLI docs:
+
+1. **Configuration section first** — explains all the config file keys with tables and examples
+2. **Get started section** — the CLI command and step-by-step flow
+3. **Output section** — what users see after completion and the file structure
+4. **Resources section** — links to related docs
+
+The documentation now covers `system_prompt`, `tools`, `personas`, `scenarios`, `evaluation_criteria`, `settings`, `llm`, `stt`, and `tts` with clear examples matching the sample config file.
 
 ---
 

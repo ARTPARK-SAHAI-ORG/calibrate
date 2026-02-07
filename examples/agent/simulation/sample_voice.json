@@ -1,0 +1,72 @@
+{
+  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nAfter each customer message, call the `log_inquiry` tool to categorize the inquiry type and capture any order ID mentioned.\n\nBe friendly, helpful, and concise in your responses.",
+  "tools": [
+    {
+      "type": "structured_output",
+      "name": "log_inquiry",
+      "description": "Log and categorize the customer inquiry. Call this after each customer message to track the conversation.",
+      "parameters": [
+        {
+          "id": "inquiry_type",
+          "type": "string",
+          "description": "Type of inquiry: order_status, return_request, product_question, or general",
+          "required": true
+        },
+        {
+          "id": "order_id",
+          "type": "string",
+          "description": "The order ID if mentioned by the customer, otherwise null",
+          "required": false
+        },
+        {
+          "id": "sentiment",
+          "type": "string",
+          "description": "Customer sentiment: positive, neutral, or negative",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "personas": [
+    {
+      "label": "impatient customer",
+      "characteristics": "You are an impatient customer who has been waiting a long time for your order. Your order ID is ORD-67890. You are frustrated but not rude.",
+      "gender": "neutral",
+      "language": "english",
+      "interruption_sensitivity": "high"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "simple order inquiry",
+      "description": "Ask about your order status directly and provide your order ID right away."
+    },
+    {
+      "name": "vague inquiry",
+      "description": "Start by asking about your order without providing the order ID. Only provide it after being asked."
+    }
+  ],
+  "evaluation_criteria": [
+    {
+      "name": "tool_usage",
+      "description": "The agent should call the log_inquiry tool with the correct inquiry_type and order_id when provided by the customer."
+    },
+    {
+      "name": "response_quality",
+      "description": "The agent should be helpful, polite, and guide the customer through the process."
+    }
+  ],
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 2
+  },
+  "stt": {
+    "provider": "sarvam"
+  },
+  "tts": {
+    "provider": "cartesia"
+  },
+  "llm": {
+    "model": "google/gemini-3-flash-preview"
+  }
+}

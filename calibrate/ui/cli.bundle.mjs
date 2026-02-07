@@ -48255,11 +48255,11 @@ function SimulationsApp({ onBack }) {
         setModelInput("");
         break;
       case "parallel":
-        setStep("enter-model");
+        setStep("output-dir");
         break;
       case "output-dir":
         if (config.type === "text") {
-          setStep("parallel");
+          setStep("enter-model");
         } else {
           setStep("config-path");
         }
@@ -48269,7 +48269,7 @@ function SimulationsApp({ onBack }) {
         setExistingDirs([]);
         break;
       case "api-keys":
-        setStep("output-dir");
+        setStep("parallel");
         setCurrentKeyIdx(0);
         setKeyInput("");
         break;
@@ -48345,16 +48345,44 @@ function SimulationsApp({ onBack }) {
     setConfig((c) => ({ ...c, calibrate: calibrateBin.current }));
     setStep("select-type");
   }, [step]);
+  const PROVIDER_KEY_MAP = {
+    deepgram: "DEEPGRAM_API_KEY",
+    sarvam: "SARVAM_API_KEY",
+    elevenlabs: "ELEVENLABS_API_KEY",
+    openai: "OPENAI_API_KEY",
+    cartesia: "CARTESIA_API_KEY",
+    smallest: "SMALLEST_API_KEY",
+    groq: "GROQ_API_KEY",
+    google: "GOOGLE_APPLICATION_CREDENTIALS",
+    openrouter: "OPENROUTER_API_KEY"
+  };
   function checkApiKeys(simType, provider) {
     const needed = [];
-    if (simType === "text") {
-      if (!getCredential("OPENAI_API_KEY")) {
-        needed.push("OPENAI_API_KEY");
+    const addIfMissing = (key) => {
+      if (key && !getCredential(key) && !needed.includes(key)) {
+        needed.push(key);
       }
+    };
+    if (simType === "text") {
+      addIfMissing("OPENAI_API_KEY");
       if (provider === "openrouter") {
-        if (!getCredential("OPENROUTER_API_KEY")) {
-          needed.push("OPENROUTER_API_KEY");
+        addIfMissing("OPENROUTER_API_KEY");
+      }
+    } else if (simType === "voice") {
+      addIfMissing("OPENAI_API_KEY");
+      addIfMissing("GOOGLE_APPLICATION_CREDENTIALS");
+      try {
+        const configData = JSON.parse(
+          fs5.readFileSync(config.configPath, "utf-8")
+        );
+        const sttProvider = configData.stt?.provider || "google";
+        const ttsProvider = configData.tts?.provider || "google";
+        const llmProvider = configData.llm?.provider || "openrouter";
+        for (const p of [sttProvider, ttsProvider, llmProvider]) {
+          const key = PROVIDER_KEY_MAP[p];
+          if (key) addIfMissing(key);
         }
+      } catch {
       }
     }
     return needed;
@@ -48367,6 +48395,8 @@ function SimulationsApp({ onBack }) {
     if (step !== "running") return;
     if (config.type === "voice") {
       setModelStates({ voice: { status: "running", logs: [] } });
+      setSimSlots([]);
+      setSimProcessRunning(true);
       setPhase("eval");
       return;
     }
@@ -48376,47 +48406,62 @@ function SimulationsApp({ onBack }) {
   }, [step]);
   const pollSimulationDirs = () => {
     try {
-      if (!fs5.existsSync(config.outputDir)) return;
-      const entries = fs5.readdirSync(config.outputDir, { withFileTypes: true });
-      const simDirs = entries.filter(
-        (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
-      ).map((e) => e.name);
-      const newSlots = [];
-      for (const dirName of simDirs) {
-        const match = dirName.match(/simulation_persona_(\d+)_scenario_(\d+)/);
-        if (!match) continue;
-        const personaIdx = parseInt(match[1], 10);
-        const scenarioIdx = parseInt(match[2], 10);
-        const logPath = path4.join(config.outputDir, dirName, "results.log");
-        let logs = [];
-        let status = "running";
-        if (fs5.existsSync(logPath)) {
-          try {
-            const content = fs5.readFileSync(logPath, "utf-8");
-            logs = content.split("\n").filter((l) => l.trim()).slice(-15);
-          } catch {
-          }
+      let numPersonas = 0;
+      let numScenarios = 0;
+      if (fs5.existsSync(config.configPath)) {
+        try {
+          const configData = JSON.parse(
+            fs5.readFileSync(config.configPath, "utf-8")
+          );
+          numPersonas = configData.personas?.length || 0;
+          numScenarios = configData.scenarios?.length || 0;
+        } catch {
         }
-        const evalPath = path4.join(
-          config.outputDir,
-          dirName,
-          "evaluation_results.csv"
-        );
-        if (fs5.existsSync(evalPath)) {
-          status = "done";
-        }
-        newSlots.push({
-          name: dirName,
-          personaIdx,
-          scenarioIdx,
-          logs,
-          status
-        });
       }
-      newSlots.sort((a, b) => {
-        if (a.personaIdx !== b.personaIdx) return a.personaIdx - b.personaIdx;
-        return a.scenarioIdx - b.scenarioIdx;
-      });
+      const dirStatusMap = /* @__PURE__ */ new Map();
+      if (fs5.existsSync(config.outputDir)) {
+        const entries = fs5.readdirSync(config.outputDir, {
+          withFileTypes: true
+        });
+        const simDirs = entries.filter(
+          (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
+        ).map((e) => e.name);
+        for (const dirName of simDirs) {
+          const logPath = path4.join(config.outputDir, dirName, "results.log");
+          let logs = [];
+          let status = "running";
+          if (fs5.existsSync(logPath)) {
+            try {
+              const content = fs5.readFileSync(logPath, "utf-8");
+              logs = content.split("\n").filter((l) => l.trim()).slice(-15);
+            } catch {
+            }
+          }
+          const evalPath = path4.join(
+            config.outputDir,
+            dirName,
+            "evaluation_results.csv"
+          );
+          if (fs5.existsSync(evalPath)) {
+            status = "done";
+          }
+          dirStatusMap.set(dirName, { logs, status });
+        }
+      }
+      const newSlots = [];
+      for (let p = 1; p <= numPersonas; p++) {
+        for (let s = 1; s <= numScenarios; s++) {
+          const dirName = `simulation_persona_${p}_scenario_${s}`;
+          const existing = dirStatusMap.get(dirName);
+          newSlots.push({
+            name: dirName,
+            personaIdx: p,
+            scenarioIdx: s,
+            logs: existing?.logs || [],
+            status: existing?.status || "pending"
+          });
+        }
+      }
       setSimSlots(newSlots);
     } catch {
     }
@@ -48514,6 +48559,9 @@ function SimulationsApp({ onBack }) {
       "-o",
       config.outputDir
     ];
+    if (config.parallel > 1) {
+      cmdArgs.push("-n", String(config.parallel));
+    }
     const proc = spawn2(bin.cmd, cmdArgs, {
       env: env3,
       stdio: ["pipe", "pipe", "pipe"]
@@ -48531,18 +48579,43 @@ function SimulationsApp({ onBack }) {
     };
     proc.stdout?.on("data", onData);
     proc.stderr?.on("data", onData);
+    pollingRef.current = setInterval(pollSimulationDirs, 500);
     proc.on("close", (code) => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      pollSimulationDirs();
       setModelStates((prev) => ({
         ...prev,
         voice: { ...prev.voice, status: code === 0 ? "done" : "error" }
       }));
+      setSimProcessRunning(false);
       processRefs.current.delete("voice");
       loadMetrics();
       loadEvalResults();
       setPhase("done");
       setTimeout(() => setStep("leaderboard"), 500);
     });
+    proc.on("error", () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setModelStates((prev) => ({
+        ...prev,
+        voice: { ...prev.voice, status: "error" }
+      }));
+      setSimProcessRunning(false);
+      processRefs.current.delete("voice");
+      setPhase("done");
+      setTimeout(() => setStep("leaderboard"), 500);
+    });
     return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
       proc.kill();
     };
   }, [step, config.type]);
@@ -48788,7 +48861,7 @@ function SimulationsApp({ onBack }) {
                 const modelToUse = trimmed || defaultModel;
                 setConfig((c) => ({ ...c, models: [modelToUse] }));
                 setModelInput("");
-                setStep("parallel");
+                setStep("output-dir");
               },
               placeholder: defaultModel
             }
@@ -48806,7 +48879,7 @@ function SimulationsApp({ onBack }) {
         header,
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Run multiple persona \xD7 scenario combinations at the same time to speed things up." }),
         /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: "Parallel simulations per model: " }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: "Parallel simulations: " }),
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
             TextInput,
             {
@@ -48817,7 +48890,14 @@ function SimulationsApp({ onBack }) {
                   ...c,
                   parallel: parseInt(v) || 1
                 }));
-                setStep("output-dir");
+                const missing = checkApiKeys(config.type, config.provider);
+                if (missing.length > 0) {
+                  setMissingKeys(missing);
+                  setCurrentKeyIdx(0);
+                  setStep("api-keys");
+                } else {
+                  setStep("running");
+                }
               },
               placeholder: "1"
             }
@@ -48845,14 +48925,7 @@ function SimulationsApp({ onBack }) {
                   setStep("output-dir-confirm");
                   return;
                 }
-                const missing = checkApiKeys(config.type, config.provider);
-                if (missing.length > 0) {
-                  setMissingKeys(missing);
-                  setCurrentKeyIdx(0);
-                  setStep("api-keys");
-                } else {
-                  setStep("running");
-                }
+                setStep("parallel");
               },
               placeholder: "./out"
             }
@@ -48887,14 +48960,7 @@ function SimulationsApp({ onBack }) {
             onSelect: (v) => {
               if (v === "yes") {
                 setConfig((c) => ({ ...c, overwrite: true }));
-                const missing = checkApiKeys(config.type, config.provider);
-                if (missing.length > 0) {
-                  setMissingKeys(missing);
-                  setCurrentKeyIdx(0);
-                  setStep("api-keys");
-                } else {
-                  setStep("running");
-                }
+                setStep("parallel");
               } else {
                 setOutputInput("");
                 setExistingDirs([]);
@@ -48978,18 +49044,25 @@ function SimulationsApp({ onBack }) {
             ] })
           ] }),
           simSlots.map((slot) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 4, children: slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: " + " }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 4, children: slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: " + " }) : slot.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " }),
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Spinner, {}),
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " })
-            ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 35, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { bold: slot.status === "running", children: [
-              "Persona ",
-              slot.personaIdx,
-              " Scenario ",
-              slot.scenarioIdx
-            ] }) }),
-            slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "Complete" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "cyan", children: "Running..." })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " \xB7 " }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 35, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+              Text,
+              {
+                bold: slot.status === "running",
+                dimColor: slot.status === "pending",
+                children: [
+                  "Persona ",
+                  slot.personaIdx,
+                  " Scenario ",
+                  slot.scenarioIdx
+                ]
+              }
+            ) }),
+            slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "Complete" }) : slot.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "cyan", children: "Running..." }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Pending" })
           ] }, slot.name)),
           phase === "eval" && runningSlots.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "row", marginTop: 1, children: runningSlots.map((slot, idx) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
             Box_default,
@@ -49014,23 +49087,67 @@ function SimulationsApp({ onBack }) {
             slot.name
           )) })
         ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(import_jsx_runtime3.Fragment, { children: modelStates.voice && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 4, children: modelStates.voice.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: " + " }) : modelStates.voice.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "red", children: " x " }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginBottom: 1, children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: simProcessRunning ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
+              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Spinner, {}),
+              " Running simulations..."
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "+ Complete" }) }),
+            simSlots.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
+              " ",
+              "(",
+              completedSlots.length,
+              "/",
+              simSlots.length,
+              " done)"
+            ] }),
+            config.parallel > 1 && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
+              " | Parallel: ",
+              config.parallel
+            ] })
+          ] }),
+          simSlots.map((slot) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 4, children: slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: " + " }) : slot.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " }),
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Spinner, {}),
               /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: " " })
-            ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 30, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: modelStates.voice.status === "running", children: "Voice Simulation" }) }),
-            modelStates.voice.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "Complete" }) : modelStates.voice.status === "error" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "red", children: "Failed" }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "cyan", children: "Running..." })
-          ] }),
-          phase === "eval" && modelStates.voice.status === "running" && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { flexDirection: "column", marginTop: 1, children: [
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500\u2500 " }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, color: "cyan", children: "Voice Simulation" }),
-              /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " " + "\u2500".repeat(15) })
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "column", paddingLeft: 1, children: modelStates.voice.logs.slice(-8).map((line, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, wrap: "truncate", children: stripAnsi2(line).slice(0, 70) }, i)) })
-          ] })
+            ] }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " \xB7 " }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { width: 35, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+              Text,
+              {
+                bold: slot.status === "running",
+                dimColor: slot.status === "pending",
+                children: [
+                  "Persona ",
+                  slot.personaIdx,
+                  " Scenario ",
+                  slot.scenarioIdx
+                ]
+              }
+            ) }),
+            slot.status === "done" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "Complete" }) : slot.status === "running" ? /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "cyan", children: "Running..." }) : /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Pending" })
+          ] }, slot.name)),
+          phase === "eval" && runningSlots.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "row", marginTop: 1, children: runningSlots.map((slot, idx) => /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(
+            Box_default,
+            {
+              flexDirection: "column",
+              width: runningSlots.length === 1 ? "100%" : `${Math.floor(100 / runningSlots.length)}%`,
+              marginRight: idx < runningSlots.length - 1 ? 1 : 0,
+              children: [
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "\u2500\u2500 " }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { bold: true, color: "cyan", children: [
+                    "P",
+                    slot.personaIdx,
+                    " S",
+                    slot.scenarioIdx
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: " " + "\u2500".repeat(15) })
+                ] }),
+                /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { flexDirection: "column", paddingLeft: 1, children: slot.logs.slice(-8).map((line, i) => /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, wrap: "truncate", children: stripAnsi2(line).slice(0, 50) }, i)) })
+              ]
+            },
+            slot.name
+          )) })
         ] }) }),
         phase === "done" && /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { color: "green", children: "+ All simulations complete!" }) })
       ] });
@@ -49175,7 +49292,6 @@ function SimulationsApp({ onBack }) {
           })
         ] }),
         hasEvalResults && /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(import_jsx_runtime3.Fragment, { children: [
-          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { bold: true, children: "Per-Simulation Results" }) }),
           evalResults.map((r, idx) => {
             const personaLabel = r.personaInfo?.label || `Persona ${r.persona_idx}`;
             const scenarioLabel = r.scenarioInfo?.name || `Scenario ${r.scenario_idx}`;

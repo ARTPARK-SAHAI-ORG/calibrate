@@ -50,7 +50,7 @@ interface SimSlotState {
   personaIdx: number;
   scenarioIdx: number;
   logs: string[];
-  status: "running" | "done";
+  status: "pending" | "running" | "done";
 }
 
 interface SimulationResult {
@@ -193,11 +193,11 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
         setModelInput("");
         break;
       case "parallel":
-        setStep("enter-model");
+        setStep("output-dir");
         break;
       case "output-dir":
         if (config.type === "text") {
-          setStep("parallel");
+          setStep("enter-model");
         } else {
           setStep("config-path");
         }
@@ -207,7 +207,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
         setExistingDirs([]);
         break;
       case "api-keys":
-        setStep("output-dir");
+        setStep("parallel");
         setCurrentKeyIdx(0);
         setKeyInput("");
         break;
@@ -298,21 +298,56 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
   }, [step]);
 
   // ── Check API keys ──
+  const PROVIDER_KEY_MAP: Record<string, string> = {
+    deepgram: "DEEPGRAM_API_KEY",
+    sarvam: "SARVAM_API_KEY",
+    elevenlabs: "ELEVENLABS_API_KEY",
+    openai: "OPENAI_API_KEY",
+    cartesia: "CARTESIA_API_KEY",
+    smallest: "SMALLEST_API_KEY",
+    groq: "GROQ_API_KEY",
+    google: "GOOGLE_APPLICATION_CREDENTIALS",
+    openrouter: "OPENROUTER_API_KEY",
+  };
+
   function checkApiKeys(simType: string, provider: string) {
     const needed: string[] = [];
+    const addIfMissing = (key: string) => {
+      if (key && !getCredential(key) && !needed.includes(key)) {
+        needed.push(key);
+      }
+    };
+
     if (simType === "text") {
       // Always need OPENAI_API_KEY for LLM judge/evaluation
-      if (!getCredential("OPENAI_API_KEY")) {
-        needed.push("OPENAI_API_KEY");
-      }
+      addIfMissing("OPENAI_API_KEY");
       // Need OPENROUTER_API_KEY if using OpenRouter
       if (provider === "openrouter") {
-        if (!getCredential("OPENROUTER_API_KEY")) {
-          needed.push("OPENROUTER_API_KEY");
+        addIfMissing("OPENROUTER_API_KEY");
+      }
+    } else if (simType === "voice") {
+      // Always need OPENAI_API_KEY for simulated user LLM and evaluation judge
+      addIfMissing("OPENAI_API_KEY");
+      // Always need GOOGLE_APPLICATION_CREDENTIALS for simulated user TTS
+      addIfMissing("GOOGLE_APPLICATION_CREDENTIALS");
+
+      // Read config to check agent's STT, TTS, LLM provider keys
+      try {
+        const configData = JSON.parse(
+          fs.readFileSync(config.configPath, "utf-8")
+        );
+        const sttProvider = configData.stt?.provider || "google";
+        const ttsProvider = configData.tts?.provider || "google";
+        const llmProvider = configData.llm?.provider || "openrouter";
+
+        for (const p of [sttProvider, ttsProvider, llmProvider]) {
+          const key = PROVIDER_KEY_MAP[p];
+          if (key) addIfMissing(key);
         }
+      } catch {
+        // If config can't be read, skip provider-specific checks
       }
     }
-    // Voice simulations need keys based on config file providers — hard to check here.
     return needed;
   }
 
@@ -327,9 +362,11 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
   useEffect(() => {
     if (step !== "running") return;
 
-    // For voice simulations, we run a single process
+    // For voice simulations, set up slots and polling like text
     if (config.type === "voice") {
       setModelStates({ voice: { status: "running", logs: [] } });
+      setSimSlots([]);
+      setSimProcessRunning(true);
       setPhase("eval");
       return;
     }
@@ -340,69 +377,89 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     setPhase("eval");
   }, [step]);
 
-  // ── Poll simulation directories for logs (text simulations) ──
+  // ── Poll simulation directories for logs (text/voice simulations) ──
   const pollSimulationDirs = () => {
     try {
-      if (!fs.existsSync(config.outputDir)) return;
-
-      const entries = fs.readdirSync(config.outputDir, { withFileTypes: true });
-      const simDirs = entries
-        .filter(
-          (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
-        )
-        .map((e) => e.name);
-
-      const newSlots: SimSlotState[] = [];
-
-      for (const dirName of simDirs) {
-        // Parse persona and scenario indices from directory name
-        const match = dirName.match(/simulation_persona_(\d+)_scenario_(\d+)/);
-        if (!match) continue;
-
-        const personaIdx = parseInt(match[1]!, 10);
-        const scenarioIdx = parseInt(match[2]!, 10);
-
-        // Read results.log if it exists
-        const logPath = path.join(config.outputDir, dirName, "results.log");
-        let logs: string[] = [];
-        let status: "running" | "done" = "running";
-
-        if (fs.existsSync(logPath)) {
-          try {
-            const content = fs.readFileSync(logPath, "utf-8");
-            logs = content
-              .split("\n")
-              .filter((l) => l.trim())
-              .slice(-15);
-          } catch {
-            // Ignore read errors
-          }
+      // Read config to get total personas and scenarios
+      let numPersonas = 0;
+      let numScenarios = 0;
+      if (fs.existsSync(config.configPath)) {
+        try {
+          const configData = JSON.parse(
+            fs.readFileSync(config.configPath, "utf-8")
+          );
+          numPersonas = configData.personas?.length || 0;
+          numScenarios = configData.scenarios?.length || 0;
+        } catch {
+          // Ignore config read errors
         }
-
-        // Check if evaluation_results.csv exists (indicates completion)
-        const evalPath = path.join(
-          config.outputDir,
-          dirName,
-          "evaluation_results.csv"
-        );
-        if (fs.existsSync(evalPath)) {
-          status = "done";
-        }
-
-        newSlots.push({
-          name: dirName,
-          personaIdx,
-          scenarioIdx,
-          logs,
-          status,
-        });
       }
 
-      // Sort by persona then scenario
-      newSlots.sort((a, b) => {
-        if (a.personaIdx !== b.personaIdx) return a.personaIdx - b.personaIdx;
-        return a.scenarioIdx - b.scenarioIdx;
-      });
+      // Build status map from existing directories
+      const dirStatusMap = new Map<
+        string,
+        { logs: string[]; status: "running" | "done" }
+      >();
+
+      if (fs.existsSync(config.outputDir)) {
+        const entries = fs.readdirSync(config.outputDir, {
+          withFileTypes: true,
+        });
+        const simDirs = entries
+          .filter(
+            (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
+          )
+          .map((e) => e.name);
+
+        for (const dirName of simDirs) {
+          // Read results.log if it exists
+          const logPath = path.join(config.outputDir, dirName, "results.log");
+          let logs: string[] = [];
+          let status: "running" | "done" = "running";
+
+          if (fs.existsSync(logPath)) {
+            try {
+              const content = fs.readFileSync(logPath, "utf-8");
+              logs = content
+                .split("\n")
+                .filter((l) => l.trim())
+                .slice(-15);
+            } catch {
+              // Ignore read errors
+            }
+          }
+
+          // Check if evaluation_results.csv exists (indicates completion)
+          const evalPath = path.join(
+            config.outputDir,
+            dirName,
+            "evaluation_results.csv"
+          );
+          if (fs.existsSync(evalPath)) {
+            status = "done";
+          }
+
+          dirStatusMap.set(dirName, { logs, status });
+        }
+      }
+
+      // Build slots for all persona x scenario combinations
+      const newSlots: SimSlotState[] = [];
+
+      for (let p = 1; p <= numPersonas; p++) {
+        for (let s = 1; s <= numScenarios; s++) {
+          const dirName = `simulation_persona_${p}_scenario_${s}`;
+          const existing = dirStatusMap.get(dirName);
+
+          newSlots.push({
+            name: dirName,
+            personaIdx: p,
+            scenarioIdx: s,
+            logs: existing?.logs || [],
+            status: existing?.status || "pending",
+          });
+        }
+      }
 
       setSimSlots(newSlots);
     } catch {
@@ -504,7 +561,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     };
   }, [step, config.type, simProcessRunning]);
 
-  // ── Run voice simulation (single process) ──
+  // ── Run voice simulation (single process with directory polling) ──
   useEffect(() => {
     if (step !== "running" || config.type !== "voice" || !config.calibrate)
       return;
@@ -533,6 +590,10 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
       config.outputDir,
     ];
 
+    if (config.parallel > 1) {
+      cmdArgs.push("-n", String(config.parallel));
+    }
+
     const proc = spawn(bin.cmd, cmdArgs, {
       env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -557,11 +618,24 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     proc.stdout?.on("data", onData);
     proc.stderr?.on("data", onData);
 
+    // Start polling for simulation directories (same as text simulations)
+    pollingRef.current = setInterval(pollSimulationDirs, 500);
+
     proc.on("close", (code) => {
+      // Stop polling
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+
+      // Final poll to get latest state
+      pollSimulationDirs();
+
       setModelStates((prev) => ({
         ...prev,
         voice: { ...prev.voice!, status: code === 0 ? "done" : "error" },
       }));
+      setSimProcessRunning(false);
       processRefs.current.delete("voice");
 
       // Load results
@@ -571,7 +645,26 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
       setTimeout(() => setStep("leaderboard"), 500);
     });
 
+    proc.on("error", () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setModelStates((prev) => ({
+        ...prev,
+        voice: { ...prev.voice!, status: "error" },
+      }));
+      setSimProcessRunning(false);
+      processRefs.current.delete("voice");
+      setPhase("done");
+      setTimeout(() => setStep("leaderboard"), 500);
+    });
+
     return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
       proc.kill();
     };
   }, [step, config.type]);
@@ -908,7 +1001,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
                 const modelToUse = trimmed || defaultModel;
                 setConfig((c) => ({ ...c, models: [modelToUse] }));
                 setModelInput("");
-                setStep("parallel");
+                setStep("output-dir");
               }}
               placeholder={defaultModel}
             />
@@ -931,7 +1024,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
             speed things up.
           </Text>
           <Box marginTop={1}>
-            <Text>Parallel simulations per model: </Text>
+            <Text>Parallel simulations: </Text>
             <TextInput
               value={parallelInput}
               onChange={setParallelInput}
@@ -940,7 +1033,14 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
                   ...c,
                   parallel: parseInt(v) || 1,
                 }));
-                setStep("output-dir");
+                const missing = checkApiKeys(config.type, config.provider);
+                if (missing.length > 0) {
+                  setMissingKeys(missing);
+                  setCurrentKeyIdx(0);
+                  setStep("api-keys");
+                } else {
+                  setStep("running");
+                }
               }}
               placeholder="1"
             />
@@ -975,15 +1075,8 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
                   return;
                 }
 
-                // No existing data, proceed
-                const missing = checkApiKeys(config.type, config.provider);
-                if (missing.length > 0) {
-                  setMissingKeys(missing);
-                  setCurrentKeyIdx(0);
-                  setStep("api-keys");
-                } else {
-                  setStep("running");
-                }
+                // No existing data, proceed to parallel step
+                setStep("parallel");
               }}
               placeholder="./out"
             />
@@ -1028,14 +1121,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
               onSelect={(v) => {
                 if (v === "yes") {
                   setConfig((c) => ({ ...c, overwrite: true }));
-                  const missing = checkApiKeys(config.type, config.provider);
-                  if (missing.length > 0) {
-                    setMissingKeys(missing);
-                    setCurrentKeyIdx(0);
-                    setStep("api-keys");
-                  } else {
-                    setStep("running");
-                  }
+                  setStep("parallel");
                 } else {
                   setOutputInput("");
                   setExistingDirs([]);
@@ -1140,23 +1226,30 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
                   <Box width={4}>
                     {slot.status === "done" ? (
                       <Text color="green"> + </Text>
-                    ) : (
+                    ) : slot.status === "running" ? (
                       <Box>
                         <Text> </Text>
                         <Spinner />
                         <Text> </Text>
                       </Box>
+                    ) : (
+                      <Text dimColor> · </Text>
                     )}
                   </Box>
                   <Box width={35}>
-                    <Text bold={slot.status === "running"}>
+                    <Text
+                      bold={slot.status === "running"}
+                      dimColor={slot.status === "pending"}
+                    >
                       Persona {slot.personaIdx} Scenario {slot.scenarioIdx}
                     </Text>
                   </Box>
                   {slot.status === "done" ? (
                     <Text color="green">Complete</Text>
-                  ) : (
+                  ) : slot.status === "running" ? (
                     <Text color="cyan">Running...</Text>
+                  ) : (
+                    <Text dimColor>Pending</Text>
                   )}
                 </Box>
               ))}
@@ -1196,57 +1289,97 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
             </>
           ) : (
             <>
-              {/* Voice simulation status */}
+              {/* Voice simulation status - show simulation slots like text simulations */}
               {modelStates.voice && (
                 <>
-                  <Box>
-                    <Box width={4}>
-                      {modelStates.voice.status === "done" ? (
-                        <Text color="green"> + </Text>
-                      ) : modelStates.voice.status === "error" ? (
-                        <Text color="red"> x </Text>
+                  {/* Overall voice simulation status header */}
+                  <Box marginBottom={1}>
+                    <Text>
+                      {simProcessRunning ? (
+                        <>
+                          <Spinner /> Running simulations...
+                        </>
                       ) : (
-                        <Box>
-                          <Text> </Text>
-                          <Spinner />
-                          <Text> </Text>
-                        </Box>
+                        <Text color="green">+ Complete</Text>
                       )}
-                    </Box>
-                    <Box width={30}>
-                      <Text bold={modelStates.voice.status === "running"}>
-                        Voice Simulation
+                    </Text>
+                    {simSlots.length > 0 && (
+                      <Text dimColor>
+                        {" "}
+                        ({completedSlots.length}/{simSlots.length} done)
                       </Text>
-                    </Box>
-                    {modelStates.voice.status === "done" ? (
-                      <Text color="green">Complete</Text>
-                    ) : modelStates.voice.status === "error" ? (
-                      <Text color="red">Failed</Text>
-                    ) : (
-                      <Text color="cyan">Running...</Text>
+                    )}
+                    {config.parallel > 1 && (
+                      <Text dimColor> | Parallel: {config.parallel}</Text>
                     )}
                   </Box>
 
-                  {/* Voice simulation logs */}
-                  {phase === "eval" &&
-                    modelStates.voice.status === "running" && (
-                      <Box flexDirection="column" marginTop={1}>
-                        <Box>
-                          <Text dimColor>{"── "}</Text>
-                          <Text bold color="cyan">
-                            Voice Simulation
-                          </Text>
-                          <Text dimColor>{" " + "\u2500".repeat(15)}</Text>
-                        </Box>
-                        <Box flexDirection="column" paddingLeft={1}>
-                          {modelStates.voice.logs.slice(-8).map((line, i) => (
-                            <Text key={i} dimColor wrap="truncate">
-                              {stripAnsi(line).slice(0, 70)}
-                            </Text>
-                          ))}
-                        </Box>
+                  {/* Simulation slot status list */}
+                  {simSlots.map((slot) => (
+                    <Box key={slot.name}>
+                      <Box width={4}>
+                        {slot.status === "done" ? (
+                          <Text color="green"> + </Text>
+                        ) : slot.status === "running" ? (
+                          <Box>
+                            <Text> </Text>
+                            <Spinner />
+                            <Text> </Text>
+                          </Box>
+                        ) : (
+                          <Text dimColor> · </Text>
+                        )}
                       </Box>
-                    )}
+                      <Box width={35}>
+                        <Text
+                          bold={slot.status === "running"}
+                          dimColor={slot.status === "pending"}
+                        >
+                          Persona {slot.personaIdx} Scenario {slot.scenarioIdx}
+                        </Text>
+                      </Box>
+                      {slot.status === "done" ? (
+                        <Text color="green">Complete</Text>
+                      ) : slot.status === "running" ? (
+                        <Text color="cyan">Running...</Text>
+                      ) : (
+                        <Text dimColor>Pending</Text>
+                      )}
+                    </Box>
+                  ))}
+
+                  {/* Log windows for running slots - side by side (like text simulations) */}
+                  {phase === "eval" && runningSlots.length > 0 && (
+                    <Box flexDirection="row" marginTop={1}>
+                      {runningSlots.map((slot, idx) => (
+                        <Box
+                          key={slot.name}
+                          flexDirection="column"
+                          width={
+                            runningSlots.length === 1
+                              ? "100%"
+                              : `${Math.floor(100 / runningSlots.length)}%`
+                          }
+                          marginRight={idx < runningSlots.length - 1 ? 1 : 0}
+                        >
+                          <Box>
+                            <Text dimColor>{"── "}</Text>
+                            <Text bold color="cyan">
+                              P{slot.personaIdx} S{slot.scenarioIdx}
+                            </Text>
+                            <Text dimColor>{" " + "\u2500".repeat(15)}</Text>
+                          </Box>
+                          <Box flexDirection="column" paddingLeft={1}>
+                            {slot.logs.slice(-8).map((line, i) => (
+                              <Text key={i} dimColor wrap="truncate">
+                                {stripAnsi(line).slice(0, 50)}
+                              </Text>
+                            ))}
+                          </Box>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
                 </>
               )}
             </>

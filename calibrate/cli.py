@@ -20,6 +20,7 @@ import argparse
 import asyncio
 import runpy
 import os
+from importlib.metadata import version as get_version
 from dotenv import load_dotenv
 
 
@@ -90,7 +91,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="calibrate",
-        usage="calibrate [-h] {stt,tts,llm,simulations} ...",
+        usage="calibrate [-h] [-v] {stt,tts,llm,simulations} ...",
         description="Voice agent evaluation and benchmarking toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -103,6 +104,13 @@ Examples:
     calibrate simulations                            # Interactive simulations
     calibrate simulations --type text -c config.json # Run text simulation directly
         """,
+    )
+
+    parser.add_argument(
+        "-v",
+        "--version",
+        action="version",
+        version=f"%(prog)s {get_version('calibrate-agent')}",
     )
 
     subparsers = parser.add_subparsers(
@@ -239,7 +247,7 @@ Examples:
         "--parallel",
         type=int,
         default=1,
-        help="Parallel simulations (text only)",
+        help="Number of simulations to run in parallel",
     )
 
     # Hidden internal subcommand for simulation leaderboard
@@ -449,7 +457,6 @@ Examples:
                     "type",
                     "model",
                     "provider",
-                    "parallel",
                 },
             )
             asyncio.run(agent_main())

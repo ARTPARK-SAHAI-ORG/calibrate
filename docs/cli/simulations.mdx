@@ -1,7 +1,268 @@
 ---
 title: "Simulations"
-description: "Run simulated text or voice conversations with your agents via CLI"
+description: "Run simulated conversations to test your agent end-to-end"
 ---
+
+## Configuration
+
+You need to create a config file that defines the following:
+
+- Instructions for your agent (system prompt)
+- Tools available to your agent
+- Personas that simulate different user types
+- Scenarios that define conversation patterns
+- Evaluation criteria to measure agent performance
+
+Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_text.json) for a template. This section explains the different keys in the config file.
+
+### `system_prompt`
+
+The system prompt that defines your agent's behavior. This is the same prompt you use in production.
+
+```
+You are a helpful customer support assistant for an online store.
+
+You help customers with:
+1. Checking order status
+2. Processing returns
+3. Answering product questions
+```
+
+### `tools`
+
+An array of tools available to your agent. For a primer on tools, refer to [Tools](/core-concepts/tools). Each tool has:
+
+| Key           | Type                                 | Description                                                                                                                             |
+| ------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`        | `"structured_output"` or `"webhook"` | Either a [structured output tool](/core-concepts/tools#structured-output-tools) or a [webhook tool](/core-concepts/tools#webhook-tools) |
+| `name`        | string                               | Unique identifier for the tool                                                                                                          |
+| `description` | string                               | Description shown to the LLM (explains the purpose of the tool and when it should be called)                                            |
+| `parameters`  | array                                | Schema of the expected output (required when `type` is `"structured_output"`)                                                           |
+| `webhook`     | object                               | Configuration for webhook tools (required when `type` is `"webhook"`)                                                                   |
+
+**Structured output tool example:**
+
+```json
+{
+  "type": "structured_output",
+  "name": "log_inquiry",
+  "description": "Log and categorize the customer inquiry",
+  "parameters": [
+    {
+      "id": "inquiry_type",
+      "type": "string",
+      "description": "Type of inquiry: order_status, return_request, product_question, or general",
+      "required": true
+    },
+    {
+      "id": "order_id",
+      "type": "string",
+      "description": "The order ID if mentioned by the customer, otherwise null",
+      "required": false
+    },
+    {
+      "id": "sentiment",
+      "type": "string",
+      "description": "Customer sentiment: positive, neutral, or negative",
+      "required": true
+    }
+  ]
+}
+```
+
+### `personas`
+
+An array of user personas that simulate different types of users interacting with your agent. Each persona has:
+
+| Key                        | Type   | Description                                                                |
+| -------------------------- | ------ | -------------------------------------------------------------------------- |
+| `label`                    | string | A short name for the persona                                               |
+| `characteristics`          | string | Detailed description of the persona's behavior, knowledge, and personality |
+| `gender`                   | string | Gender for voice simulations: `male`, `female`, or `neutral`               |
+| `language`                 | string | Language the persona speaks: `english`, `hindi`, etc.                      |
+| `interruption_sensitivity` | string | (Voice only) How likely to interrupt: `none`, `low`, `medium`, `high`      |
+
+**Example:**
+
+```json
+{
+  "personas": [
+    {
+      "label": "friendly customer",
+      "characteristics": "You are a friendly customer who wants to check your order status. Your order ID is ORD-12345. You are polite and patient.",
+      "gender": "neutral",
+      "language": "english"
+    },
+    {
+      "label": "impatient customer",
+      "characteristics": "You are an impatient customer who has been waiting a long time for your order. Your order ID is ORD-67890. You are frustrated but not rude.",
+      "gender": "neutral",
+      "language": "english"
+    }
+  ]
+}
+```
+
+### `scenarios`
+
+An array of scenarios that define different conversation patterns to test. Each scenario has:
+
+| Key           | Type   | Description                                           |
+| ------------- | ------ | ----------------------------------------------------- |
+| `name`        | string | A short name for the scenario                         |
+| `description` | string | Instructions for how the simulated user should behave |
+
+**Example:**
+
+```json
+{
+  "scenarios": [
+    {
+      "name": "simple order inquiry",
+      "description": "Ask about your order status directly and provide your order ID right away."
+    },
+    {
+      "name": "vague inquiry",
+      "description": "Start by asking about your order without providing the order ID. Only provide it after being asked."
+    }
+  ]
+}
+```
+
+### `evaluation_criteria`
+
+An array of criteria used to evaluate the agent's performance. Each criterion has:
+
+| Key           | Type   | Description                                         |
+| ------------- | ------ | --------------------------------------------------- |
+| `name`        | string | A short name for the criterion (used in results)    |
+| `description` | string | What the criterion measures (used by the LLM judge) |
+
+**Example:**
+
+```json
+{
+  "evaluation_criteria": [
+    {
+      "name": "tool_usage",
+      "description": "The agent should call the log_inquiry tool with the correct inquiry_type and order_id when provided by the customer."
+    },
+    {
+      "name": "response_quality",
+      "description": "The agent should be helpful, polite, and guide the customer through the process."
+    }
+  ]
+}
+```
+
+### `settings`
+
+Optional settings to control the simulation:
+
+| Key                  | Type    | Description                                                    |
+| -------------------- | ------- | -------------------------------------------------------------- |
+| `agent_speaks_first` | boolean | Whether the agent initiates the conversation (default: `true`) |
+| `max_turns`          | number  | Maximum number of conversation turns (default: `10`)           |
+
+### `llm` (optional)
+
+For voice simulations, you can specify the LLM model to use:
+
+```json
+{
+  "llm": {
+    "model": "openai/gpt-4.1"
+  }
+}
+```
+
+### `stt` and `tts` (voice simulations only)
+
+For voice simulations, specify the STT and TTS providers:
+
+```json
+{
+  "stt": {
+    "provider": "google"
+  },
+  "tts": {
+    "provider": "google"
+  }
+}
+```
+
+### Full example
+
+```json
+{
+  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nAfter each customer message, call the `log_inquiry` tool to categorize the inquiry type and capture any order ID mentioned.\n\nBe friendly, helpful, and concise in your responses.",
+  "tools": [
+    {
+      "type": "structured_output",
+      "name": "log_inquiry",
+      "description": "Log and categorize the customer inquiry",
+      "parameters": [
+        {
+          "id": "inquiry_type",
+          "type": "string",
+          "description": "Type of inquiry: order_status, return_request, product_question, or general",
+          "required": true
+        },
+        {
+          "id": "order_id",
+          "type": "string",
+          "description": "The order ID if mentioned by the customer",
+          "required": false
+        },
+        {
+          "id": "sentiment",
+          "type": "string",
+          "description": "Customer sentiment: positive, neutral, or negative",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "personas": [
+    {
+      "label": "friendly customer",
+      "characteristics": "You are a friendly customer who wants to check your order status. Your order ID is ORD-12345. You are polite and patient.",
+      "gender": "neutral",
+      "language": "english"
+    },
+    {
+      "label": "impatient customer",
+      "characteristics": "You are an impatient customer who has been waiting a long time for your order. Your order ID is ORD-67890. You are frustrated but not rude.",
+      "gender": "neutral",
+      "language": "english"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "simple order inquiry",
+      "description": "Ask about your order status directly and provide your order ID right away."
+    },
+    {
+      "name": "vague inquiry",
+      "description": "Start by asking about your order without providing the order ID. Only provide it after being asked."
+    }
+  ],
+  "evaluation_criteria": [
+    {
+      "name": "tool_usage",
+      "description": "The agent should call the log_inquiry tool with the correct inquiry_type and order_id when provided by the customer."
+    },
+    {
+      "name": "response_quality",
+      "description": "The agent should be helpful, polite, and guide the customer through the process."
+    }
+  ],
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 10
+  }
+}
+```
 
 ## Get started
 
@@ -12,92 +273,39 @@ calibrate simulations
 The interactive UI guides you through the full simulation process:
 
 1. **Simulation type** — text (LLM-only) or voice (full STT → LLM → TTS pipeline)
-2. **Config file** — path to a JSON file containing system prompt, personas, scenarios, and evaluation criteria
+2. **Config file** — path to the config file you created in the [previous](#configuration) section
 3. **Provider** — OpenRouter or OpenAI (text simulations only)
-4. **Model selection** — multi-select from a list of suggested models (text simulations only):
-   - Use Space to toggle selection, Enter to confirm
-   - Each selected model runs all persona × scenario combinations
-5. **Parallel count** — run multiple simulations per model simultaneously (text only, default: 1)
+4. **Model entry** — enter the model you want to use for the simulation
+5. **Parallel count** — run multiple simulations simultaneously (text only, default: 1)
 6. **Output directory** — where results will be saved (defaults to `./out`)
 7. **API keys** — enter the API keys for the selected providers
-8. **Leaderboard** — displays comparison table with metrics, bar charts, and option to drill into model details
-9. **Model details** — view per-simulation results with scores for each evaluation criterion
 
-Models run in parallel (max 2 at a time), showing live progress in side-by-side columns.
-
-## Config File Format
-
-The config file is a JSON file containing the system prompt, tools, personas, scenarios, and evaluation criteria:
-
-```json
-{
-  "system_prompt": "You are a helpful assistant...",
-  "tools": [...],
-  "personas": [
-    {
-      "characteristics": "A shy user who gives short answers",
-      "gender": "female",
-      "language": "english",
-      "interruption_sensitivity": "medium"
-    }
-  ],
-  "scenarios": [
-    {
-      "description": "User completes the form without issues"
-    }
-  ],
-  "evaluation_criteria": [
-    {
-      "name": "completeness",
-      "description": "Whether all required information was collected"
-    }
-  ]
-}
-```
-
-<Note>
-  The `interruption_sensitivity` field is only used for voice simulations.
-  Values: `none` (0%), `low` (25%), `medium` (50%), `high` (80%).
-</Note>
-
-See the [core concepts](/core-concepts/personas) for details on personas and scenarios.
+The simulation runs all persona × scenario combinations. For example, with 2 personas and 2 scenarios, you get 4 simulations.
 
 ## Output
 
-After completion, the UI displays:
+Once all simulations complete, it displays:
 
-- **Comparison table** — model-by-model metrics comparison (text simulations with multiple models)
-- **Bar charts** — visualization of top metrics across models
-- **Model details** — drill into per-simulation results with scores
+- **Overall metrics** — bar charts showing aggregated scores across all simulations
+- **Per-simulation cards** — each card shows persona, scenario, and evaluation scores
+- **Simulation details** — select a card to view the full transcript and detailed evaluation with reasoning
 
-Results are saved with this structure (for text simulations with multiple models):
+Results are saved with this structure:
 
 ```
 /path/to/output/
-├── openai__gpt-4.1/                    # Model folder (slashes replaced with __)
-│   ├── simulation_persona_1_scenario_1/
-│   │   ├── transcript.json             # Full conversation
-│   │   ├── evaluation_results.csv      # Per-criterion results
-│   │   └── results.log                 # Pipeline logs
-│   ├── simulation_persona_1_scenario_2/
-│   │   └── ...
-│   ├── metrics.json                    # Aggregated metrics for this model
-│   └── results.csv                     # Summary of simulations for this model
-├── anthropic__claude-3.5-sonnet/
+├── simulation_persona_1_scenario_1/
+│   ├── transcript.json             # Full conversation
+│   ├── evaluation_results.csv      # Per-criterion results
+│   └── results.log                 # Pipeline logs
+├── simulation_persona_1_scenario_2/
 │   └── ...
-└── leaderboard/
-    └── sim_leaderboard.csv             # Model comparison
+├── simulation_persona_2_scenario_1/
+│   └── ...
+├── simulation_persona_2_scenario_2/
+│   └── ...
+└── metrics.json                    # Aggregated metrics
 ```
-
-For voice simulations (single run), results are saved directly in the output directory without model subfolders.
-
-<Card
-  title="Learn more about simulations"
-  icon="comments"
-  href="/quickstart/simulations"
->
-  Step-by-step guide to creating and running simulations
-</Card>
 
 ## Resources
 

@@ -9,6 +9,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Literal
+import traceback
 from uuid import uuid4
 from deepgram import LiveOptions
 from loguru import logger
@@ -19,8 +20,10 @@ from collections import defaultdict
 
 from calibrate.utils import (
     current_context,
+    current_simulation_name,
     add_default_source,
     configure_print_logger,
+    cleanup_print_logger,
     log_and_print,
     save_audio_chunk,
     combine_turn_audio_chunks,
@@ -1276,6 +1279,7 @@ async def _run_simulation_inner(
 
 
 async def run_single_simulation_task(
+    semaphore: asyncio.Semaphore,
     config: dict,
     persona_index: int,
     user_persona: dict,
@@ -1284,7 +1288,29 @@ async def run_single_simulation_task(
     output_dir: str,
     interrupt_sensitivity_map: dict,
 ):
-    """Run a single simulation task."""
+    """Run a single simulation task with semaphore for concurrency control."""
+    async with semaphore:
+        return await _run_single_simulation_inner(
+            config=config,
+            persona_index=persona_index,
+            user_persona=user_persona,
+            scenario_index=scenario_index,
+            scenario=scenario,
+            output_dir=output_dir,
+            interrupt_sensitivity_map=interrupt_sensitivity_map,
+        )
+
+
+async def _run_single_simulation_inner(
+    config: dict,
+    persona_index: int,
+    user_persona: dict,
+    scenario_index: int,
+    scenario: dict,
+    output_dir: str,
+    interrupt_sensitivity_map: dict,
+):
+    """Inner implementation of a single simulation task."""
     simulation_name = (
         f"simulation_persona_{persona_index + 1}_scenario_{scenario_index + 1}"
     )
@@ -1328,19 +1354,31 @@ async def run_single_simulation_task(
 
     logs_file_path = f"{output_dir}/{simulation_name}/logs"
 
-    logger.remove()
-    eval_logger.remove()
+    # Generate a unique ID for this simulation run to avoid conflicts
+    # when multiple simulations with the same name run in parallel
+    simulation_run_id = str(uuid4())
 
-    log_file_id = eval_logger.add(
+    # Create a unique loguru sink for this simulation with a strict filter
+    # that only accepts logs from this simulation's context
+    def simulation_filter(record):
+        if "source" not in record["extra"]:
+            context = current_context.get()
+            record["extra"]["source"] = f"{context}-SYS"
+        sim_id = record["extra"].get("simulation")
+        return sim_id == simulation_run_id
+
+    log_file_id = logger.add(
         logs_file_path,
         level="DEBUG",
         format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | [{extra[source]}] | {message}",
-        filter=add_default_source,
+        filter=simulation_filter,
         colorize=False,
     )
 
+    # Configure print logger with unique ID for parallel execution
     print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
-    configure_print_logger(print_log_save_path)
+    configure_print_logger(print_log_save_path, simulation_name=simulation_run_id)
+    current_simulation_name.set(simulation_run_id)
 
     # Extract STT and TTS configs from config dict
     stt_config_data = config.get("stt", {})
@@ -1358,105 +1396,118 @@ async def run_single_simulation_task(
 
     max_turns = config.get("settings", {}).get("max_turns", DEFAULT_MAX_TURNS)
 
-    command = " ".join(sys.argv)
-    log_and_print(f"\033[33mRunning command\033[0m: {command}")
+    # Use contextualize to bind simulation ID to ALL log calls within this context
+    # This includes logs from libraries like pipecat
+    with logger.contextualize(simulation=simulation_run_id):
+        command = " ".join(sys.argv)
+        log_and_print(f"\033[33mRunning command\033[0m: {command}")
 
-    log_and_print("--------------------------------")
-    log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
-    log_and_print(f"\033[93mPersona:\033[0m\n{characteristics}")
-    log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
-    log_and_print(f"\033[93mLanguage:\033[0m {language}")
-    log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
-    log_and_print(f"\033[93mPort:\033[0m {port}")
-    log_and_print(f"\033[93mSTT Config:\033[0m {stt_config}")
-    log_and_print(f"\033[93mTTS Config:\033[0m {tts_config}")
-    log_and_print(f"\033[93mLLM Config:\033[0m {llm_config}")
-    log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
-    log_and_print(f"\033[93mMax Turns:\033[0m {max_turns}")
-    log_and_print("--------------------------------")
+        log_and_print("--------------------------------")
+        log_and_print(f"""Running simulation \033[93m{simulation_name}\033[0m""")
+        log_and_print(f"\033[93mPersona:\033[0m\n{characteristics}")
+        log_and_print(f"\033[93mGender:\033[0m {gender}" if gender else "")
+        log_and_print(f"\033[93mLanguage:\033[0m {language}")
+        log_and_print(f"\033[93mScenario:\033[0m\n{scenario_description}")
+        log_and_print(f"\033[93mPort:\033[0m {port}")
+        log_and_print(f"\033[93mSTT Config:\033[0m {stt_config}")
+        log_and_print(f"\033[93mTTS Config:\033[0m {tts_config}")
+        log_and_print(f"\033[93mLLM Config:\033[0m {llm_config}")
+        log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
+        log_and_print(f"\033[93mMax Turns:\033[0m {max_turns}")
+        log_and_print("--------------------------------")
 
-    simulation_result = None
-    bot_task = None
-    sim_task = None
-    try:
-        bot_task = asyncio.create_task(
-            start_bot(
-                config["system_prompt"] + f"\n\nYou must always speak in {language}.",
-                config["tools"],
-                language,
-                port=port,
-                stt_config=stt_config,
-                tts_config=tts_config,
-                llm_config=llm_config,
-                agent_speaks_first=agent_speaks_first,
+        simulation_result = None
+        bot_task = None
+        sim_task = None
+        try:
+            bot_task = asyncio.create_task(
+                start_bot(
+                    config["system_prompt"]
+                    + f"\n\nYou must always speak in {language}.",
+                    config["tools"],
+                    language,
+                    port=port,
+                    stt_config=stt_config,
+                    tts_config=tts_config,
+                    llm_config=llm_config,
+                    agent_speaks_first=agent_speaks_first,
+                )
             )
-        )
-        # Give the bot a moment to start listening before connecting
-        await asyncio.sleep(1.0)
+            # Give the bot a moment to start listening before connecting
+            await asyncio.sleep(1.0)
 
-        # Check if bot_task failed during startup - if so, get its result to surface the error
-        if bot_task.done():
-            # This will raise if the bot task failed with an exception
-            bot_task.result()
-            # If we get here, bot completed without exception but also without starting server
-            # this is still wrong because the bot should be running, not completed
-            raise RuntimeError(
-                "Bot task completed unexpectedly before simulation could connect"
+            # Check if bot_task failed during startup - if so, get its result to surface the error
+            if bot_task.done():
+                # This will raise if the bot task failed with an exception
+                bot_task.result()
+                # If we get here, bot completed without exception but also without starting server
+                # this is still wrong because the bot should be running, not completed
+                raise RuntimeError(
+                    "Bot task completed unexpectedly before simulation could connect"
+                )
+
+            sim_task = asyncio.create_task(
+                run_simulation(
+                    user_system_prompt,
+                    language,
+                    gender,
+                    config["evaluation_criteria"],
+                    simulation_output_dir,
+                    interrupt_probability=interrupt_probability,
+                    port=port,
+                    agent_speaks_first=agent_speaks_first,
+                    max_turns=max_turns,
+                    tools=config.get("tools", []),
+                )
             )
-
-        sim_task = asyncio.create_task(
-            run_simulation(
-                user_system_prompt,
-                language,
-                gender,
-                config["evaluation_criteria"],
-                simulation_output_dir,
-                interrupt_probability=interrupt_probability,
-                port=port,
-                agent_speaks_first=agent_speaks_first,
-                max_turns=max_turns,
-                tools=config.get("tools", []),
+            simulation_tasks = [bot_task, sim_task]
+            done, pending = await asyncio.wait(
+                simulation_tasks, timeout=EVAL_TIMEOUT_SECS
             )
-        )
-        simulation_tasks = [bot_task, sim_task]
-        done, pending = await asyncio.wait(simulation_tasks, timeout=EVAL_TIMEOUT_SECS)
-        if pending:
-            eval_logger.error(
-                f"ERROR: Eval timeout expired, cancelling pending tasks..."
-            )
-            # Both pipeline idle timeouts should have worked and both tasks
-            # should have exited already, but if we got here something went
-            # wrong so we perform an abrupt asyncio task cancellation, which
-            # will not cleanup things nicely.
-            for task in pending:
-                task.cancel()
-            await asyncio.gather(*pending, return_exceptions=True)
+            if pending:
+                eval_logger.error(
+                    f"ERROR: Eval timeout expired, cancelling pending tasks..."
+                )
+                # Both pipeline idle timeouts should have worked and both tasks
+                # should have exited already, but if we got here something went
+                # wrong so we perform an abrupt asyncio task cancellation, which
+                # will not cleanup things nicely.
+                for task in pending:
+                    task.cancel()
+                await asyncio.gather(*pending, return_exceptions=True)
 
-        # Get result from simulation task
-        if sim_task in done:
-            if sim_task.cancelled():
-                # Simulation was cancelled (likely due to websocket disconnect from error)
-                # Check if bot_task has an exception that caused this
-                if bot_task in done and not bot_task.cancelled():
-                    # This will raise if bot_task failed with an exception
-                    bot_task.result()
-                raise RuntimeError("Simulation task was cancelled unexpectedly")
-            else:
-                simulation_result = sim_task.result()
-    finally:
-        # Ensure all tasks are fully cancelled and cleaned up
-        for task in [bot_task, sim_task]:
-            if task and not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass
+            # Get result from simulation task
+            if sim_task in done:
+                if sim_task.cancelled():
+                    # Simulation was cancelled (likely due to websocket disconnect from error)
+                    # Check if bot_task has an exception that caused this
+                    if bot_task in done and not bot_task.cancelled():
+                        # This will raise if bot_task failed with an exception
+                        bot_task.result()
+                    raise RuntimeError("Simulation task was cancelled unexpectedly")
+                else:
+                    simulation_result = sim_task.result()
+        except Exception as e:
+            traceback.print_exc()
+        finally:
+            # Ensure all tasks are fully cancelled and cleaned up
+            for task in [bot_task, sim_task]:
+                if task and not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
 
-        # Give async cleanup tasks time to complete (WebSocket close, STT stream close, etc.)
-        await asyncio.sleep(0.5)
+            # Give async cleanup tasks time to complete (WebSocket close, STT stream close, etc.)
+            await asyncio.sleep(0.5)
 
-        eval_logger.remove(log_file_id)
+            try:
+                logger.remove(log_file_id)
+            except ValueError:
+                pass  # Handler was already removed
+            # Clean up the print logger for this simulation using the unique run ID
+            cleanup_print_logger(simulation_run_id)
 
     # Combine audio chunks for each turn into single turn files, then combine all into conversation.wav
     audio_dir = os.path.join(simulation_output_dir, "audios")
@@ -1494,6 +1545,10 @@ async def run_single_simulation_task(
 
 
 async def main():
+    # Remove default loguru handler (stderr) to prevent all logs from showing on terminal
+    # This is done once at startup, not per-simulation
+    logger.remove()
+
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -1512,6 +1567,13 @@ async def main():
         default="./out",
         help="Path to the output directory to save the results",
     )
+    parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=1,
+        help="Number of simulations to run in parallel",
+    )
 
     args = parser.parse_args()
 
@@ -1528,15 +1590,15 @@ async def main():
         "high": 0.8,
     }
 
-    # Run simulations sequentially
-    results = []
-    total_simulations = len(config["personas"]) * len(config["scenarios"])
-    simulation_count = 0
+    # Create semaphore to limit parallel executions
+    semaphore = asyncio.Semaphore(args.parallel)
 
+    # Create all simulation tasks
+    tasks = []
     for persona_index, user_persona in enumerate(config["personas"]):
         for scenario_index, scenario in enumerate(config["scenarios"]):
-            simulation_count += 1
-            result = await run_single_simulation_task(
+            task = run_single_simulation_task(
+                semaphore=semaphore,
                 config=config,
                 persona_index=persona_index,
                 user_persona=user_persona,
@@ -1545,22 +1607,10 @@ async def main():
                 output_dir=args.output_dir,
                 interrupt_sensitivity_map=interrupt_sensitivity_map,
             )
-            results.append(result)
+            tasks.append(task)
 
-            # Cleanup between simulations to prevent state leakage
-            # This is critical when running multiple simulations sequentially
-            if simulation_count < total_simulations:
-                # Force garbage collection to clean up lingering objects
-                # (WebSocket connections, STT streams, turn analyzer state, etc.)
-                gc.collect()
-
-                # Wait for ports to be fully released (TIME_WAIT state)
-                # and for async cleanup tasks to complete
-                cleanup_delay = 3.0  # seconds
-                log_and_print(
-                    f"Waiting {cleanup_delay}s for cleanup before next simulation..."
-                )
-                await asyncio.sleep(cleanup_delay)
+    # Run all tasks with controlled parallelism
+    results = await asyncio.gather(*tasks, return_exceptions=True)
 
     # Aggregated metrics across all simulations
     all_simulation_metrics = []
@@ -1569,6 +1619,10 @@ async def main():
 
     # Collect metrics from results
     for result in results:
+        if isinstance(result, Exception):
+            logger.error(f"Simulation failed with error: {result}")
+            continue
+
         sim_metrics_row, evaluation_results, stt_judge = result
         if sim_metrics_row is None:
             continue
