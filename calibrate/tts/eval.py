@@ -845,18 +845,6 @@ async def main():
         action="store_true",
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
-    parser.add_argument(
-        "--leaderboard",
-        action="store_true",
-        help="Generate leaderboard after evaluation completes",
-    )
-    parser.add_argument(
-        "-s",
-        "--save-dir",
-        type=str,
-        help="Directory to save leaderboard results (defaults to output_dir/leaderboard)",
-    )
-
     args = parser.parse_args()
 
     provider = args.provider
@@ -912,21 +900,6 @@ async def main():
             print(f"  {provider}: LLM Score={llm_score:.2f}, TTFB={ttfb_mean}")
         else:
             print(f"  {provider}: LLM Score={llm_score}, TTFB={ttfb_mean}")
-
-    # Generate leaderboard if requested (used by Ink UI for last provider)
-    if args.leaderboard:
-        from calibrate.tts.leaderboard import generate_leaderboard
-
-        if args.save_dir is None:
-            save_dir = join(args.output_dir, "leaderboard")
-        else:
-            save_dir = args.save_dir
-        print(f"\n\033[93mGenerating leaderboard...\033[0m")
-        try:
-            generate_leaderboard(args.output_dir, save_dir)
-            print(f"\033[92mLeaderboard saved to {save_dir}\033[0m")
-        except Exception as e:
-            print(f"\033[91mError generating leaderboard: {e}\033[0m")
 
 
 if __name__ == "__main__":

@@ -7581,3 +7581,1299 @@ Done. Added the same pattern used by the other CLI docs pages:
 
 ---
 
+_**User**_
+
+@calibrate/stt/benchmark.py is leaderboard being generated??
+
+i run this but leaderboard folder is not generated
+@/Users/aman/.cursor/projects/Users-aman-Documents-repos-artpark-agentloop/terminals/23.txt:41-42 
+
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/stt/benchmark.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<think><details><summary>Thought Process</summary>
+The user is running `calibrate stt -p openai -l english -i examples/stt/sample_input/ -o ./out/stt` - this is a **single provider** command. Let me check how the CLI dispatches this.</details></think>
+
+---
+
+The issue is that you're passing a **single provider** (`-p openai`). Let me check how the CLI routes single vs multiple providers.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+That's the issue. When you pass a **single provider** (`-p openai`), the CLI routes to `eval.py` (line 283-302), which only runs the evaluation -- it does **not** generate the leaderboard. Leaderboard generation only happens if `--leaderboard` flag is also passed (line 304-316), which is an internal flag the Ink UI uses.
+
+The `benchmark.py` path (which auto-generates the leaderboard) is only used for **multiple providers** (line 317+).
+
+This is by design -- a leaderboard with a single provider doesn't make much sense for comparison. But if you want the leaderboard generated even for a single provider, you can either:
+
+1. Pass the `--leaderboard` flag: `calibrate stt -p openai -l english -i examples/stt/sample_input/ -o ./out/stt --leaderboard`
+2. Or pass the provider twice to trigger the benchmark path (not recommended)
+
+Here's the relevant code path:
+
+```283:316:calibrate/cli.py
+            if len(providers) == 1:
+                # Single provider → use eval.py (Ink UI calls this for each provider)
+                from calibrate.stt.eval import main as stt_eval_main
+                // ... runs eval only ...
+
+                # Generate leaderboard if requested (Ink UI passes --leaderboard for last provider)
+                if args.leaderboard:
+                    from calibrate.stt.leaderboard import generate_leaderboard
+                    // ... generates leaderboard ...
+```
+
+The leaderboard is gated behind `args.leaderboard` which you're not passing. Would you like me to change it so the leaderboard is always generated after a single-provider run as well?
+
+---
+
+_**User**_
+
+it should run even if there is 1
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now the leaderboard will always be generated after a single-provider STT evaluation, no longer gated behind `--leaderboard`.
+
+---
+
+_**User**_
+
+is this also happening for tts and llm tests?
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+Yes, same issue. Let me check how TTS eval handles the `--leaderboard` flag, and whether LLM has a leaderboard at all for single model:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "leaderboard",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/tts/eval.py",
+  "context": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "leaderboard",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/tts/eval.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "calibrate/tts/eval.py",
+              "matches": [
+                {
+                  "lineNumber": 844,
+                  "content": "        \"--overwrite\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 845,
+                  "content": "        action=\"store_true\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 846,
+                  "content": "        help=\"Overwrite existing results instead of resuming from last checkpoint\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 847,
+                  "content": "    )",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 848,
+                  "content": "    parser.add_argument(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 849,
+                  "content": "        \"--leaderboard\","
+                },
+                {
+                  "lineNumber": 850,
+                  "content": "        action=\"store_true\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 851,
+                  "content": "        help=\"Generate leaderboard after evaluation completes\","
+                },
+                {
+                  "lineNumber": 852,
+                  "content": "    )",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 853,
+                  "content": "    parser.add_argument(",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 854,
+                  "content": "        \"-s\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 855,
+                  "content": "        \"--save-dir\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 856,
+                  "content": "        type=str,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 857,
+                  "content": "        help=\"Directory to save leaderboard results (defaults to output_dir/leaderboard)\","
+                },
+                {
+                  "lineNumber": 858,
+                  "content": "    )",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 859,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 860,
+                  "content": "    args = parser.parse_args()",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 861,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 862,
+                  "content": "    provider = args.provider",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 911,
+                  "content": "        elif isinstance(llm_score, float):",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 912,
+                  "content": "            print(f\"  {provider}: LLM Score={llm_score:.2f}, TTFB={ttfb_mean}\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 913,
+                  "content": "        else:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 914,
+                  "content": "            print(f\"  {provider}: LLM Score={llm_score}, TTFB={ttfb_mean}\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 915,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 916,
+                  "content": "    # Generate leaderboard if requested (used by Ink UI for last provider)"
+                },
+                {
+                  "lineNumber": 917,
+                  "content": "    if args.leaderboard:"
+                },
+                {
+                  "lineNumber": 918,
+                  "content": "        from calibrate.tts.leaderboard import generate_leaderboard"
+                },
+                {
+                  "lineNumber": 919,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 920,
+                  "content": "        if args.save_dir is None:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 921,
+                  "content": "            save_dir = join(args.output_dir, \"leaderboard\")"
+                },
+                {
+                  "lineNumber": 922,
+                  "content": "        else:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 923,
+                  "content": "            save_dir = args.save_dir",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 924,
+                  "content": "        print(f\"\\n\\033[93mGenerating leaderboard...\\033[0m\")"
+                },
+                {
+                  "lineNumber": 925,
+                  "content": "        try:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 926,
+                  "content": "            generate_leaderboard(args.output_dir, save_dir)"
+                },
+                {
+                  "lineNumber": 927,
+                  "content": "            print(f\"\\033[92mLeaderboard saved to {save_dir}\\033[0m\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 928,
+                  "content": "        except Exception as e:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 929,
+                  "content": "            print(f\"\\033[91mError generating leaderboard: {e}\\033[0m\")"
+                },
+                {
+                  "lineNumber": 930,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 931,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 932,
+                  "content": "if __name__ == \"__main__\":",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 933,
+                  "content": "    asyncio.run(main())",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 42,
+          "totalMatchedLines": 10
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "leaderboard",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/llm/run_tests.py",
+  "context": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "leaderboard",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/llm/run_tests.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {}
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+So:
+- **TTS**: Same issue — single provider path passes `--leaderboard` to `tts_eval.py` only if `args.leaderboard` is set (line 356-357), and `tts_eval.py` itself only generates it when `args.leaderboard` is true (line 917).
+- **LLM**: No leaderboard at all in the single-model path (`run_tests.py`). Let me check if the benchmark has one.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "leaderboard|generate_leaderboard",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/llm/benchmark.py",
+  "context": 5,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "leaderboard|generate_leaderboard",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/llm/benchmark.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "calibrate/llm/benchmark.py",
+              "matches": [
+                {
+                  "lineNumber": 1,
+                  "content": "\"\"\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 2,
+                  "content": "LLM Tests Benchmark — Multi-model parallel evaluation with leaderboard generation."
+                },
+                {
+                  "lineNumber": 3,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 4,
+                  "content": "This module handles running LLM tests across multiple models in parallel",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 5,
+                  "content": "and automatically generates a leaderboard after all models complete."
+                },
+                {
+                  "lineNumber": 6,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 7,
+                  "content": "CLI Usage:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 8,
+                  "content": "    calibrate llm -c config.json -m model1 model2 -p openrouter -o ./out",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 9,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 10,
+                  "content": "Python SDK:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 25,
+                  "content": "import os",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 26,
+                  "content": "import sys",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 27,
+                  "content": "from os.path import exists, join",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 28,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 29,
+                  "content": "from calibrate.llm.run_tests import run_model_tests",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 30,
+                  "content": "from calibrate.llm.tests_leaderboard import generate_leaderboard"
+                },
+                {
+                  "lineNumber": 31,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 32,
+                  "content": "# Maximum number of models to run in parallel",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 33,
+                  "content": "MAX_PARALLEL_MODELS = 2",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 34,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 35,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 39,
+                  "content": "    provider: str,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 40,
+                  "content": "    output_dir: str = \"./out\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 41,
+                  "content": "    max_parallel: int = MAX_PARALLEL_MODELS,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 42,
+                  "content": ") -&gt; dict:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 43,
+                  "content": "    \"\"\"",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 44,
+                  "content": "    Run LLM tests for multiple models in parallel and generate a leaderboard."
+                },
+                {
+                  "lineNumber": 45,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 46,
+                  "content": "    This is the main entry point for multi-model LLM benchmarks.",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 47,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 48,
+                  "content": "    Args:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 49,
+                  "content": "        config: Test configuration dict containing system_prompt, tools, test_cases",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 90,
+                  "content": "    model_results = await asyncio.gather(*tasks)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 91,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 92,
+                  "content": "    for model, result in model_results:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 93,
+                  "content": "        results[model] = result",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 94,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 95,
+                  "content": "    # Generate leaderboard from output_dir (which contains model folders)"
+                },
+                {
+                  "lineNumber": 96,
+                  "content": "    leaderboard_dir = join(output_dir, \"leaderboard\")"
+                },
+                {
+                  "lineNumber": 97,
+                  "content": "    try:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 98,
+                  "content": "        generate_leaderboard(output_dir=output_dir, save_dir=leaderboard_dir)"
+                },
+                {
+                  "lineNumber": 99,
+                  "content": "    except Exception as e:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 100,
+                  "content": "        results[\"leaderboard\"] = f\"error: {e}\""
+                },
+                {
+                  "lineNumber": 101,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 102,
+                  "content": "    return {",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 103,
+                  "content": "        \"status\": \"completed\",",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 104,
+                  "content": "        \"output_dir\": output_dir,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 105,
+                  "content": "        \"leaderboard_dir\": leaderboard_dir,"
+                },
+                {
+                  "lineNumber": 106,
+                  "content": "        \"models\": results,",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 107,
+                  "content": "    }",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 108,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 109,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 110,
+                  "content": "async def main():",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 182,
+                  "content": "                passed = model_result.get(\"passed\", 0)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 183,
+                  "content": "                total = model_result.get(\"total\", 0)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 184,
+                  "content": "                pct = (passed / total * 100) if total &gt; 0 else 0",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 185,
+                  "content": "                print(f\"  {args.provider}/{model}: {passed}/{total} ({pct:.1f}%)\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 186,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 187,
+                  "content": "    print(f\"\\n\\033[92mLeaderboard saved to {result['leaderboard_dir']}\\033[0m\")"
+                },
+                {
+                  "lineNumber": 188,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 189,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 190,
+                  "content": "if __name__ == \"__main__\":",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 191,
+                  "content": "    asyncio.run(main())",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 63,
+          "totalMatchedLines": 10
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Same pattern. LLM benchmark auto-generates leaderboard for multiple models, but single model path has no leaderboard generation at all.
+
+Let me fix both TTS and LLM the same way I fixed STT:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me also remove the now-redundant `--leaderboard` gated block from the TTS `eval.py` `--leaderboard` flag passing in cli.py (since we're always generating it now):
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+
+
+---
+
+Good - the `--leaderboard` flag on line 356-357 is still being passed to `tts_eval_main()`, which means TTS eval would generate it twice (once inside eval.py if the flag is set, and once from cli.py after). Let me check if that's a problem. Looking at the STT fix for reference:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "stt_eval_main|generate_leaderboard\"",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py",
+  "context": 8,
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "stt_eval_main|generate_leaderboard\"",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py",
+    "outputMode": "content",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "content": {
+          "matches": [
+            {
+              "file": "calibrate/cli.py",
+              "matches": [
+                {
+                  "lineNumber": 277,
+                  "content": "    # ── Dispatch ────────────────────────────────────────────────",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 278,
+                  "content": "    if args.component == \"stt\":",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 279,
+                  "content": "        # If provider is given, run evaluation directly; otherwise launch interactive UI",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 280,
+                  "content": "        if args.provider is not None:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 281,
+                  "content": "            providers = args.provider",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 282,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 283,
+                  "content": "            if len(providers) == 1:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 284,
+                  "content": "                # Single provider → use eval.py (Ink UI calls this for each provider)",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 285,
+                  "content": "                from calibrate.stt.eval import main as stt_eval_main"
+                },
+                {
+                  "lineNumber": 286,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 287,
+                  "content": "                argv = [\"calibrate\"]",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 288,
+                  "content": "                argv.extend([\"-p\", providers[0]])",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 289,
+                  "content": "                argv.extend([\"-l\", args.language])",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 290,
+                  "content": "                argv.extend([\"-i\", args.input_dir])",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 291,
+                  "content": "                argv.extend([\"-o\", args.output_dir])",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 292,
+                  "content": "                argv.extend([\"-f\", args.input_file_name])",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 293,
+                  "content": "                if args.debug:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 294,
+                  "content": "                    argv.append(\"-d\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 295,
+                  "content": "                argv.extend([\"-dc\", str(args.debug_count)])",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 296,
+                  "content": "                if args.ignore_retry:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 297,
+                  "content": "                    argv.append(\"--ignore_retry\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 298,
+                  "content": "                if args.overwrite:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 299,
+                  "content": "                    argv.append(\"--overwrite\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 300,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 301,
+                  "content": "                sys.argv = argv",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 302,
+                  "content": "                asyncio.run(stt_eval_main())"
+                },
+                {
+                  "lineNumber": 303,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 304,
+                  "content": "                # Generate leaderboard after evaluation",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 305,
+                  "content": "                from calibrate.stt.leaderboard import generate_leaderboard",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 306,
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 307,
+                  "content": "                save_dir = args.save_dir or os.path.join(args.output_dir, \"leaderboard\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 308,
+                  "content": "                print(f\"\\n\\033[93mGenerating leaderboard...\\033[0m\")",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 309,
+                  "content": "                try:",
+                  "isContextLine": true
+                },
+                {
+                  "lineNumber": 310,
+                  "content": "                    generate_leaderboard(args.output_dir, save_dir)",
+                  "isContextLine": true
+                }
+              ]
+            }
+          ],
+          "totalLines": 34,
+          "totalMatchedLines": 2
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+I see the STT fix already removed the `--leaderboard` flag from the argv passed to `stt_eval_main()`. For TTS, the `--leaderboard` flag is still being passed, so `tts_eval.py` will generate the leaderboard internally, and then `cli.py` will generate it again. Let me remove the flag from the TTS argv to be consistent and avoid double generation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me verify the final state of all three blocks:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+All three are now consistent. Let me check for lint errors:
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "calibrate/cli.py"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "calibrate/cli.py"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Yes, the same issue was present for both **TTS** and **LLM**:
+
+- **TTS (single provider)**: The `--leaderboard` flag was only passed conditionally, so the leaderboard wouldn't generate unless explicitly requested.
+- **LLM (single model)**: There was no leaderboard generation at all in the single-model path.
+
+I've applied the same fix to both — the leaderboard is now unconditionally generated after evaluation completes for single-provider TTS and single-model LLM runs, matching the STT fix. I also removed the now-redundant `--leaderboard` flag from the TTS argv to avoid double generation.
+
+---
+
+_**User**_
+
+leaderboard is separate file already for tts remove the --leaderboard flag from tts.py and the code for that. 
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to remove the `--leaderboard` flag and its associated code from `calibrate/tts/eval.py`, since leaderboard generation is now handled separately in `cli.py`.</details></think>
+
+---
+
+Let me read the relevant sections of `calibrate/tts/eval.py`.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/tts/eval.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/tts/eval.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/tts/eval.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Now let me also check if `join` from `os.path` was only used for the leaderboard code, so we can clean up that import if needed.
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "pattern": "\\bjoin\\b",
+  "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/tts/eval.py",
+  "outputMode": "count",
+  "caseInsensitive": false
+}
+```
+Result:
+
+```json
+{
+  "success": {
+    "pattern": "\\bjoin\\b",
+    "path": "/Users/aman/Documents/repos/artpark/agentloop/calibrate/tts/eval.py",
+    "outputMode": "count",
+    "workspaceResults": {
+      "/Users/aman/Documents/repos/artpark/agentloop": {
+        "count": {
+          "counts": [
+            {
+              "file": "calibrate/tts/eval.py",
+              "count": 10
+            }
+          ],
+          "totalFiles": 1,
+          "totalMatches": 10
+        }
+      }
+    }
+  }
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Still used elsewhere, so the import stays. Let me also check that the `--save-dir` / `-s` flag in `cli.py` for TTS is still valid — since we removed it from `eval.py`, we should make sure `cli.py` no longer passes it to `tts_eval_main`:
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+
+Lines 356-357 pass `-s` / `--save-dir` to `tts_eval_main()`, but we just removed that argument from `eval.py`. That would cause an error. Let me remove it:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "calibrate/tts/eval.py",
+    "calibrate/cli.py"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "calibrate/tts/eval.py"
+    },
+    {
+      "relativeWorkspacePath": "calibrate/cli.py"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Done. Removed the `--leaderboard` and `--save-dir` arguments from `calibrate/tts/eval.py` along with the leaderboard generation code at the end. Also removed the now-invalid `-s` flag from the argv passed to `tts_eval_main()` in `cli.py`. Leaderboard generation for single-provider TTS is now handled entirely by `cli.py` after the eval completes.
+
+---
+
+_**User**_
+
+where it is it defined that benchmark.py is used for routing cli commands
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user is asking where in the codebase the routing from CLI commands to `benchmark.py` is defined. This is in `calibrate/cli.py` where the dispatch logic routes to benchmark modules based on number of providers/models.</details></think>
+
+---
+
+The routing is in `calibrate/cli.py`. When multiple providers/models are specified, it dispatches to the respective `benchmark.py`:
+
+**STT** (line ~314-334):
+
+```314:334:/Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py
+            else:
+                # Multiple providers → use benchmark.py (parallel execution + auto leaderboard)
+                from calibrate.stt.benchmark import main as stt_benchmark_main
+                // ... builds argv and calls asyncio.run(stt_benchmark_main())
+```
+
+**TTS** (line ~372-387):
+
+```372:387:/Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py
+            else:
+                # Multiple providers → use benchmark.py (parallel execution + auto leaderboard)
+                from calibrate.tts.benchmark import main as tts_benchmark_main
+                // ... builds argv and calls asyncio.run(tts_benchmark_main())
+```
+
+**LLM** (line ~423-433):
+
+```423:433:/Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py
+            else:
+                # Multiple models → use benchmark.py (parallel execution + auto leaderboard)
+                from calibrate.llm.benchmark import main as llm_benchmark_main
+                // ... builds argv and calls asyncio.run(llm_benchmark_main())
+```
+
+The logic is: **1 provider/model** routes to `eval.py` / `run_tests.py` (single evaluation), **2+ providers/models** routes to `benchmark.py` (parallel execution + auto leaderboard). All three components (STT, TTS, LLM) follow this same pattern in `calibrate/cli.py`.
+
+---
+
+_**User**_
+
+remove check for handling one provider vs multiple providers in this cli
+
+---
+
+_**Agent (model claude-4.6-opus-high-thinking, mode Agent)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to remove the branching logic that routes single provider to eval.py and multiple providers to benchmark.py. Instead, it should always use benchmark.py regardless of the number of providers/models. Let me read the current state of cli.py to see all three sections.</details></think>
+
+---
+
+Let me read the current state of the dispatch sections in `cli.py`.
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/calibrate/cli.py</summary>
+
+</details>
+</tool-use>
+
+---
+

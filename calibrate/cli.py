@@ -278,107 +278,47 @@ Examples:
     if args.component == "stt":
         # If provider is given, run evaluation directly; otherwise launch interactive UI
         if args.provider is not None:
+            from calibrate.stt.benchmark import main as stt_benchmark_main
+
             providers = args.provider
+            argv = ["calibrate", "-p"] + providers
+            argv.extend(["-l", args.language])
+            argv.extend(["-i", args.input_dir])
+            argv.extend(["-o", args.output_dir])
+            argv.extend(["-f", args.input_file_name])
+            if args.debug:
+                argv.append("-d")
+            argv.extend(["-dc", str(args.debug_count)])
+            if args.ignore_retry:
+                argv.append("--ignore_retry")
+            if args.overwrite:
+                argv.append("--overwrite")
+            if args.save_dir:
+                argv.extend(["-s", args.save_dir])
 
-            if len(providers) == 1:
-                # Single provider → use eval.py (Ink UI calls this for each provider)
-                from calibrate.stt.eval import main as stt_eval_main
-
-                argv = ["calibrate"]
-                argv.extend(["-p", providers[0]])
-                argv.extend(["-l", args.language])
-                argv.extend(["-i", args.input_dir])
-                argv.extend(["-o", args.output_dir])
-                argv.extend(["-f", args.input_file_name])
-                if args.debug:
-                    argv.append("-d")
-                argv.extend(["-dc", str(args.debug_count)])
-                if args.ignore_retry:
-                    argv.append("--ignore_retry")
-                if args.overwrite:
-                    argv.append("--overwrite")
-
-                sys.argv = argv
-                asyncio.run(stt_eval_main())
-
-                # Generate leaderboard if requested (Ink UI passes --leaderboard for last provider)
-                if args.leaderboard:
-                    from calibrate.stt.leaderboard import generate_leaderboard
-
-                    save_dir = args.save_dir or os.path.join(
-                        args.output_dir, "leaderboard"
-                    )
-                    print(f"\n\033[93mGenerating leaderboard...\033[0m")
-                    try:
-                        generate_leaderboard(args.output_dir, save_dir)
-                        print(f"\033[92mLeaderboard saved to {save_dir}\033[0m")
-                    except Exception as e:
-                        print(f"\033[91mError generating leaderboard: {e}\033[0m")
-            else:
-                # Multiple providers → use benchmark.py (parallel execution + auto leaderboard)
-                from calibrate.stt.benchmark import main as stt_benchmark_main
-
-                argv = ["calibrate", "-p"] + providers
-                argv.extend(["-l", args.language])
-                argv.extend(["-i", args.input_dir])
-                argv.extend(["-o", args.output_dir])
-                argv.extend(["-f", args.input_file_name])
-                if args.debug:
-                    argv.append("-d")
-                argv.extend(["-dc", str(args.debug_count)])
-                if args.ignore_retry:
-                    argv.append("--ignore_retry")
-                if args.overwrite:
-                    argv.append("--overwrite")
-                if args.save_dir:
-                    argv.extend(["-s", args.save_dir])
-
-                sys.argv = argv
-                asyncio.run(stt_benchmark_main())
+            sys.argv = argv
+            asyncio.run(stt_benchmark_main())
         else:
             _launch_ink_ui("stt")
 
     elif args.component == "tts":
         # If provider is given, run evaluation directly; otherwise launch interactive UI
         if args.provider is not None:
-            providers = args.provider  # Already a list from nargs='+'
+            from calibrate.tts.benchmark import main as tts_benchmark_main
 
-            if len(providers) == 1:
-                # Single provider → use eval.py (for Ink UI compatibility)
-                from calibrate.tts.eval import main as tts_eval_main
+            providers = args.provider
+            argv = ["calibrate", "-p"] + providers
+            argv.extend(["-l", args.language])
+            argv.extend(["-i", args.input])
+            argv.extend(["-o", args.output_dir])
+            if args.debug:
+                argv.append("-d")
+            argv.extend(["-dc", str(args.debug_count)])
+            if args.overwrite:
+                argv.append("--overwrite")
 
-                argv = ["calibrate", "-p", providers[0]]
-                argv.extend(["-l", args.language])
-                argv.extend(["-i", args.input])
-                argv.extend(["-o", args.output_dir])
-                if args.debug:
-                    argv.append("-d")
-                argv.extend(["-dc", str(args.debug_count)])
-                if args.overwrite:
-                    argv.append("--overwrite")
-                if args.leaderboard:
-                    argv.append("--leaderboard")
-                if args.save_dir:
-                    argv.extend(["-s", args.save_dir])
-
-                sys.argv = argv
-                asyncio.run(tts_eval_main())
-            else:
-                # Multiple providers → use benchmark.py (parallel execution + auto leaderboard)
-                from calibrate.tts.benchmark import main as tts_benchmark_main
-
-                argv = ["calibrate", "-p"] + providers
-                argv.extend(["-l", args.language])
-                argv.extend(["-i", args.input])
-                argv.extend(["-o", args.output_dir])
-                if args.debug:
-                    argv.append("-d")
-                argv.extend(["-dc", str(args.debug_count)])
-                if args.overwrite:
-                    argv.append("--overwrite")
-
-                sys.argv = argv
-                asyncio.run(tts_benchmark_main())
+            sys.argv = argv
+            asyncio.run(tts_benchmark_main())
         else:
             _launch_ink_ui("tts")
 
@@ -388,32 +328,19 @@ Examples:
             _launch_ink_ui("llm")
         else:
             # Direct mode: run tests with provided config
+            from calibrate.llm.benchmark import main as llm_benchmark_main
+
             models = (
                 args.model if args.model else ["gpt-4.1"]
             )  # Default to gpt-4.1 if not specified
 
-            if len(models) == 1:
-                # Single model → use run_tests.py (for Ink UI compatibility)
-                from calibrate.llm.run_tests import main as llm_tests_main
+            argv = ["calibrate", "-c", args.config]
+            argv.extend(["-o", args.output_dir])
+            argv.extend(["-m"] + models)
+            argv.extend(["-p", args.provider])
 
-                argv = ["calibrate", "-c", args.config]
-                argv.extend(["-o", args.output_dir])
-                argv.extend(["-m", models[0]])
-                argv.extend(["-p", args.provider])
-
-                sys.argv = argv
-                asyncio.run(llm_tests_main())
-            else:
-                # Multiple models → use benchmark.py (parallel execution + auto leaderboard)
-                from calibrate.llm.benchmark import main as llm_benchmark_main
-
-                argv = ["calibrate", "-c", args.config]
-                argv.extend(["-o", args.output_dir])
-                argv.extend(["-m"] + models)
-                argv.extend(["-p", args.provider])
-
-                sys.argv = argv
-                asyncio.run(llm_benchmark_main())
+            sys.argv = argv
+            asyncio.run(llm_benchmark_main())
 
     elif args.component == "simulations":
         # Hidden leaderboard subcommand (used by Ink UI)
