@@ -1480,10 +1480,6 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
           {/* Per-Simulation Results - Cards with SelectInput */}
           {hasEvalResults && (
             <>
-              <Box marginTop={1} marginBottom={1}>
-                <Text bold>Per-Simulation Results</Text>
-              </Box>
-
               {/* Cards displayed above */}
               {evalResults.map((r, idx) => {
                 const personaLabel =

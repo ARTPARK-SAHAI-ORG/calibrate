@@ -1,0 +1,56 @@
+{
+  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nWhen a customer asks about their order, call the `check_order` tool with their order ID to fetch the status.\n\nBe friendly, helpful, and concise in your responses.",
+  "tools": [
+    {
+      "type": "client",
+      "name": "check_order",
+      "description": "Check the status of a customer order by order ID",
+      "parameters": [
+        {
+          "id": "order_id",
+          "type": "string",
+          "description": "The customer's order ID",
+          "required": true
+        }
+      ]
+    }
+  ],
+  "personas": [
+    {
+      "label": "friendly customer",
+      "characteristics": "You are a friendly customer who wants to check your order status. Your order ID is ORD-12345. You are polite and patient.",
+      "gender": "neutral",
+      "language": "english"
+    },
+    {
+      "label": "impatient customer",
+      "characteristics": "You are an impatient customer who has been waiting a long time for your order. Your order ID is ORD-67890. You are frustrated but not rude.",
+      "gender": "neutral",
+      "language": "english"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "simple order inquiry",
+      "description": "Ask about your order status directly and provide your order ID when asked."
+    },
+    {
+      "name": "vague inquiry",
+      "description": "Start by asking about your order without providing the order ID. Only provide it after being asked."
+    }
+  ],
+  "evaluation_criteria": [
+    {
+      "name": "tool_usage",
+      "description": "The agent should call the check_order tool with the correct order ID provided by the customer."
+    },
+    {
+      "name": "response_quality",
+      "description": "The agent should be helpful, polite, and guide the customer through the process."
+    }
+  ],
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 10
+  }
+}

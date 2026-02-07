@@ -5365,3 +5365,79 @@ Done. Added a note explaining that passing `arguments: null` will only check if 
 
 ---
 
+_**User**_
+
+update @examples/agent/simulation/sample_text.json @sim_bug.json (1-110) 
+to have a simpler version of sim_bug that can serve as a good example like @examples/llm/config.json 
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/examples/llm/config.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/aman/Documents/repos/artpark/agentloop/examples/agent/simulation/sample_text.json</summary>
+
+</details>
+</tool-use>
+
+---
+
+Now I'll create a simple, clean simulation config example based on the customer support theme from the LLM config:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/examples/agent/simulation/sample_text.json</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Done. I've updated `sample_text.json` with a simpler, cleaner example that:
+
+- Uses the same customer support theme as the LLM test config
+- Has 2 simple personas (friendly customer, impatient customer)
+- Has 2 simple scenarios (direct inquiry, vague inquiry)
+- Has 2 clear evaluation criteria
+- Uses a simple `check_order` tool
+- Is easy to understand and serves as a good starting point
+
+---
+
+_**User**_
+
+it is a fucking json wtf are you doing? look at how @examples/llm/config.json respects json
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+You're right, I used actual newlines in the JSON string which is invalid. Let me fix it with proper `\n` escape sequences:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/examples/agent/simulation/sample_text.json</summary>
+
+</details>
+
+</tool-use>
+
+---
+
+Fixed. Now it's proper JSON with `\n` for newlines in strings.
+
+---
+
