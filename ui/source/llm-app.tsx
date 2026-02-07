@@ -9,7 +9,6 @@ import {
   Spinner,
   Table,
   BarChart,
-  MultiSelect,
 } from "./components.js";
 import { getCredential, saveCredential } from "./credentials.js";
 import { type CalibrateCmd, findCalibrateBin, stripAnsi } from "./shared.js";
@@ -19,7 +18,8 @@ type LlmStep =
   | "init"
   | "config-path"
   | "provider"
-  | "select-models"
+  | "enter-model"
+  | "model-confirm"
   | "output-dir"
   | "output-dir-confirm"
   | "api-keys"
@@ -32,46 +32,43 @@ interface ModelState {
   metrics?: { passed?: number; failed?: number; total?: number };
 }
 
+interface HistoryMessage {
+  role: string;
+  content: string;
+}
+
+interface ToolCall {
+  tool: string;
+  arguments: Record<string, unknown>;
+}
+
 interface TestResult {
   id: string;
-  input?: string;
-  expected_output?: string;
-  actual_output?: string;
-  passed?: boolean;
-  reason?: string;
-  [key: string]: string | number | boolean | undefined;
+  history: HistoryMessage[];
+  evaluationType: string;
+  evaluationCriteria: string;
+  actualOutput: string;
+  passed: boolean;
+  reasoning: string;
 }
 
 const MAX_PARALLEL_MODELS = 2;
 
-// ─── Model Options ───────────────────────────────────────────
-const OPENAI_MODELS = [
-  { label: "gpt-4.1", value: "gpt-4.1" },
-  { label: "gpt-4.1-mini", value: "gpt-4.1-mini" },
-  { label: "gpt-4o", value: "gpt-4o" },
-  { label: "gpt-4o-mini", value: "gpt-4o-mini" },
-  { label: "o1", value: "o1" },
-  { label: "o1-mini", value: "o1-mini" },
-  { label: "o3-mini", value: "o3-mini" },
+// ─── Model Examples ───────────────────────────────────────────
+const OPENAI_MODEL_EXAMPLES = [
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "o1",
+  "o1-mini",
+  "o3-mini",
 ];
 
-const OPENROUTER_MODELS = [
-  { label: "openai/gpt-4.1", value: "openai/gpt-4.1" },
-  { label: "openai/gpt-4.1-mini", value: "openai/gpt-4.1-mini" },
-  { label: "openai/gpt-4o", value: "openai/gpt-4o" },
-  { label: "anthropic/claude-sonnet-4", value: "anthropic/claude-sonnet-4" },
-  {
-    label: "anthropic/claude-3.5-sonnet",
-    value: "anthropic/claude-3.5-sonnet",
-  },
-  {
-    label: "google/gemini-2.0-flash-001",
-    value: "google/gemini-2.0-flash-001",
-  },
-  {
-    label: "google/gemini-2.5-pro-preview",
-    value: "google/gemini-2.5-pro-preview",
-  },
+const OPENROUTER_MODEL_EXAMPLES = [
+  "openai/gpt-4.1",
+  "anthropic/claude-sonnet-4",
+  "google/gemini-2.0-flash-001",
 ];
 
 interface LlmConfig {
@@ -103,7 +100,11 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
 
   // ── input state ──
   const [configInput, setConfigInput] = useState("");
+  const [modelInput, setModelInput] = useState("");
   const [outputInput, setOutputInput] = useState("./out");
+
+  // ── duplicate model error state ──
+  const [duplicateError, setDuplicateError] = useState("");
 
   // ── API key state ──
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
@@ -152,11 +153,15 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
       case "provider":
         setStep("config-path");
         break;
-      case "select-models":
+      case "enter-model":
         setStep("provider");
+        setDuplicateError("");
+        break;
+      case "model-confirm":
+        setStep("enter-model");
         break;
       case "output-dir":
-        setStep("select-models");
+        setStep("model-confirm");
         break;
       case "output-dir-confirm":
         setStep("output-dir");
@@ -250,11 +255,16 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
   // ── Check API keys ──
   function checkApiKeys(provider: string) {
     const needed: string[] = [];
-    if (provider === "openrouter") {
-      if (!getCredential("OPENROUTER_API_KEY"))
-        needed.push("OPENROUTER_API_KEY");
+    // Always need OPENAI_API_KEY for LLM judge
+    if (!getCredential("OPENAI_API_KEY")) {
+      needed.push("OPENAI_API_KEY");
     }
-    if (!getCredential("OPENAI_API_KEY")) needed.push("OPENAI_API_KEY");
+    // Need OPENROUTER_API_KEY if using OpenRouter
+    if (provider === "openrouter") {
+      if (!getCredential("OPENROUTER_API_KEY")) {
+        needed.push("OPENROUTER_API_KEY");
+      }
+    }
     return needed;
   }
 
@@ -512,6 +522,14 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
     setMetrics(results);
   };
 
+  // ── Format tool calls as string ──
+  const formatToolCalls = (toolCalls: ToolCall[]): string => {
+    if (!toolCalls || toolCalls.length === 0) return "";
+    return toolCalls
+      .map((tc) => `${tc.tool}(${JSON.stringify(tc.arguments)})`)
+      .join(", ");
+  };
+
   // ── Load model results when selected ──
   useEffect(() => {
     if (!selectedModel) return;
@@ -525,21 +543,53 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
             r: {
               test_case?: {
                 id?: string;
-                input?: string;
-                expected_output?: string;
+                history?: HistoryMessage[];
+                evaluation?: {
+                  type?: string;
+                  criteria?: string;
+                  tool_calls?: ToolCall[];
+                };
               };
-              output?: string;
-              metrics?: { passed?: boolean; reason?: string };
+              output?: {
+                response?: string;
+                tool_calls?: ToolCall[];
+              };
+              metrics?: { passed?: boolean; reasoning?: string };
             },
             idx: number
-          ) => ({
-            id: r.test_case?.id || String(idx + 1),
-            input: r.test_case?.input || "",
-            expected_output: r.test_case?.expected_output || "",
-            actual_output: r.output || "",
-            passed: r.metrics?.passed || false,
-            reason: r.metrics?.reason || "",
-          })
+          ) => {
+            // Build actual output string from response or tool calls
+            let actualOutput = "";
+            if (r.output?.response) {
+              actualOutput = r.output.response;
+            } else if (r.output?.tool_calls && r.output.tool_calls.length > 0) {
+              actualOutput = formatToolCalls(r.output.tool_calls);
+            }
+
+            // Build evaluation criteria string
+            let evaluationCriteria = "";
+            const evalType = r.test_case?.evaluation?.type || "";
+            if (evalType === "response") {
+              evaluationCriteria = r.test_case?.evaluation?.criteria || "";
+            } else if (
+              evalType === "tool_call" &&
+              r.test_case?.evaluation?.tool_calls
+            ) {
+              evaluationCriteria = formatToolCalls(
+                r.test_case.evaluation.tool_calls
+              );
+            }
+
+            return {
+              id: r.test_case?.id || String(idx + 1),
+              history: r.test_case?.history || [],
+              evaluationType: evalType,
+              evaluationCriteria,
+              actualOutput,
+              passed: r.metrics?.passed || false,
+              reasoning: r.metrics?.reasoning || "",
+            };
+          }
         );
         setModelResults(results);
         setScrollOffset(0);
@@ -625,7 +675,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
               ]}
               onSelect={(v) => {
                 setConfig((c) => ({ ...c, provider: v, models: [] }));
-                setStep("select-models");
+                setStep("enter-model");
               }}
             />
           </Box>
@@ -635,31 +685,133 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
         </Box>
       );
 
-    case "select-models": {
-      const modelOptions =
-        config.provider === "openai" ? OPENAI_MODELS : OPENROUTER_MODELS;
+    case "enter-model": {
+      const examples =
+        config.provider === "openai"
+          ? OPENAI_MODEL_EXAMPLES
+          : OPENROUTER_MODEL_EXAMPLES;
+      const platformName =
+        config.provider === "openai" ? "OpenAI" : "OpenRouter";
+      const platformUrl =
+        config.provider === "openai"
+          ? "platform.openai.com"
+          : "openrouter.ai/models";
+      const defaultModel =
+        config.provider === "openai" ? "gpt-4.1" : "openai/gpt-4.1";
+
       return (
         <Box flexDirection="column" padding={1}>
           {header}
           <Box marginBottom={1}>
             <Text dimColor>Provider: {config.provider}</Text>
           </Box>
-          <Text>Select models to evaluate:</Text>
+          <Text dimColor>
+            Enter model name exactly as it appears on {platformName} (
+            {platformUrl}).
+          </Text>
+          {config.models.length > 0 && (
+            <Box marginTop={1} flexDirection="column">
+              <Text bold>Selected models:</Text>
+              {config.models.map((m, i) => (
+                <Text key={i} color="green">
+                  {"  "}• {m}
+                </Text>
+              ))}
+            </Box>
+          )}
+          <Box marginTop={1} flexDirection="column">
+            <Text dimColor>Examples: {examples.join(", ")}</Text>
+          </Box>
+          {duplicateError && (
+            <Box marginTop={1}>
+              <Text color="red">{duplicateError}</Text>
+            </Box>
+          )}
           <Box marginTop={1}>
-            <MultiSelect
-              items={modelOptions}
-              onSubmit={(selected) => {
-                if (selected.length > 0) {
-                  setConfig((c) => ({ ...c, models: selected }));
+            <Text>
+              {config.models.length === 0 ? "Model: " : "Add another model: "}
+            </Text>
+            <TextInput
+              value={modelInput}
+              onChange={(v) => {
+                setModelInput(v);
+                setDuplicateError("");
+              }}
+              onSubmit={(v) => {
+                const input = v.trim();
+                if (input) {
+                  // Check for duplicate
+                  if (config.models.includes(input)) {
+                    setDuplicateError(`Model "${input}" is already selected.`);
+                    return;
+                  }
+                  // Add the model to the list
+                  setConfig((c) => ({
+                    ...c,
+                    models: [...c.models, input],
+                  }));
+                  setModelInput("");
+                  setDuplicateError("");
+                  // Go to confirmation step
+                  setStep("model-confirm");
+                } else if (config.models.length === 0) {
+                  // If no input and no models yet, use default and go to confirmation
+                  setConfig((c) => ({
+                    ...c,
+                    models: [defaultModel],
+                  }));
+                  setStep("model-confirm");
+                } else {
+                  // If no input but models already selected, go to confirmation
+                  setStep("model-confirm");
+                }
+              }}
+              placeholder={
+                config.models.length === 0
+                  ? defaultModel
+                  : "Enter model name or press Enter to continue"
+              }
+            />
+          </Box>
+          <Box marginTop={1}>
+            <Text dimColor>Enter to submit, Esc to go back</Text>
+          </Box>
+        </Box>
+      );
+    }
+
+    case "model-confirm": {
+      return (
+        <Box flexDirection="column" padding={1}>
+          {header}
+          <Box flexDirection="column">
+            <Text bold>Selected models:</Text>
+            {config.models.map((m, i) => (
+              <Text key={i} color="green">
+                {"  "}• {m}
+              </Text>
+            ))}
+          </Box>
+          <Box marginTop={1}>
+            <Text>Add another model?</Text>
+          </Box>
+          <Box marginTop={1}>
+            <SelectInput
+              items={[
+                { label: "Yes, add another model", value: "add" },
+                { label: "No, continue with these models", value: "continue" },
+              ]}
+              onSelect={(v) => {
+                if (v === "add") {
+                  setStep("enter-model");
+                } else {
                   setStep("output-dir");
                 }
               }}
             />
           </Box>
           <Box marginTop={1}>
-            <Text dimColor>
-              Space to toggle, Enter to confirm, Esc to go back
-            </Text>
+            <Text dimColor>Press Esc to go back</Text>
           </Box>
         </Box>
       );
@@ -943,6 +1095,14 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
           scrollOffset,
           scrollOffset + MAX_VISIBLE_ROWS
         );
+
+        // Format history messages as "Role: Message"
+        const formatHistory = (history: HistoryMessage[]): string => {
+          if (!history || history.length === 0) return "-";
+          return history.map((h) => `${h.role}: ${h.content}`).join(" | ");
+        };
+
+        // Truncate text for display
         const truncate = (s: string, max: number) =>
           s.length > max ? s.slice(0, max - 1) + "…" : s;
 
@@ -959,23 +1119,87 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
               <Text color="yellow">No results found for this model.</Text>
             ) : (
               <>
-                {/* Results Table */}
-                <Table
-                  columns={[
-                    { key: "id", label: "ID", width: 8 },
-                    { key: "input", label: "Input", width: 25 },
-                    { key: "expected", label: "Expected", width: 20 },
-                    { key: "actual", label: "Actual", width: 20 },
-                    { key: "status", label: "Status", width: 8 },
-                  ]}
-                  data={visibleRows.map((r) => ({
-                    id: truncate(String(r.id || ""), 8),
-                    input: truncate(String(r.input || ""), 25),
-                    expected: truncate(String(r.expected_output || ""), 20),
-                    actual: truncate(String(r.actual_output || ""), 20),
-                    status: r.passed ? "Pass" : "Fail",
-                  }))}
-                />
+                {/* Per-test results - one block per test */}
+                {visibleRows.map((r, idx) => (
+                  <Box
+                    key={idx}
+                    flexDirection="column"
+                    marginBottom={1}
+                    borderStyle="single"
+                    borderColor={r.passed ? "green" : "red"}
+                    paddingX={1}
+                  >
+                    {/* Header with test ID and pass/fail */}
+                    <Box marginBottom={1}>
+                      <Text bold>Test {r.id}</Text>
+                      <Text> </Text>
+                      {r.passed ? (
+                        <Text color="green" bold>
+                          ✓ Pass
+                        </Text>
+                      ) : (
+                        <Text color="red" bold>
+                          ✗ Fail
+                        </Text>
+                      )}
+                    </Box>
+
+                    {/* History */}
+                    <Box flexDirection="column" marginBottom={1}>
+                      <Text bold dimColor>
+                        History:
+                      </Text>
+                      {r.history && r.history.length > 0 ? (
+                        r.history.map((h, hIdx) => (
+                          <Box key={hIdx} marginLeft={1}>
+                            <Text color="cyan">{h.role}: </Text>
+                            <Text wrap="wrap">{truncate(h.content, 60)}</Text>
+                          </Box>
+                        ))
+                      ) : (
+                        <Box marginLeft={1}>
+                          <Text dimColor>-</Text>
+                        </Box>
+                      )}
+                    </Box>
+
+                    {/* Criteria */}
+                    <Box flexDirection="column" marginBottom={1}>
+                      <Text bold dimColor>
+                        Criteria ({r.evaluationType || "unknown"}):
+                      </Text>
+                      <Box marginLeft={1}>
+                        <Text wrap="wrap">
+                          {truncate(r.evaluationCriteria || "-", 80)}
+                        </Text>
+                      </Box>
+                    </Box>
+
+                    {/* Actual Output */}
+                    <Box flexDirection="column" marginBottom={1}>
+                      <Text bold dimColor>
+                        Actual Output:
+                      </Text>
+                      <Box marginLeft={1}>
+                        <Text wrap="wrap">
+                          {truncate(r.actualOutput || "-", 80)}
+                        </Text>
+                      </Box>
+                    </Box>
+
+                    {/* Reasoning */}
+                    <Box flexDirection="column">
+                      <Text bold dimColor>
+                        Reasoning:
+                      </Text>
+                      <Box marginLeft={1}>
+                        <Text wrap="wrap" color={r.passed ? "green" : "red"}>
+                          {r.reasoning || "-"}
+                        </Text>
+                      </Box>
+                    </Box>
+                  </Box>
+                ))}
 
                 {/* Scroll indicator */}
                 {modelResults.length > MAX_VISIBLE_ROWS && (
@@ -990,32 +1214,6 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
                     </Text>
                   </Box>
                 )}
-
-                {/* Reasoning for visible rows */}
-                <Box marginTop={1} flexDirection="column">
-                  <Text bold dimColor>
-                    Test Reasoning:
-                  </Text>
-                  {visibleRows.map((r, idx) => {
-                    const reason = String(r.reason || "");
-                    if (!reason || reason === "-") return null;
-                    return (
-                      <Box key={idx} marginTop={1} flexDirection="column">
-                        <Box>
-                          <Text color={r.passed ? "green" : "red"}>
-                            [{String(r.id || idx + 1)}]{" "}
-                          </Text>
-                          <Text color={r.passed ? "green" : "red"}>
-                            {r.passed ? "Pass" : "Fail"}
-                          </Text>
-                        </Box>
-                        <Box marginLeft={2}>
-                          <Text wrap="wrap">{reason}</Text>
-                        </Box>
-                      </Box>
-                    );
-                  })}
-                </Box>
               </>
             )}
 

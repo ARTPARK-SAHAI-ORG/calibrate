@@ -9,7 +9,6 @@ import {
   Spinner,
   Table,
   BarChart,
-  MultiSelect,
 } from "./components.js";
 import { getCredential, saveCredential } from "./credentials.js";
 import { type CalibrateCmd, findCalibrateBin, stripAnsi } from "./shared.js";
@@ -20,7 +19,7 @@ type SimStep =
   | "select-type"
   | "config-path"
   | "provider"
-  | "select-models"
+  | "enter-model"
   | "parallel"
   | "output-dir"
   | "output-dir-confirm"
@@ -46,40 +45,44 @@ interface ModelState {
   metrics?: Record<string, number>;
 }
 
+interface SimSlotState {
+  name: string; // e.g., "simulation_persona_1_scenario_1"
+  personaIdx: number;
+  scenarioIdx: number;
+  logs: string[];
+  status: "running" | "done";
+}
+
 interface SimulationResult {
   persona_idx: number;
   scenario_idx: number;
-  [key: string]: string | number | boolean;
+  name: string;
+  value: number;
+  reasoning: string;
 }
 
-// ─── Model Options ───────────────────────────────────────────
-const OPENAI_MODELS = [
-  { label: "gpt-4.1", value: "gpt-4.1" },
-  { label: "gpt-4.1-mini", value: "gpt-4.1-mini" },
-  { label: "gpt-4o", value: "gpt-4o" },
-  { label: "gpt-4o-mini", value: "gpt-4o-mini" },
-  { label: "o1", value: "o1" },
-  { label: "o1-mini", value: "o1-mini" },
-  { label: "o3-mini", value: "o3-mini" },
+interface EvalResult {
+  simulation: string;
+  persona_idx: number;
+  scenario_idx: number;
+  criteria: { name: string; value: number; reasoning: string }[];
+}
+
+// ─── Model Examples ───────────────────────────────────────────
+const OPENAI_MODEL_EXAMPLES = [
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "o1",
+  "o1-mini",
+  "o3-mini",
 ];
 
-const OPENROUTER_MODELS = [
-  { label: "openai/gpt-4.1", value: "openai/gpt-4.1" },
-  { label: "openai/gpt-4.1-mini", value: "openai/gpt-4.1-mini" },
-  { label: "openai/gpt-4o", value: "openai/gpt-4o" },
-  { label: "anthropic/claude-sonnet-4", value: "anthropic/claude-sonnet-4" },
-  {
-    label: "anthropic/claude-3.5-sonnet",
-    value: "anthropic/claude-3.5-sonnet",
-  },
-  {
-    label: "google/gemini-2.0-flash-001",
-    value: "google/gemini-2.0-flash-001",
-  },
-  {
-    label: "google/gemini-2.5-pro-preview",
-    value: "google/gemini-2.5-pro-preview",
-  },
+const OPENROUTER_MODEL_EXAMPLES = [
+  "openai/gpt-4.1",
+  "anthropic/claude-sonnet-4",
+  "google/gemini-2.0-flash-001",
 ];
 
 const MAX_PARALLEL_MODELS = 2;
@@ -107,6 +110,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
   const [configInput, setConfigInput] = useState("");
   const [outputInput, setOutputInput] = useState("./out");
   const [parallelInput, setParallelInput] = useState("1");
+  const [modelInput, setModelInput] = useState("");
 
   // ── API key state ──
   const [missingKeys, setMissingKeys] = useState<string[]>([]);
@@ -123,25 +127,24 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
   const processRefs = useRef<Map<string, ChildProcess>>(new Map());
   const calibrateBin = useRef<CalibrateCmd | null>(null);
 
+  // ── simulation slot state (for text simulations) ──
+  const [simSlots, setSimSlots] = useState<SimSlotState[]>([]);
+  const [simProcessRunning, setSimProcessRunning] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+
   // ── init error state ──
   const [initError, setInitError] = useState("");
 
   // ── leaderboard state ──
-  const [view, setView] = useState<"leaderboard" | "model-detail">(
-    "leaderboard"
-  );
-  const [selectedModel, setSelectedModel] = useState<string | null>(null);
-  const [modelResults, setModelResults] = useState<SimulationResult[]>([]);
+  const [view, setView] = useState<"leaderboard" | "sim-detail">("leaderboard");
+  const [selectedSim, setSelectedSim] = useState<string | null>(null);
+  const [evalResults, setEvalResults] = useState<EvalResult[]>([]);
   const [scrollOffset, setScrollOffset] = useState(0);
   const MAX_VISIBLE_ROWS = 10;
 
   const [metrics, setMetrics] = useState<
-    Array<{
-      model: string;
-      overall?: number;
-      [key: string]: string | number | undefined;
-    }>
-  >([]);
+    Record<string, { mean: number; std: number; values: number[] }>
+  >({});
 
   // Step navigation helper
   const goBack = () => {
@@ -155,11 +158,12 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
       case "provider":
         setStep("config-path");
         break;
-      case "select-models":
+      case "enter-model":
         setStep("provider");
+        setModelInput("");
         break;
       case "parallel":
-        setStep("select-models");
+        setStep("enter-model");
         break;
       case "output-dir":
         if (config.type === "text") {
@@ -214,9 +218,9 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
   useInput((input, key) => {
     if (input === "q") {
       if (step === "leaderboard") {
-        if (view === "model-detail") {
+        if (view === "sim-detail") {
           setView("leaderboard");
-          setSelectedModel(null);
+          setSelectedSim(null);
           setScrollOffset(0);
         } else {
           if (onBack) onBack();
@@ -227,23 +231,22 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     if (input === "b" && step === "init" && onBack) onBack();
     // Escape key to go back to previous step
     if (key.escape) {
-      if (step === "leaderboard" && view === "model-detail") {
+      if (step === "leaderboard" && view === "sim-detail") {
         setView("leaderboard");
-        setSelectedModel(null);
+        setSelectedSim(null);
         setScrollOffset(0);
       } else if (!["init", "running", "leaderboard"].includes(step)) {
         goBack();
       }
     }
-    // Scroll in model detail view
-    if (step === "leaderboard" && view === "model-detail") {
+    // Scroll in detail view
+    if (step === "leaderboard" && view === "sim-detail") {
+      const selectedResult = evalResults.find((r) => r.simulation === selectedSim);
+      const itemCount = selectedResult?.criteria.length || 0;
       if (key.upArrow && scrollOffset > 0) {
         setScrollOffset((o) => o - 1);
       }
-      if (
-        key.downArrow &&
-        scrollOffset < modelResults.length - MAX_VISIBLE_ROWS
-      ) {
+      if (key.downArrow && scrollOffset < itemCount - MAX_VISIBLE_ROWS) {
         setScrollOffset((o) => o + 1);
       }
     }
@@ -266,11 +269,16 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
   function checkApiKeys(simType: string, provider: string) {
     const needed: string[] = [];
     if (simType === "text") {
-      if (provider === "openrouter") {
-        if (!getCredential("OPENROUTER_API_KEY"))
-          needed.push("OPENROUTER_API_KEY");
+      // Always need OPENAI_API_KEY for LLM judge/evaluation
+      if (!getCredential("OPENAI_API_KEY")) {
+        needed.push("OPENAI_API_KEY");
       }
-      if (!getCredential("OPENAI_API_KEY")) needed.push("OPENAI_API_KEY");
+      // Need OPENROUTER_API_KEY if using OpenRouter
+      if (provider === "openrouter") {
+        if (!getCredential("OPENROUTER_API_KEY")) {
+          needed.push("OPENROUTER_API_KEY");
+        }
+      }
     }
     // Voice simulations need keys based on config file providers — hard to check here.
     return needed;
@@ -283,31 +291,99 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     return modelDir.replace(/\//g, "__");
   }
 
-  // ── Initialize model states when entering running step ──
+  // ── Initialize states when entering running step ──
   useEffect(() => {
     if (step !== "running") return;
 
-    // For voice simulations, we run a single process (no multi-model)
+    // For voice simulations, we run a single process
     if (config.type === "voice") {
       setModelStates({ voice: { status: "running", logs: [] } });
       setPhase("eval");
       return;
     }
 
-    // For text simulations with multiple models
-    const initialStates: Record<string, ModelState> = {};
-    for (const model of config.models) {
-      initialStates[model] = { status: "waiting", logs: [] };
-    }
-    setModelStates(initialStates);
+    // For text simulations, run a single process and poll for simulation directories
+    setSimSlots([]);
+    setSimProcessRunning(true);
     setPhase("eval");
-    setRunningCount(0);
-    setNextModelIdx(0);
   }, [step]);
 
-  // ── Start a single model simulation (text) ──
-  const startModel = (model: string) => {
-    if (!config.calibrate) return;
+  // ── Poll simulation directories for logs (text simulations) ──
+  const pollSimulationDirs = () => {
+    try {
+      if (!fs.existsSync(config.outputDir)) return;
+
+      const entries = fs.readdirSync(config.outputDir, { withFileTypes: true });
+      const simDirs = entries
+        .filter(
+          (e) => e.isDirectory() && e.name.startsWith("simulation_persona_")
+        )
+        .map((e) => e.name);
+
+      const newSlots: SimSlotState[] = [];
+
+      for (const dirName of simDirs) {
+        // Parse persona and scenario indices from directory name
+        const match = dirName.match(/simulation_persona_(\d+)_scenario_(\d+)/);
+        if (!match) continue;
+
+        const personaIdx = parseInt(match[1]!, 10);
+        const scenarioIdx = parseInt(match[2]!, 10);
+
+        // Read results.log if it exists
+        const logPath = path.join(config.outputDir, dirName, "results.log");
+        let logs: string[] = [];
+        let status: "running" | "done" = "running";
+
+        if (fs.existsSync(logPath)) {
+          try {
+            const content = fs.readFileSync(logPath, "utf-8");
+            logs = content
+              .split("\n")
+              .filter((l) => l.trim())
+              .slice(-15);
+          } catch {
+            // Ignore read errors
+          }
+        }
+
+        // Check if evaluation_results.csv exists (indicates completion)
+        const evalPath = path.join(
+          config.outputDir,
+          dirName,
+          "evaluation_results.csv"
+        );
+        if (fs.existsSync(evalPath)) {
+          status = "done";
+        }
+
+        newSlots.push({
+          name: dirName,
+          personaIdx,
+          scenarioIdx,
+          logs,
+          status,
+        });
+      }
+
+      // Sort by persona then scenario
+      newSlots.sort((a, b) => {
+        if (a.personaIdx !== b.personaIdx)
+          return a.personaIdx - b.personaIdx;
+        return a.scenarioIdx - b.scenarioIdx;
+      });
+
+      setSimSlots(newSlots);
+    } catch {
+      // Ignore errors
+    }
+  };
+
+  // ── Run text simulation (single process with directory polling) ──
+  useEffect(() => {
+    if (step !== "running" || config.type !== "text" || !config.calibrate)
+      return;
+    if (!simProcessRunning) return;
 
     const bin = config.calibrate;
     const env: Record<string, string> = { ...process.env } as Record<
@@ -322,6 +398,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     Object.assign(env, config.envVars);
     env.PYTHONUNBUFFERED = "1";
 
+    const model = config.models[0] || "gpt-4.1";
     const cmdArgs = [
       ...bin.args,
       "simulations",
@@ -341,84 +418,60 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
       cmdArgs.push("-n", String(config.parallel));
     }
 
-    setModelStates((prev) => ({
-      ...prev,
-      [model]: { ...prev[model]!, status: "running" },
-    }));
-    setRunningCount((c) => c + 1);
-
     const proc = spawn(bin.cmd, cmdArgs, {
       env,
       stdio: ["pipe", "pipe", "pipe"],
     });
 
-    processRefs.current.set(model, proc);
+    processRefs.current.set("text-sim", proc);
 
-    const onData = (data: Buffer) => {
-      const lines = data
-        .toString()
-        .split(/[\r\n]+/)
-        .filter((l) => l.trim());
-      setModelStates((prev) => ({
-        ...prev,
-        [model]: {
-          ...prev[model]!,
-          logs: [...prev[model]!.logs, ...lines].slice(-20),
-        },
-      }));
-    };
-
-    proc.stdout?.on("data", onData);
-    proc.stderr?.on("data", onData);
-
-    proc.on("error", () => {
-      setModelStates((prev) => ({
-        ...prev,
-        [model]: { ...prev[model]!, status: "error" },
-      }));
-      setRunningCount((c) => c - 1);
-      processRefs.current.delete(model);
-    });
+    // Start polling for simulation directories
+    pollingRef.current = setInterval(pollSimulationDirs, 500);
 
     proc.on("close", (code) => {
-      // Try to read metrics
-      let metricsData: ModelState["metrics"] = undefined;
-      if (code === 0) {
-        try {
-          const modelDir = getModelDir(model);
-          const metricsPath = path.join(
-            config.outputDir,
-            modelDir,
-            "metrics.json"
-          );
-          if (fs.existsSync(metricsPath)) {
-            const raw = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
-            metricsData = {};
-            for (const [key, val] of Object.entries(raw)) {
-              if (typeof val === "object" && val !== null && "mean" in val) {
-                metricsData[key] = (val as { mean: number }).mean;
-              } else if (typeof val === "number") {
-                metricsData[key] = val;
-              }
-            }
-          }
-        } catch {
-          // Ignore errors
-        }
+      // Stop polling
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
       }
 
-      setModelStates((prev) => ({
-        ...prev,
-        [model]: {
-          ...prev[model]!,
-          status: code === 0 ? "done" : "error",
-          metrics: metricsData,
-        },
-      }));
-      setRunningCount((c) => c - 1);
-      processRefs.current.delete(model);
+      // Final poll to get latest state
+      pollSimulationDirs();
+
+      setSimProcessRunning(false);
+      processRefs.current.delete("text-sim");
+
+      if (code === 0) {
+        // Load results and show leaderboard
+        loadMetrics();
+        loadEvalResults();
+        setPhase("done");
+        setTimeout(() => setStep("leaderboard"), 500);
+      } else {
+        setPhase("done");
+        setTimeout(() => setStep("leaderboard"), 500);
+      }
     });
-  };
+
+    proc.on("error", () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      setSimProcessRunning(false);
+      processRefs.current.delete("text-sim");
+      setPhase("done");
+      setTimeout(() => setStep("leaderboard"), 500);
+    });
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+      proc.kill();
+    };
+  }, [step, config.type, simProcessRunning]);
 
   // ── Run voice simulation (single process) ──
   useEffect(() => {
@@ -480,103 +533,17 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
       }));
       processRefs.current.delete("voice");
 
-      // Generate leaderboard
-      setPhase("leaderboard");
-      const lbDir = path.join(config.outputDir, "leaderboard");
-      const lbProc = spawn(
-        bin.cmd,
-        [
-          ...bin.args,
-          "simulations",
-          "leaderboard",
-          "-o",
-          config.outputDir,
-          "-s",
-          lbDir,
-        ],
-        { env, stdio: ["pipe", "pipe", "pipe"] }
-      );
-
-      lbProc.on("close", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
-
-      lbProc.on("error", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
+      // Load results
+      loadMetrics();
+      loadEvalResults();
+      setPhase("done");
+      setTimeout(() => setStep("leaderboard"), 500);
     });
 
     return () => {
       proc.kill();
     };
   }, [step, config.type]);
-
-  // ── Effect to manage parallel model execution (text simulations) ──
-  useEffect(() => {
-    if (step !== "running" || phase !== "eval" || config.type !== "text")
-      return;
-    if (Object.keys(modelStates).length === 0) return;
-
-    // Check if all models are done
-    const completedCount = Object.values(modelStates).filter(
-      (s) => s.status === "done" || s.status === "error"
-    ).length;
-
-    if (completedCount >= config.models.length) {
-      // All models done, generate leaderboard then finish
-      setPhase("leaderboard");
-
-      const bin = config.calibrate;
-      const env: Record<string, string> = { ...process.env } as Record<
-        string,
-        string
-      >;
-      env.PYTHONUNBUFFERED = "1";
-
-      const lbDir = path.join(config.outputDir, "leaderboard");
-
-      const proc = spawn(
-        bin.cmd,
-        [
-          ...bin.args,
-          "simulations",
-          "leaderboard",
-          "-o",
-          config.outputDir,
-          "-s",
-          lbDir,
-        ],
-        { env, stdio: ["pipe", "pipe", "pipe"] }
-      );
-
-      proc.on("close", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
-
-      proc.on("error", () => {
-        loadMetrics();
-        setPhase("done");
-        setTimeout(() => setStep("leaderboard"), 500);
-      });
-      return;
-    }
-
-    // Start more models if we have capacity
-    if (
-      runningCount < MAX_PARALLEL_MODELS &&
-      nextModelIdx < config.models.length
-    ) {
-      const model = config.models[nextModelIdx]!;
-      setNextModelIdx((idx) => idx + 1);
-      startModel(model);
-    }
-  }, [step, phase, runningCount, nextModelIdx, modelStates, config.type]);
 
   // ── Load metrics for leaderboard ──
   const loadMetrics = () => {
@@ -778,7 +745,8 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
               ]}
               onSelect={(v) => {
                 setConfig((c) => ({ ...c, provider: v, models: [] }));
-                setStep("select-models");
+                setModelInput("");
+                setStep("enter-model");
               }}
             />
           </Box>
@@ -788,34 +756,46 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
         </Box>
       );
 
-    case "select-models": {
-      const modelOptions =
-        config.provider === "openai" ? OPENAI_MODELS : OPENROUTER_MODELS;
+    case "enter-model": {
+      const modelExamples =
+        config.provider === "openai"
+          ? OPENAI_MODEL_EXAMPLES
+          : OPENROUTER_MODEL_EXAMPLES;
+      const defaultModel =
+        config.provider === "openai" ? "gpt-4.1" : "openai/gpt-4.1";
+      const platformHint =
+        config.provider === "openai"
+          ? "Enter model name exactly as it appears on OpenAI (platform.openai.com)"
+          : "Enter model name exactly as it appears on OpenRouter (openrouter.ai/models)";
+
       return (
         <Box flexDirection="column" padding={1}>
           {header}
           <Box marginBottom={1}>
             <Text dimColor>Provider: {config.provider}</Text>
           </Box>
-          <Text dimColor>
-            Select models to evaluate. Each model will run all persona ×
-            scenario combinations.
-          </Text>
-          <Text>Select models:</Text>
+          <Text dimColor>{platformHint}</Text>
+          <Box marginTop={1} flexDirection="column">
+            <Text dimColor>Examples: {modelExamples.join(", ")}</Text>
+          </Box>
           <Box marginTop={1}>
-            <MultiSelect
-              items={modelOptions}
-              onSubmit={(selected) => {
-                if (selected.length > 0) {
-                  setConfig((c) => ({ ...c, models: selected }));
-                  setStep("parallel");
-                }
+            <Text>Model: </Text>
+            <TextInput
+              value={modelInput}
+              onChange={setModelInput}
+              onSubmit={(v) => {
+                const trimmed = v.trim();
+                const modelToUse = trimmed || defaultModel;
+                setConfig((c) => ({ ...c, models: [modelToUse] }));
+                setModelInput("");
+                setStep("parallel");
               }}
+              placeholder={defaultModel}
             />
           </Box>
           <Box marginTop={1}>
             <Text dimColor>
-              Space to toggle, Enter to confirm, Esc to go back
+              Enter to submit (default: {defaultModel}), Esc to go back
             </Text>
           </Box>
         </Box>

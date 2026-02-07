@@ -47184,23 +47184,19 @@ import fs4 from "node:fs";
 import path3 from "node:path";
 var import_jsx_runtime2 = __toESM(require_jsx_runtime(), 1);
 var MAX_PARALLEL_MODELS = 2;
-var OPENAI_MODELS = [
-  { label: "gpt-4.1", value: "gpt-4.1" },
-  { label: "gpt-4.1-mini", value: "gpt-4.1-mini" },
-  { label: "gpt-4o", value: "gpt-4o" },
-  { label: "gpt-4o-mini", value: "gpt-4o-mini" },
-  { label: "o1", value: "o1" },
-  { label: "o1-mini", value: "o1-mini" },
-  { label: "o3-mini", value: "o3-mini" }
+var OPENAI_MODEL_EXAMPLES = [
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "o1",
+  "o1-mini",
+  "o3-mini"
 ];
-var OPENROUTER_MODELS = [
-  { label: "openai/gpt-4.1", value: "openai/gpt-4.1" },
-  { label: "openai/gpt-4.1-mini", value: "openai/gpt-4.1-mini" },
-  { label: "openai/gpt-4o", value: "openai/gpt-4o" },
-  { label: "anthropic/claude-sonnet-4", value: "anthropic/claude-sonnet-4" },
-  { label: "anthropic/claude-3.5-sonnet", value: "anthropic/claude-3.5-sonnet" },
-  { label: "google/gemini-2.0-flash-001", value: "google/gemini-2.0-flash-001" },
-  { label: "google/gemini-2.5-pro-preview", value: "google/gemini-2.5-pro-preview" }
+var OPENROUTER_MODEL_EXAMPLES = [
+  "openai/gpt-4.1",
+  "anthropic/claude-sonnet-4",
+  "google/gemini-2.0-flash-001"
 ];
 function LlmTestsApp({ onBack }) {
   const { exit } = use_app_default();
@@ -47216,18 +47212,24 @@ function LlmTestsApp({ onBack }) {
   });
   const [existingDirs, setExistingDirs] = (0, import_react23.useState)([]);
   const [configInput, setConfigInput] = (0, import_react23.useState)("");
+  const [modelInput, setModelInput] = (0, import_react23.useState)("");
   const [outputInput, setOutputInput] = (0, import_react23.useState)("./out");
+  const [duplicateError, setDuplicateError] = (0, import_react23.useState)("");
   const [missingKeys, setMissingKeys] = (0, import_react23.useState)([]);
   const [currentKeyIdx, setCurrentKeyIdx] = (0, import_react23.useState)(0);
   const [keyInput, setKeyInput] = (0, import_react23.useState)("");
-  const [modelStates, setModelStates] = (0, import_react23.useState)({});
+  const [modelStates, setModelStates] = (0, import_react23.useState)(
+    {}
+  );
   const [phase, setPhase] = (0, import_react23.useState)("eval");
   const [runningCount, setRunningCount] = (0, import_react23.useState)(0);
   const [nextModelIdx, setNextModelIdx] = (0, import_react23.useState)(0);
   const processRefs = (0, import_react23.useRef)(/* @__PURE__ */ new Map());
   const calibrateBin = (0, import_react23.useRef)(null);
   const [initError, setInitError] = (0, import_react23.useState)("");
-  const [view, setView] = (0, import_react23.useState)("leaderboard");
+  const [view, setView] = (0, import_react23.useState)(
+    "leaderboard"
+  );
   const [selectedModel, setSelectedModel] = (0, import_react23.useState)(null);
   const [modelResults, setModelResults] = (0, import_react23.useState)([]);
   const [scrollOffset, setScrollOffset] = (0, import_react23.useState)(0);
@@ -47241,11 +47243,15 @@ function LlmTestsApp({ onBack }) {
       case "provider":
         setStep("config-path");
         break;
-      case "select-models":
+      case "enter-model":
         setStep("provider");
+        setDuplicateError("");
+        break;
+      case "model-confirm":
+        setStep("enter-model");
         break;
       case "output-dir":
-        setStep("select-models");
+        setStep("model-confirm");
         break;
       case "output-dir-confirm":
         setStep("output-dir");
@@ -47324,10 +47330,14 @@ function LlmTestsApp({ onBack }) {
   }, [step]);
   function checkApiKeys(provider) {
     const needed = [];
-    if (provider === "openrouter") {
-      if (!getCredential("OPENROUTER_API_KEY")) needed.push("OPENROUTER_API_KEY");
+    if (!getCredential("OPENAI_API_KEY")) {
+      needed.push("OPENAI_API_KEY");
     }
-    if (!getCredential("OPENAI_API_KEY")) needed.push("OPENAI_API_KEY");
+    if (provider === "openrouter") {
+      if (!getCredential("OPENROUTER_API_KEY")) {
+        needed.push("OPENROUTER_API_KEY");
+      }
+    }
     return needed;
   }
   function getModelDir(model) {
@@ -47402,7 +47412,11 @@ function LlmTestsApp({ onBack }) {
       if (code === 0) {
         try {
           const modelDir = getModelDir(model);
-          const resultsPath = path3.join(config.outputDir, modelDir, "results.json");
+          const resultsPath = path3.join(
+            config.outputDir,
+            modelDir,
+            "results.json"
+          );
           if (fs4.existsSync(resultsPath)) {
             const results = JSON.parse(fs4.readFileSync(resultsPath, "utf-8"));
             const passed = results.filter(
@@ -47439,7 +47453,14 @@ function LlmTestsApp({ onBack }) {
       const lbDir = path3.join(config.outputDir, "leaderboard");
       const proc = spawn(
         "python",
-        ["-m", "calibrate.llm.tests_leaderboard", "-o", config.outputDir, "-s", lbDir],
+        [
+          "-m",
+          "calibrate.llm.tests_leaderboard",
+          "-o",
+          config.outputDir,
+          "-s",
+          lbDir
+        ],
         { env: env3, stdio: ["pipe", "pipe", "pipe"] }
       );
       proc.on("close", () => {
@@ -47465,7 +47486,11 @@ function LlmTestsApp({ onBack }) {
     for (const model of config.models) {
       try {
         const modelDir = getModelDir(model);
-        const resultsPath = path3.join(config.outputDir, modelDir, "results.json");
+        const resultsPath = path3.join(
+          config.outputDir,
+          modelDir,
+          "results.json"
+        );
         if (fs4.existsSync(resultsPath)) {
           const data = JSON.parse(fs4.readFileSync(resultsPath, "utf-8"));
           const passed = data.filter(
@@ -47480,12 +47505,18 @@ function LlmTestsApp({ onBack }) {
       }
     }
     try {
-      const lbCsvPath = path3.join(config.outputDir, "leaderboard", "llm_leaderboard.csv");
+      const lbCsvPath = path3.join(
+        config.outputDir,
+        "leaderboard",
+        "llm_leaderboard.csv"
+      );
       if (fs4.existsSync(lbCsvPath)) {
         const lines = fs4.readFileSync(lbCsvPath, "utf-8").trim().split("\n");
         if (lines.length > 1) {
           const headers = lines[0].split(",").map((h) => h.trim());
-          const overallIdx = headers.findIndex((h) => h.toLowerCase() === "overall");
+          const overallIdx = headers.findIndex(
+            (h) => h.toLowerCase() === "overall"
+          );
           const modelIdx = headers.findIndex(
             (h) => h.toLowerCase() === "model" || h.toLowerCase() === "provider"
           );
@@ -47506,6 +47537,10 @@ function LlmTestsApp({ onBack }) {
     }
     setMetrics(results);
   };
+  const formatToolCalls = (toolCalls) => {
+    if (!toolCalls || toolCalls.length === 0) return "";
+    return toolCalls.map((tc) => `${tc.tool}(${JSON.stringify(tc.arguments)})`).join(", ");
+  };
   (0, import_react23.useEffect)(() => {
     if (!selectedModel) return;
     try {
@@ -47514,14 +47549,32 @@ function LlmTestsApp({ onBack }) {
       if (fs4.existsSync(resultsPath)) {
         const data = JSON.parse(fs4.readFileSync(resultsPath, "utf-8"));
         const results = data.map(
-          (r, idx) => ({
-            id: r.test_case?.id || String(idx + 1),
-            input: r.test_case?.input || "",
-            expected_output: r.test_case?.expected_output || "",
-            actual_output: r.output || "",
-            passed: r.metrics?.passed || false,
-            reason: r.metrics?.reason || ""
-          })
+          (r, idx) => {
+            let actualOutput = "";
+            if (r.output?.response) {
+              actualOutput = r.output.response;
+            } else if (r.output?.tool_calls && r.output.tool_calls.length > 0) {
+              actualOutput = formatToolCalls(r.output.tool_calls);
+            }
+            let evaluationCriteria = "";
+            const evalType = r.test_case?.evaluation?.type || "";
+            if (evalType === "response") {
+              evaluationCriteria = r.test_case?.evaluation?.criteria || "";
+            } else if (evalType === "tool_call" && r.test_case?.evaluation?.tool_calls) {
+              evaluationCriteria = formatToolCalls(
+                r.test_case.evaluation.tool_calls
+              );
+            }
+            return {
+              id: r.test_case?.id || String(idx + 1),
+              history: r.test_case?.history || [],
+              evaluationType: evalType,
+              evaluationCriteria,
+              actualOutput,
+              passed: r.metrics?.passed || false,
+              reasoning: r.metrics?.reasoning || ""
+            };
+          }
         );
         setModelResults(results);
         setScrollOffset(0);
@@ -47589,34 +47642,113 @@ function LlmTestsApp({ onBack }) {
             ],
             onSelect: (v) => {
               setConfig((c) => ({ ...c, provider: v, models: [] }));
-              setStep("select-models");
+              setStep("enter-model");
             }
           }
         ) }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "Press Esc to go back" }) })
       ] });
-    case "select-models": {
-      const modelOptions = config.provider === "openai" ? OPENAI_MODELS : OPENROUTER_MODELS;
+    case "enter-model": {
+      const examples = config.provider === "openai" ? OPENAI_MODEL_EXAMPLES : OPENROUTER_MODEL_EXAMPLES;
+      const platformName = config.provider === "openai" ? "OpenAI" : "OpenRouter";
+      const platformUrl = config.provider === "openai" ? "platform.openai.com" : "openrouter.ai/models";
+      const defaultModel = config.provider === "openai" ? "gpt-4.1" : "openai/gpt-4.1";
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
         header,
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { dimColor: true, children: [
           "Provider: ",
           config.provider
         ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { children: "Select models to evaluate:" }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { dimColor: true, children: [
+          "Enter model name exactly as it appears on ",
+          platformName,
+          " (",
+          platformUrl,
+          ")."
+        ] }),
+        config.models.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, children: "Selected models:" }),
+          config.models.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { color: "green", children: [
+            "  ",
+            "\u2022 ",
+            m
+          ] }, i))
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { dimColor: true, children: [
+          "Examples: ",
+          examples.join(", ")
+        ] }) }),
+        duplicateError && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { color: "red", children: duplicateError }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { marginTop: 1, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { children: config.models.length === 0 ? "Model: " : "Add another model: " }),
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
+            TextInput,
+            {
+              value: modelInput,
+              onChange: (v) => {
+                setModelInput(v);
+                setDuplicateError("");
+              },
+              onSubmit: (v) => {
+                const input = v.trim();
+                if (input) {
+                  if (config.models.includes(input)) {
+                    setDuplicateError(`Model "${input}" is already selected.`);
+                    return;
+                  }
+                  setConfig((c) => ({
+                    ...c,
+                    models: [...c.models, input]
+                  }));
+                  setModelInput("");
+                  setDuplicateError("");
+                  setStep("model-confirm");
+                } else if (config.models.length === 0) {
+                  setConfig((c) => ({
+                    ...c,
+                    models: [defaultModel]
+                  }));
+                  setStep("model-confirm");
+                } else {
+                  setStep("model-confirm");
+                }
+              },
+              placeholder: config.models.length === 0 ? defaultModel : "Enter model name or press Enter to continue"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "Enter to submit, Esc to go back" }) })
+      ] });
+    }
+    case "model-confirm": {
+      return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
+        header,
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, children: "Selected models:" }),
+          config.models.map((m, i) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { color: "green", children: [
+            "  ",
+            "\u2022 ",
+            m
+          ] }, i))
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { children: "Add another model?" }) }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-          MultiSelect,
+          SelectInput,
           {
-            items: modelOptions,
-            onSubmit: (selected) => {
-              if (selected.length > 0) {
-                setConfig((c) => ({ ...c, models: selected }));
+            items: [
+              { label: "Yes, add another model", value: "add" },
+              { label: "No, continue with these models", value: "continue" }
+            ],
+            onSelect: (v) => {
+              if (v === "add") {
+                setStep("enter-model");
+              } else {
                 setStep("output-dir");
               }
             }
           }
         ) }),
-        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "Space to toggle, Enter to confirm, Esc to go back" }) })
+        /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "Press Esc to go back" }) })
       ] });
     }
     case "output-dir":
@@ -47787,7 +47919,9 @@ function LlmTestsApp({ onBack }) {
               /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { children: [
                 /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "\u2500\u2500 " }),
                 /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, color: "cyan", children: model.length > 20 ? model.slice(-20) : model }),
-                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: " " + "\u2500".repeat(Math.max(0, 20 - Math.min(model.length, 20))) })
+                /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: " " + "\u2500".repeat(
+                  Math.max(0, 20 - Math.min(model.length, 20))
+                ) })
               ] }),
               /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { flexDirection: "column", paddingLeft: 1, children: (modelStates[model]?.logs || []).slice(-8).map((line, i) => {
                 const cleanLine = stripAnsi2(line).slice(0, 45);
@@ -47826,6 +47960,10 @@ function LlmTestsApp({ onBack }) {
           scrollOffset,
           scrollOffset + MAX_VISIBLE_ROWS
         );
+        const formatHistory = (history) => {
+          if (!history || history.length === 0) return "-";
+          return history.map((h) => `${h.role}: ${h.content}`).join(" | ");
+        };
         const truncate = (s, max) => s.length > max ? s.slice(0, max - 1) + "\u2026" : s;
         return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
           /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { marginBottom: 1, children: [
@@ -47840,54 +47978,66 @@ function LlmTestsApp({ onBack }) {
             ] })
           ] }),
           modelResults.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { color: "yellow", children: "No results found for this model." }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(import_jsx_runtime2.Fragment, { children: [
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
-              Table,
+            visibleRows.map((r, idx) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(
+              Box_default,
               {
-                columns: [
-                  { key: "id", label: "ID", width: 8 },
-                  { key: "input", label: "Input", width: 25 },
-                  { key: "expected", label: "Expected", width: 20 },
-                  { key: "actual", label: "Actual", width: 20 },
-                  { key: "status", label: "Status", width: 8 }
-                ],
-                data: visibleRows.map((r) => ({
-                  id: truncate(String(r.id || ""), 8),
-                  input: truncate(String(r.input || ""), 25),
-                  expected: truncate(String(r.expected_output || ""), 20),
-                  actual: truncate(String(r.actual_output || ""), 20),
-                  status: r.passed ? "Pass" : "Fail"
-                }))
-              }
-            ),
+                flexDirection: "column",
+                marginBottom: 1,
+                borderStyle: "single",
+                borderColor: r.passed ? "green" : "red",
+                paddingX: 1,
+                children: [
+                  /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { marginBottom: 1, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { bold: true, children: [
+                      "Test ",
+                      r.id
+                    ] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { children: " " }),
+                    r.passed ? /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { color: "green", bold: true, children: "\u2713 Pass" }) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { color: "red", bold: true, children: "\u2717 Fail" })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, dimColor: true, children: "History:" }),
+                    r.history && r.history.length > 0 ? r.history.map((h, hIdx) => /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { marginLeft: 1, children: [
+                      /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { color: "cyan", children: [
+                        h.role,
+                        ": "
+                      ] }),
+                      /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { wrap: "wrap", children: truncate(h.content, 60) })
+                    ] }, hIdx)) : /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginLeft: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "-" }) })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { bold: true, dimColor: true, children: [
+                      "Criteria (",
+                      r.evaluationType || "unknown",
+                      "):"
+                    ] }),
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginLeft: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { wrap: "wrap", children: truncate(r.evaluationCriteria || "-", 80) }) })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", marginBottom: 1, children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, dimColor: true, children: "Actual Output:" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginLeft: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { wrap: "wrap", children: truncate(r.actualOutput || "-", 80) }) })
+                  ] }),
+                  /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", children: [
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, dimColor: true, children: "Reasoning:" }),
+                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginLeft: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { wrap: "wrap", color: r.passed ? "green" : "red", children: r.reasoning || "-" }) })
+                  ] })
+                ]
+              },
+              idx
+            )),
             modelResults.length > MAX_VISIBLE_ROWS && /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { dimColor: true, children: [
               "Showing ",
               scrollOffset + 1,
               "-",
-              Math.min(scrollOffset + MAX_VISIBLE_ROWS, modelResults.length),
-              " of",
+              Math.min(
+                scrollOffset + MAX_VISIBLE_ROWS,
+                modelResults.length
+              ),
               " ",
+              "of ",
               modelResults.length,
               " | Use \u2191\u2193 to scroll"
-            ] }) }),
-            /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, dimColor: true, children: "Test Reasoning:" }),
-              visibleRows.map((r, idx) => {
-                const reason = String(r.reason || "");
-                if (!reason || reason === "-") return null;
-                return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { marginTop: 1, flexDirection: "column", children: [
-                  /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { children: [
-                    /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { color: r.passed ? "green" : "red", children: [
-                      "[",
-                      String(r.id || idx + 1),
-                      "]",
-                      " "
-                    ] }),
-                    /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { color: r.passed ? "green" : "red", children: r.passed ? "Pass" : "Fail" })
-                  ] }),
-                  /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginLeft: 2, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { wrap: "wrap", children: reason }) })
-                ] }, idx);
-              })
-            ] })
+            ] }) })
           ] }),
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "Press q or Esc to go back to leaderboard" }) })
         ] });
@@ -47898,7 +48048,9 @@ function LlmTestsApp({ onBack }) {
           /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { dimColor: true, children: "Press q to exit" }) })
         ] });
       }
-      const sortedMetrics = [...metrics].sort((a, b) => b.pass_rate - a.pass_rate);
+      const sortedMetrics = [...metrics].sort(
+        (a, b) => b.pass_rate - a.pass_rate
+      );
       return /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { bold: true, color: "cyan", children: "LLM Tests Leaderboard" }) }),
         /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(
@@ -47909,7 +48061,12 @@ function LlmTestsApp({ onBack }) {
               { key: "passed", label: "Passed", width: 8, align: "right" },
               { key: "failed", label: "Failed", width: 8, align: "right" },
               { key: "total", label: "Total", width: 8, align: "right" },
-              { key: "pass_rate", label: "Pass Rate", width: 10, align: "right" }
+              {
+                key: "pass_rate",
+                label: "Pass Rate",
+                width: 10,
+                align: "right"
+              }
             ],
             data: metrics.map((m) => ({
               model: m.model,
@@ -48026,23 +48183,19 @@ import { spawn as spawn2 } from "node:child_process";
 import fs5 from "node:fs";
 import path4 from "node:path";
 var import_jsx_runtime3 = __toESM(require_jsx_runtime(), 1);
-var OPENAI_MODELS2 = [
-  { label: "gpt-4.1", value: "gpt-4.1" },
-  { label: "gpt-4.1-mini", value: "gpt-4.1-mini" },
-  { label: "gpt-4o", value: "gpt-4o" },
-  { label: "gpt-4o-mini", value: "gpt-4o-mini" },
-  { label: "o1", value: "o1" },
-  { label: "o1-mini", value: "o1-mini" },
-  { label: "o3-mini", value: "o3-mini" }
+var OPENAI_MODEL_EXAMPLES2 = [
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "o1",
+  "o1-mini",
+  "o3-mini"
 ];
-var OPENROUTER_MODELS2 = [
-  { label: "openai/gpt-4.1", value: "openai/gpt-4.1" },
-  { label: "openai/gpt-4.1-mini", value: "openai/gpt-4.1-mini" },
-  { label: "openai/gpt-4o", value: "openai/gpt-4o" },
-  { label: "anthropic/claude-sonnet-4", value: "anthropic/claude-sonnet-4" },
-  { label: "anthropic/claude-3.5-sonnet", value: "anthropic/claude-3.5-sonnet" },
-  { label: "google/gemini-2.0-flash-001", value: "google/gemini-2.0-flash-001" },
-  { label: "google/gemini-2.5-pro-preview", value: "google/gemini-2.5-pro-preview" }
+var OPENROUTER_MODEL_EXAMPLES2 = [
+  "openai/gpt-4.1",
+  "anthropic/claude-sonnet-4",
+  "google/gemini-2.0-flash-001"
 ];
 var MAX_PARALLEL_MODELS2 = 2;
 function SimulationsApp({ onBack }) {
@@ -48063,17 +48216,22 @@ function SimulationsApp({ onBack }) {
   const [configInput, setConfigInput] = (0, import_react24.useState)("");
   const [outputInput, setOutputInput] = (0, import_react24.useState)("./out");
   const [parallelInput, setParallelInput] = (0, import_react24.useState)("1");
+  const [modelInput, setModelInput] = (0, import_react24.useState)("");
   const [missingKeys, setMissingKeys] = (0, import_react24.useState)([]);
   const [currentKeyIdx, setCurrentKeyIdx] = (0, import_react24.useState)(0);
   const [keyInput, setKeyInput] = (0, import_react24.useState)("");
-  const [modelStates, setModelStates] = (0, import_react24.useState)({});
+  const [modelStates, setModelStates] = (0, import_react24.useState)(
+    {}
+  );
   const [phase, setPhase] = (0, import_react24.useState)("eval");
   const [runningCount, setRunningCount] = (0, import_react24.useState)(0);
   const [nextModelIdx, setNextModelIdx] = (0, import_react24.useState)(0);
   const processRefs = (0, import_react24.useRef)(/* @__PURE__ */ new Map());
   const calibrateBin = (0, import_react24.useRef)(null);
   const [initError, setInitError] = (0, import_react24.useState)("");
-  const [view, setView] = (0, import_react24.useState)("leaderboard");
+  const [view, setView] = (0, import_react24.useState)(
+    "leaderboard"
+  );
   const [selectedModel, setSelectedModel] = (0, import_react24.useState)(null);
   const [modelResults, setModelResults] = (0, import_react24.useState)([]);
   const [scrollOffset, setScrollOffset] = (0, import_react24.useState)(0);
@@ -48090,11 +48248,12 @@ function SimulationsApp({ onBack }) {
       case "provider":
         setStep("config-path");
         break;
-      case "select-models":
+      case "enter-model":
         setStep("provider");
+        setModelInput("");
         break;
       case "parallel":
-        setStep("select-models");
+        setStep("enter-model");
         break;
       case "output-dir":
         if (config.type === "text") {
@@ -48183,10 +48342,14 @@ function SimulationsApp({ onBack }) {
   function checkApiKeys(simType, provider) {
     const needed = [];
     if (simType === "text") {
-      if (provider === "openrouter") {
-        if (!getCredential("OPENROUTER_API_KEY")) needed.push("OPENROUTER_API_KEY");
+      if (!getCredential("OPENAI_API_KEY")) {
+        needed.push("OPENAI_API_KEY");
       }
-      if (!getCredential("OPENAI_API_KEY")) needed.push("OPENAI_API_KEY");
+      if (provider === "openrouter") {
+        if (!getCredential("OPENROUTER_API_KEY")) {
+          needed.push("OPENROUTER_API_KEY");
+        }
+      }
     }
     return needed;
   }
@@ -48272,7 +48435,11 @@ function SimulationsApp({ onBack }) {
       if (code === 0) {
         try {
           const modelDir = getModelDir(model);
-          const metricsPath = path4.join(config.outputDir, modelDir, "metrics.json");
+          const metricsPath = path4.join(
+            config.outputDir,
+            modelDir,
+            "metrics.json"
+          );
           if (fs5.existsSync(metricsPath)) {
             const raw = JSON.parse(fs5.readFileSync(metricsPath, "utf-8"));
             metricsData = {};
@@ -48300,7 +48467,8 @@ function SimulationsApp({ onBack }) {
     });
   };
   (0, import_react24.useEffect)(() => {
-    if (step !== "running" || config.type !== "voice" || !config.calibrate) return;
+    if (step !== "running" || config.type !== "voice" || !config.calibrate)
+      return;
     const bin = config.calibrate;
     const env3 = { ...process.env };
     for (const k of ["OPENAI_API_KEY", "OPENROUTER_API_KEY"]) {
@@ -48346,7 +48514,15 @@ function SimulationsApp({ onBack }) {
       const lbDir = path4.join(config.outputDir, "leaderboard");
       const lbProc = spawn2(
         bin.cmd,
-        [...bin.args, "simulations", "leaderboard", "-o", config.outputDir, "-s", lbDir],
+        [
+          ...bin.args,
+          "simulations",
+          "leaderboard",
+          "-o",
+          config.outputDir,
+          "-s",
+          lbDir
+        ],
         { env: env3, stdio: ["pipe", "pipe", "pipe"] }
       );
       lbProc.on("close", () => {
@@ -48365,7 +48541,8 @@ function SimulationsApp({ onBack }) {
     };
   }, [step, config.type]);
   (0, import_react24.useEffect)(() => {
-    if (step !== "running" || phase !== "eval" || config.type !== "text") return;
+    if (step !== "running" || phase !== "eval" || config.type !== "text")
+      return;
     if (Object.keys(modelStates).length === 0) return;
     const completedCount = Object.values(modelStates).filter(
       (s) => s.status === "done" || s.status === "error"
@@ -48378,7 +48555,15 @@ function SimulationsApp({ onBack }) {
       const lbDir = path4.join(config.outputDir, "leaderboard");
       const proc = spawn2(
         bin.cmd,
-        [...bin.args, "simulations", "leaderboard", "-o", config.outputDir, "-s", lbDir],
+        [
+          ...bin.args,
+          "simulations",
+          "leaderboard",
+          "-o",
+          config.outputDir,
+          "-s",
+          lbDir
+        ],
         { env: env3, stdio: ["pipe", "pipe", "pipe"] }
       );
       proc.on("close", () => {
@@ -48422,7 +48607,11 @@ function SimulationsApp({ onBack }) {
       for (const model of config.models) {
         try {
           const modelDir = getModelDir(model);
-          const metricsPath = path4.join(config.outputDir, modelDir, "metrics.json");
+          const metricsPath = path4.join(
+            config.outputDir,
+            modelDir,
+            "metrics.json"
+          );
           if (fs5.existsSync(metricsPath)) {
             const raw = JSON.parse(fs5.readFileSync(metricsPath, "utf-8"));
             const entry = { model };
@@ -48557,35 +48746,51 @@ function SimulationsApp({ onBack }) {
             ],
             onSelect: (v) => {
               setConfig((c) => ({ ...c, provider: v, models: [] }));
-              setStep("select-models");
+              setModelInput("");
+              setStep("enter-model");
             }
           }
         ) }),
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Press Esc to go back" }) })
       ] });
-    case "select-models": {
-      const modelOptions = config.provider === "openai" ? OPENAI_MODELS2 : OPENROUTER_MODELS2;
+    case "enter-model": {
+      const modelExamples = config.provider === "openai" ? OPENAI_MODEL_EXAMPLES2 : OPENROUTER_MODEL_EXAMPLES2;
+      const defaultModel = config.provider === "openai" ? "gpt-4.1" : "openai/gpt-4.1";
+      const platformHint = config.provider === "openai" ? "Enter model name exactly as it appears on OpenAI (platform.openai.com)" : "Enter model name exactly as it appears on OpenRouter (openrouter.ai/models)";
       return /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
         header,
         /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
           "Provider: ",
           config.provider
         ] }) }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Select models to evaluate. Each model will run all persona \xD7 scenario combinations." }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: "Select models:" }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
-          MultiSelect,
-          {
-            items: modelOptions,
-            onSubmit: (selected) => {
-              if (selected.length > 0) {
-                setConfig((c) => ({ ...c, models: selected }));
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: platformHint }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, flexDirection: "column", children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
+          "Examples: ",
+          modelExamples.join(", ")
+        ] }) }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Box_default, { marginTop: 1, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { children: "Model: " }),
+          /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
+            TextInput,
+            {
+              value: modelInput,
+              onChange: setModelInput,
+              onSubmit: (v) => {
+                const trimmed = v.trim();
+                const modelToUse = trimmed || defaultModel;
+                setConfig((c) => ({ ...c, models: [modelToUse] }));
+                setModelInput("");
                 setStep("parallel");
-              }
+              },
+              placeholder: defaultModel
             }
-          }
-        ) }),
-        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Text, { dimColor: true, children: "Space to toggle, Enter to confirm, Esc to go back" }) })
+          )
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(Box_default, { marginTop: 1, children: /* @__PURE__ */ (0, import_jsx_runtime3.jsxs)(Text, { dimColor: true, children: [
+          "Enter to submit (default: ",
+          defaultModel,
+          "), Esc to go back"
+        ] }) })
       ] });
     }
     case "parallel":
@@ -48858,9 +49063,12 @@ function SimulationsApp({ onBack }) {
               "Showing ",
               scrollOffset + 1,
               "-",
-              Math.min(scrollOffset + MAX_VISIBLE_ROWS, modelResults.length),
-              " of",
+              Math.min(
+                scrollOffset + MAX_VISIBLE_ROWS,
+                modelResults.length
+              ),
               " ",
+              "of ",
               modelResults.length,
               " | Use \u2191\u2193 to scroll"
             ] }) })
@@ -48914,7 +49122,9 @@ function SimulationsApp({ onBack }) {
           /* @__PURE__ */ (0, import_jsx_runtime3.jsx)(
             BarChart,
             {
-              data: [...metrics].sort((a, b) => (b[metricKey] || 0) - (a[metricKey] || 0)).map((m) => ({
+              data: [...metrics].sort(
+                (a, b) => (b[metricKey] || 0) - (a[metricKey] || 0)
+              ).map((m) => ({
                 label: String(m.model).length > 25 ? String(m.model).slice(-25) : String(m.model),
                 value: m[metricKey] || 0,
                 color: "green"

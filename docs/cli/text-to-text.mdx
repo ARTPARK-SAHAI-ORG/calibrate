@@ -10,10 +10,11 @@ calibrate llm
 The interactive UI guides you through the full evaluation process:
 
 1. **Config file** — path to a JSON file containing system prompt, tools, and test cases
-2. **Provider** — OpenRouter or OpenAI (determines model options)
-3. **Model selection** — multi-select from a list of suggested models:
-   - Use Space to toggle selection, Enter to confirm
-   - Provider-specific options are shown (e.g., `openai/gpt-4.1` for OpenRouter)
+2. **Provider** — OpenRouter or OpenAI
+3. **Model entry** — enter models one at a time (free-form text input):
+   - Type the exact model name as it appears on the provider's platform
+   - Examples are shown for reference (e.g., `openai/gpt-4.1` for OpenRouter)
+   - After each model, choose to add another or continue
 4. **Output directory** — where results will be saved (defaults to `./out`)
 5. **API key setup** — enter any missing API keys
 6. **Evaluation** — runs models in parallel (max 2 at a time), showing live progress in side-by-side columns

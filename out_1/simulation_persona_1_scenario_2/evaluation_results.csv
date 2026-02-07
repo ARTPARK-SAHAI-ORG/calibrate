@@ -1,9 +1,0 @@
-name,value,reasoning
-answer_completeness,1.0,"The assistant asked for the patient’s full name (first and last). The user provided “गीता प्रसाद,” which includes both first and last name. The assistant then concluded the form was complete; for a form containing only the patient name, the required information was captured correctly."
-llm/ttft,3.238274097442627,
-tts/ttft,0.21952088673909506,
-stt/ttft,0.047487497329711914,
-llm/processing_time,3.2501728534698486,
-tts/processing_time,0.8507885932922363,
-stt/processing_time,0.46544408798217773,
-stt_llm_judge_score,1.0,

@@ -121,14 +121,14 @@ EVAL_TIMEOUT_SECS = 3000
 
 def find_available_port() -> int:
     """Find an available port by letting the OS assign one.
-    
+
     This is the most robust approach for scalability when multiple processes
     may be trying to find ports simultaneously. The OS handles the race condition
     by assigning unique ephemeral ports.
-    
+
     Returns:
         An available port number.
-        
+
     Raises:
         RuntimeError: If unable to find an available port.
     """
