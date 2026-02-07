@@ -71,6 +71,11 @@ exclude = ["ui*", "examples*", "docs*", "images*"]
 local_scheme = "no-local-version"
 fallback_version = "0.0.0-dev"
 
+[tool.uv.workspace]
+members = [
+    "test",
+]
+
 [build-system]
 requires = ["setuptools>=64", "setuptools_scm>=8"]
 build-backend = "setuptools.build_meta"

@@ -25,36 +25,6 @@ Some providers use different models for specific languages:
   This is handled automatically by Calibrate.
 </Note>
 
-## Configuration
-
-Set the required environment variable for your chosen provider:
-
-```bash
-# Deepgram
-export DEEPGRAM_API_KEY=your_key
-
-# Google
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-
-# OpenAI
-export OPENAI_API_KEY=your_key
-
-# ElevenLabs
-export ELEVENLABS_API_KEY=your_key
-
-# Sarvam
-export SARVAM_API_KEY=your_key
-
-# Cartesia
-export CARTESIA_API_KEY=your_key
-
-# Groq
-export GROQ_API_KEY=your_key
-
-# Smallest
-export SMALLEST_API_KEY=your_key
-```
-
 ## Next Steps
 
 <CardGroup cols={2}>
@@ -67,9 +37,6 @@ export SMALLEST_API_KEY=your_key
     href="/core-concepts/agents#create-a-new-agent"
   >
     Configure the STT provider for your agent
-  </Card>
-  <Card title="Python SDK" icon="code" href="/python-sdk/speech-to-text">
-    Use the Python SDK to evaluate any STT provider
   </Card>
   <Card title="CLI" icon="terminal" href="/cli/speech-to-text">
     Run STT evaluation from the command line

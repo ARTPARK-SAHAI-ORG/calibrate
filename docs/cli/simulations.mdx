@@ -1,0 +1,110 @@
+---
+title: "Simulations"
+description: "Run simulated text or voice conversations with your agents via CLI"
+---
+
+## Get started
+
+```bash
+calibrate simulations
+```
+
+The interactive UI guides you through the full simulation process:
+
+1. **Simulation type** — text (LLM-only) or voice (full STT → LLM → TTS pipeline)
+2. **Config file** — path to a JSON file containing system prompt, personas, scenarios, and evaluation criteria
+3. **Provider** — OpenRouter or OpenAI (text simulations only)
+4. **Model selection** — multi-select from a list of suggested models (text simulations only):
+   - Use Space to toggle selection, Enter to confirm
+   - Each selected model runs all persona × scenario combinations
+5. **Parallel count** — run multiple simulations per model simultaneously (text only, default: 1)
+6. **Output directory** — where results will be saved (defaults to `./out`)
+7. **API keys** — enter the API keys for the selected providers
+8. **Leaderboard** — displays comparison table with metrics, bar charts, and option to drill into model details
+9. **Model details** — view per-simulation results with scores for each evaluation criterion
+
+Models run in parallel (max 2 at a time), showing live progress in side-by-side columns.
+
+## Config File Format
+
+The config file is a JSON file containing the system prompt, tools, personas, scenarios, and evaluation criteria:
+
+```json
+{
+  "system_prompt": "You are a helpful assistant...",
+  "tools": [...],
+  "personas": [
+    {
+      "characteristics": "A shy user who gives short answers",
+      "gender": "female",
+      "language": "english",
+      "interruption_sensitivity": "medium"
+    }
+  ],
+  "scenarios": [
+    {
+      "description": "User completes the form without issues"
+    }
+  ],
+  "evaluation_criteria": [
+    {
+      "name": "completeness",
+      "description": "Whether all required information was collected"
+    }
+  ]
+}
+```
+
+<Note>
+  The `interruption_sensitivity` field is only used for voice simulations.
+  Values: `none` (0%), `low` (25%), `medium` (50%), `high` (80%).
+</Note>
+
+See the [core concepts](/core-concepts/personas) for details on personas and scenarios.
+
+## Output
+
+After completion, the UI displays:
+
+- **Comparison table** — model-by-model metrics comparison (text simulations with multiple models)
+- **Bar charts** — visualization of top metrics across models
+- **Model details** — drill into per-simulation results with scores
+
+Results are saved with this structure (for text simulations with multiple models):
+
+```
+/path/to/output/
+├── openai__gpt-4.1/                    # Model folder (slashes replaced with __)
+│   ├── simulation_persona_1_scenario_1/
+│   │   ├── transcript.json             # Full conversation
+│   │   ├── evaluation_results.csv      # Per-criterion results
+│   │   └── results.log                 # Pipeline logs
+│   ├── simulation_persona_1_scenario_2/
+│   │   └── ...
+│   ├── metrics.json                    # Aggregated metrics for this model
+│   └── results.csv                     # Summary of simulations for this model
+├── anthropic__claude-3.5-sonnet/
+│   └── ...
+└── leaderboard/
+    └── sim_leaderboard.csv             # Model comparison
+```
+
+For voice simulations (single run), results are saved directly in the output directory without model subfolders.
+
+<Card
+  title="Learn more about simulations"
+  icon="comments"
+  href="/quickstart/simulations"
+>
+  Step-by-step guide to creating and running simulations
+</Card>
+
+## Resources
+
+<Card title="Personas" icon="user" href="/core-concepts/personas">
+  Learn how to create realistic user personas
+</Card>
+
+<Card title="Scenarios" icon="file-lines" href="/core-concepts/scenarios">
+  Learn how to write effective scenarios
+</Card>

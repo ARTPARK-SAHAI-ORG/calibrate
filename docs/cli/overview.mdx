@@ -1,63 +1,47 @@
 ---
 title: "Overview"
-description: "Command-line interface for evaluating voice agents and LLMs"
+description: "Command-line interface for evaluating voice agents"
 ---
-
-The Calibrate CLI provides commands for evaluating Speech to Text, Text to Speech, LLMs, and running voice agent simulations.
 
 ## Installation
 
 ```bash
-pip install calibrate
+pip install calibrate-agent
 ```
 
-## Setup
+## Get started
 
-Set environment variables for providers you plan to use:
+<Note>
+  The interactive CLI requires [Node.js](https://nodejs.org/) to be installed on
+  your system.
+</Note>
 
 ```bash
-# Speech to Text / Text to Speech
-DEEPGRAM_API_KEY=your_key
-OPENAI_API_KEY=your_key
-GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-SARVAM_API_KEY=your_key
-ELEVENLABS_API_KEY=your_key
-CARTESIA_API_KEY=your_key
-GROQ_API_KEY=your_key
-SMALLEST_API_KEY=your_key
-
-# LLM
-OPENROUTER_API_KEY=your_key
+calibrate
 ```
 
-## Available Commands
+Launches the interactive main menu where you can select from all available options.
 
-### Component Testing
+| Command                 | Description                                       |
+| ----------------------- | ------------------------------------------------- |
+| `calibrate stt`         | Interactive STT evaluation — benchmark providers  |
+| `calibrate tts`         | Interactive TTS evaluation — benchmark providers  |
+| `calibrate llm`         | Interactive LLM evaluation — test agent responses |
+| `calibrate simulations` | Interactive text or voice simulations             |
 
-| Command                           | Description                        |
-| --------------------------------- | ---------------------------------- |
-| `calibrate stt eval`              | Evaluate Speech to Text provider   |
-| `calibrate stt leaderboard`       | Generate Speech to Text comparison |
-| `calibrate llm tests run`         | Run LLM test cases                 |
-| `calibrate llm tests leaderboard` | Generate LLM tests comparison      |
-| `calibrate tts eval`              | Evaluate Text to Speech provider   |
-| `calibrate tts leaderboard`       | Generate Text to Speech comparison |
+## Next Steps
 
-### End to End Tests
-
-| Command                                 | Description                     |
-| --------------------------------------- | ------------------------------- |
-| `calibrate llm simulations run`         | Run text-only simulations       |
-| `calibrate llm simulations leaderboard` | Generate simulation comparison  |
-| `calibrate agent simulation`            | Run voice agent simulations     |
-| `calibrate agent test`                  | Interactive voice agent session |
-
-## Getting Help
-
-Get help for any command by adding `--help`:
-
-```bash
-calibrate --help
-calibrate stt --help
-calibrate stt eval --help
-```
+<CardGroup cols={2}>
+  <Card title="Speech to Text" icon="microphone" href="/cli/speech-to-text">
+    Benchmark STT providers on your audio dataset
+  </Card>
+  <Card title="Text to Speech" icon="volume-high" href="/cli/text-to-speech">
+    Benchmark TTS providers on your text dataset
+  </Card>
+  <Card title="LLM Evaluation" icon="brain" href="/cli/text-to-text">
+    Test agent responses and tool calls
+  </Card>
+  <Card title="Simulations" icon="comments" href="/cli/text-simulations">
+    Run text or voice simulations
+  </Card>
+</CardGroup>

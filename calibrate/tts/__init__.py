@@ -3,121 +3,39 @@
 Text-to-Speech evaluation and benchmarking module.
 
 Library Usage:
-    from calibrate.tts import eval, leaderboard
+    from calibrate.tts import run, run_single, generate_leaderboard
 
-    # Run TTS evaluation
+    # Run TTS benchmark across multiple providers (parallel + auto-leaderboard)
     import asyncio
-    result = asyncio.run(eval(
-        provider="google",
+    result = asyncio.run(run(
+        providers=["google", "openai"],
         language="english",
         input="./data/sample.csv",
         output_dir="./out"
     ))
 
-    # Generate leaderboard
-    leaderboard(output_dir="./out", save_dir="./leaderboard")
+    # Run single provider evaluation (no leaderboard)
+    result = asyncio.run(run_single(
+        provider="google",
+        language="english",
+        input_file="./data/sample.csv",
+        output_dir="./out"
+    ))
+
+    # Generate leaderboard separately
+    generate_leaderboard(output_dir="./out", save_dir="./out/leaderboard")
 """
 
-from typing import Literal
+# Multi-provider benchmark (parallel execution + auto-leaderboard)
+from calibrate.tts.benchmark import run
 
+# Single provider evaluation
+from calibrate.tts.eval import run_single_provider_eval as run_single
 
-async def eval(
-    input: str,
-    provider: Literal[
-        "cartesia", "openai", "groq", "google", "elevenlabs", "sarvam", "smallest"
-    ] = "google",
-    language: Literal[
-        "english",
-        "hindi",
-        "kannada",
-        "bengali",
-        "malayalam",
-        "marathi",
-        "odia",
-        "punjabi",
-        "tamil",
-        "telugu",
-        "gujarati",
-        "sindhi",
-    ] = "english",
-    output_dir: str = "./out",
-    debug: bool = False,
-    debug_count: int = 5,
-    overwrite: bool = False,
-) -> dict:
-    """
-    Run TTS evaluation for a given provider.
+# Leaderboard generation
+from calibrate.tts.leaderboard import generate_leaderboard
 
-    Args:
-        input: Path to input CSV file containing texts to synthesize
-        provider: TTS provider to evaluate (cartesia, openai, groq, google, elevenlabs, sarvam, smallest)
-        language: Language for synthesis (english, hindi, kannada, bengali, malayalam, marathi, odia, punjabi, tamil, telugu, gujarati, sindhi)
-        output_dir: Path to output directory for results (default: ./out)
-        debug: Run evaluation on first N texts only
-        debug_count: Number of texts to run in debug mode (default: 5)
-        overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
+# Validation utilities
+from calibrate.tts.eval import validate_tts_input_file
 
-    Returns:
-        dict: Results containing audio paths and metrics
-
-    Example:
-        >>> import asyncio
-        >>> from calibrate.tts import eval
-        >>> result = asyncio.run(eval(
-        ...     provider="google",
-        ...     language="english",
-        ...     input="./data/sample.csv",
-        ...     output_dir="./out"
-        ... ))
-    """
-    from calibrate.tts.eval import main as _tts_eval_main
-    import sys
-
-    # Build argument list
-    argv = [
-        "calibrate",
-        "--provider",
-        provider,
-        "--language",
-        language,
-        "--input",
-        input,
-        "--output-dir",
-        output_dir,
-        "--debug_count",
-        str(debug_count),
-    ]
-
-    if debug:
-        argv.append("--debug")
-    if overwrite:
-        argv.append("--overwrite")
-
-    # Save original sys.argv and restore after
-    original_argv = sys.argv
-    try:
-        sys.argv = argv
-        await _tts_eval_main()
-        return {"status": "completed", "output_dir": output_dir}
-    finally:
-        sys.argv = original_argv
-
-
-def leaderboard(output_dir: str, save_dir: str) -> None:
-    """
-    Generate TTS leaderboard from evaluation results.
-
-    Args:
-        output_dir: Path to directory containing provider evaluation results
-        save_dir: Path to directory where leaderboard will be saved
-
-    Example:
-        >>> from calibrate.tts import leaderboard
-        >>> leaderboard(output_dir="./out", save_dir="./leaderboard")
-    """
-    from calibrate.tts.leaderboard import generate_leaderboard
-
-    generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
-
-
-__all__ = ["eval", "leaderboard"]
+__all__ = ["run", "run_single", "generate_leaderboard", "validate_tts_input_file"]

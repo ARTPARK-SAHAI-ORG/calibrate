@@ -552,103 +552,170 @@ async def run_stt_eval(
     return success_count
 
 
-async def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-p",
-        "--provider",
-        type=str,
-        required=True,
-        choices=[
-            "deepgram",
-            "openai",
-            "cartesia",
-            "smallest",
-            "groq",
-            "google",
-            "sarvam",
-            "elevenlabs",
-        ],
-        help="STT provider to use for evaluation",
-    )
-    parser.add_argument(
-        "-l",
-        "--language",
-        type=str,
-        default="english",
-        choices=[
-            "english",
-            "hindi",
-            "kannada",
-            "bengali",
-            "malayalam",
-            "marathi",
-            "odia",
-            "punjabi",
-            "tamil",
-            "telugu",
-            "gujarati",
-            "sindhi",
-        ],
-        help="Language of the audio files",
-    )
-    parser.add_argument(
-        "-i",
-        "--input-dir",
-        type=str,
-        required=True,
-        help="Path to the input directory containing the audio files and stt.csv",
-    )
-    parser.add_argument(
-        "-f",
-        "--input-file-name",
-        type=str,
-        default="stt.csv",
-        help="name of the input file containing the dataset to evaluate",
-    )
-    parser.add_argument(
-        "-o",
-        "--output-dir",
-        type=str,
-        default="./out",
-        help="Path to the output directory to save the results",
-    )
-    parser.add_argument(
-        "-d",
-        "--debug",
-        action="store_true",
-        help="Run the evaluation on the first 5 audio files",
-    )
-    parser.add_argument(
-        "-dc",
-        "--debug_count",
-        type=int,
-        default=5,
-        help="Number of audio files to run the evaluation on",
-    )
-    parser.add_argument(
-        "--ignore_retry",
-        action="store_true",
-        help="Ignore retrying if all the audios are not processed and move on to LLM judge",
-    )
-    parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing results instead of resuming from last checkpoint",
-    )
+def validate_stt_input_dir(input_dir: str, input_file_name: str) -> tuple[bool, str]:
+    """Validate STT input directory structure.
 
-    args = parser.parse_args()
+    Expected structure:
+        input_dir/
+        ├── stt.csv (or custom input_file_name)
+        └── audios/
+            ├── audio_1.wav
+            └── audio_2.wav
 
-    if not exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    Returns:
+        tuple[bool, str]: (is_valid, error_message)
+    """
+    input_path = Path(input_dir)
 
-    output_dir = join(args.output_dir, args.provider)
+    # Check if directory exists
+    if not input_path.exists():
+        return False, f"Input directory does not exist: {input_dir}"
 
-    if not exists(output_dir):
-        os.makedirs(output_dir)
+    if not input_path.is_dir():
+        return False, f"Input path is not a directory: {input_dir}"
 
-    log_save_path = join(output_dir, "results.log")
+    # Check if CSV file exists
+    csv_path = input_path / input_file_name
+    if not csv_path.exists():
+        return False, f"CSV file not found: {csv_path}"
 
+    # Check if audios directory exists
+    audios_dir = input_path / "audios"
+    if not audios_dir.exists():
+        return False, f"Audios directory not found: {audios_dir}"
+
+    if not audios_dir.is_dir():
+        return False, f"Audios path is not a directory: {audios_dir}"
+
+    # Read CSV and validate columns
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        return False, f"Failed to read CSV file: {e}"
+
+    if "id" not in df.columns:
+        return (
+            False,
+            f"CSV file missing required column 'id'. Found columns: {list(df.columns)}",
+        )
+
+    if "text" not in df.columns:
+        return (
+            False,
+            f"CSV file missing required column 'text'. Found columns: {list(df.columns)}",
+        )
+
+    # Check if all audio files referenced in CSV exist
+    missing_files = []
+    for row_id in df["id"]:
+        audio_path = audios_dir / f"{row_id}.wav"
+        if not audio_path.exists():
+            missing_files.append(f"{row_id}.wav")
+
+    if missing_files:
+        if len(missing_files) <= 5:
+            return False, f"Missing audio files in audios/: {', '.join(missing_files)}"
+        else:
+            return (
+                False,
+                f"Missing {len(missing_files)} audio files in audios/. First 5: {', '.join(missing_files[:5])}",
+            )
+
+    return True, ""
+
+
+# Expected columns in results.csv for STT evaluation
+STT_RESULTS_COLUMNS = [
+    "id",
+    "gt",
+    "pred",
+]
+
+
+def validate_existing_results_csv(results_csv_path: str) -> tuple[bool, str]:
+    """Validate existing results.csv file structure.
+
+    Checks if the file is either empty or has the expected columns for STT results.
+
+    Args:
+        results_csv_path: Path to the results.csv file
+
+    Returns:
+        tuple[bool, str]: (is_valid, error_message)
+    """
+    if not exists(results_csv_path):
+        return True, ""  # File doesn't exist, that's fine
+
+    try:
+        df = pd.read_csv(results_csv_path)
+    except Exception as e:
+        return False, f"Failed to read existing results.csv: {e}"
+
+    # Empty file is valid (will be overwritten)
+    if len(df) == 0:
+        return True, ""
+
+    # Check if all expected columns are present
+    missing_columns = [col for col in STT_RESULTS_COLUMNS if col not in df.columns]
+    if missing_columns:
+        return False, (
+            f"Existing results.csv has incompatible structure. "
+            f"Missing columns: {missing_columns}. "
+            f"Expected columns: {STT_RESULTS_COLUMNS}. "
+            f"Found columns: {list(df.columns)}. "
+            f"Use --overwrite to replace the file or delete it manually."
+        )
+
+    return True, ""
+
+
+STT_PROVIDERS = [
+    "deepgram",
+    "openai",
+    "cartesia",
+    "smallest",
+    "groq",
+    "google",
+    "sarvam",
+    "elevenlabs",
+]
+
+STT_LANGUAGES = [
+    "english",
+    "hindi",
+    "kannada",
+    "bengali",
+    "malayalam",
+    "marathi",
+    "odia",
+    "punjabi",
+    "tamil",
+    "telugu",
+    "gujarati",
+    "sindhi",
+]
+
+
+async def run_single_provider_eval(
+    provider: str,
+    language: str,
+    input_dir: str,
+    input_file_name: str,
+    output_dir: str,
+    debug: bool,
+    debug_count: int,
+    ignore_retry: bool,
+    overwrite: bool,
+) -> dict:
+    """Run STT evaluation for a single provider."""
+    provider_output_dir = join(output_dir, provider)
+
+    if not exists(provider_output_dir):
+        os.makedirs(provider_output_dir)
+
+    log_save_path = join(provider_output_dir, "results.log")
+
+    # Configure logger for this provider
     logger.remove()
     logger.add(
         log_save_path,
@@ -658,34 +725,39 @@ async def main():
     )
 
     log_and_print("--------------------------------")
-
-    command = " ".join(sys.argv)
-    log_and_print(f"\033[33mRunning command\033[0m: {command}")
+    log_and_print(f"\033[33mRunning STT evaluation for provider: {provider}\033[0m")
 
     # Validate language is supported by the provider
     try:
-        validate_stt_language(args.language, args.provider)
+        validate_stt_language(language, provider)
     except ValueError as e:
         log_and_print(f"\033[31mError: {e}\033[0m")
-        sys.exit(1)
+        return {"provider": provider, "status": "error", "error": str(e)}
 
     # Audio files are expected in audios/*.wav
-    audio_dir = Path(args.input_dir) / "audios"
-    gt_file = join(args.input_dir, args.input_file_name)
-    results_csv_path = Path(output_dir) / "results.csv"
+    audio_dir = Path(input_dir) / "audios"
+    gt_file = join(input_dir, input_file_name)
+    results_csv_path = Path(provider_output_dir) / "results.csv"
+
+    # Validate existing results.csv structure (if not overwriting)
+    if not overwrite:
+        is_valid, error_msg = validate_existing_results_csv(str(results_csv_path))
+        if not is_valid:
+            log_and_print(f"\033[31mError: {error_msg}\033[0m")
+            return {"provider": provider, "status": "error", "error": error_msg}
 
     # Delete existing results if overwrite is set
-    if args.overwrite and exists(results_csv_path):
+    if overwrite and exists(results_csv_path):
         os.remove(results_csv_path)
         log_and_print("Overwrite enabled - deleted existing results.csv")
 
     gt = pd.read_csv(gt_file)
 
-    if args.debug:
+    if debug:
         logger.debug(
-            f"running in debug mode: using first {args.debug_count} audio files for evaluation"
+            f"running in debug mode: using first {debug_count} audio files for evaluation"
         )
-        gt = gt.head(args.debug_count)
+        gt = gt.head(debug_count)
 
     total_expected = len(gt)
     gt_data = [{"id": row["id"], "gt": row["text"]} for _, row in gt.iterrows()]
@@ -736,12 +808,12 @@ async def main():
         success_count = await run_stt_eval(
             gt_data=gt_data,
             audio_dir=audio_dir,
-            provider=args.provider,
-            language=args.language,
+            provider=provider,
+            language=language,
             results_csv_path=results_csv_path,
         )
 
-        if args.ignore_retry:
+        if ignore_retry:
             break
 
     # Load final results for metrics
@@ -789,11 +861,141 @@ async def main():
             }
         )
 
-    metrics_save_path = join(output_dir, "metrics.json")
+    metrics_save_path = join(provider_output_dir, "metrics.json")
     with open(metrics_save_path, "w") as f:
         json.dump(metrics_data, f, indent=4)
 
-    pd.DataFrame(data).to_csv(join(output_dir, "results.csv"), index=False)
+    pd.DataFrame(data).to_csv(join(provider_output_dir, "results.csv"), index=False)
+
+    return {
+        "provider": provider,
+        "status": "completed",
+        "metrics": metrics_data,
+        "output_dir": provider_output_dir,
+    }
+
+
+async def main():
+    """CLI entry point for single-provider STT evaluation.
+
+    For multiple providers, use `calibrate stt -p provider1 provider2 ...` which
+    routes to benchmark.py, or use the Python SDK's `run()` function.
+    """
+    parser = argparse.ArgumentParser(
+        description="Run STT evaluation for a single provider"
+    )
+    parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        required=True,
+        help="STT provider to use for evaluation",
+    )
+    parser.add_argument(
+        "-l",
+        "--language",
+        type=str,
+        default="english",
+        choices=STT_LANGUAGES,
+        help="Language of the audio files",
+    )
+    parser.add_argument(
+        "-i",
+        "--input-dir",
+        type=str,
+        required=True,
+        help="Path to the input directory containing the audio files and stt.csv",
+    )
+    parser.add_argument(
+        "-f",
+        "--input-file-name",
+        type=str,
+        default="stt.csv",
+        help="Name of the input file containing the dataset to evaluate",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default="./out",
+        help="Path to the output directory to save the results",
+    )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Run the evaluation on the first N audio files",
+    )
+    parser.add_argument(
+        "-dc",
+        "--debug_count",
+        type=int,
+        default=5,
+        help="Number of audio files to run the evaluation on in debug mode",
+    )
+    parser.add_argument(
+        "--ignore_retry",
+        action="store_true",
+        help="Ignore retrying if all the audios are not processed and move on to LLM judge",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing results instead of resuming from last checkpoint",
+    )
+
+    args = parser.parse_args()
+
+    provider = args.provider
+
+    # Validate provider
+    if provider not in STT_PROVIDERS:
+        print(f"\033[31mError: Invalid provider '{provider}'.\033[0m")
+        print(f"Available providers: {', '.join(STT_PROVIDERS)}")
+        sys.exit(1)
+
+    # Validate input directory structure
+    is_valid, error_msg = validate_stt_input_dir(args.input_dir, args.input_file_name)
+    if not is_valid:
+        print(f"\033[31mInput validation error: {error_msg}\033[0m")
+        sys.exit(1)
+
+    if not exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    print("\n\033[91mSTT Evaluation\033[0m\n")
+    print(f"Provider: {provider}")
+    print(f"Language: {args.language}")
+    print(f"Input: {args.input_dir}")
+    print(f"Output: {args.output_dir}")
+    print("")
+
+    # Run single provider evaluation
+    result = await run_single_provider_eval(
+        provider=provider,
+        language=args.language,
+        input_dir=args.input_dir,
+        input_file_name=args.input_file_name,
+        output_dir=args.output_dir,
+        debug=args.debug,
+        debug_count=args.debug_count,
+        ignore_retry=args.ignore_retry,
+        overwrite=args.overwrite,
+    )
+
+    # Print summary
+    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\033[92mSummary\033[0m")
+    print(f"\033[92m{'='*60}\033[0m\n")
+
+    if result.get("status") == "error":
+        print(f"  {provider}: \033[31mError - {result.get('error')}\033[0m")
+        sys.exit(1)
+    else:
+        metrics = result.get("metrics", {})
+        wer = metrics.get("wer", 0)
+        llm_score = metrics.get("llm_judge_score", 0)
+        print(f"  {provider}: WER={wer:.4f}, LLM Score={llm_score:.4f}")
 
 
 if __name__ == "__main__":

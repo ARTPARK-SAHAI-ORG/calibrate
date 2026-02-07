@@ -1,0 +1,3 @@
+reference,prediction,score,reasoning
+नमस्ते। मेरी पत्नी का पूरा नाम गीता प्रसाद है।,"नमस्ते, मेरी पत्नी का पूरा नाम गीता प्रसाद है।",1,"The only difference between the source and transcription is the punctuation: the source uses a period after 'नमस्ते', while the transcription uses a comma. The rest of the sentence is identical, and the values represented are the same. Punctuation differences like this do not change the meaning or value."
+"ठीक है, धन्यवाद।","ठीक है, धन्यवाद।",1,Both the source and transcription strings are exactly the same. The values and meaning are identical.

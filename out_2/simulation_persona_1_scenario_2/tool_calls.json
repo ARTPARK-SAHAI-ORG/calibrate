@@ -1,0 +1,76 @@
+[
+    {
+        "position": 1,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_IiF5mkkhTC5gDJsr2kaC",
+            "args": {
+                "body": {
+                    "content_type": "audio/wav",
+                    "task_type": "polite",
+                    "extension": "wav"
+                },
+                "query": {
+                    "test": "initial_greeting"
+                }
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_1ztAkYkbajll5SEBX80I",
+            "args": {
+                "body": {
+                    "extension": "wav",
+                    "task_type": "agent",
+                    "content_type": "audio/wav"
+                },
+                "query": {
+                    "test": "name_received"
+                }
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "plan_next_question",
+            "tool_call_id": "tool_plan_next_question_Fy3kDXWIpvHrLO8YPOKO",
+            "args": {
+                "next_unanswered_question_index": 2,
+                "questions_answered": [
+                    1
+                ]
+            }
+        }
+    },
+    {
+        "position": 5,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_LurRExfrmmAcQGSu6g0O",
+            "args": {
+                "body": {
+                    "content_type": "audio/wav",
+                    "extension": "wav",
+                    "task_type": "agent"
+                },
+                "query": {
+                    "test": "farewell"
+                }
+            }
+        }
+    },
+    {
+        "position": 5,
+        "data": {
+            "function_name": "end_call",
+            "tool_call_id": "tool_end_call_asm6zRpnu8NR1DkTeZVs",
+            "args": {
+                "reason": "Form completion and final farewell."
+            }
+        }
+    }
+]

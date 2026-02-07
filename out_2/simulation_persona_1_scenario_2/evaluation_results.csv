@@ -1,0 +1,9 @@
+name,value,reasoning
+answer_completeness,1.0,एजेंट ने मरीज का पूरा नाम पूछा। यूजर ने जवाब दिया कि उनकी पत्नी का पूरा नाम गीता प्रसाद है। यह नाम पर्सोना के अनुसार सही है और इसी फॉर्म प्रश्न (Name of patient) के लिए अपेक्षित जानकारी है।
+llm/ttft,2.395509433746338,
+tts/ttft,0.30958592891693115,
+stt/ttft,0.04325532913208008,
+llm/processing_time,2.5249211311340334,
+tts/processing_time,1.197001338005066,
+stt/processing_time,0.3043928623199463,
+stt_llm_judge_score,1.0,

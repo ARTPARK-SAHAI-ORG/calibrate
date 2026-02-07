@@ -1,0 +1,93 @@
+[
+    {
+        "position": 1,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_AIIbn5dQQyRT6gjRfMKf",
+            "args": {
+                "body": {
+                    "content_type": "audio/wav",
+                    "task_type": "polite",
+                    "extension": "wav"
+                },
+                "query": {
+                    "test": "start_conversation"
+                }
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_FXS9979N52nw3zzwUiBN",
+            "args": {
+                "body": {
+                    "extension": "wav",
+                    "task_type": "tts",
+                    "content_type": "audio/wav"
+                },
+                "query": {
+                    "test": "explain_purpose"
+                }
+            }
+        }
+    },
+    {
+        "position": 5,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_8JykTO7vNSJF4gHO5nCm",
+            "args": {
+                "body": {
+                    "task_type": "tts",
+                    "content_type": "audio/wav",
+                    "extension": "wav"
+                },
+                "query": {
+                    "test": "confirm_name"
+                }
+            }
+        }
+    },
+    {
+        "position": 5,
+        "data": {
+            "function_name": "plan_next_question",
+            "tool_call_id": "tool_plan_next_question_7ngk4dfBavaHm5q52nIo",
+            "args": {
+                "questions_answered": [
+                    1
+                ],
+                "next_unanswered_question_index": 2
+            }
+        }
+    },
+    {
+        "position": 7,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_zBZ7VQx6wcR7Hw49v9uh",
+            "args": {
+                "query": {
+                    "test": "end_convo"
+                },
+                "body": {
+                    "extension": "wav",
+                    "content_type": "audio/wav",
+                    "task_type": "tts"
+                }
+            }
+        }
+    },
+    {
+        "position": 7,
+        "data": {
+            "function_name": "end_call",
+            "tool_call_id": "tool_end_call_fEmPpWK6eVu1KfU5zSOm",
+            "args": {
+                "reason": "All questions answered."
+            }
+        }
+    }
+]

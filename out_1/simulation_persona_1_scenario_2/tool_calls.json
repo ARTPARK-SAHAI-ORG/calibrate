@@ -1,0 +1,59 @@
+[
+    {
+        "position": 1,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_Fttjmftx0JMiA5iPjy0G",
+            "args": {
+                "query": {
+                    "test": "initial_greeting"
+                },
+                "body": {
+                    "content_type": "audio/wav",
+                    "task_type": "polite",
+                    "extension": "wav"
+                }
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_KO2cKOCJwpth5GBvrUTO",
+            "args": {
+                "body": {
+                    "task_type": "tts",
+                    "content_type": "audio/wav",
+                    "extension": "wav"
+                },
+                "query": {
+                    "test": "name_received"
+                }
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "plan_next_question",
+            "tool_call_id": "tool_plan_next_question_XbbxOJHSp4LG1ggKNrGR",
+            "args": {
+                "questions_answered": [
+                    1
+                ],
+                "next_unanswered_question_index": 2
+            }
+        }
+    },
+    {
+        "position": 5,
+        "data": {
+            "function_name": "end_call",
+            "tool_call_id": "tool_end_call_5PA2cKN8a19hFt734EBE",
+            "args": {
+                "reason": "All questions answered and user acknowledged."
+            }
+        }
+    }
+]

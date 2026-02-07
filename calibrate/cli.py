@@ -2,16 +2,17 @@
 CLI entry point for calibrate package.
 
 Usage:
-    # New style (recommended) - with subcommands:
-    calibrate stt eval -p deepgram -l english -i ./data -o ./out
-    calibrate stt leaderboard -o ./out -s ./leaderboard
-    calibrate tts eval -p openai -i ./data -o ./out
-    calibrate tts leaderboard -o ./out -s ./leaderboard
-    calibrate llm tests run -c ./config.json -o ./out
-    calibrate llm tests leaderboard -o ./out -s ./leaderboard
-    calibrate llm simulations run -c ./config.json -o ./out
-    calibrate llm simulations leaderboard -o ./out -s ./leaderboard
-    calibrate agent simulation -c ./config.json -o ./out
+    # Interactive mode (recommended):
+    calibrate                                        # Main menu
+    calibrate stt                                    # Interactive STT evaluation
+    calibrate tts                                    # Interactive TTS evaluation
+    calibrate llm                                    # Interactive LLM tests
+    calibrate simulations                            # Interactive simulations
+
+    # Direct mode:
+    calibrate llm -c config.json -m gpt-4.1 -p openrouter -o ./out
+    calibrate simulations --type text -c config.json -m gpt-4.1 -p openrouter -o ./out
+    calibrate simulations --type voice -c config.json -o ./out
 """
 
 import sys
@@ -55,6 +56,33 @@ def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
     return argv
 
 
+def _launch_ink_ui(mode: str):
+    """Launch the bundled Ink UI for interactive TTS/STT evaluation."""
+    import shutil
+    from pathlib import Path
+
+    node_bin = shutil.which("node")
+    if not node_bin:
+        print(
+            f"Error: Node.js is required for the interactive {mode.upper()} UI.\n"
+            "Install it from https://nodejs.org/ or via your package manager."
+        )
+        sys.exit(1)
+
+    bundle_path = Path(__file__).parent / "ui" / "cli.bundle.mjs"
+    if not bundle_path.exists():
+        print(
+            f"Error: UI bundle not found at {bundle_path}\n"
+            "Run 'cd ui && npm run bundle' to build it."
+        )
+        sys.exit(1)
+
+    import subprocess
+
+    result = subprocess.run([node_bin, str(bundle_path), mode])
+    sys.exit(result.returncode)
+
+
 def main():
     """Main CLI entry point that dispatches to component-specific scripts."""
     # Load environment variables from .env file
@@ -62,152 +90,166 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="calibrate",
+        usage="calibrate [-h] {stt,tts,llm,simulations} ...",
         description="Voice agent evaluation and benchmarking toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    calibrate stt eval -p deepgram -l english -i ./data -o ./out
-    calibrate stt leaderboard -o ./out -s ./leaderboard
-    calibrate tts eval -p openai -i ./data -o ./out
-    calibrate llm tests run -c ./config.json -o ./out
-    calibrate llm tests leaderboard -o ./out -s ./leaderboard
-    calibrate llm simulations run -c ./config.json -o ./out
-    calibrate llm simulations leaderboard -o ./out -s ./leaderboard
-    calibrate agent test -c ./config.json -o ./out
-    calibrate agent simulation -c ./config.json -o ./out
+    calibrate                                        # Main menu (interactive)
+    calibrate stt                                    # Interactive STT evaluation
+    calibrate tts                                    # Interactive TTS evaluation
+    calibrate llm                                    # Interactive LLM tests
+    calibrate llm -c config.json                     # Run LLM tests directly
+    calibrate simulations                            # Interactive simulations
+    calibrate simulations --type text -c config.json # Run text simulation directly
         """,
     )
 
-    subparsers = parser.add_subparsers(dest="component", help="Component to run")
-    subparsers.required = True
+    subparsers = parser.add_subparsers(
+        dest="component",
+        help="Component to run",
+        metavar="{stt,tts,llm,simulations}",
+    )
+    subparsers.required = False  # Allow `calibrate` alone for main menu
 
-    # STT subcommands
-    stt_parser = subparsers.add_parser("stt", help="Speech-to-text evaluation")
-    stt_subparsers = stt_parser.add_subparsers(dest="command", help="STT command")
-    stt_subparsers.required = True
-
-    stt_eval_parser = stt_subparsers.add_parser("eval", help="Run STT evaluation")
-    stt_eval_parser.add_argument("-p", "--provider", type=str, required=True)
-    stt_eval_parser.add_argument("-l", "--language", type=str, default="english")
-    stt_eval_parser.add_argument("-i", "--input-dir", type=str, required=True)
-    stt_eval_parser.add_argument("-o", "--output-dir", type=str, default="./out")
-    stt_eval_parser.add_argument("-f", "--input-file-name", type=str, default="stt.csv")
-    stt_eval_parser.add_argument("-d", "--debug", action="store_true")
-    stt_eval_parser.add_argument("-dc", "--debug_count", type=int, default=5)
-    stt_eval_parser.add_argument("--ignore_retry", action="store_true")
-    stt_eval_parser.add_argument(
-        "--overwrite",
+    # ── STT ───────────────────────────────────────────────────────
+    # `calibrate stt` with no args → interactive UI
+    # `calibrate stt -p provider1 provider2 ... -i input-dir ...` → run benchmark (multi) or eval (single)
+    stt_parser = subparsers.add_parser(
+        "stt",
+        help="Speech-to-text evaluation",
+    )
+    stt_parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        nargs="+",
+        help="STT provider(s) to evaluate (space-separated for multiple)",
+    )
+    stt_parser.add_argument("-l", "--language", type=str, default="english")
+    stt_parser.add_argument("-i", "--input-dir", type=str)
+    stt_parser.add_argument("-o", "--output-dir", type=str, default="./out")
+    stt_parser.add_argument("-f", "--input-file-name", type=str, default="stt.csv")
+    stt_parser.add_argument("-d", "--debug", action="store_true")
+    stt_parser.add_argument("-dc", "--debug_count", type=int, default=5)
+    stt_parser.add_argument("--ignore_retry", action="store_true")
+    stt_parser.add_argument("--overwrite", action="store_true")
+    stt_parser.add_argument(
+        "--leaderboard",
         action="store_true",
-        help="Overwrite existing results instead of resuming from last checkpoint",
+        help="Generate leaderboard after evaluation (for single provider)",
     )
+    stt_parser.add_argument("-s", "--save-dir", type=str)
 
-    stt_leaderboard_parser = stt_subparsers.add_parser(
-        "leaderboard", help="Generate STT leaderboard"
-    )
-    stt_leaderboard_parser.add_argument("-o", "--output-dir", type=str, required=True)
-    stt_leaderboard_parser.add_argument("-s", "--save-dir", type=str, required=True)
-
-    # TTS subcommands
+    # ── TTS ───────────────────────────────────────────────────────
+    # `calibrate tts` with no args → interactive UI
+    # `calibrate tts -p provider -i input ...` → single provider (eval.py)
+    # `calibrate tts -p provider1 provider2 -i input ...` → multi-provider (benchmark.py)
     tts_parser = subparsers.add_parser(
         "tts",
-        help="Text-to-speech evaluation (run without subcommand for interactive mode)",
+        help="Text-to-speech evaluation",
     )
-    tts_subparsers = tts_parser.add_subparsers(dest="command", help="TTS command")
-    tts_subparsers.required = False  # Allow `calibrate tts` alone for interactive UI
-
-    tts_eval_parser = tts_subparsers.add_parser("eval", help="Run TTS evaluation")
-    tts_eval_parser.add_argument("-p", "--provider", type=str, default="google")
-    tts_eval_parser.add_argument("-l", "--language", type=str, default="english")
-    tts_eval_parser.add_argument("-i", "--input", type=str, required=True)
-    tts_eval_parser.add_argument("-o", "--output-dir", type=str, default="./out")
-    tts_eval_parser.add_argument("-d", "--debug", action="store_true")
-    tts_eval_parser.add_argument("-dc", "--debug_count", type=int, default=5)
-    tts_eval_parser.add_argument(
-        "--overwrite",
+    tts_parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        nargs="+",
+        help="TTS provider(s) to use for evaluation (space-separated for multiple)",
+    )
+    tts_parser.add_argument("-l", "--language", type=str, default="english")
+    tts_parser.add_argument("-i", "--input", type=str)
+    tts_parser.add_argument("-o", "--output-dir", type=str, default="./out")
+    tts_parser.add_argument("-d", "--debug", action="store_true")
+    tts_parser.add_argument("-dc", "--debug_count", type=int, default=5)
+    tts_parser.add_argument("--overwrite", action="store_true")
+    tts_parser.add_argument(
+        "--leaderboard",
         action="store_true",
-        help="Overwrite existing results instead of resuming from last checkpoint",
+        help="Generate leaderboard after evaluation (for single provider)",
     )
+    tts_parser.add_argument("-s", "--save-dir", type=str)
 
-    tts_leaderboard_parser = tts_subparsers.add_parser(
-        "leaderboard", help="Generate TTS leaderboard"
+    # ── LLM tests ───────────────────────────────────────────────
+    # `calibrate llm` with no args → interactive UI
+    # `calibrate llm -c config.json -m model ...` → single model (run_tests.py)
+    # `calibrate llm -c config.json -m model1 model2 ...` → multi-model (benchmark.py)
+    llm_parser = subparsers.add_parser(
+        "llm",
+        help="LLM evaluation — test agent responses and tool calls",
     )
-    tts_leaderboard_parser.add_argument("-o", "--output-dir", type=str, required=True)
-    tts_leaderboard_parser.add_argument("-s", "--save-dir", type=str, required=True)
-
-    # LLM subcommands
-    llm_parser = subparsers.add_parser("llm", help="LLM evaluation")
-    llm_subparsers = llm_parser.add_subparsers(dest="llm_type", help="LLM type")
-    llm_subparsers.required = True
-
-    # LLM tests subcommands
-    llm_tests_parser = llm_subparsers.add_parser("tests", help="LLM tests")
-    llm_tests_subparsers = llm_tests_parser.add_subparsers(
-        dest="command", help="Tests command"
+    llm_parser.add_argument(
+        "-c", "--config", type=str, default=None, help="Path to test config JSON file"
     )
-    llm_tests_subparsers.required = True
-
-    llm_tests_run_parser = llm_tests_subparsers.add_parser("run", help="Run LLM tests")
-    llm_tests_run_parser.add_argument(
-        "-c", "--config", type=str, default="examples/tests.json"
+    llm_parser.add_argument(
+        "-o", "--output-dir", type=str, default="./out", help="Output directory"
     )
-    llm_tests_run_parser.add_argument("-o", "--output-dir", type=str, default="./out")
-    llm_tests_run_parser.add_argument("-m", "--model", type=str, default="gpt-4.1")
-    llm_tests_run_parser.add_argument(
-        "-p", "--provider", type=str, default="openrouter"
+    llm_parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        nargs="+",
+        help="Model(s) to use for evaluation (space-separated for multiple)",
     )
-
-    llm_tests_leaderboard_parser = llm_tests_subparsers.add_parser(
-        "leaderboard", help="Generate LLM tests leaderboard"
+    llm_parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        default="openrouter",
+        choices=["openai", "openrouter"],
+        help="LLM provider",
     )
-    llm_tests_leaderboard_parser.add_argument(
-        "-o", "--output-dir", type=str, required=True
+    # ── Simulations ─────────────────────────────────────────────
+    # `calibrate simulations` with no args → interactive UI
+    # `calibrate simulations --type text -c config.json ...` → run directly
+    sim_parser = subparsers.add_parser(
+        "simulations",
+        help="Run text or voice simulations",
     )
-    llm_tests_leaderboard_parser.add_argument(
-        "-s", "--save-dir", type=str, required=True
+    sim_parser.add_argument(
+        "-t",
+        "--type",
+        type=str,
+        default=None,
+        choices=["text", "voice"],
+        help="Simulation type: text or voice",
     )
-
-    # LLM simulations subcommands
-    llm_simulations_parser = llm_subparsers.add_parser(
-        "simulations", help="LLM simulations"
+    sim_parser.add_argument(
+        "-c", "--config", type=str, default=None, help="Path to simulation config JSON"
     )
-    llm_simulations_subparsers = llm_simulations_parser.add_subparsers(
-        dest="command", help="Simulations command"
+    sim_parser.add_argument(
+        "-o", "--output-dir", type=str, default="./out", help="Output directory"
     )
-    llm_simulations_subparsers.required = True
-
-    llm_simulations_run_parser = llm_simulations_subparsers.add_parser(
-        "run", help="Run LLM simulation"
+    sim_parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        default="gpt-4.1",
+        help="Model name (text simulations)",
     )
-    llm_simulations_run_parser.add_argument("-c", "--config", type=str, required=True)
-    llm_simulations_run_parser.add_argument(
-        "-o", "--output-dir", type=str, default="./out"
+    sim_parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        default="openrouter",
+        choices=["openai", "openrouter"],
+        help="LLM provider (text simulations)",
     )
-    llm_simulations_run_parser.add_argument(
-        "-m", "--model", type=str, default="gpt-4.1"
-    )
-    llm_simulations_run_parser.add_argument(
-        "-p", "--provider", type=str, default="openrouter"
-    )
-    llm_simulations_run_parser.add_argument(
+    sim_parser.add_argument(
         "-n",
         "--parallel",
         type=int,
         default=1,
-        help="Number of simulations to run in parallel",
+        help="Parallel simulations (text only)",
     )
 
-    llm_simulations_leaderboard_parser = llm_simulations_subparsers.add_parser(
-        "leaderboard", help="Generate LLM simulation leaderboard"
-    )
-    llm_simulations_leaderboard_parser.add_argument(
-        "-o", "--output-dir", type=str, required=True
-    )
-    llm_simulations_leaderboard_parser.add_argument(
-        "-s", "--save-dir", type=str, required=True
-    )
+    # Hidden internal subcommand for simulation leaderboard
+    sim_subparsers = sim_parser.add_subparsers(dest="sim_subcmd", metavar="")
+    sim_lb_parser = sim_subparsers.add_parser("leaderboard")
+    sim_lb_parser.add_argument("-o", "--output-dir", type=str, required=True)
+    sim_lb_parser.add_argument("-s", "--save-dir", type=str, required=True)
 
-    # Agent subcommands
-    agent_parser = subparsers.add_parser("agent", help="Agent simulation")
+    # ── Agent test (hidden — interactive voice testing) ─────────
+    agent_parser = subparsers.add_parser("agent")
     agent_subparsers = agent_parser.add_subparsers(dest="command", help="Agent command")
     agent_subparsers.required = True
 
@@ -217,128 +259,204 @@ Examples:
     agent_test_parser.add_argument("-c", "--config", type=str, required=True)
     agent_test_parser.add_argument("-o", "--output-dir", type=str, default="./out")
 
-    agent_simulation_parser = agent_subparsers.add_parser(
-        "simulation", help="Run agent simulation"
-    )
-    agent_simulation_parser.add_argument("-c", "--config", type=str, required=True)
-    agent_simulation_parser.add_argument(
-        "-o", "--output-dir", type=str, default="./out"
-    )
-    agent_simulation_parser.add_argument("--port", type=int, default=8765)
-
+    # ─────────────────────────────────────────────────────────────
     args = parser.parse_args()
 
-    # Dispatch to the appropriate module
-    # Note: sys.argv[0] should be just the program name, not include subcommands
-    # The submodule parsers will parse the remaining arguments
+    # No component specified → launch main menu UI
+    if args.component is None:
+        _launch_ink_ui("menu")
+
+    # ── Dispatch ────────────────────────────────────────────────
     if args.component == "stt":
-        if args.command == "eval":
-            from calibrate.stt.eval import main as stt_main
+        # If provider is given, run evaluation directly; otherwise launch interactive UI
+        if args.provider is not None:
+            providers = args.provider
 
-            # Map attribute names to their original flag names (preserve underscores)
-            flag_mapping = {
-                "debug_count": "--debug_count",
-                "ignore_retry": "--ignore_retry",
-                "overwrite": "--overwrite",
-            }
-            sys.argv = ["calibrate"] + _args_to_argv(
-                args, exclude_keys={"component", "command"}, flag_mapping=flag_mapping
-            )
-            asyncio.run(stt_main())
-        elif args.command == "leaderboard":
-            from calibrate.stt.leaderboard import main as leaderboard_main
+            if len(providers) == 1:
+                # Single provider → use eval.py (Ink UI calls this for each provider)
+                from calibrate.stt.eval import main as stt_eval_main
 
-            sys.argv = ["calibrate"] + _args_to_argv(
-                args, exclude_keys={"component", "command"}
-            )
-            leaderboard_main()
+                argv = ["calibrate"]
+                argv.extend(["-p", providers[0]])
+                argv.extend(["-l", args.language])
+                argv.extend(["-i", args.input_dir])
+                argv.extend(["-o", args.output_dir])
+                argv.extend(["-f", args.input_file_name])
+                if args.debug:
+                    argv.append("-d")
+                argv.extend(["-dc", str(args.debug_count)])
+                if args.ignore_retry:
+                    argv.append("--ignore_retry")
+                if args.overwrite:
+                    argv.append("--overwrite")
+
+                sys.argv = argv
+                asyncio.run(stt_eval_main())
+
+                # Generate leaderboard if requested (Ink UI passes --leaderboard for last provider)
+                if args.leaderboard:
+                    from calibrate.stt.leaderboard import generate_leaderboard
+
+                    save_dir = args.save_dir or os.path.join(
+                        args.output_dir, "leaderboard"
+                    )
+                    print(f"\n\033[93mGenerating leaderboard...\033[0m")
+                    try:
+                        generate_leaderboard(args.output_dir, save_dir)
+                        print(f"\033[92mLeaderboard saved to {save_dir}\033[0m")
+                    except Exception as e:
+                        print(f"\033[91mError generating leaderboard: {e}\033[0m")
+            else:
+                # Multiple providers → use benchmark.py (parallel execution + auto leaderboard)
+                from calibrate.stt.benchmark import main as stt_benchmark_main
+
+                argv = ["calibrate", "-p"] + providers
+                argv.extend(["-l", args.language])
+                argv.extend(["-i", args.input_dir])
+                argv.extend(["-o", args.output_dir])
+                argv.extend(["-f", args.input_file_name])
+                if args.debug:
+                    argv.append("-d")
+                argv.extend(["-dc", str(args.debug_count)])
+                if args.ignore_retry:
+                    argv.append("--ignore_retry")
+                if args.overwrite:
+                    argv.append("--overwrite")
+                if args.save_dir:
+                    argv.extend(["-s", args.save_dir])
+
+                sys.argv = argv
+                asyncio.run(stt_benchmark_main())
+        else:
+            _launch_ink_ui("stt")
+
     elif args.component == "tts":
-        if args.command is None:
-            # Interactive mode: launch the bundled Ink UI
-            import shutil
-            from pathlib import Path
+        # If provider is given, run evaluation directly; otherwise launch interactive UI
+        if args.provider is not None:
+            providers = args.provider  # Already a list from nargs='+'
 
-            node_bin = shutil.which("node")
-            if not node_bin:
-                print(
-                    "Error: Node.js is required for the interactive TTS UI.\n"
-                    "Install it from https://nodejs.org/ or via your package manager.\n\n"
-                    "Alternatively, use the non-interactive commands:\n"
-                    "  calibrate tts eval -p <provider> -l <language> -i <input.csv> -o <output_dir>\n"
-                    "  calibrate tts leaderboard -o <output_dir> -s <save_dir>"
-                )
-                sys.exit(1)
+            if len(providers) == 1:
+                # Single provider → use eval.py (for Ink UI compatibility)
+                from calibrate.tts.eval import main as tts_eval_main
 
-            bundle_path = Path(__file__).parent / "ui" / "cli.bundle.mjs"
-            if not bundle_path.exists():
-                print(
-                    f"Error: UI bundle not found at {bundle_path}\n"
-                    "Run 'cd ui && npm run bundle' to build it."
-                )
-                sys.exit(1)
+                argv = ["calibrate", "-p", providers[0]]
+                argv.extend(["-l", args.language])
+                argv.extend(["-i", args.input])
+                argv.extend(["-o", args.output_dir])
+                if args.debug:
+                    argv.append("-d")
+                argv.extend(["-dc", str(args.debug_count)])
+                if args.overwrite:
+                    argv.append("--overwrite")
+                if args.leaderboard:
+                    argv.append("--leaderboard")
+                if args.save_dir:
+                    argv.extend(["-s", args.save_dir])
 
-            import subprocess
+                sys.argv = argv
+                asyncio.run(tts_eval_main())
+            else:
+                # Multiple providers → use benchmark.py (parallel execution + auto leaderboard)
+                from calibrate.tts.benchmark import main as tts_benchmark_main
 
-            result = subprocess.run([node_bin, str(bundle_path)])
-            sys.exit(result.returncode)
-        elif args.command == "eval":
-            from calibrate.tts.eval import main as tts_main
+                argv = ["calibrate", "-p"] + providers
+                argv.extend(["-l", args.language])
+                argv.extend(["-i", args.input])
+                argv.extend(["-o", args.output_dir])
+                if args.debug:
+                    argv.append("-d")
+                argv.extend(["-dc", str(args.debug_count)])
+                if args.overwrite:
+                    argv.append("--overwrite")
 
-            # Map attribute names to their original flag names (preserve underscores)
-            flag_mapping = {
-                "debug_count": "--debug_count",
-                "overwrite": "--overwrite",
-            }
-            sys.argv = ["calibrate"] + _args_to_argv(
-                args, exclude_keys={"component", "command"}, flag_mapping=flag_mapping
-            )
-            asyncio.run(tts_main())
-        elif args.command == "leaderboard":
-            from calibrate.tts.leaderboard import main as leaderboard_main
+                sys.argv = argv
+                asyncio.run(tts_benchmark_main())
+        else:
+            _launch_ink_ui("tts")
 
-            sys.argv = ["calibrate"] + _args_to_argv(
-                args, exclude_keys={"component", "command"}
-            )
-            leaderboard_main()
     elif args.component == "llm":
-        if args.llm_type == "tests":
-            if args.command == "run":
+        if args.config is None:
+            # No config → interactive mode
+            _launch_ink_ui("llm")
+        else:
+            # Direct mode: run tests with provided config
+            models = (
+                args.model if args.model else ["gpt-4.1"]
+            )  # Default to gpt-4.1 if not specified
+
+            if len(models) == 1:
+                # Single model → use run_tests.py (for Ink UI compatibility)
                 from calibrate.llm.run_tests import main as llm_tests_main
 
-                sys.argv = ["calibrate"] + _args_to_argv(
-                    args, exclude_keys={"component", "llm_type", "command"}
-                )
+                argv = ["calibrate", "-c", args.config]
+                argv.extend(["-o", args.output_dir])
+                argv.extend(["-m", models[0]])
+                argv.extend(["-p", args.provider])
+
+                sys.argv = argv
                 asyncio.run(llm_tests_main())
-            elif args.command == "leaderboard":
-                from calibrate.llm.tests_leaderboard import main as leaderboard_main
+            else:
+                # Multiple models → use benchmark.py (parallel execution + auto leaderboard)
+                from calibrate.llm.benchmark import main as llm_benchmark_main
 
-                sys.argv = ["calibrate"] + _args_to_argv(
-                    args, exclude_keys={"component", "llm_type", "command"}
-                )
-                leaderboard_main()
-        elif args.llm_type == "simulations":
-            if args.command == "run":
-                from calibrate.llm.run_simulation import main as llm_simulation_main
+                argv = ["calibrate", "-c", args.config]
+                argv.extend(["-o", args.output_dir])
+                argv.extend(["-m"] + models)
+                argv.extend(["-p", args.provider])
 
-                sys.argv = ["calibrate"] + _args_to_argv(
-                    args, exclude_keys={"component", "llm_type", "command"}
-                )
-                asyncio.run(llm_simulation_main())
-            elif args.command == "leaderboard":
-                from calibrate.llm.simulation_leaderboard import (
-                    main as leaderboard_main,
-                )
+                sys.argv = argv
+                asyncio.run(llm_benchmark_main())
 
-                sys.argv = ["calibrate"] + _args_to_argv(
-                    args, exclude_keys={"component", "llm_type", "command"}
-                )
-                leaderboard_main()
+    elif args.component == "simulations":
+        # Hidden leaderboard subcommand (used by Ink UI)
+        if getattr(args, "sim_subcmd", None) == "leaderboard":
+            from calibrate.llm.simulation_leaderboard import (
+                main as leaderboard_main,
+            )
+
+            sys.argv = ["calibrate"] + _args_to_argv(
+                args,
+                exclude_keys={
+                    "component",
+                    "sim_subcmd",
+                    "type",
+                    "config",
+                    "model",
+                    "provider",
+                    "parallel",
+                    "port",
+                },
+            )
+            leaderboard_main()
+        elif args.type is None or args.config is None:
+            # Missing type or config → interactive mode
+            _launch_ink_ui("simulations")
+        elif args.type == "text":
+            from calibrate.llm.run_simulation import main as llm_simulation_main
+
+            sys.argv = ["calibrate"] + _args_to_argv(
+                args, exclude_keys={"component", "sim_subcmd", "type"}
+            )
+            asyncio.run(llm_simulation_main())
+        elif args.type == "voice":
+            from calibrate.agent.run_simulation import main as agent_main
+
+            sys.argv = ["calibrate"] + _args_to_argv(
+                args,
+                exclude_keys={
+                    "component",
+                    "sim_subcmd",
+                    "type",
+                    "model",
+                    "provider",
+                    "parallel",
+                },
+            )
+            asyncio.run(agent_main())
+
     elif args.component == "agent":
         if args.command == "test":
-            # The test.py script uses pipecat's runner which expects specific sys.argv format
-            # We need to convert output-dir to output_dir for the test script
             test_args = _args_to_argv(args, exclude_keys={"component", "command"})
-            # Convert --output-dir to --output_dir for test.py compatibility
             test_args = [
                 arg.replace("--output-dir", "--output_dir") for arg in test_args
             ]
@@ -348,13 +466,7 @@ Examples:
             )
             sys.argv = ["calibrate-agent-test"] + test_args
             runpy.run_path(test_module_path, run_name="__main__")
-        elif args.command == "simulation":
-            from calibrate.agent.run_simulation import main as agent_main
 
-            sys.argv = ["calibrate"] + _args_to_argv(
-                args, exclude_keys={"component", "command"}
-            )
-            asyncio.run(agent_main())
     else:
         parser.print_help()
         sys.exit(1)

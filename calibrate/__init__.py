@@ -2,16 +2,14 @@
 calibrate - A package for voice agent evaluation and benchmarking.
 
 Library Usage:
-    # STT Evaluation
-    from calibrate.stt import eval, leaderboard
+    # STT Evaluation (runs eval across providers + generates leaderboard)
+    from calibrate.stt import run
     import asyncio
-    asyncio.run(eval(provider="deepgram", input_dir="./data", output_dir="./out"))
-    leaderboard(output_dir="./out", save_dir="./leaderboard")
+    asyncio.run(run(providers=["deepgram", "google"], input_dir="./data", output_dir="./out"))
 
-    # TTS Evaluation
-    from calibrate.tts import eval, leaderboard
-    asyncio.run(eval(provider="google", input="./data/sample.csv", output_dir="./out"))
-    leaderboard(output_dir="./out", save_dir="./leaderboard")
+    # TTS Evaluation (runs eval across providers + generates leaderboard)
+    from calibrate.tts import run
+    asyncio.run(run(providers=["google", "openai"], input="./data/sample.csv", output_dir="./out"))
 
     # LLM Tests
     from calibrate.llm import tests
@@ -27,6 +25,18 @@ Library Usage:
     from calibrate.agent import simulation
     asyncio.run(simulation.run(config="./config.json", output_dir="./out"))
 """
+
+# Suppress noisy startup logs from pipecat (loguru) and transformers
+# This MUST happen before any submodule imports that trigger pipecat/transformers
+import sys
+import os
+
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+
+from loguru import logger
+
+logger.remove()  # Remove default handler to suppress pipecat startup message
+logger.add(sys.stderr, level="WARNING")
 
 from importlib.metadata import version, PackageNotFoundError
 

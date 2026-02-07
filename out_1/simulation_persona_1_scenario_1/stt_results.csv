@@ -1,0 +1,2 @@
+reference,prediction,score,reasoning
+"नमस्ते। हां, उम्म… नाम गीता प्रसाद है।","नमस्ते, हां, उम नाम गीता प्रसाद है।",1,"The source says 'उम्म…' while the transcription says 'उम'. The difference here is minor and represents a hesitation sound, which is captured similarly in both. All the key values, including the name 'गीता प्रसाद', are the same. The difference in punctuation and the slight variation in the hesitation sound do not change the underlying value."

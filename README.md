@@ -24,9 +24,14 @@ pip install calibrate-agent
 
 ## Usage
 
-Calibrate can be used as a **Python SDK** or through the **CLI**.
+```bash
+calibrate              # Interactive main menu
+calibrate stt          # Benchmark STT providers
+calibrate tts          # Benchmark TTS providers
+calibrate llm          # Interactive LLM evaluation
+calibrate simulations  # Interactive text or voice simulations
+```
 
-- [Python SDK Documentation](https://calibrate.artpark.ai/docs/python-sdk/overview)
 - [CLI Documentation](https://calibrate.artpark.ai/docs/cli/overview)
 
 ## License

@@ -1,3 +1,0 @@
-id,text,audio_path,ttfb,llm_judge_score,llm_judge_reasoning
-row_1,hello world,calibrate/tts/examples/sample_output/elevenlabs/audios/row_1.wav,1.5105640888214111,True,"The audio says 'hello world' clearly and matches the reference text exactly. There are no discrepancies in pronunciation, wording, or content between the audio and the provided text."
-row_2,this is a test,calibrate/tts/examples/sample_output/elevenlabs/audios/row_2.wav,1.2153360843658447,True,"The audio clearly says 'this is a test,' which matches exactly with the provided reference text. The pronunciation, wording, and sequence of words are all correct and easily understandable from the audio."

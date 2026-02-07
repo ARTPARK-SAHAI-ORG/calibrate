@@ -103,7 +103,7 @@ def log_and_print(
         simulation_name: Override simulation name (uses context var if not provided)
     """
     text = str(message)
-    print(text)
+    print(text, flush=True)
 
     if use_loguru:
         # logger.info will inherit the simulation context from logger.contextualize()

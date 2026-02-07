@@ -1,0 +1,49 @@
+[
+    {
+        "position": 1,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_HUgJ39uDiBbyh7rxfXPJ",
+            "args": {
+                "query": {
+                    "test": "initial_greeting"
+                },
+                "body": {
+                    "extension": "wav",
+                    "task_type": "polite",
+                    "content_type": "audio/wav"
+                }
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "plan_next_question",
+            "tool_call_id": "tool_plan_next_question_FYdFKPwvY8kxhpVtHdnz",
+            "args": {
+                "questions_answered": [
+                    1
+                ],
+                "next_unanswered_question_index": 2
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_p6Ep0TDAG2N2IVHhLcoN",
+            "args": {
+                "query": {
+                    "test": "completed_name"
+                },
+                "body": {
+                    "content_type": "audio/wav",
+                    "extension": "wav",
+                    "task_type": "tts"
+                }
+            }
+        }
+    }
+]

@@ -119,46 +119,28 @@ PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
 
 
-def is_port_available(port: int) -> bool:
-    """Check if a port is available by verifying no process is listening on it."""
-    # First check if we can connect to the port (if yes, something is listening)
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(0.5)
-            result = s.connect_ex(("localhost", port))
-            if result == 0:
-                # Connection succeeded, port is in use
-                return False
-    except OSError:
-        pass
-
-    # Then verify we can bind to it (without SO_REUSEADDR for stricter check)
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.bind(("localhost", port))
-            return True
-    except OSError:
-        return False
-
-
-def find_available_port(
-    start_port: int, max_attempts: int = 100, excluded_ports: Optional[set] = None
-) -> Optional[int]:
-    """Find an available port starting from start_port, checking up to max_attempts ports.
-
-    Args:
-        start_port: Port to start checking from
-        max_attempts: Maximum number of ports to check
-        excluded_ports: Set of ports to exclude from consideration
+def find_available_port() -> int:
+    """Find an available port by letting the OS assign one.
+    
+    This is the most robust approach for scalability when multiple processes
+    may be trying to find ports simultaneously. The OS handles the race condition
+    by assigning unique ephemeral ports.
+    
+    Returns:
+        An available port number.
+        
+    Raises:
+        RuntimeError: If unable to find an available port.
     """
-    excluded_ports = excluded_ports or set()
-    for i in range(max_attempts):
-        port = start_port + i
-        if port in excluded_ports:
-            continue
-        if is_port_available(port):
+    try:
+        # Let the OS assign an available port by binding to port 0
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind(("localhost", 0))
+            port = s.getsockname()[1]
             return port
-    return None
+    except OSError as e:
+        raise RuntimeError(f"Could not find an available port: {e}")
 
 
 async def start_bot(
@@ -1151,7 +1133,7 @@ async def _run_simulation_inner(
     if not meaningful_messages:
         error_details = ""
         if captured_errors:
-            error_details = f" Captured errors: {'; '.join(captured_errors)}"
+            error_details = f"{'; '.join(captured_errors)}"
         raise RuntimeError(
             f"Simulation failed: no meaningful conversation occurred.{error_details}"
         )
@@ -1301,7 +1283,6 @@ async def run_single_simulation_task(
     scenario: dict,
     output_dir: str,
     interrupt_sensitivity_map: dict,
-    base_port: int = DEFAULT_PORT,
 ):
     """Run a single simulation task."""
     simulation_name = (
@@ -1333,13 +1314,8 @@ async def run_single_simulation_task(
     os.makedirs(simulation_output_dir)
 
     # Find an available port for this simulation
-    port = find_available_port(base_port)
-
-    if port is None:
-        raise RuntimeError(
-            f"Could not find an available port starting from {base_port} "
-            f"after checking 100 ports. Please free up some ports or use a different base port."
-        )
+    # Uses OS-assigned ephemeral port for robustness when multiple simulations run concurrently
+    port = find_available_port()
 
     # Save persona dict and scenario dict
     simulation_config = {
@@ -1536,12 +1512,6 @@ async def main():
         default="./out",
         help="Path to the output directory to save the results",
     )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8765,
-        help="Websocket port to run the simulations on",
-    )
 
     args = parser.parse_args()
 
@@ -1574,7 +1544,6 @@ async def main():
                 scenario=scenario,
                 output_dir=args.output_dir,
                 interrupt_sensitivity_map=interrupt_sensitivity_map,
-                base_port=args.port,
             )
             results.append(result)
 

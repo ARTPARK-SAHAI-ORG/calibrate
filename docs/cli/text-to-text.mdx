@@ -1,400 +1,136 @@
 ---
 title: "LLM Evaluation"
-description: "Evaluate LLM behavior via CLI"
+description: "Create edge cases to test the LLM powering your agent"
 ---
 
-Run LLM tests to validate tool calls and response patterns.
-
-<Card
-  title="Learn about LLM tests"
-  icon="flask"
-  href="/quickstart/text-to-text"
->
-  Step-by-step guide to creating and running LLM tests
-</Card>
-
-## Configuration
-
-Create a JSON configuration file that defines your agent's behavior and test cases.
-
-### System Prompt
-
-The system prompt defines your agent's behavior, personality, and capabilities. It sets the context for how the LLM should respond.
-
-```json
-{
-  "system_prompt": "You are a helpful assistant filling out a medical form. Ask questions one at a time and be empathetic with patients."
-}
+```bash
+calibrate llm
 ```
 
-**Best Practices:**
+The interactive UI guides you through the full evaluation process:
 
-- Be specific about the agent's role and purpose
-- Include any constraints or rules the agent must follow
-- Specify the tone and style of communication
-- Mention when tools should be called
+1. **Config file** — path to a JSON file containing system prompt, tools, and test cases
+2. **Provider** — OpenRouter or OpenAI (determines model options)
+3. **Model selection** — multi-select from a list of suggested models:
+   - Use Space to toggle selection, Enter to confirm
+   - Provider-specific options are shown (e.g., `openai/gpt-4.1` for OpenRouter)
+4. **Output directory** — where results will be saved (defaults to `./out`)
+5. **API key setup** — enter any missing API keys
+6. **Evaluation** — runs models in parallel (max 2 at a time), showing live progress in side-by-side columns
+7. **Leaderboard** — displays comparison table with pass rates, bar charts, and option to drill into model details
+8. **Model details** — view test-by-test results with pass/fail status and reasoning
 
-### Tools
+### Output Directory
 
-Tools extend your agent's capabilities by enabling structured outputs or external API calls:
+When using the interactive UI, if the output directory already contains model results or other data, you'll be prompted to confirm before overwriting:
 
-<Card title="Understanding Tools" icon="wrench" href="/core-concepts/tools">
-  Learn about webhook and structured output tools
-</Card>
+```
+⚠ Existing data found
 
-#### Structured Output Tools
+The following directories already contain data:
+  • ./out/openai__gpt-4.1
+  • ./out/leaderboard
 
-These tools extract information from conversations in a defined format. Use them when you need the LLM to:
+Do you want to overwrite existing results?
+  > Yes, overwrite and continue
+    No, enter a different path
+```
 
-- Track conversation state
-- Extract structured data from user responses
-- Make decisions about conversation flow
+### Output
+
+Results are saved per-model with a leaderboard auto-generated after all models complete:
+
+```
+/path/to/output/
+├── openai__gpt-4.1/           # Model folder (slashes replaced with __)
+│   ├── results.json           # Per-test results with pass/fail
+│   ├── metrics.json           # Aggregated metrics {total, passed}
+│   └── results.log            # Terminal output
+├── anthropic__claude-3.5-sonnet/
+│   ├── results.json
+│   ├── metrics.json
+│   └── results.log
+└── leaderboard/
+    ├── llm_leaderboard.csv    # Model comparison
+    └── llm_leaderboard.png    # Bar chart
+```
+
+**results.json** contains per-test evaluation results:
 
 ```json
-{
-  "type": "client",
-  "name": "plan_next_question",
-  "description": "Plan the next question to ask based on user's response",
-  "parameters": [
-    {
-      "id": "next_unanswered_question_index",
-      "type": "integer",
-      "description": "Index of the next question to ask (1-indexed)",
-      "required": true
+[
+  {
+    "output": {
+      "response": "Hello! How can I help you?",
+      "tool_calls": []
     },
-    {
-      "id": "questions_answered",
-      "type": "array",
-      "description": "List of question indices that were answered in the last user response",
-      "items": { "type": "integer" },
-      "required": true
-    }
-  ]
-}
-```
-
-**Key Fields:**
-
-- `type`: Set to `"client"` or `"structured_output"` (both work the same)
-- `name`: Unique identifier for the tool
-- `description`: When and why the LLM should call this tool (be specific!)
-- `parameters`: Array of parameter definitions
-
-**Parameter Fields:**
-
-- `id`: Parameter name
-- `type`: Data type (`string`, `integer`, `number`, `boolean`, `array`, `object`)
-- `description`: What this parameter represents and how to populate it
-- `required`: Whether this field is mandatory
-- `items`: For array types, defines the type of array elements
-
-####Webhook Tools
-
-Webhook tools call external APIs to perform actions. Use them when you need to:
-
-- Submit data to external systems
-- Query databases or services
-- Trigger notifications or workflows
-- Integrate with third-party APIs
-
-```json
-{
-  "type": "webhook",
-  "name": "submit_form",
-  "description": "Submit completed form data to the backend API",
-  "webhook": {
-    "method": "POST",
-    "url": "https://api.example.com/forms/submit",
-    "timeout": 20,
-    "headers": [
-      { "name": "Authorization", "value": "Bearer YOUR_TOKEN" },
-      { "name": "Content-Type", "value": "application/json" }
-    ],
-    "body": {
-      "description": "Form data with user information",
-      "parameters": [
-        {
-          "id": "name",
-          "type": "string",
-          "description": "User's full name",
-          "required": true
-        },
-        {
-          "id": "age",
-          "type": "integer",
-          "description": "User's age in years",
-          "required": true
-        }
-      ]
-    }
+    "metrics": { "passed": true },
+    "test_case": { ... }
   }
-}
+]
 ```
 
-**Webhook Configuration:**
+---
 
-- `method`: HTTP method (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`)
-- `url`: The endpoint URL to call
-- `timeout`: Maximum wait time in seconds (optional, default: 20)
-- `headers`: HTTP headers to include in the request
-- `body.parameters`: Data fields to send in the request body
+## Direct Mode
 
-**Important Notes:**
+Pass all parameters as flags to skip the interactive UI:
 
-- Webhook tools make actual HTTP calls during evaluation
-- The LLM provides values for all parameters
-- Failed requests return error details in the response
-- Use headers for authentication tokens
+```bash
+# Single model evaluation
+calibrate llm -c config.json -m gpt-4.1 -p openrouter -o ./out
 
-### Test Cases
+# Multiple models (runs in parallel, auto-generates leaderboard)
+calibrate llm -c config.json -m gpt-4.1 claude-3.5-sonnet gemini-2.0-flash -p openrouter -o ./out
+```
 
-Test cases define conversation scenarios and expected outcomes. Each test validates specific agent behavior.
+<Note>
+  When running multiple models, they execute in parallel (max 2 at a time) and a
+  leaderboard is automatically generated after all models complete.
+</Note>
 
-#### Test Case Structure
+### CLI Options
+
+| Flag                 | Description                                  | Default      |
+| -------------------- | -------------------------------------------- | ------------ |
+| `-c`, `--config`     | Path to test config JSON file                | —            |
+| `-m`, `--model`      | Model name(s) - space-separated for multiple | `gpt-4.1`    |
+| `-p`, `--provider`   | LLM provider (`openai`/`openrouter`)         | `openrouter` |
+| `-o`, `--output-dir` | Output directory                             | `./out`      |
+
+<Note>
+  For a guided setup experience with interactive prompts, run `calibrate llm`
+  without any arguments.
+</Note>
+
+---
+
+## Config File Format
+
+The config file is a JSON file containing the system prompt, tools, and test cases:
 
 ```json
 {
-  "history": [
-    { "role": "assistant", "content": "Hello! What is your name?" },
-    { "role": "user", "content": "Aman Dalmia" }
-  ],
-  "evaluation": {
-    "type": "tool_call"
-  },
-  "settings": { "language": "english" }
-}
-```
-
-**History Array:**
-
-- Defines the conversation context leading up to the test
-- Each message has a `role` (`"assistant"` or `"user"`) and `content`
-- The LLM generates a response based on this history
-- Can include tool call messages for complex scenarios
-
-**Settings (Optional):**
-
-- `language`: Specify the language for the agent's response (e.g., `"english"`, `"hindi"`)
-
-#### Tool Call Tests
-
-Verify that the LLM calls the correct tools with the correct parameters. Use these tests to ensure:
-
-- Tools are invoked at the right time
-- Parameters are populated correctly
-- Multiple tools are called in the right sequence
-
-```json
-{
-  "history": [
-    { "role": "assistant", "content": "What is your name?" },
-    { "role": "user", "content": "Aman Dalmia" }
-  ],
-  "evaluation": {
-    "type": "tool_call",
-    "tool_calls": [
-      {
-        "tool": "plan_next_question",
-        "arguments": {
-          "next_unanswered_question_index": 2,
-          "questions_answered": [1]
-        }
-      }
-    ]
-  }
-}
-```
-
-**Evaluation Fields:**
-
-- `type`: Set to `"tool_call"`
-- `tool_calls`: Array of expected tool invocations
-- Each tool call specifies:
-  - `tool`: Name of the tool that should be called
-  - `arguments`: Expected parameter values (exact match required)
-
-**How It Works:**
-
-- The test passes if the LLM calls all specified tools with matching arguments
-- Order of tool calls matters
-- All specified arguments must match exactly
-
-#### Response Tests
-
-Verify that the LLM's text response meets specific criteria. Use these tests to validate:
-
-- Tone and style of responses
-- Content accuracy
-- Adherence to guidelines
-- Handling of edge cases
-
-```json
-{
-  "history": [
-    { "role": "assistant", "content": "What is your phone number?" },
-    { "role": "user", "content": "Can I skip this question?" }
-  ],
-  "evaluation": {
-    "type": "response",
-    "criteria": "The assistant should politely allow the user to skip providing their phone number and move to the next question."
-  }
-}
-```
-
-**Evaluation Fields:**
-
-- `type`: Set to `"response"`
-- `criteria`: Natural language description of what makes a good response
-
-**How It Works:**
-
-- An LLM judge evaluates whether the response meets the criteria
-- The judge provides pass/fail and reasoning
-- Use specific, measurable criteria for better results
-- Can test for tone, content, completeness, or any text quality
-
-### Complete Example
-
-```json
-{
-  "system_prompt": "You are a helpful assistant filling out a form...",
-  "tools": [
-    {
-      "type": "client",
-      "name": "plan_next_question",
-      "description": "Plan the next question to ask",
-      "parameters": [
-        {
-          "id": "next_unanswered_question_index",
-          "type": "integer",
-          "description": "Index of next question",
-          "required": true
-        }
-      ]
-    }
-  ],
+  "system_prompt": "You are a helpful assistant...",
+  "tools": [...],
   "test_cases": [
     {
       "history": [
-        { "role": "assistant", "content": "Hello! What is your name?" },
-        { "role": "user", "content": "Aman Dalmia" }
-      ],
-      "evaluation": {
-        "type": "tool_call",
-        "tool_calls": [
-          {
-            "tool": "plan_next_question",
-            "arguments": {
-              "next_unanswered_question_index": 2,
-              "questions_answered": [1]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "history": [
-        { "role": "assistant", "content": "What is your phone number?" },
-        { "role": "user", "content": "Can I skip this question?" }
+        {"role": "user", "content": "Hello"}
       ],
       "evaluation": {
         "type": "response",
-        "criteria": "The assistant should allow the user to skip."
+        "criteria": "The assistant should greet the user"
       }
     }
   ]
 }
 ```
 
----
+See the [core concepts](/core-concepts/agents) documentation for details on the config structure.
 
-## Run Tests
+## Resources
 
-```bash
-calibrate llm tests run -c <config_file> -o <output_dir> -m <model> -p <provider>
-```
-
-### Arguments
-
-| Flag | Long           | Type   | Required | Default               | Description                                    |
-| ---- | -------------- | ------ | -------- | --------------------- | ---------------------------------------------- |
-| `-c` | `--config`     | string | No       | `examples/tests.json` | Path to test configuration JSON file           |
-| `-o` | `--output-dir` | string | No       | `./out`               | Path to output directory                       |
-| `-m` | `--model`      | string | No       | `gpt-4.1`             | Model name (e.g., `gpt-4.1`, `openai/gpt-4.1`) |
-| `-p` | `--provider`   | string | No       | `openrouter`          | Provider: `openai` or `openrouter`             |
-
-### Examples
-
-**Basic:**
-
-```bash
-calibrate llm tests run -c ./config.json -o ./out
-```
-
-**Specific model:**
-
-```bash
-calibrate llm tests run -c ./config.json -m openai/gpt-4.1 -p openrouter
-```
-
-**OpenAI direct:**
-
-```bash
-calibrate llm tests run -c ./config.json -m gpt-4.1 -p openai
-```
-
-### Output
-
-```
-/path/to/output/<test_config_name>/<model_name>
-├── results.json      # Detailed results for each test case
-├── metrics.json      # Summary statistics (total, passed)
-└── logs
-```
-
----
-
-## Leaderboard
-
-Generate a comparison of multiple test runs.
-
-```bash
-calibrate llm tests leaderboard -o <output_dir> -s <save_dir>
-```
-
-### Arguments
-
-| Flag | Long           | Type   | Required | Description                           |
-| ---- | -------------- | ------ | -------- | ------------------------------------- |
-| `-o` | `--output-dir` | string | Yes      | Directory containing test run folders |
-| `-s` | `--save-dir`   | string | Yes      | Directory to save leaderboard outputs |
-
-### Example
-
-```bash
-calibrate llm tests leaderboard -o ./out -s ./leaderboard
-```
-
-### Output
-
-- `ttt_leaderboard.csv` - Pass percentages by model and test config
-- `ttt_leaderboard.png` - Visual comparison chart
-
----
-
-## Providers
-
-| Provider     | Model Format   | Example                                     |
-| ------------ | -------------- | ------------------------------------------- |
-| `openai`     | OpenAI naming  | `gpt-4.1`, `gpt-4o`                         |
-| `openrouter` | Provider/model | `openai/gpt-4.1`, `anthropic/claude-3-opus` |
-
-## Environment Variables
-
-```bash
-# For OpenAI provider
-export OPENAI_API_KEY=your_key
-
-# For OpenRouter provider
-export OPENROUTER_API_KEY=your_key
-```
+<Card title="Integrations" icon="volume-high" href="/integrations/llm">
+  See the full list of supported providers and their configuration options
+</Card>

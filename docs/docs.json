@@ -11,7 +11,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Getting Started",
+        "tab": "Getting started",
         "groups": [
           {
             "group": "Get Started",
@@ -55,47 +55,17 @@
         ]
       },
       {
-        "tab": "Python SDK",
-        "groups": [
-          {
-            "group": "Python SDK",
-            "pages": ["python-sdk/overview"]
-          },
-          {
-            "group": "Component Testing",
-            "pages": [
-              "python-sdk/speech-to-text",
-              "python-sdk/text-to-text",
-              "python-sdk/text-to-speech"
-            ]
-          },
-          {
-            "group": "End to End Tests",
-            "pages": [
-              "python-sdk/text-simulations",
-              "python-sdk/voice-simulations"
-            ]
-          }
-        ]
-      },
-      {
         "tab": "CLI",
         "groups": [
           {
             "group": "CLI",
-            "pages": ["cli/overview"]
-          },
-          {
-            "group": "Component Testing",
             "pages": [
+              "cli/overview",
               "cli/speech-to-text",
               "cli/text-to-text",
-              "cli/text-to-speech"
+              "cli/text-to-speech",
+              "cli/simulations"
             ]
-          },
-          {
-            "group": "End to End Tests",
-            "pages": ["cli/text-simulations", "cli/voice-simulations"]
           }
         ]
       },

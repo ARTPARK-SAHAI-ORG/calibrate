@@ -3,9 +3,27 @@ title: "Speech to Text"
 description: "Evaluate Speech to Text providers via CLI"
 ---
 
-## Input Structure
+## Get started
 
-Prepare a directory with this structure:
+```bash
+calibrate stt
+```
+
+<iframe
+  className="w-full aspect-video rounded-xl"
+  src="https://www.youtube.com/embed/pFdsOMo_J2s"
+  title="CLI Speech-to-Text Evaluation Walkthrough"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+
+The interactive UI guides you through the full evaluation process:
+
+1. **Language selection** — pick from 10+ supported Indic languages
+2. **Provider selection** — choose providers (only those supporting your language are shown)
+3. **Input directory** — path to the directory containing your audio files and reference transcripts
+
+The input directory should have this structure:
 
 ```
 /path/to/data/
@@ -15,7 +33,7 @@ Prepare a directory with this structure:
     └── audio_2.wav
 ```
 
-**stt.csv format:**
+The **stt.csv** file contains the reference transcriptions:
 
 | id      | text                            |
 | ------- | ------------------------------- |
@@ -23,140 +41,41 @@ Prepare a directory with this structure:
 | audio_2 | Madam, my name is Geeta Shankar |
 
 <Note>
-All audio files should be in WAV format. The evaluation script expects files at `audios/<id>.wav` where `<id>` matches the `id` column in your CSV.
+  All audio files should be in WAV format. The evaluation script expects files
+  at `audios/<id>.wav` where `<id>` matches the `id` column in your CSV.
 </Note>
+
+Refer to the [sample dataset](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/stt/sample_input) for a template.
+
+4. **Output directory** — where results will be saved (defaults to `./out`)
+5. **API keys** — enter the API keys for the selected providers
+
+The evaluation runs providers in parallel (max 2 at a time), showing the transcriptions as they are generated.
+
+## Output
+
+Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.
+
+<Frame>
+  <img src="./images/stt_leaderboard.png" alt="STT leaderboard" />
+</Frame>
+
+You can also view the generated transcript and metrics for each row of your dataset including the LLM judge score and reasoning.
+
+<Frame>
+  <img src="./images/stt_output_provider.png" alt="STT provider outputs" />
+</Frame>
 
 <Card
   title="Learn more about metrics"
   icon="chart-bar"
-  href="/getting-started/core-concepts#metrics"
+  href="/core-concepts/speech-to-text#metrics"
 >
-  Detailed explanation of all metrics, including why LLM Judge is necessary
+  Detailed explanation of all metrics and why using an LLM Judge is necessary
 </Card>
 
----
+## Resources
 
-## Run Evaluation
-
-Evaluate a Speech to Text provider on your dataset.
-
-```bash
-calibrate stt eval -p <provider> -l <language> -i <input_dir> -o <output_dir>
-```
-
-### Arguments
-
-| Flag  | Long                | Type   | Required | Default   | Description                                                                                                                            |
-| ----- | ------------------- | ------ | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `-p`  | `--provider`        | string | Yes      | -         | Provider: `deepgram`, `openai`, `cartesia`, `google`, `sarvam`, `elevenlabs`, `smallest`, `groq`                                       |
-| `-l`  | `--language`        | string | No       | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati`, `sindhi` |
-| `-i`  | `--input-dir`       | string | Yes      | -         | Path to input directory containing `stt.csv` and `audios/` folder                                                                      |
-| `-o`  | `--output-dir`      | string | No       | `./out`   | Path to output directory for results                                                                                                   |
-| `-f`  | `--input-file-name` | string | No       | `stt.csv` | Name of input CSV file                                                                                                                 |
-| `-d`  | `--debug`           | flag   | No       | `false`   | Run on first N audio files only                                                                                                        |
-| `-dc` | `--debug_count`     | int    | No       | `5`       | Number of files in debug mode                                                                                                          |
-|       | `--ignore_retry`    | flag   | No       | `false`   | Skip retry if not all audios processed                                                                                                 |
-|       | `--overwrite`       | flag   | No       | `false`   | Overwrite existing results instead of resuming                                                                                         |
-
-### Examples
-
-**Basic evaluation:**
-
-```bash
-calibrate stt eval -p deepgram -l english -i ./data -o ./out
-```
-
-**Evaluate with Hindi language:**
-
-```bash
-calibrate stt eval -p sarvam -l hindi -i ./data -o ./out
-```
-
-**Debug mode (process only first 5 files):**
-
-```bash
-calibrate stt eval -p deepgram -l english -i ./data -o ./out -d -dc 5
-```
-
-### Output
-
-```
-/path/to/output/<provider>
-├── results.csv       # Per-file results with metrics
-├── metrics.json      # Aggregated metrics (WER, similarity, LLM judge)
-└── results.log       # Full logs including terminal output
-```
-
-**results.csv** contains per-file evaluation results:
-
-**results.csv** contains per-file evaluation results:
-
-| id      | gt               | pred            | wer  | string_similarity | llm_judge_score | llm_judge_reasoning   |
-| ------- | ---------------- | --------------- | ---- | ----------------- | --------------- | --------------------- |
-| audio_1 | Hello            | Hello           | 0.0  | 1.0               | True            | Exact match           |
-| audio_2 | My name is Geeta | My name is Gita | 0.25 | 0.9               | False           | Name spelling differs |
-
----
-
-## calibrate stt leaderboard
-
-Generate a comparative leaderboard from multiple evaluation runs.
-
-```bash
-calibrate stt leaderboard -o <output_dir> -s <save_dir>
-```
-
-### Arguments
-
-| Flag | Long           | Type   | Required | Description                                 |
-| ---- | -------------- | ------ | -------- | ------------------------------------------- |
-| `-o` | `--output-dir` | string | Yes      | Directory containing evaluation run folders |
-| `-s` | `--save-dir`   | string | Yes      | Directory to save leaderboard outputs       |
-
-### Example
-
-```bash
-calibrate stt leaderboard -o ./out -s ./leaderboard
-```
-
-### Output
-
-The leaderboard command generates:
-
-- `stt_leaderboard.xlsx` - Comparative spreadsheet of all providers
-- Individual metric charts: `wer.png`, `string_similarity.png`, `llm_judge_score.png`
-
----
-
-## Providers
-
-| Provider     | Languages                       |
-| ------------ | ------------------------------- |
-| `deepgram`   | English, Hindi                  |
-| `openai`     | English, Hindi                  |
-| `google`     | English, Hindi, Kannada, Sindhi |
-| `sarvam`     | English, Hindi, Kannada         |
-| `elevenlabs` | English, Sindhi                 |
-| `cartesia`   | English, Sindhi                 |
-| `smallest`   | English, Hindi                  |
-| `groq`       | English                         |
-
-<Note>
-  Sindhi STT is supported by Google (uses chirp_2 model), Cartesia, and
-  ElevenLabs providers.
-</Note>
-
-## Environment Variables
-
-Set the appropriate API key for your chosen provider:
-
-```bash
-export DEEPGRAM_API_KEY=your_key
-export OPENAI_API_KEY=your_key
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-export SARVAM_API_KEY=your_key
-export ELEVENLABS_API_KEY=your_key
-export CARTESIA_API_KEY=your_key
-export GROQ_API_KEY=your_key
-export SMALLEST_API_KEY=your_key
-```
+<Card title="Integrations" icon="microphone" href="/integrations/stt">
+  See the full list of supported providers and their configuration options
+</Card>

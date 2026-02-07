@@ -1,0 +1,18 @@
+{
+    "answer_completeness": {
+        "mean": 1.0,
+        "std": 0.0,
+        "values": [
+            1.0,
+            1.0
+        ]
+    },
+    "stt_llm_judge": {
+        "mean": 1.0,
+        "std": 0.0,
+        "values": [
+            1.0,
+            1.0
+        ]
+    }
+}

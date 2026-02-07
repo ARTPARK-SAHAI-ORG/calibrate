@@ -4,8 +4,9 @@ import sys
 from typing import List
 from loguru import logger
 import os
-from os.path import join, exists, splitext, basename
+from os.path import join, exists
 import json
+from pathlib import Path
 
 from calibrate.utils import configure_print_logger, log_and_print, build_tools_schema
 from pipecat.frames.frames import (
@@ -95,14 +96,68 @@ class Processor(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+class LLMInferenceError(Exception):
+    """Raised when LLM inference fails due to system error (API error, invalid model, etc.)"""
+
+    pass
+
+
+# Lock to protect logger add/remove operations from race conditions when running in parallel
+import threading
+
+_logger_lock = threading.Lock()
+
+
 async def run_inference(
     chat_history: List[dict[str, str]],
     system_prompt: str,
     model: str,
     provider: str,
     tools: List[dict[str, str]],
-) -> List[str]:
-    """Runs a text-only bot that processes text inputs through an LLM and returns text outputs."""
+) -> dict:
+    """Runs a text-only bot that processes text inputs through an LLM and returns text outputs.
+
+    Returns dict with 'response', 'tool_calls', and 'captured_errors' keys.
+    """
+    # Capture ERROR-level logs to surface pipecat internal errors
+    captured_errors: list[str] = []
+
+    def error_capture_sink(message):
+        record = message.record
+        if record["level"].name in ("ERROR", "CRITICAL"):
+            captured_errors.append(record["message"])
+
+    # Use lock to protect logger operations from race conditions in parallel execution
+    with _logger_lock:
+        error_sink_id = logger.add(error_capture_sink, level="ERROR")
+
+    try:
+        result = await _run_inference_inner(
+            chat_history=chat_history,
+            system_prompt=system_prompt,
+            model=model,
+            provider=provider,
+            tools=tools,
+        )
+        result["captured_errors"] = captured_errors
+        return result
+    finally:
+        with _logger_lock:
+            try:
+                logger.remove(error_sink_id)
+            except ValueError:
+                # Handler may have already been removed in race condition
+                pass
+
+
+async def _run_inference_inner(
+    chat_history: List[dict[str, str]],
+    system_prompt: str,
+    model: str,
+    provider: str,
+    tools: List[dict[str, str]],
+) -> dict:
+    """Inner implementation of run_inference."""
     # Create LLM service
     if provider == "openrouter":
         llm = OpenRouterLLMService(
@@ -350,6 +405,17 @@ async def run_test(
         provider=provider,
         tools=tools,
     )
+
+    # Check for system-level failures: if both response and tool_calls are empty,
+    # LLM inference failed (API error, invalid model, auth failure, etc.)
+    if not output["response"] and not output["tool_calls"]:
+        error_details = ""
+        if output.get("captured_errors"):
+            error_details = f"{'; '.join(output['captured_errors'])}"
+        raise LLMInferenceError(
+            f"LLM inference failed - no response or tool calls returned. {error_details}"
+        )
+
     metrics = {"passed": False}
 
     if evaluation["type"] == "tool_call":
@@ -379,82 +445,47 @@ async def run_test(
     }
 
 
-async def main():
-    parser = argparse.ArgumentParser(
-        description="Text-only Pipecat bot that processes text through an LLM"
-    )
-    parser.add_argument(
-        "-c",
-        "--config",
-        type=str,
-        default="examples/tests.json",
-        help="Path to the JSON configuration file for the tests",
-    )
-    parser.add_argument(
-        "-o",
-        "--output-dir",
-        type=str,
-        default="./out",
-        help="Path to the output directory to save the results",
-    )
-    parser.add_argument(
-        "-m",
-        "--model",
-        type=str,
-        default="gpt-4.1",
-        help="OpenAI model to use for the evaluation",
-    )
-    parser.add_argument(
-        "-p",
-        "--provider",
-        type=str,
-        choices=["openai", "openrouter"],
-        default="openrouter",
-        help="LLM provider to use (openai or openrouter)",
-    )
-
-    args = parser.parse_args()
-
-    print(
-        f"\033[91mRunning tests defined in the config at {args.config} for model: {args.model}\033[0m"
-    )
-
-    config = json.load(open(args.config))
-
-    config_name = splitext(basename(args.config))[0]
-
-    save_folder_name = (
-        f"{args.provider}/{args.model}"
-        if args.provider == "openai"
-        else f"{args.model}"
-    )
-
+async def run_model_tests(
+    model: str,
+    provider: str,
+    config: dict,
+    output_dir: str,
+) -> dict:
+    """Run tests for a single model and return results.
+    
+    Args:
+        model: Model name to evaluate
+        provider: LLM provider (openai or openrouter)
+        config: Test configuration dict
+        output_dir: Base output directory - results saved to output_dir/model_name/
+    """
+    # Build model folder name: for openai provider, prefix with provider name
+    save_folder_name = f"{provider}/{model}" if provider == "openai" else f"{model}"
     save_folder_name = save_folder_name.replace("/", "__")
-    output_dir = join(args.output_dir, config_name, save_folder_name)
+    model_output_dir = join(output_dir, save_folder_name)
 
-    if not exists(output_dir):
-        os.makedirs(output_dir)
+    if not exists(model_output_dir):
+        os.makedirs(model_output_dir)
 
-    log_save_path = join(output_dir, "logs")
-
+    log_save_path = join(model_output_dir, "logs")
     if exists(log_save_path):
         os.remove(log_save_path)
 
-    logger.remove()
-    logger.add(log_save_path)
+    # Note: We don't modify global logger here to avoid conflicts when running
+    # multiple models in parallel. Logs go to the default loguru handler.
 
-    print_log_save_path = join(output_dir, "results.log")
-
+    print_log_save_path = join(model_output_dir, "results.log")
     if exists(print_log_save_path):
         os.remove(print_log_save_path)
 
-    configure_print_logger(print_log_save_path)
-
-    command = " ".join(sys.argv)
-    log_and_print(f"\033[33mRunning command\033[0m: {command}")
+    # Print model header
+    print(f"\n\033[94m{'='*60}\033[0m")
+    print(f"\033[94mModel: {provider}/{model}\033[0m")
+    print(f"\033[94m{'='*60}\033[0m\n")
 
     results = []
-    results_file_path = join(output_dir, "results.json")
+    results_file_path = join(model_output_dir, "results.json")
+
     for test_case_index, test_case in enumerate(config["test_cases"]):
         agent_language = test_case.get("settings", {}).get("language", "english")
 
@@ -468,17 +499,17 @@ async def main():
             evaluation=test_case["evaluation"],
             system_prompt=config["system_prompt"]
             + f"\n\nYou must always speak in {agent_language}.",
-            model=args.model,
-            provider=args.provider,
+            model=model,
+            provider=provider,
             tools=config["tools"],
         )
 
         if result["metrics"]["passed"]:
-            log_and_print(f"✅ Test case {test_case_index + 1} passed")
+            print(f"[{provider}/{model}] ✅ Test case {test_case_index + 1} passed")
         else:
-            log_and_print(f"❌ Test case {test_case_index + 1} failed")
+            print(f"[{provider}/{model}] ❌ Test case {test_case_index + 1} failed")
             if "reasoning" in result["metrics"]:
-                log_and_print(result["metrics"]["reasoning"])
+                print(f"  Reason: {result['metrics']['reasoning']}")
 
         result["test_case"] = test_case
         results.append(result)
@@ -487,27 +518,22 @@ async def main():
         with open(results_file_path, "w") as f:
             json.dump(results, f, indent=4)
 
-        log_and_print("-" * 40)
-
     total_passed = sum(1 for result in results if result["metrics"]["passed"])
     total_tests = len(results)
-
     passed_count = total_passed
     failed_count = total_tests - total_passed
 
+    # Print summary for this model
     if passed_count == total_tests:
-        log_and_print("🎉 All tests passed!")
+        print(f"[{provider}/{model}] 🎉 All tests passed!")
     elif failed_count == total_tests:
-        log_and_print("❌ All tests failed!")
+        print(f"[{provider}/{model}] ❌ All tests failed!")
     else:
-        log_and_print(
-            f"✅ Total Passed: {passed_count}/{total_tests} ({(passed_count/total_tests)*100:.1f}%)"
-        )
-        log_and_print(
-            f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
+        print(
+            f"[{provider}/{model}] ✅ Total Passed: {passed_count}/{total_tests} ({(passed_count/total_tests)*100:.1f}%)"
         )
 
-    with open(join(output_dir, "results.json"), "w") as f:
+    with open(join(model_output_dir, "results.json"), "w") as f:
         json.dump(results, f, indent=4)
 
     metrics = {
@@ -515,36 +541,97 @@ async def main():
         "passed": passed_count,
     }
 
-    with open(join(output_dir, "metrics.json"), "w") as f:
+    with open(join(model_output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
 
-    if failed_count:
-        log_and_print("Failed test cases:")
-        log_and_print("=" * 40)
+    # Write to log file
+    with open(print_log_save_path, "w") as f:
         for result in results:
             if result["metrics"]["passed"]:
-                continue
+                f.write(f"✅ Test case passed\n")
+            else:
+                f.write(f"❌ Test case failed\n")
+                if "reasoning" in result["metrics"]:
+                    f.write(f"  Reason: {result['metrics']['reasoning']}\n")
+        f.write(f"\nTotal Passed: {passed_count}/{total_tests}\n")
 
-            log_and_print("History:\n\n")
-            log_and_print(
-                "\n".join(
-                    [
-                        f"{message['role']}: {message['content']}"
-                        for message in result["test_case"]["history"]
-                        if "content" in message
-                    ]
-                )
-            )
-            log_and_print("\n\nExpected output:")
-            log_and_print(result["test_case"]["evaluation"])
-            log_and_print("-" * 40)
-            log_and_print("Output:")
-            log_and_print(result["output"])
-            log_and_print("-" * 40)
-            log_and_print("Metrics:")
-            log_and_print(result["metrics"])
-            log_and_print("-" * 40)
-            log_and_print("=" * 40)
+    return {
+        "model": model,
+        "provider": provider,
+        "passed": passed_count,
+        "total": total_tests,
+        "results": results,
+    }
+
+
+async def main():
+    """CLI entry point for single-model LLM test evaluation.
+
+    Used by the Ink UI which spawns individual model processes.
+    For multi-model benchmark, use benchmark.py via `calibrate llm -m model1 model2 ...`
+    """
+    parser = argparse.ArgumentParser(
+        description="Single-model LLM test evaluation (used by Ink UI)"
+    )
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        required=True,
+        help="Path to the JSON configuration file for the tests",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default="./out",
+        help="Path to the output directory to save the results",
+    )
+    parser.add_argument(
+        "-m",
+        "--model",
+        type=str,
+        required=True,
+        help="Model to use for evaluation",
+    )
+    parser.add_argument(
+        "-p",
+        "--provider",
+        type=str,
+        choices=["openai", "openrouter"],
+        default="openrouter",
+        help="LLM provider to use (openai or openrouter)",
+    )
+
+    args = parser.parse_args()
+
+    model = args.model
+
+    print("\n\033[91mLLM Tests\033[0m\n")
+    print(f"Config: {args.config}")
+    print(f"Model: {args.provider}/{model}")
+    print(f"Provider: {args.provider}")
+    print("")
+
+    config = json.load(open(args.config))
+
+    # Run tests for single model - results saved to output_dir/model_name/
+    result = await run_model_tests(
+        model=model,
+        provider=args.provider,
+        config=config,
+        output_dir=args.output_dir,
+    )
+
+    # Print summary
+    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\033[92mSummary\033[0m")
+    print(f"\033[92m{'='*60}\033[0m\n")
+
+    pct = (result["passed"] / result["total"] * 100) if result["total"] > 0 else 0
+    print(
+        f"  {result['provider']}/{result['model']}: {result['passed']}/{result['total']} ({pct:.1f}%)"
+    )
 
 
 if __name__ == "__main__":

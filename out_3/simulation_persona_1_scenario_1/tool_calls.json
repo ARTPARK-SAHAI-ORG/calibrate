@@ -1,0 +1,36 @@
+[
+    {
+        "position": 1,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_QsmU0hmkBVsd7TCwXCjd",
+            "args": {
+                "body": {
+                    "content_type": "audio/wav",
+                    "extension": "wav",
+                    "task_type": "polite"
+                },
+                "query": {
+                    "test": "initial_greeting"
+                }
+            }
+        }
+    },
+    {
+        "position": 3,
+        "data": {
+            "function_name": "get_presigned_url",
+            "tool_call_id": "tool_get_presigned_url_gYQJEtv9YwsBxjaTMCD3",
+            "args": {
+                "body": {
+                    "content_type": "audio/wav",
+                    "task_type": "agent",
+                    "extension": "wav"
+                },
+                "query": {
+                    "test": "ask_name"
+                }
+            }
+        }
+    }
+]

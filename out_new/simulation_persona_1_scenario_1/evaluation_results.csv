@@ -1,0 +1,9 @@
+name,value,reasoning
+answer_completeness,0.0,"The form field to capture was the patient’s name. The assistant asked for “your full name,” and the user provided “Rajesh Prasad,” which is not the patient’s name in the given persona (patient is Geeta Prasad). The assistant also ended the interaction claiming all answers were received without confirming or correcting that the name captured was the patient’s name. Therefore, the correct patient name was not captured."
+llm/ttft,3.824019193649292,
+tts/ttft,0.36387598514556885,
+stt/ttft,0.12340157372610909,
+llm/processing_time,3.886793772379557,
+tts/processing_time,1.0738320350646973,
+stt/processing_time,0.10189199447631836,
+stt_llm_judge_score,1.0,

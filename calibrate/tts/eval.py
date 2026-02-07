@@ -517,22 +517,292 @@ async def run_tts_eval(
     }
 
 
+def validate_tts_input_file(input_path: str) -> tuple[bool, str]:
+    """Validate TTS input CSV file.
+
+    Expected format:
+        id,text
+        row_1,hello world
+        row_2,this is a test
+
+    Returns:
+        tuple[bool, str]: (is_valid, error_message)
+    """
+    # Check if file exists
+    if not exists(input_path):
+        return False, f"Input file does not exist: {input_path}"
+
+    if not input_path.lower().endswith(".csv"):
+        return False, f"Input must be a CSV file. Got: {input_path}"
+
+    # Read CSV and validate columns
+    try:
+        df = pd.read_csv(input_path)
+    except Exception as e:
+        return False, f"Failed to read CSV file: {e}"
+
+    if "id" not in df.columns:
+        return (
+            False,
+            f"CSV file missing required column 'id'. Found columns: {list(df.columns)}",
+        )
+
+    if "text" not in df.columns:
+        return (
+            False,
+            f"CSV file missing required column 'text'. Found columns: {list(df.columns)}",
+        )
+
+    if len(df) == 0:
+        return False, "CSV file is empty (no rows found)"
+
+    # Check for empty text values
+    empty_texts = df[df["text"].isna() | (df["text"].astype(str).str.strip() == "")]
+    if len(empty_texts) > 0:
+        empty_ids = empty_texts["id"].tolist()[:5]
+        if len(empty_texts) <= 5:
+            return False, f"CSV has rows with empty text: {empty_ids}"
+        else:
+            return (
+                False,
+                f"CSV has {len(empty_texts)} rows with empty text. First 5 IDs: {empty_ids}",
+            )
+
+    return True, ""
+
+
+# Expected columns in results.csv for TTS evaluation
+TTS_RESULTS_COLUMNS = [
+    "id",
+    "text",
+    "audio_path",
+    "ttfb",
+    "llm_judge_score",
+    "llm_judge_reasoning",
+]
+
+
+def validate_existing_results_csv(results_csv_path: str) -> tuple[bool, str]:
+    """Validate existing results.csv file structure.
+
+    Checks if the file is either empty or has the expected columns for TTS results.
+
+    Args:
+        results_csv_path: Path to the results.csv file
+
+    Returns:
+        tuple[bool, str]: (is_valid, error_message)
+    """
+    if not exists(results_csv_path):
+        return True, ""  # File doesn't exist, that's fine
+
+    try:
+        df = pd.read_csv(results_csv_path)
+    except Exception as e:
+        return False, f"Failed to read existing results.csv: {e}"
+
+    # Empty file is valid (will be overwritten)
+    if len(df) == 0:
+        return True, ""
+
+    # Check if all expected columns are present
+    missing_columns = [col for col in TTS_RESULTS_COLUMNS if col not in df.columns]
+    if missing_columns:
+        return False, (
+            f"Existing results.csv has incompatible structure. "
+            f"Missing columns: {missing_columns}. "
+            f"Expected columns: {TTS_RESULTS_COLUMNS}. "
+            f"Found columns: {list(df.columns)}. "
+            f"Use --overwrite to replace the file or delete it manually."
+        )
+
+    return True, ""
+
+
+TTS_PROVIDERS = [
+    "cartesia",
+    "openai",
+    "groq",
+    "google",
+    "elevenlabs",
+    "sarvam",
+    "smallest",
+]
+
+TTS_LANGUAGES = [
+    "english",
+    "hindi",
+    "kannada",
+    "bengali",
+    "malayalam",
+    "marathi",
+    "odia",
+    "punjabi",
+    "tamil",
+    "telugu",
+    "gujarati",
+    "sindhi",
+]
+
+
+async def run_single_provider_eval(
+    provider: str,
+    language: str,
+    input_file: str,
+    output_dir: str,
+    debug: bool,
+    debug_count: int,
+    overwrite: bool,
+) -> dict:
+    """Run TTS evaluation for a single provider."""
+    provider_output_dir = os.path.join(output_dir, provider)
+    os.makedirs(provider_output_dir, exist_ok=True)
+
+    log_save_path = join(provider_output_dir, "logs")
+    if exists(log_save_path):
+        os.remove(log_save_path)
+
+    logger.remove()
+    logger.add(log_save_path)
+
+    print_log_save_path = join(provider_output_dir, "results.log")
+    if exists(print_log_save_path):
+        os.remove(print_log_save_path)
+
+    configure_print_logger(print_log_save_path)
+
+    log_and_print("--------------------------------")
+    log_and_print(f"\033[33mRunning TTS evaluation for provider: {provider}\033[0m")
+
+    # Validate language is supported by the provider
+    try:
+        validate_tts_language(language, provider)
+    except ValueError as e:
+        log_and_print(f"\033[31mError: {e}\033[0m")
+        return {"provider": provider, "status": "error", "error": str(e)}
+
+    df = pd.read_csv(input_file)
+
+    ids = df["id"].tolist()
+    texts = df["text"].tolist()
+
+    if debug:
+        ids = ids[:debug_count]
+        texts = texts[:debug_count]
+
+    gt_data = [{"id": _id, "text": text} for _id, text in zip(ids, texts)]
+
+    results_csv_path = join(provider_output_dir, "results.csv")
+
+    # Validate existing results.csv structure (if not overwriting)
+    if not overwrite:
+        is_valid, error_msg = validate_existing_results_csv(results_csv_path)
+        if not is_valid:
+            log_and_print(f"\033[31mError: {error_msg}\033[0m")
+            return {"provider": provider, "status": "error", "error": error_msg}
+
+    log_and_print(f"Processing {len(gt_data)} texts with provider: {provider}")
+    log_and_print("--------------------------------")
+
+    # Run TTS evaluation
+    eval_results = await run_tts_eval(
+        gt_data=gt_data,
+        provider=provider,
+        language=language,
+        output_dir=provider_output_dir,
+        results_csv_path=results_csv_path,
+        overwrite=overwrite,
+    )
+
+    log_and_print("--------------------------------")
+    log_and_print(f"Successfully synthesized: {eval_results['success_count']} texts")
+
+    # Reload the final results from CSV
+    if exists(results_csv_path):
+        final_df = pd.read_csv(results_csv_path)
+        all_ids = final_df["id"].tolist()
+        all_texts = final_df["text"].tolist()
+        all_audio_paths = final_df["audio_path"].tolist()
+        all_ttfb = final_df["ttfb"].tolist()
+    else:
+        log_and_print("No results found")
+        return {"provider": provider, "status": "error", "error": "No results found"}
+
+    # Run LLM judge evaluation
+    log_and_print("Running LLM judge evaluation...")
+    llm_judge_results = await get_tts_llm_judge_score(all_audio_paths, all_texts)
+    log_and_print(f"LLM Judge Score: {llm_judge_results['score']}")
+
+    # Build metrics data
+    metrics_data = {
+        "llm_judge_score": llm_judge_results["score"],
+    }
+
+    # Add ttfb metrics with mean, std, and values (filter out None/NaN values)
+    valid_ttfb = [
+        t
+        for t in all_ttfb
+        if t is not None and not (isinstance(t, float) and np.isnan(t))
+    ]
+    if valid_ttfb:
+        metrics_data["ttfb"] = {
+            "mean": float(np.mean(valid_ttfb)),
+            "std": float(np.std(valid_ttfb)),
+            "values": valid_ttfb,
+        }
+
+    # Save metrics
+    metrics_save_path = join(provider_output_dir, "metrics.json")
+    with open(metrics_save_path, "w") as f:
+        json.dump(metrics_data, f, indent=4)
+
+    log_and_print(f"Metrics saved to: {metrics_save_path}")
+
+    # Update results CSV with LLM judge scores
+    data = []
+    for _id, text, audio_path, ttfb, llm_judge_score in zip(
+        all_ids,
+        all_texts,
+        all_audio_paths,
+        all_ttfb,
+        llm_judge_results["per_row"],
+    ):
+        data.append(
+            {
+                "id": _id,
+                "text": text,
+                "audio_path": audio_path,
+                "ttfb": ttfb,
+                "llm_judge_score": llm_judge_score["match"],
+                "llm_judge_reasoning": llm_judge_score["reasoning"],
+            }
+        )
+
+    pd.DataFrame(data).to_csv(results_csv_path, index=False)
+    log_and_print(f"Results saved to: {results_csv_path}")
+
+    return {
+        "provider": provider,
+        "status": "completed",
+        "metrics": metrics_data,
+        "output_dir": provider_output_dir,
+    }
+
+
 async def main():
-    parser = argparse.ArgumentParser()
+    """CLI entry point for single-provider TTS evaluation.
+
+    Used by the Ink UI which spawns individual provider processes.
+    For multi-provider benchmark, use benchmark.py via `calibrate tts -p provider1 provider2 ...`
+    """
+    parser = argparse.ArgumentParser(
+        description="Single-provider TTS evaluation (used by Ink UI)"
+    )
     parser.add_argument(
         "-p",
         "--provider",
         type=str,
         required=True,
-        choices=[
-            "cartesia",
-            "openai",
-            "groq",
-            "google",
-            "elevenlabs",
-            "sarvam",
-            "smallest",
-        ],
         help="TTS provider to use for evaluation",
     )
     parser.add_argument(
@@ -540,20 +810,7 @@ async def main():
         "--language",
         type=str,
         default="english",
-        choices=[
-            "english",
-            "hindi",
-            "kannada",
-            "bengali",
-            "malayalam",
-            "marathi",
-            "odia",
-            "punjabi",
-            "tamil",
-            "telugu",
-            "gujarati",
-            "sindhi",
-        ],
+        choices=TTS_LANGUAGES,
         help="Language of the audio files",
     )
     parser.add_argument(
@@ -588,134 +845,88 @@ async def main():
         action="store_true",
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
+    parser.add_argument(
+        "--leaderboard",
+        action="store_true",
+        help="Generate leaderboard after evaluation completes",
+    )
+    parser.add_argument(
+        "-s",
+        "--save-dir",
+        type=str,
+        help="Directory to save leaderboard results (defaults to output_dir/leaderboard)",
+    )
 
     args = parser.parse_args()
 
-    output_dir = os.path.join(args.output_dir, args.provider)
-    os.makedirs(output_dir, exist_ok=True)
+    provider = args.provider
 
-    log_save_path = join(output_dir, "logs")
-    if exists(log_save_path):
-        os.remove(log_save_path)
-
-    logger.remove()
-    logger.add(log_save_path)
-
-    print_log_save_path = join(output_dir, "results.log")
-    if exists(print_log_save_path):
-        os.remove(print_log_save_path)
-
-    configure_print_logger(print_log_save_path)
-
-    log_and_print("--------------------------------")
-    command = " ".join(sys.argv)
-    log_and_print(f"\033[33mRunning command\033[0m: {command}")
-
-    # Validate language is supported by the provider
-    try:
-        validate_tts_language(args.language, args.provider)
-    except ValueError as e:
-        log_and_print(f"\033[31mError: {e}\033[0m")
+    # Validate provider
+    if provider not in TTS_PROVIDERS:
+        print(f"\033[31mError: Invalid provider '{provider}'.\033[0m")
+        print(f"Available providers: {', '.join(TTS_PROVIDERS)}")
         sys.exit(1)
 
-    if not args.input.lower().endswith(".csv"):
-        log_and_print(
-            "\033[31mInput must be a CSV file path. Got: {}\033[0m".format(args.input)
-        )
+    # Validate input CSV file
+    is_valid, error_msg = validate_tts_input_file(args.input)
+    if not is_valid:
+        print(f"\033[31mInput validation error: {error_msg}\033[0m")
         sys.exit(1)
 
-    df = pd.read_csv(args.input)
+    if not exists(args.output_dir):
+        os.makedirs(args.output_dir)
 
-    ids = df["id"].tolist()
-    texts = df["text"].tolist()
+    print("\n\033[91mTTS Evaluation\033[0m\n")
+    print(f"Provider: {provider}")
+    print(f"Language: {args.language}")
+    print(f"Input: {args.input}")
+    print(f"Output: {args.output_dir}")
+    print("")
 
-    if args.debug:
-        ids = ids[: args.debug_count]
-        texts = texts[: args.debug_count]
-
-    gt_data = [{"id": _id, "text": text} for _id, text in zip(ids, texts)]
-
-    results_csv_path = join(output_dir, "results.csv")
-
-    log_and_print(f"Processing {len(gt_data)} texts with provider: {args.provider}")
-    log_and_print("--------------------------------")
-
-    # Run TTS evaluation
-    eval_results = await run_tts_eval(
-        gt_data=gt_data,
-        provider=args.provider,
+    # Run single provider evaluation
+    result = await run_single_provider_eval(
+        provider=provider,
         language=args.language,
-        output_dir=output_dir,
-        results_csv_path=results_csv_path,
+        input_file=args.input,
+        output_dir=args.output_dir,
+        debug=args.debug,
+        debug_count=args.debug_count,
         overwrite=args.overwrite,
     )
 
-    log_and_print("--------------------------------")
-    log_and_print(f"Successfully synthesized: {eval_results['success_count']} texts")
+    # Print summary
+    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\033[92mSummary\033[0m")
+    print(f"\033[92m{'='*60}\033[0m\n")
 
-    # Reload the final results from CSV
-    if exists(results_csv_path):
-        final_df = pd.read_csv(results_csv_path)
-        all_ids = final_df["id"].tolist()
-        all_texts = final_df["text"].tolist()
-        all_audio_paths = final_df["audio_path"].tolist()
-        all_ttfb = final_df["ttfb"].tolist()
+    if result.get("status") == "error":
+        print(f"  {provider}: \033[31mError - {result.get('error')}\033[0m")
     else:
-        log_and_print("No results found")
-        return
+        metrics = result.get("metrics", {})
+        llm_score = metrics.get("llm_judge_score", "N/A")
+        ttfb_data = metrics.get("ttfb", {})
+        ttfb_mean = ttfb_data.get("mean", "N/A") if ttfb_data else "N/A"
+        if isinstance(llm_score, float) and isinstance(ttfb_mean, float):
+            print(f"  {provider}: LLM Score={llm_score:.2f}, TTFB={ttfb_mean:.3f}s")
+        elif isinstance(llm_score, float):
+            print(f"  {provider}: LLM Score={llm_score:.2f}, TTFB={ttfb_mean}")
+        else:
+            print(f"  {provider}: LLM Score={llm_score}, TTFB={ttfb_mean}")
 
-    # Run LLM judge evaluation
-    log_and_print("Running LLM judge evaluation...")
-    llm_judge_results = await get_tts_llm_judge_score(all_audio_paths, all_texts)
-    log_and_print(f"LLM Judge Score: {llm_judge_results['score']}")
+    # Generate leaderboard if requested (used by Ink UI for last provider)
+    if args.leaderboard:
+        from calibrate.tts.leaderboard import generate_leaderboard
 
-    # Build metrics data
-    metrics_data = {
-        "llm_judge_score": llm_judge_results["score"],
-    }
-
-    # Add ttfb metrics with mean, std, and values (filter out None/NaN values)
-    valid_ttfb = [
-        t
-        for t in all_ttfb
-        if t is not None and not (isinstance(t, float) and np.isnan(t))
-    ]
-    if valid_ttfb:
-        metrics_data["ttfb"] = {
-            "mean": float(np.mean(valid_ttfb)),
-            "std": float(np.std(valid_ttfb)),
-            "values": valid_ttfb,
-        }
-
-    # Save metrics
-    metrics_save_path = join(output_dir, "metrics.json")
-    with open(metrics_save_path, "w") as f:
-        json.dump(metrics_data, f, indent=4)
-
-    log_and_print(f"Metrics saved to: {metrics_save_path}")
-
-    # Update results CSV with LLM judge scores
-    data = []
-    for _id, text, audio_path, ttfb, llm_judge_score in zip(
-        all_ids,
-        all_texts,
-        all_audio_paths,
-        all_ttfb,
-        llm_judge_results["per_row"],
-    ):
-        data.append(
-            {
-                "id": _id,
-                "text": text,
-                "audio_path": audio_path,
-                "ttfb": ttfb,
-                "llm_judge_score": llm_judge_score["match"],
-                "llm_judge_reasoning": llm_judge_score["reasoning"],
-            }
-        )
-
-    pd.DataFrame(data).to_csv(results_csv_path, index=False)
-    log_and_print(f"Results saved to: {results_csv_path}")
+        if args.save_dir is None:
+            save_dir = join(args.output_dir, "leaderboard")
+        else:
+            save_dir = args.save_dir
+        print(f"\n\033[93mGenerating leaderboard...\033[0m")
+        try:
+            generate_leaderboard(args.output_dir, save_dir)
+            print(f"\033[92mLeaderboard saved to {save_dir}\033[0m")
+        except Exception as e:
+            print(f"\033[91mError generating leaderboard: {e}\033[0m")
 
 
 if __name__ == "__main__":

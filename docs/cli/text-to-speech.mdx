@@ -3,9 +3,27 @@ title: "Text to Speech"
 description: "Evaluate Text to Speech providers via CLI"
 ---
 
-## Input Structure
+## Get started
 
-Prepare a CSV file with this format:
+```bash
+calibrate tts
+```
+
+<iframe
+  className="w-full aspect-video rounded-xl"
+  src="https://www.youtube.com/embed/cMYGuAT8BM8"
+  title="CLI Text-to-Speech Evaluation Walkthrough"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+
+The interactive UI guides you through the full evaluation process:
+
+1. **Language selection** — pick from 10+ supported Indic languages
+2. **Provider selection** — choose providers (only those supporting your language are shown)
+3. **Input CSV** — path to CSV file with `id` and `text` columns
+
+The **input CSV** should have this format:
 
 | id    | text                    |
 | ----- | ----------------------- |
@@ -13,138 +31,37 @@ Prepare a CSV file with this format:
 | row_2 | this is a test          |
 | row_3 | how are you doing today |
 
-The CSV requires two columns: `id` (unique identifier) and `text` (text to synthesize).
+Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/tts/sample.csv) for a template.
+
+4. **Output directory** — where results will be saved (defaults to `./out`)
+5. **API keys** — enter the API keys for the selected providers
+
+The evaluation runs providers in parallel (max 2 at a time), showing the progress as audio files are generated.
+
+## Output
+
+Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.
+
+<Frame>
+  <img src="./images/tts_leaderboard.png" alt="TTS leaderboard" />
+</Frame>
+
+You can also view the generated audio and metrics for each row of your dataset including the LLM judge score and reasoning. Use the arrow keys to navigate rows and press **Enter** or **p** to play the generated audio.
+
+<Frame>
+  <img src="./images/tts_output_provider.png" alt="TTS provider outputs" />
+</Frame>
 
 <Card
   title="Learn more about metrics"
   icon="chart-bar"
-  href="/getting-started/core-concepts#metrics"
+  href="/core-concepts/text-to-speech#metrics"
 >
   Detailed explanation of all metrics and how LLM Judge works
 </Card>
 
----
+## Resources
 
-## Run Evaluation
-
-Evaluate a Text to Speech provider on your dataset.
-
-```bash
-calibrate tts eval -p <provider> -l <language> -i <input_file> -o <output_dir>
-```
-
-### Arguments
-
-| Flag  | Long            | Type   | Required | Default   | Description                                                                                                                            |
-| ----- | --------------- | ------ | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `-p`  | `--provider`    | string | No       | `google`  | Provider: `cartesia`, `openai`, `groq`, `google`, `elevenlabs`, `sarvam`, `smallest`                                                   |
-| `-l`  | `--language`    | string | No       | `english` | Language: `english`, `hindi`, `kannada`, `bengali`, `malayalam`, `marathi`, `odia`, `punjabi`, `tamil`, `telugu`, `gujarati`, `sindhi` |
-| `-i`  | `--input`       | string | Yes      | -         | Path to input CSV file                                                                                                                 |
-| `-o`  | `--output-dir`  | string | No       | `./out`   | Path to output directory                                                                                                               |
-| `-d`  | `--debug`       | flag   | No       | `false`   | Run on first N texts only                                                                                                              |
-| `-dc` | `--debug_count` | int    | No       | `5`       | Number of texts in debug mode                                                                                                          |
-|       | `--overwrite`   | flag   | No       | `false`   | Overwrite existing results instead of resuming                                                                                         |
-
-### Examples
-
-**Basic:**
-
-```bash
-calibrate tts eval -p google -l english -i ./sample.csv -o ./out
-```
-
-**Specific provider:**
-
-```bash
-calibrate tts eval -p cartesia -i ./sample.csv -o ./out
-```
-
-**Debug mode:**
-
-```bash
-calibrate tts eval -p google -i ./sample.csv -o ./out -d -dc 3
-```
-
-### Output
-
-```
-/path/to/output/<provider>
-├── audios/
-│   ├── row_1.wav
-│   ├── row_2.wav
-│   └── row_3.wav
-├── results.csv       # Per-text results with TTFB and LLM judge scores
-├── metrics.json      # Aggregated metrics (TTFB mean/std, LLM judge score)
-└── results.log       # Terminal output summary
-```
-
-### Output Files
-
-**results.csv** contains per-text evaluation results:
-
-| id    | text           | audio_path                        | ttfb  | llm_judge_score | llm_judge_reasoning                                                                              |
-| ----- | -------------- | --------------------------------- | ----- | --------------- | ------------------------------------------------------------------------------------------------ |
-| row_1 | hello world    | ./out/elevenlabs/audios/row_1.wav | 1.511 | True            | The audio says 'hello world' clearly and matches the reference text exactly.                     |
-| row_2 | this is a test | ./out/elevenlabs/audios/row_2.wav | 1.215 | True            | The audio clearly says 'this is a test,' which matches exactly with the provided reference text. |
-
----
-
-## calibrate tts leaderboard
-
-Generate a comparative leaderboard from multiple evaluation runs.
-
-```bash
-calibrate tts leaderboard -o <output_dir> -s <save_dir>
-```
-
-### Arguments
-
-| Flag | Long           | Type   | Required | Description                                 |
-| ---- | -------------- | ------ | -------- | ------------------------------------------- |
-| `-o` | `--output-dir` | string | Yes      | Directory containing evaluation run folders |
-| `-s` | `--save-dir`   | string | Yes      | Directory to save leaderboard outputs       |
-
-### Example
-
-```bash
-calibrate tts leaderboard -o ./out -s ./leaderboard
-```
-
-### Output
-
-The leaderboard command generates:
-
-- `tts_leaderboard.xlsx` - Comparative spreadsheet of all providers
-- Individual metric charts: `llm_judge_score.png`, `ttfb.png`
-
----
-
-## Providers
-
-| Provider     | Languages                       |
-| ------------ | ------------------------------- |
-| `google`     | English, Hindi, Kannada, Sindhi |
-| `openai`     | English                         |
-| `cartesia`   | English                         |
-| `elevenlabs` | English, Sindhi                 |
-| `sarvam`     | Hindi, Kannada                  |
-| `groq`       | English                         |
-| `smallest`   | English, Hindi                  |
-
-<Note>
-  Sindhi TTS is supported by Google (uses gemini-2.5-flash-lite-preview-tts
-  model) and ElevenLabs (uses eleven_v3 model).
-</Note>
-
-## Environment Variables
-
-Set the appropriate API key for your chosen provider:
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
-export OPENAI_API_KEY=your_key
-export CARTESIA_API_KEY=your_key
-export ELEVENLABS_API_KEY=your_key
-export SARVAM_API_KEY=your_key
-export SMALLEST_API_KEY=your_key
-```
+<Card title="Integrations" icon="volume-high" href="/integrations/tts">
+  See the full list of supported providers and their configuration options
+</Card>
