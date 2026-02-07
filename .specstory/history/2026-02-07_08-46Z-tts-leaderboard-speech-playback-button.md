@@ -5441,3 +5441,32 @@ Fixed. Now it's proper JSON with `\n` for newlines in strings.
 
 ---
 
+_**User**_
+
+why did you set @sample_text.json (5-6) ? it is either webhook or structured output
+
+this tool has been set up as a requirement for webhook as it needs data back but structured output will not return any data back only webhook will - you also need to use a dummy but working public webhook if you want to use a webhook or just use structured output but use it make the agent produce structured outputs like extracting data from the conversation before responding to the user
+
+
+and this will go into an actual simulation and so, it should work properly
+
+---
+
+_**Agent (model claude-4.5-opus-high, mode Agent)**_
+
+You're right. Let me fix this to use `structured_output` for extracting data from the conversation:
+
+---
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/aman/Documents/repos/artpark/agentloop/examples/agent/simulation/sample_text.json</summary>
+
+Status: **loading**
+
+</details>
+
+</tool-use>
+
+---
+

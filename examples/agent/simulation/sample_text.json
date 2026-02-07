@@ -1,15 +1,27 @@
 {
-  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nWhen a customer asks about their order, call the `check_order` tool with their order ID to fetch the status.\n\nBe friendly, helpful, and concise in your responses.",
+  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nAfter each customer message, call the `log_inquiry` tool to categorize the inquiry type and capture any order ID mentioned.\n\nBe friendly, helpful, and concise in your responses.",
   "tools": [
     {
-      "type": "client",
-      "name": "check_order",
-      "description": "Check the status of a customer order by order ID",
+      "type": "structured_output",
+      "name": "log_inquiry",
+      "description": "Log and categorize the customer inquiry. Call this after each customer message to track the conversation.",
       "parameters": [
+        {
+          "id": "inquiry_type",
+          "type": "string",
+          "description": "Type of inquiry: order_status, return_request, product_question, or general",
+          "required": true
+        },
         {
           "id": "order_id",
           "type": "string",
-          "description": "The customer's order ID",
+          "description": "The order ID if mentioned by the customer, otherwise null",
+          "required": false
+        },
+        {
+          "id": "sentiment",
+          "type": "string",
+          "description": "Customer sentiment: positive, neutral, or negative",
           "required": true
         }
       ]
@@ -32,7 +44,7 @@
   "scenarios": [
     {
       "name": "simple order inquiry",
-      "description": "Ask about your order status directly and provide your order ID when asked."
+      "description": "Ask about your order status directly and provide your order ID right away."
     },
     {
       "name": "vague inquiry",
@@ -42,7 +54,7 @@
   "evaluation_criteria": [
     {
       "name": "tool_usage",
-      "description": "The agent should call the check_order tool with the correct order ID provided by the customer."
+      "description": "The agent should call the log_inquiry tool with the correct inquiry_type and order_id when provided by the customer."
     },
     {
       "name": "response_quality",
@@ -51,6 +63,6 @@
   ],
   "settings": {
     "agent_speaks_first": true,
-    "max_turns": 10
+    "max_turns": 5
   }
 }
