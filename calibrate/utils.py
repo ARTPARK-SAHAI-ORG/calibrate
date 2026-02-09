@@ -21,6 +21,37 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
+def patch_langfuse_trace(trace_name: str):
+    from pipecat.utils.tracing import service_decorators
+
+    original = service_decorators.add_llm_span_attributes
+    first_call = [True]
+
+    def patched(span, *args, **kwargs):
+        original(span, *args, **kwargs)
+
+        if first_call[0]:
+            span.set_attribute("langfuse.trace.name", trace_name)
+            first_call[0] = False
+
+        # Set the input of the first LLM call as the trace input
+        if first_call[0] and kwargs.get("messages"):
+            span.set_attribute("langfuse.trace.input", kwargs["messages"])
+            first_call[0] = False
+
+        # Set the output of each LLM call as the trace output (last one wins)
+        orig_set = span.set_attribute
+
+        def new_set(key, value):
+            orig_set(key, value)
+            if key == "output":
+                orig_set("langfuse.trace.output", value)
+
+        span.set_attribute = new_set
+
+    service_decorators.add_llm_span_attributes = patched
+
+
 def add_default_source(record):
     """Add default source if not present in extra"""
     if "source" not in record["extra"]:

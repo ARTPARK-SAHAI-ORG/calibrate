@@ -118,7 +118,6 @@ from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from calibrate.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
 from pipecat.utils.time import time_now_iso8601
 
-
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
 

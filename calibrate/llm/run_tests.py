@@ -1,13 +1,12 @@
 import asyncio
 import argparse
-import sys
+import uuid
 from typing import List
 from loguru import logger
 import os
 from os.path import join, exists
 import json
 from pathlib import Path
-
 from calibrate.utils import configure_print_logger, log_and_print, build_tools_schema
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -36,6 +35,8 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate.llm.metrics import test_response_llm_judge
+
+from calibrate.langfuse import observe, langfuse, langfuse_enabled
 
 
 class Processor(FrameProcessor):
@@ -390,13 +391,15 @@ def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
     }
 
 
+@observe(name="llm_test", capture_input=False, capture_output=False)
 async def run_test(
     chat_history: List[dict[str, str]],
     evaluation: dict[str, str],
     system_prompt: str,
     model: str,
     provider: str,
-    tools: List[dict[str, str]] = [],
+    tools: List[dict[str, str]],
+    unique_id: str,
 ):
     output = await run_inference(
         chat_history=chat_history,
@@ -439,6 +442,26 @@ async def run_test(
     else:
         raise ValueError(f"Invalid evaluation type: {evaluation['type']}")
 
+    if langfuse_enabled and langfuse:
+        langfuse.update_current_trace(
+            input={
+                "chat_history": chat_history,
+                "evaluation": evaluation,
+                "model": model,
+                "provider": provider,
+            },
+            output={"output": output, "metrics": metrics},
+            metadata={
+                "model": model,
+                "provider": provider,
+                "tools": tools,
+                "system_prompt": system_prompt,
+                "input": f"Chat history: {chat_history}\nEvaluation: {evaluation}",
+                "output": f"Output: {output}\n\nMetrics: {metrics}",
+            },
+            session_id=unique_id,
+        )
+
     return {
         "output": output,
         "metrics": metrics,
@@ -452,7 +475,7 @@ async def run_model_tests(
     output_dir: str,
 ) -> dict:
     """Run tests for a single model and return results.
-    
+
     Args:
         model: Model name to evaluate
         provider: LLM provider (openai or openrouter)
@@ -471,8 +494,9 @@ async def run_model_tests(
     if exists(log_save_path):
         os.remove(log_save_path)
 
-    # Note: We don't modify global logger here to avoid conflicts when running
-    # multiple models in parallel. Logs go to the default loguru handler.
+    # Add file sink for pipecat logs (use lock to avoid race conditions in parallel runs)
+    with _logger_lock:
+        log_sink_id = logger.add(log_save_path, level="DEBUG")
 
     print_log_save_path = join(model_output_dir, "results.log")
     if exists(print_log_save_path):
@@ -485,6 +509,8 @@ async def run_model_tests(
 
     results = []
     results_file_path = join(model_output_dir, "results.json")
+
+    unique_id = str(uuid.uuid4())
 
     for test_case_index, test_case in enumerate(config["test_cases"]):
         agent_language = test_case.get("settings", {}).get("language", "english")
@@ -502,6 +528,7 @@ async def run_model_tests(
             model=model,
             provider=provider,
             tools=config["tools"],
+            unique_id=unique_id,
         )
 
         if result["metrics"]["passed"]:
@@ -543,6 +570,10 @@ async def run_model_tests(
 
     with open(join(model_output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
+
+    # Remove pipecat log file sink
+    with _logger_lock:
+        logger.remove(log_sink_id)
 
     # Write to log file
     with open(print_log_save_path, "w") as f:

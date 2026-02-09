@@ -1,6 +1,6 @@
 import os
 from typing import Any, Dict, Literal
-
+import uuid
 from loguru import logger
 import asyncio
 
@@ -65,6 +65,25 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.observers.loggers.user_bot_latency_log_observer import (
     UserBotLatencyLogObserver,
 )
+
+from pipecat.utils.tracing.setup import setup_tracing
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from calibrate.utils import patch_langfuse_trace
+
+IS_TRACING_ENABLED = bool(os.getenv("ENABLE_TRACING"))
+
+# Initialize tracing if enabled
+if IS_TRACING_ENABLED:
+    patch_langfuse_trace(trace_name="voice_simulation")
+
+    exporter = OTLPSpanExporter()
+
+    setup_tracing(
+        service_name="voice_simulation",
+        exporter=exporter,
+    )
+    logger.info("OpenTelemetry tracing initialized")
+
 
 bot_logger = logger.bind(source="BOT")
 
@@ -451,6 +470,8 @@ async def run_bot(
             OutputAudioRawFrame,  # Audio being sent out
         ),
         cancel_on_idle_timeout=True,
+        enable_tracing=IS_TRACING_ENABLED,
+        conversation_id=str(uuid.uuid4()) if IS_TRACING_ENABLED else None,
     )
 
     @transport.event_handler("on_client_connected")

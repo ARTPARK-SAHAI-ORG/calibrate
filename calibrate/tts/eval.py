@@ -23,6 +23,8 @@ import numpy as np
 from loguru import logger
 import pandas as pd
 
+import backoff
+
 from calibrate.utils import (
     configure_print_logger,
     log_and_print,
@@ -30,6 +32,12 @@ from calibrate.utils import (
     validate_tts_language,
 )
 from calibrate.tts.metrics import get_tts_llm_judge_score
+from calibrate.langfuse import (
+    observe,
+    langfuse,
+    langfuse_enabled,
+    create_langfuse_audio_media,
+)
 
 
 # =============================================================================
@@ -399,6 +407,8 @@ async def synthesize_smallest(text: str, language: str, audio_path: str) -> Dict
 # =============================================================================
 
 
+@backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
+@observe(name="tts", capture_input=False, capture_output=False)
 async def synthesize_speech(
     text: str,
     provider: str,
@@ -420,7 +430,21 @@ async def synthesize_speech(
         raise ValueError(f"Unsupported TTS provider: {provider}")
 
     method = provider_methods[provider]
-    return await method(text, language, audio_path)
+    metrics = await method(text, language, audio_path)
+
+    audio_media = create_langfuse_audio_media(audio_path)
+
+    if langfuse_enabled and langfuse:
+        langfuse.update_current_trace(
+            input={"text": text, "language": language, "provider": provider},
+            output=audio_media,
+            metadata={
+                "input": f"Text: {text}\nLanguage: {language}\nProvider: {provider}\nAudio path: {audio_path}",
+                "metrics": metrics,
+            },
+        )
+
+    return metrics
 
 
 # =============================================================================

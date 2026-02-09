@@ -9,24 +9,20 @@ from os.path import join, exists
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
-
+import backoff
 from sarvamai import AsyncSarvamAI
 from openai import AsyncOpenAI
 from elevenlabs.client import AsyncElevenLabs
 from groq import AsyncGroq
 from deepgram import DeepgramClient, PrerecordedOptions, FileSource
 from cartesia import AsyncCartesia
-
+import uuid
 from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech as cloud_speech_types
 from google.api_core.client_options import ClientOptions
 
-import time
-import requests
 from loguru import logger
 import pandas as pd
-import numpy as np
-from natsort import natsorted
 
 from calibrate.utils import (
     log_and_print,
@@ -37,6 +33,12 @@ from calibrate.stt.metrics import (
     get_wer_score,
     get_llm_judge_score,
     get_string_similarity,
+)
+from calibrate.langfuse import (
+    create_langfuse_audio_media,
+    observe,
+    langfuse,
+    langfuse_enabled,
 )
 
 
@@ -460,10 +462,14 @@ async def transcribe_smallest(audio_path: Path, language: str) -> str:
 # =============================================================================
 
 
+@backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
+@observe(name="stt", capture_input=False, capture_output=False)
 async def transcribe_audio(
     audio_path: Path,
+    reference: str,
     provider: str,
     language: str,
+    unique_id: str,
 ) -> str:
     """Route audio transcription to the appropriate provider."""
     provider_methods = {
@@ -482,7 +488,30 @@ async def transcribe_audio(
 
     method = provider_methods[provider]
     output = await method(audio_path, language)
-    return output["transcript"].strip()
+
+    transcript = output["transcript"].strip()
+
+    if langfuse_enabled and langfuse:
+        # Download the audio from path and add to input in langfuse
+        input_audio_media = create_langfuse_audio_media(audio_path)
+
+        langfuse.update_current_trace(
+            input={
+                "audio": input_audio_media,
+                "reference": reference,
+                "language": language,
+                "provider": provider,
+            },
+            output=transcript,
+            metadata={
+                "provider": provider,
+                "language": language,
+                "reference": reference,
+            },
+            session_id=unique_id,
+        )
+
+    return transcript
 
 
 # =============================================================================
@@ -520,6 +549,8 @@ async def run_stt_eval(
 
     success_count = 0
 
+    unique_id = str(uuid.uuid4())
+
     for i, gt_info in enumerate(gt_data):
         # Skip if already processed
         if gt_info["id"] in processed_ids:
@@ -531,7 +562,9 @@ async def run_stt_eval(
         log_and_print(f"Processing audio [{i + 1}/{len(gt_data)}]: {audio_path.name}")
 
         try:
-            transcript = await transcribe_audio(audio_path, provider, language)
+            transcript = await transcribe_audio(
+                audio_path, gt_info["gt"], provider, language, unique_id
+            )
             log_and_print(f"\033[33mTranscript: {transcript}\033[0m")
             if transcript:
                 success_count += 1

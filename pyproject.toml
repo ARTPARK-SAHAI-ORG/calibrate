@@ -27,6 +27,7 @@ dependencies = [
     "evaluate>=0.4.6",
     "instructor>=1.13.0",
     "jiwer>=4.0.0",
+    "langfuse==3.3.0",
     "matplotlib>=3.10.7",
     "natsort>=8.4.0",
     "onnxruntime>=1.23.2",

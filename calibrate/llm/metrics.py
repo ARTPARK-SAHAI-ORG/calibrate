@@ -1,12 +1,12 @@
-from openai import AsyncOpenAI
-from pyarrow import system_memory_pool
-from pydantic import BaseModel, Field
-from typing import List
-import os
 from pydantic import BaseModel, Field, create_model
-import json
+import os
+from calibrate.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
 
 
+@observe(
+    name="llm_test_llm_judge",
+    capture_input=False,
+)
 async def test_response_llm_judge(
     conversation: list[dict], response: str, criteria: str
 ) -> float:
@@ -26,15 +26,11 @@ async def test_response_llm_judge(
             description="True if the response passes the criteria. False if it does not.",
         )
 
-    system_prompt = """You are a highly accurate evaluator evaluating the response to a conversation.
+    system_prompt = """You are a highly accurate evaluator evaluating the response to a conversation.\n\nYou will be given a conversation between a user and a human agent along with the response of the human agent to the final user message and an evaluation criteria to use for evaluating the agent's final response.\n\nYou need to evaluate if the response adheres to the evaluation criteria."""
 
-You will be given a conversation between a user and a human agent along with the response of the human agent to the final user message and an evaluation criteria to use for evaluating the agent's final response. 
+    user_prompt = f"""`Chat history`:\n\n{conversation_as_prompt}\n\n`Response to evaluation`:\n\n{response}\n\n`Evaluation criteria`:\n\n{criteria}"""
 
-You need to evaluate if the response adheres to the evaluation criteria."""
-
-    user_prompt = f"""Chat history: {conversation_as_prompt}\nResponse to evaluation: {response}\nEvaluation criteria: {criteria}"""
-
-    response = await client.responses.parse(
+    judge_response = await client.responses.parse(
         model="gpt-4.1-2025-04-14",
         input=[
             {
@@ -52,7 +48,20 @@ You need to evaluate if the response adheres to the evaluation criteria."""
         store=True,
     )
 
-    return response.output_parsed.model_dump()
+    judge_response = judge_response.output_parsed.model_dump()
+
+    if langfuse_enabled and langfuse:
+        langfuse.update_current_span(
+            input=user_prompt,
+            metadata={
+                "input": user_prompt,
+                "output": judge_response,
+                "system_prompt": system_prompt,
+                "output_schema": Output.model_json_schema(),
+            },
+        )
+
+    return judge_response
 
 
 def convert_evaluation_criteria_to_prompt(evaluation_criteria: list[dict]) -> str:
@@ -85,6 +94,7 @@ def format_conversation_with_tool_calls(conversation: list[dict]) -> str:
     return "\n".join(lines)
 
 
+@observe(name="simulation_llm_judge")
 async def evaluate_simuation(
     conversation: list[dict],
     evaluation_criteria: list[dict],
@@ -118,22 +128,15 @@ async def evaluate_simuation(
 
     agent_instructions_section = ""
     if agent_system_prompt:
-        agent_instructions_section = f"""
+        agent_instructions_section = f"""\n\nThe agent was given the following instructions:\n\n<agent_instructions>\n\n{agent_system_prompt}\n\n</agent_instructions>\n\nUse these instructions to understand what the agent was supposed to do and evaluate if the agent followed its instructions correctly."""
 
-The agent was given the following instructions:
-<agent_instructions>
-{agent_system_prompt}
-</agent_instructions>
+    system_prompt = f"""You are a highly accurate grader.\n\nYou will be given a conversation between a user and an agent along with an evaluation criteria to use for evaluating the agent's behaviour.{agent_instructions_section}\n\nYou need to evaluate if the agent's behaviour adheres to the evaluation criteria. Always give your reasoning in english irrespective of the language of the conversation."""
 
-Use these instructions to understand what the agent was supposed to do and evaluate if the agent followed its instructions correctly."""
+    evaluation_criteria_as_prompt = convert_evaluation_criteria_to_prompt(
+        evaluation_criteria
+    )
 
-    system_prompt = f"""You are a highly accurate grader. 
-
-You will be given a conversation between a user and an agent along with an evaluation criteria to use for evaluating the agent's behaviour.{agent_instructions_section}
-
-You need to evaluate if the agent's behaviour adheres to the evaluation criteria. Always give your reasoning in english irrespective of the language of the conversation."""
-
-    user_prompt = f"""Chat history: {conversation_as_prompt}\nEvaluation criteria: {convert_evaluation_criteria_to_prompt(evaluation_criteria)}"""
+    user_prompt = f"""`Chat history`:\n\n{conversation_as_prompt}\n\n`Evaluation criteria`:\n\n{evaluation_criteria_as_prompt}"""
 
     response = await client.responses.parse(
         model="gpt-5.2-2025-12-11",
@@ -153,4 +156,16 @@ You need to evaluate if the agent's behaviour adheres to the evaluation criteria
         store=True,
     )
 
-    return response.output_parsed.model_dump()
+    response = response.output_parsed.model_dump()
+
+    if langfuse_enabled and langfuse:
+        langfuse.update_current_span(
+            metadata={
+                "input": f"Conversation: {conversation_as_prompt}\nEvaluation criteria: {evaluation_criteria_as_prompt}",
+                "output": response,
+                "system_prompt": system_prompt,
+                "output_schema": Output.model_json_schema(),
+            }
+        )
+
+    return response

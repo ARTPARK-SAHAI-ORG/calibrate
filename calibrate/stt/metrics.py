@@ -4,7 +4,7 @@ from transformers.models.whisper.english_normalizer import BasicTextNormalizer
 import numpy as np
 from tqdm.asyncio import tqdm_asyncio
 import difflib
-from openai import AsyncOpenAI
+from calibrate.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
 from pydantic import BaseModel, Field
 import backoff
 
@@ -46,6 +46,10 @@ def get_string_similarity(references: List[str], predictions: List[str]) -> floa
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
+@observe(
+    name="stt_llm_judge",
+    capture_input=False,
+)
 async def stt_llm_judge(reference: str, prediction: str) -> float:
     client = AsyncOpenAI()
 
@@ -89,7 +93,19 @@ You need to evaluate if the two strings are the same.
         store=True,
     )
 
-    return response.output_parsed.model_dump()
+    response = response.output_parsed.model_dump()
+
+    if langfuse_enabled and langfuse:
+        langfuse.update_current_trace(
+            input={"reference": reference, "prediction": prediction},
+            metadata={
+                "reference": reference,
+                "prediction": prediction,
+                "output": response,
+            },
+        )
+
+    return response
 
 
 async def get_llm_judge_score(references: List[str], predictions: List[str]) -> float:

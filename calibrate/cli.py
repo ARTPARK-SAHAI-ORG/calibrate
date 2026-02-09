@@ -8,6 +8,7 @@ Usage:
     calibrate tts                                    # Interactive TTS evaluation
     calibrate llm                                    # Interactive LLM tests
     calibrate simulations                            # Interactive simulations
+    calibrate status                                  # Check provider connectivity
 
     # Direct mode:
     calibrate llm -c config.json -m gpt-4.1 -p openrouter -o ./out
@@ -20,6 +21,7 @@ import argparse
 import asyncio
 import runpy
 import os
+import json
 from importlib.metadata import version as get_version
 from dotenv import load_dotenv
 
@@ -91,7 +93,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="calibrate",
-        usage="calibrate [-h] [-v] {stt,tts,llm,simulations} ...",
+        usage="calibrate [-h] [-v] {stt,tts,llm,simulations,status} ...",
         description="Voice agent evaluation and benchmarking toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -103,6 +105,7 @@ Examples:
     calibrate llm -c config.json                     # Run LLM tests directly
     calibrate simulations                            # Interactive simulations
     calibrate simulations --type text -c config.json # Run text simulation directly
+    calibrate status                                 # Check provider connectivity
         """,
     )
 
@@ -116,7 +119,7 @@ Examples:
     subparsers = parser.add_subparsers(
         dest="component",
         help="Component to run",
-        metavar="{stt,tts,llm,simulations}",
+        metavar="{stt,tts,llm,simulations,status}",
     )
     subparsers.required = False  # Allow `calibrate` alone for main menu
 
@@ -256,6 +259,18 @@ Examples:
     sim_lb_parser.add_argument("-o", "--output-dir", type=str, required=True)
     sim_lb_parser.add_argument("-s", "--save-dir", type=str, required=True)
 
+    # ── Status ────────────────────────────────────────────────────
+    status_parser = subparsers.add_parser(
+        "status",
+        help="Check API key configuration and provider connectivity",
+    )
+    status_parser.add_argument(
+        "--table",
+        action="store_true",
+        default=False,
+        help="Display results as a formatted table instead of JSON",
+    )
+
     # ── Agent test (hidden — interactive voice testing) ─────────
     agent_parser = subparsers.add_parser("agent")
     agent_subparsers = agent_parser.add_subparsers(dest="command", help="Agent command")
@@ -387,6 +402,14 @@ Examples:
                 },
             )
             asyncio.run(agent_main())
+
+    elif args.component == "status":
+        from calibrate.status import main as status_main
+
+        table_mode = getattr(args, "table", False)
+        result = asyncio.run(status_main(quiet=not table_mode))
+        if not table_mode:
+            print(json.dumps(result, indent=2))
 
     elif args.component == "agent":
         if args.command == "test":

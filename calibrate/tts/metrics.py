@@ -4,18 +4,29 @@ from transformers.models.whisper.english_normalizer import BasicTextNormalizer
 import numpy as np
 import instructor
 from tqdm.asyncio import tqdm_asyncio
-import json
-from openai import AsyncOpenAI
 from pydantic import BaseModel, Field
 import base64
 import backoff
+from calibrate.langfuse import (
+    AsyncOpenAI,
+    observe,
+    langfuse,
+    langfuse_enabled,
+    create_langfuse_audio_media,
+)
 
 normalizer = BasicTextNormalizer()
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
+@observe(
+    name="tts_llm_judge",
+    capture_input=False,
+    capture_output=False,
+)
 async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
-    client = instructor.from_provider("openai/gpt-4o-audio-preview", async_client=True)
+    client = instructor.apatch(AsyncOpenAI())
+    # client = instructor.from_provider("openai/gpt-4o-audio-preview", async_client=True)
 
     class Output(BaseModel):
         reasoning: str = Field(
@@ -26,18 +37,12 @@ async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
             ..., description="Indicates whether the audio matches the provided text."
         )
 
-    response = await client.create(
+    system_prompt = """You are a highly accurate evaluator evaluating the audio output of a TTs model.\n\nYou will be given the audio and the text that should have been spoken in the audio.\n\nYou need to evaluate if the text is easily understandable from the audio."""
+
+    response = await client.chat.completions.create(
         model="gpt-audio-2025-08-28",
         messages=[
-            {
-                "role": "system",
-                "content": [
-                    {
-                        "type": "text",
-                        "text": "You are a highly accurate evaluator evaluating the audio output of a TTs model.\n\nYou will be given the audio and the text that should have been spoken in the audio.\n\nYou need to evaluate if the text is easily understandable from the audio.",
-                    }
-                ],
-            },
+            {"role": "system", "content": system_prompt},
             {
                 "role": "user",
                 "content": [
@@ -67,7 +72,22 @@ async def tts_llm_judge(audio_path: str, reference_text: str) -> float:
         store=True,
     )
 
-    return response.model_dump()
+    response = response.model_dump()
+
+    if langfuse_enabled and langfuse:
+        audio_media = create_langfuse_audio_media(audio_path)
+        langfuse.update_current_trace(
+            input={"audio": audio_media, "reference_text": reference_text},
+            output=response,
+            metadata={
+                "input": f"Reference text: {reference_text}",
+                "output": response,
+                "system_prompt": system_prompt,
+                "output_schema": Output.model_json_schema(),
+            },
+        )
+
+    return response
 
 
 async def get_tts_llm_judge_score(

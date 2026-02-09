@@ -29,7 +29,6 @@ from pipecat.frames.frames import (
     TextFrame,
     FunctionCallResultProperties,
 )
-from openai import AsyncOpenAI
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.services.llm_service import FunctionCallParams
@@ -47,6 +46,25 @@ from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate.llm.metrics import evaluate_simuation
 import pandas as pd
 import numpy as np
+
+from pipecat.utils.tracing.setup import setup_tracing
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from calibrate.utils import patch_langfuse_trace
+
+IS_TRACING_ENABLED = bool(os.getenv("ENABLE_TRACING"))
+
+# Initialize tracing if enabled
+if IS_TRACING_ENABLED:
+    patch_langfuse_trace(trace_name="text_simulation")
+
+    exporter = OTLPSpanExporter()
+
+    setup_tracing(
+        service_name="text_simulation",
+        exporter=exporter,
+    )
+    logger.info("OpenTelemetry tracing initialized")
+
 
 DEFAULT_MAX_TURNS = 50
 
@@ -398,6 +416,8 @@ async def run_simulation(
             enable_usage_metrics=True,
         ),
         observers=[LLMLogObserver()],
+        enable_tracing=IS_TRACING_ENABLED,
+        conversation_id=str(uuid.uuid4()) if IS_TRACING_ENABLED else None,
     )
 
     user_task = PipelineTask(
