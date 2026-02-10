@@ -1,5 +1,6 @@
 import asyncio
 import io
+import json
 import logging
 import os
 import struct
@@ -417,14 +418,24 @@ def combine_turn_audio_chunks(audio_dir: str) -> bool:
     return True
 
 
-def combine_audio_files(audio_dir: str, output_path: str) -> bool:
+def combine_audio_files(
+    audio_dir: str, output_path: str, transcript_path: str = None
+) -> bool:
     """Combine all WAV files in a directory into a single conversation WAV file.
 
-    Files are sorted by modification time to preserve conversation order.
+    Uses the transcript to determine the correct order of audio files.
+    For each content message in the transcript (skipping tool_calls-only messages),
+    the corresponding audio file is added in order:
+      - assistant content messages map to {N}_bot.wav (N = 1, 2, 3, ...)
+      - user content messages map to {N}_user.wav (N = 1, 2, 3, ...)
+    Bot and user indices are tracked separately.
+
+    Falls back to sorting by filename if no transcript is provided.
 
     Args:
         audio_dir: Directory containing the audio files
         output_path: Path to save the combined audio file
+        transcript_path: Path to the transcript.json file for ordering
 
     Returns:
         True if successful, False otherwise
@@ -437,8 +448,40 @@ def combine_audio_files(audio_dir: str, output_path: str) -> bool:
         logger.warning(f"No audio files found in {audio_dir}")
         return False
 
-    # Sort files by modification time
-    sorted_files = sorted(audio_files, key=lambda f: os.path.getmtime(f))
+    sorted_files = []
+
+    if not transcript_path or not os.path.exists(transcript_path):
+        raise FileNotFoundError(f"No transcript file found at {transcript_path}")
+
+    with open(transcript_path, "r") as f:
+        transcript = json.load(f)
+
+    bot_index = 1
+    user_index = 1
+
+    for msg in transcript:
+        # Skip messages that only have tool_calls and no content
+        if "content" not in msg or msg.get("content") is None:
+            continue
+
+        role = msg.get("role")
+        if role == "assistant":
+            file_path = os.path.join(audio_dir, f"{bot_index}_bot.wav")
+            if os.path.exists(file_path):
+                sorted_files.append(file_path)
+            else:
+                logger.warning(f"Expected audio file not found: {file_path}")
+            bot_index += 1
+        elif role == "user":
+            file_path = os.path.join(audio_dir, f"{user_index}_user.wav")
+            if os.path.exists(file_path):
+                sorted_files.append(file_path)
+            else:
+                logger.warning(f"Expected audio file not found: {file_path}")
+            user_index += 1
+
+    if not sorted_files:
+        raise ValueError("No audio files matched from transcript")
 
     # Read all audio data
     combined_audio = b""

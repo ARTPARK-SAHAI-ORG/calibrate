@@ -120,6 +120,7 @@ from pipecat.utils.time import time_now_iso8601
 
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
+TRANSCRIPT_FILE_NAME = "transcript.json"
 
 
 def find_available_port() -> int:
@@ -325,7 +326,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._serialized_transcript = transcript
 
         with open(
-            os.path.join(self._output_dir, "transcript.json"), "w"
+            os.path.join(self._output_dir, TRANSCRIPT_FILE_NAME), "w"
         ) as transcripts_file:
             json.dump(transcript, transcripts_file, indent=4)
 
@@ -1518,8 +1519,9 @@ async def _run_single_simulation_inner(
         # First, combine chunks for each turn (e.g., 0_bot_0.wav, 0_bot_1.wav -> 0_bot.wav)
         combine_turn_audio_chunks(audio_dir)
         log_and_print(f"Combined turn audio chunks in {audio_dir}")
-        # Then combine all turn files into conversation.wav
-        combine_audio_files(audio_dir, conversation_audio_path)
+        # Then combine all turn files into conversation.wav, using transcript for correct ordering
+        transcript_path = os.path.join(simulation_output_dir, TRANSCRIPT_FILE_NAME)
+        combine_audio_files(audio_dir, conversation_audio_path, transcript_path)
         log_and_print(f"Combined audio saved to {conversation_audio_path}")
 
     # Return metrics for aggregation
