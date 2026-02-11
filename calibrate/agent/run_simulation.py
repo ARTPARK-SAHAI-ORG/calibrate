@@ -835,11 +835,25 @@ async def run_simulation(
 
     # Capture ERROR-level logs to surface pipecat internal errors
     captured_errors: list[str] = []
+    # Mutable container so the error sink can access the pipeline task once it's created
+    _pipeline_task_ref: list = [None]
+    _error_triggered = False
 
     def error_capture_sink(message):
+        nonlocal _error_triggered
         record = message.record
         if record["level"].name in ("ERROR", "CRITICAL"):
             captured_errors.append(record["message"])
+
+            # Cancel the pipeline task immediately on critical errors
+            # so the simulation doesn't wait for idle timeout
+            if not _error_triggered and _pipeline_task_ref[0] is not None:
+                _error_triggered = True
+                pipeline_task = _pipeline_task_ref[0]
+                loop = asyncio.get_running_loop()
+                loop.call_soon_threadsafe(
+                    lambda: asyncio.ensure_future(pipeline_task.cancel())
+                )
 
     error_sink_id = logger.add(error_capture_sink, level="ERROR")
 
@@ -856,6 +870,7 @@ async def run_simulation(
             max_turns=max_turns,
             tools=tools,
             captured_errors=captured_errors,
+            pipeline_task_ref=_pipeline_task_ref,
         )
     finally:
         logger.remove(error_sink_id)
@@ -873,6 +888,7 @@ async def _run_simulation_inner(
     max_turns: int,
     tools: list[dict],
     captured_errors: list[str],
+    pipeline_task_ref: list,
 ) -> dict:
     # Build webhook configs from tools for function call handling
     webhook_configs = {}
@@ -1060,6 +1076,9 @@ async def _run_simulation_inner(
         ),
         cancel_on_idle_timeout=True,
     )
+
+    # Expose task reference so the error capture sink can cancel it on critical errors
+    pipeline_task_ref[0] = task
 
     function_call_handler.set_frame_sender(task.queue_frame)
 
@@ -1491,7 +1510,7 @@ async def _run_single_simulation_inner(
                 else:
                     simulation_result = sim_task.result()
         except Exception as e:
-            traceback.print_exc()
+            raise e
         finally:
             # Ensure all tasks are fully cancelled and cleaned up
             for task in [bot_task, sim_task]:
@@ -1622,9 +1641,11 @@ async def main():
     stt_llm_judge_scores = []
 
     # Collect metrics from results
+    failed_simulations = []
     for result in results:
         if isinstance(result, Exception):
             logger.error(f"Simulation failed with error: {result}")
+            failed_simulations.append(result)
             continue
 
         sim_metrics_row, evaluation_results, stt_judge = result
@@ -1670,6 +1691,12 @@ async def main():
     # Save overall metrics.json
     with open(join(args.output_dir, "metrics.json"), "w") as f:
         json.dump(metrics_summary, f, indent=4)
+
+    if failed_simulations:
+        print(f"\n\033[31m{len(failed_simulations)} simulation(s) failed:\033[0m")
+        for err in failed_simulations:
+            print(f"  \033[31m- {err}\033[0m")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

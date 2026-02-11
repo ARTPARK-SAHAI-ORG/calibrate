@@ -1,19 +1,43 @@
+import logging
+import os
+import warnings
 from dotenv import load_dotenv
 from loguru import logger
 
 load_dotenv()
 
 try:
-    from langfuse import get_client
-    from langfuse.media import LangfuseMedia
+    # Suppress langfuse warnings/errors when not configured
+    # so it fails silently without printing messages
+    _langfuse_logger = logging.getLogger("langfuse")
+    _prev_level = _langfuse_logger.level
+    _langfuse_logger.setLevel(logging.CRITICAL)
 
-    langfuse = get_client()
-    langfuse.auth_check()
-    from langfuse.openai import AsyncOpenAI
-    from langfuse import observe
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
 
-    langfuse_enabled = True
+        from langfuse import get_client
+        from langfuse.media import LangfuseMedia
+
+        # Only attempt initialization if keys are configured
+        if not os.getenv("LANGFUSE_PUBLIC_KEY"):
+            raise RuntimeError("Langfuse not configured")
+
+        langfuse = get_client()
+        langfuse.auth_check()
+        from langfuse.openai import AsyncOpenAI
+        from langfuse import observe
+
+        langfuse_enabled = True
+
+    _langfuse_logger.setLevel(_prev_level)
 except Exception:
+    # Restore logger level in case it was suppressed
+    try:
+        _langfuse_logger.setLevel(_prev_level)
+    except NameError:
+        pass
+
     from openai import AsyncOpenAI
 
     LangfuseMedia = None

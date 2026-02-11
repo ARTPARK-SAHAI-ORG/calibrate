@@ -74,16 +74,13 @@ async def run(
     async def run_model(model: str) -> tuple[str, dict]:
         """Run tests for a single model with semaphore control."""
         async with semaphore:
-            try:
-                result = await run_model_tests(
-                    model=model,
-                    provider=provider,
-                    config=config,
-                    output_dir=output_dir,
-                )
-                return (model, result)
-            except Exception as e:
-                return (model, {"status": "error", "error": str(e)})
+            result = await run_model_tests(
+                model=model,
+                provider=provider,
+                config=config,
+                output_dir=output_dir,
+            )
+            return (model, result)
 
     # Run all models with limited parallelism
     tasks = [run_model(model) for model in models]
@@ -171,6 +168,7 @@ async def main():
     print(f"\033[92mOverall Summary\033[0m")
     print(f"\033[92m{'='*60}\033[0m\n")
 
+    has_errors = False
     for model in models:
         model_result = result["models"].get(model, {})
         if isinstance(model_result, dict):
@@ -178,6 +176,7 @@ async def main():
                 print(
                     f"  {args.provider}/{model}: \033[31mError - {model_result.get('error')}\033[0m"
                 )
+                has_errors = True
             else:
                 passed = model_result.get("passed", 0)
                 total = model_result.get("total", 0)
@@ -185,6 +184,9 @@ async def main():
                 print(f"  {args.provider}/{model}: {passed}/{total} ({pct:.1f}%)")
 
     print(f"\n\033[92mLeaderboard saved to {result['leaderboard_dir']}\033[0m")
+
+    if has_errors:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

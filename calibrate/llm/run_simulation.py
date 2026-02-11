@@ -439,6 +439,27 @@ async def run_simulation(
     runner = PipelineRunner(handle_sigint=False)
     user_runner = PipelineRunner(handle_sigint=False)
 
+    # Capture ERROR-level logs to surface pipecat internal errors
+    # and cancel pipeline tasks immediately on critical errors
+    captured_errors: list[str] = []
+    _error_triggered = False
+
+    def error_capture_sink(message):
+        nonlocal _error_triggered
+        record = message.record
+        if record["level"].name in ("ERROR", "CRITICAL"):
+            captured_errors.append(record["message"])
+
+            if not _error_triggered:
+                _error_triggered = True
+                loop = asyncio.get_running_loop()
+                loop.call_soon_threadsafe(lambda: asyncio.ensure_future(task.cancel()))
+                loop.call_soon_threadsafe(
+                    lambda: asyncio.ensure_future(user_task.cancel())
+                )
+
+    error_sink_id = logger.add(error_capture_sink, level="ERROR")
+
     try:
         await asyncio.gather(
             runner.run(task),
@@ -447,6 +468,14 @@ async def run_simulation(
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
         raise e
+    finally:
+        logger.remove(error_sink_id)
+
+    # Check if errors were captured during the run
+    if captured_errors:
+        raise RuntimeError(
+            f"Simulation failed with pipeline errors: {'; '.join(captured_errors)}"
+        )
 
     transcript = [
         message
@@ -606,6 +635,7 @@ async def run_single_simulation_task(
                 return simulation_metrics, output["evaluation_results"]
             except Exception as e:
                 traceback.print_exc()
+                raise e
             finally:
                 try:
                     logger.remove(log_file_id)
@@ -691,10 +721,12 @@ async def main():
     # Collect metrics from results
     metrics = defaultdict(list)
     all_simulation_metrics = []
+    failed_simulations = []
 
     for result in results:
         if isinstance(result, Exception):
             logger.error(f"Simulation failed with error: {result}")
+            failed_simulations.append(result)
             continue
 
         simulation_metrics, evaluation_results = result
@@ -717,6 +749,12 @@ async def main():
 
     with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics_summary, f, indent=4)
+
+    if failed_simulations:
+        print(f"\n\033[31m{len(failed_simulations)} simulation(s) failed:\033[0m")
+        for err in failed_simulations:
+            print(f"  \033[31m- {err}\033[0m")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

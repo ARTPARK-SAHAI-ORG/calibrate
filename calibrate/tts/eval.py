@@ -502,38 +502,36 @@ async def run_tts_eval(
 
         log_and_print(f"Processing [{i+1}/{len(gt_data)}]: {_id}")
 
+        audio_path = join(audio_output_dir, f"{_id}.wav")
         try:
-            audio_path = join(audio_output_dir, f"{_id}.wav")
             result = await synthesize_speech(text, provider, language, audio_path)
-
-            # Handle optional ttfb (some providers may not return it)
-            ttfb = result.get("ttfb")
-            if ttfb is not None:
-                ttfb_values.append(ttfb)
-
-            # Prepare row data
-            row_data = {
-                "id": _id,
-                "text": text,
-                "audio_path": audio_path,
-                "ttfb": ttfb,
-            }
-
-            # Append to CSV immediately for crash recovery
-            row_df = pd.DataFrame([row_data])
-            if exists(results_csv_path):
-                row_df.to_csv(results_csv_path, mode="a", header=False, index=False)
-            else:
-                row_df.to_csv(results_csv_path, index=False)
-
-            success_count += 1
-            if ttfb is not None:
-                log_and_print(f"\n\033[93m  TTFB: {ttfb:.3f}s\033[0m")
-
         except Exception as e:
-            log_and_print(f"  Error synthesizing {_id}: {e}")
-            logger.exception(f"Error synthesizing {_id}")
-            continue
+            log_and_print(f"\033[91mFailed to synthesize {_id}: {e}\033[0m")
+            raise
+
+        # Handle optional ttfb (some providers may not return it)
+        ttfb = result.get("ttfb")
+        if ttfb is not None:
+            ttfb_values.append(ttfb)
+
+        # Prepare row data
+        row_data = {
+            "id": _id,
+            "text": text,
+            "audio_path": audio_path,
+            "ttfb": ttfb,
+        }
+
+        # Append to CSV immediately for crash recovery
+        row_df = pd.DataFrame([row_data])
+        if exists(results_csv_path):
+            row_df.to_csv(results_csv_path, mode="a", header=False, index=False)
+        else:
+            row_df.to_csv(results_csv_path, index=False)
+
+        success_count += 1
+        if ttfb is not None:
+            log_and_print(f"\n\033[93m  TTFB: {ttfb:.3f}s\033[0m")
 
     return {
         "success_count": success_count,
@@ -699,11 +697,7 @@ async def run_single_provider_eval(
     log_and_print(f"\033[33mRunning TTS evaluation for provider: {provider}\033[0m")
 
     # Validate language is supported by the provider
-    try:
-        validate_tts_language(language, provider)
-    except ValueError as e:
-        log_and_print(f"\033[31mError: {e}\033[0m")
-        return {"provider": provider, "status": "error", "error": str(e)}
+    validate_tts_language(language, provider)
 
     df = pd.read_csv(input_file)
 

@@ -28,6 +28,7 @@ from calibrate.utils import (
     log_and_print,
     get_stt_language_code,
     validate_stt_language,
+    configure_print_logger,
 )
 from calibrate.stt.metrics import (
     get_wer_score,
@@ -360,45 +361,37 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
         # Send audio and receive results concurrently
         async def send_audio():
             """Send audio chunks to the STT websocket"""
-            try:
-                async for chunk in audio_stream():
-                    await ws.send(chunk)
-                    # print(f"Sent audio chunk of {len(chunk)} bytes")
-                    # Small delay to simulate realtime applications
-                    await asyncio.sleep(0.02)
+            async for chunk in audio_stream():
+                await ws.send(chunk)
+                # print(f"Sent audio chunk of {len(chunk)} bytes")
+                # Small delay to simulate realtime applications
+                await asyncio.sleep(0.02)
 
-                # Signal end of audio stream
-                await ws.send("finalize")
-                await ws.send("done")
-                # print("Audio streaming completed")
-
-            except Exception as e:
-                print(f"Error sending audio: {e}")
+            # Signal end of audio stream
+            await ws.send("finalize")
+            await ws.send("done")
+            # print("Audio streaming completed")
 
         async def receive_transcripts():
             """Receive and process transcription results with word timestamps"""
             full_transcript = ""
 
-            try:
-                async for result in ws.receive():
-                    if result["type"] == "transcript":
-                        text = result["text"]
-                        is_final = result["is_final"]
+            async for result in ws.receive():
+                if result["type"] == "transcript":
+                    text = result["text"]
+                    is_final = result["is_final"]
 
-                        if is_final:
-                            # Final result - this text won't change
-                            full_transcript += text + " "
-                            # print(f"FINAL: {text}")
-                        # else:
-                        # Partial result - may change as more audio is processed
-                        # print(f"PARTIAL: {text}")
+                    if is_final:
+                        # Final result - this text won't change
+                        full_transcript += text + " "
+                        # print(f"FINAL: {text}")
+                    # else:
+                    # Partial result - may change as more audio is processed
+                    # print(f"PARTIAL: {text}")
 
-                    elif result["type"] == "done":
-                        # print("Transcription completed")
-                        break
-
-            except Exception as e:
-                print(f"Error receiving transcripts: {e}")
+                elif result["type"] == "done":
+                    # print("Transcription completed")
+                    break
 
             return full_transcript.strip()
 
@@ -417,8 +410,6 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
 
         return {"transcript": final_transcript}
 
-    except Exception as e:
-        print(f"STT streaming error: {e}")
     finally:
         await client.close()
 
@@ -462,7 +453,7 @@ async def transcribe_smallest(audio_path: Path, language: str) -> str:
 # =============================================================================
 
 
-@backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
+@backoff.on_exception(backoff.expo, Exception, max_tries=3, factor=2)
 @observe(name="stt", capture_input=False, capture_output=False)
 async def transcribe_audio(
     audio_path: Path,
@@ -570,7 +561,7 @@ async def run_stt_eval(
                 success_count += 1
         except Exception as e:
             log_and_print(f"\033[91mFailed to transcribe {audio_path}: {e}\033[0m")
-            raise e
+            raise
 
         # Save immediately after each file
         results.append(
@@ -746,26 +737,24 @@ async def run_single_provider_eval(
     if not exists(provider_output_dir):
         os.makedirs(provider_output_dir)
 
-    log_save_path = join(provider_output_dir, "results.log")
+    log_save_path = join(provider_output_dir, "logs")
+    if exists(log_save_path):
+        os.remove(log_save_path)
 
-    # Configure logger for this provider
     logger.remove()
-    logger.add(
-        log_save_path,
-        level="DEBUG",
-        format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {message}",
-        colorize=False,
-    )
+    logger.add(log_save_path)
+
+    print_log_save_path = join(provider_output_dir, "results.log")
+    if exists(print_log_save_path):
+        os.remove(print_log_save_path)
+
+    configure_print_logger(print_log_save_path)
 
     log_and_print("--------------------------------")
     log_and_print(f"\033[33mRunning STT evaluation for provider: {provider}\033[0m")
 
     # Validate language is supported by the provider
-    try:
-        validate_stt_language(language, provider)
-    except ValueError as e:
-        log_and_print(f"\033[31mError: {e}\033[0m")
-        return {"provider": provider, "status": "error", "error": str(e)}
+    validate_stt_language(language, provider)
 
     # Audio files are expected in audios/*.wav
     audio_dir = Path(input_dir) / "audios"

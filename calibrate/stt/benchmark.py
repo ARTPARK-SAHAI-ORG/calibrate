@@ -109,21 +109,18 @@ async def run(
     async def run_provider(provider: str) -> tuple[str, dict]:
         """Run evaluation for a single provider with semaphore control."""
         async with semaphore:
-            try:
-                result = await run_single_provider_eval(
-                    provider=provider,
-                    language=language,
-                    input_dir=input_dir,
-                    input_file_name=input_file_name,
-                    output_dir=output_dir,
-                    debug=debug,
-                    debug_count=debug_count,
-                    ignore_retry=ignore_retry,
-                    overwrite=overwrite,
-                )
-                return (provider, result)
-            except Exception as e:
-                return (provider, {"status": "error", "error": str(e)})
+            result = await run_single_provider_eval(
+                provider=provider,
+                language=language,
+                input_dir=input_dir,
+                input_file_name=input_file_name,
+                output_dir=output_dir,
+                debug=debug,
+                debug_count=debug_count,
+                ignore_retry=ignore_retry,
+                overwrite=overwrite,
+            )
+            return (provider, result)
 
     # Run all providers with limited parallelism
     tasks = [run_provider(provider) for provider in providers]
@@ -244,7 +241,6 @@ async def main():
     print(f"Language: {args.language}")
     print(f"Input: {args.input_dir}")
     print(f"Output: {args.output_dir}")
-    print(f"Parallel: max {MAX_PARALLEL_PROVIDERS} at a time")
     print("")
 
     # Run benchmark
@@ -265,6 +261,7 @@ async def main():
     print(f"\033[92mSummary\033[0m")
     print(f"\033[92m{'='*60}\033[0m\n")
 
+    has_errors = False
     provider_results = result.get("providers", {})
     for provider in providers:
         prov_result = provider_results.get(provider, {})
@@ -272,11 +269,15 @@ async def main():
             print(f"  {provider}: \033[31m{prov_result}\033[0m")
         elif prov_result.get("status") == "error":
             print(f"  {provider}: \033[31mError - {prov_result.get('error')}\033[0m")
+            has_errors = True
         else:
             metrics = prov_result.get("metrics", {})
             wer = metrics.get("wer", 0)
             llm_score = metrics.get("llm_judge_score", 0)
             print(f"  {provider}: WER={wer:.4f}, LLM Score={llm_score:.4f}")
+
+    if has_errors:
+        sys.exit(1)
 
     print(f"\n\033[92mLeaderboard saved to: {result.get('leaderboard_dir')}\033[0m")
 

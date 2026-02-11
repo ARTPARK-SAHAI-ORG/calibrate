@@ -189,9 +189,14 @@ class _Simulation:
         metrics_by_criterion = defaultdict(list)
         stt_llm_judge_scores = []
 
+        failed_simulations = [r for r in results if isinstance(r, Exception)]
+        if failed_simulations:
+            error_msgs = "; ".join(str(e) for e in failed_simulations)
+            raise RuntimeError(
+                f"{len(failed_simulations)} simulation(s) failed: {error_msgs}"
+            )
+
         for result in results:
-            if isinstance(result, Exception):
-                continue
             if result is None:
                 continue
 
