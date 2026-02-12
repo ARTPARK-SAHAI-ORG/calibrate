@@ -121,7 +121,12 @@
         "label": "GitHub",
         "href": "https://github.com/artpark-sahai-org/calibrate"
       }
-    ]
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get Started",
+      "href": "https://calibrate.artpark.ai"
+    }
   },
   "contextual": {
     "options": [
