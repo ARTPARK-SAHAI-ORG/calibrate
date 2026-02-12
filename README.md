@@ -1,11 +1,11 @@
 # Calibrate
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ARTPARK-SAHAI-ORG/calibrate)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Community-7289da?logo=discord&logoColor=white)](https://discord.gg/9dQB4AngK2)
+[![WhatsApp](https://img.shields.io/badge/WhatsApp-Join%20Community-25D366?logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z)
 [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
 An open-source evaluation framework for voice agents.
-
-[![Discord](https://img.shields.io/badge/Discord-Join%20Community-7289da?logo=discord&logoColor=white)](https://discord.gg/9dQB4AngK2)
-[![WhatsApp](https://img.shields.io/badge/WhatsApp-Join%20Community-25D366?logo=whatsapp&logoColor=white)](https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z)
 
 With [Calibrate](https://calibrate.artpark.ai), you can move from slow, manual testing to a fast, automated, and repeatable testing process for your entire voice agent stack:
 
