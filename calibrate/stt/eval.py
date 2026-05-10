@@ -263,7 +263,13 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
         model = "chirp_3"
         region = "us"
 
-    transcript = _transcribe_google_streaming(audio_path, lang_code, model, region)
+    transcript = await asyncio.to_thread(
+        _transcribe_google_streaming,
+        audio_path,
+        lang_code,
+        model,
+        region,
+    )
 
     return {
         "transcript": transcript.strip(),
