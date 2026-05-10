@@ -338,7 +338,9 @@ async def synthesize_sarvam(text: str, language: str, audio_path: str) -> Dict:
     start_time = time.time()
     ttfb = None
 
-    async with client.text_to_speech_streaming.connect(model="bulbul:v3") as ws:
+    async with client.text_to_speech_streaming.connect(
+        model="bulbul:v3", send_completion_event=False
+    ) as ws:
         await ws.configure(
             target_language_code=lang_code, speaker="aditya", output_audio_codec="wav"
         )
