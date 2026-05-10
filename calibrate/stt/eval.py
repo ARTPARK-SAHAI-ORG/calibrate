@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import base64
+import time
 import httpx
 from os.path import join, exists
 from datetime import datetime
@@ -217,9 +218,15 @@ def _transcribe_google_streaming(
         streaming_config=streaming_config,
     )
 
-    def requests(config: cloud_speech_types.RecognitionConfig, audio: list) -> list:
+    def requests(
+        config: cloud_speech_types.StreamingRecognizeRequest,
+        audio: list,
+    ) -> list:
         yield config
-        yield from audio
+        for req in audio:
+            yield req
+            # Pace 24KB chunks to avoid flooding Google's streaming gRPC endpoint.
+            time.sleep(0.5)
 
     # Transcribes the audio into text
     responses_iterator = client.streaming_recognize(
@@ -273,14 +280,16 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
 
     audio_data = base64.b64encode(load_audio(audio_path)).decode("utf-8")
 
-    client = AsyncSarvamAI(api_subscription_key=api_key)
+    client = AsyncSarvamAI(api_subscription_key=api_key, timeout=120.0)
 
     transcript = ""
+    ttft = None
 
     async with client.speech_to_text_streaming.connect(
         language_code=lang_code,
-        model="saarika:v2.5",
-        flush_signal=True,  # Enable manual control
+        model="saaras:v3",
+        mode="transcribe",
+        flush_signal=True,
     ) as ws:
         # Send audio
         await ws.transcribe(audio=audio_data, encoding="audio/wav", sample_rate=16000)
@@ -288,15 +297,23 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
         # Force immediate processing
         await ws.flush()
         _log("⚡ Processing forced - getting immediate results")
+
         # Get results
         async for message in ws:
-            transcript = message.data.transcript
-            processing_time = message.data.metrics.processing_latency
+            if getattr(message, "type", None) == "error":
+                error = getattr(message.data, "error", "Unknown Sarvam STT error")
+                raise RuntimeError(error)
+            if getattr(message, "type", None) != "data":
+                continue
+
+            transcript = getattr(message.data, "transcript", "")
+            metrics = getattr(message.data, "metrics", None)
+            ttft = getattr(metrics, "processing_latency", None)
             break
 
     return {
         "transcript": transcript,
-        "processing_time": processing_time,
+        "ttft": ttft,
     }
 
 

@@ -138,7 +138,7 @@ async def synthesize_google(text: str, language: str, audio_path: str) -> Dict:
         voice_params = texttospeech.VoiceSelectionParams(
             language_code=lang_code,
             name="Charon",
-            model_name="gemini-2.5-flash-lite-preview-tts",
+            model_name="gemini-2.5-flash-tts",
         )
 
         audio_config = texttospeech.AudioConfig(
@@ -280,7 +280,7 @@ async def synthesize_cartesia(text: str, language: str, audio_path: str) -> Dict
         ttfb = None
 
         bytes_iter = client.tts.bytes(
-            model_id="sonic-3",
+            model_id="sonic-3.5",
             transcript=text,
             voice={
                 "mode": "id",
@@ -338,7 +338,7 @@ async def synthesize_sarvam(text: str, language: str, audio_path: str) -> Dict:
     start_time = time.time()
     ttfb = None
 
-    async with client.text_to_speech_streaming.connect(model="bulbul:v3-beta") as ws:
+    async with client.text_to_speech_streaming.connect(model="bulbul:v3") as ws:
         await ws.configure(
             target_language_code=lang_code, speaker="aditya", output_audio_codec="wav"
         )
@@ -755,9 +755,7 @@ async def run_single_provider_eval(
 
         # Run evaluators
         _log("Running evaluators...")
-        _evaluators = (
-            judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
-        )
+        _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
         require_unique_evaluator_names(_evaluators)
         write_evaluator_config(output_dir, _evaluators)
         llm_judge_results = await get_tts_llm_judge_score(

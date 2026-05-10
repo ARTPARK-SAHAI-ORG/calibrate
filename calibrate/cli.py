@@ -194,7 +194,7 @@ Examples:
         nargs="+",
         help="STT provider(s) to evaluate (space-separated for multiple)",
     )
-    stt_parser.add_argument("-l", "--language", type=str, default="english")
+    stt_parser.add_argument("-l", "--language", type=str, required=True)
     stt_parser.add_argument("-i", "--input-dir", type=str)
     stt_parser.add_argument("-o", "--output-dir", type=str, default="./out")
     stt_parser.add_argument("-f", "--input-file-name", type=str, default="stt.csv")
@@ -242,7 +242,7 @@ Examples:
         nargs="+",
         help="TTS provider(s) to use for evaluation (space-separated for multiple)",
     )
-    tts_parser.add_argument("-l", "--language", type=str, default="english")
+    tts_parser.add_argument("-l", "--language", type=str, required=True)
     tts_parser.add_argument("-i", "--input", type=str)
     tts_parser.add_argument("-o", "--output-dir", type=str, default="./out")
     tts_parser.add_argument("-d", "--debug", action="store_true")
