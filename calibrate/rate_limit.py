@@ -35,10 +35,23 @@ class AsyncRateLimiter:
         self.max_calls = max_calls
         self.period = period
         self._calls: deque[float] = deque()
-        self._lock = asyncio.Lock()
+        self._lock: asyncio.Lock | None = None
+        self._lock_loop: asyncio.AbstractEventLoop | None = None
+
+    def _get_lock(self) -> asyncio.Lock:
+        # ``asyncio.Lock`` binds to whatever loop first awaits it. Module-level
+        # limiters outlive any single ``asyncio.run(...)``, so we lazily
+        # rebuild the lock whenever the running loop changes — otherwise a
+        # second ``asyncio.run`` would inherit a lock bound to a closed loop
+        # and raise ``RuntimeError: ... is bound to a different event loop``.
+        loop = asyncio.get_running_loop()
+        if self._lock is None or self._lock_loop is not loop:
+            self._lock = asyncio.Lock()
+            self._lock_loop = loop
+        return self._lock
 
     async def acquire(self) -> None:
-        async with self._lock:
+        async with self._get_lock():
             now = time.monotonic()
             self._evict(now)
 
