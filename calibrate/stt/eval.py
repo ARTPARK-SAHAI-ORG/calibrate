@@ -47,6 +47,7 @@ from calibrate.langfuse import (
     langfuse,
     langfuse_enabled,
 )
+from calibrate.rate_limit import SARVAM_STT_STREAMING_LIMITER
 
 
 # =============================================================================
@@ -290,6 +291,8 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
     lang_code = get_stt_language_code(language, "sarvam")
 
     audio_data = base64.b64encode(load_audio(audio_path)).decode("utf-8")
+
+    await SARVAM_STT_STREAMING_LIMITER.acquire()
 
     client = AsyncSarvamAI(api_subscription_key=api_key, timeout=120.0)
 

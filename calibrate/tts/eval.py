@@ -43,6 +43,7 @@ from calibrate.langfuse import (
     langfuse_enabled,
     create_langfuse_audio_media,
 )
+from calibrate.rate_limit import SARVAM_TTS_STREAMING_LIMITER
 
 
 # =============================================================================
@@ -332,6 +333,8 @@ async def synthesize_sarvam(text: str, language: str, audio_path: str) -> Dict:
         raise ValueError("SARVAM_API_KEY environment variable not set")
 
     lang_code = get_tts_language_code(language, "sarvam")
+
+    await SARVAM_TTS_STREAMING_LIMITER.acquire()
 
     client = AsyncSarvamAI(api_subscription_key=api_key)
 
