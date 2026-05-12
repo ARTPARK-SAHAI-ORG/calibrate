@@ -611,6 +611,46 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertEqual(result["status"], "completed")
 
+    async def test_all_rows_failed_returns_error_status(self):
+        from calibrate.stt import eval as E
+
+        async def always_fail(*args, **kwargs):
+            raise RuntimeError("simulated outage")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            for rid in ["a", "b"]:
+                (base / "audios" / f"{rid}.wav").write_bytes(b"\x00")
+            pd.DataFrame(
+                {"id": ["a", "b"], "text": ["hello", "world"]}
+            ).to_csv(base / "stt.csv", index=False)
+
+            output = Path(tmp) / "out"
+            output.mkdir()
+
+            judge_mock = AsyncMock()
+            with patch.object(
+                E, "transcribe_audio", AsyncMock(side_effect=always_fail)
+            ), patch.object(E, "get_llm_judge_score", judge_mock):
+                result = await E.run_single_provider_eval(
+                    provider="deepgram",
+                    language="english",
+                    input_dir=str(base),
+                    input_file_name="stt.csv",
+                    output_dir=str(output),
+                    debug=False,
+                    debug_count=5,
+                    ignore_retry=True,
+                    overwrite=True,
+                )
+
+            self.assertEqual(result["status"], "error")
+            self.assertIn("All", result["error"])
+            self.assertIn("deepgram", result["error"])
+            # Judges must not be called when every row failed.
+            judge_mock.assert_not_awaited()
+
     async def test_existing_invalid_csv_error(self):
         from calibrate.stt import eval as E
 

@@ -1202,6 +1202,19 @@ async def run_single_provider_eval(
         else:
             all_errors = [None] * len(all_ids)
 
+        if all_statuses and not any(s == "success" for s in all_statuses):
+            error_msg = (
+                f"All {len(all_statuses)} row(s) failed for provider '{provider}' — "
+                "no successful transcriptions to score."
+            )
+            _log(f"\033[91m{error_msg}\033[0m")
+            return {
+                "provider": provider,
+                "status": "error",
+                "error": error_msg,
+                "output_dir": provider_output_dir,
+            }
+
         _log(f"gt_transcripts: {all_gt_transcripts}", to_terminal=False)
         _log(f"pred_transcripts: {all_pred_transcripts}", to_terminal=False)
 
