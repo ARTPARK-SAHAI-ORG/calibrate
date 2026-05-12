@@ -19,40 +19,6 @@ def _mock_load_audio(*args, **kwargs):
     return b"RIFF\x00\x00\x00\x00WAVE"
 
 
-class TestTranscribeDeepgram(unittest.IsolatedAsyncioTestCase):
-    async def test_deepgram_happy(self):
-        from calibrate.stt import eval as E
-
-        fake_resp = MagicMock()
-        fake_resp.results.channels[0].alternatives[0].transcript = "hello"
-        fake_client = MagicMock()
-        fake_client.listen.asyncrest.v.return_value.transcribe_file = AsyncMock(
-            return_value=fake_resp
-        )
-
-        with patch.dict(os.environ, {"DEEPGRAM_API_KEY": "k"}), \
-             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
-             patch.object(E, "DeepgramClient", return_value=fake_client):
-            result = await E.transcribe_deepgram(Path("/tmp/x.wav"), "english")
-        self.assertEqual(result["transcript"], "hello")
-
-
-class TestTranscribeOpenAI(unittest.IsolatedAsyncioTestCase):
-    async def test_openai_happy(self):
-        from calibrate.stt import eval as E
-
-        fake_resp = MagicMock()
-        fake_resp.text = "hi"
-        fake_client = MagicMock()
-        fake_client.audio.transcriptions.create = AsyncMock(return_value=fake_resp)
-
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), \
-             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
-             patch.object(E, "AsyncOpenAI", return_value=fake_client):
-            result = await E.transcribe_openai(Path("/tmp/x.wav"), "english")
-        self.assertEqual(result["transcript"], "hi")
-
-
 class TestTranscribeGroq(unittest.IsolatedAsyncioTestCase):
     async def test_groq_happy(self):
         from calibrate.stt import eval as E
@@ -65,23 +31,6 @@ class TestTranscribeGroq(unittest.IsolatedAsyncioTestCase):
              patch.object(E, "AsyncGroq", return_value=fake_client):
             result = await E.transcribe_groq(Path("/tmp/x.wav"), "english")
         self.assertEqual(result["transcript"], "hello world")
-
-
-class TestTranscribeElevenlabs(unittest.IsolatedAsyncioTestCase):
-    async def test_elevenlabs_happy(self):
-        from calibrate.stt import eval as E
-
-        fake_resp = MagicMock()
-        fake_resp.text = "hello"
-
-        fake_client = MagicMock()
-        fake_client.speech_to_text.convert = AsyncMock(return_value=fake_resp)
-
-        with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "k"}), \
-             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
-             patch.object(E, "AsyncElevenLabs", return_value=fake_client):
-            result = await E.transcribe_elevenlabs(Path("/tmp/x.wav"), "english")
-        self.assertEqual(result["transcript"], "hello")
 
 
 class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
@@ -142,29 +91,6 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
              patch.object(E, "AsyncSarvamAI", return_value=fake_client):
             with self.assertRaises(RuntimeError):
                 await E.transcribe_sarvam(Path("/tmp/x.wav"), "english")
-
-
-class TestTranscribeSmallest(unittest.IsolatedAsyncioTestCase):
-    async def test_smallest_happy(self):
-        from calibrate.stt import eval as E
-
-        # Mock httpx response
-        fake_resp = MagicMock()
-        fake_resp.json.return_value = {"transcription": "hello"}
-
-        async def fake_post(*args, **kwargs):
-            return fake_resp
-
-        fake_client = MagicMock()
-        fake_client.__aenter__ = AsyncMock(return_value=fake_client)
-        fake_client.__aexit__ = AsyncMock(return_value=False)
-        fake_client.post = AsyncMock(return_value=fake_resp)
-
-        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), \
-             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
-             patch("httpx.AsyncClient", return_value=fake_client):
-            result = await E.transcribe_smallest(Path("/tmp/x.wav"), "english")
-        self.assertEqual(result["transcript"], "hello")
 
 
 class TestTranscribeGoogle(unittest.IsolatedAsyncioTestCase):

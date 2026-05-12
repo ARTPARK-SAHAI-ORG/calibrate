@@ -73,20 +73,6 @@ class TestLoadAudio(unittest.TestCase):
 # --- Provider transcribe_* missing-key paths ------------------------------
 
 class TestProviderAPIKeyMissing(unittest.IsolatedAsyncioTestCase):
-    async def test_deepgram_missing_key(self):
-        from calibrate.stt.eval import transcribe_deepgram
-
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValueError):
-                await transcribe_deepgram(Path("/tmp/x.wav"), "english")
-
-    async def test_openai_missing_key(self):
-        from calibrate.stt.eval import transcribe_openai
-
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValueError):
-                await transcribe_openai(Path("/tmp/x.wav"), "english")
-
     async def test_groq_missing_key(self):
         from calibrate.stt.eval import transcribe_groq
 
@@ -108,13 +94,6 @@ class TestProviderAPIKeyMissing(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await transcribe_sarvam(Path("/tmp/x.wav"), "english")
 
-    async def test_elevenlabs_missing_key(self):
-        from calibrate.stt.eval import transcribe_elevenlabs
-
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValueError):
-                await transcribe_elevenlabs(Path("/tmp/x.wav"), "english")
-
     async def test_cartesia_missing_key(self):
         from calibrate.stt.eval import transcribe_cartesia
 
@@ -122,19 +101,181 @@ class TestProviderAPIKeyMissing(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await transcribe_cartesia(Path("/tmp/x.wav"), "english")
 
-    async def test_smallest_missing_key(self):
-        from calibrate.stt.eval import transcribe_smallest
-
-        with patch.dict(os.environ, {}, clear=True):
-            with self.assertRaises(ValueError):
-                await transcribe_smallest(Path("/tmp/x.wav"), "english")
-
     async def test_smallest_streaming_missing_key(self):
         from calibrate.stt.eval import transcribe_smallest_streaming
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await transcribe_smallest_streaming(Path("/tmp/x.wav"), "english")
+
+    async def test_elevenlabs_streaming_missing_key(self):
+        from calibrate.stt.eval import transcribe_elevenlabs_streaming
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError):
+                await transcribe_elevenlabs_streaming(
+                    Path("/tmp/x.wav"), "english"
+                )
+
+    async def test_openai_streaming_missing_key(self):
+        from calibrate.stt.eval import transcribe_openai_streaming
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError):
+                await transcribe_openai_streaming(
+                    Path("/tmp/x.wav"), "english"
+                )
+
+    async def test_deepgram_streaming_missing_key(self):
+        from calibrate.stt.eval import transcribe_deepgram_streaming
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError):
+                await transcribe_deepgram_streaming(
+                    Path("/tmp/x.wav"), "english"
+                )
+
+    async def test_elevenlabs_streaming_happy(self):
+        import asyncio as _asyncio
+        import json as _json
+
+        from calibrate.stt import eval as E
+
+        # Fake WS that emits session_started on recv() and yields a
+        # committed_transcript only after the client sends its final commit,
+        # mirroring the real server's protocol order.
+        class FakeWS:
+            def __init__(self):
+                self.sent = []
+                self._commit_received = _asyncio.Event()
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def recv(self):
+                return _json.dumps({"message_type": "session_started"})
+
+            async def send(self, payload):
+                self.sent.append(payload)
+                if '"commit": true' in payload:
+                    self._commit_received.set()
+
+            def __aiter__(self):
+                evt = self._commit_received
+
+                async def gen():
+                    await evt.wait()
+                    yield _json.dumps(
+                        {"message_type": "committed_transcript", "text": "hello"}
+                    )
+
+                return gen()
+
+        fake_ws = FakeWS()
+
+        def _fake_connect(*args, **kwargs):
+            return fake_ws
+
+        with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "k"}), patch.object(
+            E, "load_audio", return_value=b"\x00\x00" * 1000
+        ), patch(
+            "websockets.asyncio.client.connect", side_effect=_fake_connect
+        ):
+            result = await E.transcribe_elevenlabs_streaming(
+                Path("/tmp/x.wav"), "english"
+            )
+
+        self.assertEqual(result["transcript"], "hello")
+        # Final commit must have been sent before we received the transcript.
+        self.assertTrue(any('"commit": true' in s for s in fake_ws.sent))
+
+    async def test_openai_streaming_happy(self):
+        from types import SimpleNamespace
+
+        from calibrate.stt import eval as E
+
+        events = [
+            SimpleNamespace(type="transcript.text.delta", delta="hello "),
+            SimpleNamespace(type="transcript.text.done", text="hello world"),
+        ]
+
+        async def fake_stream():
+            for ev in events:
+                yield ev
+
+        fake_client = MagicMock()
+        fake_client.audio.transcriptions.create = AsyncMock(
+            return_value=fake_stream()
+        )
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), patch.object(
+            E, "load_audio", return_value=b"\x00" * 100
+        ), patch.object(E, "AsyncOpenAI", return_value=fake_client):
+            result = await E.transcribe_openai_streaming(
+                Path("/tmp/x.wav"), "english"
+            )
+
+        self.assertEqual(result["transcript"], "hello world")
+        self.assertIsNotNone(result["ttft"])
+
+    async def test_deepgram_streaming_happy(self):
+        import json as _json
+
+        from calibrate.stt import eval as E
+
+        # Fake WS that emits a final Results then a Metadata to signal end.
+        class FakeWS:
+            def __init__(self):
+                self.sent = []
+                self._messages = [
+                    _json.dumps(
+                        {
+                            "type": "Results",
+                            "is_final": True,
+                            "channel": {
+                                "alternatives": [{"transcript": "hello world"}]
+                            },
+                        }
+                    ),
+                    _json.dumps({"type": "Metadata"}),
+                ]
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *a):
+                return False
+
+            async def send(self, payload):
+                self.sent.append(payload)
+
+            def __aiter__(self):
+                msgs = self._messages
+
+                async def gen():
+                    for m in msgs:
+                        yield m
+
+                return gen()
+
+        fake_ws = FakeWS()
+
+        def _fake_connect(*args, **kwargs):
+            return fake_ws
+
+        with patch.dict(os.environ, {"DEEPGRAM_API_KEY": "k"}), patch.object(
+            E, "load_audio", return_value=b"\x00" * 1000
+        ), patch(
+            "websockets.asyncio.client.connect", side_effect=_fake_connect
+        ):
+            result = await E.transcribe_deepgram_streaming(
+                Path("/tmp/x.wav"), "english"
+            )
+
+        self.assertEqual(result["transcript"], "hello world")
 
 
 # --- transcribe_audio router ----------------------------------------------
@@ -153,13 +294,13 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
     async def test_routes_to_provider(self):
         from calibrate.stt import eval as E
 
-        fake_fn = AsyncMock(return_value={"transcript": "hello world"})
+        fake_fn = AsyncMock(return_value={"transcript": "hello world", "ttft": 0.25})
         inner = E.transcribe_audio
         while hasattr(inner, "__wrapped__"):
             inner = inner.__wrapped__
-        with patch.object(E, "transcribe_deepgram", fake_fn):
+        with patch.object(E, "transcribe_deepgram_streaming", fake_fn):
             result = await inner(Path("/tmp/x.wav"), "ref", "deepgram", "english", "u")
-        self.assertEqual(result, "hello world")
+        self.assertEqual(result, {"transcript": "hello world", "ttft": 0.25})
         fake_fn.assert_called_once()
 
     async def test_with_langfuse(self):
@@ -170,7 +311,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
         while hasattr(inner, "__wrapped__"):
             inner = inner.__wrapped__
         fake_lf = MagicMock()
-        with patch.object(E, "transcribe_deepgram", fake_fn), \
+        with patch.object(E, "transcribe_deepgram_streaming", fake_fn), \
              patch.object(E, "langfuse_enabled", True), \
              patch.object(E, "langfuse", fake_lf), \
              patch.object(E, "create_langfuse_audio_media", return_value=None):
@@ -371,7 +512,11 @@ class TestRunStteval(unittest.IsolatedAsyncioTestCase):
                 str(results_csv), index=False
             )
 
-            with patch.object(E, "transcribe_audio", AsyncMock(return_value="hello b")):
+            with patch.object(
+                E,
+                "transcribe_audio",
+                AsyncMock(return_value={"transcript": "hello b", "ttft": 0.1}),
+            ):
                 count = await E.run_stt_eval(
                     gt_data=[{"id": "a", "gt": "X"}, {"id": "b", "gt": "Y"}],
                     audio_dir=audio_dir,
@@ -383,6 +528,50 @@ class TestRunStteval(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(count, 1)
             df = pd.read_csv(str(results_csv))
             self.assertEqual(len(df), 2)
+
+    async def test_row_level_error_does_not_abort_run(self):
+        from calibrate.stt import eval as E
+
+        # transcribe_audio raises for "a", succeeds for "b". The run must
+        # complete, recording "a" as failed and "b" as success.
+        async def fake_transcribe(audio_path, *args, **kwargs):
+            if audio_path.name == "a.wav":
+                raise RuntimeError("simulated provider failure")
+            return {"transcript": "hello b", "ttft": 0.2}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "stuff"
+            base.mkdir()
+            audio_dir = base / "audios"
+            audio_dir.mkdir()
+            (audio_dir / "a.wav").write_bytes(b"\x00")
+            (audio_dir / "b.wav").write_bytes(b"\x00")
+            results_csv = base / "results.csv"
+
+            with patch.object(
+                E, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                count = await E.run_stt_eval(
+                    gt_data=[
+                        {"id": "a", "gt": "X"},
+                        {"id": "b", "gt": "Y"},
+                    ],
+                    audio_dir=audio_dir,
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=str(results_csv),
+                )
+
+            self.assertEqual(count, 1)
+            df = pd.read_csv(str(results_csv))
+            self.assertEqual(len(df), 2)
+            self.assertEqual(set(df["status"].tolist()), {"success", "failed"})
+            failed_row = df[df["id"] == "a"].iloc[0]
+            self.assertEqual(failed_row["status"], "failed")
+            self.assertIn("simulated provider failure", str(failed_row["error"]))
+            success_row = df[df["id"] == "b"].iloc[0]
+            self.assertEqual(success_row["status"], "success")
+            self.assertEqual(success_row["pred"], "hello b")
 
 
 # --- run_single_provider_eval --------------------------------------------
@@ -403,7 +592,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
             # Pre-existing results.csv to trigger overwrite path
             (output / "deepgram" / "results.csv").write_text("id,gt,pred\na,hello,hi\n")
 
-            with patch.object(E, "transcribe_audio", AsyncMock(return_value="hello")), \
+            with patch.object(E, "transcribe_audio", AsyncMock(return_value={"transcript": "hello", "ttft": 0.3})), \
                  patch.object(E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
@@ -463,7 +652,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
             output = Path(tmp) / "out"
             output.mkdir()
 
-            with patch.object(E, "transcribe_audio", AsyncMock(return_value="hello")), \
+            with patch.object(E, "transcribe_audio", AsyncMock(return_value={"transcript": "hello", "ttft": 0.4})), \
                  patch.object(E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},

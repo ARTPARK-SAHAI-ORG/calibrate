@@ -14,15 +14,14 @@ from urllib.parse import urlencode
 import backoff
 from sarvamai import AsyncSarvamAI
 from openai import AsyncOpenAI
-from elevenlabs.client import AsyncElevenLabs
 from groq import AsyncGroq
-from deepgram import DeepgramClient, PrerecordedOptions, FileSource
 from cartesia import AsyncCartesia
 import uuid
 from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech as cloud_speech_types
 from google.api_core.client_options import ClientOptions
 
+import numpy as np
 import pandas as pd
 
 from calibrate.utils import (
@@ -47,7 +46,11 @@ from calibrate.langfuse import (
     langfuse,
     langfuse_enabled,
 )
-from calibrate.rate_limit import SARVAM_STT_STREAMING_LIMITER
+from calibrate.rate_limit import (
+    STT_PROVIDER_TIMEOUT_SECONDS,
+    STT_STREAMING_IDLE_TIMEOUT_SECONDS,
+    SARVAM_STT_STREAMING_LIMITER,
+)
 
 
 # =============================================================================
@@ -98,36 +101,131 @@ def load_audio(audio_path: Path, as_file: bool = False, raw_pcm: bool = False):
     return out_io.getvalue()
 
 
-async def transcribe_deepgram(audio_path: Path, language: str) -> str:
-    """Transcribe audio using Deepgram's REST API."""
+async def _aiter_with_idle_timeout(aiter, timeout: float):
+    """Async-iterate ``aiter`` enforcing a per-message idle timeout.
+
+    Raises ``asyncio.TimeoutError`` if no next message arrives within
+    ``timeout`` seconds. Useful for STT WebSocket loops where the SDK's
+    own timeout settings don't apply to the receive side and a stalled
+    server can otherwise block forever.
+    """
+    it = aiter.__aiter__() if hasattr(aiter, "__aiter__") else aiter
+    while True:
+        try:
+            msg = await asyncio.wait_for(it.__anext__(), timeout=timeout)
+        except StopAsyncIteration:
+            return
+        yield msg
+
+
+async def transcribe_deepgram_streaming(audio_path: Path, language: str) -> str:
+    """Transcribe audio using Deepgram's live streaming WebSocket API.
+
+    Uses the raw WebSocket protocol (``wss://api.deepgram.com/v1/listen``)
+    rather than the threaded SDK because the SDK's live client is sync /
+    callback-based and doesn't compose with our async pipeline. See
+    https://developers.deepgram.com/docs/live-streaming-audio.
+    """
+    try:
+        from websockets.asyncio.client import connect as websocket_connect
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            "websockets is required for Deepgram streaming STT. "
+            "Install with 'pip install websockets'."
+        ) from e
+
     api_key = os.getenv("DEEPGRAM_API_KEY")
     if not api_key:
         raise ValueError("DEEPGRAM_API_KEY environment variable not set")
 
     lang_code = get_stt_language_code(language, "deepgram")
 
-    client = DeepgramClient(api_key=api_key)
-
-    audio_file = load_audio(audio_path)
-
-    options = PrerecordedOptions(model="nova-3", language=lang_code)
-
-    payload: FileSource = {
-        "buffer": audio_file,
+    endpoint = "wss://api.deepgram.com/v1/listen"
+    params = {
+        "model": "nova-3",
+        "language": lang_code,
+        "encoding": "linear16",
+        "sample_rate": "16000",
+        "channels": "1",
+        "smart_format": "true",
     }
+    ws_url = f"{endpoint}?{urlencode(params)}"
+    headers = {"Authorization": f"Token {api_key}"}
 
-    response = await client.listen.asyncrest.v("1").transcribe_file(
-        source=payload, options=options
-    )
-    transcript = response.results.channels[0].alternatives[0].transcript.strip()
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 4096
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+
+        async def send_audio():
+            for start in range(0, len(audio), chunk_size):
+                chunk = audio[start : start + chunk_size]
+                if chunk:
+                    await ws.send(chunk)
+                    await asyncio.sleep(0.05)
+
+            # Tells Deepgram we've sent all audio so it flushes and closes.
+            await ws.send(json.dumps({"type": "CloseStream"}))
+
+        start_time = time.perf_counter()
+        ttft = None
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+
+        try:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
+                try:
+                    output = json.loads(message)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+                if not isinstance(output, dict):
+                    continue
+
+                msg_type = output.get("type")
+
+                if msg_type == "Results":
+                    alternatives = output.get("channel", {}).get("alternatives") or []
+                    if not alternatives:
+                        continue
+
+                    transcript = alternatives[0].get("transcript", "")
+                    if transcript and ttft is None:
+                        ttft = time.perf_counter() - start_time
+
+                    if output.get("is_final") and transcript:
+                        transcript_parts.append(transcript)
+                elif msg_type == "Metadata":
+                    # Sent after CloseStream once Deepgram has flushed all
+                    # final transcripts — safe to stop reading.
+                    break
+        finally:
+            if sender.done():
+                await sender
+            else:
+                sender.cancel()
+                try:
+                    await sender
+                except asyncio.CancelledError:
+                    pass
 
     return {
-        "transcript": transcript,
+        "transcript": " ".join(
+            part.strip() for part in transcript_parts if part.strip()
+        ),
+        "ttft": ttft,
     }
 
 
-async def transcribe_openai(audio_path: Path, language: str) -> str:
-    """Transcribe audio using OpenAI's Whisper API."""
+async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
+    """Transcribe audio using OpenAI's transcriptions API with ``stream=True``.
+
+    Streams ``transcript.text.delta`` events as soon as each segment is ready
+    and finishes on ``transcript.text.done`` which carries the full transcript.
+    See https://developers.openai.com/api/docs/guides/speech-to-text#streaming.
+    """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set")
@@ -136,13 +234,35 @@ async def transcribe_openai(audio_path: Path, language: str) -> str:
 
     audio_file = load_audio(audio_path, as_file=True)
 
-    response = await client.audio.transcriptions.create(
-        model="gpt-4o-transcribe", file=audio_file
+    stream = await client.audio.transcriptions.create(
+        model="gpt-4o-transcribe",
+        file=audio_file,
+        response_format="text",
+        stream=True,
     )
-    transcript = response.text
+
+    start_time = time.perf_counter()
+    ttft = None
+    transcript = ""
+
+    async for event in _aiter_with_idle_timeout(
+        stream, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+    ):
+        event_type = getattr(event, "type", None)
+
+        if event_type == "transcript.text.delta":
+            if ttft is None and getattr(event, "delta", ""):
+                ttft = time.perf_counter() - start_time
+
+        elif event_type == "transcript.text.done":
+            transcript = getattr(event, "text", "") or ""
+            if ttft is None:
+                ttft = time.perf_counter() - start_time
+            break
 
     return {
         "transcript": transcript,
+        "ttft": ttft,
     }
 
 
@@ -158,12 +278,15 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
 
     audio_file = load_audio(audio_path, as_file=True)
 
-    transcription = await client.audio.transcriptions.create(
-        file=audio_file,  # Required audio file
-        model="whisper-large-v3-turbo",  # Required model to use for transcription
-        response_format="text",  # Optional
-        language=lang_code,  # Optional
-        temperature=0.0,  # Optional
+    transcription = await asyncio.wait_for(
+        client.audio.transcriptions.create(
+            file=audio_file,  # Required audio file
+            model="whisper-large-v3-turbo",  # Required model to use for transcription
+            response_format="text",  # Optional
+            language=lang_code,  # Optional
+            temperature=0.0,  # Optional
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
     )
 
     return {
@@ -269,12 +392,15 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
         model = "chirp_3"
         region = "us"
 
-    transcript = await asyncio.to_thread(
-        _transcribe_google_streaming,
-        audio_path,
-        lang_code,
-        model,
-        region,
+    transcript = await asyncio.wait_for(
+        asyncio.to_thread(
+            _transcribe_google_streaming,
+            audio_path,
+            lang_code,
+            model,
+            region,
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
     )
 
     return {
@@ -294,7 +420,7 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
 
     await SARVAM_STT_STREAMING_LIMITER.acquire()
 
-    client = AsyncSarvamAI(api_subscription_key=api_key, timeout=120.0)
+    client = AsyncSarvamAI(api_subscription_key=api_key)
 
     transcript = ""
     ttft = None
@@ -313,7 +439,9 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
         _log("⚡ Processing forced - getting immediate results")
 
         # Get results
-        async for message in ws:
+        async for message in _aiter_with_idle_timeout(
+            ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+        ):
             if getattr(message, "type", None) == "error":
                 error = getattr(message.data, "error", "Unknown Sarvam STT error")
                 raise RuntimeError(error)
@@ -328,31 +456,6 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
     return {
         "transcript": transcript,
         "ttft": ttft,
-    }
-
-
-async def transcribe_elevenlabs(audio_path: Path, language: str) -> str:
-    """Transcribe audio using ElevenLabs' STT API."""
-    api_key = os.getenv("ELEVENLABS_API_KEY")
-    if not api_key:
-        raise ValueError("ELEVENLABS_API_KEY environment variable not set")
-
-    lang_code = get_stt_language_code(language, "elevenlabs")
-
-    elevenlabs = AsyncElevenLabs(api_key=api_key)
-
-    audio_data = load_audio(audio_path)
-
-    response = await elevenlabs.speech_to_text.convert(
-        file=audio_data,
-        model_id="scribe_v2",
-        language_code=lang_code,
-    )
-
-    transcript = response.text
-
-    return {
-        "transcript": transcript,
     }
 
 
@@ -407,80 +510,39 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
             await ws.send("done")
             # print("Audio streaming completed")
 
+        start_time = time.perf_counter()
+        ttft_holder = {"ttft": None}
+
         async def receive_transcripts():
             """Receive and process transcription results with word timestamps"""
             full_transcript = ""
 
-            async for result in ws.receive():
+            async for result in _aiter_with_idle_timeout(
+                ws.receive(), STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
                 if result["type"] == "transcript":
                     text = result["text"]
                     is_final = result["is_final"]
 
+                    if text and ttft_holder["ttft"] is None:
+                        ttft_holder["ttft"] = time.perf_counter() - start_time
+
                     if is_final:
-                        # Final result - this text won't change
                         full_transcript += text + " "
-                        # print(f"FINAL: {text}")
-                    # else:
-                    # Partial result - may change as more audio is processed
-                    # print(f"PARTIAL: {text}")
 
                 elif result["type"] == "done":
-                    # print("Transcription completed")
                     break
 
             return full_transcript.strip()
 
-        # print("Starting streaming STT...")
+        _, final_transcript = await asyncio.gather(send_audio(), receive_transcripts())
 
-        # Use asyncio.gather to run audio sending and transcript receiving concurrently
-        _, (final_transcript) = await asyncio.gather(
-            send_audio(), receive_transcripts()
-        )
-
-        # print(f"\nComplete transcript: {final_transcript}")
-        # print(f"Total words with timestamps: {len(word_timestamps)}")
-
-        # Clean up
         await ws.close()
 
-        return {"transcript": final_transcript}
+        return {"transcript": final_transcript, "ttft": ttft_holder["ttft"]}
 
     finally:
         await client.close()
-
-
-async def transcribe_smallest(audio_path: Path, language: str) -> str:
-    """Transcribe audio using Smallest's STT API."""
-    api_key = os.getenv("SMALLEST_API_KEY")
-    if not api_key:
-        raise ValueError("SMALLEST_API_KEY environment variable not set")
-
-    lang_code = get_stt_language_code(language, "smallest")
-
-    endpoint = "https://api.smallest.ai/waves/v1/pulse/get_text"
-    params = {
-        "model": "pulse",
-        "language": lang_code,
-        "word_timestamps": "false",
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "audio/wav",
-    }
-
-    audio = load_audio(audio_path)
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            endpoint, params=params, headers=headers, content=audio
-        )
-
-    output = response.json()
-    transcript = output.get("transcription", "")
-
-    return {
-        "transcript": transcript,
-    }
 
 
 async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
@@ -527,7 +589,9 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
         transcript_parts = []
 
         try:
-            async for message in ws:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
                 try:
                     output = json.loads(message)
                 except json.JSONDecodeError:
@@ -567,6 +631,126 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
     }
 
 
+async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> str:
+    """Transcribe audio using ElevenLabs' Scribe v2 Realtime WebSocket API.
+
+    Uses the documented raw-WebSocket protocol (manual commit strategy) rather
+    than the SDK's higher-level ``speech_to_text.realtime.connect`` because the
+    installed elevenlabs SDK version doesn't ship the realtime STT client.
+    See https://elevenlabs.io/docs/eleven-api/guides/how-to/speech-to-text/realtime/server-side-streaming.
+    """
+    try:
+        from websockets.asyncio.client import connect as websocket_connect
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            "websockets is required for ElevenLabs streaming STT. "
+            "Install with 'pip install websockets'."
+        ) from e
+
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise ValueError("ELEVENLABS_API_KEY environment variable not set")
+
+    lang_code = get_stt_language_code(language, "elevenlabs")
+
+    endpoint = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+    params = {
+        "model_id": "scribe_v2_realtime",
+        "audio_format": "pcm_16000",
+        "commit_strategy": "manual",
+        "language_code": lang_code,
+    }
+    ws_url = f"{endpoint}?{urlencode(params)}"
+    headers = {"xi-api-key": api_key}
+
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 32000  # 1s of 16 kHz, 16-bit mono PCM
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+        # The server emits ``session_started`` before accepting audio.
+        await asyncio.wait_for(ws.recv(), timeout=STT_STREAMING_IDLE_TIMEOUT_SECONDS)
+
+        async def send_audio():
+            for start in range(0, len(audio), chunk_size):
+                chunk = audio[start : start + chunk_size]
+                if chunk:
+                    await ws.send(
+                        json.dumps(
+                            {
+                                "message_type": "input_audio_chunk",
+                                "audio_base_64": base64.b64encode(chunk).decode(
+                                    "utf-8"
+                                ),
+                                "commit": False,
+                                "sample_rate": 16000,
+                            }
+                        )
+                    )
+                    await asyncio.sleep(0.05)
+
+            # Final commit finalises the segment and triggers committed_transcript.
+            await ws.send(
+                json.dumps(
+                    {
+                        "message_type": "input_audio_chunk",
+                        "audio_base_64": "",
+                        "commit": True,
+                        "sample_rate": 16000,
+                    }
+                )
+            )
+
+        start_time = time.perf_counter()
+        ttft = None
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+
+        try:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
+                try:
+                    output = json.loads(message)
+                except json.JSONDecodeError:
+                    continue
+
+                if not isinstance(output, dict):
+                    continue
+
+                message_type = output.get("message_type")
+
+                if message_type == "input_error":
+                    raise RuntimeError(f"ElevenLabs streaming STT error: {output}")
+
+                if message_type == "partial_transcript":
+                    if output.get("text") and ttft is None:
+                        ttft = time.perf_counter() - start_time
+
+                if message_type == "committed_transcript":
+                    text = output.get("text", "")
+                    if text:
+                        if ttft is None:
+                            ttft = time.perf_counter() - start_time
+                        transcript_parts.append(text)
+                    break
+        finally:
+            if sender.done():
+                await sender
+            else:
+                sender.cancel()
+                try:
+                    await sender
+                except asyncio.CancelledError:
+                    pass
+
+    return {
+        "transcript": " ".join(
+            part.strip() for part in transcript_parts if part.strip()
+        ),
+        "ttft": ttft,
+    }
+
+
 # =============================================================================
 # Main Transcription Router
 # =============================================================================
@@ -583,14 +767,13 @@ async def transcribe_audio(
 ) -> str:
     """Route audio transcription to the appropriate provider."""
     provider_methods = {
-        "deepgram": transcribe_deepgram,
-        "openai": transcribe_openai,
+        "deepgram": transcribe_deepgram_streaming,
+        "openai": transcribe_openai_streaming,
         "groq": transcribe_groq,
         "google": transcribe_google,
         "sarvam": transcribe_sarvam,
-        "elevenlabs": transcribe_elevenlabs,
+        "elevenlabs": transcribe_elevenlabs_streaming,
         "cartesia": transcribe_cartesia,
-        # "smallest": transcribe_smallest,
         "smallest": transcribe_smallest_streaming,
     }
 
@@ -601,6 +784,7 @@ async def transcribe_audio(
     output = await method(audio_path, language)
 
     transcript = output["transcript"].strip()
+    ttft = output.get("ttft")
 
     if langfuse_enabled and langfuse:
         # Download the audio from path and add to input in langfuse
@@ -618,11 +802,12 @@ async def transcribe_audio(
                 "provider": provider,
                 "language": language,
                 "reference": reference,
+                "ttft": ttft,
             },
             session_id=unique_id,
         )
 
-    return transcript
+    return {"transcript": transcript, "ttft": ttft}
 
 
 # =============================================================================
@@ -638,6 +823,12 @@ async def run_stt_eval(
     results_csv_path: Path,
 ) -> int:
     """Process audio files and save results immediately to CSV.
+
+    Row-level failures (after ``transcribe_audio``'s backoff retries are
+    exhausted) are recorded as ``status="failed"`` with an ``error`` message
+    in the CSV row and do NOT abort the run. The loop continues so a single
+    bad row can't sink an otherwise-good benchmark. A summary of all failed
+    rows is logged at the end.
 
     Args:
         gt_data: List of {"id": ..., "gt": ...} for each file to process
@@ -659,6 +850,7 @@ async def run_stt_eval(
         processed_ids = set()
 
     success_count = 0
+    row_errors: List[tuple] = []
 
     unique_id = str(uuid.uuid4())
 
@@ -672,16 +864,26 @@ async def run_stt_eval(
         _log(f"--------------------------------")
         _log(f"Processing audio [{i + 1}/{len(gt_data)}]: {audio_path.name}")
 
+        transcript = ""
+        ttft = None
+        status = "success"
+        error = None
         try:
-            transcript = await transcribe_audio(
+            output = await transcribe_audio(
                 audio_path, gt_info["gt"], provider, language, unique_id
             )
+            transcript = output["transcript"]
+            ttft = output.get("ttft")
             _log(f"\033[33mTranscript: {transcript}\033[0m")
+            if ttft is not None:
+                _log(f"TTFT: {ttft:.3f}s")
             if transcript:
                 success_count += 1
         except Exception as e:
-            _log(f"\033[91mFailed to transcribe {audio_path}: {e}\033[0m")
-            raise
+            status = "failed"
+            error = f"{type(e).__name__}: {e}"
+            row_errors.append((gt_info["id"], error))
+            _log(f"\033[91mFailed to transcribe {audio_path}: {error}\033[0m")
 
         # Save immediately after each file
         results.append(
@@ -689,9 +891,20 @@ async def run_stt_eval(
                 "id": gt_info["id"],
                 "gt": gt_info["gt"],
                 "pred": transcript,
+                "ttft": ttft,
+                "status": status,
+                "error": error,
             }
         )
         pd.DataFrame(results).to_csv(results_csv_path, index=False)
+
+    if row_errors:
+        _log("--------------------------------")
+        _log(
+            f"\033[91m{len(row_errors)} row(s) failed for provider '{provider}':\033[0m"
+        )
+        for row_id, err in row_errors:
+            _log(f"  - {row_id}: {err}")
 
     return success_count
 
@@ -939,7 +1152,14 @@ async def run_single_provider_eval(
                 for gt_info in gt_data:
                     if gt_info["id"] not in processed_ids:
                         results.append(
-                            {"id": gt_info["id"], "gt": gt_info["gt"], "pred": ""}
+                            {
+                                "id": gt_info["id"],
+                                "gt": gt_info["gt"],
+                                "pred": "",
+                                "ttft": None,
+                                "status": "failed",
+                                "error": "not processed (no progress after retry)",
+                            }
                         )
 
                 pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -965,6 +1185,23 @@ async def run_single_provider_eval(
         all_gt_transcripts = results_df["gt"].astype(str).tolist()
         all_pred_transcripts = results_df["pred"].fillna("").astype(str).tolist()
 
+        if "ttft" in results_df.columns:
+            all_ttfts = [
+                None if pd.isna(v) else float(v) for v in results_df["ttft"].tolist()
+            ]
+        else:
+            all_ttfts = [None] * len(all_ids)
+        if "status" in results_df.columns:
+            all_statuses = results_df["status"].fillna("success").astype(str).tolist()
+        else:
+            all_statuses = ["success"] * len(all_ids)
+        if "error" in results_df.columns:
+            all_errors = [
+                None if pd.isna(v) else str(v) for v in results_df["error"].tolist()
+            ]
+        else:
+            all_errors = [None] * len(all_ids)
+
         _log(f"gt_transcripts: {all_gt_transcripts}", to_terminal=False)
         _log(f"pred_transcripts: {all_pred_transcripts}", to_terminal=False)
 
@@ -978,6 +1215,9 @@ async def run_single_provider_eval(
             output_dir=provider_output_dir,
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
+            ttfts=all_ttfts,
+            statuses=all_statuses,
+            errors=all_errors,
         )
 
         return {
@@ -1032,6 +1272,9 @@ async def _score_and_write_results(
     output_dir: str,
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
+    ttfts: list = None,
+    statuses: list = None,
+    errors: list = None,
 ) -> dict:
     """Run WER + LLM-judge evaluators over (gt, pred) pairs and write outputs.
 
@@ -1039,41 +1282,87 @@ async def _score_and_write_results(
     resolved evaluator config under ``evaluator_config_dir``. Returns the
     metrics_data dict.
     """
+    n = len(ids)
+    if ttfts is None:
+        ttfts = [None] * n
+    if statuses is None:
+        statuses = ["success"] * n
+    if errors is None:
+        errors = [None] * n
+
     wer_results = get_wer_score(gt_transcripts, pred_transcripts)
-    _log(f"WER: {wer_results['score']}", to_terminal=False)
+    # Exclude failed rows from per-row WER and the corpus aggregate so a
+    # provider timeout/error isn't conflated with a bad transcription.
+    per_row_wer = [
+        wer if status == "success" else None
+        for wer, status in zip(wer_results["per_row"], statuses)
+    ]
+    valid_wer = [w for w in per_row_wer if w is not None]
+    overall_wer = float(np.mean(valid_wer)) if valid_wer else None
+    _log(f"WER: {overall_wer}", to_terminal=False)
 
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_STT_EVALUATOR]
     require_unique_evaluator_names(_evaluators)
     write_evaluator_config(evaluator_config_dir, _evaluators)
-    llm_results = await get_llm_judge_score(
-        gt_transcripts,
-        pred_transcripts,
-        evaluators=_evaluators,
-    )
-    for name, score_dict in llm_results["scores"].items():
-        _log(f"  {name}: {score_dict['mean']:.4f}")
+
+    # Only run judges on successful rows — failed rows have empty pred and
+    # would otherwise waste API calls and pollute the aggregate scores.
+    success_idx = [i for i, s in enumerate(statuses) if s == "success"]
+    if success_idx:
+        llm_results = await get_llm_judge_score(
+            [gt_transcripts[i] for i in success_idx],
+            [pred_transcripts[i] for i in success_idx],
+            evaluators=_evaluators,
+        )
+        for name, score_dict in llm_results["scores"].items():
+            _log(f"  {name}: {score_dict['mean']:.4f}")
+    else:
+        llm_results = {"scores": {}, "score": None, "per_row": []}
+
+    # Expand per-row judge results back to full length (None for failed rows).
+    per_row_llm = [None] * n
+    for offset, i in enumerate(success_idx):
+        per_row_llm[i] = llm_results["per_row"][offset]
 
     _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
 
-    metrics_data = {"wer": wer_results["score"]}
+    metrics_data = {"wer": overall_wer}
     for name, score_dict in llm_results["scores"].items():
         metrics_data[name] = score_dict
 
+    valid_ttfts = [t for t in ttfts if t is not None]
+    if valid_ttfts:
+        metrics_data["ttft"] = {
+            "mean": float(np.mean(valid_ttfts)),
+            "std": float(np.std(valid_ttfts)),
+            "values": [float(t) for t in valid_ttfts],
+        }
+
     data = []
-    for _id, gt_text, pred_text, wer, llm_row in zip(
+    for _id, gt_text, pred_text, wer, llm_row, ttft, status, error in zip(
         ids,
         gt_transcripts,
         pred_transcripts,
-        wer_results["per_row"],
-        llm_results["per_row"],
+        per_row_wer,
+        per_row_llm,
+        ttfts,
+        statuses,
+        errors,
     ):
         row = {
             "id": _id,
             "gt": gt_text,
             "pred": pred_text,
+            "ttft": ttft,
+            "status": status,
+            "error": error,
             "wer": wer,
         }
         for name, ev in _evaluators_by_name.items():
+            if llm_row is None:
+                row[name] = None
+                row[f"{name}_reasoning"] = None
+                continue
             ev_result = llm_row[name]
             if is_rating(ev):
                 row[name] = ev_result["score"]
@@ -1269,16 +1558,20 @@ async def main():
         sys.exit(1)
     else:
         metrics = result.get("metrics", {})
-        wer = metrics.get("wer", 0)
+        wer = metrics.get("wer")
         # Evaluator entries are dicts carrying a ``type`` field; that's the
         # marker we use to pick them out from other top-level metrics.
         judge_scores = {
-            k: v["mean"]
+            k: v.get("mean")
             for k, v in metrics.items()
             if isinstance(v, dict) and "type" in v
         }
-        judge_str = ", ".join(f"{k}={v:.4f}" for k, v in judge_scores.items())
-        print(f"  {provider}: WER={wer:.4f}, {judge_str}")
+
+        def _fmt(v):
+            return f"{v:.4f}" if isinstance(v, (int, float)) else "N/A"
+
+        judge_str = ", ".join(f"{k}={_fmt(v)}" for k, v in judge_scores.items())
+        print(f"  {provider}: WER={_fmt(wer)}, {judge_str}")
 
 
 if __name__ == "__main__":
