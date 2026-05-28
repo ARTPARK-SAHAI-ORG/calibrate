@@ -88,9 +88,9 @@ class _Tests:
         from calibrate.llm.run_tests import (
             run_test as _run_test,
             run_test_external as _run_test_external,
-            _build_evaluators_registry,
+            _get_name_to_evaluator_dict,
             _evaluators_for_config_output,
-            _resolve_test_case_evaluators,
+            _resolve_evaluators_for_test_case,
         )
         from calibrate.judges import write_evaluator_config
         from calibrate.utils import configure_print_logger, log_and_print
@@ -133,15 +133,23 @@ class _Tests:
         agent_model_hint: Optional[str] = model if (agent is not None and model) else None
 
         evaluator_config = {"evaluators": evaluators or []}
-        evaluators_registry = _build_evaluators_registry(evaluator_config)
+        name_to_evaluator = _get_name_to_evaluator_dict(evaluator_config)
         write_evaluator_config(
             output_dir, _evaluators_for_config_output(evaluator_config)
         )
 
         for test_case_index, test_case in enumerate(test_cases):
             evaluation = test_case["evaluation"]
-            resolved_evaluators = _resolve_test_case_evaluators(
-                evaluation, evaluator_config
+            resolved_evaluators = (
+                _resolve_evaluators_for_test_case(
+                    evaluation,
+                    _get_name_to_evaluator_dict(
+                        evaluator_config,
+                        include_default=(evaluation.get("type") == "response"),
+                    ),
+                )
+                if evaluation.get("type") in ("response", "conversation")
+                else None
             )
             if agent is not None:
                 result = await _run_test_external(
@@ -205,7 +213,7 @@ class _Tests:
         metrics = {
             "total": total_tests,
             "passed": total_passed,
-            "criteria": _aggregate_criteria(results, evaluators_registry),
+            "criteria": _aggregate_criteria(results, name_to_evaluator),
             "tool_calls": _aggregate_tool_calls(results),
         }
         with open(os.path.join(final_output_dir, "metrics.json"), "w") as f:
@@ -453,11 +461,21 @@ class _Tests:
         """
         from calibrate.llm.run_tests import (
             run_test as _run_test,
-            _resolve_test_case_evaluators,
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
         )
 
-        resolved_evaluators = _resolve_test_case_evaluators(
-            evaluation, {"evaluators": evaluators or []}
+        evaluator_config = {"evaluators": evaluators or []}
+        resolved_evaluators = (
+            _resolve_evaluators_for_test_case(
+                evaluation,
+                _get_name_to_evaluator_dict(
+                    evaluator_config,
+                    include_default=(evaluation.get("type") == "response"),
+                ),
+            )
+            if evaluation.get("type") in ("response", "conversation")
+            else None
         )
 
         return await _run_test(

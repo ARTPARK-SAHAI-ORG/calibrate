@@ -48,27 +48,27 @@ class TestNormalizeCriteriaRefs(unittest.TestCase):
             _normalize_criteria_refs(42)
 
 
-class TestBuildEvaluatorsRegistry(unittest.TestCase):
+class TestGetNameToEvaluatorDict(unittest.TestCase):
     def test_default_registry(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        reg = _build_evaluators_registry({"evaluators": []})
+        reg = _get_name_to_evaluator_dict({"evaluators": []})
         self.assertIn(DEFAULT_LLM_TEST_EVALUATOR["name"], reg)
         self.assertIn("default", reg)
 
     def test_user_evaluator_override(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
 
-        reg = _build_evaluators_registry({"evaluators": [_bin_ev("custom")]})
+        reg = _get_name_to_evaluator_dict({"evaluators": [_bin_ev("custom")]})
         self.assertIn("custom", reg)
 
     def test_default_alias_conflict_raises(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
         with self.assertRaises(ValueError):
-            _build_evaluators_registry({
+            _get_name_to_evaluator_dict({
                 "evaluators": [
                     _bin_ev("default"),
                     _bin_ev(DEFAULT_LLM_TEST_EVALUATOR["name"]),
@@ -76,70 +76,83 @@ class TestBuildEvaluatorsRegistry(unittest.TestCase):
             })
 
     def test_missing_required_field_raises(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
 
         with self.assertRaises(ValueError):
-            _build_evaluators_registry({"evaluators": [{"name": "noprompt"}]})
+            _get_name_to_evaluator_dict({"evaluators": [{"name": "noprompt"}]})
 
 
 class TestResolveEvaluatorsForTestCase(unittest.TestCase):
     def test_unknown_evaluator_raises(self):
-        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
 
         with self.assertRaises(ValueError):
-            _resolve_test_case_evaluators(
+            _resolve_evaluators_for_test_case(
                 {"type": "response", "criteria": [{"name": "noexist"}]},
-                {"evaluators": []},
+                _get_name_to_evaluator_dict({"evaluators": []}),
             )
 
     def test_resolves_with_template(self):
-        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
 
-        result = _resolve_test_case_evaluators(
+        result = _resolve_evaluators_for_test_case(
             {
                 "type": "response",
                 "criteria": [{"name": "x", "arguments": {"criteria": "be polite"}}],
             },
-            {
+            _get_name_to_evaluator_dict({
                 "evaluators": [
                     {"name": "x", "system_prompt": "Check {{criteria}}", "judge_model": "m"}
                 ]
-            },
+            }),
         )
         self.assertEqual(result[0]["system_prompt"], "Check be polite")
 
     def test_response_uses_implicit_default(self):
-        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
 
-        resolved = _resolve_test_case_evaluators(
-            {"type": "response", "criteria": "be nice"}, {"evaluators": []}
+        resolved = _resolve_evaluators_for_test_case(
+            {"type": "response", "criteria": "be nice"},
+            _get_name_to_evaluator_dict({"evaluators": []}),
         )
         self.assertEqual(resolved[0]["name"], "correctness")
 
     def test_conversation_uses_user_evaluator(self):
-        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
 
-        resolved = _resolve_test_case_evaluators(
+        resolved = _resolve_evaluators_for_test_case(
             {"type": "conversation", "criteria": [{"name": "tone"}]},
-            {"evaluators": [_bin_ev("tone")]},
+            _get_name_to_evaluator_dict(
+                {"evaluators": [_bin_ev("tone")]}, include_default=False
+            ),
         )
         self.assertEqual(resolved[0]["name"], "tone")
 
     def test_conversation_rejects_implicit_default(self):
-        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
 
         with self.assertRaises(ValueError):
-            _resolve_test_case_evaluators(
+            _resolve_evaluators_for_test_case(
                 {"type": "conversation", "criteria": "be nice"},
-                {"evaluators": [_bin_ev("tone")]},
+                _get_name_to_evaluator_dict(
+                    {"evaluators": [_bin_ev("tone")]}, include_default=False
+                ),
             )
-
-    def test_tool_call_returns_none(self):
-        from calibrate.llm.run_tests import _resolve_test_case_evaluators
-
-        self.assertIsNone(
-            _resolve_test_case_evaluators({"type": "tool_call"}, {"evaluators": []})
-        )
 
 
 class TestDisplayLabel(unittest.TestCase):
@@ -931,12 +944,12 @@ class TestMainCLI(unittest.IsolatedAsyncioTestCase):
                 await RT.main()
 
 
-class TestBuildEvaluatorsRegistryNoDefault(unittest.TestCase):
+class TestGetNameToEvaluatorDictNoDefault(unittest.TestCase):
     def test_excludes_implicit_default(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        reg = _build_evaluators_registry(
+        reg = _get_name_to_evaluator_dict(
             {"evaluators": [_bin_ev("tone")]}, include_default=False
         )
         self.assertIn("tone", reg)
@@ -944,77 +957,33 @@ class TestBuildEvaluatorsRegistryNoDefault(unittest.TestCase):
         self.assertNotIn("default", reg)
 
     def test_default_included_by_default(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        reg = _build_evaluators_registry({"evaluators": [_bin_ev("tone")]})
+        reg = _get_name_to_evaluator_dict({"evaluators": [_bin_ev("tone")]})
         self.assertIn(DEFAULT_LLM_TEST_EVALUATOR["name"], reg)
         self.assertIn("default", reg)
         self.assertIn("tone", reg)
 
     def test_empty_no_default(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
 
         self.assertEqual(
-            _build_evaluators_registry({"evaluators": []}, include_default=False), {}
+            _get_name_to_evaluator_dict({"evaluators": []}, include_default=False), {}
         )
 
     def test_missing_fields_raise(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
 
         with self.assertRaises(ValueError):
-            _build_evaluators_registry(
+            _get_name_to_evaluator_dict(
                 {"evaluators": [{"name": "x"}]}, include_default=False
             )
 
 
-class TestResolveConversationEvaluators(unittest.TestCase):
-    """Conversation resolution via _resolve_test_case_evaluators."""
-
-    @staticmethod
-    def _resolve(criteria, evaluators):
-        from calibrate.llm.run_tests import _resolve_test_case_evaluators
-
-        evaluation = {"type": "conversation"}
-        if criteria is not None:
-            evaluation["criteria"] = criteria
-        return _resolve_test_case_evaluators(evaluation, {"evaluators": evaluators})
-
-    def test_string_criteria_rejected(self):
-        with self.assertRaises(ValueError):
-            self._resolve("be polite", [_bin_ev("tone")])
-
-    def test_missing_criteria_rejected(self):
-        with self.assertRaises(ValueError):
-            self._resolve(None, [_bin_ev("tone")])
-
-    def test_empty_list_rejected(self):
-        with self.assertRaises(ValueError):
-            self._resolve([], [_bin_ev("tone")])
-
-    def test_unknown_evaluator_rejected(self):
-        with self.assertRaises(ValueError):
-            self._resolve([{"name": "missing"}], [_bin_ev("tone")])
-
-    def test_default_evaluator_not_available(self):
-        from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
-
-        # The implicit default name is not resolvable for conversation tests.
-        with self.assertRaises(ValueError):
-            self._resolve(
-                [{"name": DEFAULT_LLM_TEST_EVALUATOR["name"]}], [_bin_ev("tone")]
-            )
-
-    def test_resolves_user_evaluators_with_arguments(self):
-        ev = {"name": "tone", "system_prompt": "judge {{aspect}}", "judge_model": "m"}
-        resolved = self._resolve(
-            [{"name": "tone", "arguments": {"aspect": "warmth"}}], [ev]
-        )
-        self.assertEqual(len(resolved), 1)
-        self.assertEqual(resolved[0]["system_prompt"], "judge warmth")
-
-
 class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
+    _NO_REPLY = ("no tool reply", "no reply")
+
     async def test_binary_pass(self):
         from calibrate.llm import run_tests as RT
 
@@ -1024,6 +993,8 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
                 chat_history=[{"role": "user", "content": "hi"}],
                 evaluators=[_bin_ev("tone")],
                 output={"response": "hi", "tool_calls": []},
+                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
             )
         self.assertTrue(metrics["passed"])
         self.assertEqual(metrics["reasoning"], "All evaluators passed")
@@ -1036,7 +1007,9 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
                           AsyncMock(return_value={"tone": {"reasoning": "rude", "match": False}})):
             metrics = await RT._evaluate_conversation(
                 chat_history=[], evaluators=[_bin_ev("tone")],
-                output={"response": "", "tool_calls": []},
+                output={"response": "x", "tool_calls": []},
+                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
             )
         self.assertFalse(metrics["passed"])
         self.assertEqual(metrics["reasoning"], "rude")
@@ -1048,7 +1021,9 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
                           AsyncMock(return_value={"qual": {"reasoning": "ok", "score": 3}})):
             metrics = await RT._evaluate_conversation(
                 chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
-                output={"response": "", "tool_calls": []},
+                output={"response": "x", "tool_calls": []},
+                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
             )
         self.assertFalse(metrics["passed"])
 
@@ -1059,7 +1034,9 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
                           AsyncMock(return_value={"qual": {"reasoning": "great", "score": 5}})):
             metrics = await RT._evaluate_conversation(
                 chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
-                output={"response": "", "tool_calls": []},
+                output={"response": "x", "tool_calls": []},
+                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
             )
         self.assertTrue(metrics["passed"])
 
@@ -1072,6 +1049,8 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
                 chat_history=[{"role": "user", "content": "hi"}],
                 evaluators=[_bin_ev("tone")],
                 output={"response": "hello", "tool_calls": []},
+                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
             )
         judged = sim.await_args.kwargs["conversation"]
         self.assertEqual(judged[-1], {"role": "assistant", "content": "hello"})
@@ -1086,7 +1065,7 @@ class TestEvaluateTestCaseOutputConversation(unittest.IsolatedAsyncioTestCase):
             metrics = await RT.evaluate_test_case_output(
                 chat_history=[{"role": "user", "content": "hi"}],
                 evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
-                output={"response": "", "tool_calls": []},
+                output={"response": "hi", "tool_calls": []},
                 evaluators=[_bin_ev("tone")],
             )
         sim.assert_awaited_once()
@@ -1290,7 +1269,9 @@ class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
             await RT._evaluate_conversation(
                 chat_history=[],
                 evaluators=[_bin_ev("tone")],
-                output={"response": "", "tool_calls": []},
+                output={"response": "hi", "tool_calls": []},
+                no_response_reasoning_with_tool_calls="",
+                no_response_reasoning_no_tool_calls="",
             )
         self.assertNotIn("fallback_model", sim.await_args.kwargs)
 
