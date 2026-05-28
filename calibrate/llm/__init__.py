@@ -89,7 +89,6 @@ class _Tests:
             run_test as _run_test,
             run_test_external as _run_test_external,
             _build_evaluators_registry,
-            _user_evaluators_registry,
             _evaluators_for_config_output,
             _resolve_test_case_evaluators,
         )
@@ -135,7 +134,6 @@ class _Tests:
 
         evaluator_config = {"evaluators": evaluators or []}
         evaluators_registry = _build_evaluators_registry(evaluator_config)
-        user_registry = _user_evaluators_registry(evaluator_config)
         write_evaluator_config(
             output_dir, _evaluators_for_config_output(evaluator_config)
         )
@@ -143,7 +141,7 @@ class _Tests:
         for test_case_index, test_case in enumerate(test_cases):
             evaluation = test_case["evaluation"]
             resolved_evaluators = _resolve_test_case_evaluators(
-                evaluation, evaluators_registry, user_registry
+                evaluation, evaluator_config
             )
             if agent is not None:
                 result = await _run_test_external(
@@ -455,16 +453,11 @@ class _Tests:
         """
         from calibrate.llm.run_tests import (
             run_test as _run_test,
-            _build_evaluators_registry,
-            _user_evaluators_registry,
             _resolve_test_case_evaluators,
         )
 
-        evaluator_config = {"evaluators": evaluators or []}
         resolved_evaluators = _resolve_test_case_evaluators(
-            evaluation,
-            _build_evaluators_registry(evaluator_config),
-            _user_evaluators_registry(evaluator_config),
+            evaluation, {"evaluators": evaluators or []}
         )
 
         return await _run_test(

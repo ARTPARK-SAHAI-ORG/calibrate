@@ -85,32 +85,36 @@ def _normalize_criteria_refs(criteria) -> list[dict]:
     )
 
 
-def _build_evaluators_registry(config: dict) -> dict:
+def _build_evaluators_registry(config: dict, include_default: bool = True) -> dict:
     """Return ``{name: evaluator_dict}`` from top-level ``config.evaluators``.
 
-    The implicit default LLM-test evaluator is always registered first under
-    its canonical name (``DEFAULT_LLM_TEST_EVALUATOR["name"]``) and also under
-    the legacy alias ``"default"`` so older configs that reference
-    ``{"name": "default"}`` keep working. User-supplied evaluators with the
-    same name override either entry.
+    When ``include_default`` is True (``response`` tests), the implicit default
+    LLM-test evaluator is registered under its canonical name
+    (``DEFAULT_LLM_TEST_EVALUATOR["name"]``) and the legacy alias ``"default"``
+    so older configs that reference ``{"name": "default"}`` keep working;
+    user-supplied evaluators with the same name override either entry.
+
+    When ``include_default`` is False (``conversation`` tests, which have no
+    implicit default), only user-defined evaluators are included.
     """
     user_evaluators = config.get("evaluators") or []
     require_unique_evaluator_names(user_evaluators)
-    # ``"default"`` is a legacy alias for the canonical default evaluator
-    # (``DEFAULT_LLM_TEST_EVALUATOR["name"]``). Defining both in the same
-    # config would resolve to two separate registry entries for the same
-    # logical evaluator — reject early.
-    _default_name = DEFAULT_LLM_TEST_EVALUATOR["name"]
-    _user_names = {ev.get("name") for ev in user_evaluators if isinstance(ev, dict)}
-    if "default" in _user_names and _default_name in _user_names:
-        raise ValueError(
-            f"config.evaluators defines both 'default' and '{_default_name}', "
-            f"which are aliases for the same default LLM-test evaluator. "
-            f"Define only one."
-        )
-    registry: dict = {_default_name: DEFAULT_LLM_TEST_EVALUATOR}
-    # Legacy alias for back-compat: pre-rename, the implicit default was named "default".
-    registry["default"] = DEFAULT_LLM_TEST_EVALUATOR
+    registry: dict = {}
+    if include_default:
+        # ``"default"`` is a legacy alias for the canonical default evaluator
+        # (``DEFAULT_LLM_TEST_EVALUATOR["name"]``). Defining both in the same
+        # config would resolve to two separate registry entries for the same
+        # logical evaluator — reject early.
+        _default_name = DEFAULT_LLM_TEST_EVALUATOR["name"]
+        _user_names = {ev.get("name") for ev in user_evaluators if isinstance(ev, dict)}
+        if "default" in _user_names and _default_name in _user_names:
+            raise ValueError(
+                f"config.evaluators defines both 'default' and '{_default_name}', "
+                f"which are aliases for the same default LLM-test evaluator. "
+                f"Define only one."
+            )
+        registry[_default_name] = DEFAULT_LLM_TEST_EVALUATOR
+        registry["default"] = DEFAULT_LLM_TEST_EVALUATOR
     for ev in user_evaluators:
         if "name" not in ev or "system_prompt" not in ev:
             raise ValueError(
@@ -143,28 +147,7 @@ def _resolve_evaluators_for_test_case(evaluation: dict, registry: dict) -> list[
     return rendered
 
 
-def _user_evaluators_registry(config: dict) -> dict:
-    """Return ``{name: evaluator}`` from ``config.evaluators`` only — no default.
-
-    Conversation-type tests have no implicit default evaluator (unlike
-    ``response`` tests, which fall back to ``DEFAULT_LLM_TEST_EVALUATOR``). They
-    must reference explicitly-defined evaluators, so they resolve against this
-    registry rather than the one from :func:`_build_evaluators_registry`.
-    """
-    user_evaluators = config.get("evaluators") or []
-    require_unique_evaluator_names(user_evaluators)
-    registry: dict = {}
-    for ev in user_evaluators:
-        if "name" not in ev or "system_prompt" not in ev:
-            raise ValueError(
-                "Each evaluator in config.evaluators must include 'name' and "
-                "'system_prompt' (got: " + repr(ev) + ")"
-            )
-        registry[ev["name"]] = ev
-    return registry
-
-
-def _resolve_conversation_evaluators(evaluation: dict, user_registry: dict) -> list[dict]:
+def _resolve_conversation_evaluators(evaluation: dict, registry: dict) -> list[dict]:
     """Resolve a conversation-type test case's evaluators.
 
     Conversation tests have no implicit default, so ``evaluation.criteria`` must
@@ -189,34 +172,35 @@ def _resolve_conversation_evaluators(evaluation: dict, user_registry: dict) -> l
     rendered: list[dict] = []
     for ref in refs:
         name = ref["name"]
-        if name not in user_registry:
+        if name not in registry:
             raise ValueError(
                 f"Unknown evaluator '{name}' referenced in conversation test "
                 f"case. Conversation tests have no implicit default — define "
                 f"'{name}' under config.evaluators."
             )
-        rendered.append(render_evaluator(user_registry[name], ref.get("arguments")))
+        rendered.append(render_evaluator(registry[name], ref.get("arguments")))
     return rendered
 
 
-def _resolve_test_case_evaluators(
-    evaluation: dict, evaluators_registry: dict, user_registry: dict
-) -> Optional[list[dict]]:
+def _resolve_test_case_evaluators(evaluation: dict, config: dict) -> Optional[list[dict]]:
     """Resolve the evaluators for a test case based on its ``evaluation.type``.
 
     Single source of truth for the per-type resolution rule, shared by every
     runner (live, eval-only, and the SDK):
 
-    - ``response`` → resolve against ``evaluators_registry`` (includes the
-      implicit default evaluator).
-    - ``conversation`` → resolve against ``user_registry`` (no implicit default).
+    - ``response`` → resolve against the registry *with* the implicit default.
+    - ``conversation`` → resolve against the registry *without* the default.
     - ``tool_call`` / anything else → ``None`` (no LLM-judge evaluators).
     """
     ev_type = evaluation.get("type")
     if ev_type == "response":
-        return _resolve_evaluators_for_test_case(evaluation, evaluators_registry)
+        return _resolve_evaluators_for_test_case(
+            evaluation, _build_evaluators_registry(config)
+        )
     if ev_type == "conversation":
-        return _resolve_conversation_evaluators(evaluation, user_registry)
+        return _resolve_conversation_evaluators(
+            evaluation, _build_evaluators_registry(config, include_default=False)
+        )
     return None
 
 
@@ -1235,7 +1219,6 @@ async def run_model_tests(
     unique_id = str(uuid.uuid4())
 
     evaluators_registry = _build_evaluators_registry(config)
-    user_registry = _user_evaluators_registry(config)
     write_evaluator_config(output_dir, _evaluators_for_config_output(config))
 
     # ``tools`` / ``system_prompt`` are only needed for the inference-based
@@ -1255,9 +1238,7 @@ async def run_model_tests(
             test_case["history"], tools
         )
 
-        resolved_evaluators = _resolve_test_case_evaluators(
-            evaluation, evaluators_registry, user_registry
-        )
+        resolved_evaluators = _resolve_test_case_evaluators(evaluation, config)
 
         result = await run_test(
             chat_history=preprocessed_history,
@@ -1427,7 +1408,6 @@ async def run_eval_only_tests(
     os.makedirs(output_dir, exist_ok=True)
 
     evaluators_registry = _build_evaluators_registry(config)
-    user_registry = _user_evaluators_registry(config)
     write_evaluator_config(output_dir, _evaluators_for_config_output(config))
 
     print_log_save_path = join(output_dir, "results.log")
@@ -1445,9 +1425,7 @@ async def run_eval_only_tests(
         test_case = item["test_case"]
         evaluation = test_case["evaluation"]
         ev_type = evaluation.get("type")
-        resolved_evaluators = _resolve_test_case_evaluators(
-            evaluation, evaluators_registry, user_registry
-        )
+        resolved_evaluators = _resolve_test_case_evaluators(evaluation, config)
 
         if ev_type == "conversation":
             # Conversation cases are graded exactly as captured — no synthetic

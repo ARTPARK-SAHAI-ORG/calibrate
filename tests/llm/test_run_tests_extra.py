@@ -899,26 +899,41 @@ class TestMainCLI(unittest.IsolatedAsyncioTestCase):
                 await RT.main()
 
 
-class TestUserEvaluatorsRegistry(unittest.TestCase):
+class TestBuildEvaluatorsRegistryNoDefault(unittest.TestCase):
     def test_excludes_implicit_default(self):
-        from calibrate.llm.run_tests import _user_evaluators_registry
+        from calibrate.llm.run_tests import _build_evaluators_registry
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        reg = _user_evaluators_registry({"evaluators": [_bin_ev("tone")]})
+        reg = _build_evaluators_registry(
+            {"evaluators": [_bin_ev("tone")]}, include_default=False
+        )
         self.assertIn("tone", reg)
         self.assertNotIn(DEFAULT_LLM_TEST_EVALUATOR["name"], reg)
         self.assertNotIn("default", reg)
 
-    def test_empty(self):
-        from calibrate.llm.run_tests import _user_evaluators_registry
+    def test_default_included_by_default(self):
+        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        self.assertEqual(_user_evaluators_registry({"evaluators": []}), {})
+        reg = _build_evaluators_registry({"evaluators": [_bin_ev("tone")]})
+        self.assertIn(DEFAULT_LLM_TEST_EVALUATOR["name"], reg)
+        self.assertIn("default", reg)
+        self.assertIn("tone", reg)
+
+    def test_empty_no_default(self):
+        from calibrate.llm.run_tests import _build_evaluators_registry
+
+        self.assertEqual(
+            _build_evaluators_registry({"evaluators": []}, include_default=False), {}
+        )
 
     def test_missing_fields_raise(self):
-        from calibrate.llm.run_tests import _user_evaluators_registry
+        from calibrate.llm.run_tests import _build_evaluators_registry
 
         with self.assertRaises(ValueError):
-            _user_evaluators_registry({"evaluators": [{"name": "x"}]})
+            _build_evaluators_registry(
+                {"evaluators": [{"name": "x"}]}, include_default=False
+            )
 
 
 class TestResolveConversationEvaluators(unittest.TestCase):
@@ -972,29 +987,39 @@ class TestResolveConversationEvaluators(unittest.TestCase):
 
 
 class TestResolveTestCaseEvaluators(unittest.TestCase):
-    def test_response_uses_full_registry(self):
+    def test_response_uses_implicit_default(self):
         from calibrate.llm.run_tests import _resolve_test_case_evaluators
 
-        full = {"correctness": dict(_bin_ev("correctness")), "default": dict(_bin_ev("correctness"))}
+        # No user evaluators — response falls back to the implicit default.
         resolved = _resolve_test_case_evaluators(
-            {"type": "response", "criteria": "be nice"}, full, {}
+            {"type": "response", "criteria": "be nice"}, {"evaluators": []}
         )
         self.assertEqual(resolved[0]["name"], "correctness")
 
-    def test_conversation_uses_user_registry(self):
+    def test_conversation_uses_user_evaluator(self):
         from calibrate.llm.run_tests import _resolve_test_case_evaluators
 
-        user = {"tone": _bin_ev("tone")}
         resolved = _resolve_test_case_evaluators(
-            {"type": "conversation", "criteria": [{"name": "tone"}]}, {}, user
+            {"type": "conversation", "criteria": [{"name": "tone"}]},
+            {"evaluators": [_bin_ev("tone")]},
         )
         self.assertEqual(resolved[0]["name"], "tone")
+
+    def test_conversation_rejects_implicit_default(self):
+        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+
+        # The default is not available for conversation tests.
+        with self.assertRaises(ValueError):
+            _resolve_test_case_evaluators(
+                {"type": "conversation", "criteria": "be nice"},
+                {"evaluators": [_bin_ev("tone")]},
+            )
 
     def test_tool_call_returns_none(self):
         from calibrate.llm.run_tests import _resolve_test_case_evaluators
 
         self.assertIsNone(
-            _resolve_test_case_evaluators({"type": "tool_call"}, {}, {})
+            _resolve_test_case_evaluators({"type": "tool_call"}, {"evaluators": []})
         )
 
 
