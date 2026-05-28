@@ -89,8 +89,10 @@ class _Tests:
             run_test as _run_test,
             run_test_external as _run_test_external,
             _build_evaluators_registry,
+            _user_evaluators_registry,
             _evaluators_for_config_output,
             _resolve_evaluators_for_test_case,
+            _resolve_conversation_evaluators,
         )
         from calibrate.judges import write_evaluator_config
         from calibrate.utils import configure_print_logger, log_and_print
@@ -134,17 +136,24 @@ class _Tests:
 
         evaluator_config = {"evaluators": evaluators or []}
         evaluators_registry = _build_evaluators_registry(evaluator_config)
+        user_registry = _user_evaluators_registry(evaluator_config)
         write_evaluator_config(
             output_dir, _evaluators_for_config_output(evaluator_config)
         )
 
         for test_case_index, test_case in enumerate(test_cases):
             evaluation = test_case["evaluation"]
-            resolved_evaluators = (
-                _resolve_evaluators_for_test_case(evaluation, evaluators_registry)
-                if evaluation.get("type") == "response"
-                else None
-            )
+            ev_type = evaluation.get("type")
+            if ev_type == "response":
+                resolved_evaluators = _resolve_evaluators_for_test_case(
+                    evaluation, evaluators_registry
+                )
+            elif ev_type == "conversation":
+                resolved_evaluators = _resolve_conversation_evaluators(
+                    evaluation, user_registry
+                )
+            else:
+                resolved_evaluators = None
             if agent is not None:
                 result = await _run_test_external(
                     chat_history=test_case["history"],
@@ -456,15 +465,24 @@ class _Tests:
         from calibrate.llm.run_tests import (
             run_test as _run_test,
             _build_evaluators_registry,
+            _user_evaluators_registry,
             _resolve_evaluators_for_test_case,
+            _resolve_conversation_evaluators,
         )
 
-        registry = _build_evaluators_registry({"evaluators": evaluators or []})
-        resolved_evaluators = (
-            _resolve_evaluators_for_test_case(evaluation, registry)
-            if evaluation.get("type") == "response"
-            else None
-        )
+        evaluator_config = {"evaluators": evaluators or []}
+        registry = _build_evaluators_registry(evaluator_config)
+        ev_type = evaluation.get("type")
+        if ev_type == "response":
+            resolved_evaluators = _resolve_evaluators_for_test_case(
+                evaluation, registry
+            )
+        elif ev_type == "conversation":
+            resolved_evaluators = _resolve_conversation_evaluators(
+                evaluation, _user_evaluators_registry(evaluator_config)
+            )
+        else:
+            resolved_evaluators = None
 
         return await _run_test(
             chat_history=chat_history,
