@@ -121,13 +121,15 @@ This sends a test message and checks that the response matches the required form
 
 An array of test cases to evaluate your agent on. Each test case has:
 
-| Key          | Type   | Description                                                                       |
-| ------------ | ------ | --------------------------------------------------------------------------------- |
-| `id`         | string | Optional unique test-case id. When provided, results include `test_case_id`.       |
-| `history`    | array  | Conversation history as context for the agent to generate the next output         |
+| Key          | Type   | Description                                                                              |
+| ------------ | ------ | ---------------------------------------------------------------------------------------- |
+| `id`         | string | Optional unique test-case id. When provided, results include `test_case_id`.             |
+| `history`    | array  | Conversation history as context for the agent to generate the next output                |
 | `evaluation` | object | The criteria for evaluating the agent — a tool call, a response, or a whole conversation |
 
-**Tool call test** — verifies the agent calls the correct tool with expected arguments:
+### Tool call test
+
+Verifies the agent calls the correct tools with the expected arguments:
 
 ```jsonc
 {
@@ -159,7 +161,11 @@ An array of test cases to evaluate your agent on. Each test case has:
   called without checking the arguments.
 </Note>
 
-**Response test** — verifies the agent's response meets the criteria defined (evaluated by an LLM judge):
+For agent connection, your agent owns its tools internally — there is no need to define them in the config. The `history` and `evaluation` keys work identically for both setup options.
+
+### Response test
+
+Given a conversation history, this test verifies that the agent's response meets the evaluation criteria defined by you (evaluated by an LLM judge):
 
 ```jsonc
 {
@@ -176,7 +182,9 @@ An array of test cases to evaluate your agent on. Each test case has:
 }
 ```
 
-**Conversation test** — judges an entire conversation as a single transcript, instead of generating and grading a next reply. The `history` must contain the **full** conversation (including the final assistant turn); no model is run, so the result is the same regardless of which model you pass. The transcript is graded by the same judge used for [simulations](/cli/simulations), and the output (per-evaluator `judge_results`, pass/fail, leaderboard columns) is identical to a response test.
+### Conversation test
+
+Judges an entire conversation (using an LLM judge), instead of generating a next reply and grading it. The `history` must contain the **full** conversation (including the final assistant turn). No model is run, so the result is the same regardless of which model you pass.
 
 ```jsonc
 {
@@ -185,7 +193,10 @@ An array of test cases to evaluate your agent on. Each test case has:
   "history": [
     { "role": "assistant", "content": "Hello! How can I help you today?" },
     { "role": "user", "content": "I'd like to check order ORD-12345." },
-    { "role": "assistant", "content": "It shipped yesterday and arrives Thursday. Anything else?" },
+    {
+      "role": "assistant",
+      "content": "It shipped yesterday and arrives Thursday. Anything else?",
+    },
     { "role": "user", "content": "That's great, thanks!" },
     { "role": "assistant", "content": "You're very welcome!" },
   ],
@@ -199,13 +210,7 @@ An array of test cases to evaluate your agent on. Each test case has:
 }
 ```
 
-<Note>
-  Conversation tests have **no implicit default evaluator** — unlike response tests, you cannot use a bare string for `criteria`. Every referenced evaluator must be declared explicitly under the top-level `evaluators` and referenced by name.
-</Note>
-
-See [`examples/llm/config-conversation.json`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-conversation.json) for a full template, and [`examples/llm/sample_dataset_conversation.json`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/sample_dataset_conversation.json) for the eval-only dataset form (conversation items carry no `output` field).
-
-For agent connection, your agent owns its tools internally — there is no need to define them in the config. The `history` and `evaluation` keys work identically for both setup options.
+See [`examples/llm/config-conversation.json`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-conversation.json) for a full template.
 
 ---
 
@@ -289,7 +294,7 @@ The simplest setup needs no top-level `evaluators`. Pass `criteria` as a string 
 | Key                          | Type    | Description                                                                                                                        |
 | ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `evaluators`                 | array   | Top-level list of evaluators. Each one becomes its own LLM call per test case.                                                     |
-| `evaluators[].id`            | string  | Optional unique id. Results echo it as `evaluator_id`; output `config.json` includes raw `evaluators` and an `evaluators_map`.       |
+| `evaluators[].id`            | string  | Optional unique id. Results echo it as `evaluator_id`; output `config.json` includes raw `evaluators` and an `evaluators_map`.     |
 | `evaluators[].name`          | string  | Unique evaluator name. Test cases reference it via `evaluation.criteria[].name`.                                                   |
 | `evaluators[].system_prompt` | string  | Full system prompt for this evaluator. Supports `{{variable}}` placeholders that are substituted from the test case's `arguments`. |
 | `evaluators[].judge_model`   | string  | OpenRouter model id for this evaluator (default: `openai/gpt-5.4-mini`).                                                           |
