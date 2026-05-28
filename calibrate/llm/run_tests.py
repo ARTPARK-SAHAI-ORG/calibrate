@@ -40,12 +40,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from calibrate.llm.metrics import (
-    test_response_llm_judge,
-    evaluate_simuation,
-    DEFAULT_JUDGE_MODEL,
-    DEFAULT_SIMULATION_JUDGE_MODEL,
-)
+from calibrate.llm.metrics import test_response_llm_judge, evaluate_simuation
 from calibrate.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
     attach_evaluator_id,
@@ -772,7 +767,6 @@ async def _evaluate_response(
     response: str,
     tool_calls: list,
     evaluators: Optional[List[dict]],
-    fallback_judge_model: str,
     no_response_reasoning_with_tool_calls: str,
     no_response_reasoning_no_tool_calls: str,
 ) -> dict:
@@ -797,7 +791,6 @@ async def _evaluate_response(
             conversation=chat_history,
             response=response,
             evaluators=evaluators,
-            fallback_model=fallback_judge_model,
         )
         metrics["judge_results"] = result
         failing = [
@@ -823,7 +816,6 @@ async def _evaluate_response(
 async def _evaluate_conversation(
     chat_history: List[dict],
     evaluators: Optional[List[dict]],
-    fallback_judge_model: str = DEFAULT_SIMULATION_JUDGE_MODEL,
 ) -> dict:
     """Evaluate a ``conversation``-type test case and build its ``metrics`` dict.
 
@@ -842,7 +834,6 @@ async def _evaluate_conversation(
     result = await evaluate_simuation(
         conversation=chat_history,
         evaluators=evaluators,
-        fallback_model=fallback_judge_model,
     )
     failing = [
         ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])
@@ -863,7 +854,6 @@ async def evaluate_test_case_output(
     evaluation: dict,
     output: Optional[dict] = None,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: Optional[str] = None,
     no_response_reasoning_with_tool_calls: Optional[str] = None,
     no_response_reasoning_no_tool_calls: Optional[str] = None,
 ) -> dict:
@@ -876,16 +866,12 @@ async def evaluate_test_case_output(
     (str) and ``tool_calls`` (list). For ``conversation`` types ``output`` is
     unused — the conversation history itself is the input to the judge.
 
-    ``fallback_judge_model`` is honored when set; when ``None`` each type uses
-    its own default (the text judge model for ``response``, the simulation
-    judge model for ``conversation``).
+    Each evaluator uses its own ``judge_model``; evaluators that don't set one
+    fall back to the judge's default model (the text judge model for
+    ``response``, the simulation judge model for ``conversation``).
     """
     if evaluation["type"] == "conversation":
-        return await _evaluate_conversation(
-            chat_history,
-            evaluators,
-            fallback_judge_model or DEFAULT_SIMULATION_JUDGE_MODEL,
-        )
+        return await _evaluate_conversation(chat_history, evaluators)
     if evaluation["type"] == "tool_call":
         return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
@@ -895,7 +881,6 @@ async def evaluate_test_case_output(
             response=output["response"],
             tool_calls=tool_calls,
             evaluators=evaluators,
-            fallback_judge_model=fallback_judge_model or DEFAULT_JUDGE_MODEL,
             no_response_reasoning_with_tool_calls=(
                 no_response_reasoning_with_tool_calls
                 or f"Tool calls were generated: {tool_calls}, but no reply was returned"
@@ -918,14 +903,12 @@ async def run_test(
     tools: List[dict[str, str]],
     unique_id: str,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: Optional[str] = None,
 ):
     if evaluation["type"] == "conversation":
         metrics = await evaluate_test_case_output(
             chat_history=chat_history,
             evaluation=evaluation,
             evaluators=evaluators,
-            fallback_judge_model=fallback_judge_model,
         )
         if langfuse_enabled and langfuse:
             langfuse.update_current_trace(
@@ -962,7 +945,6 @@ async def run_test(
         evaluation=evaluation,
         output=output,
         evaluators=evaluators,
-        fallback_judge_model=fallback_judge_model,
         no_response_reasoning_with_tool_calls=(
             f"The LLM generated tool calls: {output['tool_calls']}, but no reply was generated"
         ),
@@ -1001,7 +983,6 @@ async def run_test_external(
     agent,
     model: Optional[str] = None,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: Optional[str] = None,
 ) -> dict:
     """Run a single LLM test case against an external text agent.
 
@@ -1025,7 +1006,6 @@ async def run_test_external(
             chat_history=chat_history,
             evaluation=evaluation,
             evaluators=evaluators,
-            fallback_judge_model=fallback_judge_model,
         )
         return {"metrics": metrics}
 
@@ -1038,7 +1018,6 @@ async def run_test_external(
         evaluation=evaluation,
         output={"response": response, "tool_calls": tool_calls},
         evaluators=evaluators,
-        fallback_judge_model=fallback_judge_model,
         no_response_reasoning_with_tool_calls=(
             f"The agent made tool calls {tool_calls} but returned no text response"
         ),

@@ -398,7 +398,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
                 response="Hi",
                 tool_calls=[],
                 evaluators=[_bin_ev("x")],
-                fallback_judge_model="m",
                 no_response_reasoning_with_tool_calls="x",
                 no_response_reasoning_no_tool_calls="y",
             )
@@ -417,7 +416,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
                 response="Hi",
                 tool_calls=[],
                 evaluators=[_bin_ev("x"), _bin_ev("y")],
-                fallback_judge_model="m",
                 no_response_reasoning_with_tool_calls="x",
                 no_response_reasoning_no_tool_calls="y",
             )
@@ -432,7 +430,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
             response="",
             tool_calls=[],
             evaluators=[_bin_ev("x")],
-            fallback_judge_model="m",
             no_response_reasoning_with_tool_calls="WITH",
             no_response_reasoning_no_tool_calls="NONE",
         )
@@ -447,7 +444,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
             response="",
             tool_calls=[{"tool": "x"}],
             evaluators=[_bin_ev("x")],
-            fallback_judge_model="m",
             no_response_reasoning_with_tool_calls="WITH",
             no_response_reasoning_no_tool_calls="NONE",
         )
@@ -1140,23 +1136,12 @@ class TestRunEvalOnlyConversation(unittest.IsolatedAsyncioTestCase):
 
 
 class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
-    async def test_custom_fallback_model_forwarded(self):
+    async def test_no_fallback_model_override(self):
         from calibrate.llm import run_tests as RT
 
-        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
-        with patch.object(RT, "evaluate_simuation", sim):
-            await RT.evaluate_test_case_output(
-                chat_history=[],
-                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
-                evaluators=[_bin_ev("tone")],
-                fallback_judge_model="custom/judge-model",
-            )
-        self.assertEqual(sim.await_args.kwargs["fallback_model"], "custom/judge-model")
-
-    async def test_defaults_to_simulation_model(self):
-        from calibrate.llm import run_tests as RT
-        from calibrate.llm.metrics import DEFAULT_SIMULATION_JUDGE_MODEL
-
+        # _evaluate_conversation does not override the judge model — each
+        # evaluator uses its own judge_model, otherwise the simulation judge's
+        # own default applies.
         sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
         with patch.object(RT, "evaluate_simuation", sim):
             await RT.evaluate_test_case_output(
@@ -1164,9 +1149,7 @@ class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
                 evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
                 evaluators=[_bin_ev("tone")],
             )
-        self.assertEqual(
-            sim.await_args.kwargs["fallback_model"], DEFAULT_SIMULATION_JUDGE_MODEL
-        )
+        self.assertNotIn("fallback_model", sim.await_args.kwargs)
 
 
 class TestConversationHistoryNotMutated(unittest.IsolatedAsyncioTestCase):
