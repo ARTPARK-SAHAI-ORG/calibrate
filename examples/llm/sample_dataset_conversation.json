@@ -1,15 +1,15 @@
 [
   {
     "test_case": {
-      "id": "conversation-order-status",
+      "id": "conversation-donation-receipt",
       "history": [
         {
           "role": "assistant",
-          "content": "Hello! How can I help you today?"
+          "content": "Hi! I'm here from Riverbend Community Foundation. How can I help you today?"
         },
         {
           "role": "user",
-          "content": "Hi, I'd like to check the status of my order ORD-12345."
+          "content": "I donated $250 in December and need a tax receipt for my accountant."
         }
       ],
       "evaluation": {
@@ -17,36 +17,36 @@
         "criteria": [
           {
             "name": "resolution",
-            "arguments": { "topic": "order status" }
+            "arguments": { "topic": "the year-end tax receipt" }
           },
           { "name": "tone" }
         ]
       }
     },
     "output": {
-      "response": "I checked order ORD-12345 — it shipped yesterday and should arrive in 2–3 business days. Let me know if you need anything else!",
+      "response": "Thank you for supporting Riverbend! I found your $250 gift from December 12 — I've emailed a PDF tax receipt to the address on file. If you need it resent or sent to a different email, just let me know.",
       "tool_calls": []
     }
   },
   {
     "test_case": {
-      "id": "conversation-return-request",
+      "id": "conversation-volunteer-shift",
       "history": [
         {
           "role": "assistant",
-          "content": "Hello! How can I help you today?"
+          "content": "Hi! I'm here from Riverbend Community Foundation. How can I help you today?"
         },
         {
           "role": "user",
-          "content": "I want to return a defective blender I bought last week."
+          "content": "I'd like to volunteer at the Saturday food pantry this weekend."
         },
         {
           "role": "assistant",
-          "content": "I'm sorry to hear that! I can help with the return."
+          "content": "Thank you for offering your time — our pantry team can always use help!"
         },
         {
           "role": "user",
-          "content": "Great. What do I need to do?"
+          "content": "What do I need to do to sign up?"
         }
       ],
       "evaluation": {
@@ -54,14 +54,14 @@
         "criteria": [
           {
             "name": "resolution",
-            "arguments": { "topic": "the return request" }
+            "arguments": { "topic": "signing up for the Saturday pantry shift" }
           },
           { "name": "tone" }
         ]
       }
     },
     "output": {
-      "response": "Please pack the blender in its original box, attach the prepaid return label I'll email you, and drop it at any carrier location. Your refund will process within 5 business days after we receive it.",
+      "response": "Please complete our 10-minute volunteer waiver at riverbend.org/volunteer, then choose the Saturday 9am–1pm pantry shift on March 15. You'll get a confirmation email with parking and check-in details. Wear closed-toe shoes and we'll provide a name tag when you arrive.",
       "tool_calls": []
     }
   }

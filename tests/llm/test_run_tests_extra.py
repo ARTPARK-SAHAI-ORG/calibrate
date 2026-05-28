@@ -982,7 +982,7 @@ class TestGetNameToEvaluatorDictNoDefault(unittest.TestCase):
 
 
 class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
-    _NO_REPLY = ("no tool reply", "no reply")
+    _NO_REPLY = "no reply"
 
     async def test_binary_pass(self):
         from calibrate.llm import run_tests as RT
@@ -993,8 +993,7 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
                 chat_history=[{"role": "user", "content": "hi"}],
                 evaluators=[_bin_ev("tone")],
                 output={"response": "hi", "tool_calls": []},
-                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
-                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
         self.assertTrue(metrics["passed"])
         self.assertEqual(metrics["reasoning"], "All evaluators passed")
@@ -1008,8 +1007,7 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
             metrics = await RT._evaluate_conversation(
                 chat_history=[], evaluators=[_bin_ev("tone")],
                 output={"response": "x", "tool_calls": []},
-                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
-                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
         self.assertFalse(metrics["passed"])
         self.assertEqual(metrics["reasoning"], "rude")
@@ -1022,8 +1020,7 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
             metrics = await RT._evaluate_conversation(
                 chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
                 output={"response": "x", "tool_calls": []},
-                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
-                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
         self.assertFalse(metrics["passed"])
 
@@ -1035,8 +1032,7 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
             metrics = await RT._evaluate_conversation(
                 chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
                 output={"response": "x", "tool_calls": []},
-                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
-                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
         self.assertTrue(metrics["passed"])
 
@@ -1049,8 +1045,7 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
                 chat_history=[{"role": "user", "content": "hi"}],
                 evaluators=[_bin_ev("tone")],
                 output={"response": "hello", "tool_calls": []},
-                no_response_reasoning_with_tool_calls=self._NO_REPLY[0],
-                no_response_reasoning_no_tool_calls=self._NO_REPLY[1],
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
         judged = sim.await_args.kwargs["conversation"]
         self.assertEqual(judged[-1], {"role": "assistant", "content": "hello"})
@@ -1264,7 +1259,6 @@ class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
                 chat_history=[],
                 evaluators=[_bin_ev("tone")],
                 output={"response": "hi", "tool_calls": []},
-                no_response_reasoning_with_tool_calls="",
                 no_response_reasoning_no_tool_calls="",
             )
         self.assertNotIn("fallback_model", sim.await_args.kwargs)

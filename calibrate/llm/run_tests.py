@@ -822,12 +822,13 @@ async def evaluate_test_case_output(
     ``output`` must contain ``response`` (str) and ``tool_calls`` (list).
     """
     if evaluation["type"] == "conversation":
-        tool_calls = output["tool_calls"]
         return await _evaluate_conversation(
             chat_history=chat_history,
             evaluators=evaluators or [],
             output=output,
-            no_response_reasoning_no_tool_calls=no_response_reasoning_no_tool_calls,
+            no_response_reasoning_no_tool_calls=(
+                no_response_reasoning_no_tool_calls or "No reply was returned"
+            ),
         )
     if evaluation["type"] == "tool_call":
         return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
