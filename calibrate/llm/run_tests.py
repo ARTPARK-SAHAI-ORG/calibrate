@@ -108,7 +108,10 @@ def _get_name_to_evaluator_dict(config: dict, include_default: bool = True) -> d
         _user_defined_evaluator_names = {
             ev.get("name") for ev in user_defined_evaluators if isinstance(ev, dict)
         }
-        if "default" in _user_defined_evaluator_names and _default_name in _user_defined_evaluator_names:
+        if (
+            "default" in _user_defined_evaluator_names
+            and _default_name in _user_defined_evaluator_names
+        ):
             raise ValueError(
                 f"config.evaluators defines both 'default' and '{_default_name}', "
                 f"which are aliases for the same default LLM-test evaluator. "
@@ -150,9 +153,7 @@ def _resolve_evaluators_for_test_case(
                 f"it under config.evaluators (or use "
                 f"'{DEFAULT_LLM_TEST_EVALUATOR['name']}')."
             )
-        rendered.append(
-            render_evaluator(name_to_evaluator[name], ref.get("arguments"))
-        )
+        rendered.append(render_evaluator(name_to_evaluator[name], ref.get("arguments")))
     return rendered
 
 
@@ -720,9 +721,7 @@ def _evaluator_passed(evaluator: dict, ev_result: dict) -> bool:
 
 
 def _metrics_from_judge_results(evaluators: List[dict], result: dict) -> dict:
-    failing = [
-        ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])
-    ]
+    failing = [ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])]
     return {
         "passed": not failing,
         "reasoning": (
@@ -781,7 +780,6 @@ async def _evaluate_conversation(
     chat_history: List[dict],
     evaluators: List[dict],
     output: dict,
-    no_response_reasoning_with_tool_calls: str,
     no_response_reasoning_no_tool_calls: str,
 ) -> dict:
     """Append the agent's last turn to ``chat_history`` and judge the transcript."""
@@ -829,13 +827,7 @@ async def evaluate_test_case_output(
             chat_history=chat_history,
             evaluators=evaluators or [],
             output=output,
-            no_response_reasoning_with_tool_calls=(
-                no_response_reasoning_with_tool_calls
-                or f"Tool calls were generated: {tool_calls}, but no reply was returned"
-            ),
-            no_response_reasoning_no_tool_calls=(
-                no_response_reasoning_no_tool_calls or "No reply was returned"
-            ),
+            no_response_reasoning_no_tool_calls=no_response_reasoning_no_tool_calls,
         )
     if evaluation["type"] == "tool_call":
         return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
@@ -851,8 +843,7 @@ async def evaluate_test_case_output(
                 or f"Tool calls were generated: {tool_calls}, but no reply was returned"
             ),
             no_response_reasoning_no_tool_calls=(
-                no_response_reasoning_no_tool_calls
-                or "No reply was returned"
+                no_response_reasoning_no_tool_calls or "No reply was returned"
             ),
         )
     raise ValueError(f"Invalid evaluation type: {evaluation['type']}")
@@ -1368,9 +1359,7 @@ async def run_eval_only_tests(
         with open(results_file_path, "w") as f:
             json.dump(results, f, indent=4)
 
-    passed, total = _write_test_results_outputs(
-        results, output_dir, name_to_evaluator
-    )
+    passed, total = _write_test_results_outputs(results, output_dir, name_to_evaluator)
     pct = (passed / total * 100) if total else 0.0
     _print_and_log(
         f"\n✅ Total Passed: {passed}/{total} ({pct:.1f}%)", print_log_save_path
