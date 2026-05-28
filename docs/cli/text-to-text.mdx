@@ -184,21 +184,15 @@ Given a conversation history, this test verifies that the agent's response meets
 
 ### Conversation test
 
-Judges an entire conversation (using an LLM judge), instead of generating a next reply and grading it. The `history` must contain the **full** conversation (including the final assistant turn). No model is run, so the result is the same regardless of which model you pass.
+Like a [response test](#response-test), the agent is run on the `history` to produce its next reply — but instead of grading only that reply, the **entire resulting conversation** (history + the new reply) is graded by the simulation judge. Use this when correctness depends on the whole exchange, not just the latest turn. As with response tests, `history` ends at the user's turn that the agent should answer.
 
 ```jsonc
 {
-  // conversation test — judges the whole transcript
+  // conversation test — agent replies, then the whole conversation is judged
   "id": "test-id-1",
   "history": [
     { "role": "assistant", "content": "Hello! How can I help you today?" },
     { "role": "user", "content": "I'd like to check order ORD-12345." },
-    {
-      "role": "assistant",
-      "content": "It shipped yesterday and arrives Thursday. Anything else?",
-    },
-    { "role": "user", "content": "That's great, thanks!" },
-    { "role": "assistant", "content": "You're very welcome!" },
   ],
   "evaluation": {
     "type": "conversation",
@@ -209,6 +203,10 @@ Judges an entire conversation (using an LLM judge), instead of generating a next
   },
 }
 ```
+
+<Note>
+  In `--eval-only` mode, no model runs: the supplied `history` is treated as the full transcript and judged exactly as given (nothing is appended or modified). This is the key difference between the two modes for conversation tests.
+</Note>
 
 See [`examples/llm/config-conversation.json`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-conversation.json) for a full template.
 

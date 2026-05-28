@@ -1034,24 +1034,55 @@ class TestEvaluateTestCaseOutputConversation(unittest.IsolatedAsyncioTestCase):
 
 
 class TestRunTestConversation(unittest.IsolatedAsyncioTestCase):
-    async def test_skips_inference_and_omits_output(self):
+    async def test_runs_inference_and_judges_full_conversation(self):
         from calibrate.llm import run_tests as RT
 
-        infer = AsyncMock()
+        # Live mode: the agent generates the next reply, which is appended and
+        # the whole conversation is judged by the simulation judge.
+        infer = AsyncMock(return_value={
+            "response": "It ships tomorrow.", "tool_calls": [], "captured_errors": [],
+        })
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
         with patch.object(RT, "run_inference", infer), \
-             patch.object(RT, "evaluate_simuation",
-                          AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})):
+             patch.object(RT, "evaluate_simuation", sim):
             result = await RT.run_test(
-                chat_history=[{"role": "user", "content": "hi"},
-                              {"role": "assistant", "content": "hello"}],
+                chat_history=[{"role": "user", "content": "when does my order ship?"}],
                 evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
                 system_prompt="x", model="m", provider="openrouter",
                 tools=[], unique_id="u",
                 evaluators=[_bin_ev("tone")],
             )
-        infer.assert_not_called()
-        self.assertNotIn("output", result)
+        infer.assert_awaited_once()
+        # The generated reply is included as output and appended to the judged
+        # conversation.
+        self.assertEqual(result["output"]["response"], "It ships tomorrow.")
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
         self.assertTrue(result["metrics"]["passed"])
+
+    async def test_tool_calls_appended_in_function_shape(self):
+        from calibrate.llm import run_tests as RT
+
+        infer = AsyncMock(return_value={
+            "response": "",
+            "tool_calls": [{"tool": "check_order", "arguments": '{"id": "1"}'}],
+            "captured_errors": [],
+        })
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "run_inference", infer), \
+             patch.object(RT, "evaluate_simuation", sim):
+            await RT.run_test(
+                chat_history=[{"role": "user", "content": "check order 1"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                system_prompt="x", model="m", provider="openrouter",
+                tools=[], unique_id="u",
+                evaluators=[_bin_ev("tone")],
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(
+            judged[-1]["tool_calls"],
+            [{"function": {"name": "check_order", "arguments": '{"id": "1"}'}}],
+        )
 
 
 class TestAggregateCriteriaConversation(unittest.TestCase):
@@ -1152,11 +1183,14 @@ class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("fallback_model", sim.await_args.kwargs)
 
 
-class TestConversationHistoryNotMutated(unittest.IsolatedAsyncioTestCase):
-    async def test_tool_calls_without_response_not_injected(self):
+class TestConversationEvalOnlyNotMutated(unittest.IsolatedAsyncioTestCase):
+    async def test_captured_transcript_judged_as_is(self):
+        from calibrate.llm.run_tests import run_eval_only_tests
         from calibrate.llm import run_tests as RT
 
-        # A captured transcript with an assistant tool call but no tool message.
+        # Eval-only: a captured transcript with an assistant tool call but no
+        # tool message must be judged exactly as supplied (no inference, no
+        # synthetic {"status": "received"} tool message inserted).
         history = [
             {"role": "user", "content": "check my order"},
             {
@@ -1171,19 +1205,18 @@ class TestConversationHistoryNotMutated(unittest.IsolatedAsyncioTestCase):
         sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(RT, "evaluate_simuation", sim):
-            config = {
-                "evaluators": [_bin_ev("tone")],
-                "test_cases": [{
-                    "id": "c1",
-                    "history": history,
-                    "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
+            await run_eval_only_tests(
+                config={"evaluators": [_bin_ev("tone")]},
+                dataset=[{
+                    "test_case": {
+                        "id": "c1",
+                        "history": history,
+                        "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
+                    },
                 }],
-            }
-            await RT.run_model_tests(
-                model="m", provider="openrouter", config=config, output_dir=tmp,
+                output_dir=tmp,
             )
         judged = sim.await_args.kwargs["conversation"]
-        # No synthetic {"status": "received"} tool message was inserted.
         self.assertEqual(judged, history)
         self.assertFalse(any(m.get("role") == "tool" for m in judged))
 
@@ -1192,18 +1225,20 @@ class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):
     async def test_no_tools_or_system_prompt_keys(self):
         from calibrate.llm import run_tests as RT
 
-        # A conversation-only suite need not define tools or system_prompt.
+        # A conversation-only suite need not define tools or system_prompt; in
+        # live mode the agent still runs to produce the next reply.
+        infer = AsyncMock(return_value={
+            "response": "hello", "tool_calls": [], "captured_errors": [],
+        })
         with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "run_inference", infer), \
              patch.object(RT, "evaluate_simuation",
                           AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})):
             config = {
                 "evaluators": [_bin_ev("tone")],
                 "test_cases": [{
                     "id": "c1",
-                    "history": [
-                        {"role": "user", "content": "hi"},
-                        {"role": "assistant", "content": "hello"},
-                    ],
+                    "history": [{"role": "user", "content": "hi"}],
                     "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
                 }],
             }

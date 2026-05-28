@@ -29,22 +29,6 @@
         {
           "role": "user",
           "content": "Hi, I'd like to check the status of my order ORD-12345."
-        },
-        {
-          "role": "assistant",
-          "content": "Sure! Let me look that up for you — one moment."
-        },
-        {
-          "role": "assistant",
-          "content": "Your order ORD-12345 shipped yesterday and is expected to arrive on Thursday. Is there anything else I can help with?"
-        },
-        {
-          "role": "user",
-          "content": "That's great, thank you!"
-        },
-        {
-          "role": "assistant",
-          "content": "You're very welcome! Have a wonderful day."
         }
       ],
       "evaluation": {
@@ -59,7 +43,7 @@
       }
     },
     {
-      "id": "conversation-unresolved-return",
+      "id": "conversation-return-request",
       "history": [
         {
           "role": "assistant",
@@ -71,15 +55,11 @@
         },
         {
           "role": "assistant",
-          "content": "Returns can be tricky. Have you tried turning it off and on again?"
+          "content": "I'm sorry to hear that! I can help with the return."
         },
         {
           "role": "user",
-          "content": "It's clearly broken, I just want to return it."
-        },
-        {
-          "role": "assistant",
-          "content": "I understand. Anyway, is there anything else?"
+          "content": "Great. What do I need to do?"
         }
       ],
       "evaluation": {
