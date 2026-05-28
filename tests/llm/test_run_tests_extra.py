@@ -1169,6 +1169,42 @@ class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
         )
 
 
+class TestConversationHistoryNotMutated(unittest.IsolatedAsyncioTestCase):
+    async def test_tool_calls_without_response_not_injected(self):
+        from calibrate.llm import run_tests as RT
+
+        # A captured transcript with an assistant tool call but no tool message.
+        history = [
+            {"role": "user", "content": "check my order"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"id": "c1", "function": {"name": "check_order", "arguments": "{}"}}
+                ],
+            },
+            {"role": "assistant", "content": "It ships tomorrow."},
+        ]
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "evaluate_simuation", sim):
+            config = {
+                "evaluators": [_bin_ev("tone")],
+                "test_cases": [{
+                    "id": "c1",
+                    "history": history,
+                    "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
+                }],
+            }
+            await RT.run_model_tests(
+                model="m", provider="openrouter", config=config, output_dir=tmp,
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        # No synthetic {"status": "received"} tool message was inserted.
+        self.assertEqual(judged, history)
+        self.assertFalse(any(m.get("role") == "tool" for m in judged))
+
+
 class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):
     async def test_no_tools_or_system_prompt_keys(self):
         from calibrate.llm import run_tests as RT

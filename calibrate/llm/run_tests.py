@@ -1222,13 +1222,15 @@ async def run_model_tests(
         evaluation = test_case["evaluation"]
         ev_type = evaluation.get("type")
 
-        # Conversation cases carry real captured transcripts (with their own
-        # tool responses), so preprocess non-strictly like the eval-only flow.
-        preprocessed_history = preprocess_conversation_history(
-            test_case["history"],
-            tools,
-            strict=ev_type != "conversation",
-        )
+        # Conversation cases are graded exactly as captured — never inject
+        # synthetic tool responses, or the judge would see a conversation that
+        # never happened. Only inference-based types get preprocessed.
+        if ev_type == "conversation":
+            preprocessed_history = test_case["history"]
+        else:
+            preprocessed_history = preprocess_conversation_history(
+                test_case["history"], tools
+            )
 
         if ev_type == "response":
             resolved_evaluators = _resolve_evaluators_for_test_case(
@@ -1428,24 +1430,26 @@ async def run_eval_only_tests(
         evaluation = test_case["evaluation"]
         ev_type = evaluation.get("type")
 
-        # Apply the same history preprocessing the live flow uses, so the
-        # judge sees the same conversation shape in both modes. ``strict=False``
-        # keeps real tool responses already present in eval-only datasets.
-        preprocessed_history = preprocess_conversation_history(
-            test_case["history"], tools, strict=False
-        )
-
         if ev_type == "conversation":
+            # Conversation cases are graded exactly as captured — no synthetic
+            # tool responses injected.
             resolved_evaluators = _resolve_conversation_evaluators(
                 evaluation, user_registry
             )
             metrics = await evaluate_test_case_output(
-                chat_history=preprocessed_history,
+                chat_history=test_case["history"],
                 evaluation=evaluation,
                 evaluators=resolved_evaluators,
             )
             output = None
         else:
+            # Apply the same history preprocessing the live flow uses, so the
+            # judge sees the same conversation shape in both modes.
+            # ``strict=False`` keeps real tool responses already present in
+            # eval-only datasets.
+            preprocessed_history = preprocess_conversation_history(
+                test_case["history"], tools, strict=False
+            )
             output = item["output"]
             resolved_evaluators = (
                 _resolve_evaluators_for_test_case(evaluation, evaluators_registry)
