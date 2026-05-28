@@ -76,6 +76,9 @@ def _read_leaderboard_metrics(metrics_path: Path) -> dict:
     metrics = {}
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
+            if key == "cost" and isinstance(value, dict):
+                _flatten_cost_metrics(metrics, value)
+                continue
             # Evaluator entries and ttfb are dicts carrying a ``mean`` —
             # extract that scalar for the table. Plain numbers (e.g. ``wer``)
             # are kept as-is.
@@ -99,6 +102,19 @@ def _read_leaderboard_metrics(metrics_path: Path) -> dict:
             if isinstance(value, (int, float)):
                 metrics[key] = float(value)
     return metrics
+
+
+def _flatten_cost_metrics(metrics: dict, cost: dict) -> None:
+    """Add cost metrics as scalar leaderboard columns."""
+    column_map = {
+        "total_audio_minutes": "audio_minutes",
+        "price_per_audio_minute_usd": "cost_per_audio_minute_usd",
+        "estimated_total_cost_usd": "cost_usd",
+    }
+    for source_key, target_key in column_map.items():
+        value = cost.get(source_key)
+        if isinstance(value, (int, float)):
+            metrics[target_key] = float(value)
 
 
 def _read_leaderboard_results(results_path: Path) -> pd.DataFrame:

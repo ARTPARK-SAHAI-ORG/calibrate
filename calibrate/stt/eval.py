@@ -6,6 +6,7 @@ import json
 import base64
 import time
 import httpx
+import wave
 from os.path import join, exists
 from datetime import datetime
 from pathlib import Path
@@ -47,12 +48,68 @@ from calibrate.langfuse import (
     langfuse,
     langfuse_enabled,
 )
+from calibrate.pricing import resolve_pricing
 from calibrate.rate_limit import SARVAM_STT_STREAMING_LIMITER
 
 
 # =============================================================================
 # STT Provider API Methods
 # =============================================================================
+
+
+def _get_wav_duration_seconds(audio_path: Path) -> float | None:
+    """Return WAV duration in seconds, or None when it cannot be read."""
+    try:
+        with wave.open(str(audio_path), "rb") as wav_file:
+            frame_rate = wav_file.getframerate()
+            if frame_rate <= 0:
+                return None
+            return wav_file.getnframes() / float(frame_rate)
+    except Exception:
+        return None
+
+
+def _build_stt_cost_metrics(
+    provider: str,
+    audio_duration_seconds: list[float | None] | None,
+    cost_config: dict | None = None,
+) -> dict | None:
+    """Build STT cost metrics from audio duration and provider price config."""
+    durations = [
+        float(duration)
+        for duration in (audio_duration_seconds or [])
+        if duration is not None and not pd.isna(duration)
+    ]
+    if not durations:
+        return None
+
+    total_audio_seconds = float(sum(durations))
+    total_audio_minutes = total_audio_seconds / 60.0
+    metrics = {
+        "provider": provider,
+        "currency": "USD",
+        "billing_unit": "audio_minute",
+        "total_audio_seconds": total_audio_seconds,
+        "total_audio_minutes": total_audio_minutes,
+        "pricing_source": "unavailable",
+    }
+
+    pricing = resolve_pricing("stt", provider, overrides=cost_config)
+    if not pricing:
+        return metrics
+
+    if pricing["billing_unit"] != "audio_minute":
+        return metrics
+
+    price_per_minute = pricing["price_per_unit_usd"]
+    metrics["pricing_source"] = pricing["pricing_source"]
+    if pricing.get("model"):
+        metrics["pricing_model"] = pricing["model"]
+    metrics["price_per_unit_usd"] = price_per_minute
+    metrics["price_per_audio_minute_usd"] = price_per_minute
+    metrics["total_units"] = total_audio_minutes
+    metrics["estimated_total_cost_usd"] = total_audio_minutes * price_per_minute
+    return metrics
 
 
 def load_audio(audio_path: Path, as_file: bool = False, raw_pcm: bool = False):
@@ -684,11 +741,13 @@ async def run_stt_eval(
             raise
 
         # Save immediately after each file
+        audio_duration_seconds = _get_wav_duration_seconds(audio_path)
         results.append(
             {
                 "id": gt_info["id"],
                 "gt": gt_info["gt"],
                 "pred": transcript,
+                "audio_duration_seconds": audio_duration_seconds,
             }
         )
         pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -851,6 +910,7 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
+    cost_config: dict | None = None,
 ) -> dict:
     """Run STT evaluation for a single provider."""
     provider_output_dir = join(output_dir, provider)
@@ -938,8 +998,16 @@ async def run_single_provider_eval(
 
                 for gt_info in gt_data:
                     if gt_info["id"] not in processed_ids:
+                        audio_path = audio_dir / f"{gt_info['id']}.wav"
                         results.append(
-                            {"id": gt_info["id"], "gt": gt_info["gt"], "pred": ""}
+                            {
+                                "id": gt_info["id"],
+                                "gt": gt_info["gt"],
+                                "pred": "",
+                                "audio_duration_seconds": _get_wav_duration_seconds(
+                                    audio_path
+                                ),
+                            }
                         )
 
                 pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -964,6 +1032,25 @@ async def run_single_provider_eval(
         all_ids = results_df["id"].tolist()
         all_gt_transcripts = results_df["gt"].astype(str).tolist()
         all_pred_transcripts = results_df["pred"].fillna("").astype(str).tolist()
+        audio_durations = []
+        for row_index, row_id in enumerate(all_ids):
+            duration = None
+            if "audio_duration_seconds" in results_df.columns:
+                duration = results_df.iloc[row_index]["audio_duration_seconds"]
+            if duration is None or pd.isna(duration):
+                duration = _get_wav_duration_seconds(audio_dir / f"{row_id}.wav")
+            audio_durations.append(duration)
+        row_extras = [
+            {"audio_duration_seconds": duration}
+            if duration is not None and not pd.isna(duration)
+            else {}
+            for duration in audio_durations
+        ]
+        cost_metrics = _build_stt_cost_metrics(
+            provider=provider,
+            audio_duration_seconds=audio_durations,
+            cost_config=cost_config,
+        )
 
         _log(f"gt_transcripts: {all_gt_transcripts}", to_terminal=False)
         _log(f"pred_transcripts: {all_pred_transcripts}", to_terminal=False)
@@ -978,6 +1065,8 @@ async def run_single_provider_eval(
             output_dir=provider_output_dir,
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
+            row_extras=row_extras,
+            cost_metrics=cost_metrics,
         )
 
         return {
@@ -1032,6 +1121,8 @@ async def _score_and_write_results(
     output_dir: str,
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
+    row_extras: list[dict] | None = None,
+    cost_metrics: dict | None = None,
 ) -> dict:
     """Run WER + LLM-judge evaluators over (gt, pred) pairs and write outputs.
 
@@ -1058,21 +1149,28 @@ async def _score_and_write_results(
     metrics_data = {"wer": wer_results["score"]}
     for name, score_dict in llm_results["scores"].items():
         metrics_data[name] = score_dict
+    if cost_metrics:
+        metrics_data["cost"] = cost_metrics
 
+    row_extras = row_extras or []
     data = []
-    for _id, gt_text, pred_text, wer, llm_row in zip(
-        ids,
-        gt_transcripts,
-        pred_transcripts,
-        wer_results["per_row"],
-        llm_results["per_row"],
+    for row_index, (_id, gt_text, pred_text, wer, llm_row) in enumerate(
+        zip(
+            ids,
+            gt_transcripts,
+            pred_transcripts,
+            wer_results["per_row"],
+            llm_results["per_row"],
+        )
     ):
+        extra = row_extras[row_index] if row_index < len(row_extras) else {}
         row = {
             "id": _id,
             "gt": gt_text,
             "pred": pred_text,
             "wer": wer,
         }
+        row.update(extra or {})
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
             if is_rating(ev):

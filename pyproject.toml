@@ -68,6 +68,7 @@ exclude = ["ui*", "examples*", "docs*", "images*"]
 [tool.setuptools.package-data]
 "calibrate" = [
     "ui/cli.bundle.mjs",
+    "pricing_data/*.json",
 ]
 
 [tool.setuptools_scm]

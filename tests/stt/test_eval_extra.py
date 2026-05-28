@@ -319,6 +319,95 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                 judge_evaluators=[rating_ev],
             )
 
+    async def test_short_row_extras_do_not_truncate_results(self):
+        from calibrate.stt import eval as E
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "per_row": [0.1, 0.2]}), \
+                 patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
+                     "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                     "per_row": [
+                         {"semantic_match": {"match": True, "reasoning": "ok"}},
+                         {"semantic_match": {"match": False, "reasoning": "no"}},
+                     ],
+                 })):
+                await E._score_and_write_results(
+                    ids=["a", "b"],
+                    gt_transcripts=["x", "y"],
+                    pred_transcripts=["x", "z"],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                    row_extras=[{"audio_duration_seconds": 1.0}],
+                )
+
+            df = pd.read_csv(Path(tmp) / "results.csv")
+            self.assertEqual(len(df), 2)
+            self.assertEqual(df.iloc[0]["audio_duration_seconds"], 1.0)
+
+
+class TestSTTCostMetrics(unittest.TestCase):
+    def test_builds_cost_metrics_from_default_pricing(self):
+        from calibrate.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="openai",
+            audio_duration_seconds=[60.0],
+            cost_config=None,
+        )
+
+        self.assertEqual(metrics["billing_unit"], "audio_minute")
+        self.assertEqual(metrics["pricing_source"], "calibrate_default")
+        self.assertEqual(metrics["pricing_model"], "gpt-4o-transcribe")
+        self.assertEqual(metrics["price_per_audio_minute_usd"], 0.006)
+        self.assertEqual(metrics["estimated_total_cost_usd"], 0.006)
+
+    def test_builds_cost_metrics_from_provider_config(self):
+        from calibrate.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="openai",
+            audio_duration_seconds=[30.0, 90.0, None],
+            cost_config={
+                "stt": {
+                    "openai": {
+                        "price_per_minute_usd": 0.006,
+                    }
+                }
+            },
+        )
+
+        self.assertEqual(metrics["billing_unit"], "audio_minute")
+        self.assertEqual(metrics["pricing_source"], "config_override")
+        self.assertEqual(metrics["total_audio_seconds"], 120.0)
+        self.assertEqual(metrics["total_audio_minutes"], 2.0)
+        self.assertEqual(metrics["price_per_audio_minute_usd"], 0.006)
+        self.assertEqual(metrics["estimated_total_cost_usd"], 0.012)
+
+    def test_invalid_config_falls_back_to_default_pricing(self):
+        from calibrate.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="openai",
+            audio_duration_seconds=[60.0],
+            cost_config={"stt": {"openai": {"price_per_minute_usd": "bad"}}},
+        )
+
+        self.assertEqual(metrics["pricing_source"], "calibrate_default")
+        self.assertEqual(metrics["estimated_total_cost_usd"], 0.006)
+
+    def test_returns_usage_without_price_when_no_provider_config(self):
+        from calibrate.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="deepgram",
+            audio_duration_seconds=[60.0],
+            cost_config=None,
+        )
+
+        self.assertEqual(metrics["total_audio_minutes"], 1.0)
+        self.assertEqual(metrics["pricing_source"], "unavailable")
+        self.assertNotIn("estimated_total_cost_usd", metrics)
+
 
 # --- run_eval_only --------------------------------------------------------
 
