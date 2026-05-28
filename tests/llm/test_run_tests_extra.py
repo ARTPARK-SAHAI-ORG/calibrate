@@ -1197,21 +1197,18 @@ class TestAggregateCriteriaConversation(unittest.TestCase):
 
 
 class TestValidateConversationEvalOnly(unittest.TestCase):
-    def test_conversation_without_output_valid(self):
+    def test_conversation_requires_output_like_response(self):
         from calibrate.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, err = validate_llm_eval_only_dataset([
+        is_valid, _ = validate_llm_eval_only_dataset([
             {
                 "test_case": {
-                    "history": [
-                        {"role": "user", "content": "hi"},
-                        {"role": "assistant", "content": "hello"},
-                    ],
+                    "history": [{"role": "user", "content": "hi"}],
                     "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
                 },
             }
         ])
-        self.assertTrue(is_valid, err)
+        self.assertFalse(is_valid)
 
     def test_conversation_still_requires_history(self):
         from calibrate.llm.run_tests import validate_llm_eval_only_dataset
@@ -1236,23 +1233,20 @@ class TestRunEvalOnlyConversation(unittest.IsolatedAsyncioTestCase):
                     {
                         "test_case": {
                             "id": "tc1",
-                            "history": [
-                                {"role": "user", "content": "hi"},
-                                {"role": "assistant", "content": "hello"},
-                            ],
+                            "history": [{"role": "user", "content": "hi"}],
                             "evaluation": {
                                 "type": "conversation",
                                 "criteria": [{"name": "tone"}],
                             },
                         },
+                        "output": {"response": "hello", "tool_calls": []},
                     },
                 ],
                 output_dir=tmp,
             )
             self.assertEqual(result["passed"], 1)
             self.assertEqual(result["total"], 1)
-            # Conversation results carry no output field.
-            self.assertNotIn("output", result["results"][0])
+            self.assertEqual(result["results"][0]["output"]["response"], "hello")
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
             self.assertIn("tone", metrics["criteria"])
 
@@ -1281,9 +1275,8 @@ class TestConversationEvalOnlyNotMutated(unittest.IsolatedAsyncioTestCase):
         from calibrate.llm.run_tests import run_eval_only_tests
         from calibrate.llm import run_tests as RT
 
-        # Eval-only: a captured transcript with an assistant tool call but no
-        # tool message must be judged exactly as supplied (no inference, no
-        # synthetic {"status": "received"} tool message inserted).
+        # Same preprocess as response eval-only (strict=False): missing tool
+        # responses are filled in before judging.
         history = [
             {"role": "user", "content": "check my order"},
             {
@@ -1293,7 +1286,6 @@ class TestConversationEvalOnlyNotMutated(unittest.IsolatedAsyncioTestCase):
                     {"id": "c1", "function": {"name": "check_order", "arguments": "{}"}}
                 ],
             },
-            {"role": "assistant", "content": "It ships tomorrow."},
         ]
         sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
         with tempfile.TemporaryDirectory() as tmp, \
@@ -1306,12 +1298,13 @@ class TestConversationEvalOnlyNotMutated(unittest.IsolatedAsyncioTestCase):
                         "history": history,
                         "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
                     },
+                    "output": {"response": "It ships tomorrow.", "tool_calls": []},
                 }],
                 output_dir=tmp,
             )
         judged = sim.await_args.kwargs["conversation"]
-        self.assertEqual(judged, history)
-        self.assertFalse(any(m.get("role") == "tool" for m in judged))
+        self.assertEqual(judged[2]["role"], "tool")
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
 
 
 class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):

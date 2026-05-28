@@ -1256,11 +1256,17 @@ def validate_llm_eval_only_dataset(
     for i, item in enumerate(dataset):
         if not isinstance(item, dict):
             return False, f"Item {i}: must be an object"
-        if "test_case" not in item:
-            return False, f"Item {i}: missing required key 'test_case'"
+        if "test_case" not in item or "output" not in item:
+            return (
+                False,
+                f"Item {i}: missing required keys 'test_case' and/or 'output'",
+            )
         tc = item["test_case"]
+        out = item["output"]
         if not isinstance(tc, dict):
             return False, f"Item {i}: 'test_case' must be an object"
+        if not isinstance(out, dict):
+            return False, f"Item {i}: 'output' must be an object"
         if "history" not in tc or "evaluation" not in tc:
             return (
                 False,
@@ -1277,15 +1283,6 @@ def validate_llm_eval_only_dataset(
                 f"Item {i}: 'test_case.evaluation.type' must be 'response', "
                 f"'tool_call', or 'conversation' (got {ev_type!r})",
             )
-
-        if ev_type == "conversation":
-            continue
-
-        if "output" not in item:
-            return False, f"Item {i}: missing required key 'output'"
-        out = item["output"]
-        if not isinstance(out, dict):
-            return False, f"Item {i}: 'output' must be an object"
         if "response" not in out or "tool_calls" not in out:
             return (
                 False,
@@ -1341,28 +1338,20 @@ async def run_eval_only_tests(
             else None
         )
 
-        if evaluation.get("type") == "conversation":
-            judge_result = await evaluate_simuation(
-                conversation=test_case["history"],
-                evaluators=resolved_evaluators,
-            )
-            metrics = _metrics_from_judge_results(resolved_evaluators, judge_result)
-            output = None
-        else:
-            preprocessed_history = preprocess_conversation_history(
-                test_case["history"], tools, strict=False
-            )
-            output = item["output"]
-            metrics = await evaluate_test_case_output(
-                chat_history=preprocessed_history,
-                evaluation=evaluation,
-                output=output,
-                evaluators=resolved_evaluators,
-                no_response_reasoning_with_tool_calls=(
-                    f"Tool calls present: {output.get('tool_calls')}, but no reply provided"
-                ),
-                no_response_reasoning_no_tool_calls="No reply provided",
-            )
+        preprocessed_history = preprocess_conversation_history(
+            test_case["history"], tools, strict=False
+        )
+        output = item["output"]
+        metrics = await evaluate_test_case_output(
+            chat_history=preprocessed_history,
+            evaluation=evaluation,
+            output=output,
+            evaluators=resolved_evaluators,
+            no_response_reasoning_with_tool_calls=(
+                f"Tool calls present: {output.get('tool_calls')}, but no reply provided"
+            ),
+            no_response_reasoning_no_tool_calls="No reply provided",
+        )
 
         if metrics["passed"]:
             _print_and_log(f"✅ Test case {i + 1} passed", print_log_save_path)
@@ -1371,9 +1360,7 @@ async def run_eval_only_tests(
         if "reasoning" in metrics:
             _print_and_log(f"  Reason: {metrics['reasoning']}", print_log_save_path)
 
-        result = {"metrics": metrics, "test_case": test_case}
-        if output is not None:
-            result["output"] = output
+        result = {"output": output, "metrics": metrics, "test_case": test_case}
         if "id" in test_case:
             result["test_case_id"] = test_case["id"]
         results.append(result)
