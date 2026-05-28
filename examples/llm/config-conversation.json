@@ -1,0 +1,97 @@
+{
+  "system_prompt": "You are a helpful customer support assistant for an online store. You help customers check order status, process returns, and answer product questions. Be friendly, helpful, and concise.",
+  "tools": [],
+  "evaluators": [
+    {
+      "id": "resolution-id",
+      "name": "resolution",
+      "system_prompt": "You are a highly accurate evaluator grading a full conversation between a user and a support agent.\n\nYou will be given the entire chat history.\n\nMark True only if, by the end of the conversation, the agent has fully addressed the user's request about {{topic}} (and has not left the user's question unanswered or deflected it).",
+      "judge_model": "openai/gpt-4.1"
+    },
+    {
+      "id": "tone-id",
+      "name": "tone",
+      "system_prompt": "You are a highly accurate evaluator grading a full conversation between a user and a support agent.\n\nYou will be given the entire chat history.\n\nRate the agent's overall tone across the whole conversation on a 1-5 scale: 1 = rude/robotic, 3 = neutral, 5 = consistently warm and helpful.",
+      "judge_model": "openai/gpt-4.1",
+      "type": "rating",
+      "scale_min": 1,
+      "scale_max": 5
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "conversation-order-status",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hello! How can I help you today?"
+        },
+        {
+          "role": "user",
+          "content": "Hi, I'd like to check the status of my order ORD-12345."
+        },
+        {
+          "role": "assistant",
+          "content": "Sure! Let me look that up for you — one moment."
+        },
+        {
+          "role": "assistant",
+          "content": "Your order ORD-12345 shipped yesterday and is expected to arrive on Thursday. Is there anything else I can help with?"
+        },
+        {
+          "role": "user",
+          "content": "That's great, thank you!"
+        },
+        {
+          "role": "assistant",
+          "content": "You're very welcome! Have a wonderful day."
+        }
+      ],
+      "evaluation": {
+        "type": "conversation",
+        "criteria": [
+          {
+            "name": "resolution",
+            "arguments": { "topic": "order status" }
+          },
+          { "name": "tone" }
+        ]
+      }
+    },
+    {
+      "id": "conversation-unresolved-return",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hello! How can I help you today?"
+        },
+        {
+          "role": "user",
+          "content": "I want to return a defective blender I bought last week."
+        },
+        {
+          "role": "assistant",
+          "content": "Returns can be tricky. Have you tried turning it off and on again?"
+        },
+        {
+          "role": "user",
+          "content": "It's clearly broken, I just want to return it."
+        },
+        {
+          "role": "assistant",
+          "content": "I understand. Anyway, is there anything else?"
+        }
+      ],
+      "evaluation": {
+        "type": "conversation",
+        "criteria": [
+          {
+            "name": "resolution",
+            "arguments": { "topic": "the return request" }
+          },
+          { "name": "tone" }
+        ]
+      }
+    }
+  ]
+}
