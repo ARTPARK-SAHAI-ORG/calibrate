@@ -131,17 +131,25 @@ def _evaluators_for_config_output(config: dict) -> list[dict]:
     return list(user_evaluators) if user_evaluators else [DEFAULT_LLM_TEST_EVALUATOR]
 
 
-def _resolve_evaluators_for_test_case(
+def _resolve_evaluators_for_test_case(evaluation: dict, registry: dict) -> list[dict]:
+    """Resolve a test case's ``evaluation.criteria`` to rendered evaluator dicts."""
+    refs = _normalize_criteria_refs(evaluation.get("criteria"))
+    rendered: list[dict] = []
+    for ref in refs:
+        name = ref["name"]
+        if name not in registry:
+            raise ValueError(
+                f"Unknown evaluator '{name}' referenced in test case. Define "
+                f"it under config.evaluators (or use "
+                f"'{DEFAULT_LLM_TEST_EVALUATOR['name']}')."
+            )
+        rendered.append(render_evaluator(registry[name], ref.get("arguments")))
+    return rendered
+
+
+def _resolve_test_case_evaluators(
     evaluation: dict, config: dict
 ) -> Optional[list[dict]]:
-    """Resolve evaluators for a test case based on ``evaluation.type``.
-
-    - ``response`` → registry includes the implicit default; a bare-string
-      ``criteria`` is sugar for that default.
-    - ``conversation`` → registry has no default; ``criteria`` must be a
-      non-empty list of evaluator references.
-    - ``tool_call`` / anything else → ``None`` (no LLM-judge evaluators).
-    """
     ev_type = evaluation.get("type")
     if ev_type not in ("response", "conversation"):
         return None
@@ -157,18 +165,7 @@ def _resolve_evaluators_for_test_case(
     registry = _build_evaluators_registry(
         config, include_default=(ev_type == "response")
     )
-    refs = _normalize_criteria_refs(evaluation.get("criteria"))
-    rendered: list[dict] = []
-    for ref in refs:
-        name = ref["name"]
-        if name not in registry:
-            raise ValueError(
-                f"Unknown evaluator '{name}' referenced in test case. Define "
-                f"it under config.evaluators (or use "
-                f"'{DEFAULT_LLM_TEST_EVALUATOR['name']}')."
-            )
-        rendered.append(render_evaluator(registry[name], ref.get("arguments")))
-    return rendered
+    return _resolve_evaluators_for_test_case(evaluation, registry)
 
 
 class Processor(FrameProcessor):
@@ -734,6 +731,21 @@ def _evaluator_passed(evaluator: dict, ev_result: dict) -> bool:
     return bool(ev_result["match"])
 
 
+def _metrics_from_judge_results(evaluators: List[dict], result: dict) -> dict:
+    failing = [
+        ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])
+    ]
+    return {
+        "passed": not failing,
+        "reasoning": (
+            result[failing[0]["name"]]["reasoning"]
+            if failing
+            else "All evaluators passed"
+        ),
+        "judge_results": result,
+    }
+
+
 async def _evaluate_response(
     chat_history: List[dict],
     response: str,
@@ -764,15 +776,7 @@ async def _evaluate_response(
             response=response,
             evaluators=evaluators,
         )
-        metrics["judge_results"] = result
-        failing = [
-            ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])
-        ]
-        metrics["passed"] = not failing
-        if failing:
-            metrics["reasoning"] = result[failing[0]["name"]]["reasoning"]
-        else:
-            metrics["reasoning"] = "All evaluators passed"
+        metrics.update(_metrics_from_judge_results(evaluators, result))
     else:
         if tool_calls:
             metrics["reasoning"] = no_response_reasoning_with_tool_calls
@@ -788,52 +792,27 @@ async def _evaluate_response(
 async def _evaluate_conversation(
     chat_history: List[dict],
     evaluators: List[dict],
-    output: Optional[dict] = None,
+    output: dict,
 ) -> dict:
-    """Evaluate a ``conversation``-type test case and build its ``metrics`` dict.
-
-    ``evaluators`` is required and non-empty — conversation tests have no
-    implicit default, and the resolver guarantees at least one evaluator.
-
-    When ``output`` is provided (live runs), the agent's last reply is appended
-    to ``chat_history`` before judging. When ``output`` is omitted (eval-only),
-    ``chat_history`` is judged exactly as captured.
-
-    The whole conversation is judged as a single transcript via the simulation
-    judge (:func:`evaluate_simuation`). The resulting ``metrics`` dict has the
-    same shape as :func:`_evaluate_response` (``passed`` / ``reasoning`` /
-    ``judge_results``), so conversation cases flow through the same aggregation
-    and leaderboard as response cases.
-
-    The test case passes only when every evaluator passes (AND): binary
-    evaluators must match and rating evaluators must reach ``scale_max``. See
-    :func:`_evaluator_passed`.
-    """
-    conversation = (
-        _append_agent_turn(chat_history, output) if output is not None else chat_history
-    )
+    """Append the agent's last turn to ``chat_history`` and judge the transcript."""
+    turn: dict = {"role": "assistant", "content": output.get("response") or ""}
+    tool_calls = output.get("tool_calls") or []
+    if tool_calls:
+        turn["tool_calls"] = [
+            {"function": {"name": tc.get("tool"), "arguments": tc.get("arguments")}}
+            for tc in tool_calls
+        ]
     result = await evaluate_simuation(
-        conversation=conversation,
+        conversation=list(chat_history) + [turn],
         evaluators=evaluators,
     )
-    failing = [
-        ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])
-    ]
-    return {
-        "passed": not failing,
-        "reasoning": (
-            result[failing[0]["name"]]["reasoning"]
-            if failing
-            else "All evaluators passed"
-        ),
-        "judge_results": result,
-    }
+    return _metrics_from_judge_results(evaluators, result)
 
 
 async def evaluate_test_case_output(
     chat_history: List[dict],
     evaluation: dict,
-    output: Optional[dict] = None,
+    output: dict,
     evaluators: Optional[List[dict]] = None,
     no_response_reasoning_with_tool_calls: Optional[str] = None,
     no_response_reasoning_no_tool_calls: Optional[str] = None,
@@ -843,19 +822,10 @@ async def evaluate_test_case_output(
     Shared between live inference (``run_test`` / ``run_test_external``) and
     eval-only mode where ``output`` is loaded from disk instead of generated.
 
-    For ``response`` / ``tool_call`` types ``output`` must contain ``response``
-    (str) and ``tool_calls`` (list). For ``conversation`` types, pass
-    ``output`` on live runs so the last agent turn is appended before judging;
-    omit ``output`` in eval-only mode to judge the captured history as-is.
-
-    Each evaluator uses its own ``judge_model``; evaluators that don't set one
-    fall back to the judge's default model (the text judge model for
-    ``response``, the simulation judge model for ``conversation``).
+    ``output`` must contain ``response`` (str) and ``tool_calls`` (list).
     """
     if evaluation["type"] == "conversation":
-        return await _evaluate_conversation(
-            chat_history, evaluators, output=output
-        )
+        return await _evaluate_conversation(chat_history, evaluators, output)
     if evaluation["type"] == "tool_call":
         return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
@@ -875,26 +845,6 @@ async def evaluate_test_case_output(
             ),
         )
     raise ValueError(f"Invalid evaluation type: {evaluation['type']}")
-
-
-def _append_agent_turn(chat_history: List[dict], output: dict) -> List[dict]:
-    """Return ``chat_history`` plus the agent's generated reply as an assistant turn.
-
-    Used by ``conversation``-type live runs: the agent is asked to produce the
-    next reply, which is appended so the simulation judge grades the *entire*
-    resulting conversation (not just the reply, as ``response`` tests do).
-
-    Tool calls are normalized into the ``{"function": {...}}`` shape that
-    :func:`calibrate.judges.format_conversation` understands.
-    """
-    turn: dict = {"role": "assistant", "content": output.get("response") or ""}
-    tool_calls = output.get("tool_calls") or []
-    if tool_calls:
-        turn["tool_calls"] = [
-            {"function": {"name": tc.get("tool"), "arguments": tc.get("arguments")}}
-            for tc in tool_calls
-        ]
-    return list(chat_history) + [turn]
 
 
 @observe(name="llm_test", capture_input=False, capture_output=False)
@@ -990,31 +940,26 @@ async def run_test_external(
     output = await agent.call(chat_history, model=model)
     response = output.get("response")
     tool_calls = output.get("tool_calls", [])
+    output_dict = {"response": response, "tool_calls": tool_calls}
 
-    if evaluation["type"] == "conversation":
-        if not response and not tool_calls:
-            # A non-responsive agent must fail outright — otherwise judging the
-            # prior transcript alone could let it pass.
-            reasoning = "No reply was returned by the external agent"
-            metrics = {
-                "passed": False,
-                "reasoning": reasoning,
-                "judge_results": _no_response_judge_results(
-                    evaluators or [], reasoning
-                ),
-            }
-        else:
-            metrics = await evaluate_test_case_output(
-                chat_history=chat_history,
-                evaluation=evaluation,
-                output={"response": response, "tool_calls": tool_calls},
-                evaluators=evaluators,
-            )
+    if (
+        evaluation["type"] == "conversation"
+        and not response
+        and not tool_calls
+    ):
+        reasoning = "No reply was returned by the external agent"
+        metrics = {
+            "passed": False,
+            "reasoning": reasoning,
+            "judge_results": _no_response_judge_results(
+                evaluators or [], reasoning
+            ),
+        }
     else:
         metrics = await evaluate_test_case_output(
             chat_history=chat_history,
             evaluation=evaluation,
-            output={"response": response, "tool_calls": tool_calls},
+            output=output_dict,
             evaluators=evaluators,
             no_response_reasoning_with_tool_calls=(
                 f"The agent made tool calls {tool_calls} but returned no text response"
@@ -1022,17 +967,15 @@ async def run_test_external(
             no_response_reasoning_no_tool_calls="No reply was returned by the external agent",
         )
 
-    return {
-        "output": {"response": response, "tool_calls": tool_calls},
-        "metrics": metrics,
-    }
+    return {"output": output_dict, "metrics": metrics}
 
 
 def _aggregate_criteria(results: List[dict], evaluators_registry: dict) -> dict:
     """Aggregate per-evaluator metrics across test case results.
 
-    Each response-type test case contributes to the totals for the evaluators
-    referenced in its ``evaluation.criteria``. ``evaluators_registry`` is the
+    Each ``response`` / ``conversation`` test case contributes to the totals for
+    the evaluators referenced in its ``evaluation.criteria``.
+    ``evaluators_registry`` is the
     full ``{name: evaluator}`` dict used to resolve type/scale info.
 
     Per-evaluator output shape depends on the evaluator's type:
@@ -1188,24 +1131,15 @@ async def run_model_tests(
     evaluators_registry = _build_evaluators_registry(config)
     write_evaluator_config(output_dir, _evaluators_for_config_output(config))
 
-    # ``tools`` / ``system_prompt`` are only needed for the inference-based
-    # types; a conversation-only suite never runs the agent, so treat them as
-    # optional (mirrors the eval-only flow).
     tools = config.get("tools") or []
     system_prompt = config.get("system_prompt", "")
 
     for test_case_index, test_case in enumerate(config["test_cases"]):
         evaluation = test_case["evaluation"]
-
-        # All live types run the agent, so the history is the inference context
-        # and is preprocessed the same way (tool responses injected for the
-        # model). For conversation tests the agent's reply is then appended and
-        # the whole conversation is judged (see ``run_test``).
         preprocessed_history = preprocess_conversation_history(
             test_case["history"], tools
         )
-
-        resolved_evaluators = _resolve_evaluators_for_test_case(evaluation, config)
+        resolved_evaluators = _resolve_test_case_evaluators(evaluation, config)
 
         result = await run_test(
             chat_history=preprocessed_history,
@@ -1392,23 +1326,16 @@ async def run_eval_only_tests(
         test_case = item["test_case"]
         evaluation = test_case["evaluation"]
         ev_type = evaluation.get("type")
-        resolved_evaluators = _resolve_evaluators_for_test_case(evaluation, config)
+        resolved_evaluators = _resolve_test_case_evaluators(evaluation, config)
 
         if ev_type == "conversation":
-            # Conversation cases are graded exactly as captured — no synthetic
-            # tool responses injected, and no output turn appended.
-            metrics = await evaluate_test_case_output(
-                chat_history=test_case["history"],
-                evaluation=evaluation,
-                output=None,
+            result = await evaluate_simuation(
+                conversation=test_case["history"],
                 evaluators=resolved_evaluators,
             )
+            metrics = _metrics_from_judge_results(resolved_evaluators, result)
             output = None
         else:
-            # Apply the same history preprocessing the live flow uses, so the
-            # judge sees the same conversation shape in both modes.
-            # ``strict=False`` keeps real tool responses already present in
-            # eval-only datasets.
             preprocessed_history = preprocess_conversation_history(
                 test_case["history"], tools, strict=False
             )
