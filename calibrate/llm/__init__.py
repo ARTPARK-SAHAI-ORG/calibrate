@@ -90,7 +90,7 @@ class _Tests:
             run_test_external as _run_test_external,
             _build_evaluators_registry,
             _evaluators_for_config_output,
-            _resolve_test_case_evaluators,
+            _resolve_evaluators_for_test_case,
         )
         from calibrate.judges import write_evaluator_config
         from calibrate.utils import configure_print_logger, log_and_print
@@ -140,7 +140,7 @@ class _Tests:
 
         for test_case_index, test_case in enumerate(test_cases):
             evaluation = test_case["evaluation"]
-            resolved_evaluators = _resolve_test_case_evaluators(
+            resolved_evaluators = _resolve_evaluators_for_test_case(
                 evaluation, evaluator_config
             )
             if agent is not None:
@@ -453,10 +453,10 @@ class _Tests:
         """
         from calibrate.llm.run_tests import (
             run_test as _run_test,
-            _resolve_test_case_evaluators,
+            _resolve_evaluators_for_test_case,
         )
 
-        resolved_evaluators = _resolve_test_case_evaluators(
+        resolved_evaluators = _resolve_evaluators_for_test_case(
             evaluation, {"evaluators": evaluators or []}
         )
 

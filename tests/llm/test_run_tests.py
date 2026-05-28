@@ -442,18 +442,14 @@ class TestEvaluatorsRegistryLegacyDefaultAlias(unittest.TestCase):
     def test_default_alias_can_be_referenced_in_test_case(self):
         """A test case's ``criteria`` referencing ``{"name": "default"}`` must
         still render successfully and produce the implicit default evaluator."""
-        from calibrate.llm.run_tests import (
-            _build_evaluators_registry,
-            _resolve_evaluators_for_test_case,
-        )
+        from calibrate.llm.run_tests import _resolve_evaluators_for_test_case
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        registry = _build_evaluators_registry({})
         evaluation = {
             "type": "response",
             "criteria": [{"name": "default", "arguments": {"criteria": "be polite"}}],
         }
-        rendered = _resolve_evaluators_for_test_case(evaluation, registry)
+        rendered = _resolve_evaluators_for_test_case(evaluation, {"evaluators": []})
         self.assertEqual(len(rendered), 1)
         # Resolved evaluator carries the canonical name (not the alias).
         self.assertEqual(rendered[0]["name"], DEFAULT_LLM_TEST_EVALUATOR["name"])

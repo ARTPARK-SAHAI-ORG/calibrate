@@ -131,8 +131,32 @@ def _evaluators_for_config_output(config: dict) -> list[dict]:
     return list(user_evaluators) if user_evaluators else [DEFAULT_LLM_TEST_EVALUATOR]
 
 
-def _resolve_evaluators_for_test_case(evaluation: dict, registry: dict) -> list[dict]:
-    """Resolve a test case's ``evaluation.criteria`` to rendered evaluator dicts."""
+def _resolve_evaluators_for_test_case(
+    evaluation: dict, config: dict
+) -> Optional[list[dict]]:
+    """Resolve evaluators for a test case based on ``evaluation.type``.
+
+    - ``response`` → registry includes the implicit default; a bare-string
+      ``criteria`` is sugar for that default.
+    - ``conversation`` → registry has no default; ``criteria`` must be a
+      non-empty list of evaluator references.
+    - ``tool_call`` / anything else → ``None`` (no LLM-judge evaluators).
+    """
+    ev_type = evaluation.get("type")
+    if ev_type not in ("response", "conversation"):
+        return None
+    if ev_type == "conversation":
+        criteria = evaluation.get("criteria")
+        if not isinstance(criteria, list) or not criteria:
+            raise ValueError(
+                "conversation test cases require 'evaluation.criteria' to be a "
+                "non-empty list of evaluator references defined under "
+                "config.evaluators (there is no implicit default evaluator for "
+                "conversation tests)."
+            )
+    registry = _build_evaluators_registry(
+        config, include_default=(ev_type == "response")
+    )
     refs = _normalize_criteria_refs(evaluation.get("criteria"))
     rendered: list[dict] = []
     for ref in refs:
@@ -145,38 +169,6 @@ def _resolve_evaluators_for_test_case(evaluation: dict, registry: dict) -> list[
             )
         rendered.append(render_evaluator(registry[name], ref.get("arguments")))
     return rendered
-
-
-def _resolve_test_case_evaluators(evaluation: dict, config: dict) -> Optional[list[dict]]:
-    """Resolve the evaluators for a test case based on its ``evaluation.type``.
-
-    Single source of truth for the per-type resolution rule, shared by every
-    runner (live, eval-only, and the SDK):
-
-    - ``response`` → resolve against the registry *with* the implicit default
-      (a bare-string ``criteria`` is sugar for that default).
-    - ``conversation`` → resolve against the registry *without* the default, so
-      ``criteria`` must explicitly list evaluator references.
-    - ``tool_call`` / anything else → ``None`` (no LLM-judge evaluators).
-    """
-    ev_type = evaluation.get("type")
-    if ev_type not in ("response", "conversation"):
-        return None
-    if ev_type == "conversation":
-        criteria = evaluation.get("criteria")
-        # No implicit default: a bare string (sugar for the default) or an
-        # empty list is not allowed — criteria must explicitly name evaluators.
-        if not isinstance(criteria, list) or not criteria:
-            raise ValueError(
-                "conversation test cases require 'evaluation.criteria' to be a "
-                "non-empty list of evaluator references defined under "
-                "config.evaluators (there is no implicit default evaluator for "
-                "conversation tests)."
-            )
-    registry = _build_evaluators_registry(
-        config, include_default=(ev_type == "response")
-    )
-    return _resolve_evaluators_for_test_case(evaluation, registry)
 
 
 class Processor(FrameProcessor):
@@ -796,24 +788,32 @@ async def _evaluate_response(
 async def _evaluate_conversation(
     chat_history: List[dict],
     evaluators: List[dict],
+    output: Optional[dict] = None,
 ) -> dict:
     """Evaluate a ``conversation``-type test case and build its ``metrics`` dict.
 
     ``evaluators`` is required and non-empty — conversation tests have no
     implicit default, and the resolver guarantees at least one evaluator.
 
-    The whole conversation history is judged as a single transcript via the
-    simulation judge (:func:`evaluate_simuation`). The resulting ``metrics``
-    dict has the same shape as :func:`_evaluate_response` (``passed`` /
-    ``reasoning`` / ``judge_results``), so conversation cases flow through the
-    same aggregation and leaderboard as response cases.
+    When ``output`` is provided (live runs), the agent's last reply is appended
+    to ``chat_history`` before judging. When ``output`` is omitted (eval-only),
+    ``chat_history`` is judged exactly as captured.
+
+    The whole conversation is judged as a single transcript via the simulation
+    judge (:func:`evaluate_simuation`). The resulting ``metrics`` dict has the
+    same shape as :func:`_evaluate_response` (``passed`` / ``reasoning`` /
+    ``judge_results``), so conversation cases flow through the same aggregation
+    and leaderboard as response cases.
 
     The test case passes only when every evaluator passes (AND): binary
     evaluators must match and rating evaluators must reach ``scale_max``. See
     :func:`_evaluator_passed`.
     """
+    conversation = (
+        _append_agent_turn(chat_history, output) if output is not None else chat_history
+    )
     result = await evaluate_simuation(
-        conversation=chat_history,
+        conversation=conversation,
         evaluators=evaluators,
     )
     failing = [
@@ -844,15 +844,18 @@ async def evaluate_test_case_output(
     eval-only mode where ``output`` is loaded from disk instead of generated.
 
     For ``response`` / ``tool_call`` types ``output`` must contain ``response``
-    (str) and ``tool_calls`` (list). For ``conversation`` types ``output`` is
-    unused — the conversation history itself is the input to the judge.
+    (str) and ``tool_calls`` (list). For ``conversation`` types, pass
+    ``output`` on live runs so the last agent turn is appended before judging;
+    omit ``output`` in eval-only mode to judge the captured history as-is.
 
     Each evaluator uses its own ``judge_model``; evaluators that don't set one
     fall back to the judge's default model (the text judge model for
     ``response``, the simulation judge model for ``conversation``).
     """
     if evaluation["type"] == "conversation":
-        return await _evaluate_conversation(chat_history, evaluators)
+        return await _evaluate_conversation(
+            chat_history, evaluators, output=output
+        )
     if evaluation["type"] == "tool_call":
         return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
@@ -923,25 +926,16 @@ async def run_test(
             f"LLM inference failed - no response or tool calls returned. {error_details}"
         )
 
-    if evaluation["type"] == "conversation":
-        # Judge the whole conversation (history + the reply we just generated),
-        # not just the reply.
-        metrics = await evaluate_test_case_output(
-            chat_history=_append_agent_turn(chat_history, output),
-            evaluation=evaluation,
-            evaluators=evaluators,
-        )
-    else:
-        metrics = await evaluate_test_case_output(
-            chat_history=chat_history,
-            evaluation=evaluation,
-            output=output,
-            evaluators=evaluators,
-            no_response_reasoning_with_tool_calls=(
-                f"The LLM generated tool calls: {output['tool_calls']}, but no reply was generated"
-            ),
-            no_response_reasoning_no_tool_calls="No reply was generated by the LLM",
-        )
+    metrics = await evaluate_test_case_output(
+        chat_history=chat_history,
+        evaluation=evaluation,
+        output=output,
+        evaluators=evaluators,
+        no_response_reasoning_with_tool_calls=(
+            f"The LLM generated tool calls: {output['tool_calls']}, but no reply was generated"
+        ),
+        no_response_reasoning_no_tool_calls="No reply was generated by the LLM",
+    )
 
     if langfuse_enabled and langfuse:
         langfuse.update_current_trace(
@@ -1010,13 +1004,10 @@ async def run_test_external(
                 ),
             }
         else:
-            # Judge the whole conversation (history + the reply the agent just
-            # produced), not just the reply.
             metrics = await evaluate_test_case_output(
-                chat_history=_append_agent_turn(
-                    chat_history, {"response": response, "tool_calls": tool_calls}
-                ),
+                chat_history=chat_history,
                 evaluation=evaluation,
+                output={"response": response, "tool_calls": tool_calls},
                 evaluators=evaluators,
             )
     else:
@@ -1214,7 +1205,7 @@ async def run_model_tests(
             test_case["history"], tools
         )
 
-        resolved_evaluators = _resolve_test_case_evaluators(evaluation, config)
+        resolved_evaluators = _resolve_evaluators_for_test_case(evaluation, config)
 
         result = await run_test(
             chat_history=preprocessed_history,
@@ -1401,14 +1392,15 @@ async def run_eval_only_tests(
         test_case = item["test_case"]
         evaluation = test_case["evaluation"]
         ev_type = evaluation.get("type")
-        resolved_evaluators = _resolve_test_case_evaluators(evaluation, config)
+        resolved_evaluators = _resolve_evaluators_for_test_case(evaluation, config)
 
         if ev_type == "conversation":
             # Conversation cases are graded exactly as captured — no synthetic
-            # tool responses injected.
+            # tool responses injected, and no output turn appended.
             metrics = await evaluate_test_case_output(
                 chat_history=test_case["history"],
                 evaluation=evaluation,
+                output=None,
                 evaluators=resolved_evaluators,
             )
             output = None
