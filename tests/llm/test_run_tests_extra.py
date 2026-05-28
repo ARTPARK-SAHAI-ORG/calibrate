@@ -971,6 +971,33 @@ class TestResolveConversationEvaluators(unittest.TestCase):
         self.assertEqual(resolved[0]["system_prompt"], "judge warmth")
 
 
+class TestResolveTestCaseEvaluators(unittest.TestCase):
+    def test_response_uses_full_registry(self):
+        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+
+        full = {"correctness": dict(_bin_ev("correctness")), "default": dict(_bin_ev("correctness"))}
+        resolved = _resolve_test_case_evaluators(
+            {"type": "response", "criteria": "be nice"}, full, {}
+        )
+        self.assertEqual(resolved[0]["name"], "correctness")
+
+    def test_conversation_uses_user_registry(self):
+        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+
+        user = {"tone": _bin_ev("tone")}
+        resolved = _resolve_test_case_evaluators(
+            {"type": "conversation", "criteria": [{"name": "tone"}]}, {}, user
+        )
+        self.assertEqual(resolved[0]["name"], "tone")
+
+    def test_tool_call_returns_none(self):
+        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+
+        self.assertIsNone(
+            _resolve_test_case_evaluators({"type": "tool_call"}, {}, {})
+        )
+
+
 class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
     async def test_binary_pass(self):
         from calibrate.llm import run_tests as RT

@@ -199,6 +199,27 @@ def _resolve_conversation_evaluators(evaluation: dict, user_registry: dict) -> l
     return rendered
 
 
+def _resolve_test_case_evaluators(
+    evaluation: dict, evaluators_registry: dict, user_registry: dict
+) -> Optional[list[dict]]:
+    """Resolve the evaluators for a test case based on its ``evaluation.type``.
+
+    Single source of truth for the per-type resolution rule, shared by every
+    runner (live, eval-only, and the SDK):
+
+    - ``response`` → resolve against ``evaluators_registry`` (includes the
+      implicit default evaluator).
+    - ``conversation`` → resolve against ``user_registry`` (no implicit default).
+    - ``tool_call`` / anything else → ``None`` (no LLM-judge evaluators).
+    """
+    ev_type = evaluation.get("type")
+    if ev_type == "response":
+        return _resolve_evaluators_for_test_case(evaluation, evaluators_registry)
+    if ev_type == "conversation":
+        return _resolve_conversation_evaluators(evaluation, user_registry)
+    return None
+
+
 class Processor(FrameProcessor):
     """Processor that captures LLM text output."""
 
@@ -1225,7 +1246,6 @@ async def run_model_tests(
 
     for test_case_index, test_case in enumerate(config["test_cases"]):
         evaluation = test_case["evaluation"]
-        ev_type = evaluation.get("type")
 
         # All live types run the agent, so the history is the inference context
         # and is preprocessed the same way (tool responses injected for the
@@ -1235,16 +1255,9 @@ async def run_model_tests(
             test_case["history"], tools
         )
 
-        if ev_type == "response":
-            resolved_evaluators = _resolve_evaluators_for_test_case(
-                evaluation, evaluators_registry
-            )
-        elif ev_type == "conversation":
-            resolved_evaluators = _resolve_conversation_evaluators(
-                evaluation, user_registry
-            )
-        else:
-            resolved_evaluators = None
+        resolved_evaluators = _resolve_test_case_evaluators(
+            evaluation, evaluators_registry, user_registry
+        )
 
         result = await run_test(
             chat_history=preprocessed_history,
@@ -1432,13 +1445,13 @@ async def run_eval_only_tests(
         test_case = item["test_case"]
         evaluation = test_case["evaluation"]
         ev_type = evaluation.get("type")
+        resolved_evaluators = _resolve_test_case_evaluators(
+            evaluation, evaluators_registry, user_registry
+        )
 
         if ev_type == "conversation":
             # Conversation cases are graded exactly as captured — no synthetic
             # tool responses injected.
-            resolved_evaluators = _resolve_conversation_evaluators(
-                evaluation, user_registry
-            )
             metrics = await evaluate_test_case_output(
                 chat_history=test_case["history"],
                 evaluation=evaluation,
@@ -1454,11 +1467,6 @@ async def run_eval_only_tests(
                 test_case["history"], tools, strict=False
             )
             output = item["output"]
-            resolved_evaluators = (
-                _resolve_evaluators_for_test_case(evaluation, evaluators_registry)
-                if ev_type == "response"
-                else None
-            )
             metrics = await evaluate_test_case_output(
                 chat_history=preprocessed_history,
                 evaluation=evaluation,
