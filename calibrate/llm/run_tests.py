@@ -1017,15 +1017,27 @@ async def run_test_external(
     tool_calls = output.get("tool_calls", [])
 
     if evaluation["type"] == "conversation":
-        # Judge the whole conversation (history + the reply the agent just
-        # produced), not just the reply.
-        metrics = await evaluate_test_case_output(
-            chat_history=_append_agent_turn(
-                chat_history, {"response": response, "tool_calls": tool_calls}
-            ),
-            evaluation=evaluation,
-            evaluators=evaluators,
-        )
+        if not response and not tool_calls:
+            # A non-responsive agent must fail outright — otherwise judging the
+            # prior transcript alone could let it pass.
+            reasoning = "No reply was returned by the external agent"
+            metrics = {
+                "passed": False,
+                "reasoning": reasoning,
+                "judge_results": _no_response_judge_results(
+                    evaluators or [], reasoning
+                ),
+            }
+        else:
+            # Judge the whole conversation (history + the reply the agent just
+            # produced), not just the reply.
+            metrics = await evaluate_test_case_output(
+                chat_history=_append_agent_turn(
+                    chat_history, {"response": response, "tool_calls": tool_calls}
+                ),
+                evaluation=evaluation,
+                evaluators=evaluators,
+            )
     else:
         metrics = await evaluate_test_case_output(
             chat_history=chat_history,

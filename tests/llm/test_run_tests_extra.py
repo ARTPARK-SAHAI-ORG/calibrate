@@ -1085,6 +1085,43 @@ class TestRunTestConversation(unittest.IsolatedAsyncioTestCase):
         )
 
 
+class TestRunTestExternalConversation(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_reply_fails_without_judging(self):
+        from calibrate.llm import run_tests as RT
+
+        agent = MagicMock()
+        agent.call = AsyncMock(return_value={"response": "", "tool_calls": []})
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            result = await RT.run_test_external(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                agent=agent,
+                evaluators=[_bin_ev("tone")],
+            )
+        # A non-responsive agent fails outright; the judge is never consulted.
+        sim.assert_not_called()
+        self.assertFalse(result["metrics"]["passed"])
+        self.assertFalse(result["metrics"]["judge_results"]["tone"]["match"])
+
+    async def test_reply_judged_as_full_conversation(self):
+        from calibrate.llm import run_tests as RT
+
+        agent = MagicMock()
+        agent.call = AsyncMock(return_value={"response": "It ships tomorrow.", "tool_calls": []})
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            result = await RT.run_test_external(
+                chat_history=[{"role": "user", "content": "when does it ship?"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                agent=agent,
+                evaluators=[_bin_ev("tone")],
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
+        self.assertTrue(result["metrics"]["passed"])
+
+
 class TestAggregateCriteriaConversation(unittest.TestCase):
     def test_conversation_cases_aggregated(self):
         from calibrate.llm.run_tests import _aggregate_criteria
