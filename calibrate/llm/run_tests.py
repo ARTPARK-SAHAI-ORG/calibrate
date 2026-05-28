@@ -795,22 +795,23 @@ async def _evaluate_response(
 
 async def _evaluate_conversation(
     chat_history: List[dict],
-    evaluators: Optional[List[dict]],
+    evaluators: List[dict],
 ) -> dict:
     """Evaluate a ``conversation``-type test case and build its ``metrics`` dict.
 
+    ``evaluators`` is required and non-empty — conversation tests have no
+    implicit default, and the resolver guarantees at least one evaluator.
+
     The whole conversation history is judged as a single transcript via the
-    simulation judge (:func:`evaluate_simuation`) — no LLM inference and no
-    separate reply to grade. The resulting ``metrics`` dict has the same shape
-    as :func:`_evaluate_response` (``passed`` / ``reasoning`` /
-    ``judge_results``), so conversation cases flow through the same aggregation
-    and leaderboard as response cases.
+    simulation judge (:func:`evaluate_simuation`). The resulting ``metrics``
+    dict has the same shape as :func:`_evaluate_response` (``passed`` /
+    ``reasoning`` / ``judge_results``), so conversation cases flow through the
+    same aggregation and leaderboard as response cases.
 
     The test case passes only when every evaluator passes (AND): binary
     evaluators must match and rating evaluators must reach ``scale_max``. See
     :func:`_evaluator_passed`.
     """
-    evaluators = evaluators or []
     result = await evaluate_simuation(
         conversation=chat_history,
         evaluators=evaluators,
