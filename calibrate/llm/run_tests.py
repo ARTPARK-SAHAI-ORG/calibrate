@@ -147,61 +147,36 @@ def _resolve_evaluators_for_test_case(evaluation: dict, registry: dict) -> list[
     return rendered
 
 
-def _resolve_conversation_evaluators(evaluation: dict, registry: dict) -> list[dict]:
-    """Resolve a conversation-type test case's evaluators.
-
-    Conversation tests have no implicit default, so ``evaluation.criteria`` must
-    be a non-empty list of references to evaluators defined under
-    ``config.evaluators``. A bare-string criteria (sugar for the implicit
-    default) is rejected.
-    """
-    criteria = evaluation.get("criteria")
-    if criteria is None or isinstance(criteria, str):
-        raise ValueError(
-            "conversation test cases require 'evaluation.criteria' to be a list "
-            "of evaluator references; the implicit default evaluator is not "
-            "available for conversation tests, so define evaluators under "
-            "config.evaluators and reference them by name."
-        )
-    refs = _normalize_criteria_refs(criteria)
-    if not refs:
-        raise ValueError(
-            "conversation test cases must reference at least one evaluator in "
-            "'evaluation.criteria'."
-        )
-    rendered: list[dict] = []
-    for ref in refs:
-        name = ref["name"]
-        if name not in registry:
-            raise ValueError(
-                f"Unknown evaluator '{name}' referenced in conversation test "
-                f"case. Conversation tests have no implicit default — define "
-                f"'{name}' under config.evaluators."
-            )
-        rendered.append(render_evaluator(registry[name], ref.get("arguments")))
-    return rendered
-
-
 def _resolve_test_case_evaluators(evaluation: dict, config: dict) -> Optional[list[dict]]:
     """Resolve the evaluators for a test case based on its ``evaluation.type``.
 
     Single source of truth for the per-type resolution rule, shared by every
     runner (live, eval-only, and the SDK):
 
-    - ``response`` → resolve against the registry *with* the implicit default.
-    - ``conversation`` → resolve against the registry *without* the default.
+    - ``response`` → resolve against the registry *with* the implicit default
+      (a bare-string ``criteria`` is sugar for that default).
+    - ``conversation`` → resolve against the registry *without* the default, so
+      ``criteria`` must explicitly list evaluator references.
     - ``tool_call`` / anything else → ``None`` (no LLM-judge evaluators).
     """
     ev_type = evaluation.get("type")
-    if ev_type == "response":
-        return _resolve_evaluators_for_test_case(
-            evaluation, _build_evaluators_registry(config)
-        )
+    if ev_type not in ("response", "conversation"):
+        return None
     if ev_type == "conversation":
-        return _resolve_conversation_evaluators(
-            evaluation, _build_evaluators_registry(config, include_default=False)
-        )
-    return None
+        criteria = evaluation.get("criteria")
+        # No implicit default: a bare string (sugar for the default) or an
+        # empty list is not allowed — criteria must explicitly name evaluators.
+        if not isinstance(criteria, list) or not criteria:
+            raise ValueError(
+                "conversation test cases require 'evaluation.criteria' to be a "
+                "non-empty list of evaluator references defined under "
+                "config.evaluators (there is no implicit default evaluator for "
+                "conversation tests)."
+            )
+    registry = _build_evaluators_registry(
+        config, include_default=(ev_type == "response")
+    )
+    return _resolve_evaluators_for_test_case(evaluation, registry)
 
 
 class Processor(FrameProcessor):

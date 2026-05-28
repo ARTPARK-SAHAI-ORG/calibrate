@@ -937,50 +937,46 @@ class TestBuildEvaluatorsRegistryNoDefault(unittest.TestCase):
 
 
 class TestResolveConversationEvaluators(unittest.TestCase):
-    def test_string_criteria_rejected(self):
-        from calibrate.llm.run_tests import _resolve_conversation_evaluators
+    """Conversation resolution via the shared _resolve_test_case_evaluators."""
 
+    @staticmethod
+    def _resolve(criteria, evaluators):
+        from calibrate.llm.run_tests import _resolve_test_case_evaluators
+
+        evaluation = {"type": "conversation"}
+        if criteria is not None:
+            evaluation["criteria"] = criteria
+        return _resolve_test_case_evaluators(evaluation, {"evaluators": evaluators})
+
+    def test_string_criteria_rejected(self):
         with self.assertRaises(ValueError):
-            _resolve_conversation_evaluators({"criteria": "be polite"}, {"tone": _bin_ev("tone")})
+            self._resolve("be polite", [_bin_ev("tone")])
 
     def test_missing_criteria_rejected(self):
-        from calibrate.llm.run_tests import _resolve_conversation_evaluators
-
         with self.assertRaises(ValueError):
-            _resolve_conversation_evaluators({}, {"tone": _bin_ev("tone")})
+            self._resolve(None, [_bin_ev("tone")])
 
     def test_empty_list_rejected(self):
-        from calibrate.llm.run_tests import _resolve_conversation_evaluators
-
         with self.assertRaises(ValueError):
-            _resolve_conversation_evaluators({"criteria": []}, {"tone": _bin_ev("tone")})
+            self._resolve([], [_bin_ev("tone")])
 
     def test_unknown_evaluator_rejected(self):
-        from calibrate.llm.run_tests import _resolve_conversation_evaluators
-
         with self.assertRaises(ValueError):
-            _resolve_conversation_evaluators(
-                {"criteria": [{"name": "missing"}]}, {"tone": _bin_ev("tone")}
-            )
+            self._resolve([{"name": "missing"}], [_bin_ev("tone")])
 
     def test_default_evaluator_not_available(self):
-        from calibrate.llm.run_tests import _resolve_conversation_evaluators
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
         # The implicit default name is not resolvable for conversation tests.
         with self.assertRaises(ValueError):
-            _resolve_conversation_evaluators(
-                {"criteria": [{"name": DEFAULT_LLM_TEST_EVALUATOR["name"]}]},
-                {"tone": _bin_ev("tone")},
+            self._resolve(
+                [{"name": DEFAULT_LLM_TEST_EVALUATOR["name"]}], [_bin_ev("tone")]
             )
 
     def test_resolves_user_evaluators_with_arguments(self):
-        from calibrate.llm.run_tests import _resolve_conversation_evaluators
-
         ev = {"name": "tone", "system_prompt": "judge {{aspect}}", "judge_model": "m"}
-        resolved = _resolve_conversation_evaluators(
-            {"criteria": [{"name": "tone", "arguments": {"aspect": "warmth"}}]},
-            {"tone": ev},
+        resolved = self._resolve(
+            [{"name": "tone", "arguments": {"aspect": "warmth"}}], [ev]
         )
         self.assertEqual(len(resolved), 1)
         self.assertEqual(resolved[0]["system_prompt"], "judge warmth")
