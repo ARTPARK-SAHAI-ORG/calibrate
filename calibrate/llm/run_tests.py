@@ -863,7 +863,7 @@ async def evaluate_test_case_output(
     evaluation: dict,
     output: Optional[dict] = None,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: str = DEFAULT_JUDGE_MODEL,
+    fallback_judge_model: Optional[str] = None,
     no_response_reasoning_with_tool_calls: Optional[str] = None,
     no_response_reasoning_no_tool_calls: Optional[str] = None,
 ) -> dict:
@@ -875,9 +875,17 @@ async def evaluate_test_case_output(
     For ``response`` / ``tool_call`` types ``output`` must contain ``response``
     (str) and ``tool_calls`` (list). For ``conversation`` types ``output`` is
     unused — the conversation history itself is the input to the judge.
+
+    ``fallback_judge_model`` is honored when set; when ``None`` each type uses
+    its own default (the text judge model for ``response``, the simulation
+    judge model for ``conversation``).
     """
     if evaluation["type"] == "conversation":
-        return await _evaluate_conversation(chat_history, evaluators)
+        return await _evaluate_conversation(
+            chat_history,
+            evaluators,
+            fallback_judge_model or DEFAULT_SIMULATION_JUDGE_MODEL,
+        )
     if evaluation["type"] == "tool_call":
         return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
@@ -887,7 +895,7 @@ async def evaluate_test_case_output(
             response=output["response"],
             tool_calls=tool_calls,
             evaluators=evaluators,
-            fallback_judge_model=fallback_judge_model,
+            fallback_judge_model=fallback_judge_model or DEFAULT_JUDGE_MODEL,
             no_response_reasoning_with_tool_calls=(
                 no_response_reasoning_with_tool_calls
                 or f"Tool calls were generated: {tool_calls}, but no reply was returned"
@@ -910,13 +918,14 @@ async def run_test(
     tools: List[dict[str, str]],
     unique_id: str,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: str = DEFAULT_JUDGE_MODEL,
+    fallback_judge_model: Optional[str] = None,
 ):
     if evaluation["type"] == "conversation":
         metrics = await evaluate_test_case_output(
             chat_history=chat_history,
             evaluation=evaluation,
             evaluators=evaluators,
+            fallback_judge_model=fallback_judge_model,
         )
         if langfuse_enabled and langfuse:
             langfuse.update_current_trace(
@@ -992,7 +1001,7 @@ async def run_test_external(
     agent,
     model: Optional[str] = None,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: str = DEFAULT_JUDGE_MODEL,
+    fallback_judge_model: Optional[str] = None,
 ) -> dict:
     """Run a single LLM test case against an external text agent.
 
@@ -1016,6 +1025,7 @@ async def run_test_external(
             chat_history=chat_history,
             evaluation=evaluation,
             evaluators=evaluators,
+            fallback_judge_model=fallback_judge_model,
         )
         return {"metrics": metrics}
 
@@ -1202,6 +1212,12 @@ async def run_model_tests(
     user_registry = _user_evaluators_registry(config)
     write_evaluator_config(output_dir, _evaluators_for_config_output(config))
 
+    # ``tools`` / ``system_prompt`` are only needed for the inference-based
+    # types; a conversation-only suite never runs the agent, so treat them as
+    # optional (mirrors the eval-only flow).
+    tools = config.get("tools") or []
+    system_prompt = config.get("system_prompt", "")
+
     for test_case_index, test_case in enumerate(config["test_cases"]):
         evaluation = test_case["evaluation"]
         ev_type = evaluation.get("type")
@@ -1210,7 +1226,7 @@ async def run_model_tests(
         # tool responses), so preprocess non-strictly like the eval-only flow.
         preprocessed_history = preprocess_conversation_history(
             test_case["history"],
-            config["tools"],
+            tools,
             strict=ev_type != "conversation",
         )
 
@@ -1228,10 +1244,10 @@ async def run_model_tests(
         result = await run_test(
             chat_history=preprocessed_history,
             evaluation=evaluation,
-            system_prompt=config["system_prompt"],
+            system_prompt=system_prompt,
             model=model,
             provider=provider,
-            tools=config["tools"],
+            tools=tools,
             unique_id=unique_id,
             evaluators=resolved_evaluators,
         )

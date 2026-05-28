@@ -1139,5 +1139,60 @@ class TestRunEvalOnlyConversation(unittest.IsolatedAsyncioTestCase):
             self.assertIn("tone", metrics["criteria"])
 
 
+class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
+    async def test_custom_fallback_model_forwarded(self):
+        from calibrate.llm import run_tests as RT
+
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            await RT.evaluate_test_case_output(
+                chat_history=[],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                evaluators=[_bin_ev("tone")],
+                fallback_judge_model="custom/judge-model",
+            )
+        self.assertEqual(sim.await_args.kwargs["fallback_model"], "custom/judge-model")
+
+    async def test_defaults_to_simulation_model(self):
+        from calibrate.llm import run_tests as RT
+        from calibrate.llm.metrics import DEFAULT_SIMULATION_JUDGE_MODEL
+
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            await RT.evaluate_test_case_output(
+                chat_history=[],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                evaluators=[_bin_ev("tone")],
+            )
+        self.assertEqual(
+            sim.await_args.kwargs["fallback_model"], DEFAULT_SIMULATION_JUDGE_MODEL
+        )
+
+
+class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):
+    async def test_no_tools_or_system_prompt_keys(self):
+        from calibrate.llm import run_tests as RT
+
+        # A conversation-only suite need not define tools or system_prompt.
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "evaluate_simuation",
+                          AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})):
+            config = {
+                "evaluators": [_bin_ev("tone")],
+                "test_cases": [{
+                    "id": "c1",
+                    "history": [
+                        {"role": "user", "content": "hi"},
+                        {"role": "assistant", "content": "hello"},
+                    ],
+                    "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
+                }],
+            }
+            result = await RT.run_model_tests(
+                model="m", provider="openrouter", config=config, output_dir=tmp,
+            )
+        self.assertEqual(result["metrics"]["passed"], 1)
+
+
 if __name__ == "__main__":
     unittest.main()
