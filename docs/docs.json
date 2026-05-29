@@ -23,7 +23,8 @@
               "quickstart/speech-to-text",
               "quickstart/text-to-text",
               "quickstart/text-to-speech",
-              "quickstart/simulations"
+              "quickstart/simulations",
+              "quickstart/human-alignment"
             ]
           },
           {
@@ -37,7 +38,8 @@
 
               "core-concepts/personas",
               "core-concepts/scenarios",
-              "core-concepts/metrics"
+              "core-concepts/metrics",
+              "core-concepts/human-alignment"
             ]
           }
         ]
