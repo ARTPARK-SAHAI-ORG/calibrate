@@ -40,7 +40,7 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from calibrate.llm.metrics import test_response_llm_judge, DEFAULT_JUDGE_MODEL
+from calibrate.llm.metrics import test_response_llm_judge, evaluate_simuation
 from calibrate.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
     attach_evaluator_id,
@@ -85,61 +85,75 @@ def _normalize_criteria_refs(criteria) -> list[dict]:
     )
 
 
-def _build_evaluators_registry(config: dict) -> dict:
-    """Return ``{name: evaluator_dict}`` from top-level ``config.evaluators``.
+def _get_name_to_evaluator_dict(config: dict, include_default: bool = True) -> dict:
+    """Return ``{evaluator_name: evaluator_dict}`` from top-level ``config.evaluators``.
 
-    The implicit default LLM-test evaluator is always registered first under
-    its canonical name (``DEFAULT_LLM_TEST_EVALUATOR["name"]``) and also under
-    the legacy alias ``"default"`` so older configs that reference
-    ``{"name": "default"}`` keep working. User-supplied evaluators with the
-    same name override either entry.
+    When ``include_default`` is True (``response`` tests), the implicit default
+    LLM-test evaluator is included under its canonical name
+    (``DEFAULT_LLM_TEST_EVALUATOR["name"]``) and the legacy alias ``"default"``
+    so older configs that reference ``{"name": "default"}`` keep working;
+    config evaluators with the same name override either entry.
+
+    When ``include_default`` is False (``conversation`` tests, which have no
+    implicit default), only evaluators listed in the config are included.
     """
-    user_evaluators = config.get("evaluators") or []
-    require_unique_evaluator_names(user_evaluators)
-    # ``"default"`` is a legacy alias for the canonical default evaluator
-    # (``DEFAULT_LLM_TEST_EVALUATOR["name"]``). Defining both in the same
-    # config would resolve to two separate registry entries for the same
-    # logical evaluator — reject early.
-    _default_name = DEFAULT_LLM_TEST_EVALUATOR["name"]
-    _user_names = {ev.get("name") for ev in user_evaluators if isinstance(ev, dict)}
-    if "default" in _user_names and _default_name in _user_names:
-        raise ValueError(
-            f"config.evaluators defines both 'default' and '{_default_name}', "
-            f"which are aliases for the same default LLM-test evaluator. "
-            f"Define only one."
-        )
-    registry: dict = {_default_name: DEFAULT_LLM_TEST_EVALUATOR}
-    # Legacy alias for back-compat: pre-rename, the implicit default was named "default".
-    registry["default"] = DEFAULT_LLM_TEST_EVALUATOR
-    for ev in user_evaluators:
+    user_defined_evaluators = config.get("evaluators") or []
+    require_unique_evaluator_names(user_defined_evaluators)
+    name_to_evaluator: dict = {}
+    if include_default:
+        # ``"default"`` is a legacy alias for the canonical default evaluator
+        # (``DEFAULT_LLM_TEST_EVALUATOR["name"]``). Defining both in the same
+        # config would map two names to the same logical evaluator — reject early.
+        _default_name = DEFAULT_LLM_TEST_EVALUATOR["name"]
+        _user_defined_evaluator_names = {
+            ev.get("name") for ev in user_defined_evaluators if isinstance(ev, dict)
+        }
+        if (
+            "default" in _user_defined_evaluator_names
+            and _default_name in _user_defined_evaluator_names
+        ):
+            raise ValueError(
+                f"config.evaluators defines both 'default' and '{_default_name}', "
+                f"which are aliases for the same default LLM-test evaluator. "
+                f"Define only one."
+            )
+        name_to_evaluator[_default_name] = DEFAULT_LLM_TEST_EVALUATOR
+        name_to_evaluator["default"] = DEFAULT_LLM_TEST_EVALUATOR
+    for ev in user_defined_evaluators:
         if "name" not in ev or "system_prompt" not in ev:
             raise ValueError(
                 "Each evaluator in config.evaluators must include 'name' and "
                 "'system_prompt' (got: " + repr(ev) + ")"
             )
-        registry[ev["name"]] = ev
-    return registry
+        name_to_evaluator[ev["name"]] = ev
+    return name_to_evaluator
 
 
 def _evaluators_for_config_output(config: dict) -> list[dict]:
     """Return raw evaluators for the output config artifact."""
-    user_evaluators = config.get("evaluators") or []
-    return list(user_evaluators) if user_evaluators else [DEFAULT_LLM_TEST_EVALUATOR]
+    user_defined_evaluators = config.get("evaluators") or []
+    return (
+        list(user_defined_evaluators)
+        if user_defined_evaluators
+        else [DEFAULT_LLM_TEST_EVALUATOR]
+    )
 
 
-def _resolve_evaluators_for_test_case(evaluation: dict, registry: dict) -> list[dict]:
+def _resolve_evaluators_for_test_case(
+    evaluation: dict, name_to_evaluator: dict
+) -> list[dict]:
     """Resolve a test case's ``evaluation.criteria`` to rendered evaluator dicts."""
     refs = _normalize_criteria_refs(evaluation.get("criteria"))
     rendered: list[dict] = []
     for ref in refs:
         name = ref["name"]
-        if name not in registry:
+        if name not in name_to_evaluator:
             raise ValueError(
                 f"Unknown evaluator '{name}' referenced in test case. Define "
                 f"it under config.evaluators (or use "
                 f"'{DEFAULT_LLM_TEST_EVALUATOR['name']}')."
             )
-        rendered.append(render_evaluator(registry[name], ref.get("arguments")))
+        rendered.append(render_evaluator(name_to_evaluator[name], ref.get("arguments")))
     return rendered
 
 
@@ -706,12 +720,24 @@ def _evaluator_passed(evaluator: dict, ev_result: dict) -> bool:
     return bool(ev_result["match"])
 
 
+def _metrics_from_judge_results(evaluators: List[dict], result: dict) -> dict:
+    failing = [ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])]
+    return {
+        "passed": not failing,
+        "reasoning": (
+            result[failing[0]["name"]]["reasoning"]
+            if failing
+            else "All evaluators passed"
+        ),
+        "judge_results": result,
+    }
+
+
 async def _evaluate_response(
     chat_history: List[dict],
     response: str,
     tool_calls: list,
     evaluators: Optional[List[dict]],
-    fallback_judge_model: str,
     no_response_reasoning_with_tool_calls: str,
     no_response_reasoning_no_tool_calls: str,
 ) -> dict:
@@ -736,17 +762,8 @@ async def _evaluate_response(
             conversation=chat_history,
             response=response,
             evaluators=evaluators,
-            fallback_model=fallback_judge_model,
         )
-        metrics["judge_results"] = result
-        failing = [
-            ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])
-        ]
-        metrics["passed"] = not failing
-        if failing:
-            metrics["reasoning"] = result[failing[0]["name"]]["reasoning"]
-        else:
-            metrics["reasoning"] = "All evaluators passed"
+        metrics.update(_metrics_from_judge_results(evaluators, result))
     else:
         if tool_calls:
             metrics["reasoning"] = no_response_reasoning_with_tool_calls
@@ -759,12 +776,41 @@ async def _evaluate_response(
     return metrics
 
 
+async def _evaluate_conversation(
+    chat_history: List[dict],
+    evaluators: List[dict],
+    output: dict,
+    no_response_reasoning_no_tool_calls: str,
+) -> dict:
+    """Append the agent's last turn to ``chat_history`` and judge the transcript."""
+    response = output.get("response")
+    tool_calls = output.get("tool_calls") or []
+    if not response and not tool_calls:
+        return {
+            "passed": False,
+            "reasoning": no_response_reasoning_no_tool_calls,
+            "judge_results": _no_response_judge_results(
+                evaluators or [], no_response_reasoning_no_tool_calls
+            ),
+        }
+    turn: dict = {"role": "assistant", "content": response or ""}
+    if tool_calls:
+        turn["tool_calls"] = [
+            {"function": {"name": tc.get("tool"), "arguments": tc.get("arguments")}}
+            for tc in tool_calls
+        ]
+    result = await evaluate_simuation(
+        conversation=list(chat_history) + [turn],
+        evaluators=evaluators,
+    )
+    return _metrics_from_judge_results(evaluators, result)
+
+
 async def evaluate_test_case_output(
     chat_history: List[dict],
     evaluation: dict,
     output: dict,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: str = DEFAULT_JUDGE_MODEL,
     no_response_reasoning_with_tool_calls: Optional[str] = None,
     no_response_reasoning_no_tool_calls: Optional[str] = None,
 ) -> dict:
@@ -775,6 +821,15 @@ async def evaluate_test_case_output(
 
     ``output`` must contain ``response`` (str) and ``tool_calls`` (list).
     """
+    if evaluation["type"] == "conversation":
+        return await _evaluate_conversation(
+            chat_history=chat_history,
+            evaluators=evaluators or [],
+            output=output,
+            no_response_reasoning_no_tool_calls=(
+                no_response_reasoning_no_tool_calls or "No reply was returned"
+            ),
+        )
     if evaluation["type"] == "tool_call":
         return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
@@ -784,14 +839,12 @@ async def evaluate_test_case_output(
             response=output["response"],
             tool_calls=tool_calls,
             evaluators=evaluators,
-            fallback_judge_model=fallback_judge_model,
             no_response_reasoning_with_tool_calls=(
                 no_response_reasoning_with_tool_calls
                 or f"Tool calls were generated: {tool_calls}, but no reply was returned"
             ),
             no_response_reasoning_no_tool_calls=(
-                no_response_reasoning_no_tool_calls
-                or "No reply was returned"
+                no_response_reasoning_no_tool_calls or "No reply was returned"
             ),
         )
     raise ValueError(f"Invalid evaluation type: {evaluation['type']}")
@@ -807,7 +860,6 @@ async def run_test(
     tools: List[dict[str, str]],
     unique_id: str,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: str = DEFAULT_JUDGE_MODEL,
 ):
     output = await run_inference(
         chat_history=chat_history,
@@ -832,7 +884,6 @@ async def run_test(
         evaluation=evaluation,
         output=output,
         evaluators=evaluators,
-        fallback_judge_model=fallback_judge_model,
         no_response_reasoning_with_tool_calls=(
             f"The LLM generated tool calls: {output['tool_calls']}, but no reply was generated"
         ),
@@ -871,7 +922,6 @@ async def run_test_external(
     agent,
     model: Optional[str] = None,
     evaluators: Optional[List[dict]] = None,
-    fallback_judge_model: str = DEFAULT_JUDGE_MODEL,
 ) -> dict:
     """Run a single LLM test case against an external text agent.
 
@@ -893,13 +943,11 @@ async def run_test_external(
     output = await agent.call(chat_history, model=model)
     response = output.get("response")
     tool_calls = output.get("tool_calls", [])
-
     metrics = await evaluate_test_case_output(
         chat_history=chat_history,
         evaluation=evaluation,
         output={"response": response, "tool_calls": tool_calls},
         evaluators=evaluators,
-        fallback_judge_model=fallback_judge_model,
         no_response_reasoning_with_tool_calls=(
             f"The agent made tool calls {tool_calls} but returned no text response"
         ),
@@ -912,12 +960,12 @@ async def run_test_external(
     }
 
 
-def _aggregate_criteria(results: List[dict], evaluators_registry: dict) -> dict:
+def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
     """Aggregate per-evaluator metrics across test case results.
 
-    Each response-type test case contributes to the totals for the evaluators
-    referenced in its ``evaluation.criteria``. ``evaluators_registry`` is the
-    full ``{name: evaluator}`` dict used to resolve type/scale info.
+    Each ``response`` / ``conversation`` test case contributes to the totals for
+    the evaluators referenced in its ``evaluation.criteria``.
+    ``name_to_evaluator`` maps evaluator name to its config dict (type/scale).
 
     Per-evaluator output shape depends on the evaluator's type:
     - binary: ``{"type": "binary", "passed": int, "total": int, "pass_rate": float}``
@@ -932,7 +980,7 @@ def _aggregate_criteria(results: List[dict], evaluators_registry: dict) -> dict:
         metrics = result.get("metrics", {})
         evaluation = result.get("test_case", {}).get("evaluation", {})
 
-        if evaluation.get("type") != "response":
+        if evaluation.get("type") not in ("response", "conversation"):
             continue
 
         judge_results = metrics.get("judge_results")
@@ -942,7 +990,7 @@ def _aggregate_criteria(results: List[dict], evaluators_registry: dict) -> dict:
         refs = _normalize_criteria_refs(evaluation.get("criteria"))
         for ref in refs:
             name = ref["name"]
-            ev = evaluators_registry.get(name)
+            ev = name_to_evaluator.get(name)
             if ev is None:
                 continue
             ev_data = judge_results.get(name, {})
@@ -966,7 +1014,7 @@ def _aggregate_criteria(results: List[dict], evaluators_registry: dict) -> dict:
             "total": c["total"],
             "pass_rate": (c["passed"] / c["total"]) * 100 if c["total"] else 0.0,
         }
-        ev = evaluators_registry.get(name)
+        ev = name_to_evaluator.get(name)
         if ev and "id" in ev:
             aggregated[name]["evaluator_id"] = ev["id"]
     for name, scores in rating_scores.items():
@@ -980,7 +1028,7 @@ def _aggregate_criteria(results: List[dict], evaluators_registry: dict) -> dict:
             "scale_min": lo,
             "scale_max": hi,
         }
-        ev = evaluators_registry.get(name)
+        ev = name_to_evaluator.get(name)
         if ev and "id" in ev:
             aggregated[name]["evaluator_id"] = ev["id"]
     return aggregated
@@ -1069,30 +1117,36 @@ async def run_model_tests(
 
     unique_id = str(uuid.uuid4())
 
-    evaluators_registry = _build_evaluators_registry(config)
+    name_to_evaluator = _get_name_to_evaluator_dict(config)
     write_evaluator_config(output_dir, _evaluators_for_config_output(config))
 
-    for test_case_index, test_case in enumerate(config["test_cases"]):
-        # Preprocess conversation history to add tool responses for non-webhook tools
-        preprocessed_history = preprocess_conversation_history(
-            test_case["history"], config["tools"]
-        )
+    tools = config.get("tools") or []
+    system_prompt = config.get("system_prompt", "")
 
-        # Resolve evaluators for response-type evaluations only
+    for test_case_index, test_case in enumerate(config["test_cases"]):
         evaluation = test_case["evaluation"]
+        preprocessed_history = preprocess_conversation_history(
+            test_case["history"], tools
+        )
         resolved_evaluators = (
-            _resolve_evaluators_for_test_case(evaluation, evaluators_registry)
-            if evaluation.get("type") == "response"
+            _resolve_evaluators_for_test_case(
+                evaluation,
+                _get_name_to_evaluator_dict(
+                    config,
+                    include_default=(evaluation.get("type") == "response"),
+                ),
+            )
+            if evaluation.get("type") in ("response", "conversation")
             else None
         )
 
         result = await run_test(
             chat_history=preprocessed_history,
             evaluation=evaluation,
-            system_prompt=config["system_prompt"],
+            system_prompt=system_prompt,
             model=model,
             provider=provider,
-            tools=config["tools"],
+            tools=tools,
             unique_id=unique_id,
             evaluators=resolved_evaluators,
         )
@@ -1138,7 +1192,7 @@ async def run_model_tests(
             print_log_save_path,
         )
 
-    _write_test_results_outputs(results, model_output_dir, evaluators_registry)
+    _write_test_results_outputs(results, model_output_dir, name_to_evaluator)
 
     # Remove pipecat log file sink
     with _logger_lock:
@@ -1155,7 +1209,7 @@ async def run_model_tests(
 def _write_test_results_outputs(
     results: List[dict],
     output_dir: str,
-    evaluators_registry: dict,
+    name_to_evaluator: dict,
 ) -> tuple[int, int]:
     """Write results.json + metrics.json for an LLM test run.
 
@@ -1170,7 +1224,7 @@ def _write_test_results_outputs(
     metrics = {
         "total": total,
         "passed": passed,
-        "criteria": _aggregate_criteria(results, evaluators_registry),
+        "criteria": _aggregate_criteria(results, name_to_evaluator),
         "tool_calls": _aggregate_tool_calls(results),
     }
     with open(join(output_dir, "metrics.json"), "w") as f:
@@ -1215,10 +1269,11 @@ def validate_llm_eval_only_dataset(
         if not isinstance(tc["evaluation"], dict):
             return False, f"Item {i}: 'test_case.evaluation' must be an object"
         ev_type = tc["evaluation"].get("type")
-        if ev_type not in ("response", "tool_call"):
+        if ev_type not in ("response", "tool_call", "conversation"):
             return (
                 False,
-                f"Item {i}: 'test_case.evaluation.type' must be 'response' or 'tool_call' (got {ev_type!r})",
+                f"Item {i}: 'test_case.evaluation.type' must be 'response', "
+                f"'tool_call', or 'conversation' (got {ev_type!r})",
             )
         if "response" not in out or "tool_calls" not in out:
             return (
@@ -1246,7 +1301,7 @@ async def run_eval_only_tests(
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    evaluators_registry = _build_evaluators_registry(config)
+    name_to_evaluator = _get_name_to_evaluator_dict(config)
     write_evaluator_config(output_dir, _evaluators_for_config_output(config))
 
     print_log_save_path = join(output_dir, "results.log")
@@ -1262,22 +1317,23 @@ async def run_eval_only_tests(
 
     for i, item in enumerate(dataset):
         test_case = item["test_case"]
-        output = item["output"]
         evaluation = test_case["evaluation"]
-
         resolved_evaluators = (
-            _resolve_evaluators_for_test_case(evaluation, evaluators_registry)
-            if evaluation.get("type") == "response"
+            _resolve_evaluators_for_test_case(
+                evaluation,
+                _get_name_to_evaluator_dict(
+                    config,
+                    include_default=(evaluation.get("type") == "response"),
+                ),
+            )
+            if evaluation.get("type") in ("response", "conversation")
             else None
         )
 
-        # Apply the same history preprocessing the live flow uses, so the
-        # judge sees the same conversation shape in both modes. ``strict=False``
-        # keeps real tool responses already present in eval-only datasets.
         preprocessed_history = preprocess_conversation_history(
             test_case["history"], tools, strict=False
         )
-
+        output = item["output"]
         metrics = await evaluate_test_case_output(
             chat_history=preprocessed_history,
             evaluation=evaluation,
@@ -1304,9 +1360,7 @@ async def run_eval_only_tests(
         with open(results_file_path, "w") as f:
             json.dump(results, f, indent=4)
 
-    passed, total = _write_test_results_outputs(
-        results, output_dir, evaluators_registry
-    )
+    passed, total = _write_test_results_outputs(results, output_dir, name_to_evaluator)
     pct = (passed / total * 100) if total else 0.0
     _print_and_log(
         f"\n✅ Total Passed: {passed}/{total} ({pct:.1f}%)", print_log_save_path

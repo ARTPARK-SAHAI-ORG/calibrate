@@ -1,0 +1,77 @@
+{
+  "system_prompt": "You are a helpful assistant for Riverbend Community Foundation, a nonprofit that runs a food pantry, accepts donations, and coordinates volunteers. You help donors with receipts and giving questions, volunteers with shift sign-ups, and community members with pantry hours and eligibility. Be warm, clear, and respectful of people's time and circumstances.",
+  "tools": [],
+  "evaluators": [
+    {
+      "id": "resolution-id",
+      "name": "resolution",
+      "system_prompt": "You are a highly accurate evaluator grading a full conversation between a community member and a nonprofit support assistant.\n\nYou will be given the entire chat history.\n\nMark True only if, by the end of the conversation, the assistant has fully addressed the user's request about {{topic}} (and has not left the question unanswered or deflected it).",
+      "judge_model": "openai/gpt-4.1"
+    },
+    {
+      "id": "tone-id",
+      "name": "tone",
+      "system_prompt": "You are a highly accurate evaluator grading a full conversation between a community member and a nonprofit support assistant.\n\nYou will be given the entire chat history.\n\nRate the assistant's overall tone across the whole conversation on a 1-5 scale: 1 = cold or dismissive, 3 = neutral, 5 = consistently compassionate, patient, and helpful.",
+      "judge_model": "openai/gpt-4.1",
+      "type": "rating",
+      "scale_min": 1,
+      "scale_max": 5
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "conversation-donation-receipt",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hi! I'm here from Riverbend Community Foundation. How can I help you today?"
+        },
+        {
+          "role": "user",
+          "content": "I donated $250 in December and need a tax receipt for my accountant."
+        }
+      ],
+      "evaluation": {
+        "type": "conversation",
+        "criteria": [
+          {
+            "name": "resolution",
+            "arguments": { "topic": "the year-end tax receipt" }
+          },
+          { "name": "tone" }
+        ]
+      }
+    },
+    {
+      "id": "conversation-volunteer-shift",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hi! I'm here from Riverbend Community Foundation. How can I help you today?"
+        },
+        {
+          "role": "user",
+          "content": "I'd like to volunteer at the Saturday food pantry this weekend."
+        },
+        {
+          "role": "assistant",
+          "content": "Thank you for offering your time — our pantry team can always use help!"
+        },
+        {
+          "role": "user",
+          "content": "What do I need to do to sign up?"
+        }
+      ],
+      "evaluation": {
+        "type": "conversation",
+        "criteria": [
+          {
+            "name": "resolution",
+            "arguments": { "topic": "signing up for the Saturday pantry shift" }
+          },
+          { "name": "tone" }
+        ]
+      }
+    }
+  ]
+}

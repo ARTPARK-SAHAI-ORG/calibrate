@@ -121,13 +121,15 @@ This sends a test message and checks that the response matches the required form
 
 An array of test cases to evaluate your agent on. Each test case has:
 
-| Key          | Type   | Description                                                                       |
-| ------------ | ------ | --------------------------------------------------------------------------------- |
-| `id`         | string | Optional unique test-case id. When provided, results include `test_case_id`.       |
-| `history`    | array  | Conversation history as context for the agent to generate the next output         |
-| `evaluation` | object | The criteria for evaluating the agent's output — either a tool call or a response |
+| Key          | Type   | Description                                                                              |
+| ------------ | ------ | ---------------------------------------------------------------------------------------- |
+| `id`         | string | Optional unique test-case id. When provided, results include `test_case_id`.             |
+| `history`    | array  | Conversation history as context for the agent to generate the next output                |
+| `evaluation` | object | The criteria for evaluating the agent — a tool call, a response, or a whole conversation |
 
-**Tool call test** — verifies the agent calls the correct tool with expected arguments:
+### Tool call test
+
+Verifies the agent calls the correct tools with the expected arguments:
 
 ```jsonc
 {
@@ -159,7 +161,11 @@ An array of test cases to evaluate your agent on. Each test case has:
   called without checking the arguments.
 </Note>
 
-**Response test** — verifies the agent's response meets the criteria defined (evaluated by an LLM judge):
+For agent connection, your agent owns its tools internally — there is no need to define them in the config. The `history` and `evaluation` keys work identically for both setup options.
+
+### Response test
+
+Given a conversation history, this test verifies that the agent's response meets the evaluation criteria defined by you (evaluated by an LLM judge):
 
 ```jsonc
 {
@@ -176,7 +182,29 @@ An array of test cases to evaluate your agent on. Each test case has:
 }
 ```
 
-For agent connection, your agent owns its tools internally — there is no need to define them in the config. The `history` and `evaluation` keys work identically for both setup options.
+### Conversation test
+
+Like a [response test](#response-test), the agent is run on the `history` to produce its next reply — but instead of grading only that reply, the **entire resulting conversation** (history + the new reply) is graded by the simulation judge. Use this when correctness depends on the whole exchange, not just the latest turn. As with response tests, `history` ends at the user's turn that the agent should answer.
+
+```jsonc
+{
+  // conversation test — agent replies, then the whole conversation is judged
+  "id": "test-id-1",
+  "history": [
+    { "role": "assistant", "content": "Hello! How can I help you today?" },
+    { "role": "user", "content": "I'd like to check order ORD-12345." },
+  ],
+  "evaluation": {
+    "type": "conversation",
+    "criteria": [
+      { "name": "resolution", "arguments": { "topic": "order status" } },
+      { "name": "tone" },
+    ],
+  },
+}
+```
+
+See [`examples/llm/config-conversation.json`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-conversation.json) for a full template.
 
 ---
 
@@ -260,7 +288,7 @@ The simplest setup needs no top-level `evaluators`. Pass `criteria` as a string 
 | Key                          | Type    | Description                                                                                                                        |
 | ---------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `evaluators`                 | array   | Top-level list of evaluators. Each one becomes its own LLM call per test case.                                                     |
-| `evaluators[].id`            | string  | Optional unique id. Results echo it as `evaluator_id`; output `config.json` includes raw `evaluators` and an `evaluators_map`.       |
+| `evaluators[].id`            | string  | Optional unique id. Results echo it as `evaluator_id`; output `config.json` includes raw `evaluators` and an `evaluators_map`.     |
 | `evaluators[].name`          | string  | Unique evaluator name. Test cases reference it via `evaluation.criteria[].name`.                                                   |
 | `evaluators[].system_prompt` | string  | Full system prompt for this evaluator. Supports `{{variable}}` placeholders that are substituted from the test case's `arguments`. |
 | `evaluators[].judge_model`   | string  | OpenRouter model id for this evaluator (default: `openai/gpt-5.4-mini`).                                                           |

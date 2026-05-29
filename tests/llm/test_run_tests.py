@@ -418,24 +418,24 @@ class TestEvaluatorsRegistryLegacyDefaultAlias(unittest.TestCase):
     """
 
     def test_default_alias_resolves_to_implicit_default(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        registry = _build_evaluators_registry({})
+        registry = _get_name_to_evaluator_dict({})
         self.assertIn("default", registry)
         self.assertIs(registry["default"], DEFAULT_LLM_TEST_EVALUATOR)
         # Canonical name still present.
         self.assertIn(DEFAULT_LLM_TEST_EVALUATOR["name"], registry)
 
     def test_user_evaluator_named_default_overrides_alias(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
 
         custom = {
             "name": "default",
             "system_prompt": "user-defined override",
             "judge_model": "openai/gpt-4.1",
         }
-        registry = _build_evaluators_registry({"evaluators": [custom]})
+        registry = _get_name_to_evaluator_dict({"evaluators": [custom]})
         # User override wins.
         self.assertIs(registry["default"], custom)
 
@@ -443,17 +443,18 @@ class TestEvaluatorsRegistryLegacyDefaultAlias(unittest.TestCase):
         """A test case's ``criteria`` referencing ``{"name": "default"}`` must
         still render successfully and produce the implicit default evaluator."""
         from calibrate.llm.run_tests import (
-            _build_evaluators_registry,
+            _get_name_to_evaluator_dict,
             _resolve_evaluators_for_test_case,
         )
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        registry = _build_evaluators_registry({})
         evaluation = {
             "type": "response",
             "criteria": [{"name": "default", "arguments": {"criteria": "be polite"}}],
         }
-        rendered = _resolve_evaluators_for_test_case(evaluation, registry)
+        rendered = _resolve_evaluators_for_test_case(
+            evaluation, _get_name_to_evaluator_dict({"evaluators": []})
+        )
         self.assertEqual(len(rendered), 1)
         # Resolved evaluator carries the canonical name (not the alias).
         self.assertEqual(rendered[0]["name"], DEFAULT_LLM_TEST_EVALUATOR["name"])

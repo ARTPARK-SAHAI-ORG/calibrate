@@ -1,0 +1,68 @@
+[
+  {
+    "test_case": {
+      "id": "conversation-donation-receipt",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hi! I'm here from Riverbend Community Foundation. How can I help you today?"
+        },
+        {
+          "role": "user",
+          "content": "I donated $250 in December and need a tax receipt for my accountant."
+        }
+      ],
+      "evaluation": {
+        "type": "conversation",
+        "criteria": [
+          {
+            "name": "resolution",
+            "arguments": { "topic": "the year-end tax receipt" }
+          },
+          { "name": "tone" }
+        ]
+      }
+    },
+    "output": {
+      "response": "Thank you for supporting Riverbend! I found your $250 gift from December 12 — I've emailed a PDF tax receipt to the address on file. If you need it resent or sent to a different email, just let me know.",
+      "tool_calls": []
+    }
+  },
+  {
+    "test_case": {
+      "id": "conversation-volunteer-shift",
+      "history": [
+        {
+          "role": "assistant",
+          "content": "Hi! I'm here from Riverbend Community Foundation. How can I help you today?"
+        },
+        {
+          "role": "user",
+          "content": "I'd like to volunteer at the Saturday food pantry this weekend."
+        },
+        {
+          "role": "assistant",
+          "content": "Thank you for offering your time — our pantry team can always use help!"
+        },
+        {
+          "role": "user",
+          "content": "What do I need to do to sign up?"
+        }
+      ],
+      "evaluation": {
+        "type": "conversation",
+        "criteria": [
+          {
+            "name": "resolution",
+            "arguments": { "topic": "signing up for the Saturday pantry shift" }
+          },
+          { "name": "tone" }
+        ]
+      }
+    },
+    "output": {
+      "response": "Please complete our 10-minute volunteer waiver at riverbend.org/volunteer, then choose the Saturday 9am–1pm pantry shift on March 15. You'll get a confirmation email with parking and check-in details. Wear closed-toe shoes and we'll provide a name tag when you arrive.",
+      "tool_calls": []
+    }
+  }
+]

@@ -48,27 +48,27 @@ class TestNormalizeCriteriaRefs(unittest.TestCase):
             _normalize_criteria_refs(42)
 
 
-class TestBuildEvaluatorsRegistry(unittest.TestCase):
+class TestGetNameToEvaluatorDict(unittest.TestCase):
     def test_default_registry(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
-        reg = _build_evaluators_registry({"evaluators": []})
+        reg = _get_name_to_evaluator_dict({"evaluators": []})
         self.assertIn(DEFAULT_LLM_TEST_EVALUATOR["name"], reg)
         self.assertIn("default", reg)
 
     def test_user_evaluator_override(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
 
-        reg = _build_evaluators_registry({"evaluators": [_bin_ev("custom")]})
+        reg = _get_name_to_evaluator_dict({"evaluators": [_bin_ev("custom")]})
         self.assertIn("custom", reg)
 
     def test_default_alias_conflict_raises(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
         from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
 
         with self.assertRaises(ValueError):
-            _build_evaluators_registry({
+            _get_name_to_evaluator_dict({
                 "evaluators": [
                     _bin_ev("default"),
                     _bin_ev(DEFAULT_LLM_TEST_EVALUATOR["name"]),
@@ -76,38 +76,83 @@ class TestBuildEvaluatorsRegistry(unittest.TestCase):
             })
 
     def test_missing_required_field_raises(self):
-        from calibrate.llm.run_tests import _build_evaluators_registry
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
 
         with self.assertRaises(ValueError):
-            _build_evaluators_registry({"evaluators": [{"name": "noprompt"}]})
+            _get_name_to_evaluator_dict({"evaluators": [{"name": "noprompt"}]})
 
 
 class TestResolveEvaluatorsForTestCase(unittest.TestCase):
     def test_unknown_evaluator_raises(self):
         from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
             _resolve_evaluators_for_test_case,
-            _build_evaluators_registry,
         )
 
-        reg = _build_evaluators_registry({"evaluators": []})
         with self.assertRaises(ValueError):
             _resolve_evaluators_for_test_case(
-                {"criteria": [{"name": "noexist"}]}, reg
+                {"type": "response", "criteria": [{"name": "noexist"}]},
+                _get_name_to_evaluator_dict({"evaluators": []}),
             )
 
     def test_resolves_with_template(self):
         from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
             _resolve_evaluators_for_test_case,
-            _build_evaluators_registry,
         )
 
-        reg = _build_evaluators_registry({"evaluators": [
-            {"name": "x", "system_prompt": "Check {{criteria}}", "judge_model": "m"}
-        ]})
         result = _resolve_evaluators_for_test_case(
-            {"criteria": [{"name": "x", "arguments": {"criteria": "be polite"}}]}, reg
+            {
+                "type": "response",
+                "criteria": [{"name": "x", "arguments": {"criteria": "be polite"}}],
+            },
+            _get_name_to_evaluator_dict({
+                "evaluators": [
+                    {"name": "x", "system_prompt": "Check {{criteria}}", "judge_model": "m"}
+                ]
+            }),
         )
         self.assertEqual(result[0]["system_prompt"], "Check be polite")
+
+    def test_response_uses_implicit_default(self):
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
+
+        resolved = _resolve_evaluators_for_test_case(
+            {"type": "response", "criteria": "be nice"},
+            _get_name_to_evaluator_dict({"evaluators": []}),
+        )
+        self.assertEqual(resolved[0]["name"], "correctness")
+
+    def test_conversation_uses_user_evaluator(self):
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
+
+        resolved = _resolve_evaluators_for_test_case(
+            {"type": "conversation", "criteria": [{"name": "tone"}]},
+            _get_name_to_evaluator_dict(
+                {"evaluators": [_bin_ev("tone")]}, include_default=False
+            ),
+        )
+        self.assertEqual(resolved[0]["name"], "tone")
+
+    def test_conversation_rejects_implicit_default(self):
+        from calibrate.llm.run_tests import (
+            _get_name_to_evaluator_dict,
+            _resolve_evaluators_for_test_case,
+        )
+
+        with self.assertRaises(ValueError):
+            _resolve_evaluators_for_test_case(
+                {"type": "conversation", "criteria": "be nice"},
+                _get_name_to_evaluator_dict(
+                    {"evaluators": [_bin_ev("tone")]}, include_default=False
+                ),
+            )
 
 
 class TestDisplayLabel(unittest.TestCase):
@@ -398,7 +443,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
                 response="Hi",
                 tool_calls=[],
                 evaluators=[_bin_ev("x")],
-                fallback_judge_model="m",
                 no_response_reasoning_with_tool_calls="x",
                 no_response_reasoning_no_tool_calls="y",
             )
@@ -417,7 +461,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
                 response="Hi",
                 tool_calls=[],
                 evaluators=[_bin_ev("x"), _bin_ev("y")],
-                fallback_judge_model="m",
                 no_response_reasoning_with_tool_calls="x",
                 no_response_reasoning_no_tool_calls="y",
             )
@@ -432,7 +475,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
             response="",
             tool_calls=[],
             evaluators=[_bin_ev("x")],
-            fallback_judge_model="m",
             no_response_reasoning_with_tool_calls="WITH",
             no_response_reasoning_no_tool_calls="NONE",
         )
@@ -447,7 +489,6 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
             response="",
             tool_calls=[{"tool": "x"}],
             evaluators=[_bin_ev("x")],
-            fallback_judge_model="m",
             no_response_reasoning_with_tool_calls="WITH",
             no_response_reasoning_no_tool_calls="NONE",
         )
@@ -901,6 +942,390 @@ class TestMainCLI(unittest.IsolatedAsyncioTestCase):
                                   "metrics": {"passed": 0, "total": 0}, "results": [],
                               })):
                 await RT.main()
+
+
+class TestGetNameToEvaluatorDictNoDefault(unittest.TestCase):
+    def test_excludes_implicit_default(self):
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
+        from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
+
+        reg = _get_name_to_evaluator_dict(
+            {"evaluators": [_bin_ev("tone")]}, include_default=False
+        )
+        self.assertIn("tone", reg)
+        self.assertNotIn(DEFAULT_LLM_TEST_EVALUATOR["name"], reg)
+        self.assertNotIn("default", reg)
+
+    def test_default_included_by_default(self):
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
+        from calibrate.judges import DEFAULT_LLM_TEST_EVALUATOR
+
+        reg = _get_name_to_evaluator_dict({"evaluators": [_bin_ev("tone")]})
+        self.assertIn(DEFAULT_LLM_TEST_EVALUATOR["name"], reg)
+        self.assertIn("default", reg)
+        self.assertIn("tone", reg)
+
+    def test_empty_no_default(self):
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
+
+        self.assertEqual(
+            _get_name_to_evaluator_dict({"evaluators": []}, include_default=False), {}
+        )
+
+    def test_missing_fields_raise(self):
+        from calibrate.llm.run_tests import _get_name_to_evaluator_dict
+
+        with self.assertRaises(ValueError):
+            _get_name_to_evaluator_dict(
+                {"evaluators": [{"name": "x"}]}, include_default=False
+            )
+
+
+class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
+    _NO_REPLY = "no reply"
+
+    async def test_binary_pass(self):
+        from calibrate.llm import run_tests as RT
+
+        with patch.object(RT, "evaluate_simuation",
+                          AsyncMock(return_value={"tone": {"reasoning": "good", "match": True}})):
+            metrics = await RT._evaluate_conversation(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluators=[_bin_ev("tone")],
+                output={"response": "hi", "tool_calls": []},
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
+            )
+        self.assertTrue(metrics["passed"])
+        self.assertEqual(metrics["reasoning"], "All evaluators passed")
+        self.assertEqual(metrics["judge_results"]["tone"]["match"], True)
+
+    async def test_binary_fail_uses_failing_reasoning(self):
+        from calibrate.llm import run_tests as RT
+
+        with patch.object(RT, "evaluate_simuation",
+                          AsyncMock(return_value={"tone": {"reasoning": "rude", "match": False}})):
+            metrics = await RT._evaluate_conversation(
+                chat_history=[], evaluators=[_bin_ev("tone")],
+                output={"response": "x", "tool_calls": []},
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
+            )
+        self.assertFalse(metrics["passed"])
+        self.assertEqual(metrics["reasoning"], "rude")
+
+    async def test_rating_below_max_fails(self):
+        from calibrate.llm import run_tests as RT
+
+        with patch.object(RT, "evaluate_simuation",
+                          AsyncMock(return_value={"qual": {"reasoning": "ok", "score": 3}})):
+            metrics = await RT._evaluate_conversation(
+                chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
+                output={"response": "x", "tool_calls": []},
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
+            )
+        self.assertFalse(metrics["passed"])
+
+    async def test_rating_at_max_passes(self):
+        from calibrate.llm import run_tests as RT
+
+        with patch.object(RT, "evaluate_simuation",
+                          AsyncMock(return_value={"qual": {"reasoning": "great", "score": 5}})):
+            metrics = await RT._evaluate_conversation(
+                chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
+                output={"response": "x", "tool_calls": []},
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
+            )
+        self.assertTrue(metrics["passed"])
+
+    async def test_output_appended_before_judging(self):
+        from calibrate.llm import run_tests as RT
+
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            await RT._evaluate_conversation(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluators=[_bin_ev("tone")],
+                output={"response": "hello", "tool_calls": []},
+                no_response_reasoning_no_tool_calls=self._NO_REPLY,
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "hello"})
+
+
+class TestEvaluateTestCaseOutputConversation(unittest.IsolatedAsyncioTestCase):
+    async def test_dispatches_to_simulation_judge(self):
+        from calibrate.llm import run_tests as RT
+
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            metrics = await RT.evaluate_test_case_output(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                output={"response": "hi", "tool_calls": []},
+                evaluators=[_bin_ev("tone")],
+            )
+        sim.assert_awaited_once()
+        self.assertTrue(metrics["passed"])
+        self.assertIn("judge_results", metrics)
+
+    async def test_live_output_appended_via_evaluate(self):
+        from calibrate.llm import run_tests as RT
+
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            await RT.evaluate_test_case_output(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                output={"response": "hello", "tool_calls": []},
+                evaluators=[_bin_ev("tone")],
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "hello"})
+
+
+class TestRunTestConversation(unittest.IsolatedAsyncioTestCase):
+    async def test_runs_inference_and_judges_full_conversation(self):
+        from calibrate.llm import run_tests as RT
+
+        # Live mode: the agent generates the next reply, which is appended and
+        # the whole conversation is judged by the simulation judge.
+        infer = AsyncMock(return_value={
+            "response": "It ships tomorrow.", "tool_calls": [], "captured_errors": [],
+        })
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "run_inference", infer), \
+             patch.object(RT, "evaluate_simuation", sim):
+            result = await RT.run_test(
+                chat_history=[{"role": "user", "content": "when does my order ship?"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                system_prompt="x", model="m", provider="openrouter",
+                tools=[], unique_id="u",
+                evaluators=[_bin_ev("tone")],
+            )
+        infer.assert_awaited_once()
+        # The generated reply is included as output and appended to the judged
+        # conversation.
+        self.assertEqual(result["output"]["response"], "It ships tomorrow.")
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
+        self.assertTrue(result["metrics"]["passed"])
+
+    async def test_tool_calls_appended_in_function_shape(self):
+        from calibrate.llm import run_tests as RT
+
+        infer = AsyncMock(return_value={
+            "response": "",
+            "tool_calls": [{"tool": "check_order", "arguments": '{"id": "1"}'}],
+            "captured_errors": [],
+        })
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "run_inference", infer), \
+             patch.object(RT, "evaluate_simuation", sim):
+            await RT.run_test(
+                chat_history=[{"role": "user", "content": "check order 1"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                system_prompt="x", model="m", provider="openrouter",
+                tools=[], unique_id="u",
+                evaluators=[_bin_ev("tone")],
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(
+            judged[-1]["tool_calls"],
+            [{"function": {"name": "check_order", "arguments": '{"id": "1"}'}}],
+        )
+
+
+class TestRunTestExternalConversation(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_reply_fails_without_judging(self):
+        from calibrate.llm import run_tests as RT
+
+        agent = MagicMock()
+        agent.call = AsyncMock(return_value={"response": "", "tool_calls": []})
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            result = await RT.run_test_external(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                agent=agent,
+                evaluators=[_bin_ev("tone")],
+            )
+        # A non-responsive agent fails outright; the judge is never consulted.
+        sim.assert_not_called()
+        self.assertFalse(result["metrics"]["passed"])
+        self.assertFalse(result["metrics"]["judge_results"]["tone"]["match"])
+
+    async def test_reply_judged_as_full_conversation(self):
+        from calibrate.llm import run_tests as RT
+
+        agent = MagicMock()
+        agent.call = AsyncMock(return_value={"response": "It ships tomorrow.", "tool_calls": []})
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            result = await RT.run_test_external(
+                chat_history=[{"role": "user", "content": "when does it ship?"}],
+                evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
+                agent=agent,
+                evaluators=[_bin_ev("tone")],
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
+        self.assertTrue(result["metrics"]["passed"])
+
+
+class TestAggregateCriteriaConversation(unittest.TestCase):
+    def test_conversation_cases_aggregated(self):
+        from calibrate.llm.run_tests import _aggregate_criteria
+
+        registry = {"tone": dict(_bin_ev("tone"), id="ev1")}
+        results = [
+            {
+                "test_case": {"evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]}},
+                "metrics": {"judge_results": {"tone": {"match": True}}},
+            },
+            {
+                "test_case": {"evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]}},
+                "metrics": {"judge_results": {"tone": {"match": False}}},
+            },
+        ]
+        agg = _aggregate_criteria(results, registry)
+        self.assertEqual(agg["tone"]["passed"], 1)
+        self.assertEqual(agg["tone"]["total"], 2)
+
+
+class TestValidateConversationEvalOnly(unittest.TestCase):
+    def test_conversation_requires_output_like_response(self):
+        from calibrate.llm.run_tests import validate_llm_eval_only_dataset
+
+        is_valid, _ = validate_llm_eval_only_dataset([
+            {
+                "test_case": {
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
+                },
+            }
+        ])
+        self.assertFalse(is_valid)
+
+    def test_conversation_still_requires_history(self):
+        from calibrate.llm.run_tests import validate_llm_eval_only_dataset
+
+        is_valid, _ = validate_llm_eval_only_dataset([
+            {"test_case": {"evaluation": {"type": "conversation"}}}
+        ])
+        self.assertFalse(is_valid)
+
+
+class TestRunEvalOnlyConversation(unittest.IsolatedAsyncioTestCase):
+    async def test_conversation_eval_only(self):
+        from calibrate.llm.run_tests import run_eval_only_tests
+        from calibrate.llm import run_tests as RT
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "evaluate_simuation",
+                          AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})):
+            result = await run_eval_only_tests(
+                config={"evaluators": [_bin_ev("tone")]},
+                dataset=[
+                    {
+                        "test_case": {
+                            "id": "tc1",
+                            "history": [{"role": "user", "content": "hi"}],
+                            "evaluation": {
+                                "type": "conversation",
+                                "criteria": [{"name": "tone"}],
+                            },
+                        },
+                        "output": {"response": "hello", "tool_calls": []},
+                    },
+                ],
+                output_dir=tmp,
+            )
+            self.assertEqual(result["passed"], 1)
+            self.assertEqual(result["total"], 1)
+            self.assertEqual(result["results"][0]["output"]["response"], "hello")
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+            self.assertIn("tone", metrics["criteria"])
+
+
+class TestConversationJudgeModel(unittest.IsolatedAsyncioTestCase):
+    async def test_no_fallback_model_override(self):
+        from calibrate.llm import run_tests as RT
+
+        # _evaluate_conversation does not override the judge model — each
+        # evaluator uses its own judge_model, otherwise the simulation judge's
+        # own default applies.
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with patch.object(RT, "evaluate_simuation", sim):
+            await RT._evaluate_conversation(
+                chat_history=[],
+                evaluators=[_bin_ev("tone")],
+                output={"response": "hi", "tool_calls": []},
+                no_response_reasoning_no_tool_calls="",
+            )
+        self.assertNotIn("fallback_model", sim.await_args.kwargs)
+
+
+class TestConversationEvalOnlyNotMutated(unittest.IsolatedAsyncioTestCase):
+    async def test_captured_transcript_judged_as_is(self):
+        from calibrate.llm.run_tests import run_eval_only_tests
+        from calibrate.llm import run_tests as RT
+
+        # Same preprocess as response eval-only (strict=False): missing tool
+        # responses are filled in before judging.
+        history = [
+            {"role": "user", "content": "check my order"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {"id": "c1", "function": {"name": "check_order", "arguments": "{}"}}
+                ],
+            },
+        ]
+        sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "evaluate_simuation", sim):
+            await run_eval_only_tests(
+                config={"evaluators": [_bin_ev("tone")]},
+                dataset=[{
+                    "test_case": {
+                        "id": "c1",
+                        "history": history,
+                        "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
+                    },
+                    "output": {"response": "It ships tomorrow.", "tool_calls": []},
+                }],
+                output_dir=tmp,
+            )
+        judged = sim.await_args.kwargs["conversation"]
+        self.assertEqual(judged[2]["role"], "tool")
+        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
+
+
+class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):
+    async def test_no_tools_or_system_prompt_keys(self):
+        from calibrate.llm import run_tests as RT
+
+        # A conversation-only suite need not define tools or system_prompt; in
+        # live mode the agent still runs to produce the next reply.
+        infer = AsyncMock(return_value={
+            "response": "hello", "tool_calls": [], "captured_errors": [],
+        })
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "run_inference", infer), \
+             patch.object(RT, "evaluate_simuation",
+                          AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})):
+            config = {
+                "evaluators": [_bin_ev("tone")],
+                "test_cases": [{
+                    "id": "c1",
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
+                }],
+            }
+            result = await RT.run_model_tests(
+                model="m", provider="openrouter", config=config, output_dir=tmp,
+            )
+        self.assertEqual(result["metrics"]["passed"], 1)
 
 
 if __name__ == "__main__":

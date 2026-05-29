@@ -149,10 +149,17 @@ runs rely on them.
 
 ```bash
 uv sync --extra dev                  # one-time
-uv run pytest tests/                 # all tests
-uv run pytest tests/stt              # subset
+uv run pytest tests/stt              # subset (prefer this)
 uv run pytest tests/stt/test_eval.py::TestSTTValidateInputDir -v
+uv run pytest tests/                 # full suite (slow — avoid unless needed)
 ```
+
+**Run only the tests relevant to your change, not the whole suite.** The full
+suite is slow; scope your run to the mirrored test file(s) for the modules you
+touched (e.g. a change to `calibrate/llm/run_tests.py` →
+`uv run pytest tests/llm/test_run_tests.py tests/llm/test_run_tests_extra.py`).
+CI runs the whole suite on the PR — let it be the backstop for the full run
+rather than running everything locally on every change.
 
 Tests are pure unit tests — **no real API calls** are ever made:
 - All provider SDK clients are patched with `AsyncMock`/`MagicMock`.
@@ -192,9 +199,13 @@ For any function block you add or modify:
    boundary values, concurrent / resume paths if applicable). Put them in the
    mirrored test file under `tests/` (e.g. a change to
    `calibrate/stt/eval.py` goes in `tests/stt/test_eval.py`).
-2. **Run the suite and confirm everything passes** with `uv run pytest tests/`
-   (or a narrower subset while iterating). Don't rely on the type checker or
-   "it looks right" — the test must actually exercise the new path.
+2. **Run only the scoped tests for what you changed** — the mirrored test
+   file(s) for the modules you touched (e.g. a change to
+   `calibrate/llm/run_tests.py` → run `tests/llm/test_run_tests.py` and
+   `tests/llm/test_run_tests_extra.py`), not the whole `tests/` suite, which is
+   slow. Confirm they pass. Don't rely on the type checker or "it looks right"
+   — the test must actually exercise the new path. CI runs the full suite on
+   the PR, so let that be the backstop for the complete run.
 3. **Only after tests pass** should you report the task as done. If a change
    is genuinely untestable (e.g. a CLI flag wired through to a third-party
    SDK), say so explicitly in the response rather than implying coverage.
