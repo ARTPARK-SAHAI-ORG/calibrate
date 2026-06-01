@@ -47,6 +47,9 @@ export interface HistoryMessage {
 export interface ToolCall {
   tool: string;
   arguments: Record<string, unknown>;
+  // Optional result the tool returned when an agent connection executed it.
+  // Display-only — never affects evaluation. Internal LLM runs never set it.
+  output?: unknown;
 }
 
 // Per-evaluator result keyed by evaluator name. Binary evaluators have a

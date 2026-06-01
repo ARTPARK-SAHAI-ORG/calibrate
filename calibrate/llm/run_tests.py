@@ -1241,6 +1241,10 @@ def validate_llm_eval_only_dataset(
     Each item must be ``{"test_case": {history, evaluation}, "output":
     {response, tool_calls}}``. Returns ``(is_valid, error_message)``; the
     caller is expected to surface the message and exit non-zero on failure.
+
+    Each entry in ``output.tool_calls`` may optionally carry an ``output``
+    field (the tool's own result). It is accepted but not validated — it is
+    preserved for display/review only and never affects evaluation.
     """
     if not isinstance(dataset, list):
         return False, "Dataset must be a JSON list of {test_case, output} items"

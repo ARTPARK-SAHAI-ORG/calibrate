@@ -79,6 +79,30 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result["tool_calls"]), 1)
         self.assertEqual(result["tool_calls"][0]["tool"], "get_weather")
 
+    async def test_preserves_tool_call_output(self):
+        """Optional per-tool-call ``output`` rides through ``call`` verbatim."""
+        from calibrate.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        fake_body = {
+            "response": None,
+            "tool_calls": [
+                {
+                    "tool": "get_weather",
+                    "arguments": {"location": "Mumbai"},
+                    "output": {"temp": 31, "condition": "humid"},
+                }
+            ],
+        }
+
+        ctx, _ = _patch_httpx(fake_body)
+        with ctx:
+            result = await agent.call([{"role": "user", "content": "Weather?"}])
+
+        self.assertEqual(
+            result["tool_calls"][0]["output"], {"temp": 31, "condition": "humid"}
+        )
+
     async def test_sends_auth_header(self):
         from calibrate.connections import TextAgentConnection
 
@@ -288,6 +312,19 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["ok"])
         self.assertIsNone(result["sample_output"]["response"])
         self.assertEqual(result["sample_output"]["tool_calls"], [{"tool": "fn", "arguments": {}}])
+
+    async def test_verify_preserves_tool_call_output(self):
+        """``verify`` accepts and echoes an optional per-tool-call ``output``."""
+        from calibrate.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        tool_call = {"tool": "fn", "arguments": {}, "output": {"status": "ok"}}
+        ctx, _ = _patch_httpx({"tool_calls": [tool_call]})
+        with ctx:
+            result = await agent.verify()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["sample_output"]["tool_calls"], [tool_call])
 
     async def test_verify_fails_empty_response(self):
         from calibrate.connections import TextAgentConnection

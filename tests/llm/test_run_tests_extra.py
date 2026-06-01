@@ -626,6 +626,32 @@ class TestValidateLLMEvalOnlyDataset(unittest.TestCase):
         ])
         self.assertTrue(is_valid)
 
+    def test_valid_with_tool_call_output(self):
+        """Optional per-tool-call ``output`` is accepted by the validator."""
+        from calibrate.llm.run_tests import validate_llm_eval_only_dataset
+
+        is_valid, err = validate_llm_eval_only_dataset([
+            {
+                "test_case": {
+                    "history": [{"role": "user", "content": "weather?"}],
+                    "evaluation": {"type": "tool_call", "tool_calls": [
+                        {"tool": "get_weather", "arguments": {"city": "NYC"}}
+                    ]},
+                },
+                "output": {
+                    "response": None,
+                    "tool_calls": [
+                        {
+                            "tool": "get_weather",
+                            "arguments": {"city": "NYC"},
+                            "output": {"temp": 72},
+                        }
+                    ],
+                },
+            }
+        ])
+        self.assertTrue(is_valid, err)
+
     def test_not_a_list(self):
         from calibrate.llm.run_tests import validate_llm_eval_only_dataset
 

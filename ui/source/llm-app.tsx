@@ -672,10 +672,21 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
   };
 
   // ── Format tool calls as string ──
-  const formatToolCalls = (toolCalls: ToolCall[]): string => {
+  // ``includeOutput`` appends the tool's own result (``=> <output>``) when the
+  // agent supplied one. Only used for actual output, not the expected criteria.
+  const formatToolCalls = (
+    toolCalls: ToolCall[],
+    includeOutput = false
+  ): string => {
     if (!toolCalls || toolCalls.length === 0) return "";
     return toolCalls
-      .map((tc) => `${tc.tool}(${JSON.stringify(tc.arguments)})`)
+      .map((tc) => {
+        const call = `${tc.tool}(${JSON.stringify(tc.arguments)})`;
+        if (includeOutput && tc.output !== undefined) {
+          return `${call} => ${JSON.stringify(tc.output)}`;
+        }
+        return call;
+      })
       .join(", ");
   };
 
@@ -723,7 +734,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
             if (r.output?.response) {
               actualOutput = r.output.response;
             } else if (r.output?.tool_calls && r.output.tool_calls.length > 0) {
-              actualOutput = formatToolCalls(r.output.tool_calls);
+              actualOutput = formatToolCalls(r.output.tool_calls, true);
             }
 
             // Build evaluation criteria string. Under the new evaluators

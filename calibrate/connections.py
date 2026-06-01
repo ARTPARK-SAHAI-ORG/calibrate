@@ -57,6 +57,13 @@ class TextAgentConnection:
         • Tool call only   → ``{"response": null,  "tool_calls": [{...}]}``
         • Both             → ``{"response": "...", "tool_calls": [{...}]}``
 
+        Each tool call may optionally carry an ``output`` field — the result the
+        tool actually returned when the agent executed it. It is any JSON value
+        and is preserved for display/review only; it never affects evaluation::
+
+            {"tool": "get_weather", "arguments": {"city": "NYC"},
+             "output": {"temp": 72, "condition": "sunny"}}
+
     Use :meth:`verify` to confirm the endpoint is reachable and returns the
     expected format before running a full evaluation.
 
@@ -231,6 +238,8 @@ class TextAgentConnection:
 
         Returns:
             dict with ``response`` (str | None) and ``tool_calls`` (list) keys.
+            Each tool call dict is passed through verbatim, so an optional
+            ``output`` field (the tool's own result) is preserved for review.
 
         Raises:
             RuntimeError: On connection error, timeout, non-200 status, or
