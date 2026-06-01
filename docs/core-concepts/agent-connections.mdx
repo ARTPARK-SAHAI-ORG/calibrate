@@ -79,6 +79,24 @@ If your agent also returns tool calls, the expected output format expands to inc
 - `response` — The agent's text reply
 - `tool_calls` — An array of tool invocations, each with a `tool` name and `arguments` object
 
+Each tool call may also include an optional `output` field — the result the
+tool returned when your agent ran it. It can be any JSON value:
+
+```json
+{
+  "tool_calls": [
+    {
+      "tool": "get_schedule",
+      "arguments": { "child_age_weeks": 14 },
+      "output": { "next_visit_weeks": 14, "vaccines": ["OPV", "DPT"] }
+    }
+  ]
+}
+```
+
+`output` is optional and shown in the results view for review only — it never
+affects whether a test passes or fails.
+
 <Warning>
   Your agent's output **must** include either a `response` field or a
   `tool_calls` field
