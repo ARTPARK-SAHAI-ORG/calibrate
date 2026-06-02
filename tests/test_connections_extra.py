@@ -179,6 +179,46 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
                 await agent.call([{"role": "user", "content": "Hi"}])
         self.assertIn("HTTP 500", str(ctx.exception))
 
+    async def test_call_retries_http_500_twice_then_succeeds(self):
+        from calibrate.connections import TextAgentConnection
+        agent = TextAgentConnection(url="http://x")
+        responses = [
+            _mk_resp({}, status=500, text="server-down-1"),
+            _mk_resp({}, status=500, text="server-down-2"),
+            _mk_resp({"response": "ok"}, status=200),
+        ]
+        mock_client = _mk_mock_client(post_side_effect=responses)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await agent.call([{"role": "user", "content": "Hi"}])
+        self.assertEqual(result["response"], "ok")
+        self.assertEqual(mock_client.post.await_count, 3)
+
+    async def test_call_stops_after_three_http_500_responses(self):
+        from calibrate.connections import TextAgentConnection
+        agent = TextAgentConnection(url="http://x")
+        responses = [
+            _mk_resp({}, status=500, text="server-down-1"),
+            _mk_resp({}, status=500, text="server-down-2"),
+            _mk_resp({}, status=500, text="final-server-down"),
+        ]
+        mock_client = _mk_mock_client(post_side_effect=responses)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with self.assertRaises(RuntimeError) as ctx:
+                await agent.call([{"role": "user", "content": "Hi"}])
+        self.assertIn("Agent returned HTTP 500: final-server-down", str(ctx.exception))
+        self.assertEqual(mock_client.post.await_count, 3)
+
+    async def test_call_does_not_retry_non_500_http_errors(self):
+        from calibrate.connections import TextAgentConnection
+        agent = TextAgentConnection(url="http://x")
+        resp = _mk_resp({}, status=404, text="missing")
+        mock_client = _mk_mock_client(response=resp)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            with self.assertRaises(RuntimeError) as ctx:
+                await agent.call([{"role": "user", "content": "Hi"}])
+        self.assertIn("Agent returned HTTP 404: missing", str(ctx.exception))
+        self.assertEqual(mock_client.post.await_count, 1)
+
     async def test_call_invalid_json(self):
         from calibrate.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")

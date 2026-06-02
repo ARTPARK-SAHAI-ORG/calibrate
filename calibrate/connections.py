@@ -253,13 +253,17 @@ class TextAgentConnection:
         if model is not None:
             body["model"] = model
 
+        max_attempts = 3
         try:
             async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(
-                    self.url,
-                    json=body,
-                    headers=req_headers,
-                )
+                for attempt in range(max_attempts):
+                    resp = await client.post(
+                        self.url,
+                        json=body,
+                        headers=req_headers,
+                    )
+                    if resp.status_code != 500 or attempt == max_attempts - 1:
+                        break
         except httpx.ConnectError as e:
             raise RuntimeError(f"Could not connect to agent at {self.url}: {e}") from e
         except httpx.TimeoutException:
