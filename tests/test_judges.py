@@ -133,6 +133,38 @@ class TestRenderEvaluator(unittest.TestCase):
         self.assertEqual(ev["system_prompt"], "Evaluate: {{criteria}}")
 
 
+class TestToolCallParamEvaluator(unittest.TestCase):
+    def test_default_without_override(self):
+        from calibrate.judges import (
+            tool_call_param_evaluator,
+            DEFAULT_TOOL_CALL_PARAM_EVALUATOR,
+        )
+
+        ev = tool_call_param_evaluator()
+        self.assertEqual(ev["name"], "tool_call_parameter")
+        self.assertEqual(ev["type"], "binary")
+        self.assertEqual(
+            ev["judge_model"], DEFAULT_TOOL_CALL_PARAM_EVALUATOR["judge_model"]
+        )
+        self.assertIn("{{criteria}}", ev["system_prompt"])
+
+    def test_judge_model_override(self):
+        from calibrate.judges import tool_call_param_evaluator
+
+        ev = tool_call_param_evaluator("openai/gpt-4.1")
+        self.assertEqual(ev["judge_model"], "openai/gpt-4.1")
+
+    def test_does_not_mutate_default(self):
+        from calibrate.judges import (
+            tool_call_param_evaluator,
+            DEFAULT_TOOL_CALL_PARAM_EVALUATOR,
+        )
+
+        original = dict(DEFAULT_TOOL_CALL_PARAM_EVALUATOR)
+        tool_call_param_evaluator("some/other-model")
+        self.assertEqual(DEFAULT_TOOL_CALL_PARAM_EVALUATOR, original)
+
+
 # ---------------------------------------------------------------------------
 # Tool-name sanitization and API result shape
 # ---------------------------------------------------------------------------
