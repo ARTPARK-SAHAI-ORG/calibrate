@@ -665,6 +665,124 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
         self.assertFalse(res["match"])
 
 
+class TestNestedToolCallCriteria(unittest.TestCase):
+    @staticmethod
+    def _judge(match, reasoning="r"):
+        async def fake_text_judge(evaluators, user_prompt, *a, **k):
+            return {evaluators[0]["name"]: {"match": match, "reasoning": reasoning}}
+        return fake_text_judge
+
+    def test_nested_subparam_judged_pass(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge", side_effect=self._judge(True)
+        ) as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "book", "arguments": {
+                    "patient": {"name": "John Doe", "note": "severe headache since morning"}}}],
+                [{"tool": "book", "arguments": {
+                    "patient": {
+                        "name": "John Doe",                       # nested exact
+                        "note": {"match_type": "llm_judge",       # nested judged
+                                 "criteria": "describes a symptom"}}}}],
+            ))
+        self.assertTrue(result["passed"])
+        # The judge prompt should carry the dotted path as the argument name.
+        prompt = mock_judge.call_args.kwargs.get("user_prompt") or mock_judge.call_args.args[1]
+        self.assertIn("patient.note", prompt)
+        self.assertIn("severe headache", prompt)
+
+    def test_nested_subparam_judged_fail(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge",
+            side_effect=self._judge(False, "not a symptom"),
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "book", "arguments": {
+                    "patient": {"name": "John Doe", "note": "wants a discount"}}}],
+                [{"tool": "book", "arguments": {
+                    "patient": {
+                        "name": "John Doe",
+                        "note": {"match_type": "llm_judge", "criteria": "describes a symptom"}}}}],
+            ))
+        self.assertFalse(result["passed"])
+        self.assertIn("patient.note", result["reasoning"])
+        self.assertIn("not a symptom", result["reasoning"])
+
+    def test_nested_exact_mismatch_and_judge_pass(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        # Nested exact field (name) is wrong; nested judged field passes -> fail
+        # overall, and the literal mismatch is reported with its dotted path.
+        with patch(
+            "calibrate.llm.run_tests.text_judge", side_effect=self._judge(True)
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "book", "arguments": {
+                    "patient": {"name": "Jane", "note": "fever"}}}],
+                [{"tool": "book", "arguments": {
+                    "patient": {
+                        "name": "John Doe",
+                        "note": {"match_type": "llm_judge", "criteria": "a symptom"}}}}],
+            ))
+        self.assertFalse(result["passed"])
+        self.assertIn("patient.name", result["reasoning"])
+
+    def test_multiple_nested_subparams_judged_concurrently(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        calls = {"n": 0}
+
+        async def fake_text_judge(evaluators, user_prompt, *a, **k):
+            calls["n"] += 1
+            return {evaluators[0]["name"]: {"match": True, "reasoning": "ok"}}
+
+        with patch("calibrate.llm.run_tests.text_judge", side_effect=fake_text_judge):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "t", "arguments": {
+                    "a": {"b": "x", "c": "y"}, "d": "z"}}],
+                [{"tool": "t", "arguments": {
+                    "a": {
+                        "b": {"match_type": "llm_judge", "criteria": "c1"},
+                        "c": {"match_type": "llm_judge", "criteria": "c2"}},
+                    "d": {"match_type": "llm_judge", "criteria": "c3"}}}],
+            ))
+        self.assertTrue(result["passed"])
+        self.assertEqual(calls["n"], 3)  # all three judged
+
+    def test_nested_missing_subparam(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "t", "arguments": {"a": {"b": "x"}}}],
+                [{"tool": "t", "arguments": {
+                    "a": {"note": {"match_type": "llm_judge", "criteria": "c"}}}}],
+            ))
+        self.assertFalse(result["passed"])
+        self.assertIn("a.note", result["reasoning"])
+        self.assertIn("missing in actual", result["reasoning"])
+        mock_judge.assert_not_called()
+
+    def test_collect_arg_diffs_no_specs_matches_sync_differ(self):
+        # With no criteria specs anywhere, the recursive walk must produce the
+        # same lines as the original synchronous differ.
+        from calibrate.llm.run_tests import (
+            _collect_arg_diffs,
+            _tool_call_arguments_diff_lines,
+        )
+
+        expected = {"a": 1, "b": {"c": 2, "d": {"e": 3}}, "x": "keep"}
+        actual = {"a": 9, "b": {"c": 2, "d": {"e": 4}}, "y": "extra"}
+        lines, jobs = [], []
+        _collect_arg_diffs(expected, actual, "", lines, jobs)
+        self.assertEqual(jobs, [])
+        self.assertEqual(lines, _tool_call_arguments_diff_lines(expected, actual))
+
+
 class TestAggregateToolCallsStored(unittest.TestCase):
     def test_reads_stored_tool_call_results(self):
         from calibrate.llm.run_tests import _aggregate_tool_calls

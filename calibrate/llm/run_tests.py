@@ -691,48 +691,90 @@ async def _judge_tool_call_parameter(
     )
 
 
+def _collect_arg_diffs(
+    expected: dict,
+    actual: dict,
+    prefix: str,
+    lines: List[str],
+    judge_jobs: List[tuple],
+) -> None:
+    """Recursively diff expected vs. actual argument dicts, criteria-aware.
+
+    Walks every level so a criteria spec may sit on a top-level parameter *or*
+    on any sub-parameter of a nested object. For each expected key:
+
+    - ``llm_judge`` spec → queue ``(path, spec, actual_value)`` in
+      ``judge_jobs`` (judged after the walk); a missing value adds a line.
+    - ``exact`` spec → compare its ``value`` literally (nested dicts diffed by
+      the synchronous, criteria-agnostic differ — an ``exact`` value is taken
+      verbatim, specs inside it are not re-interpreted).
+    - plain nested object → recurse, so sub-parameters can themselves be specs.
+    - plain literal → exact comparison.
+
+    Mismatch lines (with dotted ``path`` prefixes) are appended to ``lines``.
+    Synchronous: judging runs afterwards so all calls can be issued at once.
+    """
+    for key in _sorted_union_dict_keys(expected, actual):
+        path = f"{prefix}.{key}" if prefix else key
+        in_act = key in actual
+        if key not in expected:
+            lines.append(
+                f"  {path}: unexpected key in actual output (value {actual[key]!r})"
+            )
+            continue
+
+        spec = _param_criteria_spec(expected[key], path)
+        if spec is not None and spec["match_type"] == "llm_judge":
+            if not in_act:
+                lines.append(
+                    f"  {path}: missing in actual output (criteria: {spec['criteria']})"
+                )
+            else:
+                judge_jobs.append((path, spec, actual[key]))
+            continue
+
+        ev = spec["value"] if spec is not None else expected[key]
+        if not in_act:
+            lines.append(f"  {path}: missing in actual output (expected {ev!r})")
+            continue
+        av = actual[key]
+        if ev == av:
+            continue
+        if isinstance(ev, dict) and isinstance(av, dict):
+            if spec is not None:
+                # exact spec → compare its value literally (no criteria inside)
+                lines.extend(_tool_call_arguments_diff_lines(ev, av, path))
+            else:
+                _collect_arg_diffs(ev, av, path, lines, judge_jobs)
+            continue
+        lines.append(_tool_call_argument_value_mismatch_line(path, ev, av))
+
+
 async def _tool_call_arguments_mismatch_lines_async(
     tool_name: str, expected: dict, actual: dict
 ) -> List[str]:
     """Per-field mismatch lines, judging ``llm_judge`` params via an LLM.
 
-    Literal and ``exact``-spec parameters reuse the synchronous diff machinery;
-    ``llm_judge`` parameters are evaluated concurrently against their criteria.
+    Detects criteria specs at any depth (top-level parameters and nested
+    sub-parameters). Literal and ``exact``-spec parameters are diffed
+    synchronously; every ``llm_judge`` parameter found in the walk is evaluated
+    concurrently against its criteria.
     """
-    llm_judge_specs: dict = {}
-    expected_plain: dict = {}
-    for key, raw in expected.items():
-        spec = _param_criteria_spec(raw, key)
-        if spec is None:
-            expected_plain[key] = raw
-        elif spec["match_type"] == "exact":
-            expected_plain[key] = spec["value"]
-        else:
-            llm_judge_specs[key] = spec
+    lines: List[str] = []
+    judge_jobs: List[tuple] = []
+    _collect_arg_diffs(expected, actual, "", lines, judge_jobs)
 
-    actual_plain = {k: v for k, v in actual.items() if k not in llm_judge_specs}
-    lines = _tool_call_arguments_diff_lines(expected_plain, actual_plain)
-
-    pending: List[tuple] = []
-    for key, spec in llm_judge_specs.items():
-        if key not in actual:
-            lines.append(
-                f"  {key}: missing in actual output (criteria: {spec['criteria']})"
-            )
-        else:
-            pending.append((key, spec, actual[key]))
-
-    if pending:
+    if judge_jobs:
         judge_results = await asyncio.gather(
             *[
-                _judge_tool_call_parameter(tool_name, key, spec, value)
-                for key, spec, value in pending
+                _judge_tool_call_parameter(tool_name, path, spec, value)
+                for path, spec, value in judge_jobs
             ]
         )
-        for (key, _spec, _value), result in zip(pending, judge_results):
+        for (path, _spec, _value), result in zip(judge_jobs, judge_results):
             if not result.get("match"):
                 lines.append(
-                    f"  {key}: criteria not met — {result.get('reasoning', '')}"
+                    f"  {path}: criteria not met — {result.get('reasoning', '')}"
                 )
     return lines
 
