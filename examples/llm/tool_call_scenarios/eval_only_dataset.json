@@ -1,0 +1,232 @@
+[
+  {
+    "_scenario": "1. ALL EXACT — pass. Flat reasoning, no param_judgments.",
+    "test_case": {
+      "id": "exact-all-pass",
+      "history": [{ "role": "user", "content": "Book John Doe on 2026-06-10 for a fever." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "fever" } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "fever" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "2. ALL EXACT — value mismatch (fail). Only the wrong field is listed.",
+    "test_case": {
+      "id": "exact-value-mismatch",
+      "history": [{ "role": "user", "content": "Book John Doe on 2026-06-10 for a fever." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "fever" } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "checkup" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "3. ALL EXACT — unexpected extra key (fail). Shows 'unexpected key in actual output (value=True)'.",
+    "test_case": {
+      "id": "exact-unexpected-key",
+      "history": [{ "role": "user", "content": "Book John Doe on 2026-06-10." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "fever" } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "fever", "skip_question": true } }
+      ]
+    }
+  },
+  {
+    "_scenario": "4. ALL EXACT — required field missing (fail). Shows 'missing in actual output'.",
+    "test_case": {
+      "id": "exact-missing-key",
+      "history": [{ "role": "user", "content": "Book John Doe on 2026-06-10 for a fever." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "fever" } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "5. LLM JUDGE — single param pass (needs OPENROUTER_API_KEY). param_judgments carries the verdict.",
+    "test_case": {
+      "id": "judge-pass",
+      "history": [{ "role": "user", "content": "Text +15551234567 confirming the June 10 appointment." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": { "match_type": "llm_judge", "criteria": "Confirms an appointment is booked and mentions June 10." } } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": "Your appointment is confirmed for June 10. See you then!" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "6. LLM JUDGE — single param fail (needs OPENROUTER_API_KEY). Shows 'criteria not met — <judge reasoning>'.",
+    "test_case": {
+      "id": "judge-fail",
+      "history": [{ "role": "user", "content": "Text +15551234567 confirming the June 10 appointment." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": { "match_type": "llm_judge", "criteria": "Confirms an appointment is booked and mentions June 10." } } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": "Your one-time login code is 4821." } }
+      ]
+    }
+  },
+  {
+    "_scenario": "7. MIXED exact + judge — all pass. Reasoning names the exact params AND the judged verdict.",
+    "test_case": {
+      "id": "mixed-pass",
+      "history": [{ "role": "user", "content": "Text +15551234567 to confirm John's June 10 booking." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": { "match_type": "llm_judge", "criteria": "Confirms a booking and mentions June 10." } } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": "Booking confirmed for June 10 — thanks!" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "8. MIXED — exact wrong, judge passes (fail). Exact mismatch is the headline; judge verdict still captured in param_judgments.",
+    "test_case": {
+      "id": "mixed-exact-fail",
+      "history": [{ "role": "user", "content": "Text +15551234567 to confirm John's June 10 booking." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": { "match_type": "llm_judge", "criteria": "Confirms a booking and mentions June 10." } } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "send_sms", "arguments": { "to": "+19998887777", "message": "Booking confirmed for June 10 — thanks!" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "9. EXACT SPEC — match_type=exact compares the wrapped value verbatim (pass). No judge call.",
+    "test_case": {
+      "id": "exact-spec-wrap",
+      "history": [{ "role": "user", "content": "Log this booking as a positive interaction." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "log_interaction", "arguments": { "interaction_type": { "match_type": "exact", "value": "booking" }, "sentiment": "positive", "summary": { "match_type": "llm_judge", "criteria": "Mentions a booking." } } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "log_interaction", "arguments": { "interaction_type": "booking", "sentiment": "positive", "summary": "Patient booked an appointment." } }
+      ]
+    }
+  },
+  {
+    "_scenario": "10. NESTED object — exact sub-field + judged sub-field (pass). Dotted paths like patient.note.",
+    "test_case": {
+      "id": "nested-object",
+      "history": [{ "role": "user", "content": "Book John Doe, he has had a severe headache since morning." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": { "match_type": "llm_judge", "criteria": "Describes a medical symptom." } } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "severe headache since this morning" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "11. WRONG TOOL — agent called a different tool (fail). 'Tool call mismatch'.",
+    "test_case": {
+      "id": "wrong-tool",
+      "history": [{ "role": "user", "content": "Book John Doe on 2026-06-10 for a fever." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-10", "reason": "fever" } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": "Booked!" } }
+      ]
+    }
+  },
+  {
+    "_scenario": "12. MULTIPLE tool calls — each judged (pass). Reasoning prefixes each line with its tool.",
+    "test_case": {
+      "id": "multi-call",
+      "history": [{ "role": "user", "content": "I'm grateful you booked me — please text me a confirmation." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "log_interaction", "arguments": { "interaction_type": "booking", "sentiment": "positive", "summary": { "match_type": "llm_judge", "criteria": "Patient is grateful about the booking." } } },
+          { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": { "match_type": "llm_judge", "criteria": "Confirms the appointment." } } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "log_interaction", "arguments": { "interaction_type": "booking", "sentiment": "positive", "summary": "Patient said they were grateful to be booked in." } },
+        { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": "Your appointment is confirmed!" } }
+      ]
+    }
+  }
+]

@@ -1,0 +1,101 @@
+{
+  "system_prompt": "You are a scheduling assistant for a medical clinic.\n\nYou can:\n1. Book appointments with `book_appointment`.\n2. Send SMS confirmations with `send_sms`.\n3. Record a short note about each interaction with `log_interaction`.\n\nCall the appropriate tool when the user's request clearly maps to one. Be concise and friendly.",
+  "tools": [
+    {
+      "type": "client",
+      "name": "book_appointment",
+      "description": "Book a clinic appointment for a patient.",
+      "parameters": [
+        { "id": "patient_name", "type": "string", "description": "Full name of the patient", "required": true },
+        { "id": "date", "type": "string", "description": "Appointment date in YYYY-MM-DD", "required": true },
+        { "id": "reason", "type": "string", "description": "Short reason for the visit", "required": true }
+      ]
+    },
+    {
+      "type": "client",
+      "name": "send_sms",
+      "description": "Send an SMS message to a phone number.",
+      "parameters": [
+        { "id": "to", "type": "string", "description": "Destination phone number in E.164 format", "required": true },
+        { "id": "message", "type": "string", "description": "The text body of the SMS", "required": true }
+      ]
+    },
+    {
+      "type": "client",
+      "name": "log_interaction",
+      "description": "Record a short note about the interaction.",
+      "parameters": [
+        { "id": "interaction_type", "type": "string", "description": "booking, cancellation, question, or complaint", "required": true },
+        { "id": "sentiment", "type": "string", "description": "positive, neutral, or negative", "required": true },
+        { "id": "summary", "type": "string", "description": "Free-text summary of what the patient said", "required": true }
+      ]
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "live-exact-only",
+      "history": [
+        { "role": "assistant", "content": "Hi! How can I help you today?" },
+        { "role": "user", "content": "Please book an appointment for John Doe on 2026-06-10 for a fever." }
+      ],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          {
+            "tool": "book_appointment",
+            "arguments": {
+              "patient_name": "John Doe",
+              "date": "2026-06-10",
+              "reason": "fever"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "live-judged-message",
+      "history": [
+        { "role": "assistant", "content": "Hi! How can I help you today?" },
+        { "role": "user", "content": "Text +15551234567 to confirm John's appointment is booked for June 10th." }
+      ],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          {
+            "tool": "send_sms",
+            "arguments": {
+              "to": "+15551234567",
+              "message": {
+                "match_type": "llm_judge",
+                "criteria": "Confirms an appointment is booked and mentions the date (June 10)."
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "live-mixed-exact-and-judge",
+      "history": [
+        { "role": "assistant", "content": "Hi! How can I help you today?" },
+        { "role": "user", "content": "I'm really happy you fit me in! Please log this as a positive booking." }
+      ],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          {
+            "tool": "log_interaction",
+            "arguments": {
+              "interaction_type": "booking",
+              "sentiment": "positive",
+              "summary": {
+                "match_type": "llm_judge",
+                "criteria": "States the patient is happy or grateful about getting an appointment."
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
