@@ -161,11 +161,58 @@ Verifies the agent calls the correct tools with the expected arguments:
   called without checking the arguments.
 </Note>
 
-<Tip>
-  To grade an argument against a free-text criteria with an LLM judge instead of
-  matching it exactly — including sub-parameters nested inside an object — see
-  [Judging a parameter against criteria](/core-concepts/text-to-text#judging-a-parameter-against-criteria).
-</Tip>
+#### Judging an argument against a criteria
+
+For arguments whose value varies (a generated message, a free-text summary), exact matching is too strict. Instead of a literal value, give the argument a **criteria spec** and an LLM judge decides whether the produced value satisfies it. Each argument is matched independently — mix literal (exact) and judged arguments in the same tool call:
+
+```jsonc
+{
+  "evaluation": {
+    "type": "tool_call",
+    "tool_calls": [
+      {
+        "tool": "send_sms",
+        "arguments": {
+          // exact match (default)
+          "phone_number": "555-123-4567",
+          // judged by an LLM against the criteria
+          "message": {
+            "match_type": "llm_judge",
+            "criteria": "A friendly appointment reminder that includes the date",
+            "judge_model": "openai/gpt-4.1" // optional override
+          }
+        }
+      }
+    ]
+  }
+}
+```
+
+Each argument value is one of:
+
+| `match_type`  | Shape                                                                  | Behavior                                                                              |
+| ------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| (none)        | a literal value, e.g. `"555-123-4567"`                                 | Exact match (default).                                                                |
+| `"exact"`     | `{"match_type": "exact", "value": <literal>}`                          | Exact match; use to match a value that itself looks like a spec dict.                 |
+| `"llm_judge"` | `{"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}` | An LLM judge checks the produced value against `criteria`. `judge_model` is optional. |
+
+Specs work at **any depth** — an argument that is an object can have its own sub-parameters mixed between exact and judged. Each judged sub-parameter is graded independently, and failures are reported with a dotted path (`patient.note`):
+
+```jsonc
+{
+  "tool": "book_appointment",
+  "arguments": {
+    "patient": {
+      "name": "John Doe", // nested exact match
+      "note": {
+        // nested LLM-judged
+        "match_type": "llm_judge",
+        "criteria": "Describes a medical symptom or complaint"
+      }
+    }
+  }
+}
+```
 
 For agent connection, your agent owns its tools internally — there is no need to define them in the config. The `history` and `evaluation` keys work identically for both setup options.
 
