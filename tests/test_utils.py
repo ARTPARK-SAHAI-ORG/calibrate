@@ -251,6 +251,47 @@ class TestProviderLog(unittest.TestCase):
         provider_log("no file set")
 
 
+class TestLogJudgeIO(unittest.TestCase):
+    def test_writes_block_to_bound_file_without_terminal(self):
+        from calibrate.utils import log_judge_io, provider_log_file
+
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "logs"
+            token = provider_log_file.set(str(log_path))
+            captured = io.StringIO()
+            try:
+                with patch("sys.stdout", captured):
+                    log_judge_io(
+                        evaluator="correctness",
+                        model="openai/gpt-x",
+                        system_prompt="SYS",
+                        user_input="INPUT",
+                        output={"match": True, "reasoning": "ok"},
+                    )
+            finally:
+                provider_log_file.reset(token)
+
+            text = log_path.read_text()
+            self.assertIn("judge call", text)
+            self.assertIn("correctness", text)
+            self.assertIn("openai/gpt-x", text)
+            self.assertIn("SYS", text)
+            self.assertIn("INPUT", text)
+            self.assertIn("reasoning", text)
+            # Never echoed to the terminal
+            self.assertEqual(captured.getvalue(), "")
+
+    def test_no_op_when_unbound(self):
+        from calibrate.utils import log_judge_io, provider_log_file
+
+        self.assertIsNone(provider_log_file.get())
+        # Must not raise when no run log file is bound.
+        log_judge_io(
+            evaluator="x", model="m", system_prompt="s",
+            user_input="i", output="o",
+        )
+
+
 class TestStreamTee(unittest.TestCase):
     def test_writes_to_both(self):
         from calibrate.utils import StreamTee

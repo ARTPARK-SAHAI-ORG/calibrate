@@ -48,6 +48,7 @@ import instructor
 from pydantic import BaseModel, Field, create_model
 
 from calibrate.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
+from calibrate.utils import log_judge_io
 
 
 # ── OpenRouter configuration ────────────────────────────────────────────────
@@ -425,6 +426,14 @@ async def _judge_one_text(
 
     result = _normalize_judge_api_result(response.model_dump(), Output.__name__)
 
+    log_judge_io(
+        evaluator=evaluator.get("name", ""),
+        model=model,
+        system_prompt=system_prompt,
+        user_input=user_prompt,
+        output=result,
+    )
+
     if langfuse_enabled and langfuse:
         langfuse.update_current_span(
             metadata={
@@ -481,6 +490,14 @@ async def _judge_one_audio(
     )
 
     result = _normalize_judge_api_result(response.model_dump(), Output.__name__)
+
+    log_judge_io(
+        evaluator=evaluator.get("name", ""),
+        model=model,
+        system_prompt=system_prompt,
+        user_input=f"Reference text: {reference_text}\n[audio omitted from log]",
+        output=result,
+    )
 
     if langfuse_enabled and langfuse:
         from calibrate.langfuse import create_langfuse_audio_media

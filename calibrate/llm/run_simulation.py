@@ -20,6 +20,7 @@ from calibrate.utils import (
     make_webhook_call,
     cleanup_print_logger,
     current_simulation_name,
+    provider_log_file,
 )
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -751,6 +752,9 @@ async def run_single_simulation_task(
             filter=simulation_filter,
         )
 
+        # Route judge LLM input/output into this simulation's logs file.
+        judge_log_token = provider_log_file.set(logs_file_path)
+
         agent_speaks_first = config.get("settings", {}).get("agent_speaks_first", True)
 
         # Configure print logger with unique ID for parallel execution
@@ -844,6 +848,7 @@ async def run_single_simulation_task(
                     logger.remove(log_file_id)
                 except ValueError:
                     pass  # Handler was already removed by another task
+                provider_log_file.reset(judge_log_token)
                 # Clean up the print logger for this simulation using the unique run ID
                 cleanup_print_logger(simulation_run_id)
 

@@ -179,6 +179,37 @@ def provider_log(message: object = "", *, to_terminal: bool = True) -> None:
             f.write(text + "\n")
 
 
+def log_judge_io(
+    *,
+    evaluator: str,
+    model: str,
+    system_prompt: str,
+    user_input: str,
+    output: object,
+) -> None:
+    """Append one judge LLM call's input/output to the active run log file.
+
+    Writes a formatted block to the file bound to ``provider_log_file`` (the
+    per-run / per-provider ``logs`` file) and never prints to the terminal.
+    No-op when no log file is bound to the current context, so SDK callers
+    outside a run are unaffected. Used by the judge calls in
+    :mod:`calibrate.judges` so every module (LLM, STT, TTS, simulation)
+    captures judge prompts and responses locally, independent of Langfuse.
+    """
+    if provider_log_file.get() is None:
+        return
+    block = (
+        "──── judge call ────\n"
+        f"evaluator: {evaluator}\n"
+        f"model: {model}\n"
+        f"system_prompt:\n{system_prompt}\n"
+        f"input:\n{user_input}\n"
+        f"output: {output}\n"
+        "────────────────────"
+    )
+    provider_log(block, to_terminal=False)
+
+
 class StreamTee:
     """Mirror writes to the original stream and a log file.
 

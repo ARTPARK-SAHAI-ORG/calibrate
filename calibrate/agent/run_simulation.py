@@ -31,6 +31,7 @@ from calibrate.utils import (
     combine_audio_files,
     build_tools_schema,
     make_webhook_call,
+    provider_log_file,
 )
 from calibrate.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
 from calibrate.stt.metrics import (
@@ -1715,6 +1716,9 @@ async def _run_single_simulation_inner(
         colorize=False,
     )
 
+    # Route judge LLM input/output into this simulation's logs file.
+    judge_log_token = provider_log_file.set(logs_file_path)
+
     # Configure print logger with unique ID for parallel execution
     print_log_save_path = f"{output_dir}/{simulation_name}/results.log"
     configure_print_logger(print_log_save_path, simulation_name=simulation_run_id)
@@ -1850,6 +1854,7 @@ async def _run_single_simulation_inner(
                 logger.remove(log_file_id)
             except ValueError:
                 pass  # Handler was already removed
+            provider_log_file.reset(judge_log_token)
             # Clean up the print logger for this simulation using the unique run ID
             cleanup_print_logger(simulation_run_id)
 

@@ -13,7 +13,12 @@ import os
 from os.path import join, exists
 import json
 from pathlib import Path
-from calibrate.utils import configure_print_logger, log_and_print, build_tools_schema
+from calibrate.utils import (
+    configure_print_logger,
+    log_and_print,
+    build_tools_schema,
+    provider_log_file,
+)
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -1320,6 +1325,9 @@ async def run_model_tests(
     with _logger_lock:
         log_sink_id = logger.add(log_save_path, level="DEBUG")
 
+    # Route judge LLM input/output into this model's logs file (per-context).
+    judge_log_token = provider_log_file.set(log_save_path)
+
     print_log_save_path = join(model_output_dir, "results.log")
     if exists(print_log_save_path):
         os.remove(print_log_save_path)
@@ -1416,6 +1424,8 @@ async def run_model_tests(
     # Remove pipecat log file sink
     with _logger_lock:
         logger.remove(log_sink_id)
+
+    provider_log_file.reset(judge_log_token)
 
     return {
         "model": model,
@@ -1527,6 +1537,12 @@ async def run_eval_only_tests(
     name_to_evaluator = _get_name_to_evaluator_dict(config)
     write_evaluator_config(output_dir, _evaluators_for_config_output(config))
 
+    log_save_path = join(output_dir, "logs")
+    if exists(log_save_path):
+        os.remove(log_save_path)
+    # Route judge LLM input/output into the eval-only logs file.
+    judge_log_token = provider_log_file.set(log_save_path)
+
     print_log_save_path = join(output_dir, "results.log")
     if exists(print_log_save_path):
         os.remove(print_log_save_path)
@@ -1588,6 +1604,8 @@ async def run_eval_only_tests(
     _print_and_log(
         f"\n✅ Total Passed: {passed}/{total} ({pct:.1f}%)", print_log_save_path
     )
+
+    provider_log_file.reset(judge_log_token)
 
     return {"passed": passed, "total": total, "results": results}
 
