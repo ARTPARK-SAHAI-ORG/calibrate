@@ -188,11 +188,10 @@ For arguments whose value varies (a generated message, a free-text summary), exa
 }
 ```
 
-Each argument value is one of:
+A plain literal value (e.g. `"555-123-4567"`) is matched exactly, as usual. To opt an argument out of exact matching, give it a spec with one of these `match_type` values:
 
 | `match_type`  | Shape                                                                  | Behavior                                                                              |
 | ------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| (none)        | a literal value, e.g. `"555-123-4567"`                                 | Exact match (default).                                                                |
 | `"exact"`     | `{"match_type": "exact", "value": <literal>}`                          | Exact match; use to match a value that itself looks like a spec dict.                 |
 | `"llm_judge"` | `{"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}` | An LLM judge checks the produced value against `criteria`. `judge_model` is optional. |
 
