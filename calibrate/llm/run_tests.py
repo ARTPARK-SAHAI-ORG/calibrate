@@ -713,7 +713,7 @@ def _collect_arg_diffs(
         path = f"{prefix}.{key}" if prefix else key
         in_act = key in actual
         if key not in expected:
-            detail = f"unexpected key in actual output (value {actual[key]!r})"
+            detail = f"unexpected key in actual output (value={actual[key]!r})"
             lines.append(f"  {path}: {detail}")
             if records is not None:
                 records.append(
