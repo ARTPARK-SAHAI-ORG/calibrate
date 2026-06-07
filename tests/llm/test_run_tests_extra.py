@@ -890,6 +890,60 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         self.assertIn("missing in actual", result["reasoning"])
         mock_judge.assert_not_called()
 
+    def test_multi_call_pass_prefixes_tool_in_reasoning(self):
+        # With more than one expected tool call, each parameter in the
+        # consolidated pass reasoning is prefixed with its tool so the lines
+        # stay unambiguous (exact-matched line and judged-param line alike).
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge", side_effect=self._judge(True, "ok")
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [
+                    {"tool": "log", "arguments": {"id": 1, "note": "fever"}},
+                    {"tool": "sms", "arguments": {"msg": "hello there"}},
+                ],
+                [
+                    {"tool": "log", "arguments": {
+                        "id": 1,
+                        "note": {"match_type": "llm_judge", "criteria": "a symptom"}}},
+                    {"tool": "sms", "arguments": {
+                        "msg": {"match_type": "llm_judge", "criteria": "a greeting"}}},
+                ],
+            ))
+        self.assertTrue(result["passed"])
+        self.assertIn("log.id: values match the expected values", result["reasoning"])
+        self.assertIn("log.note: criteria met", result["reasoning"])
+        self.assertIn("sms.msg: criteria met", result["reasoning"])
+
+    def test_exact_spec_wrapping_dict_mismatch(self):
+        # An `exact` spec whose value is a dict is compared verbatim; on a
+        # mismatch the per-parameter record captures the nested diff.
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        result = asyncio.run(evaluate_tool_calls(
+            [{"tool": "a", "arguments": {"loc": {"city": "Lyon"}}}],
+            [{"tool": "a", "arguments": {
+                "loc": {"match_type": "exact", "value": {"city": "Paris"}}}}],
+        ))
+        self.assertFalse(result["passed"])
+        self.assertIn("loc", result["reasoning"])
+        self.assertIn("Paris", result["reasoning"])
+
+    def test_exact_param_missing_in_actual(self):
+        # A required exact parameter absent from the output is reported as
+        # missing (no judge involved, plain exact-only mismatch message).
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        result = asyncio.run(evaluate_tool_calls(
+            [{"tool": "a", "arguments": {}}],
+            [{"tool": "a", "arguments": {"x": 1}}],
+        ))
+        self.assertFalse(result["passed"])
+        self.assertIn("x: missing in actual output", result["reasoning"])
+        self.assertEqual(result["tool_call_results"], [{"tool": "a", "passed": False}])
+
     def test_collect_arg_diffs_no_specs_matches_sync_differ(self):
         # With no criteria specs anywhere, the recursive walk must produce the
         # same lines as the original synchronous differ.

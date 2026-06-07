@@ -849,6 +849,9 @@ def _detailed_call_lines(records: List[dict], *, tool: Optional[str] = None) -> 
     parameter, then every failing parameter (exact or judged). Used for both the
     all-passed reasoning and the per-call mismatch message so the agent's output
     is reported the same way whether the call passed or failed.
+
+    ``tool`` is only supplied for the all-passed consolidation (which has no
+    failing parameters), so the failing-line branch never needs a tool prefix.
     """
     lines: List[str] = []
     matched = _matched_exact_line(records, tool=tool)
@@ -860,10 +863,7 @@ def _detailed_call_lines(records: List[dict], *, tool: Optional[str] = None) -> 
             lines.append(f"  {param}: criteria met — {r.get('reasoning', '')}")
     for r in records:
         if not r.get("match"):
-            line = _render_failing_param_line(r)
-            if tool:
-                line = f"  {tool}.{line.strip()}"
-            lines.append(line)
+            lines.append(_render_failing_param_line(r))
     return lines
 
 
