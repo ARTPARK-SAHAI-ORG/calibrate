@@ -683,6 +683,39 @@ async def _judge_tool_call_parameter(
     )
 
 
+def _record_failure(
+    path: str,
+    detail: str,
+    lines: List[str],
+    records: Optional[List[dict]],
+    *,
+    match_type: str = "exact",
+    criteria: Optional[str] = None,
+    missing: bool = False,
+) -> None:
+    """Append a failing parameter's display line and (when collecting) its record.
+
+    The shared shape behind the non-judged failure branches of
+    :func:`_collect_arg_diffs`: each renders ``  path: detail`` and, when
+    ``records`` is being collected, stores a ``match=False`` record carrying the
+    same ``detail`` as its reasoning (plus optional ``criteria`` / ``missing``).
+    """
+    lines.append(f"  {path}: {detail}")
+    if records is None:
+        return
+    record: dict = {
+        "param": path,
+        "match_type": match_type,
+        "match": False,
+        "reasoning": detail,
+    }
+    if criteria is not None:
+        record["criteria"] = criteria
+    if missing:
+        record["missing"] = True
+    records.append(record)
+
+
 def _collect_arg_diffs(
     expected: dict,
     actual: dict,
@@ -722,35 +755,26 @@ def _collect_arg_diffs(
         path = f"{prefix}.{key}" if prefix else key
         in_act = key in actual
         if key not in expected:
-            detail = f"unexpected key in actual output (value={actual[key]!r})"
-            lines.append(f"  {path}: {detail}")
-            if records is not None:
-                records.append(
-                    {
-                        "param": path,
-                        "match_type": "exact",
-                        "match": False,
-                        "reasoning": detail,
-                    }
-                )
+            _record_failure(
+                path,
+                f"unexpected key in actual output (value={actual[key]!r})",
+                lines,
+                records,
+            )
             continue
 
         spec = _param_criteria_spec(expected[key], path) if criteria_aware else None
         if spec is not None and spec["match_type"] == "llm_judge":
             if not in_act:
-                detail = f"missing in actual output (criteria: {spec['criteria']})"
-                lines.append(f"  {path}: {detail}")
-                if records is not None:
-                    records.append(
-                        {
-                            "param": path,
-                            "match_type": "llm_judge",
-                            "criteria": spec["criteria"],
-                            "match": False,
-                            "reasoning": detail,
-                            "missing": True,
-                        }
-                    )
+                _record_failure(
+                    path,
+                    f"missing in actual output (criteria: {spec['criteria']})",
+                    lines,
+                    records,
+                    match_type="llm_judge",
+                    criteria=spec["criteria"],
+                    missing=True,
+                )
             else:
                 record = None
                 if records is not None:
@@ -765,18 +789,13 @@ def _collect_arg_diffs(
 
         ev = spec["value"] if spec is not None else expected[key]
         if not in_act:
-            detail = f"missing in actual output (expected {ev!r})"
-            lines.append(f"  {path}: {detail}")
-            if records is not None:
-                records.append(
-                    {
-                        "param": path,
-                        "match_type": "exact",
-                        "match": False,
-                        "reasoning": detail,
-                        "missing": True,
-                    }
-                )
+            _record_failure(
+                path,
+                f"missing in actual output (expected {ev!r})",
+                lines,
+                records,
+                missing=True,
+            )
             continue
         av = actual[key]
         if ev == av:
@@ -813,17 +832,7 @@ def _collect_arg_diffs(
                     records=records,
                 )
             continue
-        detail = _value_mismatch_detail(ev, av)
-        lines.append(f"  {path}: {detail}")
-        if records is not None:
-            records.append(
-                {
-                    "param": path,
-                    "match_type": "exact",
-                    "match": False,
-                    "reasoning": detail,
-                }
-            )
+        _record_failure(path, _value_mismatch_detail(ev, av), lines, records)
 
 
 def _param_path(record: dict, tool: Optional[str]) -> str:
