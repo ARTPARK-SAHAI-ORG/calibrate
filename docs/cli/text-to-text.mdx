@@ -161,6 +161,12 @@ Verifies the agent calls the correct tools with the expected arguments:
   called without checking the arguments.
 </Note>
 
+<Tip>
+  To grade an argument against a free-text criteria with an LLM judge instead of
+  matching it exactly — including sub-parameters nested inside an object — see
+  [Judging a parameter against criteria](/core-concepts/text-to-text#judging-a-parameter-against-criteria).
+</Tip>
+
 For agent connection, your agent owns its tools internally — there is no need to define them in the config. The `history` and `evaluation` keys work identically for both setup options.
 
 ### Response test
