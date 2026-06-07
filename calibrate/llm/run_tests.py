@@ -534,18 +534,27 @@ def _sorted_union_dict_keys(left: dict, right: dict) -> List[Any]:
     return sorted(set(left) | set(right), key=lambda k: (type(k).__name__, repr(k)))
 
 
-def _tool_call_argument_value_mismatch_line(key_path: str, expected, actual) -> str:
-    """One human-readable line explaining why ``expected`` and ``actual`` differ."""
+def _value_mismatch_detail(expected, actual) -> str:
+    """The reason (no ``path`` prefix) two leaf values differ.
+
+    Returned standalone so it can be both stored as a record's ``reasoning`` and
+    composed into a display line, without re-parsing the rendered line.
+    """
     exp_t = type(expected).__name__
     act_t = type(actual).__name__
     if type(expected) is not type(actual):
         same_as_str = str(expected) == str(actual)
         note = " (same string form)" if same_as_str else ""
         return (
-            f"  {key_path}: type mismatch — expected {exp_t} {expected!r}, "
+            f"type mismatch — expected {exp_t} {expected!r}, "
             f"got {act_t} {actual!r}{note}"
         )
-    return f"  {key_path}: value mismatch — expected {expected!r}, got {actual!r}"
+    return f"value mismatch — expected {expected!r}, got {actual!r}"
+
+
+def _tool_call_argument_value_mismatch_line(key_path: str, expected, actual) -> str:
+    """One human-readable line explaining why ``expected`` and ``actual`` differ."""
+    return f"  {key_path}: {_value_mismatch_detail(expected, actual)}"
 
 
 def _tool_call_arguments_diff_lines(
@@ -804,15 +813,15 @@ def _collect_arg_diffs(
                     records=records,
                 )
             continue
-        mismatch_line = _tool_call_argument_value_mismatch_line(path, ev, av)
-        lines.append(mismatch_line)
+        detail = _value_mismatch_detail(ev, av)
+        lines.append(f"  {path}: {detail}")
         if records is not None:
             records.append(
                 {
                     "param": path,
                     "match_type": "exact",
                     "match": False,
-                    "reasoning": mismatch_line.strip().split(": ", 1)[1],
+                    "reasoning": detail,
                 }
             )
 

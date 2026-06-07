@@ -959,6 +959,28 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         self.assertEqual(jobs, [])
         self.assertEqual(lines, _tool_call_arguments_diff_lines(expected, actual))
 
+    def test_value_mismatch_record_reasoning_handles_colon_in_key(self):
+        # The stored reasoning is the mismatch detail itself, not the display
+        # line re-parsed — so a key containing ": " does not garble it.
+        from calibrate.llm.run_tests import _collect_arg_diffs
+
+        expected = {"time: start": 9}
+        actual = {"time: start": 5}
+        lines, jobs, records = [], [], []
+        _collect_arg_diffs(expected, actual, "", lines, jobs, records=records)
+        self.assertEqual(
+            records,
+            [
+                {
+                    "param": "time: start",
+                    "match_type": "exact",
+                    "match": False,
+                    "reasoning": "value mismatch — expected 9, got 5",
+                }
+            ],
+        )
+        self.assertEqual(lines, ["  time: start: value mismatch — expected 9, got 5"])
+
     def test_literal_differ_does_not_interpret_specs(self):
         # The criteria-agnostic wrapper (used by the aggregation fallback and by
         # `exact` values) must treat a spec-looking dict as a literal, never as
