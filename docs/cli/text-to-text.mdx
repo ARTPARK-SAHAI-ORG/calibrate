@@ -163,7 +163,7 @@ Verifies the agent calls the correct tools with the expected arguments:
 
 #### Judging an argument against a criteria
 
-For arguments whose value varies (a generated message, a free-text summary), exact matching is too strict. Instead of a literal value, give the argument a **criteria spec** and an LLM judge decides whether the produced value satisfies it. Each argument is matched independently — mix literal (exact) and judged arguments in the same tool call:
+If exact matching is too strict, you can also pass a criteria that an LLM judge uses to evaluate if the argument is correct. Each argument is matched independently, letting you mix exact matches and criteria-based evaluations in the same tool call:
 
 ```jsonc
 {
@@ -173,29 +173,31 @@ For arguments whose value varies (a generated message, a free-text summary), exa
       {
         "tool": "send_sms",
         "arguments": {
-          // exact match (default)
-          "phone_number": "555-123-4567",
+          // exact match
+          "phone_number": {
+            "match_type": "exact",
+            "value": "555-123-4567",
+          },
           // judged by an LLM against the criteria
           "message": {
             "match_type": "llm_judge",
             "criteria": "A friendly appointment reminder that includes the date",
-            "judge_model": "openai/gpt-4.1" // optional override
-          }
-        }
-      }
-    ]
-  }
+          },
+        },
+      },
+    ],
+  },
 }
 ```
 
 A plain literal value (e.g. `"555-123-4567"`) is matched exactly, as usual. To opt an argument out of exact matching, give it a spec with one of these `match_type` values:
 
-| `match_type`  | Shape                                                                  | Behavior                                                                              |
-| ------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `"exact"`     | `{"match_type": "exact", "value": <literal>}`                          | Exact match; use to match a value that itself looks like a spec dict.                 |
-| `"llm_judge"` | `{"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}` | An LLM judge checks the produced value against `criteria`. `judge_model` is optional. |
+| `match_type`  | Shape                                            | Behavior                                                      |
+| ------------- | ------------------------------------------------ | ------------------------------------------------------------- |
+| `"exact"`     | `{"match_type": "exact", "value": <literal>}`    | Check if the produced value is equal to the `<literal>` value |
+| `"llm_judge"` | `{"match_type": "llm_judge", "criteria": "..."}` | An LLM judge checks the produced value against `criteria`     |
 
-Specs work at **any depth** — an argument that is an object can have its own sub-parameters mixed between exact and judged. Each judged sub-parameter is graded independently, and failures are reported with a dotted path (`patient.note`):
+Works for nested arguments as well where each sub-parameter is graded independently:
 
 ```jsonc
 {
@@ -206,10 +208,10 @@ Specs work at **any depth** — an argument that is an object can have its own s
       "note": {
         // nested LLM-judged
         "match_type": "llm_judge",
-        "criteria": "Describes a medical symptom or complaint"
-      }
-    }
-  }
+        "criteria": "Describes a medical symptom or complaint",
+      },
+    },
+  },
 }
 ```
 
