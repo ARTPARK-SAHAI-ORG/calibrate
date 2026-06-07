@@ -682,6 +682,7 @@ def _collect_arg_diffs(
     judge_jobs: List[tuple],
     *,
     criteria_aware: bool = True,
+    records: Optional[List[dict]] = None,
 ) -> None:
     """Recursively diff expected vs. actual argument dicts.
 
@@ -698,128 +699,303 @@ def _collect_arg_diffs(
 
     Mismatch lines (with dotted ``path`` prefixes) are appended to ``lines``.
     Synchronous: judging runs afterwards so all calls can be issued at once.
+
+    When ``records`` is provided (criteria-aware path only) a structured record
+    is appended for **every** leaf parameter — matched or not, exact or judged —
+    so the caller can report on all of them, not just the failures. Each record
+    is ``{"param", "match_type", "match", ...}``; for a present ``llm_judge``
+    parameter a placeholder record (no ``match``/``reasoning`` yet) is appended
+    and also linked into ``judge_jobs`` so the verdict can be filled in after the
+    concurrent judging completes. Nested objects contribute their leaves' records
+    (the container itself gets none).
     """
     for key in _sorted_union_dict_keys(expected, actual):
         path = f"{prefix}.{key}" if prefix else key
         in_act = key in actual
         if key not in expected:
-            lines.append(
-                f"  {path}: unexpected key in actual output (value {actual[key]!r})"
-            )
+            detail = f"unexpected key in actual output (value {actual[key]!r})"
+            lines.append(f"  {path}: {detail}")
+            if records is not None:
+                records.append(
+                    {
+                        "param": path,
+                        "match_type": "exact",
+                        "match": False,
+                        "reasoning": detail,
+                    }
+                )
             continue
 
         spec = _param_criteria_spec(expected[key], path) if criteria_aware else None
         if spec is not None and spec["match_type"] == "llm_judge":
             if not in_act:
-                lines.append(
-                    f"  {path}: missing in actual output (criteria: {spec['criteria']})"
-                )
+                detail = f"missing in actual output (criteria: {spec['criteria']})"
+                lines.append(f"  {path}: {detail}")
+                if records is not None:
+                    records.append(
+                        {
+                            "param": path,
+                            "match_type": "llm_judge",
+                            "criteria": spec["criteria"],
+                            "match": False,
+                            "reasoning": detail,
+                            "missing": True,
+                        }
+                    )
             else:
-                judge_jobs.append((path, spec, actual[key]))
+                record = None
+                if records is not None:
+                    record = {
+                        "param": path,
+                        "match_type": "llm_judge",
+                        "criteria": spec["criteria"],
+                    }
+                    records.append(record)
+                judge_jobs.append((path, spec, actual[key], record))
             continue
 
         ev = spec["value"] if spec is not None else expected[key]
         if not in_act:
-            lines.append(f"  {path}: missing in actual output (expected {ev!r})")
+            detail = f"missing in actual output (expected {ev!r})"
+            lines.append(f"  {path}: {detail}")
+            if records is not None:
+                records.append(
+                    {
+                        "param": path,
+                        "match_type": "exact",
+                        "match": False,
+                        "reasoning": detail,
+                        "missing": True,
+                    }
+                )
             continue
         av = actual[key]
         if ev == av:
+            if records is not None:
+                records.append(
+                    {"param": path, "match_type": "exact", "match": True}
+                )
             continue
         if isinstance(ev, dict) and isinstance(av, dict):
             if spec is not None:
                 # exact spec → compare its value literally (specs inside an
                 # exact value are not re-interpreted)
-                lines.extend(_tool_call_arguments_diff_lines(ev, av, path))
+                sub_lines = _tool_call_arguments_diff_lines(ev, av, path)
+                lines.extend(sub_lines)
+                if records is not None:
+                    records.append(
+                        {
+                            "param": path,
+                            "match_type": "exact",
+                            "match": False,
+                            "reasoning": "; ".join(
+                                line.strip() for line in sub_lines
+                            ),
+                        }
+                    )
             else:
                 _collect_arg_diffs(
-                    ev, av, path, lines, judge_jobs, criteria_aware=criteria_aware
+                    ev,
+                    av,
+                    path,
+                    lines,
+                    judge_jobs,
+                    criteria_aware=criteria_aware,
+                    records=records,
                 )
             continue
-        lines.append(_tool_call_argument_value_mismatch_line(path, ev, av))
+        mismatch_line = _tool_call_argument_value_mismatch_line(path, ev, av)
+        lines.append(mismatch_line)
+        if records is not None:
+            records.append(
+                {
+                    "param": path,
+                    "match_type": "exact",
+                    "match": False,
+                    "reasoning": mismatch_line.strip().split(": ", 1)[1],
+                }
+            )
 
 
-async def _tool_call_arguments_mismatch_lines_async(
-    tool_name: str, expected: dict, actual: dict
-) -> List[str]:
-    """Per-field mismatch lines, judging ``llm_judge`` params via an LLM.
+def _render_failing_param_line(record: dict) -> str:
+    """One ``  path: detail`` line for a failing parameter record."""
+    if record.get("missing"):
+        return f"  {record['param']}: {record['reasoning']}"
+    if record["match_type"] == "llm_judge":
+        return f"  {record['param']}: criteria not met — {record.get('reasoning', '')}"
+    return f"  {record['param']}: {record.get('reasoning', '')}"
 
-    Detects criteria specs at any depth (top-level parameters and nested
-    sub-parameters). Literal and ``exact``-spec parameters are diffed
-    synchronously; every ``llm_judge`` parameter found in the walk is evaluated
-    concurrently against its criteria.
+
+def _matched_exact_line(records: List[dict], *, tool: Optional[str] = None) -> Optional[str]:
+    """A single line naming the exact parameters whose values matched, or ``None``.
+
+    When ``tool`` is given each name is prefixed ``tool.param`` so the line is
+    unambiguous across multiple tool calls.
+    """
+    names = [
+        f"{tool}.{r['param']}" if tool else r["param"]
+        for r in records
+        if r["match_type"] == "exact" and r.get("match")
+    ]
+    if not names:
+        return None
+    return f"  {', '.join(names)}: values match the expected values"
+
+
+def _detailed_call_lines(records: List[dict], *, tool: Optional[str] = None) -> List[str]:
+    """Full per-parameter breakdown for a call that involved an ``llm_judge`` param.
+
+    Order: the exact-match summary line first, then each satisfied ``llm_judge``
+    parameter, then every failing parameter (exact or judged). Used for both the
+    all-passed reasoning and the per-call mismatch message so the agent's output
+    is reported the same way whether the call passed or failed.
     """
     lines: List[str] = []
+    matched = _matched_exact_line(records, tool=tool)
+    if matched:
+        lines.append(matched)
+    for r in records:
+        if r["match_type"] == "llm_judge" and r.get("match"):
+            param = f"{tool}.{r['param']}" if tool else r["param"]
+            lines.append(f"  {param}: criteria met — {r.get('reasoning', '')}")
+    for r in records:
+        if not r.get("match"):
+            line = _render_failing_param_line(r)
+            if tool:
+                line = f"  {tool}.{line.strip()}"
+            lines.append(line)
+    return lines
+
+
+async def _tool_call_arguments_eval_async(
+    tool_name: str, expected, actual
+) -> dict:
+    """Evaluate one tool call's arguments, returning a structured result.
+
+    Returns ``{"message", "records", "had_llm"}``:
+
+    - ``message`` — a multi-line mismatch reason, or ``None`` when the arguments
+      match. Built from the per-parameter records: when any ``llm_judge`` param
+      is involved the full breakdown (matched exacts + judged verdicts) is shown;
+      otherwise only the failing lines are listed (the original exact-only form).
+    - ``records`` — one entry per leaf parameter (exact and judged, matched and
+      failed); see :func:`_collect_arg_diffs`. Empty for the non-dict edge cases.
+    - ``had_llm`` — whether any parameter was graded by an LLM judge.
+    """
+    header = "Tool call arguments mismatch:"
+    if not isinstance(expected, dict):
+        return {
+            "message": (
+                f"{header}\n"
+                f"  arguments: cannot diff — expected non-dict "
+                f"{type(expected).__name__} {expected!r}, got "
+                f"{type(actual).__name__} {actual!r}"
+            ),
+            "records": [],
+            "had_llm": False,
+        }
+    if not isinstance(actual, dict):
+        return {
+            "message": (
+                f"{header}\n"
+                f"  arguments: expected dict {expected!r}, "
+                f"got {type(actual).__name__} {actual!r}"
+            ),
+            "records": [],
+            "had_llm": False,
+        }
+
+    lines: List[str] = []
     judge_jobs: List[tuple] = []
-    _collect_arg_diffs(expected, actual, "", lines, judge_jobs)
+    records: List[dict] = []
+    _collect_arg_diffs(expected, actual, "", lines, judge_jobs, records=records)
 
     if judge_jobs:
         judge_results = await asyncio.gather(
             *[
                 _judge_tool_call_parameter(tool_name, path, spec, value)
-                for path, spec, value in judge_jobs
+                for path, spec, value, _record in judge_jobs
             ]
         )
-        for (path, _spec, _value), result in zip(judge_jobs, judge_results):
-            if not result.get("match"):
-                lines.append(
-                    f"  {path}: criteria not met — {result.get('reasoning', '')}"
-                )
-    return lines
+        for (_path, _spec, _value, record), result in zip(judge_jobs, judge_results):
+            if record is not None:
+                record["match"] = bool(result.get("match"))
+                record["reasoning"] = result.get("reasoning", "")
 
+    had_llm = any(r["match_type"] == "llm_judge" for r in records)
+    failures = [r for r in records if not r.get("match")]
+    if not failures:
+        return {"message": None, "records": records, "had_llm": had_llm}
 
-async def _tool_call_arguments_mismatch_message_async(
-    tool_name: str, expected, actual
-) -> Optional[str]:
-    """Async variant of :func:`_tool_call_arguments_mismatch_message`.
-
-    Returns ``None`` when the arguments match (including when every
-    ``llm_judge`` parameter satisfies its criteria), else a multi-line reason.
-    """
-    header = "Tool call arguments mismatch:"
-    if not isinstance(expected, dict):
-        return (
-            f"{header}\n"
-            f"  arguments: cannot diff — expected non-dict {type(expected).__name__} "
-            f"{expected!r}, got {type(actual).__name__} {actual!r}"
-        )
-    if not isinstance(actual, dict):
-        return (
-            f"{header}\n"
-            f"  arguments: expected dict {expected!r}, "
-            f"got {type(actual).__name__} {actual!r}"
-        )
-    detail_lines = await _tool_call_arguments_mismatch_lines_async(
-        tool_name, expected, actual
-    )
-    if not detail_lines:
-        return None
-    return header + "\n" + "\n".join(detail_lines)
+    if had_llm:
+        body = _detailed_call_lines(records)
+    else:
+        body = [_render_failing_param_line(r) for r in failures]
+    return {
+        "message": header + "\n" + "\n".join(body),
+        "records": records,
+        "had_llm": had_llm,
+    }
 
 
 async def _tool_call_pair_mismatch_async(
     output_tool_call: dict, evaluation_tool_call: dict
-) -> Optional[str]:
+) -> dict:
     """Async pair matcher supporting per-parameter ``llm_judge`` criteria.
 
-    Equivalent to :func:`_tool_call_pair_mismatch` when no parameter carries a
-    criteria spec.
+    Returns ``{"mismatch", "records", "had_llm"}`` — ``mismatch`` is a failure
+    reason string or ``None`` when the pair matches; ``records`` is the
+    per-parameter breakdown (exact + judged); ``had_llm`` flags whether any
+    parameter was judged. Equivalent to :func:`_tool_call_pair_mismatch` when no
+    parameter carries a criteria spec.
     """
     if output_tool_call["tool"] != evaluation_tool_call["tool"]:
-        return (
-            f"Tool call mismatch - expected tool call: {evaluation_tool_call['tool']} "
-            f"but got: {output_tool_call['tool']}"
-        )
+        return {
+            "mismatch": (
+                f"Tool call mismatch - expected tool call: "
+                f"{evaluation_tool_call['tool']} but got: {output_tool_call['tool']}"
+            ),
+            "records": [],
+            "had_llm": False,
+        }
     if "arguments" not in evaluation_tool_call:
-        return None
+        return {"mismatch": None, "records": [], "had_llm": False}
     exp_args = evaluation_tool_call.get("arguments")
     if exp_args is None:
-        return None
+        return {"mismatch": None, "records": [], "had_llm": False}
     out_args = output_tool_call.get("arguments")
     if out_args == exp_args:
-        return None
-    return await _tool_call_arguments_mismatch_message_async(
+        return {"mismatch": None, "records": [], "had_llm": False}
+    result = await _tool_call_arguments_eval_async(
         evaluation_tool_call["tool"], exp_args, out_args
     )
+    return {
+        "mismatch": result["message"],
+        "records": result["records"],
+        "had_llm": result["had_llm"],
+    }
+
+
+def _consolidated_pass_reasoning(pass_blocks: List[tuple], *, multi: bool) -> str:
+    """Build the all-passed reasoning string for a ``tool_call`` evaluation.
+
+    ``pass_blocks`` is a list of ``(tool_name, records)`` for every passing tool
+    call that involved at least one ``llm_judge`` parameter. When it is empty —
+    i.e. every parameter was matched exactly — the flat success message is
+    returned. Otherwise each call contributes a line naming its exact-matched
+    parameters plus one ``criteria met`` line per judged parameter, so both the
+    exact and the LLM-based matches are consolidated into the overall output.
+
+    When ``multi`` (more than one expected tool call) each parameter name is
+    prefixed with its tool so the lines stay unambiguous.
+    """
+    base = "The agent's tools calls matches the expected tool calls"
+    if not pass_blocks:
+        return base
+    lines = [base + ":"]
+    for tool_name, records in pass_blocks:
+        lines.extend(_detailed_call_lines(records, tool=tool_name if multi else None))
+    return "\n".join(lines)
 
 
 async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
@@ -831,7 +1007,19 @@ async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
 
     Returns ``passed`` / ``reasoning`` plus ``tool_call_results`` — a per-slot
     ``[{"tool": name, "passed": bool}]`` list (sorted order, missing output
-    slots marked failed) consumed by :func:`_aggregate_tool_calls`.
+    slots marked failed) consumed by :func:`_aggregate_tool_calls`. A slot whose
+    call involved at least one ``llm_judge`` parameter additionally carries a
+    ``param_judgments`` list — one record per leaf parameter, exact *and* judged,
+    matched *and* failed (``{"param", "match_type", "match", ...}``) — so the
+    full per-parameter verdict survives into ``results.json``.
+
+    Reasoning rules:
+    - Every parameter matched exactly (no judge involved) and all passed → the
+      flat ``"The agent's tools calls matches the expected tool calls"``.
+    - Any ``llm_judge`` parameter involved → the verdict is spelled out: each
+      judged parameter's met/not-met reasoning plus a line stating that the
+      exact-matched parameters' values match the expected values (see
+      :func:`_consolidated_pass_reasoning` / :func:`_detailed_call_lines`).
     """
     evaluation_sorted = sort_tool_calls(evaluation_tool_calls or [])
 
@@ -847,22 +1035,30 @@ async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
         }
 
     output_sorted = sort_tool_calls(output_tool_calls)
+    multi = len(evaluation_sorted) > 1
 
     tool_call_results: List[dict] = []
     first_failure: Optional[str] = None
+    pass_blocks: List[tuple] = []
     for i, evaluation_tool_call in enumerate(evaluation_sorted):
         name = evaluation_tool_call.get("tool")
         if i >= len(output_sorted):
             if name:
                 tool_call_results.append({"tool": name, "passed": False})
             continue
-        mismatch = await _tool_call_pair_mismatch_async(
+        evaluated = await _tool_call_pair_mismatch_async(
             output_sorted[i], evaluation_tool_call
         )
+        mismatch = evaluated["mismatch"]
         if name:
-            tool_call_results.append({"tool": name, "passed": mismatch is None})
+            slot: dict = {"tool": name, "passed": mismatch is None}
+            if evaluated["had_llm"] and evaluated["records"]:
+                slot["param_judgments"] = evaluated["records"]
+            tool_call_results.append(slot)
         if mismatch and first_failure is None:
             first_failure = mismatch
+        if mismatch is None and evaluated["had_llm"] and name:
+            pass_blocks.append((name, evaluated["records"]))
 
     if first_failure is not None:
         return {
@@ -873,7 +1069,7 @@ async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
 
     return {
         "passed": True,
-        "reasoning": "Tool calls matched expected",
+        "reasoning": _consolidated_pass_reasoning(pass_blocks, multi=multi),
         "tool_call_results": tool_call_results,
     }
 

@@ -454,8 +454,30 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
                                 "criteria": "a friendly greeting"}}}],
             ))
         self.assertTrue(result["passed"])
-        self.assertEqual(result["tool_call_results"],
-                         [{"tool": "send_sms", "passed": True}])
+        # A passing llm_judge parameter now retains its verdict + reasoning.
+        self.assertEqual(
+            result["tool_call_results"],
+            [
+                {
+                    "tool": "send_sms",
+                    "passed": True,
+                    "param_judgments": [
+                        {
+                            "param": "message",
+                            "match_type": "llm_judge",
+                            "criteria": "a friendly greeting",
+                            "match": True,
+                            "reasoning": "because",
+                        }
+                    ],
+                }
+            ],
+        )
+        # The judged parameter's reasoning is consolidated into the overall
+        # reasoning rather than discarded.
+        self.assertIn("message", result["reasoning"])
+        self.assertIn("criteria met", result["reasoning"])
+        self.assertIn("because", result["reasoning"])
         # The judge prompt should mention the argument name and actual value.
         prompt = mock_judge.call_args.kwargs.get("user_prompt") or mock_judge.call_args.args[1]
         self.assertIn("send_sms", prompt)
@@ -478,8 +500,25 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertIn("message", result["reasoning"])
         self.assertIn("not a greeting", result["reasoning"])
-        self.assertEqual(result["tool_call_results"],
-                         [{"tool": "send_sms", "passed": False}])
+        # A failing llm_judge parameter is captured too.
+        self.assertEqual(
+            result["tool_call_results"],
+            [
+                {
+                    "tool": "send_sms",
+                    "passed": False,
+                    "param_judgments": [
+                        {
+                            "param": "message",
+                            "match_type": "llm_judge",
+                            "criteria": "a friendly greeting",
+                            "match": False,
+                            "reasoning": "not a greeting",
+                        }
+                    ],
+                }
+            ],
+        )
 
     def test_llm_judge_not_invoked_for_exact_params(self):
         from calibrate.llm.run_tests import evaluate_tool_calls
@@ -548,53 +587,116 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
             ))
         self.assertFalse(result["passed"])
         self.assertIn("id", result["reasoning"])
+        # Both params are captured on the failing slot: the failing exact one
+        # and the passing judged one.
+        self.assertEqual(
+            result["tool_call_results"][0]["param_judgments"],
+            [
+                {
+                    "param": "id",
+                    "match_type": "exact",
+                    "match": False,
+                    "reasoning": "value mismatch — expected 7, got 9",
+                },
+                {
+                    "param": "note",
+                    "match_type": "llm_judge",
+                    "criteria": "positive",
+                    "match": True,
+                    "reasoning": "because",
+                },
+            ],
+        )
+
+    def test_exact_only_pass_uses_flat_message(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"x": 1}}],
+                [{"tool": "a", "arguments": {"x": 1}}],
+            ))
+        self.assertTrue(result["passed"])
+        self.assertEqual(
+            result["reasoning"],
+            "The agent's tools calls matches the expected tool calls",
+        )
+        # No judged params → no param_judgments key on the slot.
+        self.assertEqual(result["tool_call_results"], [{"tool": "a", "passed": True}])
+        mock_judge.assert_not_called()
+
+    def test_pass_reasoning_consolidates_judged_params(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge",
+            side_effect=self._judge_returning(True, "reads as friendly"),
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "send_sms", "arguments": {"id": 7, "message": "Hi!"}}],
+                [{"tool": "send_sms", "arguments": {
+                    "id": 7,
+                    "message": {"match_type": "llm_judge",
+                                "criteria": "a friendly greeting"}}}],
+            ))
+        self.assertTrue(result["passed"])
+        # Consolidated: base sentence, the exact-matched param line, and the
+        # judged parameter's verdict/reasoning.
+        self.assertIn(
+            "The agent's tools calls matches the expected tool calls",
+            result["reasoning"],
+        )
+        self.assertIn("id: values match the expected values", result["reasoning"])
+        self.assertIn("message: criteria met", result["reasoning"])
+        self.assertIn("reads as friendly", result["reasoning"])
 
 
 class TestToolCallAsyncMatchers(unittest.TestCase):
     def test_pair_async_wrong_tool(self):
         from calibrate.llm.run_tests import _tool_call_pair_mismatch_async
 
-        reason = asyncio.run(_tool_call_pair_mismatch_async(
+        res = asyncio.run(_tool_call_pair_mismatch_async(
             {"tool": "a", "arguments": {}},
             {"tool": "b", "arguments": {}},
         ))
-        self.assertIn("Tool call mismatch", reason)
+        self.assertIn("Tool call mismatch", res["mismatch"])
+        self.assertEqual(res["records"], [])
+        self.assertFalse(res["had_llm"])
 
     def test_pair_async_no_arguments_key(self):
         from calibrate.llm.run_tests import _tool_call_pair_mismatch_async
 
-        self.assertIsNone(asyncio.run(_tool_call_pair_mismatch_async(
+        self.assertEqual(asyncio.run(_tool_call_pair_mismatch_async(
             {"tool": "a", "arguments": {"x": 1}},
             {"tool": "a"},
-        )))
+        )), {"mismatch": None, "records": [], "had_llm": False})
 
     def test_pair_async_none_arguments(self):
         from calibrate.llm.run_tests import _tool_call_pair_mismatch_async
 
-        self.assertIsNone(asyncio.run(_tool_call_pair_mismatch_async(
+        self.assertEqual(asyncio.run(_tool_call_pair_mismatch_async(
             {"tool": "a", "arguments": {"x": 1}},
             {"tool": "a", "arguments": None},
-        )))
+        )), {"mismatch": None, "records": [], "had_llm": False})
 
     def test_message_async_expected_non_dict(self):
-        from calibrate.llm.run_tests import (
-            _tool_call_arguments_mismatch_message_async,
-        )
+        from calibrate.llm.run_tests import _tool_call_arguments_eval_async
 
-        reason = asyncio.run(_tool_call_arguments_mismatch_message_async(
+        res = asyncio.run(_tool_call_arguments_eval_async(
             "a", "not-a-dict", {"x": 1},
         ))
-        self.assertIn("cannot diff", reason)
+        self.assertIn("cannot diff", res["message"])
+        self.assertEqual(res["records"], [])
+        self.assertFalse(res["had_llm"])
 
     def test_message_async_actual_non_dict(self):
-        from calibrate.llm.run_tests import (
-            _tool_call_arguments_mismatch_message_async,
-        )
+        from calibrate.llm.run_tests import _tool_call_arguments_eval_async
 
-        reason = asyncio.run(_tool_call_arguments_mismatch_message_async(
+        res = asyncio.run(_tool_call_arguments_eval_async(
             "a", {"x": 1}, "not-a-dict",
         ))
-        self.assertIn("expected dict", reason)
+        self.assertIn("expected dict", res["message"])
+        self.assertEqual(res["records"], [])
 
     def test_evaluate_fewer_output_than_expected(self):
         from calibrate.llm.run_tests import evaluate_tool_calls
@@ -688,6 +790,27 @@ class TestNestedToolCallCriteria(unittest.TestCase):
                                  "criteria": "describes a symptom"}}}}],
             ))
         self.assertTrue(result["passed"])
+        # Both nested leaves are captured with their dotted paths: the exact
+        # name match and the judged note.
+        self.assertEqual(
+            result["tool_call_results"][0]["param_judgments"],
+            [
+                {
+                    "param": "patient.name",
+                    "match_type": "exact",
+                    "match": True,
+                },
+                {
+                    "param": "patient.note",
+                    "match_type": "llm_judge",
+                    "criteria": "describes a symptom",
+                    "match": True,
+                    "reasoning": "r",
+                },
+            ],
+        )
+        self.assertIn("patient.name: values match the expected values", result["reasoning"])
+        self.assertIn("patient.note", result["reasoning"])
         # The judge prompt should carry the dotted path as the argument name.
         prompt = mock_judge.call_args.kwargs.get("user_prompt") or mock_judge.call_args.args[1]
         self.assertIn("patient.note", prompt)
