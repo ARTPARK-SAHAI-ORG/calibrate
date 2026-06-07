@@ -817,13 +817,23 @@ def _collect_arg_diffs(
             )
 
 
-def _render_failing_param_line(record: dict) -> str:
+def _param_path(record: dict, tool: Optional[str]) -> str:
+    """The parameter's display path, prefixed ``tool.param`` when ``tool`` is set.
+
+    The single place the tool-name prefix is applied, so every reasoning line
+    qualifies parameter names the same way.
+    """
+    return f"{tool}.{record['param']}" if tool else record["param"]
+
+
+def _render_failing_param_line(record: dict, *, tool: Optional[str] = None) -> str:
     """One ``  path: detail`` line for a failing parameter record."""
+    path = _param_path(record, tool)
     if record.get("missing"):
-        return f"  {record['param']}: {record['reasoning']}"
+        return f"  {path}: {record['reasoning']}"
     if record["match_type"] == "llm_judge":
-        return f"  {record['param']}: criteria not met — {record.get('reasoning', '')}"
-    return f"  {record['param']}: {record.get('reasoning', '')}"
+        return f"  {path}: criteria not met — {record.get('reasoning', '')}"
+    return f"  {path}: {record.get('reasoning', '')}"
 
 
 def _matched_exact_line(records: List[dict], *, tool: Optional[str] = None) -> Optional[str]:
@@ -833,7 +843,7 @@ def _matched_exact_line(records: List[dict], *, tool: Optional[str] = None) -> O
     unambiguous across multiple tool calls.
     """
     names = [
-        f"{tool}.{r['param']}" if tool else r["param"]
+        _param_path(r, tool)
         for r in records
         if r["match_type"] == "exact" and r.get("match")
     ]
@@ -849,9 +859,6 @@ def _detailed_call_lines(records: List[dict], *, tool: Optional[str] = None) -> 
     parameter, then every failing parameter (exact or judged). Used for both the
     all-passed reasoning and the per-call mismatch message so the agent's output
     is reported the same way whether the call passed or failed.
-
-    ``tool`` is only supplied for the all-passed consolidation (which has no
-    failing parameters), so the failing-line branch never needs a tool prefix.
     """
     lines: List[str] = []
     matched = _matched_exact_line(records, tool=tool)
@@ -859,11 +866,10 @@ def _detailed_call_lines(records: List[dict], *, tool: Optional[str] = None) -> 
         lines.append(matched)
     for r in records:
         if r["match_type"] == "llm_judge" and r.get("match"):
-            param = f"{tool}.{r['param']}" if tool else r["param"]
-            lines.append(f"  {param}: criteria met — {r.get('reasoning', '')}")
+            lines.append(f"  {_param_path(r, tool)}: criteria met — {r.get('reasoning', '')}")
     for r in records:
         if not r.get("match"):
-            lines.append(_render_failing_param_line(r))
+            lines.append(_render_failing_param_line(r, tool=tool))
     return lines
 
 
