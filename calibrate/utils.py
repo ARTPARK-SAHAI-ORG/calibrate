@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import struct
+import threading
 import wave
 from collections import defaultdict
 from contextvars import ContextVar
@@ -179,6 +180,11 @@ def provider_log(message: object = "", *, to_terminal: bool = True) -> None:
             f.write(text + "\n")
 
 
+# Serializes concurrent judge-log writes within the process so two judges
+# running at once never split each other's entry.
+_judge_log_lock = threading.Lock()
+
+
 def log_judge_io(
     *,
     evaluator: str,
@@ -189,14 +195,17 @@ def log_judge_io(
 ) -> None:
     """Append one judge LLM call's input/output to the active run log file.
 
-    Writes a formatted block to the file bound to ``provider_log_file`` (the
-    per-run / per-provider ``logs`` file) and never prints to the terminal.
-    No-op when no log file is bound to the current context, so SDK callers
-    outside a run are unaffected. Used by the judge calls in
-    :mod:`calibrate.judges` so every module (LLM, STT, TTS, simulation)
-    captures judge prompts and responses locally, independent of Langfuse.
+    The whole entry is written as a **single atomic append** so concurrent
+    writers (other judges running in parallel, or the run's loguru sink sharing
+    the same file) can never interleave a judge's input and output. Never
+    prints to the terminal. No-op when no log file is bound to the current
+    context, so SDK callers outside a run are unaffected. Used by the judge
+    calls in :mod:`calibrate.judges` so every module (LLM, STT, TTS,
+    simulation) captures judge prompts and responses locally, independent of
+    Langfuse.
     """
-    if provider_log_file.get() is None:
+    log_path = provider_log_file.get()
+    if log_path is None:
         return
     block = (
         "──── judge call ────\n"
@@ -205,9 +214,18 @@ def log_judge_io(
         f"system_prompt:\n{system_prompt}\n"
         f"input:\n{user_input}\n"
         f"output: {output}\n"
-        "────────────────────"
+        "────────────────────\n"
     )
-    provider_log(block, to_terminal=False)
+    data = block.encode("utf-8", errors="replace")
+    # Single O_APPEND write: the kernel appends each write atomically, and the
+    # lock guards against torn writes if a block ever exceeds the atomic-write
+    # size or another thread logs concurrently.
+    with _judge_log_lock:
+        fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o644)
+        try:
+            os.write(fd, data)
+        finally:
+            os.close(fd)
 
 
 class StreamTee:

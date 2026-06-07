@@ -291,6 +291,52 @@ class TestLogJudgeIO(unittest.TestCase):
             user_input="i", output="o",
         )
 
+    def test_concurrent_writes_are_not_interleaved(self):
+        """Each judge entry stays intact when many write to one file at once."""
+        import threading
+        from calibrate.utils import log_judge_io, provider_log_file
+
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "logs"
+
+            def write(i):
+                # Each thread binds the log file in its own context (worker
+                # threads don't inherit the parent's context vars), then writes
+                # a large-ish payload so a non-atomic write would split.
+                tok = provider_log_file.set(str(log_path))
+                try:
+                    log_judge_io(
+                        evaluator=f"ev{i}",
+                        model="m",
+                        system_prompt="S" * 5000,
+                        user_input="I" * 5000,
+                        output=f"OUT{i}",
+                    )
+                finally:
+                    provider_log_file.reset(tok)
+
+            threads = [threading.Thread(target=write, args=(i,)) for i in range(20)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+            text = log_path.read_text()
+            # Exactly one complete block per writer, none torn apart.
+            self.assertEqual(text.count("──── judge call ────"), 20)
+            self.assertEqual(text.count("────────────────────"), 20)
+            # Every writer's evaluator name and output appear, intact.
+            for i in range(20):
+                self.assertIn(f"evaluator: ev{i}", text)
+                self.assertIn(f"output: OUT{i}", text)
+
+            # No block has another block's header spliced inside it: between a
+            # header and its closing footer there must be no second header.
+            blocks = text.split("──── judge call ────")[1:]
+            for b in blocks:
+                body = b.split("────────────────────")[0]
+                self.assertNotIn("judge call", body)
+
 
 class TestStreamTee(unittest.TestCase):
     def test_writes_to_both(self):
