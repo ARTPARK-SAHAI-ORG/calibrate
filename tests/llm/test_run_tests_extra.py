@@ -782,6 +782,26 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         self.assertEqual(jobs, [])
         self.assertEqual(lines, _tool_call_arguments_diff_lines(expected, actual))
 
+    def test_literal_differ_does_not_interpret_specs(self):
+        # The criteria-agnostic wrapper (used by the aggregation fallback and by
+        # `exact` values) must treat a spec-looking dict as a literal, never as
+        # an instruction — and never raise on a malformed-looking spec.
+        from calibrate.llm.run_tests import _tool_call_arguments_diff_lines
+
+        spec_like = {"match_type": "llm_judge", "criteria": "x"}
+        # Equal spec-like dicts → match (compared verbatim, not judged).
+        self.assertEqual(
+            _tool_call_arguments_diff_lines({"p": spec_like}, {"p": dict(spec_like)}),
+            [],
+        )
+        # Different spec-like dicts → a plain value-mismatch line, no judging,
+        # and no ValueError even though match_type would be "invalid".
+        lines = _tool_call_arguments_diff_lines(
+            {"p": {"match_type": "invalid"}}, {"p": "actual"}
+        )
+        self.assertEqual(len(lines), 1)
+        self.assertIn("p:", lines[0])
+
 
 class TestAggregateToolCallsStored(unittest.TestCase):
     def test_reads_stored_tool_call_results(self):

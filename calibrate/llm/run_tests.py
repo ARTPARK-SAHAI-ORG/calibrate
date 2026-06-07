@@ -551,32 +551,15 @@ def _tool_call_argument_value_mismatch_line(key_path: str, expected, actual) -> 
 def _tool_call_arguments_diff_lines(
     expected: dict, actual: dict, prefix: str = ""
 ) -> List[str]:
-    """List per-field mismatch lines for two argument dicts (recursive for nested dicts)."""
+    """List per-field mismatch lines for two argument dicts (recursive).
+
+    Criteria-agnostic: every value is compared literally. This is the
+    exact-match view used by the aggregation fallback and by ``exact`` specs
+    (whose value must be matched verbatim). It is a thin wrapper over
+    :func:`_collect_arg_diffs` with criteria interpretation disabled.
+    """
     lines: List[str] = []
-    for key in _sorted_union_dict_keys(expected, actual):
-        path = f"{prefix}.{key}" if prefix else key
-        in_exp = key in expected
-        in_act = key in actual
-        if not in_exp:
-            lines.append(
-                f"  {path}: unexpected key in actual output (value {actual[key]!r})"
-            )
-            continue
-        if not in_act:
-            lines.append(
-                f"  {path}: missing in actual output (expected {expected[key]!r})"
-            )
-            continue
-        ev, av = expected[key], actual[key]
-        if ev == av:
-            continue
-        if isinstance(ev, dict) and isinstance(av, dict):
-            lines.extend(_tool_call_arguments_diff_lines(ev, av, path))
-            continue
-        if isinstance(ev, list) and isinstance(av, list):
-            lines.append(_tool_call_argument_value_mismatch_line(path, ev, av))
-            continue
-        lines.append(_tool_call_argument_value_mismatch_line(path, ev, av))
+    _collect_arg_diffs(expected, actual, prefix, lines, [], criteria_aware=False)
     return lines
 
 
@@ -697,19 +680,21 @@ def _collect_arg_diffs(
     prefix: str,
     lines: List[str],
     judge_jobs: List[tuple],
+    *,
+    criteria_aware: bool = True,
 ) -> None:
-    """Recursively diff expected vs. actual argument dicts, criteria-aware.
+    """Recursively diff expected vs. actual argument dicts.
 
-    Walks every level so a criteria spec may sit on a top-level parameter *or*
-    on any sub-parameter of a nested object. For each expected key:
+    The single walk behind both exact and criteria-aware matching:
 
-    - ``llm_judge`` spec → queue ``(path, spec, actual_value)`` in
-      ``judge_jobs`` (judged after the walk); a missing value adds a line.
-    - ``exact`` spec → compare its ``value`` literally (nested dicts diffed by
-      the synchronous, criteria-agnostic differ — an ``exact`` value is taken
-      verbatim, specs inside it are not re-interpreted).
-    - plain nested object → recurse, so sub-parameters can themselves be specs.
-    - plain literal → exact comparison.
+    - ``criteria_aware=True`` (default): a value may be a criteria spec — an
+      ``llm_judge`` field is queued in ``judge_jobs`` (judged after the walk; a
+      missing value adds a line), an ``exact`` field is unwrapped to its literal
+      value, and a plain nested object is recursed into so its sub-parameters
+      can themselves be specs.
+    - ``criteria_aware=False``: every value is compared literally; specs are not
+      interpreted. Used by the aggregation fallback and by ``exact`` values
+      (matched verbatim — specs inside them are not re-interpreted).
 
     Mismatch lines (with dotted ``path`` prefixes) are appended to ``lines``.
     Synchronous: judging runs afterwards so all calls can be issued at once.
@@ -723,7 +708,7 @@ def _collect_arg_diffs(
             )
             continue
 
-        spec = _param_criteria_spec(expected[key], path)
+        spec = _param_criteria_spec(expected[key], path) if criteria_aware else None
         if spec is not None and spec["match_type"] == "llm_judge":
             if not in_act:
                 lines.append(
@@ -742,10 +727,13 @@ def _collect_arg_diffs(
             continue
         if isinstance(ev, dict) and isinstance(av, dict):
             if spec is not None:
-                # exact spec → compare its value literally (no criteria inside)
+                # exact spec → compare its value literally (specs inside an
+                # exact value are not re-interpreted)
                 lines.extend(_tool_call_arguments_diff_lines(ev, av, path))
             else:
-                _collect_arg_diffs(ev, av, path, lines, judge_jobs)
+                _collect_arg_diffs(
+                    ev, av, path, lines, judge_jobs, criteria_aware=criteria_aware
+                )
             continue
         lines.append(_tool_call_argument_value_mismatch_line(path, ev, av))
 
