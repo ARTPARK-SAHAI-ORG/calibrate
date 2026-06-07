@@ -75,7 +75,6 @@ async def run(
     overwrite: bool = False,
     max_parallel: int = MAX_PARALLEL_PROVIDERS,
     judge_evaluators: list[dict] = None,
-    cost_config: dict | None = None,
 ) -> dict:
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
@@ -96,7 +95,6 @@ async def run(
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
             the implicit default STT evaluator runs.
-        cost_config: Optional provider pricing config used to estimate cost.
 
     Returns:
         dict: Results summary with status and output paths
@@ -128,7 +126,6 @@ async def run(
                 ignore_retry=ignore_retry,
                 overwrite=overwrite,
                 judge_evaluators=judge_evaluators,
-                cost_config=cost_config,
             )
             return (provider, result)
 
@@ -279,14 +276,12 @@ async def main():
 
     # Load evaluators from optional config file (shared by both flows)
     judge_evaluators = None
-    cost_config = None
     if args.config:
         import json as _json
 
         with open(args.config) as _f:
             _cfg = _json.load(_f)
         judge_evaluators = _cfg.get("evaluators")
-        cost_config = _cfg.get("costs") or _cfg.get("cost")
 
     # Eval-only mode owns ``output_dir/logs`` itself via the provider_log
     # contextvar, so we don't set up a benchmark-level StreamTee here —
@@ -355,7 +350,6 @@ async def main():
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
-            cost_config=cost_config,
         )
 
         # Print summary
@@ -386,10 +380,8 @@ async def main():
                 judge_str = ", ".join(
                     f"{k}={v:.4f}" for k, v in judge_scores.items()
                 )
-                cost = metrics.get("cost")
-                cost_str = ""
-                if isinstance(cost, dict) and cost.get("estimated_total_cost_usd") is not None:
-                    cost_str = f", cost=${cost['estimated_total_cost_usd']:.6f}"
+                cost_usd = metrics["cost"]["estimated_total_cost_usd"]
+                cost_str = f", cost=${cost_usd:.6f}"
                 print(f"  {provider}: WER={wer:.4f}, {judge_str}{cost_str}")
 
         if has_errors:

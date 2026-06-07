@@ -11,6 +11,30 @@ from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
 
+class TestWavDurationSeconds(unittest.TestCase):
+    def test_reads_wav_duration(self):
+        from calibrate.utils import get_wav_duration_seconds
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "sample.wav"
+            with wave.open(str(path), "wb") as wav_file:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(8000)
+                wav_file.writeframes(b"\0\0" * 4000)
+
+            self.assertEqual(get_wav_duration_seconds(path), 0.5)
+
+    def test_invalid_wav_returns_none(self):
+        from calibrate.utils import get_wav_duration_seconds
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "bad.wav"
+            path.write_text("not a wav")
+
+            self.assertIsNone(get_wav_duration_seconds(path))
+
+
 class TestLanguageCodes(unittest.TestCase):
     def test_get_stt_language_codes_per_provider(self):
         from calibrate.utils import get_stt_language_code

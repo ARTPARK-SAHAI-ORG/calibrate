@@ -107,8 +107,8 @@ def _read_leaderboard_metrics(metrics_path: Path) -> dict:
 def _flatten_cost_metrics(metrics: dict, cost: dict) -> None:
     """Add cost metrics as scalar leaderboard columns."""
     column_map = {
-        "total_audio_minutes": "audio_minutes",
-        "price_per_audio_minute_usd": "cost_per_audio_minute_usd",
+        "total_minutes": "audio_minutes",
+        "price_per_minute_usd": "cost_per_minute_usd",
         "estimated_total_cost_usd": "cost_usd",
     }
     for source_key, target_key in column_map.items():

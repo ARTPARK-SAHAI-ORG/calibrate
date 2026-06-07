@@ -92,8 +92,8 @@ class TestSTTLeaderboard(unittest.TestCase):
                 "wer": 0.1,
                 "semantic_match": {"type": "binary", "mean": 0.9},
                 "cost": {
-                    "total_audio_minutes": 2.0,
-                    "price_per_audio_minute_usd": 0.006,
+                    "total_minutes": 2.0,
+                    "price_per_minute_usd": 0.006,
                     "estimated_total_cost_usd": 0.012,
                 },
             })
@@ -103,7 +103,7 @@ class TestSTTLeaderboard(unittest.TestCase):
 
             summary = pd.read_excel(save_dir / "stt_leaderboard.xlsx", sheet_name="summary")
             self.assertIn("audio_minutes", summary.columns)
-            self.assertIn("cost_per_audio_minute_usd", summary.columns)
+            self.assertIn("cost_per_minute_usd", summary.columns)
             self.assertIn("cost_usd", summary.columns)
             self.assertEqual(float(summary.iloc[0]["cost_usd"]), 0.012)
 

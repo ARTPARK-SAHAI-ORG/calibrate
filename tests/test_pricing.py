@@ -7,82 +7,44 @@ class TestPricingResolver(unittest.TestCase):
 
         pricing = resolve_pricing("stt", "openai")
 
-        self.assertEqual(pricing["billing_unit"], "audio_minute")
+        self.assertEqual(pricing["billing_unit"], "minute")
         self.assertEqual(pricing["model"], "gpt-4o-transcribe")
-        self.assertEqual(pricing["price_per_unit_usd"], 0.006)
+        self.assertEqual(pricing["price_per_minute_usd"], 0.006)
         self.assertEqual(pricing["pricing_source"], "calibrate_default")
 
-    def test_resolves_default_stt_model_pricing(self):
+    def test_resolves_explicit_stt_model_pricing(self):
         from calibrate.pricing import resolve_pricing
 
-        pricing = resolve_pricing("stt", "openai", model="gpt-4o-transcribe")
+        pricing = resolve_pricing("stt", "google", model="chirp_2")
 
-        self.assertEqual(pricing["billing_unit"], "audio_minute")
-        self.assertEqual(pricing["model"], "gpt-4o-transcribe")
-        self.assertEqual(pricing["price_per_unit_usd"], 0.006)
+        self.assertEqual(pricing["billing_unit"], "minute")
+        self.assertEqual(pricing["model"], "chirp_2")
+        self.assertEqual(pricing["price_per_minute_usd"], 0.016)
 
-    def test_nested_override_wins(self):
+    def test_resolves_all_supported_stt_provider_defaults(self):
+        from calibrate.pricing import STT_DEFAULT_MODELS, resolve_pricing
+
+        for provider, model in STT_DEFAULT_MODELS.items():
+            with self.subTest(provider=provider):
+                pricing = resolve_pricing("stt", provider)
+                self.assertEqual(pricing["model"], model)
+                self.assertIsInstance(pricing["price_per_minute_usd"], float)
+
+    def test_provider_lookup_is_case_insensitive(self):
         from calibrate.pricing import resolve_pricing
 
-        pricing = resolve_pricing(
-            "stt",
-            "openai",
-            overrides={"stt": {"openai": {"price_per_minute_usd": 0.01}}},
-        )
+        pricing = resolve_pricing("stt", "OpenAI", model="GPT-4O-TRANSCRIBE")
 
-        self.assertEqual(pricing["price_per_unit_usd"], 0.01)
-        self.assertEqual(pricing["pricing_source"], "config_override")
+        self.assertEqual(pricing["model"], "GPT-4O-TRANSCRIBE")
+        self.assertEqual(pricing["price_per_minute_usd"], 0.006)
 
-    def test_model_override_wins(self):
-        from calibrate.pricing import resolve_pricing
-
-        pricing = resolve_pricing(
-            "stt",
-            "openai",
-            model="gpt-4o-transcribe",
-            overrides={
-                "stt": {
-                    "openai": {
-                        "models": {
-                            "gpt-4o-transcribe": {
-                                "billing_unit": "audio_minute",
-                                "price_per_unit_usd": 0.03,
-                            }
-                        }
-                    }
-                }
-            },
-        )
-
-        self.assertEqual(pricing["model"], "gpt-4o-transcribe")
-        self.assertEqual(pricing["price_per_unit_usd"], 0.03)
-        self.assertEqual(pricing["pricing_source"], "config_override")
-
-    def test_bare_override_shape_is_supported(self):
-        from calibrate.pricing import resolve_pricing
-
-        pricing = resolve_pricing(
-            "stt",
-            "openai",
-            overrides={"price_per_minute_usd": 0.02},
-        )
-
-        self.assertEqual(pricing["price_per_unit_usd"], 0.02)
-        self.assertEqual(pricing["pricing_source"], "config_override")
-
-    def test_invalid_override_falls_back_to_default(self):
-        from calibrate.pricing import resolve_pricing
-
-        pricing = resolve_pricing(
-            "stt",
-            "openai",
-            overrides={"openai": {"price_per_minute_usd": "bad"}},
-        )
-
-        self.assertEqual(pricing["price_per_unit_usd"], 0.006)
-        self.assertEqual(pricing["pricing_source"], "calibrate_default")
-
-    def test_unknown_provider_without_override_returns_none(self):
+    def test_unknown_provider_returns_none(self):
         from calibrate.pricing import resolve_pricing
 
         self.assertIsNone(resolve_pricing("stt", "unknown"))
+
+    def test_unsupported_component_raises(self):
+        from calibrate.pricing import resolve_pricing
+
+        with self.assertRaises(ValueError):
+            resolve_pricing("tts", "openai")

@@ -6,7 +6,6 @@ import json
 import base64
 import time
 import httpx
-import wave
 from os.path import join, exists
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +27,7 @@ import pandas as pd
 
 from calibrate.utils import (
     get_stt_language_code,
+    get_wav_duration_seconds,
     validate_stt_language,
     provider_log as _log,
     provider_log_file as _current_log_file,
@@ -48,7 +48,7 @@ from calibrate.langfuse import (
     langfuse,
     langfuse_enabled,
 )
-from calibrate.pricing import resolve_pricing
+from calibrate.pricing import STT_DEFAULT_MODELS, resolve_pricing
 from calibrate.rate_limit import SARVAM_STT_STREAMING_LIMITER
 
 
@@ -57,22 +57,30 @@ from calibrate.rate_limit import SARVAM_STT_STREAMING_LIMITER
 # =============================================================================
 
 
-def _get_wav_duration_seconds(audio_path: Path) -> float | None:
-    """Return WAV duration in seconds, or None when it cannot be read."""
-    try:
-        with wave.open(str(audio_path), "rb") as wav_file:
-            frame_rate = wav_file.getframerate()
-            if frame_rate <= 0:
-                return None
-            return wav_file.getnframes() / float(frame_rate)
-    except Exception:
-        return None
+def _default_stt_model(provider: str, language: str | None = None) -> str | None:
+    if provider == "google" and language and language.lower() == "sindhi":
+        return "chirp_2"
+    return STT_DEFAULT_MODELS.get(provider)
+
+
+def _stt_result_row(
+    row_id: object,
+    gt_text: object,
+    pred_text: str,
+    audio_dir: Path,
+) -> dict:
+    return {
+        "id": row_id,
+        "gt": gt_text,
+        "pred": pred_text,
+        "audio_duration_seconds": get_wav_duration_seconds(audio_dir / f"{row_id}.wav"),
+    }
 
 
 def _build_stt_cost_metrics(
     provider: str,
     audio_duration_seconds: list[float | None] | None,
-    cost_config: dict | None = None,
+    model: str | None = None,
 ) -> dict | None:
     """Build STT cost metrics from audio duration and provider price config."""
     durations = [
@@ -83,32 +91,27 @@ def _build_stt_cost_metrics(
     if not durations:
         return None
 
-    total_audio_seconds = float(sum(durations))
-    total_audio_minutes = total_audio_seconds / 60.0
+    total_seconds = float(sum(durations))
+    total_minutes = total_seconds / 60.0
     metrics = {
         "provider": provider,
+        "pricing_model": model,
         "currency": "USD",
-        "billing_unit": "audio_minute",
-        "total_audio_seconds": total_audio_seconds,
-        "total_audio_minutes": total_audio_minutes,
+        "billing_unit": "minute",
+        "total_seconds": total_seconds,
+        "total_minutes": total_minutes,
         "pricing_source": "unavailable",
     }
 
-    pricing = resolve_pricing("stt", provider, overrides=cost_config)
+    pricing = resolve_pricing("stt", provider, model=model)
     if not pricing:
         return metrics
 
-    if pricing["billing_unit"] != "audio_minute":
-        return metrics
-
-    price_per_minute = pricing["price_per_unit_usd"]
+    price_per_minute = pricing["price_per_minute_usd"]
     metrics["pricing_source"] = pricing["pricing_source"]
-    if pricing.get("model"):
-        metrics["pricing_model"] = pricing["model"]
-    metrics["price_per_unit_usd"] = price_per_minute
-    metrics["price_per_audio_minute_usd"] = price_per_minute
-    metrics["total_units"] = total_audio_minutes
-    metrics["estimated_total_cost_usd"] = total_audio_minutes * price_per_minute
+    metrics["pricing_model"] = pricing["model"]
+    metrics["price_per_minute_usd"] = price_per_minute
+    metrics["estimated_total_cost_usd"] = total_minutes * price_per_minute
     return metrics
 
 
@@ -741,14 +744,13 @@ async def run_stt_eval(
             raise
 
         # Save immediately after each file
-        audio_duration_seconds = _get_wav_duration_seconds(audio_path)
         results.append(
-            {
-                "id": gt_info["id"],
-                "gt": gt_info["gt"],
-                "pred": transcript,
-                "audio_duration_seconds": audio_duration_seconds,
-            }
+            _stt_result_row(
+                gt_info["id"],
+                gt_info["gt"],
+                transcript,
+                audio_dir,
+            )
         )
         pd.DataFrame(results).to_csv(results_csv_path, index=False)
 
@@ -832,6 +834,7 @@ STT_RESULTS_COLUMNS = [
     "id",
     "gt",
     "pred",
+    "audio_duration_seconds",
 ]
 
 
@@ -910,7 +913,6 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
-    cost_config: dict | None = None,
 ) -> dict:
     """Run STT evaluation for a single provider."""
     provider_output_dir = join(output_dir, provider)
@@ -998,16 +1000,13 @@ async def run_single_provider_eval(
 
                 for gt_info in gt_data:
                     if gt_info["id"] not in processed_ids:
-                        audio_path = audio_dir / f"{gt_info['id']}.wav"
                         results.append(
-                            {
-                                "id": gt_info["id"],
-                                "gt": gt_info["gt"],
-                                "pred": "",
-                                "audio_duration_seconds": _get_wav_duration_seconds(
-                                    audio_path
-                                ),
-                            }
+                            _stt_result_row(
+                                gt_info["id"],
+                                gt_info["gt"],
+                                "",
+                                audio_dir,
+                            )
                         )
 
                 pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -1034,22 +1033,14 @@ async def run_single_provider_eval(
         all_pred_transcripts = results_df["pred"].fillna("").astype(str).tolist()
         audio_durations = []
         for row_index, row_id in enumerate(all_ids):
-            duration = None
-            if "audio_duration_seconds" in results_df.columns:
-                duration = results_df.iloc[row_index]["audio_duration_seconds"]
+            duration = results_df.iloc[row_index]["audio_duration_seconds"]
             if duration is None or pd.isna(duration):
-                duration = _get_wav_duration_seconds(audio_dir / f"{row_id}.wav")
+                duration = get_wav_duration_seconds(audio_dir / f"{row_id}.wav")
             audio_durations.append(duration)
-        row_extras = [
-            {"audio_duration_seconds": duration}
-            if duration is not None and not pd.isna(duration)
-            else {}
-            for duration in audio_durations
-        ]
         cost_metrics = _build_stt_cost_metrics(
             provider=provider,
             audio_duration_seconds=audio_durations,
-            cost_config=cost_config,
+            model=_default_stt_model(provider, language),
         )
 
         _log(f"gt_transcripts: {all_gt_transcripts}", to_terminal=False)
@@ -1065,7 +1056,7 @@ async def run_single_provider_eval(
             output_dir=provider_output_dir,
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
-            row_extras=row_extras,
+            audio_durations=audio_durations,
             cost_metrics=cost_metrics,
         )
 
@@ -1121,7 +1112,7 @@ async def _score_and_write_results(
     output_dir: str,
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
-    row_extras: list[dict] | None = None,
+    audio_durations: list[float | None] | None = None,
     cost_metrics: dict | None = None,
 ) -> dict:
     """Run WER + LLM-judge evaluators over (gt, pred) pairs and write outputs.
@@ -1152,7 +1143,7 @@ async def _score_and_write_results(
     if cost_metrics:
         metrics_data["cost"] = cost_metrics
 
-    row_extras = row_extras or []
+    audio_durations = audio_durations or []
     data = []
     for row_index, (_id, gt_text, pred_text, wer, llm_row) in enumerate(
         zip(
@@ -1163,14 +1154,17 @@ async def _score_and_write_results(
             llm_results["per_row"],
         )
     ):
-        extra = row_extras[row_index] if row_index < len(row_extras) else {}
         row = {
             "id": _id,
             "gt": gt_text,
             "pred": pred_text,
             "wer": wer,
         }
-        row.update(extra or {})
+        duration = (
+            audio_durations[row_index] if row_index < len(audio_durations) else None
+        )
+        if duration is not None and not pd.isna(duration):
+            row["audio_duration_seconds"] = duration
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
             if is_rating(ev):

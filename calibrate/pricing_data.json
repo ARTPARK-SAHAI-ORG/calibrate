@@ -1,0 +1,47 @@
+{
+  "stt": {
+    "deepgram": {
+      "nova-3": {
+        "price_per_minute_usd": 0.0043
+      }
+    },
+    "openai": {
+      "gpt-4o-transcribe": {
+        "price_per_minute_usd": 0.006
+      }
+    },
+    "groq": {
+      "whisper-large-v3-turbo": {
+        "price_per_minute_usd": 0.0006666667
+      }
+    },
+    "google": {
+      "chirp_2": {
+        "price_per_minute_usd": 0.016
+      },
+      "chirp_3": {
+        "price_per_minute_usd": 0.016
+      }
+    },
+    "sarvam": {
+      "saaras:v3": {
+        "price_per_minute_usd": 0.006
+      }
+    },
+    "elevenlabs": {
+      "scribe_v2": {
+        "price_per_minute_usd": 0.0036666667
+      }
+    },
+    "cartesia": {
+      "ink-whisper": {
+        "price_per_minute_usd": 0.0021666667
+      }
+    },
+    "smallest": {
+      "pulse_streaming": {
+        "price_per_minute_usd": 0.008
+      }
+    }
+  }
+}
