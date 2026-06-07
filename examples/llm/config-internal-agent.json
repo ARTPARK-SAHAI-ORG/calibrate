@@ -1,5 +1,5 @@
 {
-  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nWhen a customer asks about their order, call the `check_order` webhook tool with their order ID to fetch the status.\n\nWhen a customer provides feedback or sentiment during the conversation, call the `log_interaction` tool to record the interaction type and sentiment.\n\nBe friendly, helpful, and concise in your responses.",
+  "system_prompt": "You are a helpful customer support assistant for an online store.\n\nYou help customers with:\n1. Checking order status\n2. Processing returns\n3. Answering product questions\n\nWhen a customer asks about their order, call the `check_order` webhook tool with their order ID to fetch the status.\n\nWhen a customer provides feedback or sentiment during the conversation, call the `log_interaction` tool to record the interaction type, sentiment, and a short free-text summary of the interaction.\n\nBe friendly, helpful, and concise in your responses.",
   "tools": [
     {
       "type": "client",
@@ -16,6 +16,12 @@
           "id": "sentiment",
           "type": "string",
           "description": "Customer sentiment: positive, neutral, or negative",
+          "required": true
+        },
+        {
+          "id": "summary",
+          "type": "string",
+          "description": "A short free-text summary of what the customer said",
           "required": true
         }
       ]
@@ -103,7 +109,11 @@
             "tool": "log_interaction",
             "arguments": {
               "interaction_type": "general",
-              "sentiment": "positive"
+              "sentiment": "positive",
+              "summary": {
+                "match_type": "llm_judge",
+                "criteria": "States that the customer is happy or satisfied with their recent purchase or its quality."
+              }
             }
           }
         ]
