@@ -47,6 +47,8 @@ from calibrate.judges import (
     is_rating,
     render_evaluator,
     require_unique_evaluator_names,
+    text_judge,
+    tool_call_param_evaluator,
     write_evaluator_config,
 )
 
@@ -618,23 +620,226 @@ def _tool_call_pair_mismatch(
     return _tool_call_arguments_mismatch_message(exp_args, out_args)
 
 
-def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
+# ── Per-parameter criteria specs (exact match vs. LLM judge) ─────────────────
+
+
+def _param_criteria_spec(value, key: str) -> Optional[dict]:
+    """Interpret an expected-argument value as a per-parameter matching spec.
+
+    A spec is a dict carrying a ``match_type`` key, letting a test case opt a
+    single tool-call parameter out of exact matching::
+
+        {"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}
+        {"match_type": "exact", "value": <literal>}
+
+    Returns the normalized spec, or ``None`` when ``value`` is an ordinary
+    literal (the default, exact-match behavior). Raises ``ValueError`` for a
+    malformed spec.
+    """
+    if not isinstance(value, dict) or "match_type" not in value:
+        return None
+    match_type = value["match_type"]
+    if match_type == "llm_judge":
+        criteria = value.get("criteria")
+        if not isinstance(criteria, str) or not criteria.strip():
+            raise ValueError(
+                f"Tool-call parameter '{key}': an 'llm_judge' match_type "
+                f"requires a non-empty 'criteria' string."
+            )
+        spec = {"match_type": "llm_judge", "criteria": criteria}
+        if value.get("judge_model"):
+            spec["judge_model"] = value["judge_model"]
+        return spec
+    if match_type == "exact":
+        if "value" not in value:
+            raise ValueError(
+                f"Tool-call parameter '{key}': an 'exact' match_type requires "
+                f"a 'value' field holding the literal to match."
+            )
+        return {"match_type": "exact", "value": value["value"]}
+    raise ValueError(
+        f"Tool-call parameter '{key}': match_type must be 'exact' or "
+        f"'llm_judge' (got {match_type!r})."
+    )
+
+
+async def _judge_tool_call_parameter(
+    tool_name: str, param_name: str, spec: dict, actual_value
+) -> dict:
+    """Judge a single tool-call argument value against a criteria via an LLM."""
+    evaluator = render_evaluator(
+        tool_call_param_evaluator(spec.get("judge_model")),
+        {"criteria": spec["criteria"]},
+    )
+    try:
+        value_repr = json.dumps(actual_value, ensure_ascii=False, default=str)
+    except (TypeError, ValueError):
+        value_repr = repr(actual_value)
+    user_prompt = (
+        f"Tool name: {tool_name}\n"
+        f"Argument name: {param_name}\n"
+        f"Actual value produced by the agent: {value_repr}"
+    )
+    results = await text_judge([evaluator], user_prompt)
+    return results.get(
+        evaluator["name"], {"match": False, "reasoning": "Judge returned no result"}
+    )
+
+
+async def _tool_call_arguments_mismatch_lines_async(
+    tool_name: str, expected: dict, actual: dict
+) -> List[str]:
+    """Per-field mismatch lines, judging ``llm_judge`` params via an LLM.
+
+    Literal and ``exact``-spec parameters reuse the synchronous diff machinery;
+    ``llm_judge`` parameters are evaluated concurrently against their criteria.
+    """
+    llm_judge_specs: dict = {}
+    expected_plain: dict = {}
+    for key, raw in expected.items():
+        spec = _param_criteria_spec(raw, key)
+        if spec is None:
+            expected_plain[key] = raw
+        elif spec["match_type"] == "exact":
+            expected_plain[key] = spec["value"]
+        else:
+            llm_judge_specs[key] = spec
+
+    actual_plain = {k: v for k, v in actual.items() if k not in llm_judge_specs}
+    lines = _tool_call_arguments_diff_lines(expected_plain, actual_plain)
+
+    pending: List[tuple] = []
+    for key, spec in llm_judge_specs.items():
+        if key not in actual:
+            lines.append(
+                f"  {key}: missing in actual output (criteria: {spec['criteria']})"
+            )
+        else:
+            pending.append((key, spec, actual[key]))
+
+    if pending:
+        judge_results = await asyncio.gather(
+            *[
+                _judge_tool_call_parameter(tool_name, key, spec, value)
+                for key, spec, value in pending
+            ]
+        )
+        for (key, _spec, _value), result in zip(pending, judge_results):
+            if not result.get("match"):
+                lines.append(
+                    f"  {key}: criteria not met — {result.get('reasoning', '')}"
+                )
+    return lines
+
+
+async def _tool_call_arguments_mismatch_message_async(
+    tool_name: str, expected, actual
+) -> Optional[str]:
+    """Async variant of :func:`_tool_call_arguments_mismatch_message`.
+
+    Returns ``None`` when the arguments match (including when every
+    ``llm_judge`` parameter satisfies its criteria), else a multi-line reason.
+    """
+    header = "Tool call arguments mismatch:"
+    if not isinstance(expected, dict):
+        return (
+            f"{header}\n"
+            f"  arguments: cannot diff — expected non-dict {type(expected).__name__} "
+            f"{expected!r}, got {type(actual).__name__} {actual!r}"
+        )
+    if not isinstance(actual, dict):
+        return (
+            f"{header}\n"
+            f"  arguments: expected dict {expected!r}, "
+            f"got {type(actual).__name__} {actual!r}"
+        )
+    detail_lines = await _tool_call_arguments_mismatch_lines_async(
+        tool_name, expected, actual
+    )
+    if not detail_lines:
+        return None
+    return header + "\n" + "\n".join(detail_lines)
+
+
+async def _tool_call_pair_mismatch_async(
+    output_tool_call: dict, evaluation_tool_call: dict
+) -> Optional[str]:
+    """Async pair matcher supporting per-parameter ``llm_judge`` criteria.
+
+    Equivalent to :func:`_tool_call_pair_mismatch` when no parameter carries a
+    criteria spec.
+    """
+    if output_tool_call["tool"] != evaluation_tool_call["tool"]:
+        return (
+            f"Tool call mismatch - expected tool call: {evaluation_tool_call['tool']} "
+            f"but got: {output_tool_call['tool']}"
+        )
+    if "arguments" not in evaluation_tool_call:
+        return None
+    exp_args = evaluation_tool_call.get("arguments")
+    if exp_args is None:
+        return None
+    out_args = output_tool_call.get("arguments")
+    if out_args == exp_args:
+        return None
+    return await _tool_call_arguments_mismatch_message_async(
+        evaluation_tool_call["tool"], exp_args, out_args
+    )
+
+
+async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
+    """Evaluate produced tool calls against expected ones.
+
+    Each expected argument is matched exactly by default; a parameter whose
+    expected value is a criteria spec (see :func:`_param_criteria_spec`) is
+    instead graded by an LLM judge.
+
+    Returns ``passed`` / ``reasoning`` plus ``tool_call_results`` — a per-slot
+    ``[{"tool": name, "passed": bool}]`` list (sorted order, missing output
+    slots marked failed) consumed by :func:`_aggregate_tool_calls`.
+    """
+    evaluation_sorted = sort_tool_calls(evaluation_tool_calls or [])
+
     if not output_tool_calls:
-        return {"passed": False, "reasoning": "No tool calls were generated by the LLM"}
+        return {
+            "passed": False,
+            "reasoning": "No tool calls were generated by the LLM",
+            "tool_call_results": [
+                {"tool": tc["tool"], "passed": False}
+                for tc in evaluation_sorted
+                if tc.get("tool")
+            ],
+        }
 
-    output_tool_calls = sort_tool_calls(output_tool_calls)
-    evaluation_tool_calls = sort_tool_calls(evaluation_tool_calls)
+    output_sorted = sort_tool_calls(output_tool_calls)
 
-    for output_tool_call, evaluation_tool_call in zip(
-        output_tool_calls, evaluation_tool_calls
-    ):
-        mismatch = _tool_call_pair_mismatch(output_tool_call, evaluation_tool_call)
-        if mismatch:
-            return {"passed": False, "reasoning": mismatch}
+    tool_call_results: List[dict] = []
+    first_failure: Optional[str] = None
+    for i, evaluation_tool_call in enumerate(evaluation_sorted):
+        name = evaluation_tool_call.get("tool")
+        if i >= len(output_sorted):
+            if name:
+                tool_call_results.append({"tool": name, "passed": False})
+            continue
+        mismatch = await _tool_call_pair_mismatch_async(
+            output_sorted[i], evaluation_tool_call
+        )
+        if name:
+            tool_call_results.append({"tool": name, "passed": mismatch is None})
+        if mismatch and first_failure is None:
+            first_failure = mismatch
+
+    if first_failure is not None:
+        return {
+            "passed": False,
+            "reasoning": first_failure,
+            "tool_call_results": tool_call_results,
+        }
 
     return {
         "passed": True,
         "reasoning": "Tool calls matched expected",
+        "tool_call_results": tool_call_results,
     }
 
 
@@ -831,7 +1036,7 @@ async def evaluate_test_case_output(
             ),
         )
     if evaluation["type"] == "tool_call":
-        return evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
+        return await evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
         tool_calls = output["tool_calls"]
         return await _evaluate_response(
@@ -1042,6 +1247,11 @@ def _aggregate_tool_calls(results: List[dict]) -> dict:
     matches at that index (tool name and optional arguments), not from the
     case-level ``metrics.passed`` flag.
 
+    Per-slot results are read from ``metrics.tool_call_results`` (produced by
+    :func:`evaluate_tool_calls`) so LLM-judged parameters are not re-graded
+    here. Results that predate that field fall back to a synchronous,
+    exact-match recompute from the stored output.
+
     Per-tool output shape: ``{"passed": int, "total": int, "pass_rate": float}``.
     """
     totals: defaultdict = defaultdict(lambda: {"passed": 0, "total": 0})
@@ -1052,11 +1262,20 @@ def _aggregate_tool_calls(results: List[dict]) -> dict:
         if evaluation.get("type") != "tool_call":
             continue
 
-        output = result.get("output") or {}
-        output_tool_calls = output.get("tool_calls") or []
-        for name, slot_passed in _per_slot_tool_passes(
-            output_tool_calls, evaluation.get("tool_calls")
-        ):
+        stored = (result.get("metrics") or {}).get("tool_call_results")
+        if stored is not None:
+            slot_passes = [
+                (slot.get("tool"), bool(slot.get("passed")))
+                for slot in stored
+                if slot.get("tool")
+            ]
+        else:
+            output = result.get("output") or {}
+            slot_passes = _per_slot_tool_passes(
+                output.get("tool_calls") or [], evaluation.get("tool_calls")
+            )
+
+        for name, slot_passed in slot_passes:
             totals[name]["total"] += 1
             if slot_passed:
                 totals[name]["passed"] += 1

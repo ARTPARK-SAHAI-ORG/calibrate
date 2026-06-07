@@ -348,17 +348,19 @@ class TestToolCallPairs(unittest.TestCase):
     def test_evaluate_tool_calls_empty_output(self):
         from calibrate.llm.run_tests import evaluate_tool_calls
 
-        result = evaluate_tool_calls([], [{"tool": "a"}])
+        result = asyncio.run(evaluate_tool_calls([], [{"tool": "a"}]))
         self.assertFalse(result["passed"])
+        self.assertEqual(result["tool_call_results"], [{"tool": "a", "passed": False}])
 
     def test_evaluate_tool_calls_pass(self):
         from calibrate.llm.run_tests import evaluate_tool_calls
 
-        result = evaluate_tool_calls(
+        result = asyncio.run(evaluate_tool_calls(
             [{"tool": "a", "arguments": {}}],
             [{"tool": "a", "arguments": {}}],
-        )
+        ))
         self.assertTrue(result["passed"])
+        self.assertEqual(result["tool_call_results"], [{"tool": "a", "passed": True}])
 
     def test_per_slot_passes_empty_expected(self):
         from calibrate.llm.run_tests import _per_slot_tool_passes
@@ -380,6 +382,210 @@ class TestToolCallPairs(unittest.TestCase):
         )
         # First slot passes (alphabetical "a" matches), second slot fails (no output for b)
         self.assertEqual(result, [("a", True), ("b", False)])
+
+
+class TestParamCriteriaSpec(unittest.TestCase):
+    def test_literal_returns_none(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        self.assertIsNone(_param_criteria_spec("hello", "x"))
+        self.assertIsNone(_param_criteria_spec({"nested": 1}, "x"))
+        self.assertIsNone(_param_criteria_spec(5, "x"))
+
+    def test_llm_judge_spec(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        spec = _param_criteria_spec(
+            {"match_type": "llm_judge", "criteria": "a polite greeting",
+             "judge_model": "openai/gpt-4.1"},
+            "msg",
+        )
+        self.assertEqual(spec["match_type"], "llm_judge")
+        self.assertEqual(spec["criteria"], "a polite greeting")
+        self.assertEqual(spec["judge_model"], "openai/gpt-4.1")
+
+    def test_llm_judge_requires_criteria(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        with self.assertRaises(ValueError):
+            _param_criteria_spec({"match_type": "llm_judge"}, "msg")
+        with self.assertRaises(ValueError):
+            _param_criteria_spec({"match_type": "llm_judge", "criteria": "  "}, "msg")
+
+    def test_exact_spec(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        spec = _param_criteria_spec({"match_type": "exact", "value": 42}, "x")
+        self.assertEqual(spec, {"match_type": "exact", "value": 42})
+
+    def test_exact_requires_value(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        with self.assertRaises(ValueError):
+            _param_criteria_spec({"match_type": "exact"}, "x")
+
+    def test_unknown_match_type(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        with self.assertRaises(ValueError):
+            _param_criteria_spec({"match_type": "fuzzy", "criteria": "x"}, "x")
+
+
+class TestEvaluateToolCallsCriteria(unittest.TestCase):
+    @staticmethod
+    def _judge_returning(match, reasoning="because"):
+        async def fake_text_judge(evaluators, user_prompt, *a, **k):
+            name = evaluators[0]["name"]
+            return {name: {"match": match, "reasoning": reasoning}}
+
+        return fake_text_judge
+
+    def test_llm_judge_param_pass(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge",
+            side_effect=self._judge_returning(True),
+        ) as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "send_sms", "arguments": {"message": "Hi there, welcome!"}}],
+                [{"tool": "send_sms", "arguments": {
+                    "message": {"match_type": "llm_judge",
+                                "criteria": "a friendly greeting"}}}],
+            ))
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["tool_call_results"],
+                         [{"tool": "send_sms", "passed": True}])
+        # The judge prompt should mention the argument name and actual value.
+        prompt = mock_judge.call_args.kwargs.get("user_prompt") or mock_judge.call_args.args[1]
+        self.assertIn("send_sms", prompt)
+        self.assertIn("message", prompt)
+        self.assertIn("Hi there, welcome!", prompt)
+
+    def test_llm_judge_param_fail(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge",
+            side_effect=self._judge_returning(False, "not a greeting"),
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "send_sms", "arguments": {"message": "Your code is 1234"}}],
+                [{"tool": "send_sms", "arguments": {
+                    "message": {"match_type": "llm_judge",
+                                "criteria": "a friendly greeting"}}}],
+            ))
+        self.assertFalse(result["passed"])
+        self.assertIn("message", result["reasoning"])
+        self.assertIn("not a greeting", result["reasoning"])
+        self.assertEqual(result["tool_call_results"],
+                         [{"tool": "send_sms", "passed": False}])
+
+    def test_llm_judge_not_invoked_for_exact_params(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
+                [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
+            ))
+        self.assertTrue(result["passed"])
+        mock_judge.assert_not_called()
+
+    def test_exact_spec_matches_literal_value(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"x": {"match_type": "exact", "value": 1}}}],
+                [{"tool": "a", "arguments": {
+                    "x": {"match_type": "exact",
+                          "value": {"match_type": "exact", "value": 1}}}}],
+            ))
+        self.assertTrue(result["passed"])
+        mock_judge.assert_not_called()
+
+    def test_llm_judge_param_missing_in_output(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {}}],
+                [{"tool": "a", "arguments": {
+                    "msg": {"match_type": "llm_judge", "criteria": "a greeting"}}}],
+            ))
+        self.assertFalse(result["passed"])
+        self.assertIn("missing in actual", result["reasoning"])
+        mock_judge.assert_not_called()
+
+    def test_mixed_literal_and_judge_params(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge",
+            side_effect=self._judge_returning(True),
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"id": 7, "note": "looks good"}}],
+                [{"tool": "a", "arguments": {
+                    "id": 7,
+                    "note": {"match_type": "llm_judge", "criteria": "positive"}}}],
+            ))
+        self.assertTrue(result["passed"])
+
+    def test_literal_mismatch_alongside_passing_judge(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate.llm.run_tests.text_judge",
+            side_effect=self._judge_returning(True),
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"id": 9, "note": "looks good"}}],
+                [{"tool": "a", "arguments": {
+                    "id": 7,
+                    "note": {"match_type": "llm_judge", "criteria": "positive"}}}],
+            ))
+        self.assertFalse(result["passed"])
+        self.assertIn("id", result["reasoning"])
+
+
+class TestAggregateToolCallsStored(unittest.TestCase):
+    def test_reads_stored_tool_call_results(self):
+        from calibrate.llm.run_tests import _aggregate_tool_calls
+
+        results = [
+            {
+                "test_case": {"evaluation": {"type": "tool_call",
+                                             "tool_calls": [{"tool": "a"}]}},
+                "metrics": {"tool_call_results": [{"tool": "a", "passed": True}]},
+                "output": {"tool_calls": []},
+            },
+            {
+                "test_case": {"evaluation": {"type": "tool_call",
+                                             "tool_calls": [{"tool": "a"}]}},
+                "metrics": {"tool_call_results": [{"tool": "a", "passed": False}]},
+                "output": {"tool_calls": []},
+            },
+        ]
+        agg = _aggregate_tool_calls(results)
+        self.assertEqual(agg["a"]["passed"], 1)
+        self.assertEqual(agg["a"]["total"], 2)
+
+    def test_falls_back_when_no_stored_results(self):
+        from calibrate.llm.run_tests import _aggregate_tool_calls
+
+        results = [
+            {
+                "test_case": {"evaluation": {"type": "tool_call",
+                                             "tool_calls": [{"tool": "a", "arguments": {}}]}},
+                "metrics": {},
+                "output": {"tool_calls": [{"tool": "a", "arguments": {}}]},
+            },
+        ]
+        agg = _aggregate_tool_calls(results)
+        self.assertEqual(agg["a"]["passed"], 1)
+        self.assertEqual(agg["a"]["total"], 1)
 
 
 class TestNoResponseJudgeResults(unittest.TestCase):

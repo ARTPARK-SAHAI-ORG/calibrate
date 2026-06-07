@@ -120,6 +120,45 @@ Use tool call tests when you expect the agent to invoke a specific tool. You def
   arguments in the actual output are allowed and won't cause a failure.
 </Note>
 
+#### Judging a parameter against criteria
+
+For arguments whose value varies (a generated message, a free-text summary),
+exact matching is too strict. Instead of a literal value, give a parameter a
+**criteria spec** and an LLM judge decides whether the produced value satisfies
+it. Each parameter is matched independently — mix literal (exact) and judged
+parameters in the same tool call:
+
+```python
+{
+    "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+            {
+                "tool": "send_sms",
+                "arguments": {
+                    # exact match (default)
+                    "phone_number": "555-123-4567",
+                    # judged by an LLM against the criteria
+                    "message": {
+                        "match_type": "llm_judge",
+                        "criteria": "A friendly appointment reminder that includes the date",
+                        "judge_model": "openai/gpt-4.1"  # optional override
+                    }
+                }
+            }
+        ]
+    }
+}
+```
+
+Each parameter value is one of:
+
+| `match_type`  | Shape                                                                  | Behavior                                                                              |
+| ------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| (none)        | a literal value, e.g. `"555-123-4567"`                                 | Exact match (default).                                                                |
+| `"exact"`     | `{"match_type": "exact", "value": <literal>}`                          | Exact match; use to match a value that itself looks like a spec dict.                 |
+| `"llm_judge"` | `{"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}` | An LLM judge checks the produced value against `criteria`. `judge_model` is optional. |
+
 ### Response Tests
 
 Use response tests when you expect the agent to reply with text. Since natural language varies, you define **criteria** that describe what a good response looks like:

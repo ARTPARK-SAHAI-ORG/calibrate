@@ -99,6 +99,21 @@ DEFAULT_LLM_TEST_EVALUATOR = {
     "type": BINARY,
 }
 
+DEFAULT_TOOL_CALL_PARAM_EVALUATOR = {
+    "name": "tool_call_parameter",
+    "system_prompt": (
+        "You are a highly accurate evaluator checking whether the value an "
+        "agent produced for a single tool-call argument satisfies a given "
+        "criteria.\n\n"
+        "You will be given the tool name, the argument name, and the actual "
+        "value the agent produced for that argument.\n\n"
+        "Mark `match` true only if the actual value satisfies the following "
+        "criteria, and false otherwise:\n\n{{criteria}}"
+    ),
+    "judge_model": DEFAULT_TEXT_JUDGE_MODEL,
+    "type": BINARY,
+}
+
 DEFAULT_STT_EVALUATOR = {
     "name": "semantic_match",
     "system_prompt": (
@@ -353,6 +368,19 @@ def render_template(template: str, arguments: dict) -> str:
     for key, value in (arguments or {}).items():
         out = out.replace("{{" + key + "}}", str(value))
     return out
+
+
+def tool_call_param_evaluator(judge_model: Optional[str] = None) -> dict:
+    """Return a copy of the default tool-call parameter evaluator.
+
+    Used by the LLM tool-call test runner to judge a single tool-call argument
+    value against a free-text criteria. ``judge_model``, when provided,
+    overrides the evaluator's default ``judge_model``.
+    """
+    evaluator = dict(DEFAULT_TOOL_CALL_PARAM_EVALUATOR)
+    if judge_model:
+        evaluator["judge_model"] = judge_model
+    return evaluator
 
 
 def render_evaluator(evaluator: dict, arguments: Optional[dict] = None) -> dict:
