@@ -209,6 +209,12 @@ Examples:
     stt_parser.add_argument("--ignore_retry", action="store_true")
     stt_parser.add_argument("--overwrite", action="store_true")
     stt_parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of providers to evaluate in parallel (overrides CALIBRATE_STT_BENCHMARK_PARALLEL; default 2)",
+    )
+    stt_parser.add_argument(
         "--leaderboard",
         action="store_true",
         help="Generate leaderboard after evaluation (for single provider)",
@@ -254,6 +260,12 @@ Examples:
     tts_parser.add_argument("-d", "--debug", action="store_true")
     tts_parser.add_argument("-dc", "--debug_count", type=int, default=5)
     tts_parser.add_argument("--overwrite", action="store_true")
+    tts_parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of providers to evaluate in parallel (overrides CALIBRATE_TTS_BENCHMARK_PARALLEL; default 2)",
+    )
     tts_parser.add_argument(
         "--leaderboard",
         action="store_true",
@@ -491,6 +503,8 @@ Examples:
                 argv.extend(["-s", args.save_dir])
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.benchmark_parallel is not None:
+                argv.extend(["--benchmark-parallel", str(args.benchmark_parallel)])
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -514,6 +528,8 @@ Examples:
                 argv.append("--overwrite")
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.benchmark_parallel is not None:
+                argv.extend(["--benchmark-parallel", str(args.benchmark_parallel)])
 
             sys.argv = argv
             asyncio.run(tts_benchmark_main())
