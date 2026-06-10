@@ -4,7 +4,7 @@ import re
 import sys
 import uuid
 from collections import defaultdict
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, List, Optional, TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -250,6 +250,35 @@ def _resolve_test_parallel(cli_value: Optional[int] = None) -> int:
         except ValueError:
             pass
     return DEFAULT_TEST_PARALLEL
+
+
+async def _run_items_parallel(
+    items: List[Any],
+    process: "Callable[[int, Any], Awaitable[dict]]",
+    results_file_path: str,
+    test_parallel: Optional[int] = None,
+) -> List[dict]:
+    """Run ``process(index, item)`` over ``items`` with bounded concurrency.
+
+    Concurrency is capped by ``_resolve_test_parallel(test_parallel)``. Results
+    are collected in input order regardless of completion order, and the
+    partial (in-order) ``results.json`` is rewritten after each item completes.
+    Returns the ordered list of results.
+    """
+    results: List[Optional[dict]] = [None] * len(items)
+    semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
+    write_lock = asyncio.Lock()
+
+    async def run_one(index: int, item: Any) -> None:
+        async with semaphore:
+            results[index] = await process(index, item)
+            # Save intermediate results as each item completes (in order).
+            async with write_lock:
+                with open(results_file_path, "w") as f:
+                    json.dump([r for r in results if r is not None], f, indent=4)
+
+    await asyncio.gather(*[run_one(i, item) for i, item in enumerate(items)])
+    return results
 
 
 # Strip ANSI color codes when mirroring terminal output to results.log
@@ -1577,8 +1606,6 @@ async def run_model_tests(
     _print_and_log(f"\033[94mModel: {label}\033[0m", print_log_save_path)
     _print_and_log(f"\033[94m{'='*60}\033[0m\n", print_log_save_path)
 
-    test_cases = config["test_cases"]
-    results: List[Optional[dict]] = [None] * len(test_cases)
     results_file_path = join(model_output_dir, "results.json")
 
     unique_id = str(uuid.uuid4())
@@ -1589,66 +1616,57 @@ async def run_model_tests(
     tools = config.get("tools") or []
     system_prompt = config.get("system_prompt", "")
 
-    semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
-    write_lock = asyncio.Lock()
-
-    async def run_one(test_case_index: int, test_case: dict) -> None:
-        async with semaphore:
-            evaluation = test_case["evaluation"]
-            preprocessed_history = preprocess_conversation_history(
-                test_case["history"], tools
+    async def process(test_case_index: int, test_case: dict) -> dict:
+        evaluation = test_case["evaluation"]
+        preprocessed_history = preprocess_conversation_history(
+            test_case["history"], tools
+        )
+        resolved_evaluators = (
+            _resolve_evaluators_for_test_case(
+                evaluation,
+                _get_name_to_evaluator_dict(
+                    config,
+                    include_default=(evaluation.get("type") == "response"),
+                ),
             )
-            resolved_evaluators = (
-                _resolve_evaluators_for_test_case(
-                    evaluation,
-                    _get_name_to_evaluator_dict(
-                        config,
-                        include_default=(evaluation.get("type") == "response"),
-                    ),
-                )
-                if evaluation.get("type") in ("response", "conversation")
-                else None
+            if evaluation.get("type") in ("response", "conversation")
+            else None
+        )
+
+        result = await run_test(
+            chat_history=preprocessed_history,
+            evaluation=evaluation,
+            system_prompt=system_prompt,
+            model=model,
+            provider=provider,
+            tools=tools,
+            unique_id=unique_id,
+            evaluators=resolved_evaluators,
+        )
+
+        if result["metrics"]["passed"]:
+            _print_and_log(
+                f"[{label}] ✅ Test case {test_case_index + 1} passed",
+                print_log_save_path,
+            )
+        else:
+            _print_and_log(
+                f"[{label}] ❌ Test case {test_case_index + 1} failed",
+                print_log_save_path,
+            )
+        if "reasoning" in result["metrics"]:
+            _print_and_log(
+                f"  Reason: {result['metrics']['reasoning']}",
+                print_log_save_path,
             )
 
-            result = await run_test(
-                chat_history=preprocessed_history,
-                evaluation=evaluation,
-                system_prompt=system_prompt,
-                model=model,
-                provider=provider,
-                tools=tools,
-                unique_id=unique_id,
-                evaluators=resolved_evaluators,
-            )
+        if "id" in test_case:
+            result["test_case_id"] = test_case["id"]
+        result["test_case"] = test_case
+        return result
 
-            if result["metrics"]["passed"]:
-                _print_and_log(
-                    f"[{label}] ✅ Test case {test_case_index + 1} passed",
-                    print_log_save_path,
-                )
-            else:
-                _print_and_log(
-                    f"[{label}] ❌ Test case {test_case_index + 1} failed",
-                    print_log_save_path,
-                )
-            if "reasoning" in result["metrics"]:
-                _print_and_log(
-                    f"  Reason: {result['metrics']['reasoning']}",
-                    print_log_save_path,
-                )
-
-            if "id" in test_case:
-                result["test_case_id"] = test_case["id"]
-            result["test_case"] = test_case
-            results[test_case_index] = result
-
-            # Save intermediate results as each test case completes (in order).
-            async with write_lock:
-                with open(results_file_path, "w") as f:
-                    json.dump([r for r in results if r is not None], f, indent=4)
-
-    await asyncio.gather(
-        *[run_one(i, test_case) for i, test_case in enumerate(test_cases)]
+    results = await _run_items_parallel(
+        config["test_cases"], process, results_file_path, test_parallel
     )
 
     total_passed = sum(1 for result in results if result["metrics"]["passed"])
@@ -1798,64 +1816,55 @@ async def run_eval_only_tests(
 
     _print_and_log("\n\033[94mEval-only\033[0m\n", print_log_save_path)
 
-    results: List[Optional[dict]] = [None] * len(dataset)
     results_file_path = join(output_dir, "results.json")
 
     tools = config.get("tools", []) or []
 
-    semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
-    write_lock = asyncio.Lock()
-
-    async def run_one(i: int, item: dict) -> None:
-        async with semaphore:
-            test_case = item["test_case"]
-            evaluation = test_case["evaluation"]
-            resolved_evaluators = (
-                _resolve_evaluators_for_test_case(
-                    evaluation,
-                    _get_name_to_evaluator_dict(
-                        config,
-                        include_default=(evaluation.get("type") == "response"),
-                    ),
-                )
-                if evaluation.get("type") in ("response", "conversation")
-                else None
-            )
-
-            preprocessed_history = preprocess_conversation_history(
-                test_case["history"], tools
-            )
-            output = item["output"]
-            metrics = await evaluate_test_case_output(
-                chat_history=preprocessed_history,
-                evaluation=evaluation,
-                output=output,
-                evaluators=resolved_evaluators,
-                no_response_reasoning_with_tool_calls=(
-                    f"Tool calls present: {output.get('tool_calls')}, but no reply provided"
+    async def process(i: int, item: dict) -> dict:
+        test_case = item["test_case"]
+        evaluation = test_case["evaluation"]
+        resolved_evaluators = (
+            _resolve_evaluators_for_test_case(
+                evaluation,
+                _get_name_to_evaluator_dict(
+                    config,
+                    include_default=(evaluation.get("type") == "response"),
                 ),
-                no_response_reasoning_no_tool_calls="No reply provided",
             )
+            if evaluation.get("type") in ("response", "conversation")
+            else None
+        )
 
-            if metrics["passed"]:
-                _print_and_log(f"✅ Test case {i + 1} passed", print_log_save_path)
-            else:
-                _print_and_log(f"❌ Test case {i + 1} failed", print_log_save_path)
-            if "reasoning" in metrics:
-                _print_and_log(
-                    f"  Reason: {metrics['reasoning']}", print_log_save_path
-                )
+        preprocessed_history = preprocess_conversation_history(
+            test_case["history"], tools
+        )
+        output = item["output"]
+        metrics = await evaluate_test_case_output(
+            chat_history=preprocessed_history,
+            evaluation=evaluation,
+            output=output,
+            evaluators=resolved_evaluators,
+            no_response_reasoning_with_tool_calls=(
+                f"Tool calls present: {output.get('tool_calls')}, but no reply provided"
+            ),
+            no_response_reasoning_no_tool_calls="No reply provided",
+        )
 
-            result = {"output": output, "metrics": metrics, "test_case": test_case}
-            if "id" in test_case:
-                result["test_case_id"] = test_case["id"]
-            results[i] = result
+        if metrics["passed"]:
+            _print_and_log(f"✅ Test case {i + 1} passed", print_log_save_path)
+        else:
+            _print_and_log(f"❌ Test case {i + 1} failed", print_log_save_path)
+        if "reasoning" in metrics:
+            _print_and_log(f"  Reason: {metrics['reasoning']}", print_log_save_path)
 
-            async with write_lock:
-                with open(results_file_path, "w") as f:
-                    json.dump([r for r in results if r is not None], f, indent=4)
+        result = {"output": output, "metrics": metrics, "test_case": test_case}
+        if "id" in test_case:
+            result["test_case_id"] = test_case["id"]
+        return result
 
-    await asyncio.gather(*[run_one(i, item) for i, item in enumerate(dataset)])
+    results = await _run_items_parallel(
+        dataset, process, results_file_path, test_parallel
+    )
 
     passed, total = _write_test_results_outputs(results, output_dir, name_to_evaluator)
     pct = (passed / total * 100) if total else 0.0

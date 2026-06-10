@@ -92,7 +92,7 @@ class _Tests:
             _get_name_to_evaluator_dict,
             _evaluators_for_config_output,
             _resolve_evaluators_for_test_case,
-            _resolve_test_parallel,
+            _run_items_parallel,
         )
         from calibrate.judges import write_evaluator_config
         from calibrate.utils import configure_print_logger, log_and_print
@@ -128,7 +128,6 @@ class _Tests:
 
         configure_print_logger(print_log_save_path)
 
-        results: List[Optional[dict]] = [None] * len(test_cases)
         results_file_path = os.path.join(final_output_dir, "results.json")
 
         # Pass model name to agent for benchmark routing; None for single runs.
@@ -140,64 +139,54 @@ class _Tests:
             output_dir, _evaluators_for_config_output(evaluator_config)
         )
 
-        semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
-        write_lock = asyncio.Lock()
-
-        async def run_one(test_case_index: int, test_case: dict) -> None:
-            async with semaphore:
-                evaluation = test_case["evaluation"]
-                resolved_evaluators = (
-                    _resolve_evaluators_for_test_case(
-                        evaluation,
-                        _get_name_to_evaluator_dict(
-                            evaluator_config,
-                            include_default=(evaluation.get("type") == "response"),
-                        ),
-                    )
-                    if evaluation.get("type") in ("response", "conversation")
-                    else None
+        async def process(test_case_index: int, test_case: dict) -> dict:
+            evaluation = test_case["evaluation"]
+            resolved_evaluators = (
+                _resolve_evaluators_for_test_case(
+                    evaluation,
+                    _get_name_to_evaluator_dict(
+                        evaluator_config,
+                        include_default=(evaluation.get("type") == "response"),
+                    ),
                 )
-                if agent is not None:
-                    result = await _run_test_external(
-                        chat_history=test_case["history"],
-                        evaluation=evaluation,
-                        agent=agent,
-                        model=agent_model_hint,
-                        evaluators=resolved_evaluators,
-                    )
-                else:
-                    result = await _run_test(
-                        chat_history=test_case["history"],
-                        evaluation=evaluation,
-                        system_prompt=system_prompt,
-                        model=model,
-                        provider=provider,
-                        tools=tools,
-                        unique_id=run_name or "",
-                        evaluators=resolved_evaluators,
-                    )
+                if evaluation.get("type") in ("response", "conversation")
+                else None
+            )
+            if agent is not None:
+                result = await _run_test_external(
+                    chat_history=test_case["history"],
+                    evaluation=evaluation,
+                    agent=agent,
+                    model=agent_model_hint,
+                    evaluators=resolved_evaluators,
+                )
+            else:
+                result = await _run_test(
+                    chat_history=test_case["history"],
+                    evaluation=evaluation,
+                    system_prompt=system_prompt,
+                    model=model,
+                    provider=provider,
+                    tools=tools,
+                    unique_id=run_name or "",
+                    evaluators=resolved_evaluators,
+                )
 
-                if result["metrics"]["passed"]:
-                    log_and_print(f"✅ Test case {test_case_index + 1} passed")
-                else:
-                    log_and_print(f"❌ Test case {test_case_index + 1} failed")
-                if "reasoning" in result["metrics"]:
-                    log_and_print(result["metrics"]["reasoning"])
+            if result["metrics"]["passed"]:
+                log_and_print(f"✅ Test case {test_case_index + 1} passed")
+            else:
+                log_and_print(f"❌ Test case {test_case_index + 1} failed")
+            if "reasoning" in result["metrics"]:
+                log_and_print(result["metrics"]["reasoning"])
 
-                if "id" in test_case:
-                    result["test_case_id"] = test_case["id"]
-                result["test_case"] = test_case
-                results[test_case_index] = result
+            if "id" in test_case:
+                result["test_case_id"] = test_case["id"]
+            result["test_case"] = test_case
+            log_and_print("-" * 40)
+            return result
 
-                # Save intermediate results as each test case completes (in order).
-                async with write_lock:
-                    with open(results_file_path, "w") as f:
-                        json.dump([r for r in results if r is not None], f, indent=4)
-
-                log_and_print("-" * 40)
-
-        await asyncio.gather(
-            *[run_one(i, test_case) for i, test_case in enumerate(test_cases)]
+        results = await _run_items_parallel(
+            test_cases, process, results_file_path, test_parallel
         )
 
         total_passed = sum(1 for r in results if r["metrics"]["passed"])

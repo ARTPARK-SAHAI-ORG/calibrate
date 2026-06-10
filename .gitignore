@@ -133,6 +133,7 @@ Desktop.ini
 
 logs
 out
+out-*/
 data
 
 # MkDocs build output
