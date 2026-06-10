@@ -21,6 +21,7 @@ Usage:
     result = asyncio.run(simulations.run(agent=agent, personas=[...], ...))
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Optional
 import httpx
@@ -28,6 +29,14 @@ import httpx
 
 # Default messages used by verify() when no custom input is provided
 _DEFAULT_VERIFY_MESSAGES = [{"role": "user", "content": "Hello, are you there?"}]
+
+# Retry policy for transient agent failures. A flaky upstream (502/503/504 from
+# a reverse proxy, a brief overload returning 429, or a dropped connection)
+# should not abort a whole eval run — retry with exponential backoff. Permanent
+# failures (4xx other than 429, invalid JSON) are NOT retried.
+_RETRYABLE_STATUS = frozenset({429, 502, 503, 504})
+_MAX_ATTEMPTS = 4
+_BACKOFF_BASE_SECONDS = 1.0
 
 
 @dataclass
@@ -117,28 +126,47 @@ class TextAgentConnection:
         """
         input_messages = messages if messages is not None else _DEFAULT_VERIFY_MESSAGES
 
-        # ── 1. POST to endpoint ──────────────────────────────────────────
-        try:
-            req_headers = {"Content-Type": "application/json"}
-            if self.headers:
-                req_headers.update(self.headers)
+        req_headers = {"Content-Type": "application/json"}
+        if self.headers:
+            req_headers.update(self.headers)
 
-            body: dict = {"messages": input_messages}
-            if model is not None:
-                body["model"] = model
+        body: dict = {"messages": input_messages}
+        if model is not None:
+            body["model"] = model
 
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    self.url,
-                    json=body,
-                    headers=req_headers,
+        # ── 1. POST to endpoint (retry transient failures) ───────────────
+        resp = None
+        last_error = None
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(
+                        self.url,
+                        json=body,
+                        headers=req_headers,
+                    )
+            except httpx.ConnectError as e:
+                last_error = f"Could not connect to endpoint: {e}"
+            except httpx.TimeoutException:
+                last_error = "Request timed out (30s)"
+            except Exception as e:
+                return {"ok": False, "error": f"Unexpected error during request: {e}"}
+            else:
+                if resp.status_code not in _RETRYABLE_STATUS:
+                    break
+                last_error = (
+                    f"Endpoint returned HTTP {resp.status_code}: {resp.text[:500]}"
                 )
-        except httpx.ConnectError as e:
-            return {"ok": False, "error": f"Could not connect to endpoint: {e}"}
-        except httpx.TimeoutException:
-            return {"ok": False, "error": "Request timed out (30s)"}
-        except Exception as e:
-            return {"ok": False, "error": f"Unexpected error during request: {e}"}
+                resp = None
+
+            if attempt < _MAX_ATTEMPTS - 1:
+                await asyncio.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
+
+        if resp is None:
+            return {
+                "ok": False,
+                "error": f"{last_error} (after {_MAX_ATTEMPTS} attempts)",
+            }
 
         # ── 2. HTTP status ────────────────────────────────────────────────
         if resp.status_code != 200:
@@ -243,7 +271,9 @@ class TextAgentConnection:
 
         Raises:
             RuntimeError: On connection error, timeout, non-200 status, or
-                invalid JSON response.
+                invalid JSON response. Transient failures (connection errors,
+                timeouts, and HTTP 429/502/503/504) are retried with
+                exponential backoff before giving up.
         """
         req_headers = {"Content-Type": "application/json"}
         if self.headers:
@@ -253,38 +283,50 @@ class TextAgentConnection:
         if model is not None:
             body["model"] = model
 
-        try:
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                resp = await client.post(
-                    self.url,
-                    json=body,
-                    headers=req_headers,
+        last_error = None
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                async with httpx.AsyncClient(timeout=60.0) as client:
+                    resp = await client.post(
+                        self.url,
+                        json=body,
+                        headers=req_headers,
+                    )
+            except httpx.ConnectError as e:
+                last_error = f"Could not connect to agent at {self.url}: {e}"
+            except httpx.TimeoutException:
+                last_error = f"Agent request timed out (60s): {self.url}"
+            except Exception as e:
+                raise RuntimeError(
+                    f"Unexpected error calling agent at {self.url}: {e}"
+                ) from e
+            else:
+                if resp.status_code == 200:
+                    try:
+                        data = resp.json()
+                    except Exception:
+                        raise RuntimeError(
+                            f"Agent response is not valid JSON: {resp.text[:500]}"
+                        ) from None
+                    return {
+                        "response": data.get("response"),
+                        "tool_calls": data.get("tool_calls", []),
+                    }
+                if resp.status_code not in _RETRYABLE_STATUS:
+                    raise RuntimeError(
+                        f"Agent returned HTTP {resp.status_code}: {resp.text[:500]}"
+                    )
+                last_error = (
+                    f"Agent returned HTTP {resp.status_code}: {resp.text[:500]}"
                 )
-        except httpx.ConnectError as e:
-            raise RuntimeError(f"Could not connect to agent at {self.url}: {e}") from e
-        except httpx.TimeoutException:
-            raise RuntimeError(f"Agent request timed out (60s): {self.url}") from None
-        except Exception as e:
-            raise RuntimeError(
-                f"Unexpected error calling agent at {self.url}: {e}"
-            ) from e
 
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"Agent returned HTTP {resp.status_code}: {resp.text[:500]}"
-            )
+            if attempt < _MAX_ATTEMPTS - 1:
+                await asyncio.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
 
-        try:
-            data = resp.json()
-        except Exception:
-            raise RuntimeError(
-                f"Agent response is not valid JSON: {resp.text[:500]}"
-            ) from None
-
-        return {
-            "response": data.get("response"),
-            "tool_calls": data.get("tool_calls", []),
-        }
+        raise RuntimeError(
+            f"Agent call to {self.url} failed after {_MAX_ATTEMPTS} attempts. "
+            f"Last error: {last_error}"
+        )
 
 
 __all__ = ["TextAgentConnection"]

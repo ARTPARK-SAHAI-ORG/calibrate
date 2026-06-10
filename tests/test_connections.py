@@ -43,6 +43,28 @@ def _patch_httpx(response_body: dict, status: int = 200):
     return patch("httpx.AsyncClient", return_value=mock_client), mock_client
 
 
+def _patch_httpx_sequence(outcomes):
+    """Patch httpx.AsyncClient.post to yield ``outcomes`` in order.
+
+    Each outcome is either an ``(body, status)`` tuple (a fake response) or an
+    Exception instance (raised on that attempt). Lets tests exercise the retry
+    loop across multiple attempts.
+    """
+    side_effects = []
+    for outcome in outcomes:
+        if isinstance(outcome, BaseException):
+            side_effects.append(outcome)
+        else:
+            body, status = outcome
+            side_effects.append(_make_httpx_response(body, status))
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.post = AsyncMock(side_effect=side_effects)
+    return patch("httpx.AsyncClient", return_value=mock_client), mock_client
+
+
 # ---------------------------------------------------------------------------
 # Tests for TextAgentConnection.call()
 # ---------------------------------------------------------------------------
@@ -131,6 +153,72 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
 
         self.assertIsNone(result["response"])
         self.assertEqual(result["tool_calls"], [])
+
+
+# ---------------------------------------------------------------------------
+# Tests for TextAgentConnection.call() — retry on transient failures
+# ---------------------------------------------------------------------------
+
+class TestCallRetry(unittest.IsolatedAsyncioTestCase):
+
+    async def test_retries_then_succeeds_on_502(self):
+        from calibrate.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, mock_client = _patch_httpx_sequence([
+            ({}, 502),
+            ({}, 503),
+            ({"response": "recovered", "tool_calls": []}, 200),
+        ])
+        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+            result = await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertEqual(result["response"], "recovered")
+        self.assertEqual(mock_client.post.await_count, 3)
+
+    async def test_retries_then_succeeds_on_connect_error(self):
+        import httpx
+        from calibrate.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, mock_client = _patch_httpx_sequence([
+            httpx.ConnectError("boom"),
+            ({"response": "ok", "tool_calls": []}, 200),
+        ])
+        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+            result = await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertEqual(result["response"], "ok")
+        self.assertEqual(mock_client.post.await_count, 2)
+
+    async def test_gives_up_after_max_attempts(self):
+        from calibrate.connections import TextAgentConnection
+        from calibrate.connections import _MAX_ATTEMPTS
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, mock_client = _patch_httpx_sequence([({}, 502)] * _MAX_ATTEMPTS)
+        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+            with self.assertRaises(RuntimeError) as cm:
+                await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertEqual(mock_client.post.await_count, _MAX_ATTEMPTS)
+        self.assertIn("502", str(cm.exception))
+        self.assertIn(str(_MAX_ATTEMPTS), str(cm.exception))
+
+    async def test_no_retry_on_4xx(self):
+        from calibrate.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, mock_client = _patch_httpx_sequence([
+            ({}, 401),
+            ({"response": "should not reach", "tool_calls": []}, 200),
+        ])
+        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+            with self.assertRaises(RuntimeError) as cm:
+                await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertEqual(mock_client.post.await_count, 1)
+        self.assertIn("401", str(cm.exception))
 
 
 # ---------------------------------------------------------------------------
@@ -345,6 +433,33 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
             result = await agent.verify()
 
         self.assertFalse(result["ok"])
+
+    async def test_verify_retries_then_succeeds_on_503(self):
+        from calibrate.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, mock_client = _patch_httpx_sequence([
+            ({}, 503),
+            ({"response": "up now", "tool_calls": []}, 200),
+        ])
+        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+            result = await agent.verify()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(mock_client.post.await_count, 2)
+
+    async def test_verify_fails_after_retries_exhausted(self):
+        from calibrate.connections import TextAgentConnection
+        from calibrate.connections import _MAX_ATTEMPTS
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, mock_client = _patch_httpx_sequence([({}, 502)] * _MAX_ATTEMPTS)
+        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+            result = await agent.verify()
+
+        self.assertFalse(result["ok"])
+        self.assertEqual(mock_client.post.await_count, _MAX_ATTEMPTS)
+        self.assertIn("attempts", result["error"])
 
     async def test_verify_fails_wrong_tool_call_format(self):
         from calibrate.connections import TextAgentConnection
