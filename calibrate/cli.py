@@ -303,8 +303,7 @@ Examples:
         "--parallel",
         type=int,
         default=None,
-        help="Number of test cases to evaluate in parallel per model "
-        "(overrides CALIBRATE_TEST_PARALLEL; default 4)",
+        help="Number of test cases to evaluate in parallel per model",
     )
     llm_parser.add_argument(
         "--verify",

@@ -1919,8 +1919,7 @@ async def main():
         "--parallel",
         type=int,
         default=None,
-        help="Number of test cases to evaluate in parallel "
-        "(overrides CALIBRATE_TEST_PARALLEL; default 4)",
+        help="Number of test cases to evaluate in parallel",
     )
     parser.add_argument(
         "--eval-only",

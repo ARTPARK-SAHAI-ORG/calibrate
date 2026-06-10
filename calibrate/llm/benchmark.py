@@ -150,8 +150,7 @@ async def main():
         "--parallel",
         type=int,
         default=None,
-        help="Number of test cases to evaluate in parallel per model "
-        "(overrides CALIBRATE_TEST_PARALLEL; default 4)",
+        help="Number of test cases to evaluate in parallel per model",
     )
 
     args = parser.parse_args()
