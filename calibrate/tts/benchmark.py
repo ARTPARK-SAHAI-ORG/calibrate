@@ -59,6 +59,7 @@ async def run(
     debug_count: int = 5,
     overwrite: bool = False,
     max_parallel: int = MAX_PARALLEL_PROVIDERS,
+    row_parallel: int = None,
     judge_evaluators: list[dict] = None,
 ) -> dict:
     """
@@ -75,6 +76,9 @@ async def run(
         debug_count: Number of texts to run in debug mode (default: 5)
         overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
         max_parallel: Maximum number of providers to run in parallel (default: 2)
+        row_parallel: Max texts to synthesize concurrently within each provider.
+            Resolved via CLI flag / SDK arg > ``CALIBRATE_TTS_PARALLEL`` env var >
+            default. Orthogonal to ``max_parallel`` (which bounds providers).
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
             the implicit default TTS evaluator runs.
@@ -106,6 +110,7 @@ async def run(
                 debug=debug,
                 debug_count=debug_count,
                 overwrite=overwrite,
+                row_parallel=row_parallel,
                 judge_evaluators=judge_evaluators,
             )
             return (provider, result)
@@ -192,6 +197,13 @@ async def main():
         default=None,
         help="Path to optional JSON config file with an `evaluators` list",
     )
+    parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of texts to synthesize in parallel per provider",
+    )
 
     args = parser.parse_args()
 
@@ -251,6 +263,7 @@ async def main():
             debug=args.debug,
             debug_count=args.debug_count,
             overwrite=args.overwrite,
+            row_parallel=args.parallel,
             judge_evaluators=judge_evaluators,
         )
 
