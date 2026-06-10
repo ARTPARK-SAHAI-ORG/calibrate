@@ -5,6 +5,7 @@ Run with:
     python -m unittest tests.stt.test_eval -v
 """
 
+import asyncio
 import json
 import os
 import tempfile
@@ -367,6 +368,219 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["status"], "error")
         self.assertIn("does not exist", result["error"])
+
+
+class TestSTTRunSTTEvalParallel(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def _gt_data(ids):
+        return [{"id": i, "gt": f"gt {i}"} for i in ids]
+
+    async def test_concurrency_overlaps(self):
+        """With row_parallel=3 at least 3 rows are transcribed simultaneously."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c", "row_d", "row_e"]
+        release = asyncio.Event()
+        in_flight = 0
+        max_in_flight = 0
+        reached = asyncio.Event()
+        lock = asyncio.Lock()
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            nonlocal in_flight, max_in_flight
+            async with lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
+                if in_flight >= 3:
+                    reached.set()
+            await release.wait()
+            async with lock:
+                in_flight -= 1
+            return f"pred {reference}"
+
+        async def releaser():
+            await reached.wait()
+            release.set()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results.csv"
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                await asyncio.gather(
+                    stt_eval.run_stt_eval(
+                        gt_data=self._gt_data(ids),
+                        audio_dir=Path(tmp),
+                        provider="deepgram",
+                        language="english",
+                        results_csv_path=out,
+                        row_parallel=3,
+                    ),
+                    releaser(),
+                )
+
+        self.assertGreaterEqual(max_in_flight, 3)
+
+    async def test_output_order_matches_input(self):
+        """CSV rows preserve input order even when later rows finish first."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c", "row_d"]
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            # Later ids (lexicographically larger) return faster.
+            stem = audio_path.stem
+            delay = 0.05 * (len(ids) - ids.index(stem))
+            await asyncio.sleep(delay)
+            return f"pred-{stem}"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results.csv"
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                count = await stt_eval.run_stt_eval(
+                    gt_data=self._gt_data(ids),
+                    audio_dir=Path(tmp),
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=out,
+                    row_parallel=4,
+                )
+
+            self.assertEqual(count, 4)
+            df = pd.read_csv(out)
+            self.assertEqual(df["id"].tolist(), ids)
+            self.assertEqual(df["pred"].tolist(), [f"pred-{i}" for i in ids])
+
+    async def test_resume_skips_processed_ids(self):
+        """Pre-seeded rows are kept, not re-transcribed, and new rows appended."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c"]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results.csv"
+            # Pre-seed first two ids as already processed.
+            pd.DataFrame(
+                [
+                    {"id": "row_a", "gt": "gt row_a", "pred": "old_a"},
+                    {"id": "row_b", "gt": "gt row_b", "pred": "old_b"},
+                ]
+            ).to_csv(out, index=False)
+
+            seen = []
+
+            async def fake_transcribe(audio_path, reference, provider, language, uid):
+                seen.append(audio_path.stem)
+                return "new_c"
+
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                count = await stt_eval.run_stt_eval(
+                    gt_data=self._gt_data(ids),
+                    audio_dir=Path(tmp),
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=out,
+                    row_parallel=4,
+                )
+
+            self.assertEqual(seen, ["row_c"])  # only the unprocessed id
+            self.assertEqual(count, 1)
+            df = pd.read_csv(out)
+            self.assertEqual(df["id"].tolist(), ids)
+            self.assertEqual(
+                df["pred"].tolist(), ["old_a", "old_b", "new_c"]
+            )
+
+    async def test_row_parallel_limit_serializes(self):
+        """row_parallel=1 forces strictly serial transcription (no overlap)."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c"]
+        in_flight = 0
+        max_in_flight = 0
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            nonlocal in_flight, max_in_flight
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+            await asyncio.sleep(0.01)
+            in_flight -= 1
+            return "x"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results.csv"
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                await stt_eval.run_stt_eval(
+                    gt_data=self._gt_data(ids),
+                    audio_dir=Path(tmp),
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=out,
+                    row_parallel=1,
+                )
+
+        self.assertEqual(max_in_flight, 1)
+
+    async def test_env_var_caps_concurrency(self):
+        """CALIBRATE_STT_PARALLEL caps concurrency when no row_parallel passed."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c", "row_d"]
+        in_flight = 0
+        max_in_flight = 0
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            nonlocal in_flight, max_in_flight
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+            await asyncio.sleep(0.01)
+            in_flight -= 1
+            return "x"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results.csv"
+            with patch.dict(
+                "os.environ", {"CALIBRATE_STT_PARALLEL": "2"}
+            ), patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                await stt_eval.run_stt_eval(
+                    gt_data=self._gt_data(ids),
+                    audio_dir=Path(tmp),
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=out,
+                )
+
+        self.assertLessEqual(max_in_flight, 2)
+
+    async def test_failure_propagates(self):
+        """An exception from transcribe_audio bubbles out of run_stt_eval."""
+        from calibrate.stt import eval as stt_eval
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            raise RuntimeError("boom")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results.csv"
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                with self.assertRaises(RuntimeError):
+                    await stt_eval.run_stt_eval(
+                        gt_data=self._gt_data(["row_a"]),
+                        audio_dir=Path(tmp),
+                        provider="deepgram",
+                        language="english",
+                        results_csv_path=out,
+                        row_parallel=2,
+                    )
 
 
 if __name__ == "__main__":

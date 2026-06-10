@@ -29,6 +29,7 @@ from calibrate.utils import (
     validate_tts_language,
     provider_log as _log,
     provider_log_file as _current_log_file,
+    resolve_row_parallel,
 )
 from calibrate.tts.metrics import get_tts_llm_judge_score
 from calibrate.judges import (
@@ -479,8 +480,17 @@ async def run_tts_eval(
     output_dir: str,
     results_csv_path: Path,
     overwrite: bool = False,
-) -> int:
-    """Process texts and synthesize speech, saving results immediately to CSV.
+    row_parallel: int = None,
+) -> dict:
+    """Process texts and synthesize speech concurrently, saving results to CSV.
+
+    Rows are processed concurrently with bounded parallelism (capped by
+    ``resolve_row_parallel("tts", row_parallel)``). Despite out-of-order
+    completion, output rows are written in input order: existing (resumed)
+    rows first, then newly synthesized rows ordered by their position in
+    ``gt_data``. The full CSV is rewritten under a write-lock after each row
+    completes so concurrent writes are safe and the partial file stays
+    crash-recoverable.
 
     Args:
         gt_data: List of {"id": ..., "text": ...} for each text to process
@@ -489,69 +499,81 @@ async def run_tts_eval(
         output_dir: Directory to save audio files
         results_csv_path: Path to save results CSV
         overwrite: If True, overwrite existing results instead of resuming
+        row_parallel: Max texts to synthesize concurrently. Resolved via
+            CLI/SDK arg > ``CALIBRATE_TTS_PARALLEL`` env var > default.
 
     Returns:
-        Number of texts successfully synthesized in this run.
+        dict with ``success_count`` (texts synthesized this run) and
+        ``ttfb_values`` (TTFBs reported by the provider this run).
     """
     # Load existing results to skip already processed texts (unless overwrite is True)
     if overwrite:
         processed_ids = set()
+        existing_records = []
         # Remove existing results file if overwriting
         if exists(results_csv_path):
             os.remove(results_csv_path)
     elif exists(results_csv_path):
         existing_df = pd.read_csv(results_csv_path)
+        existing_records = existing_df.to_dict("records")
         processed_ids = set(existing_df["id"].tolist())
     else:
         processed_ids = set()
+        existing_records = []
 
     audio_output_dir = join(output_dir, "audios")
     os.makedirs(audio_output_dir, exist_ok=True)
 
     success_count = 0
     ttfb_values = []
+    new_rows: dict[int, dict] = {}
 
-    for i, item in enumerate(gt_data):
+    pending = [
+        (i, item) for i, item in enumerate(gt_data) if item["id"] not in processed_ids
+    ]
+
+    semaphore = asyncio.Semaphore(resolve_row_parallel("tts", row_parallel))
+    write_lock = asyncio.Lock()
+
+    async def process_one(index: int, item: Dict) -> None:
+        nonlocal success_count
         _id = item["id"]
         text = item["text"]
 
-        # Skip if already processed
-        if _id in processed_ids:
-            _log(f"Skipping already processed: {_id}")
-            continue
-
-        _log(f"Processing [{i+1}/{len(gt_data)}]: {_id}")
-
         audio_path = join(audio_output_dir, f"{_id}.wav")
-        try:
-            result = await synthesize_speech(text, provider, language, audio_path)
-        except Exception as e:
-            _log(f"\033[91mFailed to synthesize {_id}: {e}\033[0m")
-            raise
+        async with semaphore:
+            _log(f"Processing [{index + 1}/{len(gt_data)}]: {_id}")
+            try:
+                result = await synthesize_speech(text, provider, language, audio_path)
+            except Exception as e:
+                _log(f"\033[91mFailed to synthesize {_id}: {e}\033[0m")
+                raise
 
         # Handle optional ttfb (some providers may not return it)
         ttfb = result.get("ttfb")
-        if ttfb is not None:
-            ttfb_values.append(ttfb)
 
-        # Prepare row data
-        row_data = {
-            "id": _id,
-            "text": text,
-            "audio_path": audio_path,
-            "ttfb": ttfb,
-        }
+        async with write_lock:
+            new_rows[index] = {
+                "id": _id,
+                "text": text,
+                "audio_path": audio_path,
+                "ttfb": ttfb,
+            }
+            if ttfb is not None:
+                ttfb_values.append(ttfb)
+            success_count += 1
 
-        # Append to CSV immediately for crash recovery
-        row_df = pd.DataFrame([row_data])
-        if exists(results_csv_path):
-            row_df.to_csv(results_csv_path, mode="a", header=False, index=False)
-        else:
-            row_df.to_csv(results_csv_path, index=False)
+            # Rewrite the full CSV (existing rows first, then new rows in input
+            # order) so concurrent writes stay deterministic and crash-safe.
+            ordered_new = [new_rows[k] for k in sorted(new_rows)]
+            pd.DataFrame(existing_records + ordered_new).to_csv(
+                results_csv_path, index=False
+            )
 
-        success_count += 1
-        if ttfb is not None:
-            _log(f"\n\033[93m  TTFB: {ttfb:.3f}s\033[0m")
+            if ttfb is not None:
+                _log(f"\n\033[93m  TTFB: {ttfb:.3f}s\033[0m")
+
+    await asyncio.gather(*[process_one(i, it) for i, it in pending])
 
     return {
         "success_count": success_count,
@@ -694,6 +716,7 @@ async def run_single_provider_eval(
     debug: bool,
     debug_count: int,
     overwrite: bool,
+    row_parallel: int = None,
     judge_evaluators: list[dict] = None,
 ) -> dict:
     """Run TTS evaluation for a single provider."""
@@ -748,6 +771,7 @@ async def run_single_provider_eval(
             output_dir=provider_output_dir,
             results_csv_path=results_csv_path,
             overwrite=overwrite,
+            row_parallel=row_parallel,
         )
 
         _log("--------------------------------")
@@ -906,6 +930,13 @@ async def main():
         action="store_true",
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
+    parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of texts to synthesize in parallel",
+    )
     args = parser.parse_args()
 
     provider = args.provider
@@ -944,6 +975,7 @@ async def main():
         debug=args.debug,
         debug_count=args.debug_count,
         overwrite=args.overwrite,
+        row_parallel=args.parallel,
     )
 
     # Print summary

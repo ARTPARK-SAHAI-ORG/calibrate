@@ -206,8 +206,21 @@ Examples:
     stt_parser.add_argument("-f", "--input-file-name", type=str, default="stt.csv")
     stt_parser.add_argument("-d", "--debug", action="store_true")
     stt_parser.add_argument("-dc", "--debug_count", type=int, default=5)
+    stt_parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of audio files to transcribe in parallel per provider",
+    )
     stt_parser.add_argument("--ignore_retry", action="store_true")
     stt_parser.add_argument("--overwrite", action="store_true")
+    stt_parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of providers to evaluate in parallel (overrides CALIBRATE_STT_BENCHMARK_PARALLEL; default 2)",
+    )
     stt_parser.add_argument(
         "--leaderboard",
         action="store_true",
@@ -253,7 +266,20 @@ Examples:
     tts_parser.add_argument("-o", "--output-dir", type=str, default="./out")
     tts_parser.add_argument("-d", "--debug", action="store_true")
     tts_parser.add_argument("-dc", "--debug_count", type=int, default=5)
+    tts_parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of texts to synthesize in parallel per provider",
+    )
     tts_parser.add_argument("--overwrite", action="store_true")
+    tts_parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of providers to evaluate in parallel (overrides CALIBRATE_TTS_BENCHMARK_PARALLEL; default 2)",
+    )
     tts_parser.add_argument(
         "--leaderboard",
         action="store_true",
@@ -304,6 +330,12 @@ Examples:
         type=int,
         default=None,
         help="Number of test cases to evaluate in parallel per model",
+    )
+    llm_parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of models to evaluate in parallel (overrides CALIBRATE_LLM_BENCHMARK_PARALLEL; default 2)",
     )
     llm_parser.add_argument(
         "--verify",
@@ -379,8 +411,8 @@ Examples:
         "-n",
         "--parallel",
         type=int,
-        default=1,
-        help="Number of simulations to run in parallel",
+        default=None,
+        help="Number of simulations to run in parallel (overrides CALIBRATE_SIMULATION_PARALLEL)",
     )
     sim_parser.add_argument(
         "--verify",
@@ -487,10 +519,14 @@ Examples:
                 argv.append("--ignore_retry")
             if args.overwrite:
                 argv.append("--overwrite")
+            if args.parallel is not None:
+                argv.extend(["-n", str(args.parallel)])
             if args.save_dir:
                 argv.extend(["-s", args.save_dir])
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.benchmark_parallel is not None:
+                argv.extend(["--benchmark-parallel", str(args.benchmark_parallel)])
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -512,8 +548,12 @@ Examples:
             argv.extend(["-dc", str(args.debug_count)])
             if args.overwrite:
                 argv.append("--overwrite")
+            if args.parallel is not None:
+                argv.extend(["-n", str(args.parallel)])
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.benchmark_parallel is not None:
+                argv.extend(["--benchmark-parallel", str(args.benchmark_parallel)])
 
             sys.argv = argv
             asyncio.run(tts_benchmark_main())
@@ -609,6 +649,7 @@ Examples:
                                 models=_models,
                                 evaluators=_config.get("evaluators"),
                                 test_parallel=args.parallel,
+                                max_parallel=args.benchmark_parallel,
                             ),
                             config_path=args.config,
                         )
@@ -634,6 +675,8 @@ Examples:
                 argv.extend(["-p", args.provider])
                 if getattr(args, "parallel", None) is not None:
                     argv.extend(["-n", str(args.parallel)])
+                if getattr(args, "benchmark_parallel", None) is not None:
+                    argv.extend(["--benchmark-parallel", str(args.benchmark_parallel)])
 
                 sys.argv = argv
                 asyncio.run(llm_benchmark_main())

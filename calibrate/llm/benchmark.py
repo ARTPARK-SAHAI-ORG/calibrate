@@ -27,9 +27,7 @@ from os.path import join
 from calibrate.llm.run_tests import display_label, run_model_tests
 from calibrate.llm.tests_leaderboard import generate_leaderboard
 from calibrate.llm._output import run_benchmark_cli
-
-# Maximum number of models to run in parallel
-MAX_PARALLEL_MODELS = 2
+from calibrate.utils import resolve_benchmark_parallel
 
 
 async def _run_models(
@@ -37,15 +35,19 @@ async def _run_models(
     models: list[str],
     provider: str,
     output_dir: str,
-    max_parallel: int = MAX_PARALLEL_MODELS,
+    max_parallel: int | None = None,
     test_parallel: int | None = None,
 ) -> dict:
     """Run tests for each model with bounded parallelism.
+
+    ``max_parallel`` resolves via CLI flag > ``CALIBRATE_LLM_BENCHMARK_PARALLEL``
+    env var > default 2 (see :func:`calibrate.utils.resolve_benchmark_parallel`).
 
     Returns a ``{model: result}`` dict (no leaderboard side effect), so it can
     be reused as the ``runner`` for :func:`run_benchmark_cli`.
     """
     results: dict = {}
+    max_parallel = resolve_benchmark_parallel("llm", max_parallel)
     semaphore = asyncio.Semaphore(max_parallel)
 
     async def run_model(model: str) -> tuple[str, dict]:
@@ -70,7 +72,7 @@ async def run(
     models: list[str],
     provider: str,
     output_dir: str = "./out",
-    max_parallel: int = MAX_PARALLEL_MODELS,
+    max_parallel: int | None = None,
     test_parallel: int | None = None,
 ) -> dict:
     """
@@ -84,7 +86,8 @@ async def run(
         provider: LLM provider (openai or openrouter)
         output_dir: Path to output directory for results (default: ./out)
             Results saved to output_dir/model_name/ for each model
-        max_parallel: Maximum number of models to run in parallel (default: 2)
+        max_parallel: Maximum number of models to run in parallel. Resolves via
+            CLI flag > ``CALIBRATE_LLM_BENCHMARK_PARALLEL`` env var > default 2.
         test_parallel: Max test cases to evaluate concurrently per model.
 
     Returns:
@@ -168,6 +171,13 @@ async def main():
         default=None,
         help="Number of test cases to evaluate in parallel per model",
     )
+    parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of models to run in parallel "
+        "(overrides CALIBRATE_LLM_BENCHMARK_PARALLEL env var)",
+    )
 
     args = parser.parse_args()
 
@@ -183,6 +193,7 @@ async def main():
             models=models,
             provider=args.provider,
             output_dir=args.output_dir,
+            max_parallel=args.benchmark_parallel,
             test_parallel=args.parallel,
         ),
         config_path=args.config,

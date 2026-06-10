@@ -30,6 +30,7 @@ from calibrate.utils import (
     validate_stt_language,
     provider_log as _log,
     provider_log_file as _current_log_file,
+    resolve_row_parallel,
 )
 from calibrate.stt.metrics import (
     get_wer_score,
@@ -636,8 +637,17 @@ async def run_stt_eval(
     provider: str,
     language: str,
     results_csv_path: Path,
+    row_parallel: int = None,
 ) -> int:
-    """Process audio files and save results immediately to CSV.
+    """Process audio files concurrently and save results to CSV.
+
+    Audio files are transcribed with bounded concurrency (capped by
+    ``resolve_row_parallel("stt", row_parallel)``). Files whose ``id`` already
+    appears in an existing ``results.csv`` are skipped, so a re-run resumes
+    where a previous run left off. New results are written in input
+    (``gt_data``) order regardless of completion order — existing rows first,
+    then the freshly processed rows by their original index — and the partial
+    CSV is rewritten after each row completes for crash recovery.
 
     Args:
         gt_data: List of {"id": ..., "gt": ...} for each file to process
@@ -645,6 +655,8 @@ async def run_stt_eval(
         provider: STT provider name
         language: Language code
         results_csv_path: Path to save results CSV
+        row_parallel: Max audio files to transcribe concurrently. Resolves
+            CLI/SDK arg > ``CALIBRATE_STT_PARALLEL`` env var > default.
 
     Returns:
         Number of files successfully transcribed (non-empty) in this run.
@@ -652,46 +664,59 @@ async def run_stt_eval(
     # Load existing results to skip already processed files
     if exists(results_csv_path):
         existing_df = pd.read_csv(results_csv_path)
-        results = existing_df.to_dict("records")
+        existing_results = existing_df.to_dict("records")
         processed_ids = set(existing_df["id"].tolist())
     else:
-        results = []
+        existing_results = []
         processed_ids = set()
 
     success_count = 0
 
     unique_id = str(uuid.uuid4())
 
-    for i, gt_info in enumerate(gt_data):
-        # Skip if already processed
-        if gt_info["id"] in processed_ids:
-            continue
+    pending = [
+        (i, gt_info)
+        for i, gt_info in enumerate(gt_data)
+        if gt_info["id"] not in processed_ids
+    ]
+
+    semaphore = asyncio.Semaphore(resolve_row_parallel("stt", row_parallel))
+    write_lock = asyncio.Lock()
+    new_results: dict[int, dict] = {}
+
+    async def process_one(index: int, gt_info: Dict) -> None:
+        nonlocal success_count
 
         audio_path = audio_dir / f"{gt_info['id']}.wav"
 
-        _log(f"--------------------------------")
-        _log(f"Processing audio [{i + 1}/{len(gt_data)}]: {audio_path.name}")
-
-        try:
-            transcript = await transcribe_audio(
-                audio_path, gt_info["gt"], provider, language, unique_id
+        async with semaphore:
+            _log(f"--------------------------------")
+            _log(
+                f"Processing audio [{index + 1}/{len(gt_data)}]: {audio_path.name}"
             )
-            _log(f"\033[33mTranscript: {transcript}\033[0m")
-            if transcript:
-                success_count += 1
-        except Exception as e:
-            _log(f"\033[91mFailed to transcribe {audio_path}: {e}\033[0m")
-            raise
 
-        # Save immediately after each file
-        results.append(
-            {
+            try:
+                transcript = await transcribe_audio(
+                    audio_path, gt_info["gt"], provider, language, unique_id
+                )
+                _log(f"\033[33mTranscript: {transcript}\033[0m")
+            except Exception as e:
+                _log(f"\033[91mFailed to transcribe {audio_path}: {e}\033[0m")
+                raise
+
+        async with write_lock:
+            new_results[index] = {
                 "id": gt_info["id"],
                 "gt": gt_info["gt"],
                 "pred": transcript,
             }
-        )
-        pd.DataFrame(results).to_csv(results_csv_path, index=False)
+            if transcript:
+                success_count += 1
+            pd.DataFrame(
+                existing_results + [new_results[k] for k in sorted(new_results)]
+            ).to_csv(results_csv_path, index=False)
+
+    await asyncio.gather(*[process_one(i, g) for i, g in pending])
 
     return success_count
 
@@ -851,6 +876,7 @@ async def run_single_provider_eval(
     debug_count: int,
     ignore_retry: bool,
     overwrite: bool,
+    row_parallel: int = None,
     judge_evaluators: list[dict] = None,
 ) -> dict:
     """Run STT evaluation for a single provider."""
@@ -955,6 +981,7 @@ async def run_single_provider_eval(
                 provider=provider,
                 language=language,
                 results_csv_path=results_csv_path,
+                row_parallel=row_parallel,
             )
 
             if ignore_retry:
@@ -1217,6 +1244,13 @@ async def main():
         action="store_true",
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
+    parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of audio files to transcribe in parallel",
+    )
 
     args = parser.parse_args()
 
@@ -1258,6 +1292,7 @@ async def main():
         debug_count=args.debug_count,
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
+        row_parallel=args.parallel,
     )
 
     # Print summary
