@@ -299,6 +299,14 @@ Examples:
         help="LLM provider",
     )
     llm_parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of test cases to evaluate in parallel per model "
+        "(overrides CALIBRATE_TEST_PARALLEL; default 4)",
+    )
+    llm_parser.add_argument(
         "--verify",
         action="store_true",
         help="Verify an external agent connection by sending a preset message and checking the response format",
@@ -534,6 +542,8 @@ Examples:
                 "--dataset",
                 args.dataset,
             ]
+            if getattr(args, "parallel", None) is not None:
+                argv.extend(["-n", str(args.parallel)])
             sys.argv = argv
             asyncio.run(llm_run_tests_main())
         elif getattr(args, "verify", False):
@@ -598,6 +608,7 @@ Examples:
                                 output_dir=args.output_dir,
                                 models=[_m],
                                 evaluators=_config.get("evaluators"),
+                                test_parallel=args.parallel,
                             )
                         )
                         _model_results[_m] = _result.get(_m, _result)
@@ -618,6 +629,7 @@ Examples:
                             test_cases=_config["test_cases"],
                             output_dir=args.output_dir,
                             evaluators=_config.get("evaluators"),
+                            test_parallel=args.parallel,
                         )
                     )
             else:
@@ -629,6 +641,8 @@ Examples:
                 argv.extend(["-o", args.output_dir])
                 argv.extend(["-m"] + models)
                 argv.extend(["-p", args.provider])
+                if getattr(args, "parallel", None) is not None:
+                    argv.extend(["-n", str(args.parallel)])
 
                 sys.argv = argv
                 asyncio.run(llm_benchmark_main())

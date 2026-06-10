@@ -41,6 +41,7 @@ async def run(
     provider: str,
     output_dir: str = "./out",
     max_parallel: int = MAX_PARALLEL_MODELS,
+    test_parallel: int | None = None,
 ) -> dict:
     """
     Run LLM tests for multiple models in parallel and generate a leaderboard.
@@ -54,6 +55,8 @@ async def run(
         output_dir: Path to output directory for results (default: ./out)
             Results saved to output_dir/model_name/ for each model
         max_parallel: Maximum number of models to run in parallel (default: 2)
+        test_parallel: Max test cases to evaluate concurrently per model. Falls
+            back to the CALIBRATE_TEST_PARALLEL env var, then a default of 4.
 
     Returns:
         dict: Results summary with status and output paths
@@ -81,6 +84,7 @@ async def run(
                 provider=provider,
                 config=config,
                 output_dir=output_dir,
+                test_parallel=test_parallel,
             )
             return (model, result)
 
@@ -141,6 +145,14 @@ async def main():
         default="openrouter",
         help="LLM provider to use (openai or openrouter)",
     )
+    parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of test cases to evaluate in parallel per model "
+        "(overrides CALIBRATE_TEST_PARALLEL; default 4)",
+    )
 
     args = parser.parse_args()
 
@@ -186,6 +198,7 @@ async def main():
             models=models,
             provider=args.provider,
             output_dir=args.output_dir,
+            test_parallel=args.parallel,
         )
 
         has_errors = print_benchmark_summary(

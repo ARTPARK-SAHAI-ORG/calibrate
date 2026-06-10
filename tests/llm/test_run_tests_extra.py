@@ -1586,6 +1586,131 @@ class TestRunModelTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["metrics"]["passed"], 1)
 
 
+class TestResolveTestParallel(unittest.TestCase):
+    def test_cli_value_takes_precedence(self):
+        from calibrate.llm.run_tests import _resolve_test_parallel
+
+        with patch.dict("os.environ", {"CALIBRATE_TEST_PARALLEL": "7"}):
+            self.assertEqual(_resolve_test_parallel(3), 3)
+
+    def test_env_var_used_when_no_cli(self):
+        from calibrate.llm.run_tests import _resolve_test_parallel
+
+        with patch.dict("os.environ", {"CALIBRATE_TEST_PARALLEL": "7"}):
+            self.assertEqual(_resolve_test_parallel(None), 7)
+
+    def test_default_when_neither_set(self):
+        from calibrate.llm.run_tests import _resolve_test_parallel, DEFAULT_TEST_PARALLEL
+
+        with patch.dict("os.environ", {}, clear=False):
+            import os
+            os.environ.pop("CALIBRATE_TEST_PARALLEL", None)
+            self.assertEqual(_resolve_test_parallel(None), DEFAULT_TEST_PARALLEL)
+
+    def test_invalid_env_falls_back_to_default(self):
+        from calibrate.llm.run_tests import _resolve_test_parallel, DEFAULT_TEST_PARALLEL
+
+        with patch.dict("os.environ", {"CALIBRATE_TEST_PARALLEL": "abc"}):
+            self.assertEqual(_resolve_test_parallel(None), DEFAULT_TEST_PARALLEL)
+
+    def test_non_positive_values_ignored(self):
+        from calibrate.llm.run_tests import _resolve_test_parallel, DEFAULT_TEST_PARALLEL
+
+        with patch.dict("os.environ", {"CALIBRATE_TEST_PARALLEL": "0"}):
+            # CLI 0 ignored, env 0 ignored -> default
+            self.assertEqual(_resolve_test_parallel(0), DEFAULT_TEST_PARALLEL)
+
+
+class TestRunModelTestsParallel(unittest.IsolatedAsyncioTestCase):
+    async def test_test_cases_run_concurrently(self):
+        from calibrate.llm import run_tests as RT
+
+        concurrency = {"current": 0, "peak": 0}
+        gate = asyncio.Event()
+        started = 0
+        n_cases = 4
+
+        async def fake_run_test(**kwargs):
+            nonlocal started
+            concurrency["current"] += 1
+            concurrency["peak"] = max(concurrency["peak"], concurrency["current"])
+            started += 1
+            if started >= n_cases:
+                gate.set()
+            await gate.wait()  # block until all have started -> proves overlap
+            concurrency["current"] -= 1
+            return {
+                "output": {"response": "Hi", "tool_calls": []},
+                "metrics": {"passed": True, "judge_results": {}, "reasoning": "ok"},
+            }
+
+        config = {
+            "system_prompt": "sp",
+            "tools": [],
+            "evaluators": [],
+            "test_cases": [
+                {
+                    "id": f"tc{i}",
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "response", "criteria": "be polite"},
+                }
+                for i in range(n_cases)
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "run_test", side_effect=fake_run_test):
+            result = await asyncio.wait_for(
+                RT.run_model_tests(
+                    model="m", provider="openrouter", config=config,
+                    output_dir=tmp, test_parallel=n_cases,
+                ),
+                timeout=5,
+            )
+
+        self.assertEqual(concurrency["peak"], n_cases)
+        self.assertEqual(result["metrics"]["passed"], n_cases)
+
+    async def test_results_preserve_test_case_order(self):
+        from calibrate.llm import run_tests as RT
+
+        async def fake_run_test(**kwargs):
+            # Later test cases finish first to scramble completion order.
+            content = kwargs["chat_history"][0]["content"]
+            await asyncio.sleep(0.01 * (5 - int(content)))
+            return {
+                "output": {"response": content, "tool_calls": []},
+                "metrics": {"passed": True, "judge_results": {}, "reasoning": "ok"},
+            }
+
+        config = {
+            "system_prompt": "sp",
+            "tools": [],
+            "evaluators": [],
+            "test_cases": [
+                {
+                    "id": f"tc{i}",
+                    "history": [{"role": "user", "content": str(i)}],
+                    "evaluation": {"type": "response", "criteria": "x"},
+                }
+                for i in range(5)
+            ],
+        }
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RT, "run_test", side_effect=fake_run_test):
+            result = await RT.run_model_tests(
+                model="m", provider="openrouter", config=config,
+                output_dir=tmp, test_parallel=5,
+            )
+            with open(Path(tmp) / "m" / "results.json") as f:
+                saved = json.load(f)
+
+        self.assertEqual(
+            [r["test_case_id"] for r in result["results"]],
+            [f"tc{i}" for i in range(5)],
+        )
+        self.assertEqual([r["test_case_id"] for r in saved], [f"tc{i}" for i in range(5)])
+
+
 class TestMainCLI(unittest.IsolatedAsyncioTestCase):
     async def test_main_eval_only(self):
         from calibrate.llm import run_tests as RT
