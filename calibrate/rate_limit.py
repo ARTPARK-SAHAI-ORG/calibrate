@@ -64,3 +64,12 @@ class AsyncRateLimiter:
 
 SARVAM_STT_STREAMING_LIMITER = AsyncRateLimiter(max_calls=20, period=60.0)
 SARVAM_TTS_STREAMING_LIMITER = AsyncRateLimiter(max_calls=60, period=60.0)
+
+# Max wall-clock seconds for a single provider STT call before we treat it
+# as stuck and let @backoff retry
+STT_PROVIDER_TIMEOUT_SECONDS = 60.0
+
+# Idle (per-message) timeout for streaming STT providers. A streaming
+# connection that goes silent for this many seconds is treated as stuck and
+# raises ``TimeoutError`` so ``@backoff`` can retry
+STT_STREAMING_IDLE_TIMEOUT_SECONDS = 20.0

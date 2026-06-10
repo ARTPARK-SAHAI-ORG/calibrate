@@ -213,18 +213,18 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
     async def test_known_provider_routed(self):
         from calibrate.stt import eval as stt_eval
 
-        fake = AsyncMock(return_value={"transcript": "  hello  "})
+        fake = AsyncMock(return_value={"transcript": "  hello  ", "ttft": 0.5})
         with patch.dict(
             "os.environ", {"DEEPGRAM_API_KEY": "x"}
-        ), patch.object(stt_eval, "transcribe_deepgram", fake):
-            transcript = await stt_eval.transcribe_audio.__wrapped__(
+        ), patch.object(stt_eval, "transcribe_deepgram_streaming", fake):
+            output = await stt_eval.transcribe_audio.__wrapped__(
                 Path("/tmp/x.wav"),
                 "ref",
                 "deepgram",
                 "english",
                 "uid",
             )
-        self.assertEqual(transcript, "hello")
+        self.assertEqual(output, {"transcript": "hello", "ttft": 0.5})
         fake.assert_awaited_once()
 
 
