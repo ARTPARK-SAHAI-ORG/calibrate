@@ -11,6 +11,8 @@ Run with:
     python -m pytest tests/test_agent_benchmarking.py -v
 """
 
+import asyncio
+import os
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -294,6 +296,152 @@ class TestFolderNaming(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(subfolders, [])
             # results.json written directly to output_dir
             self.assertTrue(os.path.exists(os.path.join(tmpdir, "results.json")))
+
+
+# ---------------------------------------------------------------------------
+# Tests for model-level benchmark parallelism (CALIBRATE_LLM_BENCHMARK_PARALLEL)
+#
+# This is the MODEL-level concurrency (how many models run at once), distinct
+# from the test-case-level CALIBRATE_TEST_PARALLEL handled in run_tests.py.
+# ---------------------------------------------------------------------------
+
+class TestResolveBenchmarkParallelLLM(unittest.TestCase):
+    def test_cli_value_takes_precedence(self):
+        from calibrate.utils import resolve_benchmark_parallel
+
+        with patch.dict("os.environ", {"CALIBRATE_LLM_BENCHMARK_PARALLEL": "7"}):
+            self.assertEqual(resolve_benchmark_parallel("llm", 3), 3)
+
+    def test_env_var_used_when_no_cli(self):
+        from calibrate.utils import resolve_benchmark_parallel
+
+        with patch.dict("os.environ", {"CALIBRATE_LLM_BENCHMARK_PARALLEL": "7"}):
+            self.assertEqual(resolve_benchmark_parallel("llm", None), 7)
+
+    def test_default_when_neither_set(self):
+        from calibrate.utils import (
+            resolve_benchmark_parallel,
+            DEFAULT_BENCHMARK_PARALLEL,
+        )
+
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("CALIBRATE_LLM_BENCHMARK_PARALLEL", None)
+            self.assertEqual(
+                resolve_benchmark_parallel("llm", None), DEFAULT_BENCHMARK_PARALLEL
+            )
+            self.assertEqual(DEFAULT_BENCHMARK_PARALLEL, 2)
+
+    def test_invalid_env_falls_back_to_default(self):
+        from calibrate.utils import (
+            resolve_benchmark_parallel,
+            DEFAULT_BENCHMARK_PARALLEL,
+        )
+
+        with patch.dict("os.environ", {"CALIBRATE_LLM_BENCHMARK_PARALLEL": "abc"}):
+            self.assertEqual(
+                resolve_benchmark_parallel("llm", None), DEFAULT_BENCHMARK_PARALLEL
+            )
+
+    def test_zero_values_ignored(self):
+        from calibrate.utils import (
+            resolve_benchmark_parallel,
+            DEFAULT_BENCHMARK_PARALLEL,
+        )
+
+        with patch.dict("os.environ", {"CALIBRATE_LLM_BENCHMARK_PARALLEL": "0"}):
+            # CLI 0 ignored, env 0 ignored -> default
+            self.assertEqual(
+                resolve_benchmark_parallel("llm", 0), DEFAULT_BENCHMARK_PARALLEL
+            )
+
+    def test_does_not_read_test_parallel_env(self):
+        """Model-level resolver ignores the test-case-level env var."""
+        from calibrate.utils import (
+            resolve_benchmark_parallel,
+            DEFAULT_BENCHMARK_PARALLEL,
+        )
+
+        with patch.dict(
+            "os.environ", {"CALIBRATE_TEST_PARALLEL": "9"}, clear=False
+        ):
+            os.environ.pop("CALIBRATE_LLM_BENCHMARK_PARALLEL", None)
+            self.assertEqual(
+                resolve_benchmark_parallel("llm", None), DEFAULT_BENCHMARK_PARALLEL
+            )
+
+
+class TestRunModelsBenchmarkParallel(unittest.IsolatedAsyncioTestCase):
+    async def _capture_semaphore(self, *, max_parallel=None, env=None):
+        """Run ``_run_models`` and capture the int passed to ``asyncio.Semaphore``."""
+        from calibrate.llm import benchmark as BM
+
+        captured = {}
+        real_semaphore = asyncio.Semaphore
+
+        def fake_semaphore(value):
+            captured["value"] = value
+            return real_semaphore(value)
+
+        config = {"system_prompt": "sp", "tools": [], "evaluators": [], "test_cases": []}
+        env = env or {}
+        with patch.dict("os.environ", env, clear=False):
+            if "CALIBRATE_LLM_BENCHMARK_PARALLEL" not in env:
+                os.environ.pop("CALIBRATE_LLM_BENCHMARK_PARALLEL", None)
+            with patch.object(
+                BM, "run_model_tests", AsyncMock(return_value={"metrics": {}})
+            ), patch.object(BM.asyncio, "Semaphore", side_effect=fake_semaphore):
+                await BM._run_models(
+                    config=config,
+                    models=["m1", "m2", "m3"],
+                    provider="openrouter",
+                    output_dir="./out",
+                    max_parallel=max_parallel,
+                )
+        return captured["value"]
+
+    async def test_env_var_sets_model_parallelism(self):
+        value = await self._capture_semaphore(
+            env={"CALIBRATE_LLM_BENCHMARK_PARALLEL": "5"}
+        )
+        self.assertEqual(value, 5)
+
+    async def test_explicit_arg_overrides_env(self):
+        value = await self._capture_semaphore(
+            max_parallel=8, env={"CALIBRATE_LLM_BENCHMARK_PARALLEL": "5"}
+        )
+        self.assertEqual(value, 8)
+
+    async def test_zero_env_falls_back_to_default(self):
+        value = await self._capture_semaphore(
+            env={"CALIBRATE_LLM_BENCHMARK_PARALLEL": "0"}
+        )
+        self.assertEqual(value, 2)
+
+    async def test_default_when_unset(self):
+        value = await self._capture_semaphore()
+        self.assertEqual(value, 2)
+
+    async def test_benchmark_parallel_does_not_touch_test_parallel(self):
+        """The benchmark env var must not be forwarded as ``test_parallel``."""
+        from calibrate.llm import benchmark as BM
+
+        mock_run = AsyncMock(return_value={"metrics": {}})
+        config = {"system_prompt": "sp", "tools": [], "evaluators": [], "test_cases": []}
+        with patch.dict(
+            "os.environ",
+            {"CALIBRATE_LLM_BENCHMARK_PARALLEL": "5", "CALIBRATE_TEST_PARALLEL": "9"},
+            clear=False,
+        ):
+            with patch.object(BM, "run_model_tests", mock_run):
+                await BM._run_models(
+                    config=config,
+                    models=["m1"],
+                    provider="openrouter",
+                    output_dir="./out",
+                )
+        # test_parallel was not passed by the benchmark, so it stays None and the
+        # per-model run resolves CALIBRATE_TEST_PARALLEL itself downstream.
+        self.assertIsNone(mock_run.await_args.kwargs["test_parallel"])
 
 
 # ---------------------------------------------------------------------------

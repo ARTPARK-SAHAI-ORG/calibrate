@@ -23,6 +23,34 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
+# Default number of providers/models a benchmark runs concurrently.
+DEFAULT_BENCHMARK_PARALLEL = 2
+
+
+def resolve_benchmark_parallel(
+    component: Literal["stt", "tts", "llm"], cli_value: Optional[int] = None
+) -> int:
+    """Resolve how many providers/models a benchmark runs concurrently.
+
+    Precedence: explicit ``cli_value`` (CLI flag / SDK arg) >
+    ``CALIBRATE_{STT,TTS,LLM}_BENCHMARK_PARALLEL`` env var > default (2).
+
+    Non-positive or unparseable values are ignored so callers always get a
+    sane positive concurrency.
+    """
+    if cli_value is not None and cli_value > 0:
+        return cli_value
+    env_value = os.getenv(f"CALIBRATE_{component.upper()}_BENCHMARK_PARALLEL")
+    if env_value:
+        try:
+            parsed = int(env_value)
+            if parsed > 0:
+                return parsed
+        except ValueError:
+            pass
+    return DEFAULT_BENCHMARK_PARALLEL
+
+
 def patch_langfuse_trace(trace_name: str):
     from pipecat.utils.tracing import service_decorators
 

@@ -56,6 +56,71 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "completed")
         self.assertEqual(set(result["models"].keys()), {"m1", "m2"})
 
+    async def _capture_run_semaphore(self, *, max_parallel=None, env=None, agent=False):
+        """Run ``tests.run`` (multi-model) and capture the model-level Semaphore size."""
+        import asyncio
+        import calibrate.llm as llm_pkg
+        from calibrate.llm import tests
+
+        # The model-level semaphore is created first in tests.run, before any
+        # per-model test-case-level semaphore, so values[0] is the model-level size.
+        values = []
+        real_semaphore = asyncio.Semaphore
+
+        def fake_semaphore(value):
+            values.append(value)
+            return real_semaphore(value)
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+        env = env or {}
+        fake_agent = MagicMock() if agent else None
+        target = "run_test_external" if agent else "run_test"
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.dict("os.environ", env, clear=False), \
+             patch(f"calibrate.llm.run_tests.{target}",
+                   AsyncMock(return_value=fake_test_result)), \
+             patch.object(llm_pkg.asyncio, "Semaphore", side_effect=fake_semaphore):
+            if "CALIBRATE_LLM_BENCHMARK_PARALLEL" not in env:
+                os.environ.pop("CALIBRATE_LLM_BENCHMARK_PARALLEL", None)
+            await tests.run(
+                test_cases=[{
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "response", "criteria": "x"},
+                }],
+                output_dir=tmp,
+                models=["m1", "m2"],
+                max_parallel=max_parallel,
+                agent=fake_agent,
+            )
+        return values[0]
+
+    async def test_run_model_parallel_env_var(self):
+        value = await self._capture_run_semaphore(
+            env={"CALIBRATE_LLM_BENCHMARK_PARALLEL": "5"}
+        )
+        self.assertEqual(value, 5)
+
+    async def test_run_model_parallel_arg_overrides_env(self):
+        value = await self._capture_run_semaphore(
+            max_parallel=8, env={"CALIBRATE_LLM_BENCHMARK_PARALLEL": "5"}
+        )
+        self.assertEqual(value, 8)
+
+    async def test_run_model_parallel_zero_env_default(self):
+        value = await self._capture_run_semaphore(
+            env={"CALIBRATE_LLM_BENCHMARK_PARALLEL": "0"}
+        )
+        self.assertEqual(value, 2)
+
+    async def test_run_model_parallel_agent_path_uses_resolver(self):
+        value = await self._capture_run_semaphore(
+            env={"CALIBRATE_LLM_BENCHMARK_PARALLEL": "6"}, agent=True
+        )
+        self.assertEqual(value, 6)
+
     async def test_run_multi_model_with_exception(self):
         from calibrate.llm import tests
 
