@@ -330,5 +330,49 @@ class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
                     await RS.main()
 
 
+class TestResolveSimulationParallel(unittest.TestCase):
+    def test_cli_value_takes_precedence(self):
+        from calibrate.llm.run_simulation import _resolve_simulation_parallel
+        with patch.dict("os.environ", {"CALIBRATE_SIMULATION_PARALLEL": "7"}):
+            self.assertEqual(_resolve_simulation_parallel(3), 3)
+
+    def test_env_var_used_when_no_cli(self):
+        from calibrate.llm.run_simulation import _resolve_simulation_parallel
+        with patch.dict("os.environ", {"CALIBRATE_SIMULATION_PARALLEL": "7"}):
+            self.assertEqual(_resolve_simulation_parallel(None), 7)
+
+    def test_default_when_neither_set(self):
+        from calibrate.llm.run_simulation import (
+            _resolve_simulation_parallel,
+            DEFAULT_SIMULATION_PARALLEL,
+        )
+        with patch.dict("os.environ", {}, clear=False):
+            import os
+            os.environ.pop("CALIBRATE_SIMULATION_PARALLEL", None)
+            self.assertEqual(
+                _resolve_simulation_parallel(None), DEFAULT_SIMULATION_PARALLEL
+            )
+
+    def test_invalid_env_falls_back_to_default(self):
+        from calibrate.llm.run_simulation import (
+            _resolve_simulation_parallel,
+            DEFAULT_SIMULATION_PARALLEL,
+        )
+        with patch.dict("os.environ", {"CALIBRATE_SIMULATION_PARALLEL": "abc"}):
+            self.assertEqual(
+                _resolve_simulation_parallel(None), DEFAULT_SIMULATION_PARALLEL
+            )
+
+    def test_non_positive_values_ignored(self):
+        from calibrate.llm.run_simulation import (
+            _resolve_simulation_parallel,
+            DEFAULT_SIMULATION_PARALLEL,
+        )
+        with patch.dict("os.environ", {"CALIBRATE_SIMULATION_PARALLEL": "0"}):
+            self.assertEqual(
+                _resolve_simulation_parallel(0), DEFAULT_SIMULATION_PARALLEL
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

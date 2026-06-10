@@ -336,6 +336,12 @@ Run multiple simulations in parallel with `-n`:
 calibrate simulations --type text -c config.json -o ./out -n 2
 ```
 
+<Note>
+  You can also set the default parallelism with the `CALIBRATE_SIMULATION_PARALLEL`
+  environment variable (defaults to `1`). The `-n`/`--parallel` flag takes precedence
+  over it when provided.
+</Note>
+
 Simulations run for every persona × scenario combination. For example, 2 personas × 2 scenarios = 4 simulations.
 
 **Skip verification:**

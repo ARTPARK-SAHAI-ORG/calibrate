@@ -111,6 +111,23 @@ from calibrate.utils import patch_langfuse_trace
 
 IS_TRACING_ENABLED = bool(os.getenv("ENABLE_TRACING"))
 
+DEFAULT_SIMULATION_PARALLEL = 1
+
+
+def _resolve_simulation_parallel(cli_value: Optional[int] = None) -> int:
+    """Resolve simulation concurrency: CLI flag > CALIBRATE_SIMULATION_PARALLEL > default."""
+    if cli_value is not None and cli_value > 0:
+        return cli_value
+    env_value = os.getenv("CALIBRATE_SIMULATION_PARALLEL")
+    if env_value:
+        try:
+            parsed = int(env_value)
+            if parsed > 0:
+                return parsed
+        except ValueError:
+            pass
+    return DEFAULT_SIMULATION_PARALLEL
+
 # Initialize tracing if enabled
 if IS_TRACING_ENABLED:
     patch_langfuse_trace(trace_name="text_simulation")
@@ -891,8 +908,8 @@ async def main():
         "-n",
         "--parallel",
         type=int,
-        default=1,
-        help="Number of simulations to run in parallel",
+        default=None,
+        help="Number of simulations to run in parallel (overrides CALIBRATE_SIMULATION_PARALLEL)",
     )
     parser.add_argument(
         "--eval-only",
@@ -958,7 +975,7 @@ async def main():
     write_evaluator_config(output_dir, config["evaluators"])
 
     # Create semaphore to limit parallel executions
-    semaphore = asyncio.Semaphore(args.parallel)
+    semaphore = asyncio.Semaphore(_resolve_simulation_parallel(args.parallel))
 
     # Detect agent connection path
     agent = None
@@ -1138,7 +1155,7 @@ async def run_eval_only_simulations(
     config: dict,
     dataset: list[dict],
     output_dir: str,
-    parallel: int = 1,
+    parallel: Optional[int] = None,
 ) -> int:
     """Run evaluators on a pre-existing dataset of simulation transcripts.
 
@@ -1162,7 +1179,7 @@ async def run_eval_only_simulations(
     with open(join(output_dir, "dataset_map.json"), "w") as f:
         json.dump(dataset_map, f, indent=4)
 
-    semaphore = asyncio.Semaphore(parallel)
+    semaphore = asyncio.Semaphore(_resolve_simulation_parallel(parallel))
     tasks = [
         run_eval_only_simulation_task(
             semaphore=semaphore,
