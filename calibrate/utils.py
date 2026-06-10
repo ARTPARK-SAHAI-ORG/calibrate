@@ -23,6 +23,40 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
+# Default number of rows (audio files / texts) a single STT/TTS provider
+# processes concurrently within one evaluation.
+DEFAULT_ROW_PARALLEL = 4
+
+
+def resolve_row_parallel(
+    component: Literal["stt", "tts", "llm"], cli_value: Optional[int] = None
+) -> int:
+    """Resolve how many rows a single provider/model processes concurrently.
+
+    "Rows" are the per-item units of an evaluation — audio files for STT,
+    texts for TTS. This bounds the in-provider concurrency, orthogonal to
+    :func:`resolve_benchmark_parallel` which bounds how many providers/models
+    run at once.
+
+    Precedence: explicit ``cli_value`` (CLI flag / SDK arg) >
+    ``CALIBRATE_{STT,TTS,LLM}_PARALLEL`` env var > default (4).
+
+    Non-positive or unparseable values are ignored so callers always get a
+    sane positive concurrency.
+    """
+    if cli_value is not None and cli_value > 0:
+        return cli_value
+    env_value = os.getenv(f"CALIBRATE_{component.upper()}_PARALLEL")
+    if env_value:
+        try:
+            parsed = int(env_value)
+            if parsed > 0:
+                return parsed
+        except ValueError:
+            pass
+    return DEFAULT_ROW_PARALLEL
+
+
 def patch_langfuse_trace(trace_name: str):
     from pipecat.utils.tracing import service_decorators
 
