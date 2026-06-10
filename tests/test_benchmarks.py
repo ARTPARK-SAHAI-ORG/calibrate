@@ -67,7 +67,8 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                             "leaderboard_dir": tmp,
                             "models": {"m1": {"metrics": {"passed": 1, "total": 1}}}}
             with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_results)):
+                 patch.object(B, "_run_models",
+                              AsyncMock(return_value=fake_results["models"])):
                 await B.main()
 
     async def test_main_error_path_exits(self):
@@ -84,7 +85,8 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                             "leaderboard_dir": tmp,
                             "models": {"m1": {"status": "error", "error": "boom"}}}
             with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_results)):
+                 patch.object(B, "_run_models",
+                              AsyncMock(return_value=fake_results["models"])):
                 with self.assertRaises(SystemExit):
                     await B.main()
 
@@ -106,7 +108,8 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                             "models": {"m1": {"metrics": {"passed": 1, "total": 1}}}}
             with patch.object(sys, "argv", argv), \
                  patch.dict(os.environ, {"CALIBRATE_LLM_LOG_APPEND": "1"}), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_results)):
+                 patch.object(B, "_run_models",
+                              AsyncMock(return_value=fake_results["models"])):
                 await B.main()
 
 
