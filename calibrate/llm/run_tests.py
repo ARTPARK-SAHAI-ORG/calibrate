@@ -1573,8 +1573,8 @@ async def run_model_tests(
         provider: LLM provider (openai or openrouter)
         config: Test configuration dict
         output_dir: Base output directory - results saved to output_dir/model_name/
-        test_parallel: Max test cases to evaluate concurrently. Falls back to the
-            CALIBRATE_TEST_PARALLEL env var, then DEFAULT_TEST_PARALLEL.
+        test_parallel: Max test cases to evaluate concurrently; resolved via
+            ``_resolve_test_parallel``.
     """
     # Build model folder name: for openai provider, prefix with provider name
     save_folder_name = f"{provider}/{model}" if provider == "openai" else f"{model}"
