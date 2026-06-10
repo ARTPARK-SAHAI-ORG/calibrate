@@ -462,5 +462,267 @@ class TestRunTTSEvalParallel(unittest.IsolatedAsyncioTestCase):
             self.assertTrue((df["ttfb"] == 0.5).all())
 
 
+class TestRunTTSEvalRowParallel(unittest.IsolatedAsyncioTestCase):
+    """Row-level parallelism in run_tts_eval: bounded concurrency, output
+    ordering, resume, and overwrite semantics."""
+
+    async def test_concurrency_actually_overlaps(self):
+        from calibrate.tts import eval as tts_eval
+
+        row_parallel = 3
+        n_rows = 5
+        in_flight = 0
+        max_in_flight = 0
+        lock = asyncio.Lock()
+        release = asyncio.Event()
+        reached = asyncio.Event()
+
+        async def fake_synth(text, provider, language, audio_path):
+            nonlocal in_flight, max_in_flight
+            async with lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
+                if in_flight >= min(row_parallel, n_rows):
+                    reached.set()
+            # Keep the row open until enough rows are concurrently in-flight.
+            await release.wait()
+            async with lock:
+                in_flight -= 1
+            Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(audio_path).write_bytes(b"RIFF")
+            return {"ttfb": 0.1}
+
+        async def releaser():
+            await reached.wait()
+            release.set()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            results_csv = out / "results.csv"
+            gt_data = [{"id": f"row_{i}", "text": f"t{i}"} for i in range(n_rows)]
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                await asyncio.gather(
+                    tts_eval.run_tts_eval(
+                        gt_data=gt_data,
+                        provider="openai",
+                        language="english",
+                        output_dir=str(out),
+                        results_csv_path=results_csv,
+                        row_parallel=row_parallel,
+                    ),
+                    releaser(),
+                )
+
+            self.assertGreaterEqual(max_in_flight, min(row_parallel, n_rows))
+
+    async def test_concurrency_capped_serialized(self):
+        from calibrate.tts import eval as tts_eval
+
+        in_flight = 0
+        max_in_flight = 0
+        lock = asyncio.Lock()
+
+        async def fake_synth(text, provider, language, audio_path):
+            nonlocal in_flight, max_in_flight
+            async with lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
+            # Yield control so a second concurrent row could interleave if the
+            # semaphore weren't capping concurrency at 1.
+            await asyncio.sleep(0.01)
+            async with lock:
+                in_flight -= 1
+            Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(audio_path).write_bytes(b"RIFF")
+            return {"ttfb": 0.1}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            results_csv = out / "results.csv"
+            gt_data = [{"id": f"row_{i}", "text": f"t{i}"} for i in range(5)]
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                await tts_eval.run_tts_eval(
+                    gt_data=gt_data,
+                    provider="openai",
+                    language="english",
+                    output_dir=str(out),
+                    results_csv_path=results_csv,
+                    row_parallel=1,
+                )
+
+            self.assertEqual(max_in_flight, 1)
+
+    async def test_output_order_preserved_when_later_rows_finish_first(self):
+        from calibrate.tts import eval as tts_eval
+
+        # Later rows return first so completion order is the reverse of input.
+        delays = {"row_a": 0.06, "row_b": 0.04, "row_c": 0.02}
+
+        async def fake_synth(text, provider, language, audio_path):
+            _id = Path(audio_path).stem
+            await asyncio.sleep(delays[_id])
+            Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(audio_path).write_bytes(b"RIFF")
+            return {"ttfb": delays[_id]}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            results_csv = out / "results.csv"
+            gt_data = [
+                {"id": "row_a", "text": "a"},
+                {"id": "row_b", "text": "b"},
+                {"id": "row_c", "text": "c"},
+            ]
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                await tts_eval.run_tts_eval(
+                    gt_data=gt_data,
+                    provider="openai",
+                    language="english",
+                    output_dir=str(out),
+                    results_csv_path=results_csv,
+                    row_parallel=3,
+                )
+
+            df = pd.read_csv(results_csv)
+            self.assertEqual(
+                df["id"].astype(str).tolist(), ["row_a", "row_b", "row_c"]
+            )
+
+    async def test_resume_does_not_recall_processed_id(self):
+        from calibrate.tts import eval as tts_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            results_csv = out / "results.csv"
+            pd.DataFrame(
+                [{"id": "row_a", "text": "hello", "audio_path": "/x.wav", "ttfb": 0.1}]
+            ).to_csv(results_csv, index=False)
+
+            processed = []
+
+            async def fake_synth(text, provider, language, audio_path):
+                processed.append(Path(audio_path).stem)
+                Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(audio_path).write_bytes(b"RIFF")
+                return {"ttfb": 0.2}
+
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                result = await tts_eval.run_tts_eval(
+                    gt_data=[
+                        {"id": "row_a", "text": "hello"},
+                        {"id": "row_b", "text": "world"},
+                        {"id": "row_c", "text": "again"},
+                    ],
+                    provider="openai",
+                    language="english",
+                    output_dir=str(out),
+                    results_csv_path=results_csv,
+                    row_parallel=3,
+                )
+
+            self.assertNotIn("row_a", processed)
+            self.assertEqual(result["success_count"], 2)
+            df = pd.read_csv(results_csv)
+            self.assertIn("row_a", df["id"].astype(str).tolist())
+            self.assertEqual(
+                df["id"].astype(str).tolist(), ["row_a", "row_b", "row_c"]
+            )
+
+    async def test_overwrite_reprocesses_all_rows(self):
+        from calibrate.tts import eval as tts_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            results_csv = out / "results.csv"
+            pd.DataFrame(
+                [
+                    {"id": "row_a", "text": "old", "audio_path": "/x.wav", "ttfb": 0.1},
+                    {"id": "row_b", "text": "old", "audio_path": "/y.wav", "ttfb": 0.1},
+                ]
+            ).to_csv(results_csv, index=False)
+
+            processed = []
+
+            async def fake_synth(text, provider, language, audio_path):
+                processed.append(Path(audio_path).stem)
+                Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(audio_path).write_bytes(b"RIFF")
+                return {"ttfb": 0.5}
+
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                result = await tts_eval.run_tts_eval(
+                    gt_data=[
+                        {"id": "row_a", "text": "new"},
+                        {"id": "row_b", "text": "new"},
+                    ],
+                    provider="openai",
+                    language="english",
+                    output_dir=str(out),
+                    results_csv_path=results_csv,
+                    overwrite=True,
+                    row_parallel=2,
+                )
+
+            self.assertEqual(sorted(processed), ["row_a", "row_b"])
+            self.assertEqual(result["success_count"], 2)
+            df = pd.read_csv(results_csv)
+            self.assertEqual(df["id"].astype(str).tolist(), ["row_a", "row_b"])
+            self.assertTrue((df["text"] == "new").all())
+            self.assertTrue((df["ttfb"] == 0.5).all())
+
+
+class TestResolveRowParallelTTS(unittest.TestCase):
+    """Precedence for resolve_row_parallel('tts', ...): CLI > env > default."""
+
+    def test_cli_value_takes_precedence(self):
+        from calibrate.utils import resolve_row_parallel
+
+        with patch.dict(os.environ, {"CALIBRATE_TTS_PARALLEL": "7"}, clear=False):
+            self.assertEqual(resolve_row_parallel("tts", 3), 3)
+
+    def test_env_used_when_no_cli(self):
+        from calibrate.utils import resolve_row_parallel
+
+        with patch.dict(os.environ, {"CALIBRATE_TTS_PARALLEL": "6"}, clear=False):
+            self.assertEqual(resolve_row_parallel("tts", None), 6)
+
+    def test_default_when_nothing_set(self):
+        from calibrate.utils import resolve_row_parallel, DEFAULT_ROW_PARALLEL
+
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CALIBRATE_TTS_PARALLEL", None)
+            self.assertEqual(
+                resolve_row_parallel("tts", None), DEFAULT_ROW_PARALLEL
+            )
+
+    def test_non_positive_and_garbage_fall_back_to_default(self):
+        from calibrate.utils import resolve_row_parallel, DEFAULT_ROW_PARALLEL
+
+        # Non-positive CLI values are ignored; with no usable env, fall back.
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("CALIBRATE_TTS_PARALLEL", None)
+            self.assertEqual(resolve_row_parallel("tts", 0), DEFAULT_ROW_PARALLEL)
+            self.assertEqual(resolve_row_parallel("tts", -5), DEFAULT_ROW_PARALLEL)
+
+        # Garbage / non-positive env values are ignored too.
+        for bad in ("abc", "0", "-3"):
+            with patch.dict(
+                os.environ, {"CALIBRATE_TTS_PARALLEL": bad}, clear=False
+            ):
+                self.assertEqual(
+                    resolve_row_parallel("tts", None), DEFAULT_ROW_PARALLEL
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

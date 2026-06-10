@@ -583,5 +583,222 @@ class TestSTTRunSTTEvalParallel(unittest.IsolatedAsyncioTestCase):
                     )
 
 
+class TestRunSTTEvalRowParallel(unittest.IsolatedAsyncioTestCase):
+    """Row-level concurrency behaviour of ``run_stt_eval``."""
+
+    @staticmethod
+    def _gt_data(ids):
+        # Non-numeric ids on purpose: pandas coerces numeric-looking ids to
+        # int on CSV round-trip, which breaks the resume id comparison.
+        return [{"id": i, "gt": f"gt {i}"} for i in ids]
+
+    @staticmethod
+    def _make_audio(audio_dir: Path, ids):
+        for i in ids:
+            (audio_dir / f"{i}.wav").write_bytes(b"RIFF0000WAVE")
+
+    async def test_concurrency_actually_overlaps(self):
+        """row_parallel=3 over 5 rows reaches a peak in-flight of >= 3."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c", "row_d", "row_e"]
+        row_parallel = 3
+        in_flight = 0
+        max_in_flight = 0
+        counter_lock = asyncio.Lock()
+        release = asyncio.Event()
+        reached = asyncio.Event()
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            nonlocal in_flight, max_in_flight
+            async with counter_lock:
+                in_flight += 1
+                max_in_flight = max(max_in_flight, in_flight)
+                if in_flight >= min(row_parallel, len(ids)):
+                    reached.set()
+            await release.wait()
+            async with counter_lock:
+                in_flight -= 1
+            return f"pred {reference}"
+
+        async def releaser():
+            await reached.wait()
+            release.set()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_dir = Path(tmp)
+            self._make_audio(audio_dir, ids)
+            out = audio_dir / "results.csv"
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                await asyncio.gather(
+                    stt_eval.run_stt_eval(
+                        gt_data=self._gt_data(ids),
+                        audio_dir=audio_dir,
+                        provider="deepgram",
+                        language="english",
+                        results_csv_path=out,
+                        row_parallel=row_parallel,
+                    ),
+                    releaser(),
+                )
+
+        self.assertGreaterEqual(max_in_flight, min(row_parallel, len(ids)))
+
+    async def test_concurrency_is_capped_at_one(self):
+        """row_parallel=1 serializes transcription (peak in-flight never > 1)."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c", "row_d"]
+        in_flight = 0
+        max_in_flight = 0
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            nonlocal in_flight, max_in_flight
+            in_flight += 1
+            max_in_flight = max(max_in_flight, in_flight)
+            await asyncio.sleep(0.01)
+            in_flight -= 1
+            return "x"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_dir = Path(tmp)
+            self._make_audio(audio_dir, ids)
+            out = audio_dir / "results.csv"
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                await stt_eval.run_stt_eval(
+                    gt_data=self._gt_data(ids),
+                    audio_dir=audio_dir,
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=out,
+                    row_parallel=1,
+                )
+
+        self.assertEqual(max_in_flight, 1)
+
+    async def test_output_order_preserved_when_later_rows_finish_first(self):
+        """Reversed completion order still writes CSV in input order."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c", "row_d"]
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            # Earlier ids sleep longer so later ids complete first.
+            stem = audio_path.stem
+            delay = 0.05 * (len(ids) - ids.index(stem))
+            await asyncio.sleep(delay)
+            return f"pred-{stem}"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_dir = Path(tmp)
+            self._make_audio(audio_dir, ids)
+            out = audio_dir / "results.csv"
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                count = await stt_eval.run_stt_eval(
+                    gt_data=self._gt_data(ids),
+                    audio_dir=audio_dir,
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=out,
+                    row_parallel=4,
+                )
+
+            self.assertEqual(count, len(ids))
+            df = pd.read_csv(out)
+            self.assertEqual(df["id"].tolist(), ids)
+            self.assertEqual(df["pred"].tolist(), [f"pred-{i}" for i in ids])
+
+    async def test_resume_skips_already_processed_id(self):
+        """A pre-seeded id is kept and never re-transcribed."""
+        from calibrate.stt import eval as stt_eval
+
+        ids = ["row_a", "row_b", "row_c"]
+        seen = []
+
+        async def fake_transcribe(audio_path, reference, provider, language, uid):
+            seen.append(audio_path.stem)
+            return f"new-{audio_path.stem}"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_dir = Path(tmp)
+            self._make_audio(audio_dir, ids)
+            out = audio_dir / "results.csv"
+            # Pre-seed the first id as already processed.
+            pd.DataFrame(
+                [{"id": "row_a", "gt": "gt row_a", "pred": "old_a"}]
+            ).to_csv(out, index=False)
+
+            with patch.object(
+                stt_eval, "transcribe_audio", AsyncMock(side_effect=fake_transcribe)
+            ):
+                await stt_eval.run_stt_eval(
+                    gt_data=self._gt_data(ids),
+                    audio_dir=audio_dir,
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=out,
+                    row_parallel=4,
+                )
+
+            self.assertNotIn("row_a", seen)
+            self.assertEqual(sorted(seen), ["row_b", "row_c"])
+            df = pd.read_csv(out)
+            self.assertIn("row_a", df["id"].tolist())
+            self.assertEqual(
+                df.loc[df["id"] == "row_a", "pred"].iloc[0], "old_a"
+            )
+
+
+class TestResolveRowParallelPrecedence(unittest.TestCase):
+    """Precedence rules of ``resolve_row_parallel`` for the STT component."""
+
+    def test_cli_value_takes_precedence_over_env(self):
+        from calibrate.utils import resolve_row_parallel
+
+        with patch.dict("os.environ", {"CALIBRATE_STT_PARALLEL": "7"}):
+            self.assertEqual(resolve_row_parallel("stt", 3), 3)
+
+    def test_env_used_when_no_cli_value(self):
+        from calibrate.utils import resolve_row_parallel
+
+        with patch.dict("os.environ", {"CALIBRATE_STT_PARALLEL": "6"}):
+            self.assertEqual(resolve_row_parallel("stt", None), 6)
+
+    def test_default_when_no_cli_or_env(self):
+        from calibrate.utils import resolve_row_parallel, DEFAULT_ROW_PARALLEL
+
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("CALIBRATE_STT_PARALLEL", None)
+            self.assertEqual(
+                resolve_row_parallel("stt", None), DEFAULT_ROW_PARALLEL
+            )
+
+    def test_non_positive_and_garbage_fall_back_to_default(self):
+        from calibrate.utils import resolve_row_parallel, DEFAULT_ROW_PARALLEL
+
+        # Non-positive CLI values are ignored -> fall through to env/default.
+        with patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("CALIBRATE_STT_PARALLEL", None)
+            self.assertEqual(
+                resolve_row_parallel("stt", 0), DEFAULT_ROW_PARALLEL
+            )
+            self.assertEqual(
+                resolve_row_parallel("stt", -5), DEFAULT_ROW_PARALLEL
+            )
+
+        # Garbage / non-positive env values are ignored too.
+        for bad in ("abc", "0", "-1"):
+            with patch.dict("os.environ", {"CALIBRATE_STT_PARALLEL": bad}):
+                self.assertEqual(
+                    resolve_row_parallel("stt", None), DEFAULT_ROW_PARALLEL
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
