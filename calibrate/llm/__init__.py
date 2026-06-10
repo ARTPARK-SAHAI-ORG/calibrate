@@ -262,8 +262,7 @@ class _Tests:
             provider: LLM provider (openai or openrouter)
             run_name: Optional name for this run (used in output folder name)
             max_parallel: Maximum number of models to run in parallel (default: 2)
-            test_parallel: Max test cases to evaluate concurrently per model;
-                resolved via ``_resolve_test_parallel``.
+            test_parallel: Max test cases to evaluate concurrently per model.
             agent: Optional external agent connection. When provided, routes all
                 test cases to the external agent instead of an internal LLM.
             evaluators: Optional list of evaluator dicts (each with ``name``,

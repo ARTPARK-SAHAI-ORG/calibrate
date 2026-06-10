@@ -55,8 +55,7 @@ async def run(
         output_dir: Path to output directory for results (default: ./out)
             Results saved to output_dir/model_name/ for each model
         max_parallel: Maximum number of models to run in parallel (default: 2)
-        test_parallel: Max test cases to evaluate concurrently per model;
-            resolved via ``_resolve_test_parallel``.
+        test_parallel: Max test cases to evaluate concurrently per model.
 
     Returns:
         dict: Results summary with status and output paths
