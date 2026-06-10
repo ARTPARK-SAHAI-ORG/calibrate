@@ -258,17 +258,12 @@ class TestAgentBenchmark:
             f"'Overall Summary' not in stdout.\nstdout: {result.stdout}"
         )
 
-    def test_models_run_in_order(self, agent_config):
-        """gpt-4.1 output appears before gpt-5.1 output in stdout."""
+    def test_both_models_present_in_output(self, agent_config):
+        """Both models appear in stdout (order-agnostic — models run in parallel)."""
         result, _, _ = self._run_benchmark(agent_config)
         stdout = result.stdout
-        pos_41 = stdout.find("gpt-4.1")
-        pos_51 = stdout.find("gpt-5.1")
-        assert pos_41 != -1, "gpt-4.1 not found in stdout"
-        assert pos_51 != -1, "gpt-5.1 not found in stdout"
-        assert pos_41 < pos_51, (
-            "Expected gpt-4.1 to appear before gpt-5.1 in stdout"
-        )
+        assert "gpt-4.1" in stdout, "gpt-4.1 not found in stdout"
+        assert "gpt-5.1" in stdout, "gpt-5.1 not found in stdout"
 
 
 # ---------------------------------------------------------------------------

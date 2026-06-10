@@ -22,17 +22,47 @@ Python SDK:
 import argparse
 import asyncio
 import json
-import os
-import sys
-from os.path import exists, join
+from os.path import join
 
 from calibrate.llm.run_tests import display_label, run_model_tests
 from calibrate.llm.tests_leaderboard import generate_leaderboard
-from calibrate.llm._output import print_benchmark_summary
-from calibrate.utils import StreamTee
+from calibrate.llm._output import run_benchmark_cli
 
 # Maximum number of models to run in parallel
 MAX_PARALLEL_MODELS = 2
+
+
+async def _run_models(
+    config: dict,
+    models: list[str],
+    provider: str,
+    output_dir: str,
+    max_parallel: int = MAX_PARALLEL_MODELS,
+    test_parallel: int | None = None,
+) -> dict:
+    """Run tests for each model with bounded parallelism.
+
+    Returns a ``{model: result}`` dict (no leaderboard side effect), so it can
+    be reused as the ``runner`` for :func:`run_benchmark_cli`.
+    """
+    results: dict = {}
+    semaphore = asyncio.Semaphore(max_parallel)
+
+    async def run_model(model: str) -> tuple[str, dict]:
+        async with semaphore:
+            result = await run_model_tests(
+                model=model,
+                provider=provider,
+                config=config,
+                output_dir=output_dir,
+                test_parallel=test_parallel,
+            )
+            return (model, result)
+
+    tasks = [run_model(model) for model in models]
+    for model, result in await asyncio.gather(*tasks):
+        results[model] = result
+    return results
 
 
 async def run(
@@ -72,27 +102,14 @@ async def run(
         ...     output_dir="./out"
         ... ))
     """
-    results = {}
-    semaphore = asyncio.Semaphore(max_parallel)
-
-    async def run_model(model: str) -> tuple[str, dict]:
-        """Run tests for a single model with semaphore control."""
-        async with semaphore:
-            result = await run_model_tests(
-                model=model,
-                provider=provider,
-                config=config,
-                output_dir=output_dir,
-                test_parallel=test_parallel,
-            )
-            return (model, result)
-
-    # Run all models with limited parallelism
-    tasks = [run_model(model) for model in models]
-    model_results = await asyncio.gather(*tasks)
-
-    for model, result in model_results:
-        results[model] = result
+    results = await _run_models(
+        config=config,
+        models=models,
+        provider=provider,
+        output_dir=output_dir,
+        max_parallel=max_parallel,
+        test_parallel=test_parallel,
+    )
 
     # Generate leaderboard from output_dir (which contains model folders)
     leaderboard_dir = join(output_dir, "leaderboard")
@@ -158,60 +175,20 @@ async def main():
 
     config = json.load(open(args.config))
 
-    # ``exist_ok=True`` makes this safe when several ``calibrate llm``
-    # subprocesses (e.g. one per model spawned by the interactive UI) race to
-    # create the output dir — the previous ``if not exists: makedirs(...)``
-    # pattern was non-atomic and the loser raised ``FileExistsError``.
-    os.makedirs(args.output_dir, exist_ok=True)
-
-    # Mirror everything written to stdout/stderr into a single output-dir-level
-    # `logs` file so the full terminal session (banner, per-model output,
-    # leaderboard prints, summary) is captured in one place — same pattern as
-    # the STT/TTS benchmark CLIs.
-    #
-    # When the interactive UI runs each model in its own ``calibrate llm``
-    # subprocess, multiple processes target the same ``logs`` path concurrently;
-    # the UI sets ``CALIBRATE_LLM_LOG_APPEND=1`` so subprocesses append instead
-    # of racing to truncate each other's output. The UI itself clears the file
-    # once before kicking off the run.
-    log_path = join(args.output_dir, "logs")
-    append_mode = os.environ.get("CALIBRATE_LLM_LOG_APPEND") == "1"
-    if not append_mode and exists(log_path):
-        os.remove(log_path)
-    log_file = open(log_path, "a" if append_mode else "w")
-    original_stdout, original_stderr = sys.stdout, sys.stderr
-    sys.stdout = StreamTee(original_stdout, log_file)
-    sys.stderr = StreamTee(original_stderr, log_file)
-
-    try:
-        print("\n\033[91mLLM Tests Benchmark\033[0m\n")
-        print(f"Config: {args.config}")
-        print(f"Model(s): {', '.join(display_label(args.provider, m) for m in models)}")
-        print(f"Provider: {args.provider}")
-        print(f"Output: {args.output_dir}")
-        print("")
-
-        result = await run(
+    await run_benchmark_cli(
+        output_dir=args.output_dir,
+        models=models,
+        runner=lambda: _run_models(
             config=config,
             models=models,
             provider=args.provider,
             output_dir=args.output_dir,
             test_parallel=args.parallel,
-        )
-
-        has_errors = print_benchmark_summary(
-            models=models,
-            model_results=result["models"],
-            leaderboard_dir=result["leaderboard_dir"],
-            model_label=lambda m: display_label(args.provider, m),
-        )
-
-        if has_errors:
-            sys.exit(1)
-    finally:
-        sys.stdout = original_stdout
-        sys.stderr = original_stderr
-        log_file.close()
+        ),
+        config_path=args.config,
+        provider=args.provider,
+        model_label=lambda m: display_label(args.provider, m),
+    )
 
 
 if __name__ == "__main__":

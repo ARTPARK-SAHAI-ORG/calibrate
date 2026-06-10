@@ -128,6 +128,17 @@ class _Tests:
 
         configure_print_logger(print_log_save_path)
 
+        # Print a per-model header (mirrors the non-agent benchmark output) so
+        # interleaved parallel runs are attributable. Skipped for single
+        # agent-connection runs, where ``model`` is empty.
+        if model:
+            from calibrate.llm.run_tests import display_label
+
+            _label = display_label(provider, model)
+            log_and_print(f"\n\033[94m{'='*60}\033[0m")
+            log_and_print(f"\033[94mModel: {_label}\033[0m")
+            log_and_print(f"\033[94m{'='*60}\033[0m\n")
+
         results_file_path = os.path.join(final_output_dir, "results.json")
 
         # Pass model name to agent for benchmark routing; None for single runs.
