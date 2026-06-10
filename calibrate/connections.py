@@ -21,9 +21,9 @@ Usage:
     result = asyncio.run(simulations.run(agent=agent, personas=[...], ...))
 """
 
-import asyncio
 from dataclasses import dataclass, field
 from typing import Optional
+import backoff
 import httpx
 
 
@@ -138,7 +138,7 @@ class TextAgentConnection:
         try:
             resp = await self._post_with_retry(body, timeout=30.0)
         except _AgentRequestError as e:
-            return {"ok": False, "error": str(e)}
+            return {"ok": False, "error": f"{e} (after {_MAX_ATTEMPTS} attempts)"}
         except Exception as e:
             return {"ok": False, "error": f"Unexpected error during request: {e}"}
 
@@ -256,7 +256,7 @@ class TextAgentConnection:
         try:
             resp = await self._post_with_retry(body, timeout=60.0)
         except _AgentRequestError as e:
-            raise RuntimeError(str(e)) from None
+            raise RuntimeError(f"{e} (after {_MAX_ATTEMPTS} attempts)") from None
         except Exception as e:
             raise RuntimeError(
                 f"Unexpected error calling agent at {self.url}: {e}"
@@ -279,43 +279,44 @@ class TextAgentConnection:
             "tool_calls": data.get("tool_calls", []),
         }
 
+    @backoff.on_exception(
+        backoff.expo,
+        _AgentRequestError,
+        max_tries=_MAX_ATTEMPTS,
+        base=2,
+        factor=_BACKOFF_BASE_SECONDS,
+        jitter=None,
+    )
     async def _post_with_retry(self, body: dict, timeout: float) -> "httpx.Response":
         """POST ``body`` to the endpoint, retrying transient failures.
 
-        Connection errors, timeouts, and HTTP 429/502/503/504 are retried with
-        exponential backoff (``_MAX_ATTEMPTS`` tries). Returns the first
-        ``httpx.Response`` whose status is not retryable (including a permanent
-        4xx/5xx — the caller decides what to do with it). Raises
-        ``_AgentRequestError`` if every attempt was a transient failure.
+        Connection errors, timeouts, and HTTP 429/502/503/504 raise
+        ``_AgentRequestError`` and are retried with exponential backoff. Any
+        other status (200 or a permanent 4xx/5xx) is returned for the caller to
+        handle. After ``_MAX_ATTEMPTS`` transient failures the last
+        ``_AgentRequestError`` propagates.
         """
         req_headers = {"Content-Type": "application/json"}
         if self.headers:
             req_headers.update(self.headers)
 
-        last_error = None
-        for attempt in range(_MAX_ATTEMPTS):
-            try:
-                async with httpx.AsyncClient(timeout=timeout) as client:
-                    resp = await client.post(
-                        self.url,
-                        json=body,
-                        headers=req_headers,
-                    )
-            except httpx.ConnectError as e:
-                last_error = f"Could not connect to agent at {self.url}: {e}"
-            except httpx.TimeoutException:
-                last_error = f"Agent request timed out ({timeout:.0f}s): {self.url}"
-            else:
-                if resp.status_code not in _RETRYABLE_STATUS:
-                    return resp
-                last_error = (
-                    f"Agent returned HTTP {resp.status_code}: {resp.text[:500]}"
-                )
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                resp = await client.post(self.url, json=body, headers=req_headers)
+        except httpx.ConnectError as e:
+            raise _AgentRequestError(
+                f"Could not connect to agent at {self.url}: {e}"
+            ) from e
+        except httpx.TimeoutException as e:
+            raise _AgentRequestError(
+                f"Agent request timed out ({timeout:.0f}s): {self.url}"
+            ) from e
 
-            if attempt < _MAX_ATTEMPTS - 1:
-                await asyncio.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
-
-        raise _AgentRequestError(f"{last_error} (after {_MAX_ATTEMPTS} attempts)")
+        if resp.status_code in _RETRYABLE_STATUS:
+            raise _AgentRequestError(
+                f"Agent returned HTTP {resp.status_code}: {resp.text[:500]}"
+            )
+        return resp
 
 
 __all__ = ["TextAgentConnection"]

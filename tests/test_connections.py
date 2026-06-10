@@ -170,7 +170,7 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
             ({}, 503),
             ({"response": "recovered", "tool_calls": []}, 200),
         ])
-        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+        with ctx, patch("asyncio.sleep", AsyncMock()):
             result = await agent.call([{"role": "user", "content": "Hi"}])
 
         self.assertEqual(result["response"], "recovered")
@@ -185,7 +185,7 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
             httpx.ConnectError("boom"),
             ({"response": "ok", "tool_calls": []}, 200),
         ])
-        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+        with ctx, patch("asyncio.sleep", AsyncMock()):
             result = await agent.call([{"role": "user", "content": "Hi"}])
 
         self.assertEqual(result["response"], "ok")
@@ -197,7 +197,7 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([({}, 502)] * _MAX_ATTEMPTS)
-        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+        with ctx, patch("asyncio.sleep", AsyncMock()):
             with self.assertRaises(RuntimeError) as cm:
                 await agent.call([{"role": "user", "content": "Hi"}])
 
@@ -213,7 +213,7 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
             ({}, 401),
             ({"response": "should not reach", "tool_calls": []}, 200),
         ])
-        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+        with ctx, patch("asyncio.sleep", AsyncMock()):
             with self.assertRaises(RuntimeError) as cm:
                 await agent.call([{"role": "user", "content": "Hi"}])
 
@@ -442,7 +442,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
             ({}, 503),
             ({"response": "up now", "tool_calls": []}, 200),
         ])
-        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+        with ctx, patch("asyncio.sleep", AsyncMock()):
             result = await agent.verify()
 
         self.assertTrue(result["ok"])
@@ -454,7 +454,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([({}, 502)] * _MAX_ATTEMPTS)
-        with ctx, patch("calibrate.connections.asyncio.sleep", AsyncMock()):
+        with ctx, patch("asyncio.sleep", AsyncMock()):
             result = await agent.verify()
 
         self.assertFalse(result["ok"])
