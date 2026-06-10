@@ -128,6 +128,17 @@ class _Tests:
 
         configure_print_logger(print_log_save_path)
 
+        # Print a per-model header (mirrors the non-agent benchmark output) so
+        # interleaved parallel runs are attributable. Skipped for single
+        # agent-connection runs, where ``model`` is empty.
+        if model:
+            from calibrate.llm.run_tests import display_label
+
+            _label = display_label(provider, model)
+            log_and_print(f"\n\033[94m{'='*60}\033[0m")
+            log_and_print(f"\033[94mModel: {_label}\033[0m")
+            log_and_print(f"\033[94m{'='*60}\033[0m\n")
+
         results_file_path = os.path.join(final_output_dir, "results.json")
 
         # Pass model name to agent for benchmark routing; None for single runs.
@@ -237,7 +248,7 @@ class _Tests:
         model: str = "gpt-4.1",
         provider: Literal["openai", "openrouter"] = "openrouter",
         run_name: Optional[str] = None,
-        max_parallel: int = 2,
+        max_parallel: Optional[int] = None,
         agent: Optional["TextAgentConnection"] = None,
         evaluators: Optional[List[dict]] = None,
         test_parallel: Optional[int] = None,
@@ -261,7 +272,9 @@ class _Tests:
             model: Single model name to use (used if models is not provided)
             provider: LLM provider (openai or openrouter)
             run_name: Optional name for this run (used in output folder name)
-            max_parallel: Maximum number of models to run in parallel (default: 2)
+            max_parallel: Maximum number of models to run in parallel. Resolves
+                via SDK arg > ``CALIBRATE_LLM_BENCHMARK_PARALLEL`` env var >
+                default 2.
             test_parallel: Max test cases to evaluate concurrently per model.
             agent: Optional external agent connection. When provided, routes all
                 test cases to the external agent instead of an internal LLM.
@@ -290,7 +303,13 @@ class _Tests:
             ...     test_cases=[...],
             ... ))
         """
+        from calibrate.utils import resolve_benchmark_parallel
+
         tools = tools or []
+
+        # Model-level concurrency: SDK arg > CALIBRATE_LLM_BENCHMARK_PARALLEL > 2.
+        # Resolved once here so both the agent and internal-model branches share it.
+        max_parallel = resolve_benchmark_parallel("llm", max_parallel)
 
         # External agent benchmark: run once per model, passing model hint in each request
         if agent is not None and models and len(models) > 0:
@@ -540,9 +559,9 @@ class _Simulations:
         output_dir: str,
         model: str,
         provider: str,
-        parallel: int,
-        agent_speaks_first: bool,
-        max_turns: int,
+        parallel: Optional[int] = None,
+        agent_speaks_first: bool = True,
+        max_turns: int = 50,
         agent: Optional["TextAgentConnection"] = None,
         _flat_output: bool = False,
     ) -> dict:
@@ -554,7 +573,10 @@ class _Simulations:
                 for backward compatibility.
         """
         from calibrate.judges import require_simulation_evaluators, write_evaluator_config
-        from calibrate.llm.run_simulation import run_single_simulation_task
+        from calibrate.llm.run_simulation import (
+            run_single_simulation_task,
+            _resolve_simulation_parallel,
+        )
 
         require_simulation_evaluators(evaluators or [])
 
@@ -591,7 +613,7 @@ class _Simulations:
         args.provider = provider
 
         # Create semaphore for parallel execution
-        semaphore = asyncio.Semaphore(parallel)
+        semaphore = asyncio.Semaphore(_resolve_simulation_parallel(parallel))
 
         # Create all simulation tasks
         tasks = []
@@ -692,7 +714,7 @@ class _Simulations:
         models: Optional[List[str]] = None,
         model: str = "gpt-4.1",
         provider: Literal["openai", "openrouter"] = "openrouter",
-        parallel: int = 1,
+        parallel: Optional[int] = None,
         agent_speaks_first: bool = True,
         max_turns: int = 50,
         max_parallel_models: int = 2,
@@ -717,7 +739,7 @@ class _Simulations:
             models: List of model names to evaluate (if provided, runs in parallel)
             model: Single model name to use (used if models is not provided)
             provider: LLM provider (openai or openrouter)
-            parallel: Number of simulations to run in parallel per model (default: 1)
+            parallel: Number of simulations to run in parallel per model (default: CALIBRATE_SIMULATION_PARALLEL env var or 1)
             agent_speaks_first: Whether the agent initiates the conversation (default: True)
             max_turns: Maximum number of assistant turns (default: 50)
             max_parallel_models: Maximum number of models to run in parallel (default: 2)
@@ -833,7 +855,7 @@ class _Simulations:
         output_dir: str = "./out",
         model: str = "gpt-4.1",
         provider: Literal["openai", "openrouter"] = "openrouter",
-        parallel: int = 1,
+        parallel: Optional[int] = None,
         agent_speaks_first: bool = True,
         max_turns: int = 50,
         agent: Optional["TextAgentConnection"] = None,

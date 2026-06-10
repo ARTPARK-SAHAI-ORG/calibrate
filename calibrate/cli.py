@@ -306,6 +306,12 @@ Examples:
         help="Number of test cases to evaluate in parallel per model",
     )
     llm_parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of models to evaluate in parallel (overrides CALIBRATE_LLM_BENCHMARK_PARALLEL; default 2)",
+    )
+    llm_parser.add_argument(
         "--verify",
         action="store_true",
         help="Verify an external agent connection by sending a preset message and checking the response format",
@@ -590,37 +596,30 @@ Examples:
                         _print_sample_output(_verify_result)
                         print()
 
-                from calibrate.llm.tests_leaderboard import generate_leaderboard
-                from calibrate.llm._output import print_benchmark_summary
-
-                # Run — one model at a time so output is clearly separated
+                # Benchmark across models, reusing the same scaffolding as the
+                # non-agent benchmark (parallel run, per-run ``logs`` file,
+                # leaderboard, consolidated summary). Models run in parallel —
+                # the shared helper tees output to a logfile so concurrent
+                # per-model output doesn't interleave on the terminal.
                 if _models:
-                    _model_results = {}
-                    for _m in _models:
-                        print(f"\n\033[92m{'='*60}\033[0m")
-                        print(f"\033[92m  Model: {_m}\033[0m")
-                        print(f"\033[92m{'='*60}\033[0m\n")
-                        _result = asyncio.run(
-                            _tests.run(
+                    from calibrate.llm._output import run_benchmark_cli
+
+                    asyncio.run(
+                        run_benchmark_cli(
+                            output_dir=args.output_dir,
+                            models=_models,
+                            runner=lambda: _tests.run(
                                 agent=_agent,
                                 test_cases=_config["test_cases"],
                                 output_dir=args.output_dir,
-                                models=[_m],
+                                models=_models,
                                 evaluators=_config.get("evaluators"),
                                 test_parallel=args.parallel,
-                            )
+                                max_parallel=args.benchmark_parallel,
+                            ),
+                            config_path=args.config,
                         )
-                        _model_results[_m] = _result.get(_m, _result)
-
-                    _lb_dir = os.path.join(args.output_dir, "leaderboard")
-                    generate_leaderboard(output_dir=args.output_dir, save_dir=_lb_dir)
-                    _has_errors = print_benchmark_summary(
-                        models=_models,
-                        model_results=_model_results,
-                        leaderboard_dir=_lb_dir,
                     )
-                    if _has_errors:
-                        sys.exit(1)
                 else:
                     asyncio.run(
                         _tests.run(
@@ -642,6 +641,8 @@ Examples:
                 argv.extend(["-p", args.provider])
                 if getattr(args, "parallel", None) is not None:
                     argv.extend(["-n", str(args.parallel)])
+                if getattr(args, "benchmark_parallel", None) is not None:
+                    argv.extend(["--benchmark-parallel", str(args.benchmark_parallel)])
 
                 sys.argv = argv
                 asyncio.run(llm_benchmark_main())
