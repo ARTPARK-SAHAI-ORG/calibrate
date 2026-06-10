@@ -32,11 +32,7 @@ from calibrate.stt.eval import (
     STT_LANGUAGES,
 )
 from calibrate.stt.leaderboard import generate_leaderboard
-from calibrate.utils import StreamTee
-
-
-# Maximum number of providers to run in parallel
-MAX_PARALLEL_PROVIDERS = 2
+from calibrate.utils import StreamTee, resolve_benchmark_parallel
 
 
 async def run(
@@ -74,7 +70,8 @@ async def run(
     debug_count: int = 5,
     ignore_retry: bool = False,
     overwrite: bool = False,
-    max_parallel: int = MAX_PARALLEL_PROVIDERS,
+    max_parallel: int | None = None,
+    row_parallel: int = None,
     judge_evaluators: list[dict] = None,
 ) -> dict:
     """
@@ -92,7 +89,12 @@ async def run(
         debug_count: Number of audio files to run in debug mode (default: 5)
         ignore_retry: Skip retry if not all audios are processed
         overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
-        max_parallel: Maximum number of providers to run in parallel (default: 2)
+        max_parallel: Maximum number of providers to run in parallel. Resolves
+            CLI flag / SDK arg > ``CALIBRATE_STT_BENCHMARK_PARALLEL`` env var >
+            default 2.
+        row_parallel: Maximum number of audio files to transcribe in parallel
+            per provider. Resolves CLI flag / SDK arg > ``CALIBRATE_STT_PARALLEL``
+            env var > default 4.
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
             the implicit default STT evaluator runs.
@@ -111,6 +113,7 @@ async def run(
         ... ))
     """
     results = {}
+    max_parallel = resolve_benchmark_parallel("stt", max_parallel)
     semaphore = asyncio.Semaphore(max_parallel)
 
     async def run_provider(provider: str) -> tuple[str, dict]:
@@ -126,6 +129,7 @@ async def run(
                 debug_count=debug_count,
                 ignore_retry=ignore_retry,
                 overwrite=overwrite,
+                row_parallel=row_parallel,
                 judge_evaluators=judge_evaluators,
             )
             return (provider, result)
@@ -239,6 +243,19 @@ async def main():
         default=None,
         help="Path to optional JSON config file with an `evaluators` list",
     )
+    parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of providers to evaluate in parallel (overrides CALIBRATE_STT_BENCHMARK_PARALLEL)",
+    )
+    parser.add_argument(
+        "-n",
+        "--parallel",
+        type=int,
+        default=None,
+        help="Number of audio files to transcribe in parallel per provider",
+    )
 
     args = parser.parse_args()
 
@@ -350,6 +367,8 @@ async def main():
             debug_count=args.debug_count,
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
+            max_parallel=args.benchmark_parallel,
+            row_parallel=args.parallel,
             judge_evaluators=judge_evaluators,
         )
 
