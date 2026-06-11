@@ -5,10 +5,11 @@ Generates comparison leaderboard from TTS evaluation results.
 """
 
 import argparse
-import json
 from pathlib import Path
 
 import pandas as pd
+
+from calibrate.utils import read_leaderboard_metrics
 
 INVALID_SHEET_CHARS = set("[]:*?/\\")
 
@@ -46,7 +47,7 @@ def generate_leaderboard(output_dir: str, save_dir: str | None = None) -> str:
     run_results = {}
 
     for run_dir in run_dirs:
-        metrics = _read_leaderboard_metrics(run_dir / "metrics.json")
+        metrics = read_leaderboard_metrics(run_dir / "metrics.json")
         results_df = _read_leaderboard_results(run_dir / "results.csv")
 
         row = {"run": run_dir.name, "count": len(results_df)}
@@ -62,44 +63,6 @@ def generate_leaderboard(output_dir: str, save_dir: str | None = None) -> str:
     print(f"Saved leaderboard workbook to {workbook_path}")
 
     return str(save_path)
-
-
-def _read_leaderboard_metrics(metrics_path: Path) -> dict:
-    """Read metrics from metrics.json file."""
-    if not metrics_path.exists():
-        print(f"[WARN] metrics.json missing for {metrics_path.parent.name}")
-        return {}
-
-    with metrics_path.open("r", encoding="utf-8") as fp:
-        data = json.load(fp)
-
-    metrics = {}
-    if isinstance(data, dict) and "metric_name" not in data:
-        for key, value in data.items():
-            # Evaluator entries and ttfb are dicts carrying a ``mean`` and a
-            # ``median`` — extract those scalars for the table, the median into
-            # a sibling ``<key>_median`` column. Plain numbers are kept as-is.
-            if isinstance(value, dict) and "mean" in value:
-                metrics[key] = value["mean"]
-                metrics[f"{key}_median"] = value["median"]
-            elif isinstance(value, (int, float)):
-                metrics[key] = float(value)
-        return metrics
-
-    # Legacy format
-    if isinstance(data, dict):
-        data = [data]
-    for entry in data:
-        if not isinstance(entry, dict):
-            continue
-        metric_name = entry.get("metric_name")
-        if metric_name:
-            metrics[metric_name] = entry["mean"]
-            continue
-        for key, value in entry.items():
-            if isinstance(value, (int, float)):
-                metrics[key] = float(value)
-    return metrics
 
 
 def _read_leaderboard_results(results_path: Path) -> pd.DataFrame:

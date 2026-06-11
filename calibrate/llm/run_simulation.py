@@ -21,6 +21,7 @@ from calibrate.utils import (
     cleanup_print_logger,
     current_simulation_name,
     provider_log_file,
+    summarize_metric_distribution,
 )
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -104,7 +105,6 @@ def _build_evaluation_result(evaluator: dict, judge_row: dict) -> dict:
 
 
 import pandas as pd
-import numpy as np
 
 from pipecat.utils.tracing.setup import setup_tracing
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -1058,18 +1058,12 @@ def _aggregate_and_write_simulation_results(results: list, output_dir: str) -> l
 
     metrics_summary = {}
     for metric_name, metric_values in metrics.items():
-        entry = {
-            "type": criterion_types.get(metric_name, "binary"),
-            "mean": np.mean(metric_values),
-            "median": float(np.median(metric_values)),
-            "std": np.std(metric_values),
-            "values": metric_values,
-        }
-        if metric_name in criterion_scales:
-            entry["scale_min"], entry["scale_max"] = criterion_scales[metric_name]
-        if metric_name in criterion_ids:
-            entry["evaluator_id"] = criterion_ids[metric_name]
-        metrics_summary[metric_name] = entry
+        metrics_summary[metric_name] = summarize_metric_distribution(
+            metric_values,
+            metric_type=criterion_types.get(metric_name, "binary"),
+            scale=criterion_scales.get(metric_name),
+            evaluator_id=criterion_ids.get(metric_name),
+        )
 
     df = pd.DataFrame(all_simulation_metrics)
     df.to_csv(join(output_dir, "results.csv"), index=False)

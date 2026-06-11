@@ -13,6 +13,7 @@ from typing import Literal, Optional, Any
 
 import aiofiles
 import aiohttp
+import numpy as np
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import InputTransportMessageFrame
@@ -2065,3 +2066,75 @@ async def make_webhook_call(
             "status": "error",
             "error": str(e),
         }
+
+
+def summarize_metric_distribution(
+    values: list,
+    *,
+    metric_type: Optional[str] = None,
+    scale: Optional[tuple] = None,
+    evaluator_id: Optional[str] = None,
+) -> dict:
+    """Build a ``metrics.json`` summary entry for a list of per-item ``values``.
+
+    Returns ``{["type"], "mean", "median", "std", "values"[, "scale_min",
+    "scale_max"][, "evaluator_id"]}`` with JSON-friendly float aggregates.
+    Shared by the LLM and agent simulation aggregators so the entry shape stays
+    identical across all of them. Optional fields are omitted when their
+    argument is ``None``: ``metric_type`` (the ``stt_llm_judge`` rollup has no
+    type), ``scale`` (only rating criteria), and ``evaluator_id``.
+    """
+    entry: dict = {}
+    if metric_type is not None:
+        entry["type"] = metric_type
+    entry["mean"] = float(np.mean(values))
+    entry["median"] = float(np.median(values))
+    entry["std"] = float(np.std(values))
+    entry["values"] = values
+    if scale is not None:
+        entry["scale_min"], entry["scale_max"] = scale
+    if evaluator_id is not None:
+        entry["evaluator_id"] = evaluator_id
+    return entry
+
+
+def read_leaderboard_metrics(metrics_path: Path) -> dict:
+    """Read a provider/run ``metrics.json`` into a flat ``{column: scalar}`` dict.
+
+    Shared by the STT and TTS leaderboards. Current format: evaluator and
+    ``ttfb`` entries are dicts carrying a ``mean`` and a ``median`` — the mean
+    becomes the ``<key>`` column and the median a sibling ``<key>_median``
+    column; plain numbers (e.g. ``wer``) are kept as-is. The legacy
+    ``metric_name``/list format is still supported for older runs.
+    """
+    if not metrics_path.exists():
+        print(f"[WARN] metrics.json missing for {metrics_path.parent.name}")
+        return {}
+
+    with metrics_path.open("r", encoding="utf-8") as fp:
+        data = json.load(fp)
+
+    metrics: dict = {}
+    if isinstance(data, dict) and "metric_name" not in data:
+        for key, value in data.items():
+            if isinstance(value, dict) and "mean" in value:
+                metrics[key] = value["mean"]
+                metrics[f"{key}_median"] = value["median"]
+            elif isinstance(value, (int, float)):
+                metrics[key] = float(value)
+        return metrics
+
+    # Legacy format
+    if isinstance(data, dict):
+        data = [data]
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        metric_name = entry.get("metric_name")
+        if metric_name:
+            metrics[metric_name] = entry["mean"]
+            continue
+        for key, value in entry.items():
+            if isinstance(value, (int, float)):
+                metrics[key] = float(value)
+    return metrics

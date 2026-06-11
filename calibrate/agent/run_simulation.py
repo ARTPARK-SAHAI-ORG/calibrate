@@ -32,6 +32,7 @@ from calibrate.utils import (
     build_tools_schema,
     make_webhook_call,
     provider_log_file,
+    summarize_metric_distribution,
 )
 from calibrate.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
 from calibrate.stt.metrics import (
@@ -2026,27 +2027,18 @@ async def main():
 
     # Aggregate evaluation criteria metrics
     for criterion_name, values in metrics_by_criterion.items():
-        entry = {
-            "type": criterion_types.get(criterion_name, "binary"),
-            "mean": float(np.mean(values)),
-            "median": float(np.median(values)),
-            "std": float(np.std(values)),
-            "values": values,
-        }
-        if criterion_name in criterion_scales:
-            entry["scale_min"], entry["scale_max"] = criterion_scales[criterion_name]
-        if criterion_name in criterion_ids:
-            entry["evaluator_id"] = criterion_ids[criterion_name]
-        metrics_summary[criterion_name] = entry
+        metrics_summary[criterion_name] = summarize_metric_distribution(
+            values,
+            metric_type=criterion_types.get(criterion_name, "binary"),
+            scale=criterion_scales.get(criterion_name),
+            evaluator_id=criterion_ids.get(criterion_name),
+        )
 
     # Aggregate STT LLM judge scores
     if stt_llm_judge_scores:
-        metrics_summary["stt_llm_judge"] = {
-            "mean": float(np.mean(stt_llm_judge_scores)),
-            "median": float(np.median(stt_llm_judge_scores)),
-            "std": float(np.std(stt_llm_judge_scores)),
-            "values": stt_llm_judge_scores,
-        }
+        metrics_summary["stt_llm_judge"] = summarize_metric_distribution(
+            stt_llm_judge_scores
+        )
 
     # Save overall results.csv
     if all_simulation_metrics:

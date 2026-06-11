@@ -2,6 +2,7 @@
 
 import asyncio
 import io
+import json
 import os
 import sys
 import tempfile
@@ -630,6 +631,89 @@ class TestPatchLangfuseTrace(unittest.TestCase):
             span.set_attribute("output", "x")
         finally:
             service_decorators.add_llm_span_attributes = original
+
+
+class TestSummarizeMetricDistribution(unittest.TestCase):
+    def test_minimal_entry_has_mean_median_std_values(self):
+        from calibrate.utils import summarize_metric_distribution
+
+        entry = summarize_metric_distribution([1.0, 2.0, 6.0])
+        self.assertEqual(
+            entry, {"mean": 3.0, "median": 2.0, "std": entry["std"],
+                    "values": [1.0, 2.0, 6.0]}
+        )
+        # No type/scale/evaluator_id when not supplied.
+        self.assertNotIn("type", entry)
+        self.assertNotIn("scale_min", entry)
+        self.assertNotIn("evaluator_id", entry)
+        # Aggregates are plain floats (JSON-serializable, not numpy types).
+        for k in ("mean", "median", "std"):
+            self.assertIs(type(entry[k]), float)
+
+    def test_optional_fields_included_when_supplied(self):
+        from calibrate.utils import summarize_metric_distribution
+
+        entry = summarize_metric_distribution(
+            [4, 4, 2],
+            metric_type="rating",
+            scale=(1, 5),
+            evaluator_id="ev_123",
+        )
+        self.assertEqual(entry["type"], "rating")
+        self.assertEqual(entry["mean"], pytest_approx(10 / 3))
+        self.assertEqual(entry["median"], 4.0)
+        self.assertEqual((entry["scale_min"], entry["scale_max"]), (1, 5))
+        self.assertEqual(entry["evaluator_id"], "ev_123")
+
+    def test_is_json_serializable(self):
+        from calibrate.utils import summarize_metric_distribution
+
+        entry = summarize_metric_distribution([0, 1, 1], metric_type="binary")
+        json.dumps(entry)  # must not raise
+
+
+class TestReadLeaderboardMetrics(unittest.TestCase):
+    def _write(self, path: Path, data: dict) -> Path:
+        path.write_text(json.dumps(data))
+        return path
+
+    def test_missing_file_returns_empty(self):
+        from calibrate.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(
+                read_leaderboard_metrics(Path(tmp) / "nope.json"), {}
+            )
+
+    def test_current_format_extracts_mean_and_median(self):
+        from calibrate.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = self._write(Path(tmp) / "m.json", {
+                "wer": 0.1,
+                "wer_median": 0.08,
+                "semantic_match": {"type": "binary", "mean": 0.85, "median": 1.0},
+            })
+            out = read_leaderboard_metrics(p)
+            self.assertEqual(out["semantic_match"], 0.85)
+            self.assertEqual(out["semantic_match_median"], 1.0)
+            self.assertEqual(out["wer"], 0.1)
+            self.assertEqual(out["wer_median"], 0.08)
+
+    def test_legacy_metric_name_format(self):
+        from calibrate.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = self._write(Path(tmp) / "m.json", {"metric_name": "wer", "mean": 0.2})
+            self.assertEqual(read_leaderboard_metrics(p), {"wer": 0.2})
+
+
+def pytest_approx(value, tol=1e-9):
+    class _Approx:
+        def __eq__(self, other):
+            return abs(other - value) < tol
+
+    return _Approx()
 
 
 if __name__ == "__main__":
