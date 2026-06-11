@@ -83,16 +83,17 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
                 evaluators=evaluators,
             )
 
-    async def test_returns_latency_ms(self):
+    async def test_no_latency_without_agent_reported_metrics(self):
+        # Calibrate no longer times external agents itself (a round-trip timer
+        # would fold in network/proxy overhead, not true inference time). With no
+        # agent-reported metrics, the result simply has no latency. The
+        # agent-reported latency path is covered in tests/test_connections.py.
         result = await self._run(
             agent_response="Hello, how can I help?",
             evaluators=[_binary_ev("greeting")],
             judge_result={"greeting": {"match": True, "reasoning": "greeted"}},
         )
-        # Latency reflects the external agent call, captured before the judge runs.
-        self.assertIn("latency_ms", result)
-        self.assertIsInstance(result["latency_ms"], int)
-        self.assertGreaterEqual(result["latency_ms"], 0)
+        self.assertNotIn("latency_ms", result)
 
     async def test_all_evaluators_match_passes(self):
         result = await self._run(

@@ -1492,6 +1492,149 @@ class TestWriteTestResults(unittest.TestCase):
             self.assertTrue((Path(tmp) / "results.json").exists())
             self.assertTrue((Path(tmp) / "metrics.json").exists())
 
+    def test_metrics_includes_mean_cost(self):
+        from calibrate.llm.run_tests import _write_test_results_outputs
+
+        with tempfile.TemporaryDirectory() as tmp:
+            results = [
+                {
+                    "metrics": {"passed": True, "judge_results": {}},
+                    "test_case": {"evaluation": {"type": "tool_call", "tool_calls": []}},
+                    "output": {"response": "", "tool_calls": [], "cost": 0.02},
+                },
+                {
+                    "metrics": {"passed": True, "judge_results": {}},
+                    "test_case": {"evaluation": {"type": "tool_call", "tool_calls": []}},
+                    "output": {"response": "", "tool_calls": [], "cost": 0.04},
+                },
+            ]
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+            self.assertAlmostEqual(metrics["cost"]["mean"], 0.03)
+            self.assertAlmostEqual(metrics["cost"]["min"], 0.02)
+            self.assertAlmostEqual(metrics["cost"]["max"], 0.04)
+            self.assertEqual(metrics["cost"]["count"], 2)
+
+    def test_metrics_cost_omitted_without_costs(self):
+        from calibrate.llm.run_tests import _write_test_results_outputs
+
+        with tempfile.TemporaryDirectory() as tmp:
+            results = [
+                {
+                    "metrics": {"passed": True, "judge_results": {}},
+                    "test_case": {"evaluation": {"type": "tool_call", "tool_calls": []}},
+                    "output": {"response": "", "tool_calls": []},
+                },
+            ]
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+            self.assertNotIn("cost", metrics)
+
+
+class TestAggregateCost(unittest.TestCase):
+    def test_no_results_returns_none(self):
+        from calibrate.llm.run_tests import _aggregate_cost
+
+        self.assertIsNone(_aggregate_cost([]))
+
+    def test_no_costs_returns_none(self):
+        from calibrate.llm.run_tests import _aggregate_cost
+
+        results = [
+            {"output": {"response": "hi", "tool_calls": []}},
+            {"output": {"response": "yo", "tool_calls": [], "cost": None}},
+            {"metrics": {"passed": True}},  # no output key at all
+        ]
+        self.assertIsNone(_aggregate_cost(results))
+
+    def test_mean_across_costs(self):
+        from calibrate.llm.run_tests import _aggregate_cost
+
+        results = [
+            {"output": {"cost": 0.01}},
+            {"output": {"cost": 0.03}},
+            {"output": {"cost": None}},  # ignored
+            {"output": {}},  # ignored
+        ]
+        agg = _aggregate_cost(results)
+        self.assertAlmostEqual(agg["mean"], 0.02)
+        self.assertAlmostEqual(agg["min"], 0.01)
+        self.assertAlmostEqual(agg["max"], 0.03)
+        self.assertEqual(agg["count"], 2)
+
+    def test_zero_cost_counted(self):
+        from calibrate.llm.run_tests import _aggregate_cost
+
+        results = [{"output": {"cost": 0.0}}, {"output": {"cost": 0.02}}]
+        agg = _aggregate_cost(results)
+        self.assertAlmostEqual(agg["mean"], 0.01)
+        self.assertEqual(agg["count"], 2)
+
+
+    def test_cost_read_only_from_output_cost(self):
+        """Cost lives at ``output.cost`` for both paths; a nested-only metrics
+        cost is not dug out here (run_test_external lifts it first)."""
+        from calibrate.llm.run_tests import _aggregate_cost
+
+        results = [
+            {"output": {"cost": 0.02}},                       # counted
+            {"output": {"metrics": {"cost": 0.04}}},          # not lifted → ignored
+            {"output": {"response": "x", "tool_calls": []}},  # no cost
+        ]
+        agg = _aggregate_cost(results)
+        self.assertAlmostEqual(agg["mean"], 0.02)
+        self.assertEqual(agg["count"], 1)
+
+
+class TestCostTrackingService(unittest.IsolatedAsyncioTestCase):
+    def _service(self):
+        from calibrate.llm.run_tests import CostTrackingOpenRouterLLMService
+
+        return CostTrackingOpenRouterLLMService.__new__(
+            CostTrackingOpenRouterLLMService
+        )
+
+    async def _drain(self, svc, chunks):
+        async def fake_stream():
+            for c in chunks:
+                yield c
+
+        out = [c async for c in svc._capture_cost(fake_stream())]
+        return out
+
+    async def test_captures_cost_from_usage_attr(self):
+        svc = self._service()
+        svc.last_cost = None
+        usage = MagicMock(cost=0.00231)
+        chunks = [MagicMock(usage=None), MagicMock(usage=usage)]
+        out = await self._drain(svc, chunks)
+        self.assertEqual(len(out), 2)  # stream passes through unchanged
+        self.assertAlmostEqual(svc.last_cost, 0.00231)
+
+    async def test_captures_cost_from_model_extra(self):
+        svc = self._service()
+        svc.last_cost = None
+        usage = MagicMock(spec=["model_extra"])
+        usage.model_extra = {"cost": 0.005}
+        out = await self._drain(svc, [MagicMock(usage=usage)])
+        self.assertEqual(len(out), 1)
+        self.assertAlmostEqual(svc.last_cost, 0.005)
+
+    async def test_no_cost_leaves_none(self):
+        svc = self._service()
+        svc.last_cost = None
+        usage = MagicMock(spec=["model_extra"])
+        usage.model_extra = {}
+        await self._drain(svc, [MagicMock(usage=usage), MagicMock(usage=None)])
+        self.assertIsNone(svc.last_cost)
+
+    async def test_non_numeric_cost_ignored(self):
+        svc = self._service()
+        svc.last_cost = None
+        usage = MagicMock(cost="not-a-number")
+        await self._drain(svc, [MagicMock(usage=usage)])
+        self.assertIsNone(svc.last_cost)
+
 
 class TestRunInferenceWrapping(unittest.IsolatedAsyncioTestCase):
     async def test_run_inference_wraps(self):

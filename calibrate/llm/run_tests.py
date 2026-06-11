@@ -47,6 +47,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate.llm.metrics import test_response_llm_judge, evaluate_simuation
+from calibrate.llm._metrics_utils import _numeric_or_none
 from calibrate.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
     attach_evaluator_id,
@@ -223,6 +224,45 @@ class Processor(FrameProcessor):
         await self.push_frame(frame, direction)
 
 
+class CostTrackingOpenRouterLLMService(OpenRouterLLMService):
+    """OpenRouter LLM service that records the authoritative per-request USD cost.
+
+    OpenRouter returns the actual charged cost inline in the final usage chunk of
+    every streaming response (``usage.cost`` — already net of cache discounts,
+    fallback routing, and BYOK upstream pricing). The base pipecat service reads
+    only token counts from that chunk and discards the cost, so we wrap the
+    completion stream to capture it without reimplementing the chunk-processing
+    loop. This keeps cost tracking robust to new models — the price comes from
+    OpenRouter itself, not a local price table that can go stale.
+
+    After a run, ``last_cost`` holds the most recent request's cost (USD) or
+    ``None`` if OpenRouter did not report one.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.last_cost: Optional[float] = None
+
+    async def get_chat_completions(self, params_from_context):
+        stream = await super().get_chat_completions(params_from_context)
+        return self._capture_cost(stream)
+
+    async def _capture_cost(self, stream):
+        async for chunk in stream:
+            usage = getattr(chunk, "usage", None)
+            if usage is not None:
+                cost = getattr(usage, "cost", None)
+                if cost is None:
+                    extra = getattr(usage, "model_extra", None) or {}
+                    cost = extra.get("cost")
+                if cost is not None:
+                    try:
+                        self.last_cost = float(cost)
+                    except (TypeError, ValueError):
+                        pass
+            yield chunk
+
+
 class LLMInferenceError(Exception):
     """Raised when LLM inference fails due to system error (API error, invalid model, etc.)"""
 
@@ -370,7 +410,7 @@ async def _run_inference_inner(
     """Inner implementation of run_inference."""
     # Create LLM service
     if provider == "openrouter":
-        llm = OpenRouterLLMService(
+        llm = CostTrackingOpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             model=model,
             base_url="https://openrouter.ai/api/v1",
@@ -478,6 +518,7 @@ async def _run_inference_inner(
     return {
         "response": processor._current_response,
         "tool_calls": processor._tool_calls,
+        "cost": getattr(llm, "last_cost", None),
     }
 
 
@@ -1410,7 +1451,18 @@ async def run_test_external(
     same logic as the internal :func:`run_test`.
 
     The agent must return ``{"response": ..., "tool_calls": [...]}`` — see
-    :meth:`~calibrate.connections.TextAgentConnection.call` for details.
+    :meth:`~calibrate.connections.TextAgentConnection.call` for details. It may
+    optionally include a ``metrics`` dict (e.g. ``{"cost": 0.0021,
+    "latency_ms": 850}``); when present and well-formed it is preserved on the
+    output and its ``cost`` / ``latency_ms`` feed the same per-model aggregates
+    as internal LLM tests. Anything malformed is ignored so the agent contract
+    stays backwards-compatible.
+
+    Unlike the internal path, latency is **not** measured here: a wall-clock
+    timer around the HTTP call would fold in network, proxy, and queueing
+    overhead rather than the agent's true inference time. We rely solely on the
+    agent's self-reported ``metrics.latency_ms``; if it doesn't report one, the
+    run simply has no latency.
 
     Args:
         chat_history: Conversation history (role/content dicts, no system message).
@@ -1421,13 +1473,10 @@ async def run_test_external(
     Returns:
         dict with ``output`` and ``metrics`` keys.
     """
-    # Time only the agent's response; the LLM-judge evaluation that follows is
-    # excluded so the latency reflects the external agent, not the judge.
-    call_start = time.time()
     output = await agent.call(chat_history, model=model)
-    latency_ms = round((time.time() - call_start) * 1000)
     response = output.get("response")
     tool_calls = output.get("tool_calls", [])
+    agent_metrics = output.get("metrics")
     metrics = await evaluate_test_case_output(
         chat_history=chat_history,
         evaluation=evaluation,
@@ -1439,11 +1488,26 @@ async def run_test_external(
         no_response_reasoning_no_tool_calls="No reply was returned by the external agent",
     )
 
-    return {
-        "output": {"response": response, "tool_calls": tool_calls},
-        "metrics": metrics,
-        "latency_ms": latency_ms,
-    }
+    result_output: dict = {"response": response, "tool_calls": tool_calls}
+    if isinstance(agent_metrics, dict):
+        result_output["metrics"] = agent_metrics
+
+    # Lift the agent's self-reported cost and latency out of its metrics block
+    # into the same canonical fields the internal path populates, so both are
+    # extracted the same way (cost → output.cost, latency → result.latency_ms)
+    # instead of one being dug back out of the nested metrics during aggregation.
+    # Latency uses only the agent's number (clean inference time), never a
+    # network-contaminated round-trip measured from here.
+    metrics_block = agent_metrics if isinstance(agent_metrics, dict) else {}
+    agent_cost = _numeric_or_none(metrics_block.get("cost"))
+    if agent_cost is not None:
+        result_output["cost"] = agent_cost
+
+    result: dict = {"output": result_output, "metrics": metrics}
+    agent_latency = _numeric_or_none(metrics_block.get("latency_ms"))
+    if agent_latency is not None:
+        result["latency_ms"] = agent_latency
+    return result
 
 
 def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
@@ -1518,6 +1582,35 @@ def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
         if ev and "id" in ev:
             aggregated[name]["evaluator_id"] = ev["id"]
     return aggregated
+
+
+def _aggregate_cost(results: List[dict]) -> Optional[dict]:
+    """Aggregate per-test-case LLM cost (USD) across results that report one.
+
+    Cost lives in ``output.cost`` for every path: internal LLM tests get it from
+    OpenRouter (see :class:`CostTrackingOpenRouterLLMService`) and external
+    agents have it lifted there from their self-reported ``metrics`` dict in
+    :func:`run_test_external`. Test cases without a cost (the OpenAI provider,
+    agents that don't report one, or older results) are ignored. Returns
+    ``None`` when no result carries a cost so the metric is absent rather than a
+    misleading ``0.0``.
+
+    Output shape mirrors :func:`_aggregate_latency`:
+    ``{"mean", "min", "max", "count"}`` with USD floats.
+    """
+    costs = [
+        c
+        for r in results
+        if (c := _numeric_or_none((r.get("output") or {}).get("cost"))) is not None
+    ]
+    if not costs:
+        return None
+    return {
+        "mean": sum(costs) / len(costs),
+        "min": min(costs),
+        "max": max(costs),
+        "count": len(costs),
+    }
 
 
 def _aggregate_tool_calls(results: List[dict]) -> dict:
@@ -1759,6 +1852,9 @@ def _write_test_results_outputs(
         "criteria": _aggregate_criteria(results, name_to_evaluator),
         "tool_calls": _aggregate_tool_calls(results),
     }
+    cost = _aggregate_cost(results)
+    if cost is not None:
+        metrics["cost"] = cost
     latency = _aggregate_latency(results)
     if latency is not None:
         metrics["latency_ms"] = latency

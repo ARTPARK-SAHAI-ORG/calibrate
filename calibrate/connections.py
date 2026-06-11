@@ -77,6 +77,21 @@ class TextAgentConnection:
             {"tool": "get_weather", "arguments": {"city": "NYC"},
              "output": {"temp": 72, "condition": "sunny"}}
 
+        The response may also include an optional ``metrics`` dict reporting what
+        the call cost the agent. Every field is optional; ``cost`` (USD for this
+        call) is the one Calibrate aggregates into the per-model mean cost — the
+        rest are stored as-is for review::
+
+            {
+                "response": "...",
+                "tool_calls": [],
+                "metrics": {"cost": 0.0021, "prompt_tokens": 1200,
+                            "completion_tokens": 340, "latency_ms": 850}
+            }
+
+        Omit ``metrics`` entirely and the agent behaves exactly as before;
+        malformed metrics are ignored rather than rejected.
+
     Use :meth:`verify` to confirm the endpoint is reachable and returns the
     expected format before running a full evaluation.
 
@@ -242,6 +257,8 @@ class TextAgentConnection:
             dict with ``response`` (str | None) and ``tool_calls`` (list) keys.
             Each tool call dict is passed through verbatim, so an optional
             ``output`` field (the tool's own result) is preserved for review.
+            An optional ``metrics`` dict (e.g. ``{"cost": ...}``) is passed
+            through when the agent reports one and it is a dict.
 
         Raises:
             RuntimeError: On connection error, timeout, non-200 status, or
@@ -274,10 +291,14 @@ class TextAgentConnection:
                 f"Agent response is not valid JSON: {resp.text[:500]}"
             ) from None
 
-        return {
+        result = {
             "response": data.get("response"),
             "tool_calls": data.get("tool_calls", []),
         }
+        metrics = data.get("metrics")
+        if isinstance(metrics, dict):
+            result["metrics"] = metrics
+        return result
 
     @backoff.on_exception(
         backoff.expo,

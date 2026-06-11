@@ -372,6 +372,93 @@ class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Tests for run_test_external — optional agent-reported metrics
+# ---------------------------------------------------------------------------
+
+class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
+
+    async def _run(self, fake_body):
+        from calibrate.connections import TextAgentConnection
+        from calibrate.llm.run_tests import run_test_external
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        evaluation = {"type": "tool_call", "tool_calls": []}
+        ctx, _ = _patch_httpx(fake_body)
+        with ctx:
+            return await run_test_external(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluation=evaluation,
+                agent=agent,
+            )
+
+    async def test_metrics_dict_passed_through_to_output(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [],
+             "metrics": {"cost": 0.0021, "prompt_tokens": 1200}}
+        )
+        self.assertEqual(result["output"]["metrics"]["cost"], 0.0021)
+
+    async def test_no_metrics_key_omitted(self):
+        result = await self._run({"response": "hi", "tool_calls": []})
+        self.assertNotIn("metrics", result["output"])
+
+    async def test_malformed_metrics_ignored(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": "cheap"}
+        )
+        self.assertNotIn("metrics", result["output"])
+
+    async def test_agent_reported_cost_lifted_to_output(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"cost": 0.05}}
+        )
+        self.assertEqual(result["output"]["cost"], 0.05)
+
+    async def test_no_cost_when_agent_does_not_report(self):
+        result = await self._run({"response": "hi", "tool_calls": []})
+        self.assertNotIn("cost", result["output"])
+
+    async def test_malformed_cost_ignored(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"cost": "free"}}
+        )
+        self.assertNotIn("cost", result["output"])
+
+    async def test_agent_cost_feeds_aggregate_mean(self):
+        from calibrate.llm.run_tests import _aggregate_cost
+
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"cost": 0.05}}
+        )
+        self.assertAlmostEqual(_aggregate_cost([result])["mean"], 0.05)
+
+    async def test_agent_reported_latency_used(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"latency_ms": 850}}
+        )
+        self.assertEqual(result["latency_ms"], 850)
+
+    async def test_no_latency_when_agent_does_not_report(self):
+        result = await self._run({"response": "hi", "tool_calls": []})
+        self.assertNotIn("latency_ms", result)
+
+    async def test_malformed_latency_ignored(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"latency_ms": "slow"}}
+        )
+        self.assertNotIn("latency_ms", result)
+
+    async def test_agent_latency_feeds_aggregate(self):
+        from calibrate.llm.run_tests import _aggregate_latency
+
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"latency_ms": 200}}
+        )
+        agg = _aggregate_latency([result])
+        self.assertEqual(agg["mean"], 200)
+
+
+# ---------------------------------------------------------------------------
 # Tests for TextAgentConnection.verify()
 # ---------------------------------------------------------------------------
 

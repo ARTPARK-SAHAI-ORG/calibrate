@@ -27,6 +27,21 @@ def _write_model(base: Path, model_name: str, metrics: dict) -> None:
     (model_dir / "metrics.json").write_text(json.dumps(metrics))
 
 
+class TestNumericOrNone(unittest.TestCase):
+    def test_numbers_pass_through(self):
+        from calibrate.llm._metrics_utils import _numeric_or_none
+
+        self.assertEqual(_numeric_or_none(0.0), 0.0)
+        self.assertEqual(_numeric_or_none(3), 3)
+
+    def test_non_numbers_and_bools_become_none(self):
+        from calibrate.llm._metrics_utils import _numeric_or_none
+
+        self.assertIsNone(_numeric_or_none(None))
+        self.assertIsNone(_numeric_or_none("0.02"))
+        self.assertIsNone(_numeric_or_none(True))
+
+
 class TestLeaderboardMultiCriteria(unittest.TestCase):
 
     def test_per_criterion_columns_present(self):
@@ -109,11 +124,32 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertIn("pass_rate", df.columns)
             self.assertIn("passed", df.columns)
             self.assertIn("total", df.columns)
-            # No criterion columns (latency_ms is a standard column, empty here)
+            # No criterion columns (latency_ms and cost are standard columns, empty here)
             expected_cols = {
-                "model", "passed", "total", "pass_rate", "latency_ms",
+                "model", "passed", "total", "pass_rate", "latency_ms", "cost",
             }
             self.assertEqual(set(df.columns), expected_cols)
+            # Cost is absent in old-style metrics → empty column
+            self.assertTrue(df["cost"].isna().all())
+
+    def test_cost_column_shows_mean_cost(self):
+        """The leaderboard surfaces the per-model mean cost, None when absent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_model(base, "model-a", {
+                "total": 2, "passed": 2,
+                "cost": {"mean": 0.03, "min": 0.02, "max": 0.04, "count": 2},
+            })
+            _write_model(base, "model-b", {"total": 2, "passed": 1})
+
+            save_dir = base / "leaderboard"
+            generate_leaderboard(str(base), str(save_dir))
+
+            df = pd.read_csv(save_dir / "llm_leaderboard.csv")
+            self.assertIn("cost", df.columns)
+            by_model = dict(zip(df["model"], df["cost"]))
+            self.assertAlmostEqual(by_model["model-a"], 0.03)
+            self.assertTrue(pd.isna(by_model["model-b"]))
 
     def test_skip_leaderboard_folder(self):
         """The existing 'leaderboard' subdirectory inside output_dir should be ignored."""

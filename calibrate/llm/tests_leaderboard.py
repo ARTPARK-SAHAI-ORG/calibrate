@@ -5,6 +5,8 @@ from typing import Dict, List, Optional
 
 import pandas as pd
 
+from calibrate.llm._metrics_utils import _numeric_or_none
+
 
 def generate_leaderboard(output_dir: str, save_dir: str) -> None:
     """
@@ -97,11 +99,14 @@ def _build_leaderboard(
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, latency_ms, [criterion_1, ...]
+    Columns: model, passed, total, pass_rate, latency_ms, cost, [criterion_1, ...]
 
     ``latency_ms`` is the mean per-test-case response-generation latency (in
     milliseconds, judge time excluded); ``None`` for runs without it (e.g.
     eval-only).
+
+    ``cost`` is the mean per-test-case LLM cost in USD (``None`` when the run
+    reported no cost, e.g. the OpenAI provider or external agents).
 
     Per-criterion column values:
     - binary criterion → pass_rate (%)
@@ -113,12 +118,14 @@ def _build_leaderboard(
         passed = int(data.get("passed", 0))
         total = int(data.get("total", 0))
         latency = data.get("latency_ms") if isinstance(data.get("latency_ms"), dict) else {}
+        cost = data.get("cost") if isinstance(data.get("cost"), dict) else {}
         row: Dict[str, object] = {
             "model": model_name,
             "passed": passed,
             "total": total,
             "pass_rate": _to_percent(passed, total),
             "latency_ms": latency.get("mean"),
+            "cost": _numeric_or_none(cost.get("mean")),
         }
 
         criteria = data.get("criteria") or {}
