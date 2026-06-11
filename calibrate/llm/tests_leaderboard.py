@@ -99,7 +99,8 @@ def _build_leaderboard(
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, latency_ms, cost, [criterion_1, ...]
+    Columns: model, passed, total, pass_rate, latency_ms, cost, total_tokens,
+    [criterion_1, ...]
 
     ``latency_ms`` is the mean per-test-case response-generation latency (in
     milliseconds, judge time excluded); ``None`` for runs without it (e.g.
@@ -107,6 +108,10 @@ def _build_leaderboard(
 
     ``cost`` is the mean per-test-case LLM cost in USD (``None`` when the run
     reported no cost, e.g. the OpenAI provider or external agents).
+
+    ``total_tokens`` is the mean per-test-case total token usage (``None`` when
+    the run reported no token counts, e.g. external agents that don't report
+    usage or eval-only).
 
     Per-criterion column values:
     - binary criterion → pass_rate (%)
@@ -119,6 +124,11 @@ def _build_leaderboard(
         total = int(data.get("total", 0))
         latency = data.get("latency_ms") if isinstance(data.get("latency_ms"), dict) else {}
         cost = data.get("cost") if isinstance(data.get("cost"), dict) else {}
+        total_tokens = (
+            data.get("total_tokens")
+            if isinstance(data.get("total_tokens"), dict)
+            else {}
+        )
         row: Dict[str, object] = {
             "model": model_name,
             "passed": passed,
@@ -126,6 +136,7 @@ def _build_leaderboard(
             "pass_rate": _to_percent(passed, total),
             "latency_ms": latency.get("mean"),
             "cost": _numeric_or_none(cost.get("mean")),
+            "total_tokens": _numeric_or_none(total_tokens.get("mean")),
         }
 
         criteria = data.get("criteria") or {}

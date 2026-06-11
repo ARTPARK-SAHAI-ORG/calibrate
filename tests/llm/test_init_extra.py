@@ -92,15 +92,16 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(result["status"], "completed")
 
-    async def test_run_with_agent_aggregates_cost_and_latency(self):
+    async def test_run_with_agent_aggregates_cost_latency_and_tokens(self):
         from calibrate.llm import tests
 
         fake_test_result = {
             "output": {
                 "response": "Hi",
                 "tool_calls": [],
-                "metrics": {"cost": 0.002768, "latency_ms": 1245.8},
+                "metrics": {"cost": 0.002768, "latency_ms": 1245.8, "total_tokens": 4387},
                 "cost": 0.002768,
+                "total_tokens": 4387,
             },
             "metrics": {"passed": True, "judge_results": {}},
             "latency_ms": 1245.8,
@@ -127,8 +128,12 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("latency_ms", result["metrics"])
         self.assertEqual(result["metrics"]["latency_ms"]["count"], 1)
         self.assertEqual(result["metrics"]["latency_ms"]["mean"], 1246)
+        self.assertIn("total_tokens", result["metrics"])
+        self.assertEqual(result["metrics"]["total_tokens"]["count"], 1)
+        self.assertEqual(result["metrics"]["total_tokens"]["mean"], 4387)
         self.assertIn("cost", written)
         self.assertIn("latency_ms", written)
+        self.assertIn("total_tokens", written)
 
     async def test_run_agent_benchmark(self):
         from calibrate.llm import tests

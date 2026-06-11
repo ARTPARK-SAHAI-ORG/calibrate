@@ -1586,6 +1586,53 @@ class TestAggregateCost(unittest.TestCase):
         self.assertEqual(agg["count"], 1)
 
 
+class TestAggregateTotalTokens(unittest.TestCase):
+    def test_no_results_returns_none(self):
+        from calibrate.llm.run_tests import _aggregate_total_tokens
+
+        self.assertIsNone(_aggregate_total_tokens([]))
+
+    def test_no_tokens_returns_none(self):
+        from calibrate.llm.run_tests import _aggregate_total_tokens
+
+        results = [
+            {"output": {"response": "hi", "tool_calls": []}},
+            {"output": {"response": "yo", "tool_calls": [], "total_tokens": None}},
+            {"metrics": {"passed": True}},  # no output key at all
+        ]
+        self.assertIsNone(_aggregate_total_tokens(results))
+
+    def test_mean_across_token_counts(self):
+        from calibrate.llm.run_tests import _aggregate_total_tokens
+
+        results = [
+            {"output": {"total_tokens": 100}},
+            {"output": {"total_tokens": 201}},
+            {"output": {"total_tokens": None}},  # ignored
+            {"output": {}},  # ignored
+        ]
+        agg = _aggregate_total_tokens(results)
+        self.assertEqual(agg["mean"], 150)  # round(301 / 2) — banker's rounding
+        self.assertEqual(agg["min"], 100)
+        self.assertEqual(agg["max"], 201)
+        self.assertEqual(agg["count"], 2)
+
+    def test_read_only_from_output_total_tokens(self):
+        """Token usage lives at ``output.total_tokens`` for both paths; a
+        nested-only metrics count is not dug out here (run_test_external lifts
+        it first)."""
+        from calibrate.llm.run_tests import _aggregate_total_tokens
+
+        results = [
+            {"output": {"total_tokens": 50}},                    # counted
+            {"output": {"metrics": {"total_tokens": 999}}},      # not lifted → ignored
+            {"output": {"response": "x", "tool_calls": []}},     # no tokens
+        ]
+        agg = _aggregate_total_tokens(results)
+        self.assertEqual(agg["mean"], 50)
+        self.assertEqual(agg["count"], 1)
+
+
 class TestCostTrackingService(unittest.IsolatedAsyncioTestCase):
     def _service(self):
         from calibrate.llm.run_tests import CostTrackingOpenRouterLLMService
@@ -1634,6 +1681,38 @@ class TestCostTrackingService(unittest.IsolatedAsyncioTestCase):
         usage = MagicMock(cost="not-a-number")
         await self._drain(svc, [MagicMock(usage=usage)])
         self.assertIsNone(svc.last_cost)
+
+
+class TestProcessorTokenCapture(unittest.IsolatedAsyncioTestCase):
+    """The Processor accumulates token usage from LLM usage MetricsFrames."""
+
+    def _usage_frame(self, prompt, completion, total=None):
+        from pipecat.frames.frames import MetricsFrame
+        from pipecat.metrics.metrics import LLMUsageMetricsData, LLMTokenUsage
+
+        usage = LLMTokenUsage(
+            prompt_tokens=prompt, completion_tokens=completion, total_tokens=total
+        )
+        return MetricsFrame(
+            data=[LLMUsageMetricsData(processor="llm", model="m", value=usage)]
+        )
+
+    async def _feed(self, proc, frame):
+        from calibrate.llm import run_tests as RT
+
+        proc._ready = True  # skip the initial queue_frames branch
+        proc._task = None
+        with patch.object(RT.FrameProcessor, "process_frame", AsyncMock()), \
+             patch.object(proc, "push_frame", AsyncMock()):
+            await proc.process_frame(frame, RT.FrameDirection.DOWNSTREAM)
+
+    async def test_accumulates_total_tokens_across_frames(self):
+        from calibrate.llm.run_tests import Processor
+
+        proc = Processor(chat_history=[])
+        await self._feed(proc, self._usage_frame(1000, 200, total=1200))
+        await self._feed(proc, self._usage_frame(300, 50, total=350))
+        self.assertEqual(proc._total_tokens, 1550)
 
 
 class TestRunInferenceWrapping(unittest.IsolatedAsyncioTestCase):
@@ -2411,6 +2490,46 @@ class TestWriteOutputsLatency(unittest.TestCase):
             _write_test_results_outputs(results, tmp, {})
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
         self.assertNotIn("latency_ms", metrics)
+
+
+class TestWriteOutputsTotalTokens(unittest.TestCase):
+    def test_metrics_includes_total_tokens_when_present(self):
+        from calibrate.llm.run_tests import _write_test_results_outputs
+
+        results = [
+            {
+                "metrics": {"passed": True},
+                "output": {"total_tokens": 100},
+                "test_case": {"evaluation": {"type": "response"}},
+            },
+            {
+                "metrics": {"passed": False},
+                "output": {"total_tokens": 200},
+                "test_case": {"evaluation": {"type": "response"}},
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertEqual(
+            metrics["total_tokens"],
+            {"mean": 150, "min": 100, "max": 200, "count": 2},
+        )
+
+    def test_metrics_omits_total_tokens_when_absent(self):
+        from calibrate.llm.run_tests import _write_test_results_outputs
+
+        results = [
+            {
+                "metrics": {"passed": True},
+                "output": {"response": "hi", "tool_calls": []},
+                "test_case": {"evaluation": {"type": "response"}},
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertNotIn("total_tokens", metrics)
 
 
 if __name__ == "__main__":

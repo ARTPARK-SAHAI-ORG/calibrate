@@ -213,6 +213,7 @@ class _Tests:
             _aggregate_tool_calls,
             _aggregate_cost,
             _aggregate_latency,
+            _aggregate_total_tokens,
         )
         metrics = {
             "total": total_tests,
@@ -226,6 +227,9 @@ class _Tests:
         latency = _aggregate_latency(results)
         if latency is not None:
             metrics["latency_ms"] = latency
+        total_tokens = _aggregate_total_tokens(results)
+        if total_tokens is not None:
+            metrics["total_tokens"] = total_tokens
         with open(os.path.join(final_output_dir, "metrics.json"), "w") as f:
             json.dump(metrics, f, indent=4)
 

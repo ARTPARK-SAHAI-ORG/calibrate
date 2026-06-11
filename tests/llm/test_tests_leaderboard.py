@@ -124,9 +124,11 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertIn("pass_rate", df.columns)
             self.assertIn("passed", df.columns)
             self.assertIn("total", df.columns)
-            # No criterion columns (latency_ms and cost are standard columns, empty here)
+            # No criterion columns (latency_ms, cost and total_tokens are
+            # standard columns, empty here)
             expected_cols = {
                 "model", "passed", "total", "pass_rate", "latency_ms", "cost",
+                "total_tokens",
             }
             self.assertEqual(set(df.columns), expected_cols)
             # Cost is absent in old-style metrics → empty column
@@ -149,6 +151,25 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertIn("cost", df.columns)
             by_model = dict(zip(df["model"], df["cost"]))
             self.assertAlmostEqual(by_model["model-a"], 0.03)
+            self.assertTrue(pd.isna(by_model["model-b"]))
+
+    def test_total_tokens_column_shows_mean(self):
+        """The leaderboard surfaces the per-model mean total tokens, None when absent."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_model(base, "model-a", {
+                "total": 2, "passed": 2,
+                "total_tokens": {"mean": 4387, "min": 4000, "max": 4774, "count": 2},
+            })
+            _write_model(base, "model-b", {"total": 2, "passed": 1})
+
+            save_dir = base / "leaderboard"
+            generate_leaderboard(str(base), str(save_dir))
+
+            df = pd.read_csv(save_dir / "llm_leaderboard.csv")
+            self.assertIn("total_tokens", df.columns)
+            by_model = dict(zip(df["model"], df["total_tokens"]))
+            self.assertEqual(by_model["model-a"], 4387)
             self.assertTrue(pd.isna(by_model["model-b"]))
 
     def test_skip_leaderboard_folder(self):

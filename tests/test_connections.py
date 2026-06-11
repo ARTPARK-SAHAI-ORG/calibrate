@@ -457,6 +457,38 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
         agg = _aggregate_latency([result])
         self.assertEqual(agg["mean"], 200)
 
+    async def test_agent_reported_total_tokens_lifted_to_output(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"total_tokens": 4387}}
+        )
+        self.assertEqual(result["output"]["total_tokens"], 4387)
+
+    async def test_total_tokens_derived_from_prompt_and_completion(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [],
+             "metrics": {"prompt_tokens": 1200, "completion_tokens": 340}}
+        )
+        self.assertEqual(result["output"]["total_tokens"], 1540)
+
+    async def test_no_total_tokens_when_agent_does_not_report(self):
+        result = await self._run({"response": "hi", "tool_calls": []})
+        self.assertNotIn("total_tokens", result["output"])
+
+    async def test_malformed_total_tokens_ignored(self):
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"total_tokens": "lots"}}
+        )
+        self.assertNotIn("total_tokens", result["output"])
+
+    async def test_agent_total_tokens_feeds_aggregate(self):
+        from calibrate.llm.run_tests import _aggregate_total_tokens
+
+        result = await self._run(
+            {"response": "hi", "tool_calls": [], "metrics": {"total_tokens": 4387}}
+        )
+        agg = _aggregate_total_tokens([result])
+        self.assertEqual(agg["mean"], 4387)
+
 
 # ---------------------------------------------------------------------------
 # Tests for TextAgentConnection.verify()

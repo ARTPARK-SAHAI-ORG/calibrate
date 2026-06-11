@@ -31,7 +31,9 @@ from pipecat.frames.frames import (
     LLMMessagesAppendFrame,
     TextFrame,
     FunctionCallInProgressFrame,
+    MetricsFrame,
 )
+from pipecat.metrics.metrics import LLMUsageMetricsData
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
@@ -179,6 +181,7 @@ class Processor(FrameProcessor):
         self._tool_calls = []
         self._ready = False
         self._chat_history = chat_history
+        self._total_tokens: Optional[int] = None
 
     def set_task(self, task: "PipelineTask"):
         """Set the task reference after task creation."""
@@ -205,6 +208,16 @@ class Processor(FrameProcessor):
                 self._collecting_response = True
                 self._current_response += text
                 logger.info(f"Received text chunk: {text}")
+
+        # Capture token usage emitted by the LLM service (provider-agnostic:
+        # both OpenAI and OpenRouter services push these when usage metrics are
+        # enabled). A turn may emit more than one usage frame, so accumulate.
+        if isinstance(frame, MetricsFrame):
+            for data in frame.data:
+                if isinstance(data, LLMUsageMetricsData):
+                    total = getattr(data.value, "total_tokens", None)
+                    if total:
+                        self._total_tokens = (self._total_tokens or 0) + int(total)
 
         if isinstance(frame, FunctionCallInProgressFrame):
             log_and_print(f"Function call in progress: {frame.function_name}")
@@ -519,6 +532,7 @@ async def _run_inference_inner(
         "response": processor._current_response,
         "tool_calls": processor._tool_calls,
         "cost": getattr(llm, "last_cost", None),
+        "total_tokens": processor._total_tokens,
     }
 
 
@@ -1503,6 +1517,18 @@ async def run_test_external(
     if agent_cost is not None:
         result_output["cost"] = agent_cost
 
+    # Lift the agent's total token usage into the same canonical field the
+    # internal path populates (output.total_tokens). Fall back to summing the
+    # prompt/completion counts when the agent reports those but no total.
+    agent_total_tokens = _numeric_or_none(metrics_block.get("total_tokens"))
+    if agent_total_tokens is None:
+        prompt_tokens = _numeric_or_none(metrics_block.get("prompt_tokens"))
+        completion_tokens = _numeric_or_none(metrics_block.get("completion_tokens"))
+        if prompt_tokens is not None or completion_tokens is not None:
+            agent_total_tokens = (prompt_tokens or 0) + (completion_tokens or 0)
+    if agent_total_tokens is not None:
+        result_output["total_tokens"] = agent_total_tokens
+
     result: dict = {"output": result_output, "metrics": metrics}
     agent_latency = _numeric_or_none(metrics_block.get("latency_ms"))
     if agent_latency is not None:
@@ -1610,6 +1636,36 @@ def _aggregate_cost(results: List[dict]) -> Optional[dict]:
         "min": min(costs),
         "max": max(costs),
         "count": len(costs),
+    }
+
+
+def _aggregate_total_tokens(results: List[dict]) -> Optional[dict]:
+    """Aggregate per-test-case total token usage across results that report it.
+
+    Token counts live in ``output.total_tokens`` for every path: internal LLM
+    tests capture them from the pipecat usage metrics (both OpenAI and
+    OpenRouter services) and external agents have them lifted there from their
+    self-reported ``metrics`` dict in :func:`run_test_external`. Results without
+    a token count (agents that don't report one, or older results) are ignored.
+    Returns ``None`` when no result carries a count so the metric is absent
+    rather than a misleading ``0``.
+
+    Output shape mirrors :func:`_aggregate_cost`:
+    ``{"mean", "min", "max", "count"}`` with the mean rounded to a whole token.
+    """
+    values = [
+        t
+        for r in results
+        if (t := _numeric_or_none((r.get("output") or {}).get("total_tokens")))
+        is not None
+    ]
+    if not values:
+        return None
+    return {
+        "mean": round(sum(values) / len(values)),
+        "min": min(values),
+        "max": max(values),
+        "count": len(values),
     }
 
 
@@ -1858,6 +1914,9 @@ def _write_test_results_outputs(
     latency = _aggregate_latency(results)
     if latency is not None:
         metrics["latency_ms"] = latency
+    total_tokens = _aggregate_total_tokens(results)
+    if total_tokens is not None:
+        metrics["total_tokens"] = total_tokens
     with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
 
