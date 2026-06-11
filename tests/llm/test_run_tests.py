@@ -83,6 +83,17 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
                 evaluators=evaluators,
             )
 
+    async def test_returns_latency_ms(self):
+        result = await self._run(
+            agent_response="Hello, how can I help?",
+            evaluators=[_binary_ev("greeting")],
+            judge_result={"greeting": {"match": True, "reasoning": "greeted"}},
+        )
+        # Latency reflects the external agent call, captured before the judge runs.
+        self.assertIn("latency_ms", result)
+        self.assertIsInstance(result["latency_ms"], int)
+        self.assertGreaterEqual(result["latency_ms"], 0)
+
     async def test_all_evaluators_match_passes(self):
         result = await self._run(
             agent_response="Hello, how can I help?",

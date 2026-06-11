@@ -2,6 +2,7 @@ import asyncio
 import argparse
 import re
 import sys
+import time
 import uuid
 from collections import defaultdict
 from typing import Any, Awaitable, Callable, List, Optional, TYPE_CHECKING
@@ -1335,6 +1336,10 @@ async def run_test(
     unique_id: str,
     evaluators: Optional[List[dict]] = None,
 ):
+    # Time only response generation; the LLM-judge evaluation that follows is
+    # deliberately excluded so the reported latency reflects the agent, not the
+    # judge.
+    inference_start = time.time()
     output = await run_inference(
         chat_history=chat_history,
         system_prompt=system_prompt,
@@ -1342,6 +1347,7 @@ async def run_test(
         provider=provider,
         tools=tools,
     )
+    latency_ms = round((time.time() - inference_start) * 1000)
 
     # Check for system-level failures: if both response and tool_calls are empty,
     # LLM inference failed (API error, invalid model, auth failure, etc.)
@@ -1387,6 +1393,7 @@ async def run_test(
     return {
         "output": output,
         "metrics": metrics,
+        "latency_ms": latency_ms,
     }
 
 
@@ -1414,7 +1421,11 @@ async def run_test_external(
     Returns:
         dict with ``output`` and ``metrics`` keys.
     """
+    # Time only the agent's response; the LLM-judge evaluation that follows is
+    # excluded so the latency reflects the external agent, not the judge.
+    call_start = time.time()
     output = await agent.call(chat_history, model=model)
+    latency_ms = round((time.time() - call_start) * 1000)
     response = output.get("response")
     tool_calls = output.get("tool_calls", [])
     metrics = await evaluate_test_case_output(
@@ -1431,6 +1442,7 @@ async def run_test_external(
     return {
         "output": {"response": response, "tool_calls": tool_calls},
         "metrics": metrics,
+        "latency_ms": latency_ms,
     }
 
 
@@ -1700,6 +1712,32 @@ async def run_model_tests(
     }
 
 
+def _aggregate_latency(results: List[dict]) -> Optional[dict]:
+    """Aggregate per-test-case response-generation latency across results.
+
+    Only results that carry a numeric ``latency_ms`` (those produced by live
+    inference — ``run_test`` / ``run_test_external``) contribute; eval-only
+    results, which skip inference, have none. Returns ``None`` when no result
+    carries a latency so eval-only ``metrics.json`` stays free of an empty block.
+
+    Output shape: ``{"mean", "min", "max", "count"}`` with millisecond ints.
+    """
+    values = [
+        r["latency_ms"]
+        for r in results
+        if isinstance(r.get("latency_ms"), (int, float))
+        and not isinstance(r.get("latency_ms"), bool)
+    ]
+    if not values:
+        return None
+    return {
+        "mean": round(sum(values) / len(values)),
+        "min": min(values),
+        "max": max(values),
+        "count": len(values),
+    }
+
+
 def _write_test_results_outputs(
     results: List[dict],
     output_dir: str,
@@ -1721,6 +1759,9 @@ def _write_test_results_outputs(
         "criteria": _aggregate_criteria(results, name_to_evaluator),
         "tool_calls": _aggregate_tool_calls(results),
     }
+    latency = _aggregate_latency(results)
+    if latency is not None:
+        metrics["latency_ms"] = latency
     with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
 

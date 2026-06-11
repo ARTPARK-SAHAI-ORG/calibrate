@@ -2185,5 +2185,89 @@ class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["metrics"]["passed"], 1)
 
 
+class TestAggregateLatency(unittest.TestCase):
+    def test_none_when_no_latency_present(self):
+        from calibrate.llm.run_tests import _aggregate_latency
+
+        # Eval-only results carry no latency_ms.
+        results = [{"metrics": {"passed": True}}, {"metrics": {"passed": False}}]
+        self.assertIsNone(_aggregate_latency(results))
+
+    def test_mean_min_max_count(self):
+        from calibrate.llm.run_tests import _aggregate_latency
+
+        results = [
+            {"latency_ms": 100},
+            {"latency_ms": 200},
+            {"latency_ms": 300},
+        ]
+        self.assertEqual(
+            _aggregate_latency(results),
+            {"mean": 200, "min": 100, "max": 300, "count": 3},
+        )
+
+    def test_ignores_missing_and_non_numeric(self):
+        from calibrate.llm.run_tests import _aggregate_latency
+
+        # Mix of live-inference results (latency) and entries without it; bools
+        # must not be treated as numbers.
+        results = [
+            {"latency_ms": 50},
+            {"metrics": {}},
+            {"latency_ms": None},
+            {"latency_ms": True},
+            {"latency_ms": 150},
+        ]
+        self.assertEqual(
+            _aggregate_latency(results),
+            {"mean": 100, "min": 50, "max": 150, "count": 2},
+        )
+
+    def test_mean_is_rounded(self):
+        from calibrate.llm.run_tests import _aggregate_latency
+
+        agg = _aggregate_latency([{"latency_ms": 100}, {"latency_ms": 101}])
+        self.assertEqual(agg["mean"], 100)
+
+
+class TestWriteOutputsLatency(unittest.TestCase):
+    def test_metrics_includes_latency_when_present(self):
+        from calibrate.llm.run_tests import _write_test_results_outputs
+
+        results = [
+            {
+                "metrics": {"passed": True},
+                "latency_ms": 120,
+                "test_case": {"evaluation": {"type": "response"}},
+            },
+            {
+                "metrics": {"passed": False},
+                "latency_ms": 180,
+                "test_case": {"evaluation": {"type": "response"}},
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertEqual(
+            metrics["latency_ms"],
+            {"mean": 150, "min": 120, "max": 180, "count": 2},
+        )
+
+    def test_metrics_omits_latency_when_absent(self):
+        from calibrate.llm.run_tests import _write_test_results_outputs
+
+        results = [
+            {
+                "metrics": {"passed": True},
+                "test_case": {"evaluation": {"type": "response"}},
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertNotIn("latency_ms", metrics)
+
+
 if __name__ == "__main__":
     unittest.main()

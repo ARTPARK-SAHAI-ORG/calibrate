@@ -97,7 +97,11 @@ def _build_leaderboard(
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, [criterion_1, criterion_2, ...]
+    Columns: model, passed, total, pass_rate, latency_ms, [criterion_1, ...]
+
+    ``latency_ms`` is the mean per-test-case response-generation latency (in
+    milliseconds, judge time excluded); ``None`` for runs without it (e.g.
+    eval-only).
 
     Per-criterion column values:
     - binary criterion → pass_rate (%)
@@ -108,11 +112,13 @@ def _build_leaderboard(
         data = model_data[model_name]
         passed = int(data.get("passed", 0))
         total = int(data.get("total", 0))
+        latency = data.get("latency_ms")
         row: Dict[str, object] = {
             "model": model_name,
             "passed": passed,
             "total": total,
             "pass_rate": _to_percent(passed, total),
+            "latency_ms": latency.get("mean") if isinstance(latency, dict) else None,
         }
 
         criteria = data.get("criteria") or {}

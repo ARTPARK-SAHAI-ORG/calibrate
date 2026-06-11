@@ -109,8 +109,8 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertIn("pass_rate", df.columns)
             self.assertIn("passed", df.columns)
             self.assertIn("total", df.columns)
-            # No criterion columns
-            expected_cols = {"model", "passed", "total", "pass_rate"}
+            # No criterion columns (latency_ms is a standard column, empty here)
+            expected_cols = {"model", "passed", "total", "pass_rate", "latency_ms"}
             self.assertEqual(set(df.columns), expected_cols)
 
     def test_skip_leaderboard_folder(self):
@@ -178,6 +178,29 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             # accuracy (binary) still shows pass_rate
             self.assertEqual(
                 df.loc[df["model"] == "model-a", "accuracy"].iloc[0], 100.0
+            )
+
+    def test_latency_column(self):
+        """latency_ms column shows the mean; absent → None/NaN."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_model(base, "model-a", {
+                "total": 2, "passed": 2,
+                "latency_ms": {"mean": 150, "min": 100, "max": 200, "count": 2},
+            })
+            # model-b has no latency (e.g. eval-only)
+            _write_model(base, "model-b", {"total": 2, "passed": 1})
+
+            save_dir = base / "leaderboard"
+            generate_leaderboard(str(base), str(save_dir))
+
+            df = pd.read_csv(save_dir / "llm_leaderboard.csv")
+            self.assertIn("latency_ms", df.columns)
+            self.assertEqual(
+                df.loc[df["model"] == "model-a", "latency_ms"].iloc[0], 150
+            )
+            self.assertTrue(
+                pd.isna(df.loc[df["model"] == "model-b", "latency_ms"].iloc[0])
             )
 
     def test_empty_output_dir(self):
