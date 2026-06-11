@@ -21,6 +21,8 @@ from pydantic import BaseModel
 from calibrate.judges import (
     text_judge,
     simulation_judge,
+    general_task_judge,
+    format_task_io,
     audio_judge,
     is_rating,
     evaluator_result_value,
@@ -35,6 +37,7 @@ from calibrate.judges import (
     DEFAULT_AUDIO_JUDGE_MODEL,
     DEFAULT_SIMULATION_JUDGE_MODEL,
     DEFAULT_LLM_TEST_EVALUATOR,
+    DEFAULT_GENERAL_TASK_EVALUATOR,
     DEFAULT_STT_EVALUATOR,
     DEFAULT_TTS_EVALUATOR,
 )
@@ -595,6 +598,117 @@ class TestSimulationJudge(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
+# general_task_judge
+# ---------------------------------------------------------------------------
+
+
+class TestFormatTaskIO(unittest.TestCase):
+    def test_input_and_output(self):
+        out = format_task_io("the answer", input_text="the question")
+        self.assertIn("`Input`:\n\nthe question", out)
+        self.assertIn("`Output`:\n\nthe answer", out)
+
+    def test_output_only_when_no_input(self):
+        out = format_task_io("the answer")
+        self.assertNotIn("`Input`", out)
+        self.assertEqual(out, "`Output`:\n\nthe answer")
+
+    def test_blank_input_is_omitted(self):
+        out = format_task_io("the answer", input_text="   ")
+        self.assertNotIn("`Input`", out)
+
+    def test_not_framed_as_conversation(self):
+        out = format_task_io("hello", input_text="hi")
+        self.assertNotIn("Chat history", out)
+        self.assertNotIn("user:", out)
+        self.assertNotIn("assistant:", out)
+
+
+class TestGeneralTaskJudge(unittest.IsolatedAsyncioTestCase):
+    async def test_empty_evaluators_returns_empty_dict(self):
+        result = await general_task_judge(evaluators=[], output="anything")
+        self.assertEqual(result, {})
+
+    async def test_delegates_to_text_judge_with_input_and_output(self):
+        evaluators = [
+            {
+                "name": "task_quality",
+                "system_prompt": "judge it",
+                "judge_model": "openai/gpt-4.1",
+            }
+        ]
+        mock_text_judge = AsyncMock(
+            return_value={"task_quality": {"reasoning": "ok", "match": True}}
+        )
+        with patch("calibrate.judges.text_judge", mock_text_judge):
+            result = await general_task_judge(
+                evaluators=evaluators,
+                output="a faithful summary",
+                input_text="a long document",
+            )
+        self.assertEqual(
+            result, {"task_quality": {"reasoning": "ok", "match": True}}
+        )
+        call_kwargs = mock_text_judge.call_args.kwargs
+        self.assertEqual(call_kwargs["evaluators"], evaluators)
+        prompt = call_kwargs["user_prompt"]
+        self.assertIn("a long document", prompt)
+        self.assertIn("a faithful summary", prompt)
+        # Neutral framing — not a chat transcript
+        self.assertNotIn("Chat history", prompt)
+
+    async def test_output_only_omits_input_section(self):
+        mock_text_judge = AsyncMock(
+            return_value={"x": {"reasoning": "ok", "match": True}}
+        )
+        with patch("calibrate.judges.text_judge", mock_text_judge):
+            await general_task_judge(
+                evaluators=[
+                    {"name": "x", "system_prompt": "y", "judge_model": "m"}
+                ],
+                output="{\"k\": 1}",
+            )
+        prompt = mock_text_judge.call_args.kwargs["user_prompt"]
+        self.assertNotIn("`Input`", prompt)
+        self.assertIn("`Output`", prompt)
+
+    async def test_passes_fallback_model_through(self):
+        mock_text_judge = AsyncMock(return_value={})
+        with patch("calibrate.judges.text_judge", mock_text_judge):
+            await general_task_judge(
+                evaluators=[{"name": "x", "system_prompt": "y"}],
+                output="out",
+                fallback_model="fallback-model",
+            )
+        self.assertEqual(
+            mock_text_judge.call_args.kwargs["fallback_model"], "fallback-model"
+        )
+
+    async def test_end_to_end_with_mocked_client(self):
+        client = _mock_instructor_chat_completions(
+            [{"reasoning": "faithful", "match": True}]
+        )
+        with patch(
+            "calibrate.judges.instructor.apatch", return_value=client
+        ), patch(
+            "calibrate.judges._build_openrouter_client", return_value=MagicMock()
+        ):
+            result = await general_task_judge(
+                evaluators=[
+                    render_evaluator(
+                        DEFAULT_GENERAL_TASK_EVALUATOR,
+                        {"criteria": "the summary is faithful to the input"},
+                    )
+                ],
+                output="a summary",
+                input_text="a document",
+            )
+        self.assertEqual(
+            result, {"task_quality": {"reasoning": "faithful", "match": True}}
+        )
+
+
+# ---------------------------------------------------------------------------
 # audio_judge
 # ---------------------------------------------------------------------------
 
@@ -719,6 +833,16 @@ class TestDefaultEvaluators(unittest.TestCase):
         self.assertIn("{{criteria}}", DEFAULT_LLM_TEST_EVALUATOR["system_prompt"])
         self.assertEqual(
             DEFAULT_LLM_TEST_EVALUATOR["judge_model"], DEFAULT_TEXT_JUDGE_MODEL
+        )
+
+    def test_general_task_default_evaluator_shape(self):
+        self.assertEqual(DEFAULT_GENERAL_TASK_EVALUATOR["name"], "task_quality")
+        self.assertIn(
+            "{{criteria}}", DEFAULT_GENERAL_TASK_EVALUATOR["system_prompt"]
+        )
+        self.assertEqual(DEFAULT_GENERAL_TASK_EVALUATOR["type"], "binary")
+        self.assertEqual(
+            DEFAULT_GENERAL_TASK_EVALUATOR["judge_model"], DEFAULT_TEXT_JUDGE_MODEL
         )
 
     def test_stt_default_evaluator_shape(self):

@@ -115,6 +115,21 @@ DEFAULT_TOOL_CALL_PARAM_EVALUATOR = {
     "type": BINARY,
 }
 
+DEFAULT_GENERAL_TASK_EVALUATOR = {
+    "name": "task_quality",
+    "system_prompt": (
+        "You are a highly accurate evaluator assessing the output produced for "
+        "a task.\n\n"
+        "You will be given the task input (when one is provided) and the output "
+        "produced for it. Judge the output on its own merits — do not assume the "
+        "input is a conversation or that the output is a reply to a user.\n\n"
+        "Mark `match` true only if the output satisfies the following criteria, "
+        "and false otherwise:\n\n{{criteria}}"
+    ),
+    "judge_model": DEFAULT_TEXT_JUDGE_MODEL,
+    "type": BINARY,
+}
+
 DEFAULT_STT_EVALUATOR = {
     "name": "semantic_match",
     "system_prompt": (
@@ -670,6 +685,66 @@ def require_simulation_evaluators(evaluators: object) -> None:
             "(simulations have no implicit default)."
         )
     require_unique_evaluator_names(evaluators)
+
+
+# ── General task judge (thin wrapper over text_judge) ───────────────────────
+
+
+def format_task_io(output: str, input_text: Optional[str] = None) -> str:
+    """Build a neutral ``input``/``output`` user prompt for a general task.
+
+    Unlike :func:`format_conversation` this does not assume a chat transcript:
+    the text is framed as a task ``Input`` and ``Output`` pair. ``input_text``
+    is optional — when it is ``None`` or blank only the ``Output`` section is
+    emitted, so a caller can judge an output on its own (e.g. "is this valid
+    JSON", "is this summary faithful") without inventing a fake input.
+    """
+    sections: list[str] = []
+    if input_text is not None and str(input_text).strip():
+        sections.append(f"`Input`:\n\n{input_text}")
+    sections.append(f"`Output`:\n\n{output if output is not None else ''}")
+    return "\n\n".join(sections)
+
+
+@observe(name="general_task_judge", capture_input=False)
+async def general_task_judge(
+    evaluators: list[dict],
+    output: str,
+    input_text: Optional[str] = None,
+    fallback_model: str = DEFAULT_TEXT_JUDGE_MODEL,
+) -> dict:
+    """Evaluate a task output (with optional input) against a list of evaluators.
+
+    A general-purpose, non-conversational counterpart to
+    :func:`simulation_judge`. The ``output`` (and ``input_text`` when given) are
+    framed as a plain task ``Input``/``Output`` pair rather than a chat
+    transcript, so this fits arbitrary single-shot LLM tasks — summarization,
+    extraction, classification, rewriting, code generation, etc.
+
+    There is no implicit default evaluator. If ``evaluators`` is empty the
+    function returns ``{}`` and no judge calls are made.
+
+    Args:
+        evaluators: List of evaluator dicts (already rendered). Use
+            :data:`DEFAULT_GENERAL_TASK_EVALUATOR` for a generic criteria-driven
+            default.
+        output: The text output to evaluate.
+        input_text: Optional task input the output was produced for. Omitted from
+            the prompt when ``None`` or blank.
+        fallback_model: Model id used when an evaluator has no ``judge_model``.
+
+    Returns:
+        Dict keyed by ``evaluator["name"]`` — same shape as :func:`text_judge`.
+    """
+    if not evaluators:
+        return {}
+
+    user_prompt = format_task_io(output, input_text)
+    return await text_judge(
+        evaluators=evaluators,
+        user_prompt=user_prompt,
+        fallback_model=fallback_model,
+    )
 
 
 # ── Simulation judge (thin wrapper over text_judge) ─────────────────────────
