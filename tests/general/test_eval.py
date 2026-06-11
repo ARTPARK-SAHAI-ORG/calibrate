@@ -98,8 +98,14 @@ class TestValidateDataset(unittest.TestCase):
         self.assertEqual(rows, rows_in)
 
     def test_valid_with_arguments_dict(self):
+        # arguments is keyed by evaluator name → that evaluator's var dict.
         rows_in = [
-            {"id": "1", "input": "a", "output": "b", "arguments": {"k": "v"}},
+            {
+                "id": "1",
+                "input": "a",
+                "output": "b",
+                "arguments": {"faithful": {"reference": "v"}},
+            },
         ]
         path = _write_json(rows_in)
         try:
@@ -131,6 +137,28 @@ class TestValidateDataset(unittest.TestCase):
             os.unlink(path)
         self.assertFalse(ok)
         self.assertEqual(err, "Row 0 field 'arguments' must be an object")
+
+    def test_arguments_evaluator_value_not_a_dict_rejected(self):
+        path = _write_json(
+            [
+                {
+                    "id": "1",
+                    "input": "a",
+                    "output": "b",
+                    "arguments": {"faithful": "nope"},
+                }
+            ]
+        )
+        try:
+            ok, err, _ = validate_general_eval_dataset(path)
+        finally:
+            os.unlink(path)
+        self.assertFalse(ok)
+        self.assertEqual(
+            err,
+            "Row 0 field 'arguments['faithful']' must be an object "
+            "mapping variable names to values",
+        )
 
 
 class TestResolveEvaluators(unittest.TestCase):
@@ -245,7 +273,7 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
     async def test_arguments_list_passed_to_judge(self):
         rows = [
             {"id": "row_a", "input": "doc A", "output": "sum A",
-             "arguments": {"name": "Ann"}},
+             "arguments": {"faithful": {"name": "Ann"}}},
             {"id": "row_b", "input": "doc B", "output": "sum B"},
         ]
         dataset_path = _write_json(rows)
@@ -276,7 +304,7 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
         judge_mock.assert_awaited_once()
         self.assertEqual(
             judge_mock.call_args.kwargs["arguments_list"],
-            [{"name": "Ann"}, None],
+            [{"faithful": {"name": "Ann"}}, None],
         )
 
 

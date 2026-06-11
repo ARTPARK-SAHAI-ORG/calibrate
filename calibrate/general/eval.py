@@ -39,9 +39,11 @@ def validate_general_eval_dataset(
     """Validate a general eval dataset JSON file.
 
     Expected format: a JSON list of objects, each with ``id``, ``input`` and
-    ``output`` fields. Each row may optionally carry an ``arguments`` dict used
-    to render evaluator ``{{var}}`` placeholders; if present it must be an
-    object.
+    ``output`` fields. Each row may optionally carry an ``arguments`` object
+    keyed by evaluator ``name`` → that evaluator's variable dict, used to render
+    that evaluator's ``{{var}}`` placeholders (mirroring ``llm`` per-criteria
+    ``arguments``). If present, ``arguments`` and each of its values must be
+    objects.
 
     Returns:
         tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
@@ -74,8 +76,18 @@ def validate_general_eval_dataset(
                 f"Each row needs 'id', 'input', 'output'.",
                 [],
             )
-        if "arguments" in row and not isinstance(row["arguments"], dict):
-            return False, f"Row {i} field 'arguments' must be an object", []
+        if "arguments" in row:
+            row_args = row["arguments"]
+            if not isinstance(row_args, dict):
+                return False, f"Row {i} field 'arguments' must be an object", []
+            for ev_name, ev_args in row_args.items():
+                if not isinstance(ev_args, dict):
+                    return (
+                        False,
+                        f"Row {i} field 'arguments[{ev_name!r}]' must be an "
+                        f"object mapping variable names to values",
+                        [],
+                    )
         row_id = row["id"]
         if row_id in seen_ids:
             return False, f"Duplicate row id: {row_id!r}", []

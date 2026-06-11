@@ -98,14 +98,17 @@ async def get_general_judge_score(
     ``inputs`` and ``outputs`` are positionally paired; ``inputs[i]`` may be
     ``None`` to judge ``outputs[i]`` on its own.
 
-    ``arguments_list`` optionally supplies per-row template variables. When
-    provided it must have the same length as ``inputs``/``outputs``. For each
-    row whose ``arguments_list[i]`` is truthy, every evaluator's
-    ``system_prompt`` is rendered against those arguments (via
-    :func:`calibrate.judges.render_evaluator`) before being passed to the judge;
-    rows with ``None``/empty arguments use the evaluators unchanged. Rendering
-    only changes ``system_prompt`` — ``name``/``type``/``scale_*`` are untouched,
-    so aggregation remains keyed off the base ``evaluators`` list.
+    ``arguments_list`` optionally supplies per-row, per-evaluator template
+    variables. When provided it must have the same length as
+    ``inputs``/``outputs``. Each entry is a dict keyed by evaluator ``name`` →
+    that evaluator's argument dict (mirroring how ``llm`` test cases attach
+    ``arguments`` to each ``criteria`` ref). For row ``i`` and evaluator ``ev``,
+    ``ev``'s ``system_prompt`` is rendered against ``arguments_list[i][ev["name"]]``
+    (via :func:`calibrate.judges.render_evaluator`) before being passed to the
+    judge; evaluators with no entry — and rows with ``None``/empty arguments —
+    are left unchanged. Rendering only changes ``system_prompt`` —
+    ``name``/``type``/``scale_*`` are untouched, so aggregation remains keyed off
+    the base ``evaluators`` list.
 
     Returns:
         {
@@ -143,7 +146,10 @@ async def get_general_judge_score(
     for i, (input_text, output) in enumerate(zip(inputs, outputs)):
         row_arguments = arguments_list[i] if arguments_list is not None else None
         if row_arguments:
-            row_evaluators = [render_evaluator(ev, row_arguments) for ev in evaluators]
+            row_evaluators = [
+                render_evaluator(ev, row_arguments.get(ev["name"]))
+                for ev in evaluators
+            ]
         else:
             row_evaluators = evaluators
         coroutines.append(

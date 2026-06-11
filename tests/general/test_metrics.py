@@ -176,6 +176,7 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_arguments_injected_per_row(self):
+        # Per-row args are keyed by evaluator name (mirrors llm criteria args).
         seen_by_output = {}
 
         async def fake(_input, output, evaluators, **kwargs):
@@ -189,10 +190,42 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
                 inputs=["i1", "i2"],
                 outputs=["o1", "o2"],
                 evaluators=[TEMPLATED_EV],
-                arguments_list=[{"reference": "gold-A"}, {"reference": "gold-B"}],
+                arguments_list=[
+                    {"faithful": {"reference": "gold-A"}},
+                    {"faithful": {"reference": "gold-B"}},
+                ],
             )
         self.assertEqual(seen_by_output["o1"], "judge against gold-A")
         self.assertEqual(seen_by_output["o2"], "judge against gold-B")
+
+    async def test_arguments_target_only_named_evaluator(self):
+        # An evaluator with no entry in the row's args is left unrendered,
+        # while a sibling evaluator named in the args is rendered.
+        other_ev = {
+            "name": "quality",
+            "system_prompt": "rate against {{reference}}",
+            "judge_model": "openai/gpt-4.1",
+        }
+        seen = {}
+
+        async def fake(_input, output, evaluators, **kwargs):
+            seen.update({ev["name"]: ev["system_prompt"] for ev in evaluators})
+            return {
+                "faithful": {"reasoning": output, "match": True},
+                "quality": {"reasoning": output, "match": True},
+            }
+
+        with patch(
+            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+        ):
+            await get_general_judge_score(
+                inputs=["i1"],
+                outputs=["o1"],
+                evaluators=[TEMPLATED_EV, other_ev],
+                arguments_list=[{"faithful": {"reference": "gold-A"}}],
+            )
+        self.assertEqual(seen["faithful"], "judge against gold-A")
+        self.assertEqual(seen["quality"], "rate against {{reference}}")
 
     async def test_length_mismatch_raises(self):
         with self.assertRaises(ValueError):
@@ -200,7 +233,7 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
                 inputs=["i1", "i2"],
                 outputs=["o1", "o2"],
                 evaluators=[TEMPLATED_EV],
-                arguments_list=[{"reference": "gold-A"}],
+                arguments_list=[{"faithful": {"reference": "gold-A"}}],
             )
 
     async def test_none_row_leaves_prompt_unrendered(self):
@@ -217,7 +250,7 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
                 inputs=["i1", "i2"],
                 outputs=["o1", "o2"],
                 evaluators=[TEMPLATED_EV],
-                arguments_list=[None, {"reference": "gold-B"}],
+                arguments_list=[None, {"faithful": {"reference": "gold-B"}}],
             )
         self.assertEqual(seen_by_output["o1"], "judge against {{reference}}")
         self.assertEqual(seen_by_output["o2"], "judge against gold-B")
