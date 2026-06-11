@@ -2193,7 +2193,7 @@ class TestAggregateLatency(unittest.TestCase):
         results = [{"metrics": {"passed": True}}, {"metrics": {"passed": False}}]
         self.assertIsNone(_aggregate_latency(results))
 
-    def test_mean_median_min_max_count(self):
+    def test_mean_min_max_count(self):
         from calibrate.llm.run_tests import _aggregate_latency
 
         results = [
@@ -2203,7 +2203,7 @@ class TestAggregateLatency(unittest.TestCase):
         ]
         self.assertEqual(
             _aggregate_latency(results),
-            {"mean": 300, "median": 200, "min": 100, "max": 600, "count": 3},
+            {"mean": 300, "min": 100, "max": 600, "count": 3},
         )
 
     def test_ignores_missing_and_non_numeric(self):
@@ -2220,16 +2220,15 @@ class TestAggregateLatency(unittest.TestCase):
         ]
         self.assertEqual(
             _aggregate_latency(results),
-            {"mean": 100, "median": 100, "min": 50, "max": 150, "count": 2},
+            {"mean": 100, "min": 50, "max": 150, "count": 2},
         )
 
-    def test_mean_and_median_are_rounded(self):
+    def test_mean_is_rounded(self):
         from calibrate.llm.run_tests import _aggregate_latency
 
-        # mean 100.5 -> 100; even-count median (100,101) averages to 100.5 -> 100
+        # mean 100.5 -> 100
         agg = _aggregate_latency([{"latency_ms": 100}, {"latency_ms": 101}])
         self.assertEqual(agg["mean"], 100)
-        self.assertEqual(agg["median"], 100)
 
 
 class TestWriteOutputsLatency(unittest.TestCase):
@@ -2253,7 +2252,7 @@ class TestWriteOutputsLatency(unittest.TestCase):
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
         self.assertEqual(
             metrics["latency_ms"],
-            {"mean": 150, "median": 150, "min": 120, "max": 180, "count": 2},
+            {"mean": 150, "min": 120, "max": 180, "count": 2},
         )
 
     def test_metrics_omits_latency_when_absent(self):

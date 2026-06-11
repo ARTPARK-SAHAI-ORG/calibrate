@@ -802,7 +802,6 @@ async def run_single_provider_eval(
         if valid_ttfb:
             metrics_data["ttfb"] = {
                 "mean": float(np.mean(valid_ttfb)),
-                "median": float(np.median(valid_ttfb)),
                 "std": float(np.std(valid_ttfb)),
                 "values": valid_ttfb,
             }

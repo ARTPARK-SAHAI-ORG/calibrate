@@ -109,10 +109,9 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertIn("pass_rate", df.columns)
             self.assertIn("passed", df.columns)
             self.assertIn("total", df.columns)
-            # No criterion columns (latency_*_ms are standard columns, empty here)
+            # No criterion columns (latency_ms is a standard column, empty here)
             expected_cols = {
-                "model", "passed", "total", "pass_rate",
-                "latency_mean_ms", "latency_median_ms",
+                "model", "passed", "total", "pass_rate", "latency_ms",
             }
             self.assertEqual(set(df.columns), expected_cols)
 
@@ -147,7 +146,7 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
                     },
                     "fluency": {
                         "type": "rating",
-                        "mean": 4.2, "median": 4.0, "min": 3, "max": 5, "count": 3,
+                        "mean": 4.2, "min": 3, "max": 5, "count": 3,
                         "scale_min": 1, "scale_max": 5,
                     },
                 },
@@ -161,7 +160,7 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
                     },
                     "fluency": {
                         "type": "rating",
-                        "mean": 3.0, "median": 3.0, "min": 2, "max": 4, "count": 3,
+                        "mean": 3.0, "min": 2, "max": 4, "count": 3,
                         "scale_min": 1, "scale_max": 5,
                     },
                 },
@@ -178,25 +177,18 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertEqual(
                 df.loc[df["model"] == "model-b", "fluency"].iloc[0], 3.0
             )
-            # rating criterion also exposes a median sibling column
-            self.assertEqual(
-                df.loc[df["model"] == "model-a", "fluency_median"].iloc[0], 4.0
-            )
-            # accuracy (binary) shows pass_rate and gets no median column at all
+            # accuracy (binary) shows pass_rate
             self.assertEqual(
                 df.loc[df["model"] == "model-a", "accuracy"].iloc[0], 100.0
             )
-            self.assertNotIn("accuracy_median", df.columns)
 
-    def test_latency_columns(self):
-        """latency_mean_ms / latency_median_ms show the stats; absent → None/NaN."""
+    def test_latency_column(self):
+        """latency_ms shows the mean; absent → None/NaN."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             _write_model(base, "model-a", {
                 "total": 2, "passed": 2,
-                "latency_ms": {
-                    "mean": 150, "median": 140, "min": 100, "max": 200, "count": 2
-                },
+                "latency_ms": {"mean": 150, "min": 100, "max": 200, "count": 2},
             })
             # model-b has no latency (e.g. eval-only)
             _write_model(base, "model-b", {"total": 2, "passed": 1})
@@ -205,19 +197,12 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             generate_leaderboard(str(base), str(save_dir))
 
             df = pd.read_csv(save_dir / "llm_leaderboard.csv")
-            self.assertIn("latency_mean_ms", df.columns)
-            self.assertIn("latency_median_ms", df.columns)
+            self.assertIn("latency_ms", df.columns)
             self.assertEqual(
-                df.loc[df["model"] == "model-a", "latency_mean_ms"].iloc[0], 150
-            )
-            self.assertEqual(
-                df.loc[df["model"] == "model-a", "latency_median_ms"].iloc[0], 140
+                df.loc[df["model"] == "model-a", "latency_ms"].iloc[0], 150
             )
             self.assertTrue(
-                pd.isna(df.loc[df["model"] == "model-b", "latency_mean_ms"].iloc[0])
-            )
-            self.assertTrue(
-                pd.isna(df.loc[df["model"] == "model-b", "latency_median_ms"].iloc[0])
+                pd.isna(df.loc[df["model"] == "model-b", "latency_ms"].iloc[0])
             )
 
     def test_empty_output_dir(self):

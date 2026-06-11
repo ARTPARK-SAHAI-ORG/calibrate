@@ -38,13 +38,13 @@ class TestTTSLeaderboard(unittest.TestCase):
             base = Path(tmp)
             _write_provider(base, "openai", {
                 "pronunciation": {"type": "binary", "mean": 0.95},
-                "ttfb": {"mean": 0.4, "median": 0.4, "std": 0.05, "values": [0.35, 0.45]},
+                "ttfb": {"mean": 0.4, "std": 0.05, "values": [0.35, 0.45]},
             }, results_rows=[
                 {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.4},
             ])
             _write_provider(base, "elevenlabs", {
                 "pronunciation": {"type": "binary", "mean": 0.8},
-                "ttfb": {"mean": 0.3, "median": 0.3, "std": 0.02, "values": [0.29, 0.31]},
+                "ttfb": {"mean": 0.3, "std": 0.02, "values": [0.29, 0.31]},
             }, results_rows=[
                 {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.3},
             ])
@@ -64,7 +64,7 @@ class TestTTSLeaderboard(unittest.TestCase):
             _write_provider(base, "provider-a", {
                 "intelligibility": {"type": "binary", "mean": 0.9},
                 "pronunciation": {"type": "binary", "mean": 0.85},
-                "ttfb": {"mean": 0.4, "median": 0.4},
+                "ttfb": {"mean": 0.4},
             })
 
             save_dir = base / "leaderboard"

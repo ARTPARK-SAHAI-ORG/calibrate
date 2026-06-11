@@ -29,8 +29,6 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(list(result["scores"].keys()), ["pronunciation"])
         self.assertEqual(result["scores"]["pronunciation"]["type"], "binary")
         self.assertEqual(result["scores"]["pronunciation"]["mean"], 0.5)
-        # Binary evaluators report no median.
-        self.assertNotIn("median", result["scores"]["pronunciation"])
         self.assertEqual(result["score"], 0.5)
 
     async def test_multi_evaluators_per_row_and_aggregate(self):
@@ -100,9 +98,8 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(result["scores"]["naturalness"]["type"], "rating")
-        # scores (5,3,4) → mean 4.0, median 4.0
+        # scores (5,3,4) → mean 4.0
         self.assertAlmostEqual(result["scores"]["naturalness"]["mean"], 4.0)
-        self.assertAlmostEqual(result["scores"]["naturalness"]["median"], 4.0)
         self.assertEqual(result["scores"]["naturalness"]["scale_min"], 1)
         self.assertEqual(result["scores"]["naturalness"]["scale_max"], 5)
 

@@ -6,7 +6,6 @@ import time
 import uuid
 from collections import defaultdict
 from typing import Any, Awaitable, Callable, List, Optional, TYPE_CHECKING
-import numpy as np
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -1509,7 +1508,6 @@ def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
         aggregated[name] = {
             "type": "rating",
             "mean": float(sum(scores) / len(scores)) if scores else 0.0,
-            "median": float(np.median(scores)) if scores else 0.0,
             "min": min(scores) if scores else 0,
             "max": max(scores) if scores else 0,
             "count": len(scores),
@@ -1722,9 +1720,7 @@ def _aggregate_latency(results: List[dict]) -> Optional[dict]:
     results, which skip inference, have none. Returns ``None`` when no result
     carries a latency so eval-only ``metrics.json`` stays free of an empty block.
 
-    Output shape: ``{"mean", "median", "min", "max", "count"}`` with
-    millisecond ints. ``median`` is usually the more representative figure since
-    latency distributions are right-skewed by occasional slow calls.
+    Output shape: ``{"mean", "min", "max", "count"}`` with millisecond ints.
     """
     values = [
         r["latency_ms"]
@@ -1736,7 +1732,6 @@ def _aggregate_latency(results: List[dict]) -> Optional[dict]:
         return None
     return {
         "mean": round(sum(values) / len(values)),
-        "median": round(float(np.median(values))),
         "min": min(values),
         "max": max(values),
         "count": len(values),

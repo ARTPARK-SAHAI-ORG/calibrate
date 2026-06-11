@@ -279,7 +279,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
         from calibrate.stt import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
-            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "median": 0.1, "per_row": [0.1, 0.1]}), \
+            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "per_row": [0.1, 0.1]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                      "per_row": [
@@ -305,7 +305,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                      "type": "rating", "scale_min": 1, "scale_max": 5}
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(E, "get_wer_score", return_value={"score": 0.05, "median": 0.05, "per_row": [0.05]}), \
+             patch.object(E, "get_wer_score", return_value={"score": 0.05, "per_row": [0.05]}), \
              patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                  "scores": {"r": {"type": "rating", "mean": 4.0, "scale_min": 1, "scale_max": 5}},
                  "per_row": [{"r": {"score": 4, "reasoning": "ok"}}],
@@ -340,7 +340,7 @@ class TestRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                 {"id": "b", "gt": "y", "pred": None},
             ]))
             out = Path(tmp) / "out"
-            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "median": 0.1, "per_row": [0.1, 0.1]}), \
+            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "per_row": [0.1, 0.1]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                      "per_row": [
@@ -404,7 +404,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
             (output / "deepgram" / "results.csv").write_text("id,gt,pred\na,hello,hi\n")
 
             with patch.object(E, "transcribe_audio", AsyncMock(return_value="hello")), \
-                 patch.object(E, "get_wer_score", return_value={"score": 0.0, "median": 0.0, "per_row": [0.0]}), \
+                 patch.object(E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                      "per_row": [{"semantic_match": {"match": True, "reasoning": "ok"}}],
@@ -464,7 +464,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
             output.mkdir()
 
             with patch.object(E, "transcribe_audio", AsyncMock(return_value="hello")), \
-                 patch.object(E, "get_wer_score", return_value={"score": 0.0, "median": 0.0, "per_row": [0.0]}), \
+                 patch.object(E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                      "per_row": [{"semantic_match": {"match": True, "reasoning": "ok"}}],

@@ -97,12 +97,11 @@ def _build_leaderboard(
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, latency_mean_ms,
-    latency_median_ms, [criterion_1, ...]
+    Columns: model, passed, total, pass_rate, latency_ms, [criterion_1, ...]
 
-    ``latency_*_ms`` are the mean/median per-test-case response-generation
-    latency (in milliseconds, judge time excluded); ``None`` for runs without
-    it (e.g. eval-only).
+    ``latency_ms`` is the mean per-test-case response-generation latency (in
+    milliseconds, judge time excluded); ``None`` for runs without it (e.g.
+    eval-only).
 
     Per-criterion column values:
     - binary criterion → pass_rate (%)
@@ -119,8 +118,7 @@ def _build_leaderboard(
             "passed": passed,
             "total": total,
             "pass_rate": _to_percent(passed, total),
-            "latency_mean_ms": latency.get("mean"),
-            "latency_median_ms": latency.get("median"),
+            "latency_ms": latency.get("mean"),
         }
 
         criteria = data.get("criteria") or {}
@@ -129,12 +127,7 @@ def _build_leaderboard(
             if not crit:
                 row[name] = None
             elif crit.get("type") == "rating":
-                # Rating criteria report a mean score plus a median (raw, on the
-                # criterion's scale). Only rating criteria get a ``_median``
-                # column; binary criteria report a pass rate, which has no
-                # meaningful median, so no empty column is emitted for them.
                 row[name] = crit.get("mean")
-                row[f"{name}_median"] = crit.get("median")
             else:
                 row[name] = crit.get("pass_rate")
 

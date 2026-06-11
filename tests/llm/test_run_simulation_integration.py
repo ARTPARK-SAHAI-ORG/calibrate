@@ -409,10 +409,6 @@ class TestSimulationMain:
         assert metrics["helpfulness"]["mean"] == pytest.approx(1.0), (
             f"Expected helpfulness.mean == 1.0, got {metrics['helpfulness']['mean']}"
         )
-        # helpfulness is a binary criterion → no median is reported for it.
-        assert "median" not in metrics["helpfulness"], (
-            f"Binary criterion should carry no median, got {metrics['helpfulness']}"
-        )
 
     def test_exits_0_on_success(self, agent_server, tmp_path):
         """sys.exit is not called (or called with 0) when all tasks succeed."""

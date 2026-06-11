@@ -66,37 +66,6 @@ class TestSTTLeaderboard(unittest.TestCase):
             self.assertIn("semantic_match", summary.columns)
             self.assertEqual(set(summary["run"]), {"deepgram", "google"})
 
-    def test_median_surfaces_only_for_non_binary(self):
-        """Entries carrying a ``median`` get a ``<key>_median`` column; binary
-        evaluators (no median) get none."""
-        with tempfile.TemporaryDirectory() as tmp:
-            base = Path(tmp)
-            _write_provider(base, "deepgram", {
-                "wer": 0.1,
-                "wer_median": 0.08,
-                # binary → no median
-                "semantic_match": {"type": "binary", "mean": 0.85},
-                # rating → median present
-                "fluency": {
-                    "type": "rating", "mean": 4.0, "median": 4.0,
-                    "scale_min": 1, "scale_max": 5,
-                },
-            })
-
-            save_dir = base / "leaderboard"
-            generate_stt_leaderboard(str(base), str(save_dir))
-
-            summary = pd.read_excel(
-                save_dir / "stt_leaderboard.xlsx", sheet_name="summary"
-            )
-            self.assertIn("semantic_match", summary.columns)
-            self.assertNotIn("semantic_match_median", summary.columns)
-            self.assertIn("fluency_median", summary.columns)
-            self.assertIn("wer_median", summary.columns)  # plain float passes through
-            row = summary[summary["run"] == "deepgram"].iloc[0]
-            self.assertEqual(row["fluency_median"], 4.0)
-            self.assertEqual(row["wer_median"], 0.08)
-
     def test_custom_criterion_metrics_surface_dynamically(self):
         """A provider with custom criterion `semantic_match` should produce a
         column in the summary."""

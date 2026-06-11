@@ -34,8 +34,6 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(list(result["scores"].keys()), ["semantic_match"])
         self.assertEqual(result["scores"]["semantic_match"]["type"], "binary")
         self.assertEqual(result["scores"]["semantic_match"]["mean"], 0.5)
-        # Binary evaluators report no median.
-        self.assertNotIn("median", result["scores"]["semantic_match"])
         self.assertEqual(result["score"], 0.5)
         self.assertEqual(len(result["per_row"]), 2)
         # Tally per_row matches: exactly one True and one False
@@ -115,9 +113,8 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(result["scores"]["semantic_accuracy"]["type"], "rating")
-        # Two 5s and one 2 → mean = 12/3 = 4.0; median of (5,5,2) = 5.0
+        # Two 5s and one 2 → mean = 12/3 = 4.0
         self.assertAlmostEqual(result["scores"]["semantic_accuracy"]["mean"], 4.0)
-        self.assertAlmostEqual(result["scores"]["semantic_accuracy"]["median"], 5.0)
         self.assertEqual(result["scores"]["semantic_accuracy"]["scale_min"], 1)
         self.assertEqual(result["scores"]["semantic_accuracy"]["scale_max"], 5)
 

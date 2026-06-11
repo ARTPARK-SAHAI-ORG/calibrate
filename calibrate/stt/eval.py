@@ -1056,7 +1056,7 @@ async def _score_and_write_results(
 
     _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
 
-    metrics_data = {"wer": wer_results["score"], "wer_median": wer_results["median"]}
+    metrics_data = {"wer": wer_results["score"]}
     for name, score_dict in llm_results["scores"].items():
         metrics_data[name] = score_dict
 

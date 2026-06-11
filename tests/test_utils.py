@@ -634,20 +634,19 @@ class TestPatchLangfuseTrace(unittest.TestCase):
 
 
 class TestSummarizeMetricDistribution(unittest.TestCase):
-    def test_minimal_entry_has_mean_median_std_values(self):
+    def test_minimal_entry_has_mean_std_values(self):
         from calibrate.utils import summarize_metric_distribution
 
         entry = summarize_metric_distribution([1.0, 2.0, 6.0])
         self.assertEqual(
-            entry, {"mean": 3.0, "median": 2.0, "std": entry["std"],
-                    "values": [1.0, 2.0, 6.0]}
+            entry, {"mean": 3.0, "std": entry["std"], "values": [1.0, 2.0, 6.0]}
         )
         # No type/scale/evaluator_id when not supplied.
         self.assertNotIn("type", entry)
         self.assertNotIn("scale_min", entry)
         self.assertNotIn("evaluator_id", entry)
         # Aggregates are plain floats (JSON-serializable, not numpy types).
-        for k in ("mean", "median", "std"):
+        for k in ("mean", "std"):
             self.assertIs(type(entry[k]), float)
 
     def test_optional_fields_included_when_supplied(self):
@@ -661,18 +660,8 @@ class TestSummarizeMetricDistribution(unittest.TestCase):
         )
         self.assertEqual(entry["type"], "rating")
         self.assertEqual(entry["mean"], pytest_approx(10 / 3))
-        self.assertEqual(entry["median"], 4.0)
         self.assertEqual((entry["scale_min"], entry["scale_max"]), (1, 5))
         self.assertEqual(entry["evaluator_id"], "ev_123")
-
-    def test_binary_omits_median(self):
-        from calibrate.utils import summarize_metric_distribution
-
-        # Binary metrics report a pass-rate mean but no median.
-        entry = summarize_metric_distribution([0, 1, 1], metric_type="binary")
-        self.assertEqual(entry["type"], "binary")
-        self.assertIn("mean", entry)
-        self.assertNotIn("median", entry)
 
     def test_is_json_serializable(self):
         from calibrate.utils import summarize_metric_distribution
@@ -694,25 +683,19 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
                 read_leaderboard_metrics(Path(tmp) / "nope.json"), {}
             )
 
-    def test_current_format_extracts_mean_and_median(self):
+    def test_current_format_extracts_mean(self):
         from calibrate.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             p = self._write(Path(tmp) / "m.json", {
                 "wer": 0.1,
-                "wer_median": 0.08,
-                # binary → mean only, no median sibling column
                 "semantic_match": {"type": "binary", "mean": 0.85},
-                # entries with a median (rating, ttfb) → sibling column
-                "ttfb": {"mean": 0.4, "median": 0.35},
+                "ttfb": {"mean": 0.4},
             })
             out = read_leaderboard_metrics(p)
             self.assertEqual(out["semantic_match"], 0.85)
-            self.assertNotIn("semantic_match_median", out)
             self.assertEqual(out["ttfb"], 0.4)
-            self.assertEqual(out["ttfb_median"], 0.35)
             self.assertEqual(out["wer"], 0.1)
-            self.assertEqual(out["wer_median"], 0.08)
 
     def test_legacy_metric_name_format(self):
         from calibrate.utils import read_leaderboard_metrics
