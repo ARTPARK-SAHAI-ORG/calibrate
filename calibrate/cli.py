@@ -156,7 +156,7 @@ def main():
 
     parser = argparse.ArgumentParser(
         prog="calibrate",
-        usage="calibrate [-h] [-v] {stt,tts,llm,simulations,status} ...",
+        usage="calibrate [-h] [-v] {stt,tts,llm,simulations,general,status} ...",
         description="Voice agent evaluation and benchmarking toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -168,6 +168,7 @@ Examples:
     calibrate llm -c config.json                     # Run LLM tests directly
     calibrate simulations                            # Interactive simulations
     calibrate simulations --type text -c config.json # Run text simulation directly
+    calibrate general --dataset data.json -c config.json  # Score input/output pairs
     calibrate status                                 # Check provider connectivity
         """,
     )
@@ -182,7 +183,7 @@ Examples:
     subparsers = parser.add_subparsers(
         dest="component",
         help="Component to run",
-        metavar="{stt,tts,llm,simulations,status}",
+        metavar="{stt,tts,llm,simulations,general,status}",
     )
     subparsers.required = False  # Allow `calibrate` alone for main menu
 
@@ -421,6 +422,35 @@ Examples:
     sim_lb_parser = sim_subparsers.add_parser("leaderboard")
     sim_lb_parser.add_argument("-o", "--output-dir", type=str, required=True)
     sim_lb_parser.add_argument("-s", "--save-dir", type=str, required=True)
+
+    # ── General task eval ───────────────────────────────────────
+    # `calibrate general --dataset data.json --config config.json` →
+    # score a dataset of {id, input, output} rows with the general
+    # (non-conversational) task judge.
+    general_parser = subparsers.add_parser(
+        "general",
+        help="General task evaluation — judge arbitrary input/output pairs",
+    )
+    general_parser.add_argument(
+        "--dataset",
+        type=str,
+        default=None,
+        help="Path to dataset JSON (list of {id, input, output})",
+    )
+    general_parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default=None,
+        help="Path to JSON config file defining the `evaluators` list",
+    )
+    general_parser.add_argument(
+        "-o",
+        "--output-dir",
+        type=str,
+        default="./out",
+        help="Output directory",
+    )
 
     # ── Status ────────────────────────────────────────────────────
     status_parser = subparsers.add_parser(
@@ -744,6 +774,21 @@ Examples:
                 },
             )
             asyncio.run(agent_main())
+
+    elif args.component == "general":
+        from calibrate.general.eval import main as general_eval_main
+
+        if not args.dataset:
+            print("\033[31mError: --dataset is required\033[0m")
+            sys.exit(1)
+        if not args.config:
+            print("\033[31mError: --config is required\033[0m")
+            sys.exit(1)
+
+        argv = ["calibrate", "--dataset", args.dataset, "-c", args.config]
+        argv.extend(["-o", args.output_dir])
+        sys.argv = argv
+        asyncio.run(general_eval_main())
 
     elif args.component == "status":
         from calibrate.status import run_status_live
