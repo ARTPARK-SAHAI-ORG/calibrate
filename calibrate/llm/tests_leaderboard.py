@@ -128,16 +128,15 @@ def _build_leaderboard(
             crit = criteria.get(name)
             if not crit:
                 row[name] = None
-                row[f"{name}_median"] = None
             elif crit.get("type") == "rating":
-                # Rating criteria report a mean score and its median (raw, on
-                # the criterion's scale); binary criteria report a pass rate
-                # with no meaningful median.
+                # Rating criteria report a mean score plus a median (raw, on the
+                # criterion's scale). Only rating criteria get a ``_median``
+                # column; binary criteria report a pass rate, which has no
+                # meaningful median, so no empty column is emitted for them.
                 row[name] = crit.get("mean")
                 row[f"{name}_median"] = crit.get("median")
             else:
                 row[name] = crit.get("pass_rate")
-                row[f"{name}_median"] = None
 
         rows.append(row)
 

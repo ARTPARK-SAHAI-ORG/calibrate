@@ -182,13 +182,11 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertEqual(
                 df.loc[df["model"] == "model-a", "fluency_median"].iloc[0], 4.0
             )
-            # accuracy (binary) still shows pass_rate; its median column is empty
+            # accuracy (binary) shows pass_rate and gets no median column at all
             self.assertEqual(
                 df.loc[df["model"] == "model-a", "accuracy"].iloc[0], 100.0
             )
-            self.assertTrue(
-                pd.isna(df.loc[df["model"] == "model-a", "accuracy_median"].iloc[0])
-            )
+            self.assertNotIn("accuracy_median", df.columns)
 
     def test_latency_columns(self):
         """latency_mean_ms / latency_median_ms show the stats; absent → None/NaN."""
