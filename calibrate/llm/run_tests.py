@@ -656,8 +656,14 @@ def _tool_call_arguments_diff_lines(
     return lines
 
 
-def _tool_call_arguments_mismatch_message(expected, actual) -> str:
-    """Build a multi-line tool-call arguments mismatch reason."""
+def _tool_call_arguments_mismatch_message(expected, actual) -> Optional[str]:
+    """Build a multi-line tool-call arguments mismatch reason, or ``None``.
+
+    Returns ``None`` when two argument dicts have no differences under our
+    matching rules — i.e. the only divergences are wildcard ("any") parameters,
+    which produce no diff lines. This mirrors the async eval path so the
+    leaderboard's per-slot pass calculation agrees with it.
+    """
     header = "Tool call arguments mismatch:"
     if not isinstance(expected, dict):
         return (
@@ -673,11 +679,7 @@ def _tool_call_arguments_mismatch_message(expected, actual) -> str:
         )
     detail_lines = _tool_call_arguments_diff_lines(expected, actual)
     if not detail_lines:
-        return (
-            f"{header}\n"
-            f"  expected arguments: {expected!r}\n"
-            f"  actual arguments: {actual!r}"
-        )
+        return None
     return header + "\n" + "\n".join(detail_lines)
 
 
@@ -698,15 +700,7 @@ def _tool_call_pair_mismatch(
     out_args = output_tool_call.get("arguments")
     if out_args == exp_args:
         return None
-    # When the only differences are wildcard ("any") parameters the diff is
-    # empty and the arguments match under our rules — mirror the async eval path
-    # so the leaderboard's per-slot pass calculation agrees with it.
-    if (
-        isinstance(exp_args, dict)
-        and isinstance(out_args, dict)
-        and not _tool_call_arguments_diff_lines(exp_args, out_args)
-    ):
-        return None
+    # Returns None when the only differences are wildcard ("any") parameters.
     return _tool_call_arguments_mismatch_message(exp_args, out_args)
 
 
