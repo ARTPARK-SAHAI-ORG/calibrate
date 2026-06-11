@@ -635,17 +635,20 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
 
 
 class TestAnyWildcardParam(unittest.TestCase):
-    """The ``"any"`` expected value is a wildcard — the parameter is ignored."""
+    """A ``{"match_type": "any"}`` expected value is a wildcard — param ignored."""
 
-    def test_is_any_sentinel(self):
-        from calibrate.llm.run_tests import _is_any_sentinel
+    ANY = {"match_type": "any"}
 
-        self.assertTrue(_is_any_sentinel("any"))
-        self.assertFalse(_is_any_sentinel("Any"))
-        self.assertFalse(_is_any_sentinel("anything"))
-        self.assertFalse(_is_any_sentinel(""))
-        self.assertFalse(_is_any_sentinel(None))
-        self.assertFalse(_is_any_sentinel({"match_type": "exact", "value": "any"}))
+    def test_is_any_spec(self):
+        from calibrate.llm.run_tests import _is_any_spec
+
+        self.assertTrue(_is_any_spec({"match_type": "any"}))
+        # A plain "any" string is an ordinary literal, not the wildcard.
+        self.assertFalse(_is_any_spec("any"))
+        self.assertFalse(_is_any_spec("anything"))
+        self.assertFalse(_is_any_spec(None))
+        self.assertFalse(_is_any_spec({"match_type": "exact", "value": "any"}))
+        self.assertFalse(_is_any_spec({"match_type": "llm_judge", "criteria": "x"}))
 
     def test_wildcard_absent_from_output_passes(self):
         from calibrate.llm.run_tests import evaluate_tool_calls
@@ -653,7 +656,7 @@ class TestAnyWildcardParam(unittest.TestCase):
         with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
             result = asyncio.run(evaluate_tool_calls(
                 [{"tool": "lookup", "arguments": {"city": "London"}}],
-                [{"tool": "lookup", "arguments": {"city": "London", "token": "any"}}],
+                [{"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}}],
             ))
         self.assertTrue(result["passed"])
         self.assertEqual(result["tool_call_results"], [{"tool": "lookup", "passed": True}])
@@ -666,7 +669,7 @@ class TestAnyWildcardParam(unittest.TestCase):
             result = asyncio.run(evaluate_tool_calls(
                 [{"tool": "lookup",
                   "arguments": {"city": "London", "token": "xyz-123"}}],
-                [{"tool": "lookup", "arguments": {"city": "London", "token": "any"}}],
+                [{"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}}],
             ))
         self.assertTrue(result["passed"])
         self.assertEqual(result["tool_call_results"], [{"tool": "lookup", "passed": True}])
@@ -679,7 +682,7 @@ class TestAnyWildcardParam(unittest.TestCase):
             result = asyncio.run(evaluate_tool_calls(
                 [{"tool": "lookup",
                   "arguments": {"city": "Paris", "token": "whatever"}}],
-                [{"tool": "lookup", "arguments": {"city": "London", "token": "any"}}],
+                [{"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}}],
             ))
         self.assertFalse(result["passed"])
         self.assertIn("city", result["reasoning"])
@@ -695,7 +698,7 @@ class TestAnyWildcardParam(unittest.TestCase):
                 [{"tool": "book",
                   "arguments": {"patient": {"name": "John Doe", "session": "s-999"}}}],
                 [{"tool": "book",
-                  "arguments": {"patient": {"name": "John Doe", "session": "any"}}}],
+                  "arguments": {"patient": {"name": "John Doe", "session": self.ANY}}}],
             ))
         self.assertTrue(result["passed"])
         # Also passes when the wildcard sub-key is absent entirely.
@@ -703,24 +706,23 @@ class TestAnyWildcardParam(unittest.TestCase):
             result_absent = asyncio.run(evaluate_tool_calls(
                 [{"tool": "book", "arguments": {"patient": {"name": "John Doe"}}}],
                 [{"tool": "book",
-                  "arguments": {"patient": {"name": "John Doe", "session": "any"}}}],
+                  "arguments": {"patient": {"name": "John Doe", "session": self.ANY}}}],
             ))
         self.assertTrue(result_absent["passed"])
         mock_judge.assert_not_called()
 
-    def test_exact_spec_escape_hatch_matches_literal_any(self):
+    def test_plain_any_string_is_an_exact_literal(self):
         from calibrate.llm.run_tests import evaluate_tool_calls
 
+        # A bare "any" string is NOT the wildcard — it must match exactly.
         with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
             passing = asyncio.run(evaluate_tool_calls(
                 [{"tool": "a", "arguments": {"x": "any"}}],
-                [{"tool": "a",
-                  "arguments": {"x": {"match_type": "exact", "value": "any"}}}],
+                [{"tool": "a", "arguments": {"x": "any"}}],
             ))
             failing = asyncio.run(evaluate_tool_calls(
                 [{"tool": "a", "arguments": {"x": "other"}}],
-                [{"tool": "a",
-                  "arguments": {"x": {"match_type": "exact", "value": "any"}}}],
+                [{"tool": "a", "arguments": {"x": "any"}}],
             ))
         self.assertTrue(passing["passed"])
         self.assertFalse(failing["passed"])
@@ -741,7 +743,7 @@ class TestAnyWildcardParam(unittest.TestCase):
                   "arguments": {"note": "looks good", "token": "anything-goes"}}],
                 [{"tool": "a", "arguments": {
                     "note": {"match_type": "llm_judge", "criteria": "positive"},
-                    "token": "any"}}],
+                    "token": self.ANY}}],
             ))
         self.assertTrue(result["passed"])
         judgments = result["tool_call_results"][0]["param_judgments"]
@@ -757,7 +759,7 @@ class TestAnyWildcardParam(unittest.TestCase):
         # agrees with the async path and reports a match.
         self.assertIsNone(_tool_call_pair_mismatch(
             {"tool": "lookup", "arguments": {"city": "London"}},
-            {"tool": "lookup", "arguments": {"city": "London", "token": "any"}},
+            {"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}},
         ))
 
     def test_sync_pair_mismatch_wildcard_present_matches(self):
@@ -768,7 +770,7 @@ class TestAnyWildcardParam(unittest.TestCase):
         # evaluate_tool_calls and reports a match.
         self.assertIsNone(_tool_call_pair_mismatch(
             {"tool": "lookup", "arguments": {"city": "London", "token": "xyz-123"}},
-            {"tool": "lookup", "arguments": {"city": "London", "token": "any"}},
+            {"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}},
         ))
 
 

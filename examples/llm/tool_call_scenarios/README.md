@@ -56,4 +56,4 @@ python -m calibrate.llm.run_tests \
 | `nested-object`        | exact + judged sub-fields (dotted paths) | pass                               |
 | `wrong-tool`           | agent called a different tool            | fail                               |
 | `multi-call`           | two tool calls, each judged              | pass (tool-prefixed lines)         |
-| `any-wildcard`         | arg value `"any"` ignored, other pinned  | pass (wildcard arg differs)        |
+| `any-wildcard`         | `match_type: any` arg ignored, other pinned | pass (wildcard arg differs)     |

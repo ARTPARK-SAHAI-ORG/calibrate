@@ -230,14 +230,14 @@
     }
   },
   {
-    "_scenario": "13. ANY WILDCARD — arg value \"any\" is ignored; another arg pinned exact (pass). The wildcard arg differs from any literal, proving it's skipped.",
+    "_scenario": "13. ANY WILDCARD — arg with {match_type: any} is ignored; another arg pinned exact (pass). The wildcard arg differs from any literal, proving it's skipped.",
     "test_case": {
       "id": "any-wildcard",
       "history": [{ "role": "user", "content": "Book John Doe for whatever the earliest slot is — the reason is a fever." }],
       "evaluation": {
         "type": "tool_call",
         "tool_calls": [
-          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "any", "reason": "fever" } }
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": { "match_type": "any" }, "reason": "fever" } }
         ]
       }
     },

@@ -707,17 +707,16 @@ def _tool_call_pair_mismatch(
 # ── Per-parameter criteria specs (exact match vs. LLM judge) ─────────────────
 
 
-def _is_any_sentinel(value) -> bool:
-    """True when an expected argument value is the ``"any"`` wildcard.
+def _is_any_spec(value) -> bool:
+    """True when an expected argument value is the ``any`` wildcard spec.
 
-    A parameter whose expected value is the literal string ``"any"`` is ignored
+    A parameter whose expected value is ``{"match_type": "any"}`` is ignored
     entirely: it need not appear in the produced tool call, and whatever value it
     carries is accepted. This lets a test pin down the arguments that matter while
-    leaving free-form or non-deterministic ones unconstrained. To match the
-    literal string ``"any"`` verbatim instead, wrap it in an exact spec
-    (``{"match_type": "exact", "value": "any"}``).
+    leaving free-form or non-deterministic ones unconstrained. A plain ``"any"``
+    string is *not* special — it is an ordinary literal, matched exactly.
     """
-    return value == "any"
+    return isinstance(value, dict) and value.get("match_type") == "any"
 
 
 def _param_criteria_spec(value, key: str) -> Optional[dict]:
@@ -728,6 +727,7 @@ def _param_criteria_spec(value, key: str) -> Optional[dict]:
 
         {"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}
         {"match_type": "exact", "value": <literal>}
+        {"match_type": "any"}
 
     Returns the normalized spec, or ``None`` when ``value`` is an ordinary
     literal (the default, exact-match behavior). Raises ``ValueError`` for a
@@ -736,6 +736,11 @@ def _param_criteria_spec(value, key: str) -> Optional[dict]:
     if not isinstance(value, dict) or "match_type" not in value:
         return None
     match_type = value["match_type"]
+    if match_type == "any":
+        # Wildcard — the parameter is ignored entirely. The caller skips it via
+        # ``_is_any_spec`` before spec interpretation; recognized here too so all
+        # valid match_types live in one place.
+        return {"match_type": "any"}
     if match_type == "llm_judge":
         criteria = value.get("criteria")
         if not isinstance(criteria, str) or not criteria.strip():
@@ -755,8 +760,8 @@ def _param_criteria_spec(value, key: str) -> Optional[dict]:
             )
         return {"match_type": "exact", "value": value["value"]}
     raise ValueError(
-        f"Tool-call parameter '{key}': match_type must be 'exact' or "
-        f"'llm_judge' (got {match_type!r})."
+        f"Tool-call parameter '{key}': match_type must be 'exact', "
+        f"'llm_judge', or 'any' (got {match_type!r})."
     )
 
 
@@ -863,11 +868,11 @@ def _collect_arg_diffs(
             )
             continue
 
-        # An ``"any"`` expected value is a wildcard: skip the parameter entirely
-        # so neither its presence nor its value is checked. Honored in both exact
-        # and criteria-aware walks so the live evaluation and the leaderboard's
-        # per-slot pass calculation agree.
-        if _is_any_sentinel(expected[key]):
+        # A ``{"match_type": "any"}`` expected value is a wildcard: skip the
+        # parameter entirely so neither its presence nor its value is checked.
+        # Honored in both exact and criteria-aware walks so the live evaluation
+        # and the leaderboard's per-slot pass calculation agree.
+        if _is_any_spec(expected[key]):
             continue
 
         spec = _param_criteria_spec(expected[key], path) if criteria_aware else None
