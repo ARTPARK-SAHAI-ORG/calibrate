@@ -145,5 +145,83 @@ class TestGetGeneralJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(args[1], "only-output")
 
 
+TEMPLATED_EV = {
+    "name": "faithful",
+    "system_prompt": "judge against {{reference}}",
+    "judge_model": "openai/gpt-4.1",
+}
+
+
+class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
+    async def test_arguments_list_none_regression(self):
+        # arguments_list=None: evaluators reach the judge untouched.
+        seen = []
+
+        async def fake(_input, output, evaluators, **kwargs):
+            seen.append(evaluators)
+            return {"faithful": {"reasoning": output, "match": True}}
+
+        with patch(
+            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+        ):
+            result = await get_general_judge_score(
+                inputs=["i1", "i2"],
+                outputs=["o1", "o2"],
+                evaluators=[TEMPLATED_EV],
+            )
+        self.assertAlmostEqual(result["scores"]["faithful"]["mean"], 1.0)
+        for evaluators in seen:
+            self.assertEqual(
+                evaluators[0]["system_prompt"], "judge against {{reference}}"
+            )
+
+    async def test_arguments_injected_per_row(self):
+        seen_by_output = {}
+
+        async def fake(_input, output, evaluators, **kwargs):
+            seen_by_output[output] = evaluators[0]["system_prompt"]
+            return {"faithful": {"reasoning": output, "match": True}}
+
+        with patch(
+            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+        ):
+            await get_general_judge_score(
+                inputs=["i1", "i2"],
+                outputs=["o1", "o2"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[{"reference": "gold-A"}, {"reference": "gold-B"}],
+            )
+        self.assertEqual(seen_by_output["o1"], "judge against gold-A")
+        self.assertEqual(seen_by_output["o2"], "judge against gold-B")
+
+    async def test_length_mismatch_raises(self):
+        with self.assertRaises(ValueError):
+            await get_general_judge_score(
+                inputs=["i1", "i2"],
+                outputs=["o1", "o2"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[{"reference": "gold-A"}],
+            )
+
+    async def test_none_row_leaves_prompt_unrendered(self):
+        seen_by_output = {}
+
+        async def fake(_input, output, evaluators, **kwargs):
+            seen_by_output[output] = evaluators[0]["system_prompt"]
+            return {"faithful": {"reasoning": output, "match": True}}
+
+        with patch(
+            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+        ):
+            await get_general_judge_score(
+                inputs=["i1", "i2"],
+                outputs=["o1", "o2"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[None, {"reference": "gold-B"}],
+            )
+        self.assertEqual(seen_by_output["o1"], "judge against {{reference}}")
+        self.assertEqual(seen_by_output["o2"], "judge against gold-B")
+
+
 if __name__ == "__main__":
     unittest.main()

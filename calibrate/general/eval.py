@@ -39,7 +39,9 @@ def validate_general_eval_dataset(
     """Validate a general eval dataset JSON file.
 
     Expected format: a JSON list of objects, each with ``id``, ``input`` and
-    ``output`` fields.
+    ``output`` fields. Each row may optionally carry an ``arguments`` dict used
+    to render evaluator ``{{var}}`` placeholders; if present it must be an
+    object.
 
     Returns:
         tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
@@ -72,6 +74,8 @@ def validate_general_eval_dataset(
                 f"Each row needs 'id', 'input', 'output'.",
                 [],
             )
+        if "arguments" in row and not isinstance(row["arguments"], dict):
+            return False, f"Row {i} field 'arguments' must be an object", []
         row_id = row["id"]
         if row_id in seen_ids:
             return False, f"Duplicate row id: {row_id!r}", []
@@ -109,11 +113,17 @@ async def _score_and_write_results(
     outputs: List[str],
     evaluators: List[dict],
     output_dir: str,
+    arguments_list: Optional[List[Optional[dict]]] = None,
 ) -> dict:
     """Run the general judge over (input, output) pairs and write outputs.
 
     Writes ``results.csv`` and ``metrics.json`` plus the resolved evaluator
     ``config.json`` under ``output_dir``. Returns the metrics_data dict.
+
+    Args:
+        arguments_list: Optional per-row ``arguments`` dicts (one entry per
+            row, ``None`` for rows with no injection) forwarded to the judge to
+            render evaluator ``{{var}}`` placeholders.
     """
     write_evaluator_config(output_dir, evaluators)
 
@@ -121,6 +131,7 @@ async def _score_and_write_results(
         inputs,
         outputs,
         evaluators=evaluators,
+        arguments_list=arguments_list,
     )
     for name, score_dict in llm_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
@@ -196,6 +207,7 @@ async def run_general_eval(
         ids = [r["id"] for r in rows]
         inputs = [str(r["input"]) if r["input"] is not None else "" for r in rows]
         outputs = [str(r["output"]) if r["output"] is not None else "" for r in rows]
+        arguments_list = [r.get("arguments") for r in rows]
 
         metrics_data = await _score_and_write_results(
             ids=ids,
@@ -203,6 +215,7 @@ async def run_general_eval(
             outputs=outputs,
             evaluators=evaluators,
             output_dir=output_dir,
+            arguments_list=arguments_list,
         )
 
         return {

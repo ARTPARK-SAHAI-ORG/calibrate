@@ -97,6 +97,41 @@ class TestValidateDataset(unittest.TestCase):
         self.assertEqual(err, "")
         self.assertEqual(rows, rows_in)
 
+    def test_valid_with_arguments_dict(self):
+        rows_in = [
+            {"id": "1", "input": "a", "output": "b", "arguments": {"k": "v"}},
+        ]
+        path = _write_json(rows_in)
+        try:
+            ok, err, rows = validate_general_eval_dataset(path)
+        finally:
+            os.unlink(path)
+        self.assertTrue(ok)
+        self.assertEqual(err, "")
+        self.assertEqual(rows, rows_in)
+
+    def test_valid_without_arguments(self):
+        # arguments is optional — rows missing it are still valid.
+        rows_in = [{"id": "1", "input": "a", "output": "b"}]
+        path = _write_json(rows_in)
+        try:
+            ok, err, _ = validate_general_eval_dataset(path)
+        finally:
+            os.unlink(path)
+        self.assertTrue(ok)
+        self.assertEqual(err, "")
+
+    def test_arguments_not_a_dict_rejected(self):
+        path = _write_json(
+            [{"id": "1", "input": "a", "output": "b", "arguments": "nope"}]
+        )
+        try:
+            ok, err, _ = validate_general_eval_dataset(path)
+        finally:
+            os.unlink(path)
+        self.assertFalse(ok)
+        self.assertEqual(err, "Row 0 field 'arguments' must be an object")
+
 
 class TestResolveEvaluators(unittest.TestCase):
     def test_missing_evaluators_raises(self):
@@ -206,6 +241,43 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(cfg["evaluators"][0]["name"], "faithful")
         finally:
             os.unlink(dataset_path)
+
+    async def test_arguments_list_passed_to_judge(self):
+        rows = [
+            {"id": "row_a", "input": "doc A", "output": "sum A",
+             "arguments": {"name": "Ann"}},
+            {"id": "row_b", "input": "doc B", "output": "sum B"},
+        ]
+        dataset_path = _write_json(rows)
+
+        fake_score = {
+            "scores": {"faithful": {"type": "binary", "mean": 1.0}},
+            "score": 1.0,
+            "per_row": [
+                {"faithful": {"reasoning": "ok", "match": True}},
+                {"faithful": {"reasoning": "ok", "match": True}},
+            ],
+        }
+        judge_mock = AsyncMock(return_value=fake_score)
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                with patch(
+                    "calibrate.general.eval.get_general_judge_score", judge_mock
+                ):
+                    result = await run_general_eval(
+                        dataset_path=dataset_path,
+                        output_dir=out_dir,
+                        evaluators=[BINARY_EV],
+                    )
+                self.assertEqual(result["status"], "completed")
+        finally:
+            os.unlink(dataset_path)
+
+        judge_mock.assert_awaited_once()
+        self.assertEqual(
+            judge_mock.call_args.kwargs["arguments_list"],
+            [{"name": "Ann"}, None],
+        )
 
 
 class TestMain(unittest.IsolatedAsyncioTestCase):

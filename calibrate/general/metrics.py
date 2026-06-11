@@ -15,6 +15,7 @@ from calibrate.judges import (
     general_task_judge,
     is_rating,
     evaluator_result_value,
+    render_evaluator,
     require_unique_evaluator_names,
     DEFAULT_TEXT_JUDGE_MODEL,
 )
@@ -90,11 +91,21 @@ async def get_general_judge_score(
     outputs: List[str],
     evaluators: List[dict],
     fallback_model: str = DEFAULT_GENERAL_JUDGE_MODEL,
+    arguments_list: Optional[List[Optional[dict]]] = None,
 ) -> dict:
     """Run the general judge across all rows and aggregate per-evaluator scores.
 
     ``inputs`` and ``outputs`` are positionally paired; ``inputs[i]`` may be
     ``None`` to judge ``outputs[i]`` on its own.
+
+    ``arguments_list`` optionally supplies per-row template variables. When
+    provided it must have the same length as ``inputs``/``outputs``. For each
+    row whose ``arguments_list[i]`` is truthy, every evaluator's
+    ``system_prompt`` is rendered against those arguments (via
+    :func:`calibrate.judges.render_evaluator`) before being passed to the judge;
+    rows with ``None``/empty arguments use the evaluators unchanged. Rendering
+    only changes ``system_prompt`` — ``name``/``type``/``scale_*`` are untouched,
+    so aggregation remains keyed off the base ``evaluators`` list.
 
     Returns:
         {
@@ -122,15 +133,27 @@ async def get_general_judge_score(
             f"(got {len(inputs)} inputs, {len(outputs)} outputs)."
         )
 
-    coroutines = [
-        general_judge(
-            None if input_text is None else str(input_text),
-            str(output),
-            evaluators=evaluators,
-            fallback_model=fallback_model,
+    if arguments_list is not None and len(arguments_list) != len(inputs):
+        raise ValueError(
+            f"arguments_list must be the same length as inputs "
+            f"(got {len(arguments_list)} arguments, {len(inputs)} inputs)."
         )
-        for input_text, output in zip(inputs, outputs)
-    ]
+
+    coroutines = []
+    for i, (input_text, output) in enumerate(zip(inputs, outputs)):
+        row_arguments = arguments_list[i] if arguments_list is not None else None
+        if row_arguments:
+            row_evaluators = [render_evaluator(ev, row_arguments) for ev in evaluators]
+        else:
+            row_evaluators = evaluators
+        coroutines.append(
+            general_judge(
+                None if input_text is None else str(input_text),
+                str(output),
+                evaluators=row_evaluators,
+                fallback_model=fallback_model,
+            )
+        )
 
     results = await tqdm_asyncio.gather(
         *coroutines,
