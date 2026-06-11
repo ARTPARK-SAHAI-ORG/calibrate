@@ -120,7 +120,7 @@ DEFAULT_GENERAL_TASK_EVALUATOR = {
     "system_prompt": (
         "You are a highly accurate evaluator assessing the output produced for "
         "a task.\n\n"
-        "You will be given the task input (when one is provided) and the output "
+        "You will be given the task input and the output "
         "produced for it. Judge the output on its own merits — do not assume the "
         "input is a conversation or that the output is a reply to a user.\n\n"
         "Mark `match` true only if the output satisfies the following criteria, "
