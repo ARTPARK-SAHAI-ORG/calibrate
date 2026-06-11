@@ -1,12 +1,12 @@
 import asyncio
 import argparse
 import re
-import statistics
 import sys
 import time
 import uuid
 from collections import defaultdict
 from typing import Any, Awaitable, Callable, List, Optional, TYPE_CHECKING
+import numpy as np
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -1509,6 +1509,7 @@ def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
         aggregated[name] = {
             "type": "rating",
             "mean": float(sum(scores) / len(scores)) if scores else 0.0,
+            "median": float(np.median(scores)) if scores else 0.0,
             "min": min(scores) if scores else 0,
             "max": max(scores) if scores else 0,
             "count": len(scores),
@@ -1735,7 +1736,7 @@ def _aggregate_latency(results: List[dict]) -> Optional[dict]:
         return None
     return {
         "mean": round(sum(values) / len(values)),
-        "median": round(statistics.median(values)),
+        "median": round(float(np.median(values))),
         "min": min(values),
         "max": max(values),
         "count": len(values),

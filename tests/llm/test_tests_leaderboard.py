@@ -147,7 +147,7 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
                     },
                     "fluency": {
                         "type": "rating",
-                        "mean": 4.2, "min": 3, "max": 5, "count": 3,
+                        "mean": 4.2, "median": 4.0, "min": 3, "max": 5, "count": 3,
                         "scale_min": 1, "scale_max": 5,
                     },
                 },
@@ -161,7 +161,7 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
                     },
                     "fluency": {
                         "type": "rating",
-                        "mean": 3.0, "min": 2, "max": 4, "count": 3,
+                        "mean": 3.0, "median": 3.0, "min": 2, "max": 4, "count": 3,
                         "scale_min": 1, "scale_max": 5,
                     },
                 },
@@ -178,9 +178,16 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertEqual(
                 df.loc[df["model"] == "model-b", "fluency"].iloc[0], 3.0
             )
-            # accuracy (binary) still shows pass_rate
+            # rating criterion also exposes a median sibling column
+            self.assertEqual(
+                df.loc[df["model"] == "model-a", "fluency_median"].iloc[0], 4.0
+            )
+            # accuracy (binary) still shows pass_rate; its median column is empty
             self.assertEqual(
                 df.loc[df["model"] == "model-a", "accuracy"].iloc[0], 100.0
+            )
+            self.assertTrue(
+                pd.isna(df.loc[df["model"] == "model-a", "accuracy_median"].iloc[0])
             )
 
     def test_latency_columns(self):

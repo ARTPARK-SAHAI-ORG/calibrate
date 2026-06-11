@@ -1061,6 +1061,7 @@ def _aggregate_and_write_simulation_results(results: list, output_dir: str) -> l
         entry = {
             "type": criterion_types.get(metric_name, "binary"),
             "mean": np.mean(metric_values),
+            "median": float(np.median(metric_values)),
             "std": np.std(metric_values),
             "values": metric_values,
         }

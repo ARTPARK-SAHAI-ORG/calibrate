@@ -655,6 +655,7 @@ class _Simulations:
             entry = {
                 "type": criterion_types.get(criterion_name, "binary"),
                 "mean": float(np.mean(values)),
+                "median": float(np.median(values)),
                 "std": float(np.std(values)),
                 "values": values,
             }

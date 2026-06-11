@@ -66,6 +66,30 @@ class TestSTTLeaderboard(unittest.TestCase):
             self.assertIn("semantic_match", summary.columns)
             self.assertEqual(set(summary["run"]), {"deepgram", "google"})
 
+    def test_median_surfaces_as_sibling_column(self):
+        """Evaluator/ttfb dicts carrying a ``median`` get a ``<key>_median`` column."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_provider(base, "deepgram", {
+                "wer": 0.1,
+                "wer_median": 0.08,
+                "semantic_match": {"type": "binary", "mean": 0.85, "median": 1.0},
+            })
+
+            save_dir = base / "leaderboard"
+            generate_stt_leaderboard(str(base), str(save_dir))
+
+            summary = pd.read_excel(
+                save_dir / "stt_leaderboard.xlsx", sheet_name="summary"
+            )
+            self.assertIn("semantic_match", summary.columns)
+            self.assertIn("semantic_match_median", summary.columns)
+            self.assertIn("wer_median", summary.columns)  # plain float passes through
+            row = summary[summary["run"] == "deepgram"].iloc[0]
+            self.assertEqual(row["semantic_match"], 0.85)
+            self.assertEqual(row["semantic_match_median"], 1.0)
+            self.assertEqual(row["wer_median"], 0.08)
+
     def test_custom_criterion_metrics_surface_dynamically(self):
         """A provider with custom criterion `semantic_match` should produce a
         column in the summary."""

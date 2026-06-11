@@ -110,6 +110,7 @@ async def get_tts_llm_judge_score(
             scores[name] = {
                 "type": "rating",
                 "mean": float(np.mean(per_row_values)),
+                "median": float(np.median(per_row_values)),
                 "scale_min": int(ev["scale_min"]),
                 "scale_max": int(ev["scale_max"]),
             }
@@ -117,6 +118,7 @@ async def get_tts_llm_judge_score(
             scores[name] = {
                 "type": "binary",
                 "mean": float(np.mean(per_row_values)),
+                "median": float(np.median(per_row_values)),
             }
 
     overall_score = float(np.mean([s["mean"] for s in scores.values()]))

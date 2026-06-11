@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
+
 
 def _write(base: Path, name: str, metrics):
     d = base / name
@@ -51,14 +53,27 @@ class TestSimulationLeaderboard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             _write(base, "m1", {
-                "task_complete": {"type": "binary", "mean": 0.75},
-                "helpfulness": {"type": "rating", "mean": 4.0, "scale_min": 1, "scale_max": 5},
+                "task_complete": {"type": "binary", "mean": 0.75, "median": 1.0},
+                "helpfulness": {
+                    "type": "rating", "mean": 4.0, "median": 4.0,
+                    "scale_min": 1, "scale_max": 5,
+                },
                 "no_scale": {"type": "rating", "mean": 0, "scale_min": 1, "scale_max": 1},
                 "legacy": 0.8,
             })
             generate_leaderboard(tmp, str(base / "lb"))
             csv = base / "lb" / "simulation_leaderboard.csv"
             self.assertTrue(csv.exists())
+            df = pd.read_csv(csv)
+            # binary median shown as % (1.0 -> 100.0); rating median kept raw.
+            self.assertIn("task_complete_median", df.columns)
+            self.assertIn("helpfulness_median", df.columns)
+            self.assertEqual(
+                df.loc[df["model"] == "m1", "task_complete_median"].iloc[0], 100.0
+            )
+            self.assertEqual(
+                df.loc[df["model"] == "m1", "helpfulness_median"].iloc[0], 4.0
+            )
 
     def test_main_cli(self):
         from calibrate.llm import simulation_leaderboard

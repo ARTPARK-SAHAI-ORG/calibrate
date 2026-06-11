@@ -98,7 +98,9 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(result["scores"]["naturalness"]["type"], "rating")
+        # scores (5,3,4) → mean 4.0, median 4.0
         self.assertAlmostEqual(result["scores"]["naturalness"]["mean"], 4.0)
+        self.assertAlmostEqual(result["scores"]["naturalness"]["median"], 4.0)
         self.assertEqual(result["scores"]["naturalness"]["scale_min"], 1)
         self.assertEqual(result["scores"]["naturalness"]["scale_max"], 5)
 

@@ -327,6 +327,7 @@ class TestAggregateCriteria(unittest.TestCase):
             {
                 "type": "rating",
                 "mean": 3.0,
+                "median": 3.0,
                 "min": 2,
                 "max": 4,
                 "count": 2,

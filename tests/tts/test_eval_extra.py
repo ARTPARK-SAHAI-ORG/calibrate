@@ -405,6 +405,12 @@ class TestRunSingleProviderEvalTTS(unittest.IsolatedAsyncioTestCase):
                     judge_evaluators=[rating_ev],
                 )
             self.assertEqual(result["status"], "completed")
+            # ttfb aggregate in metrics.json carries both mean and median.
+            with open(Path(result["output_dir"]) / "metrics.json") as f:
+                metrics = json.load(f)
+            self.assertIn("median", metrics["ttfb"])
+            self.assertEqual(metrics["ttfb"]["mean"], 0.5)
+            self.assertEqual(metrics["ttfb"]["median"], 0.5)
 
 
 class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):

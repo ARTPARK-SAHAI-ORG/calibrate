@@ -2029,6 +2029,7 @@ async def main():
         entry = {
             "type": criterion_types.get(criterion_name, "binary"),
             "mean": float(np.mean(values)),
+            "median": float(np.median(values)),
             "std": float(np.std(values)),
             "values": values,
         }
@@ -2042,6 +2043,7 @@ async def main():
     if stt_llm_judge_scores:
         metrics_summary["stt_llm_judge"] = {
             "mean": float(np.mean(stt_llm_judge_scores)),
+            "median": float(np.median(stt_llm_judge_scores)),
             "std": float(np.std(stt_llm_judge_scores)),
             "values": stt_llm_judge_scores,
         }

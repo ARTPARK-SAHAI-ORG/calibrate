@@ -43,7 +43,11 @@ def get_wer_score(references: List[str], predictions: List[str]) -> float:
         for p, r in zip(predictions, references)
     ]
 
-    return {"score": np.mean(per_row_wer), "per_row": per_row_wer}
+    return {
+        "score": np.mean(per_row_wer),
+        "median": float(np.median(per_row_wer)) if per_row_wer else 0.0,
+        "per_row": per_row_wer,
+    }
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
@@ -145,6 +149,7 @@ async def get_llm_judge_score(
             scores[name] = {
                 "type": "rating",
                 "mean": float(np.mean(per_row_values)),
+                "median": float(np.median(per_row_values)),
                 "scale_min": int(ev["scale_min"]),
                 "scale_max": int(ev["scale_max"]),
             }
@@ -152,6 +157,7 @@ async def get_llm_judge_score(
             scores[name] = {
                 "type": "binary",
                 "mean": float(np.mean(per_row_values)),  # pass-rate fraction 0.0–1.0
+                "median": float(np.median(per_row_values)),
             }
 
     # Backward compat: top-level "score" = mean across evaluator means.
