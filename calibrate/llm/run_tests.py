@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import re
+import statistics
 import sys
 import time
 import uuid
@@ -1720,7 +1721,9 @@ def _aggregate_latency(results: List[dict]) -> Optional[dict]:
     results, which skip inference, have none. Returns ``None`` when no result
     carries a latency so eval-only ``metrics.json`` stays free of an empty block.
 
-    Output shape: ``{"mean", "min", "max", "count"}`` with millisecond ints.
+    Output shape: ``{"mean", "median", "min", "max", "count"}`` with
+    millisecond ints. ``median`` is usually the more representative figure since
+    latency distributions are right-skewed by occasional slow calls.
     """
     values = [
         r["latency_ms"]
@@ -1732,6 +1735,7 @@ def _aggregate_latency(results: List[dict]) -> Optional[dict]:
         return None
     return {
         "mean": round(sum(values) / len(values)),
+        "median": round(statistics.median(values)),
         "min": min(values),
         "max": max(values),
         "count": len(values),
