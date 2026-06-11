@@ -83,12 +83,10 @@ def _read_metrics(
         if isinstance(metric_data, dict) and "mean" in metric_data:
             is_rating_metric = metric_data.get("type") == "rating"
             mean = float(metric_data["mean"])
-            has_median = "median" in metric_data
-            median = float(metric_data["median"]) if has_median else None
+            median = float(metric_data["median"])
             if is_rating_metric:
                 display[metric_name] = mean
-                if has_median:
-                    display[f"{metric_name}_median"] = median
+                display[f"{metric_name}_median"] = median
                 scale_min = float(metric_data.get("scale_min", 0))
                 scale_max = float(metric_data.get("scale_max", 1))
                 scale_range = scale_max - scale_min
@@ -105,8 +103,7 @@ def _read_metrics(
                 }
             else:
                 display[metric_name] = mean * 100
-                if has_median:
-                    display[f"{metric_name}_median"] = median * 100
+                display[f"{metric_name}_median"] = median * 100
                 normalized[metric_name] = mean * 100
                 info[metric_name] = {"type": "binary"}
         elif isinstance(metric_data, (int, float)):

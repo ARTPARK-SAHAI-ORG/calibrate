@@ -130,7 +130,7 @@ class TestTTSLeaderboardExtra(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "p1", metrics={"ttfb": {"mean": 1.0}})
+            _write_provider(base, "p1", metrics={"ttfb": {"mean": 1.0, "median": 1.0}})
             argv = ["leaderboard.py", "-o", tmp]
             with patch.object(sys, "argv", argv):
                 leaderboard.main()

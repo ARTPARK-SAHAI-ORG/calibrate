@@ -58,7 +58,10 @@ class TestSimulationLeaderboard(unittest.TestCase):
                     "type": "rating", "mean": 4.0, "median": 4.0,
                     "scale_min": 1, "scale_max": 5,
                 },
-                "no_scale": {"type": "rating", "mean": 0, "scale_min": 1, "scale_max": 1},
+                "no_scale": {
+                    "type": "rating", "mean": 0, "median": 0,
+                    "scale_min": 1, "scale_max": 1,
+                },
                 "legacy": 0.8,
             })
             generate_leaderboard(tmp, str(base / "lb"))
@@ -80,7 +83,7 @@ class TestSimulationLeaderboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write(base, "m1", {"x": {"type": "binary", "mean": 0.5}})
+            _write(base, "m1", {"x": {"type": "binary", "mean": 0.5, "median": 0.5}})
             argv = ["leaderboard.py", "-o", tmp, "-s", str(base / "lb")]
             with patch.object(sys, "argv", argv):
                 simulation_leaderboard.main()

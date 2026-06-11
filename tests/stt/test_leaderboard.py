@@ -44,13 +44,13 @@ class TestSTTLeaderboard(unittest.TestCase):
             base = Path(tmp)
             _write_provider(base, "deepgram", {
                 "wer": 0.1,
-                "semantic_match": {"type": "binary", "mean": 0.85},
+                "semantic_match": {"type": "binary", "mean": 0.85, "median": 1.0},
             }, results_rows=[
                 {"id": 1, "gt": "hello", "pred": "hello", "semantic_match": True},
             ])
             _write_provider(base, "google", {
                 "wer": 0.2,
-                "semantic_match": {"type": "binary", "mean": 0.75},
+                "semantic_match": {"type": "binary", "mean": 0.75, "median": 1.0},
             }, results_rows=[
                 {"id": 1, "gt": "hello", "pred": "hallo", "semantic_match": False},
             ])
@@ -97,8 +97,8 @@ class TestSTTLeaderboard(unittest.TestCase):
             base = Path(tmp)
             _write_provider(base, "provider-a", {
                 "wer": 0.05,
-                "semantic_match": {"type": "binary", "mean": 0.9},
-                "completeness": {"type": "binary", "mean": 0.7},
+                "semantic_match": {"type": "binary", "mean": 0.9, "median": 1.0},
+                "completeness": {"type": "binary", "mean": 0.7, "median": 1.0},
             })
 
             save_dir = base / "leaderboard"
@@ -116,7 +116,7 @@ class TestSTTLeaderboard(unittest.TestCase):
             base = Path(tmp)
             _write_provider(base, "provider-x", {
                 "wer": 0.1,
-                "semantic_match": {"type": "binary", "mean": 1.0},
+                "semantic_match": {"type": "binary", "mean": 1.0, "median": 1.0},
             }, results_rows=[
                 {"id": 1, "gt": "hi", "pred": "hi", "semantic_match": True},
             ])

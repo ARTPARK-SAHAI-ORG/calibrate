@@ -76,14 +76,13 @@ def _read_leaderboard_metrics(metrics_path: Path) -> dict:
     metrics = {}
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
-            # Evaluator entries and ttfb are dicts carrying a ``mean`` (and a
-            # ``median``) — extract those scalars for the table, the median into
+            # Evaluator entries and ttfb are dicts carrying a ``mean`` and a
+            # ``median`` — extract those scalars for the table, the median into
             # a sibling ``<key>_median`` column. Plain numbers (e.g. ``wer``)
             # are kept as-is.
             if isinstance(value, dict) and "mean" in value:
                 metrics[key] = value["mean"]
-                if "median" in value:
-                    metrics[f"{key}_median"] = value["median"]
+                metrics[f"{key}_median"] = value["median"]
             elif isinstance(value, (int, float)):
                 metrics[key] = float(value)
         return metrics
