@@ -665,6 +665,15 @@ class TestSummarizeMetricDistribution(unittest.TestCase):
         self.assertEqual((entry["scale_min"], entry["scale_max"]), (1, 5))
         self.assertEqual(entry["evaluator_id"], "ev_123")
 
+    def test_binary_omits_median(self):
+        from calibrate.utils import summarize_metric_distribution
+
+        # Binary metrics report a pass-rate mean but no median.
+        entry = summarize_metric_distribution([0, 1, 1], metric_type="binary")
+        self.assertEqual(entry["type"], "binary")
+        self.assertIn("mean", entry)
+        self.assertNotIn("median", entry)
+
     def test_is_json_serializable(self):
         from calibrate.utils import summarize_metric_distribution
 
@@ -692,11 +701,16 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
             p = self._write(Path(tmp) / "m.json", {
                 "wer": 0.1,
                 "wer_median": 0.08,
-                "semantic_match": {"type": "binary", "mean": 0.85, "median": 1.0},
+                # binary → mean only, no median sibling column
+                "semantic_match": {"type": "binary", "mean": 0.85},
+                # entries with a median (rating, ttfb) → sibling column
+                "ttfb": {"mean": 0.4, "median": 0.35},
             })
             out = read_leaderboard_metrics(p)
             self.assertEqual(out["semantic_match"], 0.85)
-            self.assertEqual(out["semantic_match_median"], 1.0)
+            self.assertNotIn("semantic_match_median", out)
+            self.assertEqual(out["ttfb"], 0.4)
+            self.assertEqual(out["ttfb_median"], 0.35)
             self.assertEqual(out["wer"], 0.1)
             self.assertEqual(out["wer_median"], 0.08)
 

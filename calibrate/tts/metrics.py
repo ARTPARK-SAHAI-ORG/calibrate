@@ -115,10 +115,11 @@ async def get_tts_llm_judge_score(
                 "scale_max": int(ev["scale_max"]),
             }
         else:
+            # Binary: mean is a pass-rate fraction; a median of 0/1 flags is
+            # uninformative, so none is reported.
             scores[name] = {
                 "type": "binary",
                 "mean": float(np.mean(per_row_values)),
-                "median": float(np.median(per_row_values)),
             }
 
     overall_score = float(np.mean([s["mean"] for s in scores.values()]))

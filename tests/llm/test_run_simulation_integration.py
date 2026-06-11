@@ -409,8 +409,9 @@ class TestSimulationMain:
         assert metrics["helpfulness"]["mean"] == pytest.approx(1.0), (
             f"Expected helpfulness.mean == 1.0, got {metrics['helpfulness']['mean']}"
         )
-        assert metrics["helpfulness"]["median"] == pytest.approx(1.0), (
-            f"Expected helpfulness.median == 1.0, got {metrics['helpfulness']['median']}"
+        # helpfulness is a binary criterion → no median is reported for it.
+        assert "median" not in metrics["helpfulness"], (
+            f"Binary criterion should carry no median, got {metrics['helpfulness']}"
         )
 
     def test_exits_0_on_success(self, agent_server, tmp_path):

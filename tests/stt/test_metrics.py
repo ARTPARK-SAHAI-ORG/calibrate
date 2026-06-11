@@ -34,6 +34,8 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(list(result["scores"].keys()), ["semantic_match"])
         self.assertEqual(result["scores"]["semantic_match"]["type"], "binary")
         self.assertEqual(result["scores"]["semantic_match"]["mean"], 0.5)
+        # Binary evaluators report no median.
+        self.assertNotIn("median", result["scores"]["semantic_match"])
         self.assertEqual(result["score"], 0.5)
         self.assertEqual(len(result["per_row"]), 2)
         # Tally per_row matches: exactly one True and one False

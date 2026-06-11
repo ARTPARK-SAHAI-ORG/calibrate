@@ -154,10 +154,11 @@ async def get_llm_judge_score(
                 "scale_max": int(ev["scale_max"]),
             }
         else:
+            # Binary: mean is a pass-rate fraction 0.0–1.0; a median of 0/1
+            # flags is uninformative, so none is reported.
             scores[name] = {
                 "type": "binary",
-                "mean": float(np.mean(per_row_values)),  # pass-rate fraction 0.0–1.0
-                "median": float(np.median(per_row_values)),
+                "mean": float(np.mean(per_row_values)),
             }
 
     # Backward compat: top-level "score" = mean across evaluator means.

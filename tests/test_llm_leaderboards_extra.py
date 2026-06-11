@@ -53,7 +53,7 @@ class TestSimulationLeaderboard(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             _write(base, "m1", {
-                "task_complete": {"type": "binary", "mean": 0.75, "median": 1.0},
+                "task_complete": {"type": "binary", "mean": 0.75},
                 "helpfulness": {
                     "type": "rating", "mean": 4.0, "median": 4.0,
                     "scale_min": 1, "scale_max": 5,
@@ -68,12 +68,10 @@ class TestSimulationLeaderboard(unittest.TestCase):
             csv = base / "lb" / "simulation_leaderboard.csv"
             self.assertTrue(csv.exists())
             df = pd.read_csv(csv)
-            # binary median shown as % (1.0 -> 100.0); rating median kept raw.
-            self.assertIn("task_complete_median", df.columns)
+            # Rating metrics get a raw-scale median column; binary metrics
+            # (a pass rate) get no median column at all.
             self.assertIn("helpfulness_median", df.columns)
-            self.assertEqual(
-                df.loc[df["model"] == "m1", "task_complete_median"].iloc[0], 100.0
-            )
+            self.assertNotIn("task_complete_median", df.columns)
             self.assertEqual(
                 df.loc[df["model"] == "m1", "helpfulness_median"].iloc[0], 4.0
             )
@@ -83,7 +81,7 @@ class TestSimulationLeaderboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write(base, "m1", {"x": {"type": "binary", "mean": 0.5, "median": 0.5}})
+            _write(base, "m1", {"x": {"type": "binary", "mean": 0.5}})
             argv = ["leaderboard.py", "-o", tmp, "-s", str(base / "lb")]
             with patch.object(sys, "argv", argv):
                 simulation_leaderboard.main()

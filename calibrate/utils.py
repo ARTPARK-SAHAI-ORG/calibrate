@@ -2077,18 +2077,23 @@ def summarize_metric_distribution(
 ) -> dict:
     """Build a ``metrics.json`` summary entry for a list of per-item ``values``.
 
-    Returns ``{["type"], "mean", "median", "std", "values"[, "scale_min",
+    Returns ``{["type"], "mean", ["median"], "std", "values"[, "scale_min",
     "scale_max"][, "evaluator_id"]}`` with JSON-friendly float aggregates.
     Shared by the LLM and agent simulation aggregators so the entry shape stays
     identical across all of them. Optional fields are omitted when their
     argument is ``None``: ``metric_type`` (the ``stt_llm_judge`` rollup has no
     type), ``scale`` (only rating criteria), and ``evaluator_id``.
+
+    A ``median`` is included for every metric except ``binary`` ones, whose
+    values are pass/fail flags — their mean is a pass rate and a median of 0/1
+    flags carries no useful information.
     """
     entry: dict = {}
     if metric_type is not None:
         entry["type"] = metric_type
     entry["mean"] = float(np.mean(values))
-    entry["median"] = float(np.median(values))
+    if metric_type != "binary":
+        entry["median"] = float(np.median(values))
     entry["std"] = float(np.std(values))
     entry["values"] = values
     if scale is not None:
@@ -2102,10 +2107,11 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
     """Read a provider/run ``metrics.json`` into a flat ``{column: scalar}`` dict.
 
     Shared by the STT and TTS leaderboards. Current format: evaluator and
-    ``ttfb`` entries are dicts carrying a ``mean`` and a ``median`` — the mean
-    becomes the ``<key>`` column and the median a sibling ``<key>_median``
-    column; plain numbers (e.g. ``wer``) are kept as-is. The legacy
-    ``metric_name``/list format is still supported for older runs.
+    ``ttfb`` entries are dicts carrying a ``mean`` (and, for everything except
+    binary evaluators, a ``median``) — the mean becomes the ``<key>`` column
+    and the median, when present, a sibling ``<key>_median`` column; plain
+    numbers (e.g. ``wer``) are kept as-is. The legacy ``metric_name``/list
+    format is still supported for older runs.
     """
     if not metrics_path.exists():
         print(f"[WARN] metrics.json missing for {metrics_path.parent.name}")
@@ -2119,7 +2125,8 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
         for key, value in data.items():
             if isinstance(value, dict) and "mean" in value:
                 metrics[key] = value["mean"]
-                metrics[f"{key}_median"] = value["median"]
+                if "median" in value:
+                    metrics[f"{key}_median"] = value["median"]
             elif isinstance(value, (int, float)):
                 metrics[key] = float(value)
         return metrics
