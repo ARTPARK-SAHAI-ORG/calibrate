@@ -408,6 +408,27 @@ def render_evaluator(evaluator: dict, arguments: Optional[dict] = None) -> dict:
     return rendered
 
 
+def ensure_known_evaluator_names(referenced, known, context: str = "") -> None:
+    """Raise ``ValueError`` if any name in ``referenced`` is not in ``known``.
+
+    Shared guard for the places that attach per-evaluator ``arguments`` by name
+    (``llm`` test-case criteria, ``general`` row arguments) so an unknown /
+    misspelled evaluator name fails loudly instead of being silently ignored.
+
+    Args:
+        referenced: Iterable of evaluator names referenced by the caller.
+        known: Container of valid evaluator names (e.g. a set or name→evaluator dict).
+        context: Optional prefix for the error (e.g. ``"Row 3 arguments"``).
+    """
+    unknown = sorted({name for name in referenced if name not in known})
+    if unknown:
+        prefix = f"{context}: " if context else ""
+        raise ValueError(
+            f"{prefix}unknown evaluator(s) {unknown} referenced. Define them "
+            f"under config.evaluators (known: {sorted(known)})."
+        )
+
+
 def _model_for(evaluator: dict, fallback: str) -> str:
     """Return the model id for ``evaluator``, falling back when none is set."""
     return evaluator.get("judge_model") or fallback

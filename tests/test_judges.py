@@ -28,6 +28,7 @@ from calibrate.judges import (
     evaluator_result_value,
     render_template,
     render_evaluator,
+    ensure_known_evaluator_names,
     format_conversation,
     _result_model_for_evaluator,
     _sanitize_evaluator_for_tool_model,
@@ -134,6 +135,22 @@ class TestRenderEvaluator(unittest.TestCase):
         }
         render_evaluator(ev, {"criteria": "x"})
         self.assertEqual(ev["system_prompt"], "Evaluate: {{criteria}}")
+
+
+class TestEnsureKnownEvaluatorNames(unittest.TestCase):
+    def test_all_known_is_noop(self):
+        # Accepts both a set and a name->evaluator dict as `known`.
+        ensure_known_evaluator_names(["a", "b"], {"a", "b", "c"})
+        ensure_known_evaluator_names(["a"], {"a": {}, "b": {}})
+
+    def test_unknown_raises_with_names_and_context(self):
+        with self.assertRaises(ValueError) as ctx:
+            ensure_known_evaluator_names(
+                ["a", "typo"], {"a", "b"}, context="Row 3 arguments"
+            )
+        msg = str(ctx.exception)
+        self.assertIn("typo", msg)
+        self.assertIn("Row 3 arguments", msg)
 
 
 class TestToolCallParamEvaluator(unittest.TestCase):

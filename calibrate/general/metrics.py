@@ -15,6 +15,7 @@ from calibrate.judges import (
     general_task_judge,
     is_rating,
     evaluator_result_value,
+    ensure_known_evaluator_names,
     render_evaluator,
     require_unique_evaluator_names,
     DEFAULT_TEXT_JUDGE_MODEL,
@@ -150,13 +151,9 @@ async def get_general_judge_score(
     for i, (input_text, output) in enumerate(zip(inputs, outputs)):
         row_arguments = arguments_list[i] if arguments_list is not None else None
         if row_arguments:
-            unknown = [name for name in row_arguments if name not in evaluator_names]
-            if unknown:
-                raise ValueError(
-                    f"Row {i} arguments reference unknown evaluator(s) "
-                    f"{sorted(unknown)}. Define them under config.evaluators "
-                    f"(known: {sorted(evaluator_names)})."
-                )
+            ensure_known_evaluator_names(
+                row_arguments, evaluator_names, context=f"Row {i} arguments"
+            )
             row_evaluators = [
                 render_evaluator(ev, row_arguments.get(ev["name"]))
                 for ev in evaluators

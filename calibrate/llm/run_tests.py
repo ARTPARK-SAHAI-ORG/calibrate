@@ -53,6 +53,7 @@ from calibrate.llm._metrics_utils import _numeric_or_none
 from calibrate.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
     attach_evaluator_id,
+    ensure_known_evaluator_names,
     is_rating,
     render_evaluator,
     require_unique_evaluator_names,
@@ -155,17 +156,13 @@ def _resolve_evaluators_for_test_case(
 ) -> list[dict]:
     """Resolve a test case's ``evaluation.criteria`` to rendered evaluator dicts."""
     refs = _normalize_criteria_refs(evaluation.get("criteria"))
-    rendered: list[dict] = []
-    for ref in refs:
-        name = ref["name"]
-        if name not in name_to_evaluator:
-            raise ValueError(
-                f"Unknown evaluator '{name}' referenced in test case. Define "
-                f"it under config.evaluators (or use "
-                f"'{DEFAULT_LLM_TEST_EVALUATOR['name']}')."
-            )
-        rendered.append(render_evaluator(name_to_evaluator[name], ref.get("arguments")))
-    return rendered
+    ensure_known_evaluator_names(
+        [ref["name"] for ref in refs], name_to_evaluator, context="test case criteria"
+    )
+    return [
+        render_evaluator(name_to_evaluator[ref["name"]], ref.get("arguments"))
+        for ref in refs
+    ]
 
 
 class Processor(FrameProcessor):
