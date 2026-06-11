@@ -1,0 +1,22 @@
+[
+    {
+        "id": 1,
+        "input": "Summarize in one sentence: The town council voted 7 to 2 on Tuesday to approve a new bicycle lane along Main Street, with construction set to begin in March.",
+        "output": "The town council approved a new Main Street bicycle lane in a 7-2 vote, with construction starting in March."
+    },
+    {
+        "id": 2,
+        "input": "Extract all email addresses from this text: Contact Asha at asha@example.com or the support desk at help@store.io for returns.",
+        "output": "asha@example.com, help@store.io"
+    },
+    {
+        "id": 3,
+        "input": "Classify the sentiment of this review as positive, negative, or neutral: 'The product arrived late and the box was damaged, but the item itself works fine.'",
+        "output": "positive"
+    },
+    {
+        "id": 4,
+        "input": "Rewrite this sentence to be more concise: 'Due to the fact that the meeting was cancelled, we will be rescheduling it for a later date in the near future.'",
+        "output": "The meeting was cancelled and will be rescheduled soon."
+    }
+]

@@ -1,0 +1,19 @@
+{
+  "evaluators": [
+    {
+      "id": "faithful-id",
+      "name": "faithful",
+      "system_prompt": "You are a highly accurate evaluator assessing the output produced for a task.\n\nYou will be given the task input and the output produced for it. Judge the output on its own merits — do not assume the input is a conversation or that the output is a reply to a user.\n\nMark `match` true only if the output is faithful to the input: it must not add facts that are absent from the input, contradict the input, or omit information the task clearly required. Otherwise mark it false.",
+      "judge_model": "openai/gpt-5.4-mini"
+    },
+    {
+      "id": "quality-id",
+      "name": "quality",
+      "system_prompt": "You are a highly accurate evaluator that rates the overall quality of an output produced for a task.\n\nYou will be given the task input and the output produced for it. Rate the overall quality on a 1-5 scale: 1 (unusable — wrong, irrelevant, or unreadable), 3 (acceptable — mostly correct but with notable gaps or rough edges), 5 (excellent — accurate, complete, and clearly written).",
+      "judge_model": "openai/gpt-5.4-mini",
+      "type": "rating",
+      "scale_min": 1,
+      "scale_max": 5
+    }
+  ]
+}
