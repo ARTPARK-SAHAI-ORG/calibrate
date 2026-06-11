@@ -227,6 +227,18 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen["faithful"], "judge against gold-A")
         self.assertEqual(seen["quality"], "rate against {{reference}}")
 
+    async def test_unknown_evaluator_in_arguments_raises(self):
+        # A typo'd / stale evaluator name in a row's args must fail loudly,
+        # not silently skip injection (mirrors llm's unknown-criteria error).
+        with self.assertRaises(ValueError) as ctx:
+            await get_general_judge_score(
+                inputs=["i1"],
+                outputs=["o1"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[{"faithfull": {"reference": "gold-A"}}],
+            )
+        self.assertIn("faithfull", str(ctx.exception))
+
     async def test_length_mismatch_raises(self):
         with self.assertRaises(ValueError):
             await get_general_judge_score(

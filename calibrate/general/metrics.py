@@ -106,9 +106,11 @@ async def get_general_judge_score(
     ``ev``'s ``system_prompt`` is rendered against ``arguments_list[i][ev["name"]]``
     (via :func:`calibrate.judges.render_evaluator`) before being passed to the
     judge; evaluators with no entry — and rows with ``None``/empty arguments —
-    are left unchanged. Rendering only changes ``system_prompt`` —
-    ``name``/``type``/``scale_*`` are untouched, so aggregation remains keyed off
-    the base ``evaluators`` list.
+    are left unchanged. An ``arguments`` key that names no known evaluator
+    raises ``ValueError`` (mirroring ``llm``, which rejects unknown ``criteria``
+    references rather than silently ignoring them). Rendering only changes
+    ``system_prompt`` — ``name``/``type``/``scale_*`` are untouched, so
+    aggregation remains keyed off the base ``evaluators`` list.
 
     Returns:
         {
@@ -142,10 +144,19 @@ async def get_general_judge_score(
             f"(got {len(arguments_list)} arguments, {len(inputs)} inputs)."
         )
 
+    evaluator_names = {ev["name"] for ev in evaluators}
+
     coroutines = []
     for i, (input_text, output) in enumerate(zip(inputs, outputs)):
         row_arguments = arguments_list[i] if arguments_list is not None else None
         if row_arguments:
+            unknown = [name for name in row_arguments if name not in evaluator_names]
+            if unknown:
+                raise ValueError(
+                    f"Row {i} arguments reference unknown evaluator(s) "
+                    f"{sorted(unknown)}. Define them under config.evaluators "
+                    f"(known: {sorted(evaluator_names)})."
+                )
             row_evaluators = [
                 render_evaluator(ev, row_arguments.get(ev["name"]))
                 for ev in evaluators
