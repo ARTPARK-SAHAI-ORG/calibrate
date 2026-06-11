@@ -1559,6 +1559,7 @@ async def _run_simulation_inner(
             {
                 "name": f"{component}/ttft",
                 "value": float(np.mean(values)),
+                "median": float(np.median(values)),
                 "reasoning": "",
             }
         )
@@ -1575,6 +1576,7 @@ async def _run_simulation_inner(
             {
                 "name": f"{component}/processing_time",
                 "value": float(np.mean(values)),
+                "median": float(np.median(values)),
                 "reasoning": "",
             }
         )
