@@ -228,5 +228,24 @@
         { "tool": "send_sms", "arguments": { "to": "+15551234567", "message": "Your appointment is confirmed!" } }
       ]
     }
+  },
+  {
+    "_scenario": "13. ANY WILDCARD — arg value \"any\" is ignored; another arg pinned exact (pass). The wildcard arg differs from any literal, proving it's skipped.",
+    "test_case": {
+      "id": "any-wildcard",
+      "history": [{ "role": "user", "content": "Book John Doe for whatever the earliest slot is — the reason is a fever." }],
+      "evaluation": {
+        "type": "tool_call",
+        "tool_calls": [
+          { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "any", "reason": "fever" } }
+        ]
+      }
+    },
+    "output": {
+      "response": "",
+      "tool_calls": [
+        { "tool": "book_appointment", "arguments": { "patient_name": "John Doe", "date": "2026-06-12", "reason": "fever" } }
+      ]
+    }
   }
 ]

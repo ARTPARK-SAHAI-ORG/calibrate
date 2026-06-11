@@ -698,10 +698,32 @@ def _tool_call_pair_mismatch(
     out_args = output_tool_call.get("arguments")
     if out_args == exp_args:
         return None
+    # When the only differences are wildcard ("any") parameters the diff is
+    # empty and the arguments match under our rules — mirror the async eval path
+    # so the leaderboard's per-slot pass calculation agrees with it.
+    if (
+        isinstance(exp_args, dict)
+        and isinstance(out_args, dict)
+        and not _tool_call_arguments_diff_lines(exp_args, out_args)
+    ):
+        return None
     return _tool_call_arguments_mismatch_message(exp_args, out_args)
 
 
 # ── Per-parameter criteria specs (exact match vs. LLM judge) ─────────────────
+
+
+def _is_any_sentinel(value) -> bool:
+    """True when an expected argument value is the ``"any"`` wildcard.
+
+    A parameter whose expected value is the literal string ``"any"`` is ignored
+    entirely: it need not appear in the produced tool call, and whatever value it
+    carries is accepted. This lets a test pin down the arguments that matter while
+    leaving free-form or non-deterministic ones unconstrained. To match the
+    literal string ``"any"`` verbatim instead, wrap it in an exact spec
+    (``{"match_type": "exact", "value": "any"}``).
+    """
+    return value == "any"
 
 
 def _param_criteria_spec(value, key: str) -> Optional[dict]:
@@ -845,6 +867,13 @@ def _collect_arg_diffs(
                 lines,
                 records,
             )
+            continue
+
+        # An ``"any"`` expected value is a wildcard: skip the parameter entirely
+        # so neither its presence nor its value is checked. Honored in both exact
+        # and criteria-aware walks so the live evaluation and the leaderboard's
+        # per-slot pass calculation agree.
+        if _is_any_sentinel(expected[key]):
             continue
 
         spec = _param_criteria_spec(expected[key], path) if criteria_aware else None

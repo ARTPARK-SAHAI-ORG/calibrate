@@ -6,7 +6,7 @@ Test fixtures that exercise per-parameter tool-call matching.
 
 - **`config.json`** — clinic-assistant system prompt + tools, plus a few
   `tool_call` test cases for a live run against a real model.
-- **`eval_only_dataset.json`** — 12 `(test_case, output)` pairs that pin the
+- **`eval_only_dataset.json`** — 13 `(test_case, output)` pairs that pin the
   agent's output, so you see the exact pass/fail + reasoning each scenario
   produces. The `_scenario` field on each item just labels what it demonstrates.
 
@@ -56,3 +56,4 @@ python -m calibrate.llm.run_tests \
 | `nested-object`        | exact + judged sub-fields (dotted paths) | pass                               |
 | `wrong-tool`           | agent called a different tool            | fail                               |
 | `multi-call`           | two tool calls, each judged              | pass (tool-prefixed lines)         |
+| `any-wildcard`         | arg value `"any"` ignored, other pinned  | pass (wildcard arg differs)        |

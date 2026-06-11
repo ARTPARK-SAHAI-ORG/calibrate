@@ -634,6 +634,144 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
         self.assertIn("reads as friendly", result["reasoning"])
 
 
+class TestAnyWildcardParam(unittest.TestCase):
+    """The ``"any"`` expected value is a wildcard — the parameter is ignored."""
+
+    def test_is_any_sentinel(self):
+        from calibrate.llm.run_tests import _is_any_sentinel
+
+        self.assertTrue(_is_any_sentinel("any"))
+        self.assertFalse(_is_any_sentinel("Any"))
+        self.assertFalse(_is_any_sentinel("anything"))
+        self.assertFalse(_is_any_sentinel(""))
+        self.assertFalse(_is_any_sentinel(None))
+        self.assertFalse(_is_any_sentinel({"match_type": "exact", "value": "any"}))
+
+    def test_wildcard_absent_from_output_passes(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "lookup", "arguments": {"city": "London"}}],
+                [{"tool": "lookup", "arguments": {"city": "London", "token": "any"}}],
+            ))
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["tool_call_results"], [{"tool": "lookup", "passed": True}])
+        mock_judge.assert_not_called()
+
+    def test_wildcard_present_with_arbitrary_value_passes(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "lookup",
+                  "arguments": {"city": "London", "token": "xyz-123"}}],
+                [{"tool": "lookup", "arguments": {"city": "London", "token": "any"}}],
+            ))
+        self.assertTrue(result["passed"])
+        self.assertEqual(result["tool_call_results"], [{"tool": "lookup", "passed": True}])
+        mock_judge.assert_not_called()
+
+    def test_wildcard_does_not_mask_sibling_failure(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "lookup",
+                  "arguments": {"city": "Paris", "token": "whatever"}}],
+                [{"tool": "lookup", "arguments": {"city": "London", "token": "any"}}],
+            ))
+        self.assertFalse(result["passed"])
+        self.assertIn("city", result["reasoning"])
+        # The wildcard sibling must not appear in the failure reasoning.
+        self.assertNotIn("token", result["reasoning"])
+        mock_judge.assert_not_called()
+
+    def test_nested_wildcard_passes(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "book",
+                  "arguments": {"patient": {"name": "John Doe", "session": "s-999"}}}],
+                [{"tool": "book",
+                  "arguments": {"patient": {"name": "John Doe", "session": "any"}}}],
+            ))
+        self.assertTrue(result["passed"])
+        # Also passes when the wildcard sub-key is absent entirely.
+        with patch("calibrate.llm.run_tests.text_judge"):
+            result_absent = asyncio.run(evaluate_tool_calls(
+                [{"tool": "book", "arguments": {"patient": {"name": "John Doe"}}}],
+                [{"tool": "book",
+                  "arguments": {"patient": {"name": "John Doe", "session": "any"}}}],
+            ))
+        self.assertTrue(result_absent["passed"])
+        mock_judge.assert_not_called()
+
+    def test_exact_spec_escape_hatch_matches_literal_any(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            passing = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"x": "any"}}],
+                [{"tool": "a",
+                  "arguments": {"x": {"match_type": "exact", "value": "any"}}}],
+            ))
+            failing = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"x": "other"}}],
+                [{"tool": "a",
+                  "arguments": {"x": {"match_type": "exact", "value": "any"}}}],
+            ))
+        self.assertTrue(passing["passed"])
+        self.assertFalse(failing["passed"])
+        self.assertIn("x", failing["reasoning"])
+        mock_judge.assert_not_called()
+
+    def test_wildcard_contributes_no_param_record(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        # Pair a wildcard param with an llm_judge param so the slot carries a
+        # param_judgments breakdown; the wildcard must be absent from it.
+        async def fake_text_judge(evaluators, user_prompt, *a, **k):
+            return {evaluators[0]["name"]: {"match": True, "reasoning": "ok"}}
+
+        with patch("calibrate.llm.run_tests.text_judge", side_effect=fake_text_judge):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a",
+                  "arguments": {"note": "looks good", "token": "anything-goes"}}],
+                [{"tool": "a", "arguments": {
+                    "note": {"match_type": "llm_judge", "criteria": "positive"},
+                    "token": "any"}}],
+            ))
+        self.assertTrue(result["passed"])
+        judgments = result["tool_call_results"][0]["param_judgments"]
+        params = [r["param"] for r in judgments]
+        self.assertNotIn("token", params)
+        self.assertEqual(params, ["note"])
+
+    def test_sync_pair_mismatch_wildcard_absent_matches(self):
+        from calibrate.llm.run_tests import _tool_call_pair_mismatch
+
+        # Parity contract: when the only difference is an absent wildcard param,
+        # the sync matcher (used by _per_slot_tool_passes / the leaderboard)
+        # agrees with the async path and reports a match.
+        self.assertIsNone(_tool_call_pair_mismatch(
+            {"tool": "lookup", "arguments": {"city": "London"}},
+            {"tool": "lookup", "arguments": {"city": "London", "token": "any"}},
+        ))
+
+    def test_sync_pair_mismatch_wildcard_present_matches(self):
+        from calibrate.llm.run_tests import _tool_call_pair_mismatch
+
+        # Parity contract: when the ONLY difference is a wildcard param carrying
+        # an arbitrary value, the sync matcher agrees with the async
+        # evaluate_tool_calls and reports a match.
+        self.assertIsNone(_tool_call_pair_mismatch(
+            {"tool": "lookup", "arguments": {"city": "London", "token": "xyz-123"}},
+            {"tool": "lookup", "arguments": {"city": "London", "token": "any"}},
+        ))
+
+
 class TestArgumentLevelTicksAndCrosses(unittest.TestCase):
     @staticmethod
     def _judge_returning(match, reasoning="because"):
