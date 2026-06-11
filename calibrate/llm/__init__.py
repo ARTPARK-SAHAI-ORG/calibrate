@@ -208,13 +208,24 @@ class _Tests:
         with open(os.path.join(final_output_dir, "results.json"), "w") as f:
             json.dump(results, f, indent=4)
 
-        from calibrate.llm.run_tests import _aggregate_criteria, _aggregate_tool_calls
+        from calibrate.llm.run_tests import (
+            _aggregate_criteria,
+            _aggregate_tool_calls,
+            _aggregate_cost,
+            _aggregate_latency,
+        )
         metrics = {
             "total": total_tests,
             "passed": total_passed,
             "criteria": _aggregate_criteria(results, name_to_evaluator),
             "tool_calls": _aggregate_tool_calls(results),
         }
+        cost = _aggregate_cost(results)
+        if cost is not None:
+            metrics["cost"] = cost
+        latency = _aggregate_latency(results)
+        if latency is not None:
+            metrics["latency_ms"] = latency
         with open(os.path.join(final_output_dir, "metrics.json"), "w") as f:
             json.dump(metrics, f, indent=4)
 

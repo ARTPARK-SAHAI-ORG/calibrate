@@ -92,6 +92,44 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(result["status"], "completed")
 
+    async def test_run_with_agent_aggregates_cost_and_latency(self):
+        from calibrate.llm import tests
+
+        fake_test_result = {
+            "output": {
+                "response": "Hi",
+                "tool_calls": [],
+                "metrics": {"cost": 0.002768, "latency_ms": 1245.8},
+                "cost": 0.002768,
+            },
+            "metrics": {"passed": True, "judge_results": {}},
+            "latency_ms": 1245.8,
+        }
+        fake_agent = MagicMock()
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate.llm.run_tests.run_test_external", AsyncMock(return_value=fake_test_result)):
+            result = await tests.run(
+                test_cases=[{
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "response", "criteria": "respond"},
+                }],
+                output_dir=tmp,
+                agent=fake_agent,
+            )
+            with open(os.path.join(result["output_dir"], "metrics.json")) as f:
+                written = json.load(f)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertIn("cost", result["metrics"])
+        self.assertEqual(result["metrics"]["cost"]["count"], 1)
+        self.assertAlmostEqual(result["metrics"]["cost"]["mean"], 0.002768)
+        self.assertIn("latency_ms", result["metrics"])
+        self.assertEqual(result["metrics"]["latency_ms"]["count"], 1)
+        self.assertEqual(result["metrics"]["latency_ms"]["mean"], 1246)
+        self.assertIn("cost", written)
+        self.assertIn("latency_ms", written)
+
     async def test_run_agent_benchmark(self):
         from calibrate.llm import tests
 
