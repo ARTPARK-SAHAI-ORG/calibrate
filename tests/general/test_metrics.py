@@ -8,7 +8,7 @@ Covers the general (non-conversational) task scoring path:
 """
 
 import unittest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 from calibrate.general.metrics import (
     general_judge,
@@ -64,6 +64,19 @@ class TestGeneralJudge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs["output"], "the summary")
         self.assertEqual(kwargs["input_text"], "the source")
         self.assertEqual(kwargs["evaluators"], [BINARY_EV])
+
+    async def test_updates_langfuse_trace_when_enabled(self):
+        judge = AsyncMock(return_value={"faithful": {"reasoning": "ok", "match": True}})
+        lf = MagicMock()
+        with patch("calibrate.general.metrics.general_task_judge", judge), patch(
+            "calibrate.general.metrics.langfuse_enabled", True
+        ), patch("calibrate.general.metrics.langfuse", lf):
+            await general_judge(
+                input_text="src", output="out", evaluators=[BINARY_EV]
+            )
+        lf.update_current_trace.assert_called_once()
+        call = lf.update_current_trace.call_args.kwargs
+        self.assertEqual(call["input"], {"input": "src", "output": "out"})
 
 
 class TestGetGeneralJudgeScore(unittest.IsolatedAsyncioTestCase):

@@ -7,6 +7,7 @@ metrics.json + results.csv.
 
 import json
 import os
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch, AsyncMock
@@ -17,6 +18,7 @@ from calibrate.general.eval import (
     validate_general_eval_dataset,
     _resolve_evaluators,
     run_general_eval,
+    main as eval_main,
 )
 
 
@@ -124,6 +126,35 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(result["status"], "error")
 
+    async def test_removes_stale_log_file(self):
+        rows = [{"id": "1", "input": "a", "output": "b"}]
+        dataset_path = _write_json(rows)
+        fake_score = {
+            "scores": {"faithful": {"type": "binary", "mean": 1.0}},
+            "score": 1.0,
+            "per_row": [{"faithful": {"reasoning": "ok", "match": True}}],
+        }
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                # Pre-existing logs file should be removed at the start of the run.
+                stale = os.path.join(out_dir, "logs")
+                with open(stale, "w") as f:
+                    f.write("old log\n")
+                with patch(
+                    "calibrate.general.eval.get_general_judge_score",
+                    AsyncMock(return_value=fake_score),
+                ):
+                    result = await run_general_eval(
+                        dataset_path=dataset_path,
+                        output_dir=out_dir,
+                        evaluators=[BINARY_EV],
+                    )
+                self.assertEqual(result["status"], "completed")
+                # The stale content is gone (file recreated fresh by the logger).
+                self.assertNotIn("old log", open(stale).read())
+        finally:
+            os.unlink(dataset_path)
+
     async def test_end_to_end_writes_outputs(self):
         rows = [
             {"id": "row_a", "input": "doc A", "output": "sum A"},
@@ -175,6 +206,149 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(cfg["evaluators"][0]["name"], "faithful")
         finally:
             os.unlink(dataset_path)
+
+
+class TestMain(unittest.IsolatedAsyncioTestCase):
+    """Cover the CLI entry point branches of calibrate.general.eval.main()."""
+
+    def _argv(self, dataset, config, out):
+        return ["calibrate", "--dataset", dataset, "-c", config, "-o", out]
+
+    async def test_config_not_found_exits(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            ds = _write_json([{"id": "1", "input": "a", "output": "b"}])
+            try:
+                with patch.object(
+                    sys, "argv", self._argv(ds, "/no/such/config.json", out_dir)
+                ):
+                    with self.assertRaises(SystemExit) as cm:
+                        await eval_main()
+            finally:
+                os.unlink(ds)
+        self.assertEqual(cm.exception.code, 1)
+
+    async def test_config_bad_json_exits(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            ds = _write_json([{"id": "1", "input": "a", "output": "b"}])
+            bad = tempfile.NamedTemporaryFile(
+                mode="w", delete=False, suffix=".json"
+            )
+            bad.write("{not valid json")
+            bad.close()
+            try:
+                with patch.object(sys, "argv", self._argv(ds, bad.name, out_dir)):
+                    with self.assertRaises(SystemExit) as cm:
+                        await eval_main()
+            finally:
+                os.unlink(ds)
+                os.unlink(bad.name)
+        self.assertEqual(cm.exception.code, 1)
+
+    async def test_config_without_evaluators_exits(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            ds = _write_json([{"id": "1", "input": "a", "output": "b"}])
+            cfg = _write_json({"evaluators": []})
+            try:
+                with patch.object(sys, "argv", self._argv(ds, cfg, out_dir)):
+                    with self.assertRaises(SystemExit) as cm:
+                        await eval_main()
+            finally:
+                os.unlink(ds)
+                os.unlink(cfg)
+        self.assertEqual(cm.exception.code, 1)
+
+    async def test_error_status_exits(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            ds = _write_json([{"id": "1", "input": "a", "output": "b"}])
+            cfg = _write_json({"evaluators": [BINARY_EV]})
+            try:
+                with patch.object(sys, "argv", self._argv(ds, cfg, out_dir)), patch(
+                    "calibrate.general.eval.run_general_eval",
+                    AsyncMock(return_value={"status": "error", "error": "boom"}),
+                ):
+                    with self.assertRaises(SystemExit) as cm:
+                        await eval_main()
+            finally:
+                os.unlink(ds)
+                os.unlink(cfg)
+        self.assertEqual(cm.exception.code, 1)
+
+    async def test_success_prints_summary(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            ds = _write_json([{"id": "1", "input": "a", "output": "b"}])
+            cfg = _write_json({"evaluators": [BINARY_EV]})
+            completed = {
+                "status": "completed",
+                "metrics": {"faithful": {"type": "binary", "mean": 1.0}},
+                "output_dir": out_dir,
+            }
+            run_mock = AsyncMock(return_value=completed)
+            try:
+                with patch.object(sys, "argv", self._argv(ds, cfg, out_dir)), patch(
+                    "calibrate.general.eval.run_general_eval", run_mock
+                ):
+                    # Should not raise SystemExit on success
+                    await eval_main()
+            finally:
+                os.unlink(ds)
+                os.unlink(cfg)
+            # run_general_eval received the resolved evaluators from config
+            self.assertEqual(
+                run_mock.call_args.kwargs["evaluators"][0]["name"], "faithful"
+            )
+
+    async def test_success_with_no_scores_prints_placeholder(self):
+        with tempfile.TemporaryDirectory() as out_dir:
+            ds = _write_json([{"id": "1", "input": "a", "output": "b"}])
+            cfg = _write_json({"evaluators": [BINARY_EV]})
+            # metrics with no type-bearing dicts → the "(no scores)" branch
+            completed = {"status": "completed", "metrics": {}, "output_dir": out_dir}
+            try:
+                with patch.object(sys, "argv", self._argv(ds, cfg, out_dir)), patch(
+                    "calibrate.general.eval.run_general_eval",
+                    AsyncMock(return_value=completed),
+                ):
+                    await eval_main()  # should not raise
+            finally:
+                os.unlink(ds)
+                os.unlink(cfg)
+
+
+class TestCliDispatch(unittest.TestCase):
+    """Cover the `general` branch wired into calibrate.cli.main().
+
+    Plain (sync) TestCase because ``cli.main()`` calls ``asyncio.run()`` itself,
+    which cannot nest inside a running event loop.
+    """
+
+    def test_dispatch_invokes_eval_main(self):
+        from calibrate import cli
+
+        eval_main_mock = AsyncMock(return_value=None)
+        argv = ["calibrate", "general", "--dataset", "d.json", "-c", "c.json"]
+        with patch.object(sys, "argv", argv), patch(
+            "calibrate.general.eval.main", eval_main_mock
+        ):
+            cli.main()
+        eval_main_mock.assert_awaited_once()
+
+    def test_dispatch_missing_dataset_exits(self):
+        from calibrate import cli
+
+        argv = ["calibrate", "general", "-c", "c.json"]
+        with patch.object(sys, "argv", argv):
+            with self.assertRaises(SystemExit) as cm:
+                cli.main()
+        self.assertEqual(cm.exception.code, 1)
+
+    def test_dispatch_missing_config_exits(self):
+        from calibrate import cli
+
+        argv = ["calibrate", "general", "--dataset", "d.json"]
+        with patch.object(sys, "argv", argv):
+            with self.assertRaises(SystemExit) as cm:
+                cli.main()
+        self.assertEqual(cm.exception.code, 1)
 
 
 if __name__ == "__main__":
