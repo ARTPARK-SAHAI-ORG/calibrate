@@ -198,7 +198,7 @@ A plain literal value (e.g. `"555-123-4567"`) is matched exactly, as usual. To o
 | `"llm_judge"` | `{"match_type": "llm_judge", "criteria": "..."}` | An LLM judge checks the produced value against `criteria`     |
 | `"any"`       | `{"match_type": "any"}`                          | Wildcard — the argument is ignored entirely (see below)       |
 
-To leave an argument completely unconstrained, give it an `"any"` spec. This is a wildcard: the parameter is ignored entirely — it need not appear in the produced tool call, and whatever value it has is accepted. Use it to pin down only the arguments that matter and leave free-form or non-deterministic ones unchecked. (A plain `"any"` string is not special — it is matched exactly like any other literal.)
+To leave an argument completely unconstrained, give it an `"any"` spec. This is a wildcard: the parameter is ignored entirely — it need not appear in the produced tool call, and whatever value it has is accepted. Use it to pin down only the arguments that matter and leave free-form or non-deterministic ones unchecked.
 
 ```jsonc
 {
