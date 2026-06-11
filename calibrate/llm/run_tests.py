@@ -704,7 +704,7 @@ def _tool_call_pair_mismatch(
     return _tool_call_arguments_mismatch_message(exp_args, out_args)
 
 
-# ── Per-parameter criteria specs (exact match vs. LLM judge) ─────────────────
+# ── Per-parameter criteria specs (exact match, LLM judge, or "any" wildcard) ─
 
 
 def _is_any_spec(value) -> bool:
@@ -727,7 +727,9 @@ def _param_criteria_spec(value, key: str) -> Optional[dict]:
 
         {"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}
         {"match_type": "exact", "value": <literal>}
-        {"match_type": "any"}
+
+    The ``{"match_type": "any"}`` wildcard is recognized and skipped by
+    :func:`_is_any_spec` before this point, so it never reaches here.
 
     Returns the normalized spec, or ``None`` when ``value`` is an ordinary
     literal (the default, exact-match behavior). Raises ``ValueError`` for a
@@ -736,11 +738,6 @@ def _param_criteria_spec(value, key: str) -> Optional[dict]:
     if not isinstance(value, dict) or "match_type" not in value:
         return None
     match_type = value["match_type"]
-    if match_type == "any":
-        # Wildcard — the parameter is ignored entirely. The caller skips it via
-        # ``_is_any_spec`` before spec interpretation; recognized here too so all
-        # valid match_types live in one place.
-        return {"match_type": "any"}
     if match_type == "llm_judge":
         criteria = value.get("criteria")
         if not isinstance(criteria, str) or not criteria.strip():
@@ -833,7 +830,10 @@ def _collect_arg_diffs(
 ) -> None:
     """Recursively diff expected vs. actual argument dicts.
 
-    The single walk behind both exact and criteria-aware matching:
+    The single walk behind both exact and criteria-aware matching. In either
+    mode a ``{"match_type": "any"}`` value is a wildcard: the parameter is
+    skipped entirely (no line, no record) regardless of whether it appears in
+    ``actual``.
 
     - ``criteria_aware=True`` (default): a value may be a criteria spec — an
       ``llm_judge`` field is queued in ``judge_jobs`` (judged after the walk; a
