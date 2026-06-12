@@ -334,6 +334,13 @@ class _Tests:
         """
         tools = tools or []
 
+        from calibrate.llm.run_tests import ensure_test_case_ids
+
+        # Validate id uniqueness and backfill content-hash ids once, up front,
+        # so duplicate ids fail fast (before fanning models out) and resume has
+        # a stable key for every case even when none were supplied.
+        ensure_test_case_ids(test_cases)
+
         # External agent benchmark: run once per model, passing model hint in each request
         if agent is not None and models and len(models) > 0:
             semaphore = asyncio.Semaphore(max_parallel)

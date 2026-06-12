@@ -181,6 +181,70 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         # overwrite=True ignores the prior results — both cases re-run.
         self.assertEqual(mock_external.await_count, 2)
 
+    async def test_run_raises_on_duplicate_ids_before_running(self):
+        from calibrate.llm import tests
+
+        fake_agent = MagicMock()
+        test_cases = [
+            {"id": "dup", "history": [{"role": "user", "content": "a"}],
+             "evaluation": {"type": "response", "criteria": "x"}},
+            {"id": "dup", "history": [{"role": "user", "content": "b"}],
+             "evaluation": {"type": "response", "criteria": "y"}},
+        ]
+        mock_external = AsyncMock(return_value={
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        })
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate.llm.run_tests.run_test_external", mock_external):
+            with self.assertRaises(ValueError):
+                await tests.run(
+                    test_cases=test_cases, output_dir=tmp, agent=fake_agent,
+                )
+        # Fail-fast: no test cases were dispatched.
+        self.assertEqual(mock_external.await_count, 0)
+
+    async def test_run_resumes_without_ids_via_content_hash(self):
+        from calibrate.llm import tests
+
+        # Fresh dict per call: a shared return_value object would be aliased
+        # across both records (last write wins on test_case_id) and mask resume.
+        async def fresh_result(*args, **kwargs):
+            return {
+                "output": {"response": "Hi", "tool_calls": []},
+                "metrics": {"passed": True, "judge_results": {}},
+            }
+        fake_agent = MagicMock()
+
+        # No explicit ids — resume must still work via derived content-hash ids.
+        # Build fresh (id-less) dicts each run so the second run re-derives ids
+        # from scratch rather than reusing ids the first run backfilled in place.
+        def make_cases():
+            return [
+                {"history": [{"role": "user", "content": "a"}],
+                 "evaluation": {"type": "response", "criteria": "x"}},
+                {"history": [{"role": "user", "content": "b"}],
+                 "evaluation": {"type": "response", "criteria": "y"}},
+            ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            mock_external = AsyncMock(side_effect=fresh_result)
+            with patch("calibrate.llm.run_tests.run_test_external", mock_external):
+                # First run writes results.json with derived ids embedded.
+                await tests.run(
+                    test_cases=make_cases(), output_dir=tmp, agent=fake_agent,
+                )
+                first_count = mock_external.await_count
+
+                # Re-run the exact same dataset: every case is resumed, nothing reruns.
+                mock_external.reset_mock()
+                await tests.run(
+                    test_cases=make_cases(), output_dir=tmp, agent=fake_agent,
+                )
+
+        self.assertEqual(first_count, 2)
+        self.assertEqual(mock_external.await_count, 0)
+
     async def test_run_with_agent_aggregates_cost_latency_and_tokens(self):
         from calibrate.llm import tests
 

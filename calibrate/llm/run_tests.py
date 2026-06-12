@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import hashlib
 import re
 import sys
 import time
@@ -1760,6 +1761,61 @@ def _aggregate_tool_calls(results: List[dict]) -> dict:
     return aggregated
 
 
+def _derive_test_case_id(test_case: dict) -> str:
+    """Derive a stable content-hash id from a test case's ``history`` +
+    ``evaluation``.
+
+    Used to give resume a stable key for test cases that don't carry an
+    explicit ``id``. Two cases with identical history+evaluation hash to the
+    same id (they are effectively the same test). The ``auto:`` prefix
+    namespaces derived ids away from user-supplied ones.
+    """
+    payload = json.dumps(
+        {
+            "history": test_case.get("history"),
+            "evaluation": test_case.get("evaluation"),
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+        default=str,
+    )
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+    return f"auto:{digest}"
+
+
+def ensure_test_case_ids(test_cases: List[dict]) -> List[dict]:
+    """Guarantee every test case has a stable, unique ``id`` (in place).
+
+    - Raises ``ValueError`` if two test cases carry the same explicit ``id``,
+      since duplicates would let resume wrongly skip work (they collide to one
+      prior record).
+    - Fills any test case missing an ``id`` with a content hash of its
+      ``history`` + ``evaluation`` (see :func:`_derive_test_case_id`) so resume
+      works out of the box without user-supplied ids.
+
+    Idempotent: re-running on already-prepared cases is a no-op. Returns the
+    same list for convenience.
+    """
+    seen: dict = {}
+    for i, tc in enumerate(test_cases):
+        if not isinstance(tc, dict):
+            continue
+        tid = tc.get("id")
+        if tid is None:
+            continue
+        if tid in seen:
+            raise ValueError(
+                f"Duplicate test case id {tid!r} (indices {seen[tid]} and {i}). "
+                "Test case ids must be unique so interrupted runs resume correctly."
+            )
+        seen[tid] = i
+
+    for tc in test_cases:
+        if isinstance(tc, dict) and tc.get("id") is None:
+            tc["id"] = _derive_test_case_id(tc)
+    return test_cases
+
+
 def _resumable_id(record: dict) -> Optional[str]:
     """Pull the test-case id out of a prior result record, if present.
 
@@ -1876,6 +1932,8 @@ async def run_model_tests(
 
     tools = config.get("tools") or []
     system_prompt = config.get("system_prompt", "")
+
+    ensure_test_case_ids(config["test_cases"])
 
     async def process(test_case_index: int, test_case: dict) -> dict:
         evaluation = test_case["evaluation"]

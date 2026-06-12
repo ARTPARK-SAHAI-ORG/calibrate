@@ -2809,6 +2809,62 @@ class TestLoadResumableResults(unittest.TestCase):
         self.assertEqual(out, [None])
 
 
+class TestEnsureTestCaseIds(unittest.TestCase):
+    def test_raises_on_duplicate_explicit_ids(self):
+        from calibrate.llm.run_tests import ensure_test_case_ids
+
+        cases = [
+            {"id": "a", "history": [], "evaluation": {}},
+            {"id": "a", "history": [{"role": "user"}], "evaluation": {}},
+        ]
+        with self.assertRaises(ValueError) as ctx:
+            ensure_test_case_ids(cases)
+        self.assertIn("Duplicate test case id 'a'", str(ctx.exception))
+
+    def test_backfills_missing_ids_with_content_hash(self):
+        from calibrate.llm.run_tests import ensure_test_case_ids
+
+        cases = [
+            {"history": [{"role": "user", "content": "hi"}],
+             "evaluation": {"type": "response", "criteria": "x"}},
+            {"history": [{"role": "user", "content": "bye"}],
+             "evaluation": {"type": "response", "criteria": "y"}},
+        ]
+        ensure_test_case_ids(cases)
+        for c in cases:
+            self.assertTrue(c["id"].startswith("auto:"))
+        self.assertNotEqual(cases[0]["id"], cases[1]["id"])
+
+    def test_derived_id_is_stable_for_same_content(self):
+        from calibrate.llm.run_tests import _derive_test_case_id
+
+        tc = {"history": [{"role": "user", "content": "hi"}],
+              "evaluation": {"type": "response", "criteria": "x"}}
+        # Order of dict keys / a fresh equivalent object must not change the id.
+        same = {"evaluation": {"criteria": "x", "type": "response"},
+                "history": [{"content": "hi", "role": "user"}]}
+        self.assertEqual(_derive_test_case_id(tc), _derive_test_case_id(same))
+
+    def test_explicit_ids_preserved(self):
+        from calibrate.llm.run_tests import ensure_test_case_ids
+
+        cases = [{"id": "keep", "history": [], "evaluation": {}},
+                 {"history": [{"role": "user"}], "evaluation": {}}]
+        ensure_test_case_ids(cases)
+        self.assertEqual(cases[0]["id"], "keep")
+        self.assertTrue(cases[1]["id"].startswith("auto:"))
+
+    def test_idempotent(self):
+        from calibrate.llm.run_tests import ensure_test_case_ids
+
+        cases = [{"history": [{"role": "user", "content": "hi"}],
+                  "evaluation": {"type": "response"}}]
+        ensure_test_case_ids(cases)
+        first = cases[0]["id"]
+        ensure_test_case_ids(cases)  # no raise, no change
+        self.assertEqual(cases[0]["id"], first)
+
+
 class TestRunItemsParallelResume(unittest.IsolatedAsyncioTestCase):
     async def test_initial_results_skip_processing(self):
         from calibrate.llm.run_tests import _run_items_parallel
