@@ -183,6 +183,40 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(result.keys()), {"m1"})
         self.assertEqual(result["m1"]["metrics"]["passed"], 0)
 
+    async def test_run_agent_benchmark_one_model_failure_isolated(self):
+        from calibrate.llm import tests
+
+        # One model's hard failure must not cancel the others: it's recorded as
+        # an error entry while the healthy model still completes.
+        fake_ok = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+
+        async def flaky_external(*args, **kwargs):
+            if kwargs.get("model") == "bad":
+                raise RuntimeError("agent timed out")
+            return fake_ok
+
+        fake_agent = MagicMock()
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate.llm.run_tests.run_test_external",
+                   AsyncMock(side_effect=flaky_external)):
+            result = await tests.run(
+                test_cases=[{
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "response", "criteria": "x"},
+                }],
+                output_dir=tmp,
+                agent=fake_agent,
+                models=["good", "bad"],
+            )
+        self.assertEqual(set(result.keys()), {"good", "bad"})
+        self.assertEqual(result["bad"]["status"], "error")
+        self.assertIn("agent timed out", result["bad"]["error"])
+        # The healthy model still produced real metrics.
+        self.assertEqual(result["good"]["metrics"]["passed"], 1)
+
     async def test_run_single(self):
         from calibrate.llm import tests
 

@@ -326,8 +326,20 @@ class _Tests:
                         test_parallel=test_parallel,
                     )
 
-            results = await asyncio.gather(*[run_agent_model(m) for m in models])
-            return {m: r for m, r in zip(models, results)}
+            # ``return_exceptions=True`` so one model's hard failure (e.g. the
+            # agent backend timing out or returning an error after retries) is
+            # recorded against that model instead of cancelling the others and
+            # aborting the whole benchmark.
+            results = await asyncio.gather(
+                *[run_agent_model(m) for m in models], return_exceptions=True
+            )
+            results_by_model: dict = {}
+            for m, r in zip(models, results):
+                if isinstance(r, Exception):
+                    results_by_model[m] = {"status": "error", "error": str(r)}
+                else:
+                    results_by_model[m] = r
+            return results_by_model
 
         # External agent: single run (no model selection) — pass empty model so
         # no model — save directly to output_dir (no subfolder)
