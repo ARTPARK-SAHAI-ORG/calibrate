@@ -282,6 +282,12 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
     }
 
 
+# Max seconds to wait for a transcript frame after flushing the Sarvam
+# websocket. The SDK does not forward its `timeout` to the websocket, so this
+# guards against clips that never produce a `data`/`error` frame.
+SARVAM_STT_RECV_TIMEOUT = 60.0
+
+
 async def transcribe_sarvam(audio_path: Path, language: str) -> str:
     """Transcribe audio using Sarvam's STT API."""
     api_key = os.getenv("SARVAM_API_KEY")
@@ -312,18 +318,27 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
         await ws.flush()
         _log("⚡ Processing forced - getting immediate results")
 
-        # Get results
-        async for message in ws:
-            if getattr(message, "type", None) == "error":
-                error = getattr(message.data, "error", "Unknown Sarvam STT error")
-                raise RuntimeError(error)
-            if getattr(message, "type", None) != "data":
-                continue
+        # Get results. The Sarvam SDK forwards no timeout to the underlying
+        # websocket, so a clip that yields no transcript (e.g. silence) leaves
+        # `recv()` blocked forever. Bound the wait explicitly.
+        try:
+            async with asyncio.timeout(SARVAM_STT_RECV_TIMEOUT):
+                async for message in ws:
+                    if getattr(message, "type", None) == "error":
+                        error = getattr(message.data, "error", "Unknown Sarvam STT error")
+                        raise RuntimeError(error)
+                    if getattr(message, "type", None) != "data":
+                        continue
 
-            transcript = getattr(message.data, "transcript", "")
-            metrics = getattr(message.data, "metrics", None)
-            ttft = getattr(metrics, "processing_latency", None)
-            break
+                    transcript = getattr(message.data, "transcript", "")
+                    metrics = getattr(message.data, "metrics", None)
+                    ttft = getattr(metrics, "processing_latency", None)
+                    break
+        except asyncio.TimeoutError:
+            _log(
+                f"[WARN] Sarvam returned no result for {audio_path.name} within "
+                f"{SARVAM_STT_RECV_TIMEOUT}s; treating as empty transcript"
+            )
 
     return {
         "transcript": transcript,
