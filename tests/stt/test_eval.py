@@ -10,7 +10,8 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
+from types import SimpleNamespace
+from unittest.mock import patch, AsyncMock, MagicMock
 
 import pandas as pd
 
@@ -367,6 +368,115 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(result["status"], "error")
         self.assertIn("does not exist", result["error"])
+
+
+class _FakeSarvamWS:
+    """Minimal stand-in for the Sarvam streaming websocket."""
+
+    def __init__(self, messages=None, hang=False):
+        self._iter = iter(messages or [])
+        self._hang = hang
+        self.transcribe = AsyncMock()
+        self.flush = AsyncMock()
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._hang:
+            import asyncio
+
+            await asyncio.sleep(3600)
+        try:
+            return next(self._iter)
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+class _FakeSarvamConnect:
+    def __init__(self, ws):
+        self._ws = ws
+
+    async def __aenter__(self):
+        return self._ws
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+def _patch_sarvam(stt_eval, ws):
+    fake_client = MagicMock()
+    fake_client.speech_to_text_streaming.connect = MagicMock(
+        return_value=_FakeSarvamConnect(ws)
+    )
+    return (
+        patch.dict("os.environ", {"SARVAM_API_KEY": "sk-fake"}),
+        patch.object(stt_eval, "AsyncSarvamAI", return_value=fake_client),
+        patch.object(stt_eval, "load_audio", return_value=b"\x00\x00"),
+        patch.object(stt_eval, "get_stt_language_code", return_value="hi-IN"),
+        patch.object(
+            stt_eval.SARVAM_STT_STREAMING_LIMITER, "acquire", AsyncMock()
+        ),
+    )
+
+
+class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
+    async def test_returns_transcript_on_data_message(self):
+        from calibrate.stt import eval as stt_eval
+
+        message = SimpleNamespace(
+            type="data",
+            data=SimpleNamespace(
+                transcript="नमस्ते",
+                metrics=SimpleNamespace(processing_latency=0.42),
+            ),
+        )
+        ws = _FakeSarvamWS(messages=[message])
+        patches = _patch_sarvam(stt_eval, ws)
+        for p in patches:
+            p.start()
+        try:
+            result = await stt_eval.transcribe_sarvam(Path("/tmp/x.wav"), "hindi")
+        finally:
+            for p in patches:
+                p.stop()
+
+        self.assertEqual(result["transcript"], "नमस्ते")
+        self.assertEqual(result["ttft"], 0.42)
+
+    async def test_timeout_yields_empty_transcript(self):
+        from calibrate.stt import eval as stt_eval
+
+        ws = _FakeSarvamWS(hang=True)
+        patches = _patch_sarvam(stt_eval, ws)
+        patches = (*patches, patch.object(stt_eval, "SARVAM_STT_RECV_TIMEOUT", 0.01))
+        for p in patches:
+            p.start()
+        try:
+            result = await stt_eval.transcribe_sarvam(Path("/tmp/x.wav"), "hindi")
+        finally:
+            for p in patches:
+                p.stop()
+
+        self.assertEqual(result["transcript"], "")
+        self.assertIsNone(result["ttft"])
+
+    async def test_error_message_raises(self):
+        from calibrate.stt import eval as stt_eval
+
+        message = SimpleNamespace(
+            type="error", data=SimpleNamespace(error="boom")
+        )
+        ws = _FakeSarvamWS(messages=[message])
+        patches = _patch_sarvam(stt_eval, ws)
+        for p in patches:
+            p.start()
+        try:
+            with self.assertRaises(RuntimeError):
+                await stt_eval.transcribe_sarvam(Path("/tmp/x.wav"), "hindi")
+        finally:
+            for p in patches:
+                p.stop()
 
 
 if __name__ == "__main__":

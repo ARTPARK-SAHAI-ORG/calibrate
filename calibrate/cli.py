@@ -320,6 +320,11 @@ Examples:
         help="Number of test cases to evaluate in debug mode (default: 5)",
     )
     llm_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Force a clean run instead of resuming completed test cases from a prior results.json",
+    )
+    llm_parser.add_argument(
         "--verify",
         action="store_true",
         help="Verify an external agent connection by sending a preset message and checking the response format",
@@ -645,24 +650,25 @@ Examples:
                 from calibrate.llm.tests_leaderboard import generate_leaderboard
                 from calibrate.llm._output import print_benchmark_summary
 
-                # Run — one model at a time so output is clearly separated
+                # Run — all models together (tests.run fans them out in parallel)
                 if _models:
-                    _model_results = {}
-                    for _m in _models:
-                        print(f"\n\033[92m{'='*60}\033[0m")
-                        print(f"\033[92m  Model: {_m}\033[0m")
-                        print(f"\033[92m{'='*60}\033[0m\n")
-                        _result = asyncio.run(
-                            _tests.run(
-                                agent=_agent,
-                                test_cases=_config["test_cases"],
-                                output_dir=args.output_dir,
-                                models=[_m],
-                                evaluators=_config.get("evaluators"),
-                                test_parallel=args.parallel,
-                            )
+                    print(f"\n\033[92m{'='*60}\033[0m")
+                    print(f"\033[92m  Models: {', '.join(_models)}\033[0m")
+                    print(f"\033[92m{'='*60}\033[0m\n")
+                    _results = asyncio.run(
+                        _tests.run(
+                            agent=_agent,
+                            test_cases=_config["test_cases"],
+                            output_dir=args.output_dir,
+                            models=_models,
+                            evaluators=_config.get("evaluators"),
+                            test_parallel=args.parallel,
+                            overwrite=args.overwrite,
                         )
-                        _model_results[_m] = _result.get(_m, _result)
+                    )
+                    _model_results = {
+                        _m: _results.get(_m, _results) for _m in _models
+                    }
 
                     _lb_dir = os.path.join(args.output_dir, "leaderboard")
                     generate_leaderboard(output_dir=args.output_dir, save_dir=_lb_dir)
@@ -681,6 +687,7 @@ Examples:
                             output_dir=args.output_dir,
                             evaluators=_config.get("evaluators"),
                             test_parallel=args.parallel,
+                            overwrite=args.overwrite,
                         )
                     )
             else:
@@ -694,6 +701,8 @@ Examples:
                 argv.extend(["-p", args.provider])
                 if getattr(args, "parallel", None) is not None:
                     argv.extend(["-n", str(args.parallel)])
+                if getattr(args, "overwrite", False):
+                    argv.append("--overwrite")
                 if getattr(args, "debug", False):
                     argv.append("-d")
                     argv.extend(["-dc", str(args.debug_count)])

@@ -309,6 +309,7 @@ async def _run_items_parallel(
     process: "Callable[[int, Any], Awaitable[dict]]",
     results_file_path: str,
     test_parallel: Optional[int] = None,
+    initial_results: Optional[List[Optional[dict]]] = None,
 ) -> List[dict]:
     """Run ``process(index, item)`` over ``items`` with bounded concurrency.
 
@@ -316,8 +317,15 @@ async def _run_items_parallel(
     are collected in input order regardless of completion order, and the
     partial (in-order) ``results.json`` is rewritten after each item completes.
     Returns the ordered list of results.
+
+    ``initial_results`` (same length as ``items``) pre-seeds already-computed
+    entries — used to resume a partial run. Indices that are non-``None`` are
+    kept as-is and never re-processed; only ``None`` slots invoke ``process``.
     """
-    results: List[Optional[dict]] = [None] * len(items)
+    if initial_results is not None:
+        results: List[Optional[dict]] = list(initial_results)
+    else:
+        results = [None] * len(items)
     semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
     write_lock = asyncio.Lock()
 
@@ -329,7 +337,13 @@ async def _run_items_parallel(
                 with open(results_file_path, "w") as f:
                     json.dump([r for r in results if r is not None], f, indent=4)
 
-    await asyncio.gather(*[run_one(i, item) for i, item in enumerate(items)])
+    await asyncio.gather(
+        *[
+            run_one(i, item)
+            for i, item in enumerate(items)
+            if results[i] is None
+        ]
+    )
     return results
 
 
@@ -1746,12 +1760,70 @@ def _aggregate_tool_calls(results: List[dict]) -> dict:
     return aggregated
 
 
+def _resumable_id(record: dict) -> Optional[str]:
+    """Pull the test-case id out of a prior result record, if present.
+
+    Prefers the top-level ``test_case_id`` written by :func:`run_model_tests`,
+    falling back to the embedded ``test_case["id"]``.
+    """
+    rid = record.get("test_case_id")
+    if rid is None:
+        tc = record.get("test_case")
+        if isinstance(tc, dict):
+            rid = tc.get("id")
+    return rid
+
+
+def _load_resumable_results(
+    results_file_path: str,
+    test_cases: List[dict],
+    overwrite: bool,
+) -> List[Optional[dict]]:
+    """Build a pre-seeded results list to resume a partial run.
+
+    Reads a previously written ``results.json`` and, for every current test
+    case whose ``id`` matches a completed prior result, reuses that result so
+    it is not re-evaluated. Returns a list aligned with ``test_cases`` (a prior
+    result dict for resumable slots, ``None`` for slots that must run).
+
+    Resume is skipped entirely (all ``None``) when ``overwrite`` is set, the
+    file is missing/unreadable, or test cases lack ids. A prior record is only
+    considered complete if it carries a ``metrics`` block.
+    """
+    if overwrite or not exists(results_file_path):
+        return [None] * len(test_cases)
+
+    try:
+        with open(results_file_path) as f:
+            prior = json.load(f)
+    except (json.JSONDecodeError, OSError, ValueError):
+        return [None] * len(test_cases)
+
+    if not isinstance(prior, list):
+        return [None] * len(test_cases)
+
+    by_id: dict = {}
+    for record in prior:
+        if not isinstance(record, dict) or "metrics" not in record:
+            continue
+        rid = _resumable_id(record)
+        if rid is not None:
+            by_id[rid] = record
+
+    initial: List[Optional[dict]] = []
+    for tc in test_cases:
+        tcid = tc.get("id") if isinstance(tc, dict) else None
+        initial.append(by_id.get(tcid) if tcid is not None else None)
+    return initial
+
+
 async def run_model_tests(
     model: str,
     provider: str,
     config: dict,
     output_dir: str,
     test_parallel: Optional[int] = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run tests for a single model and return results.
 
@@ -1761,6 +1833,9 @@ async def run_model_tests(
         config: Test configuration dict
         output_dir: Base output directory - results saved to output_dir/model_name/
         test_parallel: Max test cases to evaluate concurrently.
+        overwrite: When False (default), reuse completed results from a prior
+            ``results.json`` (matched by test-case ``id``) so an interrupted run
+            resumes instead of re-evaluating everything. Set True for a clean run.
     """
     # Build model folder name: for openai provider, prefix with provider name
     save_folder_name = f"{provider}/{model}" if provider == "openai" else f"{model}"
@@ -1851,8 +1926,23 @@ async def run_model_tests(
         result["test_case"] = test_case
         return result
 
+    initial_results = _load_resumable_results(
+        results_file_path, config["test_cases"], overwrite
+    )
+    resumed_count = sum(1 for r in initial_results if r is not None)
+    if resumed_count:
+        _print_and_log(
+            f"[{label}] ↻ Resuming: {resumed_count}/{len(config['test_cases'])} "
+            f"test case(s) already completed; re-running the rest",
+            print_log_save_path,
+        )
+
     results = await _run_items_parallel(
-        config["test_cases"], process, results_file_path, test_parallel
+        config["test_cases"],
+        process,
+        results_file_path,
+        test_parallel,
+        initial_results=initial_results,
     )
 
     total_passed = sum(1 for result in results if result["metrics"]["passed"])

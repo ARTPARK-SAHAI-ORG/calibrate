@@ -92,6 +92,94 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(result["status"], "completed")
 
+    async def test_run_with_agent_resumes_completed_test_cases(self):
+        from calibrate.llm import tests
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+        fake_agent = MagicMock()
+        test_cases = [
+            {
+                "id": "tc1",
+                "history": [{"role": "user", "content": "a"}],
+                "evaluation": {"type": "response", "criteria": "x"},
+            },
+            {
+                "id": "tc2",
+                "history": [{"role": "user", "content": "b"}],
+                "evaluation": {"type": "response", "criteria": "y"},
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # Pre-seed a prior run where tc1 already completed.
+            prior = [{
+                "test_case_id": "tc1",
+                "output": {"response": "done", "tool_calls": []},
+                "metrics": {"passed": True, "judge_results": {}},
+                "test_case": test_cases[0],
+            }]
+            with open(os.path.join(tmp, "results.json"), "w") as f:
+                json.dump(prior, f)
+
+            mock_external = AsyncMock(return_value=fake_test_result)
+            with patch(
+                "calibrate.llm.run_tests.run_test_external", mock_external
+            ):
+                result = await tests.run(
+                    test_cases=test_cases,
+                    output_dir=tmp,
+                    agent=fake_agent,
+                )
+
+        self.assertEqual(result["status"], "completed")
+        # Only tc2 should have been (re-)run; tc1 was resumed from disk.
+        self.assertEqual(mock_external.await_count, 1)
+        self.assertEqual(result["metrics"]["total"], 2)
+
+    async def test_run_with_agent_overwrite_reruns_everything(self):
+        from calibrate.llm import tests
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+        fake_agent = MagicMock()
+        test_cases = [
+            {
+                "id": "tc1",
+                "history": [{"role": "user", "content": "a"}],
+                "evaluation": {"type": "response", "criteria": "x"},
+            },
+            {
+                "id": "tc2",
+                "history": [{"role": "user", "content": "b"}],
+                "evaluation": {"type": "response", "criteria": "y"},
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "results.json"), "w") as f:
+                json.dump(
+                    [{"test_case_id": "tc1", "metrics": {"passed": True}}], f
+                )
+
+            mock_external = AsyncMock(return_value=fake_test_result)
+            with patch(
+                "calibrate.llm.run_tests.run_test_external", mock_external
+            ):
+                await tests.run(
+                    test_cases=test_cases,
+                    output_dir=tmp,
+                    agent=fake_agent,
+                    overwrite=True,
+                )
+
+        # overwrite=True ignores the prior results — both cases re-run.
+        self.assertEqual(mock_external.await_count, 2)
+
     async def test_run_with_agent_aggregates_cost_latency_and_tokens(self):
         from calibrate.llm import tests
 

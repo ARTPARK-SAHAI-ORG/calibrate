@@ -83,6 +83,7 @@ class _Tests:
         agent: Optional["TextAgentConnection"] = None,
         evaluators: Optional[List[dict]] = None,
         test_parallel: Optional[int] = None,
+        overwrite: bool = False,
     ) -> dict:
         """Run tests for a single model (or external agent)."""
         from calibrate.llm.run_tests import (
@@ -92,6 +93,7 @@ class _Tests:
             _evaluators_for_config_output,
             _resolve_evaluators_for_test_case,
             _run_items_parallel,
+            _load_resumable_results,
         )
         from calibrate.judges import write_evaluator_config
         from calibrate.utils import configure_print_logger, log_and_print
@@ -171,10 +173,11 @@ class _Tests:
                     evaluators=resolved_evaluators,
                 )
 
+            label_prefix = f"[{model}] " if (agent is not None and model) else ""
             if result["metrics"]["passed"]:
-                log_and_print(f"✅ Test case {test_case_index + 1} passed")
+                log_and_print(f"{label_prefix}✅ Test case {test_case_index + 1} passed")
             else:
-                log_and_print(f"❌ Test case {test_case_index + 1} failed")
+                log_and_print(f"{label_prefix}❌ Test case {test_case_index + 1} failed")
             if "reasoning" in result["metrics"]:
                 log_and_print(result["metrics"]["reasoning"])
 
@@ -184,8 +187,19 @@ class _Tests:
             log_and_print("-" * 40)
             return result
 
+        initial_results = _load_resumable_results(
+            results_file_path, test_cases, overwrite
+        )
+        resumed_count = sum(1 for r in initial_results if r is not None)
+        if resumed_count:
+            label_prefix = f"[{model}] " if (agent is not None and model) else ""
+            log_and_print(
+                f"{label_prefix}↻ Resuming: {resumed_count}/{len(test_cases)} "
+                f"test case(s) already completed; re-running the rest"
+            )
+
         results = await _run_items_parallel(
-            test_cases, process, results_file_path, test_parallel
+            test_cases, process, results_file_path, test_parallel, initial_results
         )
 
         total_passed = sum(1 for r in results if r["metrics"]["passed"])
@@ -255,6 +269,7 @@ class _Tests:
         agent: Optional["TextAgentConnection"] = None,
         evaluators: Optional[List[dict]] = None,
         test_parallel: Optional[int] = None,
+        overwrite: bool = False,
     ) -> dict:
         """
         Run LLM tests with the given configuration.
@@ -277,6 +292,10 @@ class _Tests:
             run_name: Optional name for this run (used in output folder name)
             max_parallel: Maximum number of models to run in parallel (default: 2)
             test_parallel: Max test cases to evaluate concurrently per model.
+            overwrite: When False (default), reuse completed results from a prior
+                ``results.json`` (matched by test-case ``id``) so an interrupted
+                run resumes instead of re-evaluating everything. True forces a
+                clean run.
             agent: Optional external agent connection. When provided, routes all
                 test cases to the external agent instead of an internal LLM.
             evaluators: Optional list of evaluator dicts (each with ``name``,
@@ -323,6 +342,7 @@ class _Tests:
                         agent=agent,
                         evaluators=evaluators,
                         test_parallel=test_parallel,
+                        overwrite=overwrite,
                     )
 
             results = await asyncio.gather(*[run_agent_model(m) for m in models])
@@ -342,6 +362,7 @@ class _Tests:
                 agent=agent,
                 evaluators=evaluators,
                 test_parallel=test_parallel,
+                overwrite=overwrite,
             )
 
         # If models list is provided, run in parallel
@@ -360,6 +381,7 @@ class _Tests:
                         run_name=run_name,
                         evaluators=evaluators,
                         test_parallel=test_parallel,
+                        overwrite=overwrite,
                     )
 
             tasks = [run_with_semaphore(m) for m in models]
@@ -393,6 +415,7 @@ class _Tests:
             run_name=run_name,
             evaluators=evaluators,
             test_parallel=test_parallel,
+            overwrite=overwrite,
         )
 
     @staticmethod
