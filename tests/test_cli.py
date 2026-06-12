@@ -260,7 +260,6 @@ class TestAgentBenchmark:
             f"'Overall Summary' not in stdout.\nstdout: {result.stdout}"
         )
 
-
 # ---------------------------------------------------------------------------
 # TestSkipVerify
 # ---------------------------------------------------------------------------

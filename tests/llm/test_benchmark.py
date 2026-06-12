@@ -316,8 +316,11 @@ class TestBenchmarkDebugFlag(unittest.IsolatedAsyncioTestCase):
 
         captured = {}
 
-        async def fake_run(*, config, models, provider, output_dir, test_parallel=None):
+        async def fake_run(
+            *, config, models, provider, output_dir, test_parallel=None, overwrite=False
+        ):
             captured["config"] = config
+            captured["overwrite"] = overwrite
             return {
                 "status": "completed",
                 "output_dir": output_dir,
@@ -336,7 +339,16 @@ class TestBenchmarkDebugFlag(unittest.IsolatedAsyncioTestCase):
                  patch("calibrate.llm.benchmark.run", side_effect=fake_run), \
                  patch("calibrate.llm.benchmark.print_benchmark_summary", return_value=False):
                 await benchmark.main()
+        self._captured = captured
         return captured["config"]
+
+    async def test_overwrite_flag_forwarded(self):
+        await self._run_main(["--overwrite"])
+        self.assertTrue(self._captured["overwrite"])
+
+    async def test_overwrite_defaults_false(self):
+        await self._run_main([])
+        self.assertFalse(self._captured["overwrite"])
 
     async def test_debug_truncates_test_cases(self):
         config = await self._run_main(["-d", "-dc", "3"])

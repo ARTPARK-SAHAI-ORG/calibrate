@@ -320,6 +320,11 @@ Examples:
         help="Number of test cases to evaluate in debug mode (default: 5)",
     )
     llm_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Force a clean run instead of resuming completed test cases from a prior results.json",
+    )
+    llm_parser.add_argument(
         "--verify",
         action="store_true",
         help="Verify an external agent connection by sending a preset message and checking the response format",
@@ -658,6 +663,7 @@ Examples:
                             models=_models,
                             evaluators=_config.get("evaluators"),
                             test_parallel=args.parallel,
+                            overwrite=args.overwrite,
                         )
                     )
                     _model_results = {
@@ -681,6 +687,7 @@ Examples:
                             output_dir=args.output_dir,
                             evaluators=_config.get("evaluators"),
                             test_parallel=args.parallel,
+                            overwrite=args.overwrite,
                         )
                     )
             else:
@@ -694,6 +701,8 @@ Examples:
                 argv.extend(["-p", args.provider])
                 if getattr(args, "parallel", None) is not None:
                     argv.extend(["-n", str(args.parallel)])
+                if getattr(args, "overwrite", False):
+                    argv.append("--overwrite")
                 if getattr(args, "debug", False):
                     argv.append("-d")
                     argv.extend(["-dc", str(args.debug_count)])

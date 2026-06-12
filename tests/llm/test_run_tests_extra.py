@@ -2736,5 +2736,123 @@ class TestRunTestsMainDebug(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(captured["config"]["test_cases"]), 3)
 
 
+class TestLoadResumableResults(unittest.TestCase):
+    def _write(self, tmp, records):
+        path = Path(tmp) / "results.json"
+        path.write_text(json.dumps(records))
+        return str(path)
+
+    def test_missing_file_returns_all_none(self):
+        from calibrate.llm.run_tests import _load_resumable_results
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            out = _load_resumable_results(path, [{"id": "a"}, {"id": "b"}], False)
+        self.assertEqual(out, [None, None])
+
+    def test_overwrite_ignores_existing(self):
+        from calibrate.llm.run_tests import _load_resumable_results
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(
+                tmp, [{"test_case_id": "a", "metrics": {"passed": True}}]
+            )
+            out = _load_resumable_results(path, [{"id": "a"}], overwrite=True)
+        self.assertEqual(out, [None])
+
+    def test_matches_by_test_case_id(self):
+        from calibrate.llm.run_tests import _load_resumable_results
+
+        done = {"test_case_id": "a", "metrics": {"passed": True}}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, [done])
+            out = _load_resumable_results(
+                path, [{"id": "a"}, {"id": "b"}], overwrite=False
+            )
+        self.assertEqual(out, [done, None])
+
+    def test_matches_by_embedded_test_case_id(self):
+        from calibrate.llm.run_tests import _load_resumable_results
+
+        done = {"metrics": {"passed": False}, "test_case": {"id": "b"}}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, [done])
+            out = _load_resumable_results(
+                path, [{"id": "a"}, {"id": "b"}], overwrite=False
+            )
+        self.assertEqual(out, [None, done])
+
+    def test_records_without_metrics_are_not_resumed(self):
+        from calibrate.llm.run_tests import _load_resumable_results
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, [{"test_case_id": "a"}])  # no metrics block
+            out = _load_resumable_results(path, [{"id": "a"}], overwrite=False)
+        self.assertEqual(out, [None])
+
+    def test_corrupt_json_falls_back_to_all_none(self):
+        from calibrate.llm.run_tests import _load_resumable_results
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "results.json"
+            path.write_text("{not json")
+            out = _load_resumable_results(str(path), [{"id": "a"}], overwrite=False)
+        self.assertEqual(out, [None])
+
+    def test_test_cases_without_ids_not_resumed(self):
+        from calibrate.llm.run_tests import _load_resumable_results
+
+        done = {"test_case_id": "a", "metrics": {"passed": True}}
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, [done])
+            out = _load_resumable_results(path, [{"history": []}], overwrite=False)
+        self.assertEqual(out, [None])
+
+
+class TestRunItemsParallelResume(unittest.IsolatedAsyncioTestCase):
+    async def test_initial_results_skip_processing(self):
+        from calibrate.llm.run_tests import _run_items_parallel
+
+        processed = []
+
+        async def process(index, item):
+            processed.append(index)
+            return {"idx": index, "item": item, "metrics": {"passed": True}}
+
+        items = ["a", "b", "c"]
+        prior = {"idx": 1, "item": "b", "metrics": {"passed": True}}
+        initial = [None, prior, None]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            results = await _run_items_parallel(
+                items, process, path, test_parallel=2, initial_results=initial
+            )
+            on_disk = json.loads(Path(path).read_text())
+
+        # Index 1 was pre-seeded, so process() never ran for it.
+        self.assertEqual(sorted(processed), [0, 2])
+        # Output preserves input order and reuses the prior result.
+        self.assertEqual(results[1], prior)
+        self.assertEqual([r["idx"] for r in results], [0, 1, 2])
+        self.assertEqual(len(on_disk), 3)
+
+    async def test_no_initial_results_runs_all(self):
+        from calibrate.llm.run_tests import _run_items_parallel
+
+        processed = []
+
+        async def process(index, item):
+            processed.append(index)
+            return {"idx": index, "metrics": {"passed": True}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            results = await _run_items_parallel(["a", "b"], process, path)
+
+        self.assertEqual(sorted(processed), [0, 1])
+        self.assertEqual(len(results), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -84,6 +84,7 @@ class _Tests:
         evaluators: Optional[List[dict]] = None,
         test_parallel: Optional[int] = None,
         label_output: bool = False,
+        overwrite: bool = False,
     ) -> dict:
         """Run tests for a single model (or external agent).
 
@@ -91,6 +92,8 @@ class _Tests:
             label_output: When True, prefix per-test-case log lines with
                 ``[model]``. Set for multi-model parallel runs (internal or
                 agent) so interleaved output stays attributable.
+            overwrite: When False, resume by skipping test cases already present
+                in a prior ``results.json``; when True, rerun everything.
         """
         from calibrate.llm.run_tests import (
             run_test as _run_test,
@@ -99,6 +102,7 @@ class _Tests:
             _evaluators_for_config_output,
             _resolve_evaluators_for_test_case,
             _run_items_parallel,
+            _load_resumable_results,
         )
         from calibrate.judges import write_evaluator_config
         from calibrate.utils import configure_print_logger, log_and_print
@@ -192,8 +196,19 @@ class _Tests:
             log_and_print("-" * 40)
             return result
 
+        initial_results = _load_resumable_results(
+            results_file_path, test_cases, overwrite
+        )
+        resumed_count = sum(1 for r in initial_results if r is not None)
+        if resumed_count:
+            label_prefix = f"[{model}] " if (label_output and model) else ""
+            log_and_print(
+                f"{label_prefix}↻ Resuming: {resumed_count}/{len(test_cases)} "
+                f"test case(s) already completed; re-running the rest"
+            )
+
         results = await _run_items_parallel(
-            test_cases, process, results_file_path, test_parallel
+            test_cases, process, results_file_path, test_parallel, initial_results
         )
 
         total_passed = sum(1 for r in results if r["metrics"]["passed"])
@@ -263,6 +278,7 @@ class _Tests:
         agent: Optional["TextAgentConnection"] = None,
         evaluators: Optional[List[dict]] = None,
         test_parallel: Optional[int] = None,
+        overwrite: bool = False,
     ) -> dict:
         """
         Run LLM tests with the given configuration.
@@ -285,6 +301,10 @@ class _Tests:
             run_name: Optional name for this run (used in output folder name)
             max_parallel: Maximum number of models to run in parallel (default: 2)
             test_parallel: Max test cases to evaluate concurrently per model.
+            overwrite: When False (default), reuse completed results from a prior
+                ``results.json`` (matched by test-case ``id``) so an interrupted
+                run resumes instead of re-evaluating everything. True forces a
+                clean run.
             agent: Optional external agent connection. When provided, routes all
                 test cases to the external agent instead of an internal LLM.
             evaluators: Optional list of evaluator dicts (each with ``name``,
@@ -332,6 +352,7 @@ class _Tests:
                         evaluators=evaluators,
                         test_parallel=test_parallel,
                         label_output=True,
+                        overwrite=overwrite,
                     )
 
             # ``return_exceptions=True`` so one model's hard failure (e.g. the
@@ -363,6 +384,7 @@ class _Tests:
                 agent=agent,
                 evaluators=evaluators,
                 test_parallel=test_parallel,
+                overwrite=overwrite,
             )
 
         # If models list is provided, run in parallel
@@ -382,6 +404,7 @@ class _Tests:
                         evaluators=evaluators,
                         test_parallel=test_parallel,
                         label_output=True,
+                        overwrite=overwrite,
                     )
 
             tasks = [run_with_semaphore(m) for m in models]
@@ -415,6 +438,7 @@ class _Tests:
             run_name=run_name,
             evaluators=evaluators,
             test_parallel=test_parallel,
+            overwrite=overwrite,
         )
 
     @staticmethod

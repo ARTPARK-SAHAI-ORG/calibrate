@@ -42,6 +42,7 @@ async def run(
     output_dir: str = "./out",
     max_parallel: int = MAX_PARALLEL_MODELS,
     test_parallel: int | None = None,
+    overwrite: bool = False,
 ) -> dict:
     """
     Run LLM tests for multiple models in parallel and generate a leaderboard.
@@ -56,6 +57,8 @@ async def run(
             Results saved to output_dir/model_name/ for each model
         max_parallel: Maximum number of models to run in parallel (default: 2)
         test_parallel: Max test cases to evaluate concurrently per model.
+        overwrite: When False (default), resume each model from its prior
+            ``results.json`` instead of re-evaluating completed test cases.
 
     Returns:
         dict: Results summary with status and output paths
@@ -84,6 +87,7 @@ async def run(
                 config=config,
                 output_dir=output_dir,
                 test_parallel=test_parallel,
+                overwrite=overwrite,
             )
             return (model, result)
 
@@ -152,6 +156,11 @@ async def main():
         help="Number of test cases to evaluate in parallel per model",
     )
     parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Force a clean run instead of resuming completed test cases from a prior results.json",
+    )
+    parser.add_argument(
         "-d",
         "--debug",
         action="store_true",
@@ -215,6 +224,7 @@ async def main():
             provider=args.provider,
             output_dir=args.output_dir,
             test_parallel=args.parallel,
+            overwrite=args.overwrite,
         )
 
         has_errors = print_benchmark_summary(
