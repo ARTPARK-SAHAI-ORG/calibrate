@@ -83,8 +83,15 @@ class _Tests:
         agent: Optional["TextAgentConnection"] = None,
         evaluators: Optional[List[dict]] = None,
         test_parallel: Optional[int] = None,
+        label_output: bool = False,
     ) -> dict:
-        """Run tests for a single model (or external agent)."""
+        """Run tests for a single model (or external agent).
+
+        Args:
+            label_output: When True, prefix per-test-case log lines with
+                ``[model]``. Set for multi-model parallel runs (internal or
+                agent) so interleaved output stays attributable.
+        """
         from calibrate.llm.run_tests import (
             run_test as _run_test,
             run_test_external as _run_test_external,
@@ -171,7 +178,7 @@ class _Tests:
                     evaluators=resolved_evaluators,
                 )
 
-            label_prefix = f"[{model}] " if (agent is not None and model) else ""
+            label_prefix = f"[{model}] " if (label_output and model) else ""
             if result["metrics"]["passed"]:
                 log_and_print(f"{label_prefix}✅ Test case {test_case_index + 1} passed")
             else:
@@ -324,6 +331,7 @@ class _Tests:
                         agent=agent,
                         evaluators=evaluators,
                         test_parallel=test_parallel,
+                        label_output=True,
                     )
 
             # ``return_exceptions=True`` so one model's hard failure (e.g. the
@@ -373,6 +381,7 @@ class _Tests:
                         run_name=run_name,
                         evaluators=evaluators,
                         test_parallel=test_parallel,
+                        label_output=True,
                     )
 
             tasks = [run_with_semaphore(m) for m in models]

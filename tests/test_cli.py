@@ -245,10 +245,10 @@ class TestAgentBenchmark:
                 f"Model '{model}' not found in request bodies. Got: {model_hints}"
             )
 
-    def test_model_headers_in_stdout(self, agent_config):
+    def test_per_model_labels_in_stdout(self, agent_config):
         result, _, _ = self._run_benchmark(agent_config)
-        # Models now run in parallel; the combined header lists every model and
-        # each model's per-test output is prefixed with its label.
+        # Models run in parallel, so per-test output interleaves; every model's
+        # lines must carry its ``[model]`` label to stay attributable.
         for model in self.MODELS:
             assert f"[{model}]" in result.stdout, (
                 f"'[{model}]' label not in stdout.\nstdout: {result.stdout}"
@@ -259,19 +259,6 @@ class TestAgentBenchmark:
         assert "Overall Summary" in result.stdout, (
             f"'Overall Summary' not in stdout.\nstdout: {result.stdout}"
         )
-
-    def test_models_run_in_parallel(self, agent_config):
-        """Both models are dispatched in a single parallel run.
-
-        Output is no longer strictly ordered per model, but each model's
-        labeled test output must be present.
-        """
-        result, _, _ = self._run_benchmark(agent_config)
-        stdout = result.stdout
-        for model in self.MODELS:
-            assert f"[{model}]" in stdout, (
-                f"'[{model}]' labeled output not found in stdout:\n{stdout}"
-            )
 
 
 # ---------------------------------------------------------------------------

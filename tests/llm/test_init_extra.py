@@ -1,5 +1,6 @@
 """Cover llm/__init__.py public API entry points via heavy mocking."""
 
+import asyncio
 import os
 import json
 import tempfile
@@ -216,6 +217,39 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("agent timed out", result["bad"]["error"])
         # The healthy model still produced real metrics.
         self.assertEqual(result["good"]["metrics"]["passed"], 1)
+
+    async def test_agent_benchmark_runs_models_concurrently(self):
+        from calibrate.llm import tests
+
+        # A 2-party barrier proves real concurrency: each model's request blocks
+        # until *both* models have arrived. If the runner were sequential the
+        # first model would wait alone and time out, failing the test.
+        barrier = asyncio.Barrier(2)
+
+        async def gated_external(*args, **kwargs):
+            await asyncio.wait_for(barrier.wait(), timeout=2)
+            return {
+                "output": {"response": "Hi", "tool_calls": []},
+                "metrics": {"passed": True, "judge_results": {}},
+            }
+
+        fake_agent = MagicMock()
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate.llm.run_tests.run_test_external",
+                   AsyncMock(side_effect=gated_external)):
+            result = await tests.run(
+                test_cases=[{
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "response", "criteria": "x"},
+                }],
+                output_dir=tmp,
+                agent=fake_agent,
+                models=["a", "b"],
+                max_parallel=2,
+            )
+        self.assertEqual(set(result.keys()), {"a", "b"})
+        self.assertEqual(result["a"]["metrics"]["passed"], 1)
+        self.assertEqual(result["b"]["metrics"]["passed"], 1)
 
     async def test_run_single(self):
         from calibrate.llm import tests
