@@ -204,11 +204,9 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         # Fail-fast: no test cases were dispatched.
         self.assertEqual(mock_external.await_count, 0)
 
-    async def test_run_resumes_without_ids_via_content_hash(self):
+    async def test_run_without_ids_does_not_resume(self):
         from calibrate.llm import tests
 
-        # Fresh dict per call: a shared return_value object would be aliased
-        # across both records (last write wins on test_case_id) and mask resume.
         async def fresh_result(*args, **kwargs):
             return {
                 "output": {"response": "Hi", "tool_calls": []},
@@ -216,9 +214,8 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
             }
         fake_agent = MagicMock()
 
-        # No explicit ids — resume must still work via derived content-hash ids.
-        # Build fresh (id-less) dicts each run so the second run re-derives ids
-        # from scratch rather than reusing ids the first run backfilled in place.
+        # No ids on the cases — there's no stable key to resume by, so a re-run
+        # of the same dataset must re-evaluate everything (no false skips).
         def make_cases():
             return [
                 {"history": [{"role": "user", "content": "a"}],
@@ -230,20 +227,16 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             mock_external = AsyncMock(side_effect=fresh_result)
             with patch("calibrate.llm.run_tests.run_test_external", mock_external):
-                # First run writes results.json with derived ids embedded.
                 await tests.run(
                     test_cases=make_cases(), output_dir=tmp, agent=fake_agent,
                 )
-                first_count = mock_external.await_count
-
-                # Re-run the exact same dataset: every case is resumed, nothing reruns.
                 mock_external.reset_mock()
                 await tests.run(
                     test_cases=make_cases(), output_dir=tmp, agent=fake_agent,
                 )
 
-        self.assertEqual(first_count, 2)
-        self.assertEqual(mock_external.await_count, 0)
+        # Second run re-ran both cases since they carry no resumable id.
+        self.assertEqual(mock_external.await_count, 2)
 
     async def test_run_with_agent_aggregates_cost_latency_and_tokens(self):
         from calibrate.llm import tests

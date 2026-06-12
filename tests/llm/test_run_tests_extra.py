@@ -2809,60 +2809,34 @@ class TestLoadResumableResults(unittest.TestCase):
         self.assertEqual(out, [None])
 
 
-class TestEnsureTestCaseIds(unittest.TestCase):
+class TestRequireUniqueTestCaseIds(unittest.TestCase):
     def test_raises_on_duplicate_explicit_ids(self):
-        from calibrate.llm.run_tests import ensure_test_case_ids
+        from calibrate.llm.run_tests import require_unique_test_case_ids
 
         cases = [
             {"id": "a", "history": [], "evaluation": {}},
             {"id": "a", "history": [{"role": "user"}], "evaluation": {}},
         ]
         with self.assertRaises(ValueError) as ctx:
-            ensure_test_case_ids(cases)
+            require_unique_test_case_ids(cases)
         self.assertIn("Duplicate test case id 'a'", str(ctx.exception))
 
-    def test_backfills_missing_ids_with_content_hash(self):
-        from calibrate.llm.run_tests import ensure_test_case_ids
+    def test_unique_ids_pass(self):
+        from calibrate.llm.run_tests import require_unique_test_case_ids
 
-        cases = [
-            {"history": [{"role": "user", "content": "hi"}],
-             "evaluation": {"type": "response", "criteria": "x"}},
-            {"history": [{"role": "user", "content": "bye"}],
-             "evaluation": {"type": "response", "criteria": "y"}},
-        ]
-        ensure_test_case_ids(cases)
-        for c in cases:
-            self.assertTrue(c["id"].startswith("auto:"))
-        self.assertNotEqual(cases[0]["id"], cases[1]["id"])
+        cases = [{"id": "a", "history": [], "evaluation": {}},
+                 {"id": "b", "history": [], "evaluation": {}}]
+        require_unique_test_case_ids(cases)  # no raise
 
-    def test_derived_id_is_stable_for_same_content(self):
-        from calibrate.llm.run_tests import _derive_test_case_id
+    def test_missing_ids_are_left_alone(self):
+        from calibrate.llm.run_tests import require_unique_test_case_ids
 
-        tc = {"history": [{"role": "user", "content": "hi"}],
-              "evaluation": {"type": "response", "criteria": "x"}}
-        # Order of dict keys / a fresh equivalent object must not change the id.
-        same = {"evaluation": {"criteria": "x", "type": "response"},
-                "history": [{"content": "hi", "role": "user"}]}
-        self.assertEqual(_derive_test_case_id(tc), _derive_test_case_id(same))
-
-    def test_explicit_ids_preserved(self):
-        from calibrate.llm.run_tests import ensure_test_case_ids
-
-        cases = [{"id": "keep", "history": [], "evaluation": {}},
+        cases = [{"history": [], "evaluation": {}},
                  {"history": [{"role": "user"}], "evaluation": {}}]
-        ensure_test_case_ids(cases)
-        self.assertEqual(cases[0]["id"], "keep")
-        self.assertTrue(cases[1]["id"].startswith("auto:"))
-
-    def test_idempotent(self):
-        from calibrate.llm.run_tests import ensure_test_case_ids
-
-        cases = [{"history": [{"role": "user", "content": "hi"}],
-                  "evaluation": {"type": "response"}}]
-        ensure_test_case_ids(cases)
-        first = cases[0]["id"]
-        ensure_test_case_ids(cases)  # no raise, no change
-        self.assertEqual(cases[0]["id"], first)
+        require_unique_test_case_ids(cases)  # no raise
+        # No ids are invented.
+        self.assertNotIn("id", cases[0])
+        self.assertNotIn("id", cases[1])
 
 
 class TestRunItemsParallelResume(unittest.IsolatedAsyncioTestCase):
