@@ -157,6 +157,32 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(set(result.keys()), {"m1", "m2"})
 
+    async def test_run_agent_benchmark_failed_case_labeled(self):
+        from calibrate.llm import tests
+
+        # A failing case in the agent-benchmark path exercises the labeled
+        # "[model] ❌ ... failed" log branch (the passing branch is covered above).
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": False, "judge_results": {}},
+        }
+        fake_agent = MagicMock()
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate.llm.run_tests.run_test_external",
+                   AsyncMock(return_value=fake_test_result)):
+            result = await tests.run(
+                test_cases=[{
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "response", "criteria": "x"},
+                }],
+                output_dir=tmp,
+                agent=fake_agent,
+                models=["m1"],
+            )
+        self.assertEqual(set(result.keys()), {"m1"})
+        self.assertEqual(result["m1"]["metrics"]["passed"], 0)
+
     async def test_run_single(self):
         from calibrate.llm import tests
 
