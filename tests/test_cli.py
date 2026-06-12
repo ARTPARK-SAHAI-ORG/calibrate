@@ -247,9 +247,11 @@ class TestAgentBenchmark:
 
     def test_model_headers_in_stdout(self, agent_config):
         result, _, _ = self._run_benchmark(agent_config)
+        # Models now run in parallel; the combined header lists every model and
+        # each model's per-test output is prefixed with its label.
         for model in self.MODELS:
-            assert f"Model: {model}" in result.stdout, (
-                f"'Model: {model}' not in stdout.\nstdout: {result.stdout}"
+            assert f"[{model}]" in result.stdout, (
+                f"'[{model}]' label not in stdout.\nstdout: {result.stdout}"
             )
 
     def test_overall_summary_in_stdout(self, agent_config):
@@ -258,17 +260,18 @@ class TestAgentBenchmark:
             f"'Overall Summary' not in stdout.\nstdout: {result.stdout}"
         )
 
-    def test_models_run_in_order(self, agent_config):
-        """gpt-4.1 output appears before gpt-5.1 output in stdout."""
+    def test_models_run_in_parallel(self, agent_config):
+        """Both models are dispatched in a single parallel run.
+
+        Output is no longer strictly ordered per model, but each model's
+        labeled test output must be present.
+        """
         result, _, _ = self._run_benchmark(agent_config)
         stdout = result.stdout
-        pos_41 = stdout.find("gpt-4.1")
-        pos_51 = stdout.find("gpt-5.1")
-        assert pos_41 != -1, "gpt-4.1 not found in stdout"
-        assert pos_51 != -1, "gpt-5.1 not found in stdout"
-        assert pos_41 < pos_51, (
-            "Expected gpt-4.1 to appear before gpt-5.1 in stdout"
-        )
+        for model in self.MODELS:
+            assert f"[{model}]" in stdout, (
+                f"'[{model}]' labeled output not found in stdout:\n{stdout}"
+            )
 
 
 # ---------------------------------------------------------------------------

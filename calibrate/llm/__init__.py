@@ -171,10 +171,11 @@ class _Tests:
                     evaluators=resolved_evaluators,
                 )
 
+            label_prefix = f"[{model}] " if (agent is not None and model) else ""
             if result["metrics"]["passed"]:
-                log_and_print(f"✅ Test case {test_case_index + 1} passed")
+                log_and_print(f"{label_prefix}✅ Test case {test_case_index + 1} passed")
             else:
-                log_and_print(f"❌ Test case {test_case_index + 1} failed")
+                log_and_print(f"{label_prefix}❌ Test case {test_case_index + 1} failed")
             if "reasoning" in result["metrics"]:
                 log_and_print(result["metrics"]["reasoning"])
 
