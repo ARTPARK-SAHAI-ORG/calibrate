@@ -705,6 +705,45 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
             self.assertEqual(read_leaderboard_metrics(p), {"wer": 0.2})
 
 
+class TestApplyDebugLimit(unittest.TestCase):
+    def test_truncates_to_debug_count(self):
+        from calibrate.utils import apply_debug_limit
+
+        items = list(range(10))
+        result = apply_debug_limit(items, True, 3)
+        self.assertEqual(result, [0, 1, 2])
+
+    def test_noop_when_debug_off(self):
+        from calibrate.utils import apply_debug_limit
+
+        items = list(range(10))
+        result = apply_debug_limit(items, False, 3)
+        self.assertEqual(result, items)
+
+    def test_count_larger_than_list_returns_all(self):
+        from calibrate.utils import apply_debug_limit
+
+        items = [1, 2]
+        result = apply_debug_limit(items, True, 5)
+        self.assertEqual(result, [1, 2])
+
+    def test_empty_list(self):
+        from calibrate.utils import apply_debug_limit
+
+        self.assertEqual(apply_debug_limit([], True, 5), [])
+
+    def test_prints_banner_only_when_truncating(self):
+        from calibrate.utils import apply_debug_limit
+
+        with patch("builtins.print") as mock_print:
+            apply_debug_limit([1, 2, 3], True, 2)
+        self.assertTrue(mock_print.called)
+
+        with patch("builtins.print") as mock_print:
+            apply_debug_limit([1, 2, 3], False, 2)
+        self.assertFalse(mock_print.called)
+
+
 def pytest_approx(value, tol=1e-9):
     class _Approx:
         def __eq__(self, other):

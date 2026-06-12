@@ -297,6 +297,61 @@ class TestFolderNaming(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Tests for --debug / --debug_count truncating test cases in benchmark.main
+# ---------------------------------------------------------------------------
+
+class TestBenchmarkDebugFlag(unittest.IsolatedAsyncioTestCase):
+    async def _run_main(self, argv_extra):
+        import json
+        import os
+        import sys
+        import tempfile
+        from calibrate.llm import benchmark
+
+        config = {
+            "system_prompt": "p",
+            "tools": [],
+            "test_cases": [{"id": str(i)} for i in range(10)],
+        }
+
+        captured = {}
+
+        async def fake_run(*, config, models, provider, output_dir, test_parallel=None):
+            captured["config"] = config
+            return {
+                "status": "completed",
+                "output_dir": output_dir,
+                "leaderboard_dir": os.path.join(output_dir, "leaderboard"),
+                "models": {},
+            }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cfg_path = os.path.join(tmpdir, "config.json")
+            with open(cfg_path, "w") as f:
+                json.dump(config, f)
+
+            argv = ["calibrate", "-c", cfg_path, "-m", "gpt-4.1", "-o", tmpdir]
+            argv.extend(argv_extra)
+            with patch.object(sys, "argv", argv), \
+                 patch("calibrate.llm.benchmark.run", side_effect=fake_run), \
+                 patch("calibrate.llm.benchmark.print_benchmark_summary", return_value=False):
+                await benchmark.main()
+        return captured["config"]
+
+    async def test_debug_truncates_test_cases(self):
+        config = await self._run_main(["-d", "-dc", "3"])
+        self.assertEqual(len(config["test_cases"]), 3)
+
+    async def test_debug_default_count(self):
+        config = await self._run_main(["-d"])
+        self.assertEqual(len(config["test_cases"]), 5)
+
+    async def test_no_debug_keeps_all_test_cases(self):
+        config = await self._run_main([])
+        self.assertEqual(len(config["test_cases"]), 10)
+
+
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

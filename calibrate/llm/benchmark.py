@@ -29,7 +29,7 @@ from os.path import exists, join
 from calibrate.llm.run_tests import display_label, run_model_tests
 from calibrate.llm.tests_leaderboard import generate_leaderboard
 from calibrate.llm._output import print_benchmark_summary
-from calibrate.utils import StreamTee
+from calibrate.utils import StreamTee, apply_debug_limit
 
 # Maximum number of models to run in parallel
 MAX_PARALLEL_MODELS = 2
@@ -151,12 +151,30 @@ async def main():
         default=None,
         help="Number of test cases to evaluate in parallel per model",
     )
+    parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Debug mode: evaluate only the first N test cases (see --debug_count)",
+    )
+    parser.add_argument(
+        "-dc",
+        "--debug_count",
+        type=int,
+        default=5,
+        help="Number of test cases to evaluate in debug mode (default: 5)",
+    )
 
     args = parser.parse_args()
 
     models = args.model
 
     config = json.load(open(args.config))
+
+    if args.debug and config.get("test_cases"):
+        config["test_cases"] = apply_debug_limit(
+            config["test_cases"], args.debug, args.debug_count
+        )
 
     # ``exist_ok=True`` makes this safe when several ``calibrate llm``
     # subprocesses (e.g. one per model spawned by the interactive UI) race to

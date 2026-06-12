@@ -181,6 +181,28 @@ def provider_log(message: object = "", *, to_terminal: bool = True) -> None:
             f.write(text + "\n")
 
 
+def apply_debug_limit(
+    items: list,
+    debug: bool,
+    debug_count: int,
+    *,
+    label: str = "test cases",
+) -> list:
+    """Truncate ``items`` to the first ``debug_count`` when ``debug`` is on.
+
+    Mirrors the STT/TTS ``--debug`` behaviour for the LLM commands: a quick
+    smoke-run mode that limits how many items are evaluated. Returns the
+    (possibly truncated) list and prints a banner when truncation happens.
+    """
+    if not debug or not items:
+        return items
+    n = min(debug_count, len(items))
+    print(
+        f"\033[93mrunning in debug mode: using first {n} {label} for evaluation\033[0m"
+    )
+    return items[:n]
+
+
 # Serializes concurrent judge-log writes within the process so two judges
 # running at once never split each other's entry.
 _judge_log_lock = threading.Lock()

@@ -307,6 +307,19 @@ Examples:
         help="Number of test cases to evaluate in parallel per model",
     )
     llm_parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Debug mode: evaluate only the first N test cases (see --debug_count)",
+    )
+    llm_parser.add_argument(
+        "-dc",
+        "--debug_count",
+        type=int,
+        default=5,
+        help="Number of test cases to evaluate in debug mode (default: 5)",
+    )
+    llm_parser.add_argument(
         "--verify",
         action="store_true",
         help="Verify an external agent connection by sending a preset message and checking the response format",
@@ -573,6 +586,9 @@ Examples:
             ]
             if getattr(args, "parallel", None) is not None:
                 argv.extend(["-n", str(args.parallel)])
+            if getattr(args, "debug", False):
+                argv.append("-d")
+                argv.extend(["-dc", str(args.debug_count)])
             sys.argv = argv
             asyncio.run(llm_run_tests_main())
         elif getattr(args, "verify", False):
@@ -590,9 +606,15 @@ Examples:
         else:
             # Direct mode: run tests with provided config
             import json as _json
+            from calibrate.utils import apply_debug_limit
 
             with open(args.config) as _f:
                 _config = _json.load(_f)
+
+            if getattr(args, "debug", False) and _config.get("test_cases"):
+                _config["test_cases"] = apply_debug_limit(
+                    _config["test_cases"], True, args.debug_count
+                )
 
             if _config.get("agent_url"):
                 # Agent connection path
@@ -672,6 +694,9 @@ Examples:
                 argv.extend(["-p", args.provider])
                 if getattr(args, "parallel", None) is not None:
                     argv.extend(["-n", str(args.parallel)])
+                if getattr(args, "debug", False):
+                    argv.append("-d")
+                    argv.extend(["-dc", str(args.debug_count)])
 
                 sys.argv = argv
                 asyncio.run(llm_benchmark_main())

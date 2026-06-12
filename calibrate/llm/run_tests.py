@@ -19,6 +19,7 @@ from calibrate.utils import (
     log_and_print,
     build_tools_schema,
     provider_log_file,
+    apply_debug_limit,
 )
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -2142,6 +2143,19 @@ async def main():
         help="Number of test cases to evaluate in parallel",
     )
     parser.add_argument(
+        "-d",
+        "--debug",
+        action="store_true",
+        help="Debug mode: evaluate only the first N test cases (see --debug_count)",
+    )
+    parser.add_argument(
+        "-dc",
+        "--debug_count",
+        type=int,
+        default=5,
+        help="Number of test cases to evaluate in debug mode (default: 5)",
+    )
+    parser.add_argument(
         "--eval-only",
         action="store_true",
         help="Skip LLM inference and run evaluators on a dataset of (test_case, output) pairs",
@@ -2174,6 +2188,9 @@ async def main():
             print(f"\033[31mDataset validation error: {err}\033[0m")
             sys.exit(1)
 
+        if args.debug:
+            dataset = apply_debug_limit(dataset, args.debug, args.debug_count)
+
         print("\n\033[91mLLM Eval-Only\033[0m\n")
         print(f"Config: {args.config}")
         print(f"Dataset: {args.dataset}")
@@ -2198,6 +2215,11 @@ async def main():
     if not args.model:
         print("\033[31mError: --model is required (omit only with --eval-only)\033[0m")
         sys.exit(1)
+
+    if args.debug and config.get("test_cases"):
+        config["test_cases"] = apply_debug_limit(
+            config["test_cases"], args.debug, args.debug_count
+        )
 
     model = args.model
 
