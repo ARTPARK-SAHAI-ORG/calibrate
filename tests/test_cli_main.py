@@ -294,6 +294,74 @@ class TestMainDispatch(unittest.TestCase):
                     "-o", tmp,
                 ])
 
+    def test_llm_eval_only_debug_forwards_flags(self):
+        captured = {}
+
+        def _capture():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text("{}")
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate.llm.run_tests.main",
+                       AsyncMock(side_effect=_capture)):
+                self._run_with_argv([
+                    "calibrate", "llm", "--eval-only",
+                    "-c", str(cfg), "--dataset", str(ds), "-o", tmp,
+                    "-d", "-dc", "2",
+                ])
+        argv = captured["argv"]
+        self.assertIn("-d", argv)
+        self.assertIn("-dc", argv)
+        self.assertIn("2", argv)
+
+    def test_llm_benchmark_debug_forwards_flags(self):
+        captured = {}
+
+        def _capture():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text(json.dumps(
+                {"system_prompt": "sp", "tools": [], "test_cases": []}
+            ))
+            with patch("calibrate.llm.benchmark.main",
+                       AsyncMock(side_effect=_capture)):
+                self._run_with_argv([
+                    "calibrate", "llm", "-c", str(cfg),
+                    "-o", tmp, "-m", "gpt-4.1", "-d", "-dc", "2",
+                ])
+        argv = captured["argv"]
+        self.assertIn("-d", argv)
+        self.assertIn("-dc", argv)
+        self.assertIn("2", argv)
+
+    def test_llm_agent_debug_truncates_test_cases(self):
+        captured = {}
+
+        async def fake_run(**kwargs):
+            captured["test_cases"] = kwargs.get("test_cases")
+            return {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "test_cases": [
+                    {"id": str(i), "history": [], "evaluation": {"type": "tool_call"}}
+                    for i in range(4)
+                ],
+            }))
+            with patch("calibrate.llm.tests.run", side_effect=fake_run):
+                self._run_with_argv([
+                    "calibrate", "llm", "-c", str(cfg),
+                    "-o", tmp, "--skip-verify", "-d", "-dc", "1",
+                ])
+        self.assertEqual(len(captured["test_cases"]), 1)
+
     def test_simulations_verify(self):
         from calibrate import cli
         with patch.object(cli, "_run_agent_verify") as mock:

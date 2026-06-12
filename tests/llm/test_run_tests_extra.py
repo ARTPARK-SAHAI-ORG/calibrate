@@ -2672,5 +2672,69 @@ class TestWriteOutputsTotalTokens(unittest.TestCase):
         self.assertNotIn("total_tokens", metrics)
 
 
+class TestRunTestsMainDebug(unittest.IsolatedAsyncioTestCase):
+    async def test_eval_only_debug_truncates_dataset(self):
+        from calibrate.llm import run_tests
+
+        captured = {}
+
+        async def fake_eval(**kwargs):
+            captured["dataset"] = kwargs["dataset"]
+            return {"passed": 1, "total": 1}
+
+        dataset = [
+            {
+                "test_case": {"history": [], "evaluation": {}},
+                "output": {"response": "x", "tool_calls": []},
+            }
+            for _ in range(5)
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "c.json"
+            cfg.write_text("{}")
+            ds = Path(tmp) / "d.json"
+            ds.write_text(json.dumps(dataset))
+            with patch.object(sys, "argv", [
+                "calibrate", "-c", str(cfg), "-o", tmp,
+                "--eval-only", "--dataset", str(ds), "-d", "-dc", "2",
+            ]), \
+                patch("calibrate.llm.run_tests.run_eval_only_tests",
+                      side_effect=fake_eval), \
+                patch("calibrate.llm.run_tests.validate_llm_eval_only_dataset",
+                      return_value=(True, "")):
+                await run_tests.main()
+        self.assertEqual(len(captured["dataset"]), 2)
+
+    async def test_debug_truncates_config_test_cases(self):
+        from calibrate.llm import run_tests
+
+        captured = {}
+
+        async def fake_run(**kwargs):
+            captured["config"] = kwargs["config"]
+            return {
+                "metrics": {"passed": 1, "total": 1},
+                "provider": "openrouter",
+                "model": "gpt-4.1",
+            }
+
+        config = {
+            "system_prompt": "sp",
+            "tools": [],
+            "test_cases": [{"id": str(i)} for i in range(10)],
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "c.json"
+            cfg.write_text(json.dumps(config))
+            with patch.object(sys, "argv", [
+                "calibrate", "-c", str(cfg), "-o", tmp,
+                "-m", "gpt-4.1", "-d", "-dc", "3",
+            ]), \
+                patch("calibrate.llm.run_tests.run_model_tests",
+                      side_effect=fake_run):
+                await run_tests.main()
+        self.assertEqual(len(captured["config"]["test_cases"]), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
