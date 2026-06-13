@@ -14,14 +14,14 @@ A single judge call per row returns both intent (0/1) and entity (0–1) scores.
 import backoff
 import instructor
 
-from calibrate.judges import _build_openrouter_client, DEFAULT_TEXT_JUDGE_MODEL
+from calibrate.judges import _build_openrouter_client
 from calibrate.langfuse import observe, langfuse, langfuse_enabled
 from calibrate.utils import log_judge_io
 from calibrate.stt.sarvam_intent_entity import IntentEntityResponse, build_prompt
 
-# Model used to grade intent/entity. The rubric is strict and linguistically
-# nuanced, so a capable model is the default; it matches the text-judge default.
-DEFAULT_INTENT_ENTITY_MODEL = DEFAULT_TEXT_JUDGE_MODEL
+# Model used to grade intent/entity. Matches Sarvam's llm_intent_entity flow,
+# which judges with google/gemini-2.5-flash (reached here via OpenRouter).
+DEFAULT_INTENT_ENTITY_MODEL = "google/gemini-2.5-flash"
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
