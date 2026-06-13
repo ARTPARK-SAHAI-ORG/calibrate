@@ -996,6 +996,7 @@ async def run_single_provider_eval(
             output_dir=provider_output_dir,
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
+            language=language,
         )
 
         return {
@@ -1050,6 +1051,7 @@ async def _score_and_write_results(
     output_dir: str,
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
+    language: str = "english",
 ) -> dict:
     """Run WER + LLM-judge evaluators over (gt, pred) pairs and write outputs.
 
@@ -1066,7 +1068,7 @@ async def _score_and_write_results(
     # Intent + entity preservation are always computed, independent of the
     # user-supplied evaluators, and reported alongside WER as top-level floats.
     intent_entity_results = await get_intent_entity_score(
-        gt_transcripts, pred_transcripts
+        gt_transcripts, pred_transcripts, language=language
     )
     _log(
         f"Intent: {intent_entity_results['intent']:.4f}  "
@@ -1138,6 +1140,7 @@ async def run_eval_only(
     dataset_path: str,
     output_dir: str,
     judge_evaluators: list[dict] = None,
+    language: str = "english",
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
@@ -1149,6 +1152,8 @@ async def run_eval_only(
         output_dir: Directory to write results and metrics.
         judge_evaluators: Optional list of evaluator dicts. Defaults to the
             built-in STT evaluator when omitted.
+        language: Language of the dataset, used to normalize text before the
+            intent/entity judge. Defaults to ``english``.
 
     Returns:
         dict with status, metrics, and output_dir.
@@ -1181,6 +1186,7 @@ async def run_eval_only(
             output_dir=output_dir,
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
+            language=language,
         )
 
         return {

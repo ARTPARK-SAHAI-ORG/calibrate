@@ -20,6 +20,11 @@ from calibrate.judges import (
 from calibrate.langfuse import observe, langfuse, langfuse_enabled
 from calibrate.stt import intent_entity
 from calibrate.stt.intent_entity import DEFAULT_INTENT_ENTITY_MODEL
+from calibrate.stt.sarvam_intent_entity import (
+    IndicNormalizer,
+    calculate_intent_accuracy,
+    calculate_entity_metrics,
+)
 
 normalizer = BasicTextNormalizer()
 
@@ -184,29 +189,47 @@ async def get_llm_judge_score(
 async def get_intent_entity_score(
     references: List[str],
     predictions: List[str],
+    language: str = "english",
     model: str = DEFAULT_INTENT_ENTITY_MODEL,
 ) -> dict:
-    """Run the intent/entity judge across all rows and aggregate.
+    """Normalize, judge, and aggregate intent/entity preservation.
 
-    The per-row judge call, prompt, and result schema live in
-    ``stt/intent_entity.py``; this is the metric root invoked by the eval
-    pipeline, mirroring ``get_wer_score`` / ``get_llm_judge_score``.
+    Mirrors Sarvam's flow: reference and prediction are first run through the
+    vendored ``IndicNormalizer``, then each normalized pair is scored by the
+    judge in ``stt/intent_entity.py``. Aggregation uses Sarvam's
+    ``calculate_intent_accuracy`` / ``calculate_entity_metrics``. This is the
+    metric root invoked by the eval pipeline, mirroring ``get_wer_score`` /
+    ``get_llm_judge_score``.
 
     Returns:
         {
-            "intent": float,          # pass-rate of intent (mean of 0/1)
+            "intent": float,          # intent accuracy (mean of 0/1)
             "entity": float,          # mean entity-preservation fraction
-            "per_row": [ {<IntentEntityResult fields>}, ... ],
+            "per_row": [ {<IntentEntityResponse fields>}, ... ],
         }
 
     ``per_row`` order matches the input order (``asyncio.gather`` preserves
     coroutine order).
     """
+    if not references:
+        return {"intent": 0.0, "entity": 0.0, "per_row": []}
+
+    langs = [language] * len(references)
+    normalizer = IndicNormalizer()
+    norm_references = normalizer.normalize_texts(
+        [str(r) for r in references], langs
+    )
+    norm_predictions = normalizer.normalize_texts(
+        [str(p) for p in predictions], langs
+    )
+
     coroutines = [
         intent_entity.intent_entity_judge(
             str(reference), str(prediction), model=model, index=i
         )
-        for i, (reference, prediction) in enumerate(zip(references, predictions))
+        for i, (reference, prediction) in enumerate(
+            zip(norm_references, norm_predictions)
+        )
     ]
 
     results = await tqdm_asyncio.gather(
@@ -214,13 +237,11 @@ async def get_intent_entity_score(
         desc="Running intent/entity judge",
     )
 
-    intent_values = [float(int(row["intent_score"])) for row in results]
-    entity_values = [
-        float(np.clip(float(row["entity_score"]), 0.0, 1.0)) for row in results
-    ]
+    intent_scores = [int(row["intent_score"]) for row in results]
+    entity_scores = [float(row["entity_score"]) for row in results]
 
     return {
-        "intent": float(np.mean(intent_values)) if intent_values else 0.0,
-        "entity": float(np.mean(entity_values)) if entity_values else 0.0,
+        "intent": float(calculate_intent_accuracy(intent_scores)),
+        "entity": float(calculate_entity_metrics(entity_scores)["mean"]),
         "per_row": results,
     }

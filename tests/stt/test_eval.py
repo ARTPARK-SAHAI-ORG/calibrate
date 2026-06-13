@@ -232,7 +232,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
 def _fake_intent_entity(intent=1, entity=1.0):
     """Build a fake ``get_intent_entity_score`` returning fixed scores per row."""
 
-    async def _fn(refs, preds, model=None):
+    async def _fn(refs, preds, language="english", model=None):
         return {
             "intent": float(intent),
             "entity": float(entity),
