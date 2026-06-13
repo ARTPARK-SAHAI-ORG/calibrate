@@ -35,8 +35,8 @@ from calibrate.stt.metrics import (
     get_wer_score,
     get_cer_score,
     get_llm_judge_score,
+    get_intent_entity_score,
 )
-from calibrate.stt.intent_entity import get_intent_entity_score
 from calibrate.judges import (
     is_rating,
     DEFAULT_STT_EVALUATOR,

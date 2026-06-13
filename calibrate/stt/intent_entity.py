@@ -1,13 +1,15 @@
 """
-Intent & Entity preservation scoring for STT transcriptions.
+Intent & Entity judge for STT transcriptions (support for ``stt/metrics.py``).
 
-Two meaning-preservation metrics that are *always* computed for every STT run,
-independent of the user-supplied evaluators, and reported alongside ``wer``:
+This module holds the per-row judge call plus its prompt, model, and result
+schema. The aggregation entry point used by the eval pipeline,
+``get_intent_entity_score``, lives in ``stt/metrics.py`` alongside the other
+metric roots (``get_wer_score``, ``get_cer_score``, ``get_llm_judge_score``).
 
-- **intent** — binary (0/1) per row: is the core meaning/intent preserved?
-  Aggregated as a pass-rate (mean of 0/1).
-- **entity** — float (0–1) per row: fraction of key entities preserved.
-  Aggregated as a mean, like ``wer``.
+Two meaning-preservation metrics are produced per row:
+
+- **intent** — binary (0/1): is the core meaning/intent preserved?
+- **entity** — float (0–1): fraction of key entities preserved.
 
 A single judge call per row returns both scores (faithful to Sarvam's original
 single-prompt design, and half the cost of two separate calls).
@@ -19,13 +21,10 @@ See also: https://www.sarvam.ai/blogs/evaluating-indian-language-asr
 """
 
 import json
-from typing import List
 
 import backoff
 import instructor
-import numpy as np
 from pydantic import BaseModel, Field
-from tqdm.asyncio import tqdm_asyncio
 
 from calibrate.judges import _build_openrouter_client, DEFAULT_TEXT_JUDGE_MODEL
 from calibrate.langfuse import observe, langfuse, langfuse_enabled
@@ -266,42 +265,3 @@ async def intent_entity_judge(
         )
 
     return result
-
-
-async def get_intent_entity_score(
-    references: List[str],
-    predictions: List[str],
-    model: str = DEFAULT_INTENT_ENTITY_MODEL,
-) -> dict:
-    """Run the intent/entity judge across all rows and aggregate.
-
-    Returns:
-        {
-            "intent": float,          # pass-rate of intent (mean of 0/1)
-            "entity": float,          # mean entity-preservation fraction
-            "per_row": [ {<IntentEntityResult fields>}, ... ],
-        }
-
-    ``per_row`` order matches the input order (``asyncio.gather`` preserves
-    coroutine order).
-    """
-    coroutines = [
-        intent_entity_judge(str(reference), str(prediction), model=model, index=i)
-        for i, (reference, prediction) in enumerate(zip(references, predictions))
-    ]
-
-    results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running intent/entity judge",
-    )
-
-    intent_values = [float(int(row["intent_score"])) for row in results]
-    entity_values = [
-        float(np.clip(float(row["entity_score"]), 0.0, 1.0)) for row in results
-    ]
-
-    return {
-        "intent": float(np.mean(intent_values)) if intent_values else 0.0,
-        "entity": float(np.mean(entity_values)) if entity_values else 0.0,
-        "per_row": results,
-    }

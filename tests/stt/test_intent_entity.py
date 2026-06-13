@@ -1,5 +1,9 @@
 """
-Tests for calibrate/stt/intent_entity.py — intent/entity judge aggregation.
+Tests for the intent/entity judge aggregation.
+
+``get_intent_entity_score`` lives in ``calibrate/stt/metrics.py`` (the metric
+root); it delegates to the per-row judge in ``calibrate/stt/intent_entity.py``,
+which is what these tests patch.
 
 Run with:
     python -m unittest tests.stt.test_intent_entity -v
@@ -24,6 +28,7 @@ def _row(intent, entity):
 class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
     async def test_aggregates_intent_as_passrate_and_entity_as_mean(self):
         from calibrate.stt import intent_entity as ie
+        from calibrate.stt import metrics
 
         # Return per (reference, prediction): order preserved by gather.
         async def fake_judge(reference, prediction, model=None, index=0, context=""):
@@ -34,7 +39,7 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
             return mapping[(reference, prediction)]
 
         with patch.object(ie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
-            result = await ie.get_intent_entity_score(
+            result = await metrics.get_intent_entity_score(
                 references=["a", "b"],
                 predictions=["a", "x"],
             )
@@ -45,13 +50,14 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
 
     async def test_entity_score_clamped_to_unit_interval(self):
         from calibrate.stt import intent_entity as ie
+        from calibrate.stt import metrics
 
         async def fake_judge(reference, prediction, model=None, index=0, context=""):
             # A misbehaving judge returns out-of-range entity scores.
             return _row(1, 1.7) if reference == "hi" else _row(1, -0.3)
 
         with patch.object(ie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
-            result = await ie.get_intent_entity_score(
+            result = await metrics.get_intent_entity_score(
                 references=["hi", "lo"],
                 predictions=["hi", "lo"],
             )
@@ -61,9 +67,10 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
 
     async def test_empty_inputs(self):
         from calibrate.stt import intent_entity as ie
+        from calibrate.stt import metrics
 
         with patch.object(ie, "intent_entity_judge", AsyncMock()):
-            result = await ie.get_intent_entity_score(references=[], predictions=[])
+            result = await metrics.get_intent_entity_score(references=[], predictions=[])
 
         self.assertEqual(result["intent"], 0.0)
         self.assertEqual(result["entity"], 0.0)

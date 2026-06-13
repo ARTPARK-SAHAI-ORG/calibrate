@@ -18,6 +18,8 @@ from calibrate.judges import (
     DEFAULT_STT_EVALUATOR,
 )
 from calibrate.langfuse import observe, langfuse, langfuse_enabled
+from calibrate.stt import intent_entity
+from calibrate.stt.intent_entity import DEFAULT_INTENT_ENTITY_MODEL
 
 normalizer = BasicTextNormalizer()
 
@@ -175,5 +177,50 @@ async def get_llm_judge_score(
     return {
         "scores": scores,
         "score": overall_score,
+        "per_row": results,
+    }
+
+
+async def get_intent_entity_score(
+    references: List[str],
+    predictions: List[str],
+    model: str = DEFAULT_INTENT_ENTITY_MODEL,
+) -> dict:
+    """Run the intent/entity judge across all rows and aggregate.
+
+    The per-row judge call, prompt, and result schema live in
+    ``stt/intent_entity.py``; this is the metric root invoked by the eval
+    pipeline, mirroring ``get_wer_score`` / ``get_llm_judge_score``.
+
+    Returns:
+        {
+            "intent": float,          # pass-rate of intent (mean of 0/1)
+            "entity": float,          # mean entity-preservation fraction
+            "per_row": [ {<IntentEntityResult fields>}, ... ],
+        }
+
+    ``per_row`` order matches the input order (``asyncio.gather`` preserves
+    coroutine order).
+    """
+    coroutines = [
+        intent_entity.intent_entity_judge(
+            str(reference), str(prediction), model=model, index=i
+        )
+        for i, (reference, prediction) in enumerate(zip(references, predictions))
+    ]
+
+    results = await tqdm_asyncio.gather(
+        *coroutines,
+        desc="Running intent/entity judge",
+    )
+
+    intent_values = [float(int(row["intent_score"])) for row in results]
+    entity_values = [
+        float(np.clip(float(row["entity_score"]), 0.0, 1.0)) for row in results
+    ]
+
+    return {
+        "intent": float(np.mean(intent_values)) if intent_values else 0.0,
+        "entity": float(np.mean(entity_values)) if entity_values else 0.0,
         "per_row": results,
     }
