@@ -36,6 +36,7 @@ from calibrate.stt.metrics import (
     get_cer_score,
     get_llm_judge_score,
 )
+from calibrate.stt.intent_entity import get_intent_entity_score
 from calibrate.judges import (
     is_rating,
     DEFAULT_STT_EVALUATOR,
@@ -1062,6 +1063,17 @@ async def _score_and_write_results(
     cer_results = get_cer_score(gt_transcripts, pred_transcripts)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
+    # Intent + entity preservation are always computed, independent of the
+    # user-supplied evaluators, and reported alongside WER as top-level floats.
+    intent_entity_results = await get_intent_entity_score(
+        gt_transcripts, pred_transcripts
+    )
+    _log(
+        f"Intent: {intent_entity_results['intent']:.4f}  "
+        f"Entity: {intent_entity_results['entity']:.4f}",
+        to_terminal=False,
+    )
+
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_STT_EVALUATOR]
     require_unique_evaluator_names(_evaluators)
     write_evaluator_config(evaluator_config_dir, _evaluators)
@@ -1075,17 +1087,23 @@ async def _score_and_write_results(
 
     _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
 
-    metrics_data = {"wer": wer_results["score"], "cer": cer_results["score"]}
+    metrics_data = {
+        "wer": wer_results["score"],
+        "cer": cer_results["score"],
+        "intent": intent_entity_results["intent"],
+        "entity": intent_entity_results["entity"],
+    }
     for name, score_dict in llm_results["scores"].items():
         metrics_data[name] = score_dict
 
     data = []
-    for _id, gt_text, pred_text, wer, cer, llm_row in zip(
+    for _id, gt_text, pred_text, wer, cer, ie_row, llm_row in zip(
         ids,
         gt_transcripts,
         pred_transcripts,
         wer_results["per_row"],
         cer_results["per_row"],
+        intent_entity_results["per_row"],
         llm_results["per_row"],
     ):
         row = {
@@ -1094,6 +1112,10 @@ async def _score_and_write_results(
             "pred": pred_text,
             "wer": wer,
             "cer": cer,
+            "intent": int(ie_row["intent_score"]),
+            "intent_reasoning": ie_row["intent_explanation"],
+            "entity": float(ie_row["entity_score"]),
+            "entity_reasoning": ie_row["entity_explanation"],
         }
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
@@ -1293,6 +1315,8 @@ async def main():
         metrics = result.get("metrics", {})
         wer = metrics.get("wer", 0)
         cer = metrics.get("cer", 0)
+        intent = metrics.get("intent", 0)
+        entity = metrics.get("entity", 0)
         # Evaluator entries are dicts carrying a ``type`` field; that's the
         # marker we use to pick them out from other top-level metrics.
         judge_scores = {
@@ -1301,7 +1325,10 @@ async def main():
             if isinstance(v, dict) and "type" in v
         }
         judge_str = ", ".join(f"{k}={v:.4f}" for k, v in judge_scores.items())
-        print(f"  {provider}: WER={wer:.4f}, CER={cer:.4f}, {judge_str}")
+        print(
+            f"  {provider}: WER={wer:.4f}, CER={cer:.4f}, Intent={intent:.4f}, "
+            f"Entity={entity:.4f}, {judge_str}"
+        )
 
 
 if __name__ == "__main__":

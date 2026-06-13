@@ -229,6 +229,30 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
         fake.assert_awaited_once()
 
 
+def _fake_intent_entity(intent=1, entity=1.0):
+    """Build a fake ``get_intent_entity_score`` returning fixed scores per row."""
+
+    async def _fn(refs, preds, model=None):
+        return {
+            "intent": float(intent),
+            "entity": float(entity),
+            "per_row": [
+                {
+                    "intent_score": intent,
+                    "intent_explanation": "ok",
+                    "entity_score": entity,
+                    "ground_truth_entities": "NA",
+                    "preserved_entities": "NA",
+                    "missing_entities": "",
+                    "entity_explanation": "ok",
+                }
+                for _ in refs
+            ],
+        }
+
+    return AsyncMock(side_effect=_fn)
+
+
 class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_writes_metrics_and_results(self):
         from calibrate.stt import eval as stt_eval
@@ -249,6 +273,8 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             out = Path(tmp)
             with patch.object(
                 stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
             ):
                 metrics = await stt_eval._score_and_write_results(
                     ids=["1", "2"],
@@ -260,6 +286,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
 
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
+            # Intent + entity are always reported as top-level floats.
+            self.assertEqual(metrics["intent"], 1.0)
+            self.assertEqual(metrics["entity"], 1.0)
             self.assertTrue((out / "metrics.json").exists())
             self.assertTrue((out / "results.csv").exists())
             df = pd.read_csv(out / "results.csv")
@@ -270,11 +299,59 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     "gt",
                     "pred",
                     "wer",
+                    "intent",
+                    "intent_reasoning",
+                    "entity",
+                    "entity_reasoning",
                     "semantic_match",
                     "semantic_match_reasoning",
                 }
             )
             self.assertEqual(len(df), 2)
+
+    async def test_intent_entity_always_present_with_custom_evaluators(self):
+        from calibrate.stt import eval as stt_eval
+
+        custom = [
+            {
+                "name": "completeness",
+                "system_prompt": "nothing missing",
+                "judge_model": "openai/gpt-4.1",
+            }
+        ]
+
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+            return {
+                "scores": {"completeness": {"type": "binary", "mean": 0.5}},
+                "score": 0.5,
+                "per_row": [
+                    {"completeness": {"match": True, "reasoning": "ok"}} for _ in refs
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(
+                stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(0, 0.25)
+            ):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["a"],
+                    gt_transcripts=["hi"],
+                    pred_transcripts=["bye"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    judge_evaluators=custom,
+                )
+
+            # Even with a user-supplied evaluator, intent/entity still report.
+            self.assertEqual(metrics["intent"], 0.0)
+            self.assertEqual(metrics["entity"], 0.25)
+            self.assertIn("completeness", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertEqual(df.iloc[0]["intent"], 0)
+            self.assertEqual(df.iloc[0]["entity"], 0.25)
 
     async def test_rating_evaluator_writes_numeric_score(self):
         from calibrate.stt import eval as stt_eval
@@ -308,6 +385,8 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             out = Path(tmp)
             with patch.object(
                 stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
             ):
                 await stt_eval._score_and_write_results(
                     ids=["1"],
@@ -349,6 +428,8 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
 
             with patch.object(
                 stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
             ):
                 result = await stt_eval.run_eval_only(
                     dataset_path=str(ds_path),
