@@ -97,5 +97,47 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["per_row"], [])
 
 
+class TestIntentEntityJudge(unittest.IsolatedAsyncioTestCase):
+    async def test_judge_builds_prompt_and_returns_model_dump(self):
+        from calibrate.stt import intent_entity as ie
+
+        fake_result = {
+            "index": 3,
+            "intent_score": 1,
+            "intent_explanation": "ok",
+            "entity_score": 0.5,
+            "ground_truth_entities": "x",
+            "preserved_entities": "x",
+            "missing_entities": "",
+            "entity_explanation": "ok",
+        }
+        fake_response = MagicMock()
+        fake_response.model_dump.return_value = fake_result
+
+        fake_client = MagicMock()
+        fake_client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+        # Bypass the real decorators (backoff/observe) and skip the network.
+        inner = ie.intent_entity_judge
+        while hasattr(inner, "__wrapped__"):
+            inner = inner.__wrapped__
+
+        with patch.object(ie, "_build_openrouter_client", return_value=MagicMock()), \
+             patch.object(ie.instructor, "apatch", return_value=fake_client):
+            result = await inner(
+                "hello world", "helo world", model="m", index=3, context="ctx"
+            )
+
+        self.assertEqual(result, fake_result)
+        # The vendored build_prompt was used: the user message carries the
+        # input JSON with the normalized hypothesis/ground_truth.
+        _, kwargs = fake_client.chat.completions.create.call_args
+        sent = kwargs["messages"][0]["content"]
+        self.assertIn('"hypothesis": "helo world"', sent)
+        self.assertIn('"ground_truth": "hello world"', sent)
+        self.assertEqual(kwargs["temperature"], 0)
+        self.assertEqual(kwargs["response_model"], ie.IntentEntityResponse)
+
+
 if __name__ == "__main__":
     unittest.main()
