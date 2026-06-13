@@ -1071,8 +1071,7 @@ async def _score_and_write_results(
         gt_transcripts, pred_transcripts, language=language
     )
     _log(
-        f"Intent: {intent_entity_results['intent']:.4f}  "
-        f"Entity: {intent_entity_results['entity']:.4f}",
+        f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
         to_terminal=False,
     )
 
