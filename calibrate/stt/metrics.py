@@ -30,20 +30,35 @@ def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
     return list(evaluators) if evaluators else [DEFAULT_STT_EVALUATOR]
 
 
-def get_wer_score(references: List[str], predictions: List[str]) -> float:
-    wer_metric = load("wer")
+def _edit_metric(name: str, references: List[str], predictions: List[str]) -> dict:
+    """Compute a normalized per-row edit-distance metric from ``evaluate``.
+
+    Shared by WER and CER: both normalize ref/pred with the Whisper
+    ``BasicTextNormalizer``, score each row independently via the
+    HuggingFace ``evaluate`` metric ``name`` (``"wer"`` / ``"cer"``), and
+    return the macro-mean plus the per-row list.
+    """
+    metric = load(name)
 
     references = [normalizer(str(ref)) for ref in references]
     predictions = [
         normalizer(str(pred)) if isinstance(pred, str) else "" for pred in predictions
     ]
 
-    per_row_wer = [
-        wer_metric.compute(predictions=[p], references=[r])
+    per_row = [
+        metric.compute(predictions=[p], references=[r])
         for p, r in zip(predictions, references)
     ]
 
-    return {"score": np.mean(per_row_wer), "per_row": per_row_wer}
+    return {"score": np.mean(per_row), "per_row": per_row}
+
+
+def get_wer_score(references: List[str], predictions: List[str]) -> dict:
+    return _edit_metric("wer", references, predictions)
+
+
+def get_cer_score(references: List[str], predictions: List[str]) -> dict:
+    return _edit_metric("cer", references, predictions)
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)

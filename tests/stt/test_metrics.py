@@ -6,7 +6,58 @@ Run with:
 """
 
 import unittest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
+
+
+class TestEditMetrics(unittest.TestCase):
+    """WER/CER share ``_edit_metric``; ``load`` is mocked to stay pure-unit."""
+
+    def _fake_load(self, recorder):
+        """Return a fake ``evaluate`` metric that records the per-row inputs."""
+        metric = MagicMock()
+
+        def compute(predictions, references):
+            recorder.append((references[0], predictions[0]))
+            # toy score: 1.0 when ref/pred differ, else 0.0
+            return 0.0 if references[0] == predictions[0] else 1.0
+
+        metric.compute.side_effect = compute
+        return metric
+
+    def test_get_wer_score_loads_wer_and_normalizes(self):
+        from calibrate.stt import metrics as M
+
+        seen = []
+        with patch.object(M, "load", return_value=self._fake_load(seen)) as mock_load:
+            result = M.get_wer_score(["Hello World", "foo"], ["hello world", "bar"])
+
+        mock_load.assert_called_once_with("wer")
+        # Row 1 ref/pred normalize identically (case-folded) -> 0.0; row 2 differs -> 1.0.
+        self.assertEqual(result["per_row"], [0.0, 1.0])
+        self.assertEqual(result["score"], 0.5)
+        # Normalizer was applied before scoring (case-folded to the same string).
+        self.assertEqual(seen[0], ("hello world", "hello world"))
+
+    def test_get_cer_score_loads_cer(self):
+        from calibrate.stt import metrics as M
+
+        seen = []
+        with patch.object(M, "load", return_value=self._fake_load(seen)) as mock_load:
+            result = M.get_cer_score(["abc"], ["abc"])
+
+        mock_load.assert_called_once_with("cer")
+        self.assertEqual(result["per_row"], [0.0])
+        self.assertEqual(result["score"], 0.0)
+
+    def test_non_string_prediction_becomes_empty(self):
+        from calibrate.stt import metrics as M
+
+        seen = []
+        with patch.object(M, "load", return_value=self._fake_load(seen)):
+            M.get_cer_score(["abc"], [None])
+
+        # None prediction is coerced to "" before scoring.
+        self.assertEqual(seen[0][1], "")
 
 
 class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):

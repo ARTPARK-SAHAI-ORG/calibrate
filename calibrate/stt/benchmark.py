@@ -311,13 +311,14 @@ async def main():
 
         metrics = result.get("metrics", {})
         wer = metrics.get("wer", 0)
+        cer = metrics.get("cer", 0)
         judge_scores = {
             k: v["mean"]
             for k, v in metrics.items()
             if isinstance(v, dict) and "type" in v
         }
         judge_str = ", ".join(f"{k}={v:.4f}" for k, v in judge_scores.items())
-        print(f"  WER={wer:.4f}, {judge_str}")
+        print(f"  WER={wer:.4f}, CER={cer:.4f}, {judge_str}")
         return
 
     # Benchmark (multi-provider) mode: mirror stdout/stderr into a single
@@ -372,6 +373,7 @@ async def main():
             else:
                 metrics = prov_result.get("metrics", {})
                 wer = metrics.get("wer", 0)
+                cer = metrics.get("cer", 0)
                 # Evaluator entries are dicts carrying a ``type`` field.
                 judge_scores = {
                     k: v["mean"]
@@ -381,7 +383,7 @@ async def main():
                 judge_str = ", ".join(
                     f"{k}={v:.4f}" for k, v in judge_scores.items()
                 )
-                print(f"  {provider}: WER={wer:.4f}, {judge_str}")
+                print(f"  {provider}: WER={wer:.4f}, CER={cer:.4f}, {judge_str}")
 
         if has_errors:
             sys.exit(1)

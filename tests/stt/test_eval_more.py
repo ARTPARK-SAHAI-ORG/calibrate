@@ -83,6 +83,8 @@ class TestRunSinglProviderEvalProgressNoChange(unittest.IsolatedAsyncioTestCase)
                               AsyncMock(side_effect=Exception("provider down"))), \
                  patch.object(E, "get_wer_score",
                               return_value={"score": 0.0, "per_row": [0.0, 0.0]}), \
+                 patch.object(E, "get_cer_score",
+                              return_value={"score": 0.0, "per_row": [0.0, 0.0]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 0.5}},
                      "per_row": [
@@ -126,6 +128,8 @@ class TestRunSinglProviderEvalAlreadyAllProcessed(unittest.IsolatedAsyncioTestCa
             )
 
             with patch.object(E, "get_wer_score",
+                              return_value={"score": 0.0, "per_row": [0.0]}), \
+                 patch.object(E, "get_cer_score",
                               return_value={"score": 0.0, "per_row": [0.0]}), \
                  patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
                      "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
