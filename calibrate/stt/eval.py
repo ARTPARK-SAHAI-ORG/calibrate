@@ -1092,8 +1092,8 @@ async def _score_and_write_results(
     metrics_data = {
         "wer": wer_results["score"],
         "cer": cer_results["score"],
-        "intent": intent_entity_results["intent"],
-        "entity": intent_entity_results["entity"],
+        "sarvam_intent_score": intent_entity_results["intent"],
+        "sarvam_entity_score": intent_entity_results["entity"],
     }
     for name, score_dict in llm_results["scores"].items():
         metrics_data[name] = score_dict
@@ -1114,10 +1114,10 @@ async def _score_and_write_results(
             "pred": pred_text,
             "wer": wer,
             "cer": cer,
-            "intent": int(ie_row["intent_score"]),
-            "intent_reasoning": ie_row["intent_explanation"],
-            "entity": float(ie_row["entity_score"]),
-            "entity_reasoning": ie_row["entity_explanation"],
+            "sarvam_intent_score": int(ie_row["intent_score"]),
+            "sarvam_intent_reasoning": ie_row["intent_explanation"],
+            "sarvam_entity_score": float(ie_row["entity_score"]),
+            "sarvam_entity_reasoning": ie_row["entity_explanation"],
         }
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
@@ -1321,8 +1321,8 @@ async def main():
         metrics = result.get("metrics", {})
         wer = metrics.get("wer", 0)
         cer = metrics.get("cer", 0)
-        intent = metrics.get("intent", 0)
-        entity = metrics.get("entity", 0)
+        intent = metrics.get("sarvam_intent_score", 0)
+        entity = metrics.get("sarvam_entity_score", 0)
         # Evaluator entries are dicts carrying a ``type`` field; that's the
         # marker we use to pick them out from other top-level metrics.
         judge_scores = {
@@ -1331,10 +1331,7 @@ async def main():
             if isinstance(v, dict) and "type" in v
         }
         judge_str = ", ".join(f"{k}={v:.4f}" for k, v in judge_scores.items())
-        print(
-            f"  {provider}: WER={wer:.4f}, CER={cer:.4f}, Intent={intent:.4f}, "
-            f"Entity={entity:.4f}, {judge_str}"
-        )
+        print(f"  {provider}: WER={wer:.4f}, CER={cer:.4f}, Sarvam Intent Score={intent:.4f}, Sarvam Entity Score={entity:.4f}, {judge_str}")
 
 
 if __name__ == "__main__":

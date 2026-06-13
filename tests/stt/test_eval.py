@@ -287,8 +287,8 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
             # Intent + entity are always reported as top-level floats.
-            self.assertEqual(metrics["intent"], 1.0)
-            self.assertEqual(metrics["entity"], 1.0)
+            self.assertEqual(metrics["sarvam_intent_score"], 1.0)
+            self.assertEqual(metrics["sarvam_entity_score"], 1.0)
             self.assertTrue((out / "metrics.json").exists())
             self.assertTrue((out / "results.csv").exists())
             df = pd.read_csv(out / "results.csv")
@@ -299,10 +299,10 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     "gt",
                     "pred",
                     "wer",
-                    "intent",
-                    "intent_reasoning",
-                    "entity",
-                    "entity_reasoning",
+                    "sarvam_intent_score",
+                    "sarvam_intent_reasoning",
+                    "sarvam_entity_score",
+                    "sarvam_entity_reasoning",
                     "semantic_match",
                     "semantic_match_reasoning",
                 }
@@ -346,12 +346,12 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                 )
 
             # Even with a user-supplied evaluator, intent/entity still report.
-            self.assertEqual(metrics["intent"], 0.0)
-            self.assertEqual(metrics["entity"], 0.25)
+            self.assertEqual(metrics["sarvam_intent_score"], 0.0)
+            self.assertEqual(metrics["sarvam_entity_score"], 0.25)
             self.assertIn("completeness", metrics)
             df = pd.read_csv(out / "results.csv")
-            self.assertEqual(df.iloc[0]["intent"], 0)
-            self.assertEqual(df.iloc[0]["entity"], 0.25)
+            self.assertEqual(df.iloc[0]["sarvam_intent_score"], 0)
+            self.assertEqual(df.iloc[0]["sarvam_entity_score"], 0.25)
 
     async def test_rating_evaluator_writes_numeric_score(self):
         from calibrate.stt import eval as stt_eval
