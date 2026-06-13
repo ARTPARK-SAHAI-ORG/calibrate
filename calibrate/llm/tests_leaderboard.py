@@ -99,12 +99,12 @@ def _build_leaderboard(
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, latency_ms, cost, total_tokens,
-    [criterion_1, ...]
+    Columns: model, passed, total, pass_rate, latency_p50, latency_p95,
+    latency_p99, cost, total_tokens, [criterion_1, ...]
 
-    ``latency_ms`` is the mean per-test-case response-generation latency (in
-    milliseconds, judge time excluded); ``None`` for runs without it (e.g.
-    eval-only).
+    ``latency_p50``/``latency_p95``/``latency_p99`` are percentiles of the
+    per-test-case response-generation latency (in milliseconds, judge time
+    excluded); ``None`` for runs without it (e.g. eval-only).
 
     ``cost`` is the mean per-test-case LLM cost in USD (``None`` when the run
     reported no cost, e.g. the OpenAI provider or external agents).
@@ -134,7 +134,9 @@ def _build_leaderboard(
             "passed": passed,
             "total": total,
             "pass_rate": _to_percent(passed, total),
-            "latency_ms": latency.get("mean"),
+            "latency_p50": latency.get("p50"),
+            "latency_p95": latency.get("p95"),
+            "latency_p99": latency.get("p99"),
             "cost": _numeric_or_none(cost.get("mean")),
             "total_tokens": _numeric_or_none(total_tokens.get("mean")),
         }

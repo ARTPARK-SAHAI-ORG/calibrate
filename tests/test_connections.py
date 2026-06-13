@@ -455,7 +455,7 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
             {"response": "hi", "tool_calls": [], "metrics": {"latency_ms": 200}}
         )
         agg = _aggregate_latency([result])
-        self.assertEqual(agg["mean"], 200)
+        self.assertEqual(agg["p50"], 200)
 
     async def test_agent_reported_total_tokens_lifted_to_output(self):
         result = await self._run(

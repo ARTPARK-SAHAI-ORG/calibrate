@@ -438,7 +438,7 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
             argv = ["e.py", "-p", "openai", "-i", str(inp), "-o", str(out)]
             fake_result = {"provider": "openai", "status": "completed",
                            "metrics": {"pronunciation": {"type": "binary", "mean": 0.9},
-                                       "ttfb": {"mean": 0.5}}}
+                                       "ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2}}}
             with patch.object(sys, "argv", argv), \
                  patch.object(E, "run_single_provider_eval", AsyncMock(return_value=fake_result)):
                 await E.main()

@@ -2555,7 +2555,7 @@ class TestAggregateLatency(unittest.TestCase):
         results = [{"metrics": {"passed": True}}, {"metrics": {"passed": False}}]
         self.assertIsNone(_aggregate_latency(results))
 
-    def test_mean_min_max_count(self):
+    def test_percentiles_and_count(self):
         from calibrate.llm.run_tests import _aggregate_latency
 
         results = [
@@ -2563,9 +2563,10 @@ class TestAggregateLatency(unittest.TestCase):
             {"latency_ms": 200},
             {"latency_ms": 600},
         ]
+        # sorted [100, 200, 600]: p50=200, p95=200+0.9*400=560, p99=200+0.98*400=592
         self.assertEqual(
             _aggregate_latency(results),
-            {"mean": 300, "min": 100, "max": 600, "count": 3},
+            {"p50": 200, "p95": 560, "p99": 592, "count": 3},
         )
 
     def test_ignores_missing_and_non_numeric(self):
@@ -2580,17 +2581,42 @@ class TestAggregateLatency(unittest.TestCase):
             {"latency_ms": True},
             {"latency_ms": 150},
         ]
+        # sorted [50, 150]: p50=100, p95=145, p99=149
         self.assertEqual(
             _aggregate_latency(results),
-            {"mean": 100, "min": 50, "max": 150, "count": 2},
+            {"p50": 100, "p95": 145, "p99": 149, "count": 2},
         )
 
-    def test_mean_is_rounded(self):
+    def test_percentiles_are_rounded(self):
         from calibrate.llm.run_tests import _aggregate_latency
 
-        # mean 100.5 -> 100
+        # sorted [100, 101]: p50=100.5 -> 100 (banker's rounding)
         agg = _aggregate_latency([{"latency_ms": 100}, {"latency_ms": 101}])
-        self.assertEqual(agg["mean"], 100)
+        self.assertEqual(agg["p50"], 100)
+        self.assertEqual(agg["p95"], 101)
+        self.assertEqual(agg["p99"], 101)
+
+
+class TestLatencyPercentilesHelper(unittest.TestCase):
+    def test_none_for_empty(self):
+        from calibrate.llm._metrics_utils import _latency_percentiles
+
+        self.assertIsNone(_latency_percentiles([]))
+
+    def test_single_value_repeats(self):
+        from calibrate.llm._metrics_utils import _latency_percentiles
+
+        self.assertEqual(
+            _latency_percentiles([0.42]),
+            {"p50": 0.42, "p95": 0.42, "p99": 0.42, "count": 1},
+        )
+
+    def test_unsorted_input_is_ordered(self):
+        from calibrate.llm._metrics_utils import _latency_percentiles
+
+        agg = _latency_percentiles([600, 100, 200])
+        self.assertEqual(agg["p50"], 200)
+        self.assertEqual(agg["count"], 3)
 
 
 class TestWriteOutputsLatency(unittest.TestCase):
@@ -2612,9 +2638,10 @@ class TestWriteOutputsLatency(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _write_test_results_outputs(results, tmp, {})
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        # sorted [120, 180]: p50=150, p95=177, p99=179.4 -> 179
         self.assertEqual(
             metrics["latency_ms"],
-            {"mean": 150, "min": 120, "max": 180, "count": 2},
+            {"p50": 150, "p95": 177, "p99": 179, "count": 2},
         )
 
     def test_metrics_omits_latency_when_absent(self):

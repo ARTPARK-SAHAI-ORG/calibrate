@@ -697,6 +697,21 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
             self.assertEqual(out["ttfb"], 0.4)
             self.assertEqual(out["wer"], 0.1)
 
+    def test_percentile_dict_fans_out(self):
+        from calibrate.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = self._write(Path(tmp) / "m.json", {
+                "wer": 0.1,
+                "ttfb": {"p50": 0.4, "p95": 0.55, "p99": 0.6, "count": 5},
+            })
+            out = read_leaderboard_metrics(p)
+            self.assertEqual(out["ttfb_p50"], 0.4)
+            self.assertEqual(out["ttfb_p95"], 0.55)
+            self.assertEqual(out["ttfb_p99"], 0.6)
+            self.assertNotIn("ttfb", out)
+            self.assertEqual(out["wer"], 0.1)
+
     def test_legacy_metric_name_format(self):
         from calibrate.utils import read_leaderboard_metrics
 

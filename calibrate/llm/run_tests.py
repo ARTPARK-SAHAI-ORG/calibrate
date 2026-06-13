@@ -50,7 +50,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate.llm.metrics import test_response_llm_judge, evaluate_simuation
-from calibrate.llm._metrics_utils import _numeric_or_none
+from calibrate.llm._metrics_utils import _numeric_or_none, _latency_percentiles
 from calibrate.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
     attach_evaluator_id,
@@ -1661,8 +1661,7 @@ def _aggregate_cost(results: List[dict]) -> Optional[dict]:
     ``None`` when no result carries a cost so the metric is absent rather than a
     misleading ``0.0``.
 
-    Output shape mirrors :func:`_aggregate_latency`:
-    ``{"mean", "min", "max", "count"}`` with USD floats.
+    Output shape: ``{"mean", "min", "max", "count"}`` with USD floats.
     """
     costs = [
         c
@@ -2009,7 +2008,7 @@ def _aggregate_latency(results: List[dict]) -> Optional[dict]:
     results, which skip inference, have none. Returns ``None`` when no result
     carries a latency so eval-only ``metrics.json`` stays free of an empty block.
 
-    Output shape: ``{"mean", "min", "max", "count"}`` with millisecond ints.
+    Output shape: ``{"p50", "p95", "p99", "count"}`` with millisecond ints.
     """
     values = [
         r["latency_ms"]
@@ -2017,13 +2016,14 @@ def _aggregate_latency(results: List[dict]) -> Optional[dict]:
         if isinstance(r.get("latency_ms"), (int, float))
         and not isinstance(r.get("latency_ms"), bool)
     ]
-    if not values:
+    pct = _latency_percentiles(values)
+    if pct is None:
         return None
     return {
-        "mean": round(sum(values) / len(values)),
-        "min": min(values),
-        "max": max(values),
-        "count": len(values),
+        "p50": round(pct["p50"]),
+        "p95": round(pct["p95"]),
+        "p99": round(pct["p99"]),
+        "count": pct["count"],
     }
 
 

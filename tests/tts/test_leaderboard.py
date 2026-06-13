@@ -38,13 +38,13 @@ class TestTTSLeaderboard(unittest.TestCase):
             base = Path(tmp)
             _write_provider(base, "openai", {
                 "pronunciation": {"type": "binary", "mean": 0.95},
-                "ttfb": {"mean": 0.4, "std": 0.05, "values": [0.35, 0.45]},
+                "ttfb": {"p50": 0.4, "p95": 0.45, "p99": 0.46, "count": 2},
             }, results_rows=[
                 {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.4},
             ])
             _write_provider(base, "elevenlabs", {
                 "pronunciation": {"type": "binary", "mean": 0.8},
-                "ttfb": {"mean": 0.3, "std": 0.02, "values": [0.29, 0.31]},
+                "ttfb": {"p50": 0.3, "p95": 0.31, "p99": 0.31, "count": 2},
             }, results_rows=[
                 {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.3},
             ])
@@ -56,7 +56,9 @@ class TestTTSLeaderboard(unittest.TestCase):
             self.assertTrue(xlsx.exists())
             summary = pd.read_excel(xlsx, sheet_name="summary")
             self.assertIn("pronunciation", summary.columns)
-            self.assertIn("ttfb", summary.columns)
+            self.assertIn("ttfb_p50", summary.columns)
+            self.assertIn("ttfb_p95", summary.columns)
+            self.assertIn("ttfb_p99", summary.columns)
 
     def test_multi_criterion_metrics_surface_dynamically(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -64,7 +66,7 @@ class TestTTSLeaderboard(unittest.TestCase):
             _write_provider(base, "provider-a", {
                 "intelligibility": {"type": "binary", "mean": 0.9},
                 "pronunciation": {"type": "binary", "mean": 0.85},
-                "ttfb": {"mean": 0.4},
+                "ttfb": {"p50": 0.4, "p95": 0.45, "p99": 0.46, "count": 2},
             })
 
             save_dir = base / "leaderboard"
@@ -74,7 +76,7 @@ class TestTTSLeaderboard(unittest.TestCase):
             summary = pd.read_excel(xlsx, sheet_name="summary")
             self.assertIn("intelligibility", summary.columns)
             self.assertIn("pronunciation", summary.columns)
-            self.assertIn("ttfb", summary.columns)
+            self.assertIn("ttfb_p50", summary.columns)
 
 
 if __name__ == "__main__":

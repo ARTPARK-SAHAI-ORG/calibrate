@@ -273,7 +273,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(result["metrics"]["cost"]["mean"], 0.002768)
         self.assertIn("latency_ms", result["metrics"])
         self.assertEqual(result["metrics"]["latency_ms"]["count"], 1)
-        self.assertEqual(result["metrics"]["latency_ms"]["mean"], 1246)
+        self.assertEqual(result["metrics"]["latency_ms"]["p50"], 1246)
         self.assertIn("total_tokens", result["metrics"])
         self.assertEqual(result["metrics"]["total_tokens"]["count"], 1)
         self.assertEqual(result["metrics"]["total_tokens"]["mean"], 4387)

@@ -31,6 +31,7 @@ from calibrate.utils import (
     provider_log_file as _current_log_file,
 )
 from calibrate.tts.metrics import get_tts_llm_judge_score
+from calibrate.llm._metrics_utils import _latency_percentiles
 from calibrate.judges import (
     is_rating,
     DEFAULT_TTS_EVALUATOR,
@@ -793,17 +794,19 @@ async def run_single_provider_eval(
         for name, score_dict in llm_judge_results["scores"].items():
             metrics_data[name] = score_dict
 
-        # Add ttfb metrics with mean, std, and values (filter out None/NaN values)
+        # Add ttfb percentile metrics (filter out None/NaN values)
         valid_ttfb = [
             t
             for t in all_ttfb
             if t is not None and not (isinstance(t, float) and np.isnan(t))
         ]
-        if valid_ttfb:
+        ttfb_pct = _latency_percentiles(valid_ttfb)
+        if ttfb_pct is not None:
             metrics_data["ttfb"] = {
-                "mean": float(np.mean(valid_ttfb)),
-                "std": float(np.std(valid_ttfb)),
-                "values": valid_ttfb,
+                "p50": float(ttfb_pct["p50"]),
+                "p95": float(ttfb_pct["p95"]),
+                "p99": float(ttfb_pct["p99"]),
+                "count": ttfb_pct["count"],
             }
 
         # Save metrics
@@ -963,14 +966,14 @@ async def main():
             if isinstance(v, dict) and "type" in v
         }
         ttfb_data = metrics.get("ttfb", {})
-        ttfb_mean = (
-            ttfb_data.get("mean", "N/A") if isinstance(ttfb_data, dict) else "N/A"
+        ttfb_p50 = (
+            ttfb_data.get("p50", "N/A") if isinstance(ttfb_data, dict) else "N/A"
         )
         judge_str = ", ".join(f"{k}={v:.2f}" for k, v in judge_scores.items())
         ttfb_str = (
-            f"TTFB={ttfb_mean:.3f}s"
-            if isinstance(ttfb_mean, float)
-            else f"TTFB={ttfb_mean}"
+            f"TTFB(p50)={ttfb_p50:.3f}s"
+            if isinstance(ttfb_p50, float)
+            else f"TTFB(p50)={ttfb_p50}"
         )
         print(f"  {provider}: {judge_str}, {ttfb_str}")
 

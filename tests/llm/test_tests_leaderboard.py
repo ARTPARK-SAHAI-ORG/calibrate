@@ -124,11 +124,11 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertIn("pass_rate", df.columns)
             self.assertIn("passed", df.columns)
             self.assertIn("total", df.columns)
-            # No criterion columns (latency_ms, cost and total_tokens are
-            # standard columns, empty here)
+            # No criterion columns (latency percentiles, cost and total_tokens
+            # are standard columns, empty here)
             expected_cols = {
-                "model", "passed", "total", "pass_rate", "latency_ms", "cost",
-                "total_tokens",
+                "model", "passed", "total", "pass_rate", "latency_p50",
+                "latency_p95", "latency_p99", "cost", "total_tokens",
             }
             self.assertEqual(set(df.columns), expected_cols)
             # Cost is absent in old-style metrics → empty column
@@ -240,12 +240,12 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             )
 
     def test_latency_column(self):
-        """latency_ms shows the mean; absent → None/NaN."""
+        """latency percentiles are surfaced; absent → None/NaN."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             _write_model(base, "model-a", {
                 "total": 2, "passed": 2,
-                "latency_ms": {"mean": 150, "min": 100, "max": 200, "count": 2},
+                "latency_ms": {"p50": 150, "p95": 190, "p99": 198, "count": 2},
             })
             # model-b has no latency (e.g. eval-only)
             _write_model(base, "model-b", {"total": 2, "passed": 1})
@@ -254,12 +254,16 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             generate_leaderboard(str(base), str(save_dir))
 
             df = pd.read_csv(save_dir / "llm_leaderboard.csv")
-            self.assertIn("latency_ms", df.columns)
+            for col in ("latency_p50", "latency_p95", "latency_p99"):
+                self.assertIn(col, df.columns)
             self.assertEqual(
-                df.loc[df["model"] == "model-a", "latency_ms"].iloc[0], 150
+                df.loc[df["model"] == "model-a", "latency_p50"].iloc[0], 150
+            )
+            self.assertEqual(
+                df.loc[df["model"] == "model-a", "latency_p95"].iloc[0], 190
             )
             self.assertTrue(
-                pd.isna(df.loc[df["model"] == "model-b", "latency_ms"].iloc[0])
+                pd.isna(df.loc[df["model"] == "model-b", "latency_p50"].iloc[0])
             )
 
     def test_empty_output_dir(self):

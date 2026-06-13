@@ -320,7 +320,7 @@ class TestTTSBenchmarkRun(unittest.IsolatedAsyncioTestCase):
         from calibrate.tts import benchmark as B
 
         fake_result = {"provider": "openai", "status": "completed",
-                       "metrics": {"ttfb": {"mean": 0.5},
+                       "metrics": {"ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2},
                                    "pronunciation": {"type": "binary", "mean": 0.9}}}
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(B, "run_single_provider_eval", AsyncMock(return_value=fake_result)), \
@@ -382,7 +382,7 @@ class TestTTSBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 "providers": {
                     "openai": {"status": "completed",
                                "metrics": {
-                                   "ttfb": {"mean": 0.5},
+                                   "ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2},
                                    "pronunciation": {"type": "binary", "mean": 0.9},
                                }},
                 },

@@ -2122,10 +2122,12 @@ def summarize_metric_distribution(
 def read_leaderboard_metrics(metrics_path: Path) -> dict:
     """Read a provider/run ``metrics.json`` into a flat ``{column: scalar}`` dict.
 
-    Shared by the STT and TTS leaderboards. Current format: evaluator and
-    ``ttfb`` entries are dicts carrying a ``mean`` — extracted into the
-    ``<key>`` column; plain numbers (e.g. ``wer``) are kept as-is. The legacy
-    ``metric_name``/list format is still supported for older runs.
+    Shared by the STT and TTS leaderboards. Current format: evaluator entries
+    are dicts carrying a ``mean`` — extracted into the ``<key>`` column;
+    latency dicts (e.g. ``ttfb``) carry ``p50``/``p95``/``p99`` — fanned out
+    into ``<key>_p50``/``<key>_p95``/``<key>_p99`` columns; plain numbers (e.g.
+    ``wer``) are kept as-is. The legacy ``metric_name``/list format is still
+    supported for older runs.
     """
     if not metrics_path.exists():
         print(f"[WARN] metrics.json missing for {metrics_path.parent.name}")
@@ -2139,6 +2141,10 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
         for key, value in data.items():
             if isinstance(value, dict) and "mean" in value:
                 metrics[key] = value["mean"]
+            elif isinstance(value, dict) and "p50" in value:
+                for pct in ("p50", "p95", "p99"):
+                    if pct in value:
+                        metrics[f"{key}_{pct}"] = value[pct]
             elif isinstance(value, (int, float)):
                 metrics[key] = float(value)
         return metrics

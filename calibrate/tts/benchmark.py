@@ -278,9 +278,9 @@ async def main():
                         if isinstance(v, dict) and "type" in v
                     }
                     ttfb_data = metrics.get("ttfb", {})
-                    ttfb_mean = ttfb_data.get("mean", "N/A") if isinstance(ttfb_data, dict) else "N/A"
+                    ttfb_p50 = ttfb_data.get("p50", "N/A") if isinstance(ttfb_data, dict) else "N/A"
                     judge_str = ", ".join(f"{k}={v:.2f}" for k, v in judge_scores.items())
-                    ttfb_str = f"TTFB={ttfb_mean:.3f}s" if isinstance(ttfb_mean, float) else f"TTFB={ttfb_mean}"
+                    ttfb_str = f"TTFB(p50)={ttfb_p50:.3f}s" if isinstance(ttfb_p50, float) else f"TTFB(p50)={ttfb_p50}"
                     print(f"  {provider}: {judge_str}, {ttfb_str}")
 
         print(f"\n\033[92mLeaderboard saved to {result['leaderboard_dir']}\033[0m")
