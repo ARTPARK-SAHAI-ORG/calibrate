@@ -4,7 +4,7 @@ Tests for the intent/entity judge aggregation.
 ``get_intent_entity_score`` lives in ``calibrate/stt/metrics.py`` (the metric
 root). It normalizes reference/prediction via the vendored ``IndicNormalizer``
 (mocked here to avoid downloading a model), then delegates to the per-row judge
-in ``calibrate/stt/intent_entity.py``, and aggregates with Sarvam's
+in ``calibrate/stt/sarvam_intent_entity/judge.py``, and aggregates with Sarvam's
 ``calculate_intent_accuracy`` / ``calculate_entity_metrics``.
 
 Run with:
@@ -37,7 +37,7 @@ def _identity_normalizer():
 
 class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
     async def test_intent_accuracy_and_entity_mean(self):
-        from calibrate.stt import intent_entity as ie
+        from calibrate.stt import sarvam_intent_entity as sie
         from calibrate.stt import metrics
 
         async def fake_judge(reference, prediction, model=None, index=0, context=""):
@@ -48,7 +48,7 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
             return mapping[(reference, prediction)]
 
         with patch.object(metrics, "IndicNormalizer", _identity_normalizer()), \
-             patch.object(ie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
+             patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
             result = await metrics.get_intent_entity_score(
                 references=["a", "b"],
                 predictions=["a", "x"],
@@ -59,7 +59,7 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result["per_row"]), 2)
 
     async def test_normalized_text_is_passed_to_judge(self):
-        from calibrate.stt import intent_entity as ie
+        from calibrate.stt import sarvam_intent_entity as sie
         from calibrate.stt import metrics
 
         # Normalizer lowercases — the judge must receive the normalized form.
@@ -76,7 +76,7 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
             return _row(1, 1.0)
 
         with patch.object(metrics, "IndicNormalizer", norm_cls), \
-             patch.object(ie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
+             patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
             await metrics.get_intent_entity_score(
                 references=["HELLO"],
                 predictions=["Hello"],
@@ -85,11 +85,11 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(seen, [("hello", "hello")])
 
     async def test_empty_inputs(self):
-        from calibrate.stt import intent_entity as ie
+        from calibrate.stt import sarvam_intent_entity as sie
         from calibrate.stt import metrics
 
         with patch.object(metrics, "IndicNormalizer", _identity_normalizer()), \
-             patch.object(ie, "intent_entity_judge", AsyncMock()):
+             patch.object(sie, "intent_entity_judge", AsyncMock()):
             result = await metrics.get_intent_entity_score(references=[], predictions=[])
 
         self.assertEqual(result["intent"], 0.0)
@@ -99,7 +99,7 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
 
 class TestIntentEntityJudge(unittest.IsolatedAsyncioTestCase):
     async def test_judge_builds_prompt_and_returns_model_dump(self):
-        from calibrate.stt import intent_entity as ie
+        from calibrate.stt.sarvam_intent_entity import judge as ie
 
         fake_result = {
             "index": 3,

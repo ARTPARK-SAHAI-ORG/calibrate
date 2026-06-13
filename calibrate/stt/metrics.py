@@ -18,9 +18,9 @@ from calibrate.judges import (
     DEFAULT_STT_EVALUATOR,
 )
 from calibrate.langfuse import observe, langfuse, langfuse_enabled
-from calibrate.stt import intent_entity
-from calibrate.stt.intent_entity import DEFAULT_INTENT_ENTITY_MODEL
+from calibrate.stt import sarvam_intent_entity
 from calibrate.stt.sarvam_intent_entity import (
+    DEFAULT_INTENT_ENTITY_MODEL,
     IndicNormalizer,
     calculate_intent_accuracy,
     calculate_entity_metrics,
@@ -196,7 +196,7 @@ async def get_intent_entity_score(
 
     Mirrors Sarvam's flow: reference and prediction are first run through the
     vendored ``IndicNormalizer``, then each normalized pair is scored by the
-    judge in ``stt/intent_entity.py``. Aggregation uses Sarvam's
+    judge in ``stt/sarvam_intent_entity/judge.py``. Aggregation uses Sarvam's
     ``calculate_intent_accuracy`` / ``calculate_entity_metrics``. This is the
     metric root invoked by the eval pipeline, mirroring ``get_wer_score`` /
     ``get_llm_judge_score``.
@@ -224,7 +224,7 @@ async def get_intent_entity_score(
     )
 
     coroutines = [
-        intent_entity.intent_entity_judge(
+        sarvam_intent_entity.intent_entity_judge(
             str(reference), str(prediction), model=model, index=i
         )
         for i, (reference, prediction) in enumerate(

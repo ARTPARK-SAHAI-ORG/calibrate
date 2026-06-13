@@ -12,6 +12,7 @@ See also: https://www.sarvam.ai/blogs/evaluating-indian-language-asr
 """
 
 from .main import IntentEntityResponse, build_prompt, PROMPT_TEMPLATE
+from .judge import intent_entity_judge, DEFAULT_INTENT_ENTITY_MODEL
 from .utilities import (
     IndicNormalizer,
     calculate_intent_accuracy,
@@ -24,6 +25,8 @@ __all__ = [
     "IntentEntityResponse",
     "build_prompt",
     "PROMPT_TEMPLATE",
+    "intent_entity_judge",
+    "DEFAULT_INTENT_ENTITY_MODEL",
     "IndicNormalizer",
     "calculate_intent_accuracy",
     "calculate_entity_metrics",

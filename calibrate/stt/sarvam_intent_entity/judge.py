@@ -1,12 +1,11 @@
 """
-Intent & Entity judge for STT transcriptions (support for ``stt/metrics.py``).
+Per-row intent/entity judge.
 
-This module is a thin wrapper around the vendored Sarvam flow in
-``stt/sarvam_intent_entity/``: it builds the prompt with their ``build_prompt``,
-asks for their ``IntentEntityResponse`` schema, and routes the call through
-calibrate's OpenRouter + ``instructor`` client. The aggregation entry point used
-by the eval pipeline, ``get_intent_entity_score``, lives in ``stt/metrics.py``
-alongside the other metric roots.
+A thin wrapper over the vendored prompt/schema in this package: it builds the
+prompt with ``build_prompt``, asks for the ``IntentEntityResponse`` schema, and
+routes the call through calibrate's OpenRouter + ``instructor`` client. The
+aggregation entry point used by the eval pipeline, ``get_intent_entity_score``,
+lives in ``stt/metrics.py`` alongside the other metric roots.
 
 A single judge call per row returns both intent (0/1) and entity (0–1) scores.
 """
@@ -17,7 +16,7 @@ import instructor
 from calibrate.judges import _build_openrouter_client
 from calibrate.langfuse import observe, langfuse, langfuse_enabled
 from calibrate.utils import log_judge_io
-from calibrate.stt.sarvam_intent_entity import IntentEntityResponse, build_prompt
+from calibrate.stt.sarvam_intent_entity.main import IntentEntityResponse, build_prompt
 
 # Model used to grade intent/entity. Matches Sarvam's llm_intent_entity flow,
 # which judges with google/gemini-2.5-flash (reached here via OpenRouter).
