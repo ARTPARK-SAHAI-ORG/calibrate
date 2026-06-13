@@ -98,17 +98,44 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
 class TestNormalizerCaching(unittest.TestCase):
     def test_indic_normalizer_built_once(self):
         from calibrate.stt import metrics
+        from calibrate.stt import sarvam_intent_entity as sie
 
         metrics._get_indic_normalizer.cache_clear()
         fake_cls = MagicMock()
         try:
-            with patch.object(metrics, "IndicNormalizer", fake_cls):
+            # ``_get_indic_normalizer`` imports ``IndicNormalizer`` lazily from
+            # the package, so patch it there (not on ``metrics``).
+            with patch.object(sie, "IndicNormalizer", fake_cls):
                 first = metrics._get_indic_normalizer()
                 second = metrics._get_indic_normalizer()
             self.assertIs(first, second)
             fake_cls.assert_called_once()
         finally:
             metrics._get_indic_normalizer.cache_clear()
+
+
+class TestLazyImports(unittest.TestCase):
+    def test_importing_stt_does_not_load_sarvam_stack(self):
+        import subprocess
+        import sys
+
+        # Fresh interpreter: importing the STT entry points must not pull in the
+        # vendored sarvam package or its indic-nlp dependency (model loading /
+        # heavy imports are deferred until intent/entity scoring is requested).
+        code = (
+            "import sys\n"
+            "import calibrate.stt.benchmark\n"
+            "import calibrate.stt.eval\n"
+            "import calibrate.stt.metrics\n"
+            "assert 'calibrate.stt.sarvam_intent_entity' not in sys.modules, 'sarvam pkg loaded'\n"
+            "assert 'indicnlp' not in sys.modules, 'indicnlp loaded'\n"
+            "print('ok')\n"
+        )
+        proc = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("ok", proc.stdout)
 
 
 class TestIntentEntityJudge(unittest.IsolatedAsyncioTestCase):
