@@ -282,11 +282,12 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "world"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
+                    score_intent_entity=True,
                 )
 
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
-            # Intent + entity are always reported as top-level floats.
+            # Intent + entity are reported as top-level floats when enabled.
             self.assertEqual(metrics["sarvam_intent_score"], 1.0)
             self.assertEqual(metrics["sarvam_entity_score"], 1.0)
             self.assertTrue((out / "metrics.json").exists())
@@ -309,7 +310,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual(len(df), 2)
 
-    async def test_intent_entity_always_present_with_custom_evaluators(self):
+    async def test_intent_entity_present_with_custom_evaluators_when_enabled(self):
         from calibrate.stt import eval as stt_eval
 
         custom = [
@@ -343,15 +344,54 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=custom,
+                    score_intent_entity=True,
                 )
 
-            # Even with a user-supplied evaluator, intent/entity still report.
+            # With the flag on, intent/entity report alongside a custom evaluator.
             self.assertEqual(metrics["sarvam_intent_score"], 0.0)
             self.assertEqual(metrics["sarvam_entity_score"], 0.25)
             self.assertIn("completeness", metrics)
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["sarvam_intent_score"], 0)
             self.assertEqual(df.iloc[0]["sarvam_entity_score"], 0.25)
+
+    async def test_intent_entity_skipped_by_default(self):
+        from calibrate.stt import eval as stt_eval
+
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+            return {
+                "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                "score": 1.0,
+                "per_row": [
+                    {"semantic_match": {"match": True, "reasoning": "ok"}}
+                    for _ in refs
+                ],
+            }
+
+        ie_mock = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(
+                stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ), patch.object(stt_eval, "get_intent_entity_score", ie_mock):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                )
+
+            # Default: the judge is never invoked and no sarvam_* keys appear.
+            ie_mock.assert_not_awaited()
+            self.assertNotIn("sarvam_intent_score", metrics)
+            self.assertNotIn("sarvam_entity_score", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertNotIn("sarvam_intent_score", df.columns)
+            self.assertNotIn("sarvam_entity_score", df.columns)
+            # WER/CER and the judge column are still written.
+            self.assertIn("wer", metrics)
+            self.assertIn("semantic_match", metrics)
 
     async def test_rating_evaluator_writes_numeric_score(self):
         from calibrate.stt import eval as stt_eval

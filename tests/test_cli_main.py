@@ -186,6 +186,74 @@ class TestMainDispatch(unittest.TestCase):
                     "-o", tmp,
                 ])
 
+    def test_stt_benchmark_forwards_sarvam_flag(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            import pandas as pd
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(
+                base / "stt.csv", index=False
+            )
+            (base / "audios" / "a.wav").write_bytes(b"\x00")
+
+            with patch("calibrate.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate", "stt", "-p", "deepgram",
+                    "-i", str(base), "-o", str(base / "out"),
+                    "--sarvam-intent-entity",
+                ])
+
+        self.assertIn("--sarvam-intent-entity", captured["argv"])
+
+    def test_stt_benchmark_omits_sarvam_flag_by_default(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            import pandas as pd
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(
+                base / "stt.csv", index=False
+            )
+            (base / "audios" / "a.wav").write_bytes(b"\x00")
+
+            with patch("calibrate.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate", "stt", "-p", "deepgram",
+                    "-i", str(base), "-o", str(base / "out"),
+                ])
+
+        self.assertNotIn("--sarvam-intent-entity", captured["argv"])
+
+    def test_stt_eval_only_forwards_sarvam_flag_and_language(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate", "stt", "--eval-only", "--dataset", str(ds),
+                    "-o", tmp, "-l", "hindi", "--sarvam-intent-entity",
+                ])
+
+        self.assertIn("--sarvam-intent-entity", captured["argv"])
+        self.assertIn("hindi", captured["argv"])
+
     def test_tts_no_provider_launches_ui(self):
         from calibrate import cli
         with patch.object(cli, "_launch_ink_ui") as mock:

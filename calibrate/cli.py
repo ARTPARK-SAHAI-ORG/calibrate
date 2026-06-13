@@ -233,6 +233,15 @@ Examples:
         default=None,
         help="Path to dataset JSON (list of {id, gt, pred}). Required with --eval-only.",
     )
+    stt_parser.add_argument(
+        "--sarvam-intent-entity",
+        action="store_true",
+        help=(
+            "Also compute Sarvam intent & entity preservation scores. Off by "
+            "default; enabling it loads a text-normalizer model and runs an "
+            "extra per-row LLM judge."
+        ),
+    )
 
     # ── TTS ───────────────────────────────────────────────────────
     # `calibrate tts` with no args → interactive UI
@@ -513,9 +522,12 @@ Examples:
                 sys.exit(1)
 
             argv = ["calibrate", "--eval-only", "--dataset", args.dataset]
+            argv.extend(["-l", args.language])
             argv.extend(["-o", args.output_dir])
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.sarvam_intent_entity:
+                argv.append("--sarvam-intent-entity")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -539,6 +551,8 @@ Examples:
                 argv.extend(["-s", args.save_dir])
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.sarvam_intent_entity:
+                argv.append("--sarvam-intent-entity")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())

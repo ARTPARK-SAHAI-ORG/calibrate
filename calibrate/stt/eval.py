@@ -869,6 +869,7 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
+    score_intent_entity: bool = False,
 ) -> dict:
     """Run STT evaluation for a single provider."""
     provider_output_dir = join(output_dir, provider)
@@ -997,6 +998,7 @@ async def run_single_provider_eval(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
+            score_intent_entity=score_intent_entity,
         )
 
         return {
@@ -1052,12 +1054,17 @@ async def _score_and_write_results(
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
+    score_intent_entity: bool = False,
 ) -> dict:
     """Run WER + LLM-judge evaluators over (gt, pred) pairs and write outputs.
 
     Writes ``results.csv`` and ``metrics.json`` under ``output_dir`` and the
     resolved evaluator config under ``evaluator_config_dir``. Returns the
     metrics_data dict.
+
+    When ``score_intent_entity`` is False (the default) the Sarvam intent/entity
+    judge is skipped entirely — no normalizer model is loaded, no judge calls
+    are made, and the ``sarvam_*`` columns/metrics are omitted.
     """
     wer_results = get_wer_score(gt_transcripts, pred_transcripts)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
@@ -1065,15 +1072,17 @@ async def _score_and_write_results(
     cer_results = get_cer_score(gt_transcripts, pred_transcripts)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
-    # Intent + entity preservation are always computed, independent of the
-    # user-supplied evaluators, and reported alongside WER as top-level floats.
-    intent_entity_results = await get_intent_entity_score(
-        gt_transcripts, pred_transcripts, language=language
-    )
-    _log(
-        f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
-        to_terminal=False,
-    )
+    # Intent + entity preservation are opt-in via ``score_intent_entity``;
+    # skipping avoids loading the normalizer model and the per-row judge calls.
+    intent_entity_results = None
+    if score_intent_entity:
+        intent_entity_results = await get_intent_entity_score(
+            gt_transcripts, pred_transcripts, language=language
+        )
+        _log(
+            f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
+            to_terminal=False,
+        )
 
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_STT_EVALUATOR]
     require_unique_evaluator_names(_evaluators)
@@ -1091,11 +1100,18 @@ async def _score_and_write_results(
     metrics_data = {
         "wer": wer_results["score"],
         "cer": cer_results["score"],
-        "sarvam_intent_score": intent_entity_results["intent"],
-        "sarvam_entity_score": intent_entity_results["entity"],
     }
+    if intent_entity_results is not None:
+        metrics_data["sarvam_intent_score"] = intent_entity_results["intent"]
+        metrics_data["sarvam_entity_score"] = intent_entity_results["entity"]
     for name, score_dict in llm_results["scores"].items():
         metrics_data[name] = score_dict
+
+    ie_per_row = (
+        intent_entity_results["per_row"]
+        if intent_entity_results is not None
+        else [None] * len(ids)
+    )
 
     data = []
     for _id, gt_text, pred_text, wer, cer, ie_row, llm_row in zip(
@@ -1104,7 +1120,7 @@ async def _score_and_write_results(
         pred_transcripts,
         wer_results["per_row"],
         cer_results["per_row"],
-        intent_entity_results["per_row"],
+        ie_per_row,
         llm_results["per_row"],
     ):
         row = {
@@ -1113,11 +1129,12 @@ async def _score_and_write_results(
             "pred": pred_text,
             "wer": wer,
             "cer": cer,
-            "sarvam_intent_score": int(ie_row["intent_score"]),
-            "sarvam_intent_reasoning": ie_row["intent_explanation"],
-            "sarvam_entity_score": float(ie_row["entity_score"]),
-            "sarvam_entity_reasoning": ie_row["entity_explanation"],
         }
+        if ie_row is not None:
+            row["sarvam_intent_score"] = int(ie_row["intent_score"])
+            row["sarvam_intent_reasoning"] = ie_row["intent_explanation"]
+            row["sarvam_entity_score"] = float(ie_row["entity_score"])
+            row["sarvam_entity_reasoning"] = ie_row["entity_explanation"]
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
             if is_rating(ev):
@@ -1140,6 +1157,7 @@ async def run_eval_only(
     output_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
+    score_intent_entity: bool = False,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
@@ -1153,6 +1171,9 @@ async def run_eval_only(
             built-in STT evaluator when omitted.
         language: Language of the dataset, used to normalize text before the
             intent/entity judge. Defaults to ``english``.
+        score_intent_entity: When True, also run the Sarvam intent/entity judge.
+            Off by default — leaving it off skips the normalizer model load and
+            the judge calls entirely.
 
     Returns:
         dict with status, metrics, and output_dir.
@@ -1186,6 +1207,7 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
+            score_intent_entity=score_intent_entity,
         )
 
         return {
@@ -1195,6 +1217,31 @@ async def run_eval_only(
         }
     finally:
         _current_log_file.reset(token)
+
+
+def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
+    """Build the one-line ``WER / CER / Sarvam Intent / Sarvam Entity / judge``
+    summary shared by the single-provider, multi-provider, and eval-only paths.
+
+    The Sarvam intent/entity fields are only included when present in
+    ``metrics`` (i.e. when intent/entity scoring was enabled for the run).
+    """
+    parts = [
+        f"WER={metrics.get('wer', 0):.4f}",
+        f"CER={metrics.get('cer', 0):.4f}",
+    ]
+    if "sarvam_intent_score" in metrics:
+        parts.append(f"Sarvam Intent Score={metrics['sarvam_intent_score']:.4f}")
+    if "sarvam_entity_score" in metrics:
+        parts.append(f"Sarvam Entity Score={metrics['sarvam_entity_score']:.4f}")
+    # Evaluator entries are dicts carrying a ``type`` field; that's the marker
+    # we use to pick them out from other top-level metrics.
+    parts.extend(
+        f"{k}={v['mean']:.4f}"
+        for k, v in metrics.items()
+        if isinstance(v, dict) and "type" in v
+    )
+    return f"  {prefix}" + ", ".join(parts)
 
 
 async def main():
@@ -1265,6 +1312,15 @@ async def main():
         action="store_true",
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
+    parser.add_argument(
+        "--sarvam-intent-entity",
+        action="store_true",
+        help=(
+            "Also compute Sarvam intent & entity preservation scores. Off by "
+            "default; enabling it loads a text-normalizer model and runs an "
+            "extra per-row LLM judge."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -1306,6 +1362,7 @@ async def main():
         debug_count=args.debug_count,
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
+        score_intent_entity=args.sarvam_intent_entity,
     )
 
     # Print summary
@@ -1318,19 +1375,7 @@ async def main():
         sys.exit(1)
     else:
         metrics = result.get("metrics", {})
-        wer = metrics.get("wer", 0)
-        cer = metrics.get("cer", 0)
-        intent = metrics.get("sarvam_intent_score", 0)
-        entity = metrics.get("sarvam_entity_score", 0)
-        # Evaluator entries are dicts carrying a ``type`` field; that's the
-        # marker we use to pick them out from other top-level metrics.
-        judge_scores = {
-            k: v["mean"]
-            for k, v in metrics.items()
-            if isinstance(v, dict) and "type" in v
-        }
-        judge_str = ", ".join(f"{k}={v:.4f}" for k, v in judge_scores.items())
-        print(f"  {provider}: WER={wer:.4f}, CER={cer:.4f}, Sarvam Intent Score={intent:.4f}, Sarvam Entity Score={entity:.4f}, {judge_str}")
+        print(format_metrics_summary(metrics, prefix=f"{provider}: "))
 
 
 if __name__ == "__main__":
