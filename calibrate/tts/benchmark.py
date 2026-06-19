@@ -27,10 +27,7 @@ from calibrate.tts.eval import (
     validate_tts_input_file,
 )
 from calibrate.tts.leaderboard import generate_leaderboard
-from calibrate.utils import StreamTee
-
-# Maximum number of providers to run in parallel
-MAX_PARALLEL_PROVIDERS = 2
+from calibrate.utils import StreamTee, resolve_benchmark_parallel
 
 
 async def run(
@@ -58,7 +55,7 @@ async def run(
     debug: bool = False,
     debug_count: int = 5,
     overwrite: bool = False,
-    max_parallel: int = MAX_PARALLEL_PROVIDERS,
+    max_parallel: int | None = None,
     judge_evaluators: list[dict] = None,
 ) -> dict:
     """
@@ -74,7 +71,8 @@ async def run(
         debug: Run evaluation on first N texts only
         debug_count: Number of texts to run in debug mode (default: 5)
         overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
-        max_parallel: Maximum number of providers to run in parallel (default: 2)
+        max_parallel: Maximum number of providers to run in parallel. Resolved via
+            CLI flag / SDK arg > ``CALIBRATE_TTS_BENCHMARK_PARALLEL`` env var > default 2.
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
             the implicit default TTS evaluator runs.
@@ -93,6 +91,7 @@ async def run(
         ... ))
     """
     results = {}
+    max_parallel = resolve_benchmark_parallel("tts", max_parallel)
     semaphore = asyncio.Semaphore(max_parallel)
 
     async def run_provider(provider: str) -> tuple[str, dict]:
@@ -192,6 +191,12 @@ async def main():
         default=None,
         help="Path to optional JSON config file with an `evaluators` list",
     )
+    parser.add_argument(
+        "--benchmark-parallel",
+        type=int,
+        default=None,
+        help="Number of providers to evaluate in parallel (overrides CALIBRATE_TTS_BENCHMARK_PARALLEL)",
+    )
 
     args = parser.parse_args()
 
@@ -251,6 +256,7 @@ async def main():
             debug=args.debug,
             debug_count=args.debug_count,
             overwrite=args.overwrite,
+            max_parallel=args.benchmark_parallel,
             judge_evaluators=judge_evaluators,
         )
 
