@@ -20,9 +20,25 @@ on:
       - ".github/workflows/eval-providers.yml"
 
 jobs:
-  stt-eval:
-    name: STT eval (all providers)
+  eval:
+    name: ${{ matrix.kind }} eval (all providers)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kind: STT
+            artifact: stt-eval-output
+            command: >-
+              calibrate stt
+              -p deepgram openai cartesia smallest groq google sarvam elevenlabs
+              -i examples/stt/sample_input -o ./out --overwrite
+          - kind: TTS
+            artifact: tts-eval-output
+            command: >-
+              calibrate tts
+              -p cartesia openai groq google elevenlabs sarvam smallest
+              -i examples/tts/sample.csv -o ./out --overwrite
     env:
       DEEPGRAM_API_KEY: ${{ secrets.DEEPGRAM_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
@@ -57,68 +73,12 @@ jobs:
           GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
         run: printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$GOOGLE_APPLICATION_CREDENTIALS"
 
-      - name: Run STT eval for all providers
-        run: |
-          uv run calibrate stt \
-            -p deepgram openai cartesia smallest groq google sarvam elevenlabs \
-            -i examples/stt/sample_input \
-            -o ./out_stt \
-            --overwrite
+      - name: Run ${{ matrix.kind }} eval for all providers
+        run: uv run ${{ matrix.command }}
 
-      - name: Upload STT eval output
+      - name: Upload ${{ matrix.kind }} eval output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: stt-eval-output
-          path: ./out_stt
-
-  tts-eval:
-    name: TTS eval (all providers)
-    runs-on: ubuntu-latest
-    env:
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-      CARTESIA_API_KEY: ${{ secrets.CARTESIA_API_KEY }}
-      SMALLEST_API_KEY: ${{ secrets.SMALLEST_API_KEY }}
-      SARVAM_API_KEY: ${{ secrets.SARVAM_API_KEY }}
-      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      GOOGLE_CLOUD_PROJECT_ID: ${{ secrets.GOOGLE_CLOUD_PROJECT_ID }}
-      GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/gcp-credentials.json
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libasound2-dev ffmpeg
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v3
-
-      - name: Install dependencies
-        run: uv sync --extra dev
-
-      - name: Write Google credentials
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS_JSON: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
-        run: printf '%s' "$GOOGLE_APPLICATION_CREDENTIALS_JSON" > "$GOOGLE_APPLICATION_CREDENTIALS"
-
-      - name: Run TTS eval for all providers
-        run: |
-          uv run calibrate tts \
-            -p cartesia openai groq google elevenlabs sarvam smallest \
-            -i examples/tts/sample.csv \
-            -o ./out_tts \
-            --overwrite
-
-      - name: Upload TTS eval output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: tts-eval-output
-          path: ./out_tts
+          name: ${{ matrix.artifact }}
+          path: ./out
