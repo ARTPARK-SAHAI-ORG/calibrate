@@ -72,7 +72,9 @@ class _FakeRealtimeConnection:
     """Minimal stand-in for the elevenlabs SDK ``RealtimeConnection``.
 
     Emits ``session_started`` as soon as the handler is registered, and on
-    ``commit()`` emits the configured committed transcripts (or an error).
+    ``commit()`` emits the configured committed transcripts followed by a
+    ``close`` (or an error), mirroring a server that closes once all committed
+    segments for the session have been delivered.
     """
 
     def __init__(self, committed_texts=None, error_on_commit=None):
@@ -109,6 +111,10 @@ class _FakeRealtimeConnection:
                 self._events.COMMITTED_TRANSCRIPT,
                 {"message_type": "committed_transcript", "text": text},
             )
+        # The real server closes the stream once all committed segments are
+        # delivered; emit CLOSE so the collector finishes promptly rather than
+        # waiting out the inter-segment idle gap.
+        self._emit(self._events.CLOSE, None)
 
     async def close(self):
         self.closed = True
@@ -267,6 +273,60 @@ class TestProviderAPIKeyMissing(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(fake_conn.sent)
         self.assertTrue(fake_conn.committed)
         self.assertTrue(fake_conn.closed)
+
+    async def test_elevenlabs_streaming_accumulates_multiple_segments(self):
+        # The server auto-segments long audio into MULTIPLE committed_transcript
+        # messages (it auto-commits ~every 36s). All segments must be captured —
+        # stopping at the first would silently truncate long recordings.
+        import elevenlabs
+
+        from calibrate.stt import eval as E
+
+        fake_conn = _FakeRealtimeConnection(
+            committed_texts=["hello", "world", "again"]
+        )
+        fake_client = _fake_elevenlabs_client(fake_conn)
+
+        with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "k"}), patch.object(
+            E, "load_audio", return_value=b"\x00\x00" * 1000
+        ), patch.object(elevenlabs, "ElevenLabs", return_value=fake_client):
+            result = await E.transcribe_elevenlabs_streaming(
+                Path("/tmp/x.wav"), "english"
+            )
+
+        self.assertEqual(result["transcript"], "hello world again")
+
+    async def test_elevenlabs_streaming_finishes_on_idle_without_close(self):
+        # If the server never sends CLOSE after the final segment, the collector
+        # must still finish via the inter-segment idle gap — capturing every
+        # segment, with no hang and no truncation.
+        import elevenlabs
+
+        from calibrate.stt import eval as E
+
+        class _NoCloseConn(_FakeRealtimeConnection):
+            async def commit(self):
+                self.committed = True
+                for text in self._committed_texts:
+                    self._emit(
+                        self._events.COMMITTED_TRANSCRIPT,
+                        {"message_type": "committed_transcript", "text": text},
+                    )
+                # Deliberately no CLOSE — completion relies on the idle gap.
+
+        fake_conn = _NoCloseConn(committed_texts=["hello", "world"])
+        fake_client = _fake_elevenlabs_client(fake_conn)
+
+        with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "k"}), patch.object(
+            E, "load_audio", return_value=b"\x00\x00" * 1000
+        ), patch.object(elevenlabs, "ElevenLabs", return_value=fake_client), patch.object(
+            E, "ELEVENLABS_SEGMENT_IDLE_SECONDS", 0.05
+        ):
+            result = await E.transcribe_elevenlabs_streaming(
+                Path("/tmp/x.wav"), "english"
+            )
+
+        self.assertEqual(result["transcript"], "hello world")
 
     async def test_elevenlabs_streaming_short_clip_insufficient_audio(self):
         # A sub-second clip can close with ``insufficient_audio_activity`` and

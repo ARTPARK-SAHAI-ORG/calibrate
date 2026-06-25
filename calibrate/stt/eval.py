@@ -614,6 +614,13 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
     }
 
 
+# How long to wait for another ElevenLabs ``committed_transcript`` segment
+# before treating the stream as finished. The server auto-commits long audio
+# into multiple segments (~every 36s) and sends no end-of-transcript marker,
+# so completion is detected by this inter-segment idle gap.
+ELEVENLABS_SEGMENT_IDLE_SECONDS = 3.0
+
+
 async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> str:
     """Transcribe audio using ElevenLabs' Scribe v2 Realtime via the official SDK.
 
@@ -640,18 +647,24 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
     transcript_parts: List[str] = []
     fatal_error: Dict[str, object] = {"data": None}
     session_started = asyncio.Event()
-    done = asyncio.Event()
+    # Set whenever a committed_transcript arrives (to detect the stream going
+    # idle) and whenever the stream closes or errors.
+    segment_event = asyncio.Event()
+    closed = asyncio.Event()
 
     def _on_session_started(_data):
         session_started.set()
 
     def _on_committed_transcript(data):
+        # The server segments long audio and auto-commits roughly every 36s, so
+        # a single manual commit can still yield MULTIPLE committed_transcript
+        # messages (one per segment) with no terminal marker. Accumulate every
+        # segment instead of stopping at the first, or long audio gets truncated.
         if isinstance(data, dict):
             text = data.get("text", "")
             if text:
                 transcript_parts.append(text)
-        # A manual commit yields a single committed segment; we're done.
-        done.set()
+        segment_event.set()
 
     def _on_error(data):
         # ``insufficient_audio_activity`` fires for clips with no committable
@@ -661,13 +674,16 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
             isinstance(data, dict)
             and data.get("message_type") == "insufficient_audio_activity"
         ):
-            done.set()
+            closed.set()
+            segment_event.set()
             return
         fatal_error["data"] = data
-        done.set()
+        closed.set()
+        segment_event.set()
 
     def _on_close(*_args):
-        done.set()
+        closed.set()
+        segment_event.set()
 
     client = ElevenLabs(api_key=api_key)
     connection = await client.speech_to_text.realtime.connect(
@@ -707,12 +723,24 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
         await asyncio.sleep(0.5)
         await connection.commit()
 
-        try:
-            await asyncio.wait_for(
-                done.wait(), timeout=STT_STREAMING_IDLE_TIMEOUT_SECONDS
+        # Collect ALL committed segments. There is no end-of-transcript marker,
+        # so we finish once the stream goes idle (no new segment within the idle
+        # window), closes, or errors. The first segment is bounded by the longer
+        # streaming idle timeout; once segments start arriving they come
+        # back-to-back, so a short inter-segment gap signals completion.
+        received_any = bool(transcript_parts)
+        while not closed.is_set():
+            segment_event.clear()
+            timeout = (
+                ELEVENLABS_SEGMENT_IDLE_SECONDS
+                if received_any
+                else STT_STREAMING_IDLE_TIMEOUT_SECONDS
             )
-        except asyncio.TimeoutError:
-            pass
+            try:
+                await asyncio.wait_for(segment_event.wait(), timeout=timeout)
+            except asyncio.TimeoutError:
+                break
+            received_any = True
     finally:
         await connection.close()
 
