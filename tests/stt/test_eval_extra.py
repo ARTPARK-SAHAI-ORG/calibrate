@@ -34,6 +34,38 @@ def _fake_intent_entity(intent=1, entity=1.0):
     return AsyncMock(side_effect=_fn)
 
 
+# --- format_metrics_summary ----------------------------------------------
+
+class TestFormatMetricsSummary(unittest.TestCase):
+    def test_includes_sarvam_when_present(self):
+        from calibrate.stt.eval import format_metrics_summary
+
+        line = format_metrics_summary(
+            {
+                "wer": 0.1,
+                "cer": 0.2,
+                "sarvam_intent_score": 0.9,
+                "sarvam_entity_score": 0.8,
+                "semantic": {"type": "binary", "mean": 0.75},
+            },
+            prefix="deepgram: ",
+        )
+        self.assertEqual(
+            line,
+            "  deepgram: WER=0.1000, CER=0.2000, Sarvam Intent Score=0.9000, "
+            "Sarvam Entity Score=0.8000, semantic=0.7500",
+        )
+
+    def test_omits_sarvam_when_absent(self):
+        from calibrate.stt.eval import format_metrics_summary
+
+        line = format_metrics_summary(
+            {"wer": 0.1, "cer": 0.2, "semantic": {"type": "binary", "mean": 0.75}}
+        )
+        self.assertEqual(line, "  WER=0.1000, CER=0.2000, semantic=0.7500")
+        self.assertNotIn("Sarvam", line)
+
+
 # --- load_audio -----------------------------------------------------------
 
 class TestLoadAudio(unittest.TestCase):

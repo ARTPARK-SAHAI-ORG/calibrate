@@ -28,6 +28,7 @@ from calibrate.stt.eval import (
     run_single_provider_eval,
     run_eval_only,
     validate_stt_input_dir,
+    format_metrics_summary,
     STT_PROVIDERS,
     STT_LANGUAGES,
 )
@@ -76,6 +77,7 @@ async def run(
     overwrite: bool = False,
     max_parallel: int = MAX_PARALLEL_PROVIDERS,
     judge_evaluators: list[dict] = None,
+    run_sarvam_judges: bool = False,
 ) -> dict:
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
@@ -96,6 +98,9 @@ async def run(
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
             the implicit default STT evaluator runs.
+        run_sarvam_judges: When True, also run the Sarvam intent/entity judge
+            (loads a normalizer model + makes per-row judge calls). Off by
+            default.
 
     Returns:
         dict: Results summary with status and output paths
@@ -127,6 +132,7 @@ async def run(
                 ignore_retry=ignore_retry,
                 overwrite=overwrite,
                 judge_evaluators=judge_evaluators,
+                run_sarvam_judges=run_sarvam_judges,
             )
             return (provider, result)
 
@@ -239,6 +245,15 @@ async def main():
         default=None,
         help="Path to optional JSON config file with an `evaluators` list",
     )
+    parser.add_argument(
+        "--sarvam-judges",
+        action="store_true",
+        help=(
+            "Also compute Sarvam intent & entity preservation scores. Off by "
+            "default; enabling it loads a text-normalizer model and runs an "
+            "extra per-row LLM judge."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -292,6 +307,7 @@ async def main():
     if args.eval_only:
         print("\n\033[91mSTT Eval-Only\033[0m\n")
         print(f"Dataset: {args.dataset}")
+        print(f"Language: {args.language}")
         print(f"Output: {args.output_dir}")
         print("")
 
@@ -299,6 +315,8 @@ async def main():
             dataset_path=args.dataset,
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
+            language=args.language,
+            run_sarvam_judges=args.sarvam_judges,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
@@ -310,17 +328,7 @@ async def main():
             sys.exit(1)
 
         metrics = result.get("metrics", {})
-        wer = metrics.get("wer", 0)
-        cer = metrics.get("cer", 0)
-        intent = metrics.get("sarvam_intent_score", 0)
-        entity = metrics.get("sarvam_entity_score", 0)
-        judge_scores = {
-            k: v["mean"]
-            for k, v in metrics.items()
-            if isinstance(v, dict) and "type" in v
-        }
-        judge_str = ", ".join(f"{k}={v:.4f}" for k, v in judge_scores.items())
-        print(f"  WER={wer:.4f}, CER={cer:.4f}, Sarvam Intent Score={intent:.4f}, Sarvam Entity Score={entity:.4f}, {judge_str}")
+        print(format_metrics_summary(metrics))
         return
 
     # Benchmark (multi-provider) mode: mirror stdout/stderr into a single
@@ -354,6 +362,7 @@ async def main():
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
+            run_sarvam_judges=args.sarvam_judges,
         )
 
         # Print summary
@@ -374,20 +383,7 @@ async def main():
                 has_errors = True
             else:
                 metrics = prov_result.get("metrics", {})
-                wer = metrics.get("wer", 0)
-                cer = metrics.get("cer", 0)
-                intent = metrics.get("sarvam_intent_score", 0)
-                entity = metrics.get("sarvam_entity_score", 0)
-                # Evaluator entries are dicts carrying a ``type`` field.
-                judge_scores = {
-                    k: v["mean"]
-                    for k, v in metrics.items()
-                    if isinstance(v, dict) and "type" in v
-                }
-                judge_str = ", ".join(
-                    f"{k}={v:.4f}" for k, v in judge_scores.items()
-                )
-                print(f"  {provider}: WER={wer:.4f}, CER={cer:.4f}, Sarvam Intent Score={intent:.4f}, Sarvam Entity Score={entity:.4f}, {judge_str}")
+                print(format_metrics_summary(metrics, prefix=f"{provider}: "))
 
         if has_errors:
             sys.exit(1)

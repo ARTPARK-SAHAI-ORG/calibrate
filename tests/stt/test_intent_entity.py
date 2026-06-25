@@ -28,11 +28,10 @@ def _row(intent, entity):
 
 
 def _identity_normalizer():
-    """Mock IndicNormalizer whose normalize_texts returns inputs unchanged."""
+    """Mock normalizer whose normalize_texts returns inputs unchanged."""
     inst = MagicMock()
-    inst.normalize_texts.side_effect = lambda texts, langs: list(texts)
-    cls = MagicMock(return_value=inst)
-    return cls
+    inst.normalize_texts.side_effect = lambda texts, langs, n_jobs=1: list(texts)
+    return inst
 
 
 class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
@@ -47,7 +46,7 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
             }
             return mapping[(reference, prediction)]
 
-        with patch.object(metrics, "IndicNormalizer", _identity_normalizer()), \
+        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
              patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
             result = await metrics.get_intent_entity_score(
                 references=["a", "b"],
@@ -64,10 +63,9 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
 
         # Normalizer lowercases — the judge must receive the normalized form.
         norm_inst = MagicMock()
-        norm_inst.normalize_texts.side_effect = lambda texts, langs: [
+        norm_inst.normalize_texts.side_effect = lambda texts, langs, n_jobs=1: [
             t.lower() for t in texts
         ]
-        norm_cls = MagicMock(return_value=norm_inst)
 
         seen = []
 
@@ -75,7 +73,7 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
             seen.append((reference, prediction))
             return _row(1, 1.0)
 
-        with patch.object(metrics, "IndicNormalizer", norm_cls), \
+        with patch.object(metrics, "_get_indic_normalizer", return_value=norm_inst), \
              patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
             await metrics.get_intent_entity_score(
                 references=["HELLO"],
@@ -88,13 +86,56 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
         from calibrate.stt import sarvam_intent_entity as sie
         from calibrate.stt import metrics
 
-        with patch.object(metrics, "IndicNormalizer", _identity_normalizer()), \
+        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
              patch.object(sie, "intent_entity_judge", AsyncMock()):
             result = await metrics.get_intent_entity_score(references=[], predictions=[])
 
         self.assertEqual(result["intent"], 0.0)
         self.assertEqual(result["entity"], 0.0)
         self.assertEqual(result["per_row"], [])
+
+
+class TestNormalizerCaching(unittest.TestCase):
+    def test_indic_normalizer_built_once(self):
+        from calibrate.stt import metrics
+        from calibrate.stt import sarvam_intent_entity as sie
+
+        metrics._get_indic_normalizer.cache_clear()
+        fake_cls = MagicMock()
+        try:
+            # ``_get_indic_normalizer`` imports ``IndicNormalizer`` lazily from
+            # the package, so patch it there (not on ``metrics``).
+            with patch.object(sie, "IndicNormalizer", fake_cls):
+                first = metrics._get_indic_normalizer()
+                second = metrics._get_indic_normalizer()
+            self.assertIs(first, second)
+            fake_cls.assert_called_once()
+        finally:
+            metrics._get_indic_normalizer.cache_clear()
+
+
+class TestLazyImports(unittest.TestCase):
+    def test_importing_stt_does_not_load_sarvam_stack(self):
+        import subprocess
+        import sys
+
+        # Fresh interpreter: importing the STT entry points must not pull in the
+        # vendored sarvam package or its indic-nlp dependency (model loading /
+        # heavy imports are deferred until intent/entity scoring is requested).
+        code = (
+            "import sys\n"
+            "import calibrate.stt.benchmark\n"
+            "import calibrate.stt.eval\n"
+            "import calibrate.stt.metrics\n"
+            "assert 'calibrate.stt.sarvam_intent_entity' not in sys.modules, 'sarvam pkg loaded'\n"
+            "assert 'indicnlp' not in sys.modules, 'indicnlp loaded'\n"
+            "print('ok')\n"
+        )
+        proc = subprocess.run(
+            [sys.executable, "-c", code], capture_output=True, text=True
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn("ok", proc.stdout)
 
 
 class TestIntentEntityJudge(unittest.IsolatedAsyncioTestCase):

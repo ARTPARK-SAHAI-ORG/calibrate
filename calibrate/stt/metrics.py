@@ -2,6 +2,8 @@
 STT evaluation metrics.
 """
 
+import asyncio
+from functools import lru_cache
 from typing import List, Optional
 
 import numpy as np
@@ -18,18 +20,51 @@ from calibrate.judges import (
     DEFAULT_STT_EVALUATOR,
 )
 from calibrate.langfuse import observe, langfuse, langfuse_enabled
-from calibrate.stt import sarvam_intent_entity
-from calibrate.stt.sarvam_intent_entity import (
-    DEFAULT_INTENT_ENTITY_MODEL,
-    IndicNormalizer,
-    calculate_intent_accuracy,
-    calculate_entity_metrics,
-)
+
+# NOTE: ``calibrate.stt.sarvam_intent_entity`` is imported lazily inside the
+# intent/entity functions below — importing it eagerly pulls in transformers,
+# indic-nlp, and joblib, which we want to avoid unless intent/entity scoring is
+# actually requested (it's opt-in via ``--sarvam-judges``).
 
 normalizer = BasicTextNormalizer()
 
 # Re-export for existing imports
 DEFAULT_STT_JUDGE_MODEL = DEFAULT_TEXT_JUDGE_MODEL
+
+
+@lru_cache(maxsize=1)
+def _get_indic_normalizer():
+    """Build the vendored ``IndicNormalizer`` once and reuse it.
+
+    ``IndicNormalizer.__init__`` loads the ``openai/whisper-small`` processor
+    from disk, so constructing one per scoring call (and per provider in a
+    multi-provider benchmark) reloads the model repeatedly. Caching keeps a
+    single instance for the process lifetime. The import is deferred so the
+    heavy transformers/indic-nlp stack only loads when scoring is requested.
+    """
+    from calibrate.stt.sarvam_intent_entity import IndicNormalizer
+
+    return IndicNormalizer()
+
+
+def _normalize_pairs(
+    references: List[str], predictions: List[str], language: str
+) -> tuple[List[str], List[str]]:
+    """Normalize references/predictions with the cached normalizer.
+
+    Runs in-process (``n_jobs=1`` — no joblib subprocess fork) so it can be
+    offloaded to a worker thread without freezing the event loop.
+    """
+    normalizer = _get_indic_normalizer()
+    ref_langs = [language] * len(references)
+    pred_langs = [language] * len(predictions)
+    norm_references = normalizer.normalize_texts(
+        [str(r) for r in references], ref_langs, n_jobs=1
+    )
+    norm_predictions = normalizer.normalize_texts(
+        [str(p) for p in predictions], pred_langs, n_jobs=1
+    )
+    return norm_references, norm_predictions
 
 
 def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
@@ -190,7 +225,7 @@ async def get_intent_entity_score(
     references: List[str],
     predictions: List[str],
     language: str = "english",
-    model: str = DEFAULT_INTENT_ENTITY_MODEL,
+    model: Optional[str] = None,
 ) -> dict:
     """Normalize, judge, and aggregate intent/entity preservation.
 
@@ -208,19 +243,26 @@ async def get_intent_entity_score(
             "per_row": [ {<IntentEntityResponse fields>}, ... ],
         }
 
+    ``model`` defaults to ``DEFAULT_INTENT_ENTITY_MODEL`` when omitted.
     ``per_row`` order matches the input order (``asyncio.gather`` preserves
     coroutine order).
     """
     if not references:
         return {"intent": 0.0, "entity": 0.0, "per_row": []}
 
-    langs = [language] * len(references)
-    normalizer = IndicNormalizer()
-    norm_references = normalizer.normalize_texts(
-        [str(r) for r in references], langs
+    # Deferred so the transformers/indic-nlp stack only loads when scoring runs.
+    from calibrate.stt import sarvam_intent_entity
+    from calibrate.stt.sarvam_intent_entity import (
+        DEFAULT_INTENT_ENTITY_MODEL,
+        calculate_intent_accuracy,
+        calculate_entity_metrics,
     )
-    norm_predictions = normalizer.normalize_texts(
-        [str(p) for p in predictions], langs
+
+    if model is None:
+        model = DEFAULT_INTENT_ENTITY_MODEL
+
+    norm_references, norm_predictions = await asyncio.to_thread(
+        _normalize_pairs, references, predictions, language
     )
 
     coroutines = [

@@ -138,6 +138,23 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "completed")
         self.assertIn("deepgram", result["providers"])
 
+    async def test_run_forwards_intent_entity_to_provider_eval(self):
+        from calibrate.stt import benchmark as B
+
+        fake_result = {"provider": "deepgram", "status": "completed",
+                       "metrics": {"wer": 0.1}}
+        mock_eval = AsyncMock(return_value=fake_result)
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(B, "run_single_provider_eval", mock_eval), \
+             patch.object(B, "generate_leaderboard"):
+            await B.run(
+                providers=["deepgram"],
+                input_dir=tmp,
+                output_dir=tmp,
+                run_sarvam_judges=True,
+            )
+        self.assertTrue(mock_eval.call_args.kwargs["run_sarvam_judges"])
+
     async def test_run_leaderboard_error(self):
         from calibrate.stt import benchmark as B
 
@@ -207,6 +224,62 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                  patch.object(B, "run_eval_only", AsyncMock(return_value=fake_result)):
                 await B.main()
 
+    async def test_main_eval_only_forwards_language(self):
+        from calibrate.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            ds = base / "ds.json"
+            ds.write_text(json.dumps([{"id": "a", "gt": "hi", "pred": "hi"}]))
+            out = base / "out"
+
+            fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
+            mock_eval = AsyncMock(return_value=fake_result)
+            argv = ["b.py", "--eval-only", "--dataset", str(ds),
+                    "-o", str(out), "--language", "hindi"]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run_eval_only", mock_eval):
+                await B.main()
+
+            self.assertEqual(mock_eval.call_args.kwargs["language"], "hindi")
+
+    async def test_main_eval_only_intent_entity_off_by_default(self):
+        from calibrate.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            ds = base / "ds.json"
+            ds.write_text(json.dumps([{"id": "a", "gt": "hi", "pred": "hi"}]))
+            out = base / "out"
+
+            fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
+            mock_eval = AsyncMock(return_value=fake_result)
+            argv = ["b.py", "--eval-only", "--dataset", str(ds), "-o", str(out)]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run_eval_only", mock_eval):
+                await B.main()
+
+            self.assertFalse(mock_eval.call_args.kwargs["run_sarvam_judges"])
+
+    async def test_main_eval_only_forwards_intent_entity_flag(self):
+        from calibrate.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            ds = base / "ds.json"
+            ds.write_text(json.dumps([{"id": "a", "gt": "hi", "pred": "hi"}]))
+            out = base / "out"
+
+            fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
+            mock_eval = AsyncMock(return_value=fake_result)
+            argv = ["b.py", "--eval-only", "--dataset", str(ds),
+                    "-o", str(out), "--sarvam-judges"]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run_eval_only", mock_eval):
+                await B.main()
+
+            self.assertTrue(mock_eval.call_args.kwargs["run_sarvam_judges"])
+
     async def test_main_eval_only_error(self):
         from calibrate.stt import benchmark as B
 
@@ -263,6 +336,36 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
                 await B.main()
+
+    async def test_main_forwards_intent_entity_flag_to_run(self):
+        from calibrate.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            out = base / "out"
+
+            fake_run_result = {
+                "status": "completed",
+                "output_dir": str(out),
+                "leaderboard_dir": str(out / "leaderboard"),
+                "providers": {
+                    "deepgram": {"status": "completed", "metrics": {"wer": 0.1}},
+                },
+            }
+            mock_run = AsyncMock(return_value=fake_run_result)
+
+            # Default off.
+            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
+            with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
+                await B.main()
+            self.assertFalse(mock_run.call_args.kwargs["run_sarvam_judges"])
+
+            # Flag on.
+            argv.append("--sarvam-judges")
+            with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
+                await B.main()
+            self.assertTrue(mock_run.call_args.kwargs["run_sarvam_judges"])
 
     async def test_main_error_provider_exits(self):
         from calibrate.stt import benchmark as B
