@@ -77,7 +77,7 @@ async def run(
     overwrite: bool = False,
     max_parallel: int = MAX_PARALLEL_PROVIDERS,
     judge_evaluators: list[dict] = None,
-    score_intent_entity: bool = False,
+    run_sarvam_judges: bool = False,
 ) -> dict:
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
@@ -98,7 +98,7 @@ async def run(
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
             the implicit default STT evaluator runs.
-        score_intent_entity: When True, also run the Sarvam intent/entity judge
+        run_sarvam_judges: When True, also run the Sarvam intent/entity judge
             (loads a normalizer model + makes per-row judge calls). Off by
             default.
 
@@ -132,7 +132,7 @@ async def run(
                 ignore_retry=ignore_retry,
                 overwrite=overwrite,
                 judge_evaluators=judge_evaluators,
-                score_intent_entity=score_intent_entity,
+                run_sarvam_judges=run_sarvam_judges,
             )
             return (provider, result)
 
@@ -316,7 +316,7 @@ async def main():
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
             language=args.language,
-            score_intent_entity=args.sarvam_judges,
+            run_sarvam_judges=args.sarvam_judges,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
@@ -362,7 +362,7 @@ async def main():
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
-            score_intent_entity=args.sarvam_judges,
+            run_sarvam_judges=args.sarvam_judges,
         )
 
         # Print summary

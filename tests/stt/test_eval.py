@@ -282,7 +282,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "world"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
-                    score_intent_entity=True,
+                    run_sarvam_judges=True,
                 )
 
             self.assertIn("wer", metrics)
@@ -344,7 +344,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=custom,
-                    score_intent_entity=True,
+                    run_sarvam_judges=True,
                 )
 
             # With the flag on, intent/entity report alongside a custom evaluator.

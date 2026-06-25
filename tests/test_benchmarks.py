@@ -151,9 +151,9 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
                 providers=["deepgram"],
                 input_dir=tmp,
                 output_dir=tmp,
-                score_intent_entity=True,
+                run_sarvam_judges=True,
             )
-        self.assertTrue(mock_eval.call_args.kwargs["score_intent_entity"])
+        self.assertTrue(mock_eval.call_args.kwargs["run_sarvam_judges"])
 
     async def test_run_leaderboard_error(self):
         from calibrate.stt import benchmark as B
@@ -259,7 +259,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                  patch.object(B, "run_eval_only", mock_eval):
                 await B.main()
 
-            self.assertFalse(mock_eval.call_args.kwargs["score_intent_entity"])
+            self.assertFalse(mock_eval.call_args.kwargs["run_sarvam_judges"])
 
     async def test_main_eval_only_forwards_intent_entity_flag(self):
         from calibrate.stt import benchmark as B
@@ -278,7 +278,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                  patch.object(B, "run_eval_only", mock_eval):
                 await B.main()
 
-            self.assertTrue(mock_eval.call_args.kwargs["score_intent_entity"])
+            self.assertTrue(mock_eval.call_args.kwargs["run_sarvam_judges"])
 
     async def test_main_eval_only_error(self):
         from calibrate.stt import benchmark as B
@@ -359,13 +359,13 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
-            self.assertFalse(mock_run.call_args.kwargs["score_intent_entity"])
+            self.assertFalse(mock_run.call_args.kwargs["run_sarvam_judges"])
 
             # Flag on.
             argv.append("--sarvam-judges")
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
-            self.assertTrue(mock_run.call_args.kwargs["score_intent_entity"])
+            self.assertTrue(mock_run.call_args.kwargs["run_sarvam_judges"])
 
     async def test_main_error_provider_exits(self):
         from calibrate.stt import benchmark as B

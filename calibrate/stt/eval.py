@@ -869,7 +869,7 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
-    score_intent_entity: bool = False,
+    run_sarvam_judges: bool = False,
 ) -> dict:
     """Run STT evaluation for a single provider."""
     provider_output_dir = join(output_dir, provider)
@@ -998,7 +998,7 @@ async def run_single_provider_eval(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            score_intent_entity=score_intent_entity,
+            run_sarvam_judges=run_sarvam_judges,
         )
 
         return {
@@ -1054,7 +1054,7 @@ async def _score_and_write_results(
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    score_intent_entity: bool = False,
+    run_sarvam_judges: bool = False,
 ) -> dict:
     """Run WER + LLM-judge evaluators over (gt, pred) pairs and write outputs.
 
@@ -1062,7 +1062,7 @@ async def _score_and_write_results(
     resolved evaluator config under ``evaluator_config_dir``. Returns the
     metrics_data dict.
 
-    When ``score_intent_entity`` is False (the default) the Sarvam intent/entity
+    When ``run_sarvam_judges`` is False (the default) the Sarvam intent/entity
     judge is skipped entirely — no normalizer model is loaded, no judge calls
     are made, and the ``sarvam_*`` columns/metrics are omitted.
     """
@@ -1072,10 +1072,10 @@ async def _score_and_write_results(
     cer_results = get_cer_score(gt_transcripts, pred_transcripts)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
-    # Intent + entity preservation are opt-in via ``score_intent_entity``;
+    # Intent + entity preservation are opt-in via ``run_sarvam_judges``;
     # skipping avoids loading the normalizer model and the per-row judge calls.
     intent_entity_results = None
-    if score_intent_entity:
+    if run_sarvam_judges:
         intent_entity_results = await get_intent_entity_score(
             gt_transcripts, pred_transcripts, language=language
         )
@@ -1157,7 +1157,7 @@ async def run_eval_only(
     output_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    score_intent_entity: bool = False,
+    run_sarvam_judges: bool = False,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
@@ -1171,7 +1171,7 @@ async def run_eval_only(
             built-in STT evaluator when omitted.
         language: Language of the dataset, used to normalize text before the
             intent/entity judge. Defaults to ``english``.
-        score_intent_entity: When True, also run the Sarvam intent/entity judge.
+        run_sarvam_judges: When True, also run the Sarvam intent/entity judge.
             Off by default — leaving it off skips the normalizer model load and
             the judge calls entirely.
 
@@ -1207,7 +1207,7 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            score_intent_entity=score_intent_entity,
+            run_sarvam_judges=run_sarvam_judges,
         )
 
         return {
@@ -1362,7 +1362,7 @@ async def main():
         debug_count=args.debug_count,
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
-        score_intent_entity=args.sarvam_judges,
+        run_sarvam_judges=args.sarvam_judges,
     )
 
     # Print summary
