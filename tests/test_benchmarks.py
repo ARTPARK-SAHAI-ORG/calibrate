@@ -273,7 +273,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
             mock_eval = AsyncMock(return_value=fake_result)
             argv = ["b.py", "--eval-only", "--dataset", str(ds),
-                    "-o", str(out), "--sarvam-intent-entity"]
+                    "-o", str(out), "--sarvam-judges"]
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run_eval_only", mock_eval):
                 await B.main()
@@ -362,7 +362,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(mock_run.call_args.kwargs["score_intent_entity"])
 
             # Flag on.
-            argv.append("--sarvam-intent-entity")
+            argv.append("--sarvam-judges")
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
             self.assertTrue(mock_run.call_args.kwargs["score_intent_entity"])

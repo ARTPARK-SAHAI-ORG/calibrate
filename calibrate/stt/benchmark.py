@@ -246,7 +246,7 @@ async def main():
         help="Path to optional JSON config file with an `evaluators` list",
     )
     parser.add_argument(
-        "--sarvam-intent-entity",
+        "--sarvam-judges",
         action="store_true",
         help=(
             "Also compute Sarvam intent & entity preservation scores. Off by "
@@ -316,7 +316,7 @@ async def main():
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
             language=args.language,
-            score_intent_entity=args.sarvam_intent_entity,
+            score_intent_entity=args.sarvam_judges,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
@@ -362,7 +362,7 @@ async def main():
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
-            score_intent_entity=args.sarvam_intent_entity,
+            score_intent_entity=args.sarvam_judges,
         )
 
         # Print summary

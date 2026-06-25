@@ -206,10 +206,10 @@ class TestMainDispatch(unittest.TestCase):
                 self._run_with_argv([
                     "calibrate", "stt", "-p", "deepgram",
                     "-i", str(base), "-o", str(base / "out"),
-                    "--sarvam-intent-entity",
+                    "--sarvam-judges",
                 ])
 
-        self.assertIn("--sarvam-intent-entity", captured["argv"])
+        self.assertIn("--sarvam-judges", captured["argv"])
 
     def test_stt_benchmark_omits_sarvam_flag_by_default(self):
         captured = {}
@@ -233,7 +233,7 @@ class TestMainDispatch(unittest.TestCase):
                     "-i", str(base), "-o", str(base / "out"),
                 ])
 
-        self.assertNotIn("--sarvam-intent-entity", captured["argv"])
+        self.assertNotIn("--sarvam-judges", captured["argv"])
 
     def test_stt_eval_only_forwards_sarvam_flag_and_language(self):
         captured = {}
@@ -248,10 +248,10 @@ class TestMainDispatch(unittest.TestCase):
                        AsyncMock(side_effect=fake_main)):
                 self._run_with_argv([
                     "calibrate", "stt", "--eval-only", "--dataset", str(ds),
-                    "-o", tmp, "-l", "hindi", "--sarvam-intent-entity",
+                    "-o", tmp, "-l", "hindi", "--sarvam-judges",
                 ])
 
-        self.assertIn("--sarvam-intent-entity", captured["argv"])
+        self.assertIn("--sarvam-judges", captured["argv"])
         self.assertIn("hindi", captured["argv"])
 
     def test_tts_no_provider_launches_ui(self):

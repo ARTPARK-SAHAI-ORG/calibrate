@@ -234,7 +234,7 @@ Examples:
         help="Path to dataset JSON (list of {id, gt, pred}). Required with --eval-only.",
     )
     stt_parser.add_argument(
-        "--sarvam-intent-entity",
+        "--sarvam-judges",
         action="store_true",
         help=(
             "Also compute Sarvam intent & entity preservation scores. Off by "
@@ -526,8 +526,8 @@ Examples:
             argv.extend(["-o", args.output_dir])
             if args.config:
                 argv.extend(["--config", args.config])
-            if args.sarvam_intent_entity:
-                argv.append("--sarvam-intent-entity")
+            if args.sarvam_judges:
+                argv.append("--sarvam-judges")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -551,8 +551,8 @@ Examples:
                 argv.extend(["-s", args.save_dir])
             if args.config:
                 argv.extend(["--config", args.config])
-            if args.sarvam_intent_entity:
-                argv.append("--sarvam-intent-entity")
+            if args.sarvam_judges:
+                argv.append("--sarvam-judges")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())

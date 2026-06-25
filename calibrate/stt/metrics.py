@@ -24,7 +24,7 @@ from calibrate.langfuse import observe, langfuse, langfuse_enabled
 # NOTE: ``calibrate.stt.sarvam_intent_entity`` is imported lazily inside the
 # intent/entity functions below — importing it eagerly pulls in transformers,
 # indic-nlp, and joblib, which we want to avoid unless intent/entity scoring is
-# actually requested (it's opt-in via ``--sarvam-intent-entity``).
+# actually requested (it's opt-in via ``--sarvam-judges``).
 
 normalizer = BasicTextNormalizer()
 
