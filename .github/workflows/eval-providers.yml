@@ -4,15 +4,13 @@ name: Eval providers (live)
 # TTS providers whenever either provider router (calibrate/stt/eval.py or
 # calibrate/tts/eval.py) changes. These make real API calls, so they rely on
 # provider API keys being configured as GitHub Actions secrets.
+#
+# Runs only on push to main (not on pull_request): the live eval needs secrets,
+# which are unavailable to fork PRs, and these are paid API calls — so validate
+# after merge rather than on every PR.
 
 on:
   push:
-    branches: [main]
-    paths:
-      - "calibrate/stt/eval.py"
-      - "calibrate/tts/eval.py"
-      - ".github/workflows/eval-providers.yml"
-  pull_request:
     branches: [main]
     paths:
       - "calibrate/stt/eval.py"
