@@ -630,6 +630,30 @@ def _sorted_union_dict_keys(left: dict, right: dict) -> List[Any]:
     return sorted(set(left) | set(right), key=lambda k: (type(k).__name__, repr(k)))
 
 
+def _values_equal(expected, actual, *, ignore_case: bool = False) -> bool:
+    """Return whether two argument values match under the given rules."""
+    if not ignore_case:
+        return expected == actual
+    if type(expected) is not type(actual):
+        return False
+    if isinstance(expected, str):
+        return expected.casefold() == actual.casefold()
+    if isinstance(expected, dict):
+        if set(expected.keys()) != set(actual.keys()):
+            return False
+        return all(
+            _values_equal(expected[k], actual[k], ignore_case=ignore_case)
+            for k in expected
+        )
+    if isinstance(expected, (list, tuple)):
+        if len(expected) != len(actual):
+            return False
+        return all(
+            _values_equal(e, a, ignore_case=ignore_case) for e, a in zip(expected, actual)
+        )
+    return expected == actual
+
+
 def _value_mismatch_detail(expected, actual) -> str:
     """The reason (no ``path`` prefix) two leaf values differ.
 
@@ -654,17 +678,26 @@ def _tool_call_argument_value_mismatch_line(key_path: str, expected, actual) -> 
 
 
 def _tool_call_arguments_diff_lines(
-    expected: dict, actual: dict, prefix: str = ""
+    expected: dict, actual: dict, prefix: str = "", *, ignore_case: bool = False
 ) -> List[str]:
     """List per-field mismatch lines for two argument dicts (recursive).
 
-    Criteria-agnostic: every value is compared literally. This is the
-    exact-match view used by the aggregation fallback and by ``exact`` specs
-    (whose value must be matched verbatim). It is a thin wrapper over
-    :func:`_collect_arg_diffs` with criteria interpretation disabled.
+    Criteria-agnostic except for ``exact`` specs (which are unwrapped and may
+    carry ``ignore_case``). This is the exact-match view used by the
+    aggregation fallback and by nested ``exact`` spec values. It is a thin
+    wrapper over :func:`_collect_arg_diffs` with full criteria interpretation
+    disabled.
     """
     lines: List[str] = []
-    _collect_arg_diffs(expected, actual, prefix, lines, [], criteria_aware=False)
+    _collect_arg_diffs(
+        expected,
+        actual,
+        prefix,
+        lines,
+        [],
+        criteria_aware=False,
+        ignore_case=ignore_case,
+    )
     return lines
 
 
@@ -731,6 +764,32 @@ def _is_any_spec(value) -> bool:
     return isinstance(value, dict) and value.get("match_type") == "any"
 
 
+def _parse_exact_spec(value: dict, key: str) -> dict:
+    """Normalize an ``exact`` match spec dict."""
+    if "value" not in value:
+        raise ValueError(
+            f"Tool-call parameter '{key}': an 'exact' match_type requires "
+            f"a 'value' field holding the literal to match."
+        )
+    ignore_case = value.get("ignore_case", False)
+    if not isinstance(ignore_case, bool):
+        raise ValueError(
+            f"Tool-call parameter '{key}': 'ignore_case' must be a boolean "
+            f"(got {type(ignore_case).__name__})."
+        )
+    spec = {"match_type": "exact", "value": value["value"]}
+    if ignore_case:
+        spec["ignore_case"] = True
+    return spec
+
+
+def _exact_param_spec(value, key: str) -> Optional[dict]:
+    """Like :func:`_param_criteria_spec`, but only for ``exact`` specs."""
+    if not isinstance(value, dict) or value.get("match_type") != "exact":
+        return None
+    return _parse_exact_spec(value, key)
+
+
 def _param_criteria_spec(value, key: str) -> Optional[dict]:
     """Interpret an expected-argument value as a per-parameter matching spec.
 
@@ -738,7 +797,7 @@ def _param_criteria_spec(value, key: str) -> Optional[dict]:
     single tool-call parameter out of exact matching::
 
         {"match_type": "llm_judge", "criteria": "...", "judge_model": "..."}
-        {"match_type": "exact", "value": <literal>}
+        {"match_type": "exact", "value": <literal>, "ignore_case": true|false}
 
     The ``{"match_type": "any"}`` wildcard is recognized and skipped by
     :func:`_is_any_spec` before this point, so it never reaches here.
@@ -762,12 +821,7 @@ def _param_criteria_spec(value, key: str) -> Optional[dict]:
             spec["judge_model"] = value["judge_model"]
         return spec
     if match_type == "exact":
-        if "value" not in value:
-            raise ValueError(
-                f"Tool-call parameter '{key}': an 'exact' match_type requires "
-                f"a 'value' field holding the literal to match."
-            )
-        return {"match_type": "exact", "value": value["value"]}
+        return _parse_exact_spec(value, key)
     raise ValueError(
         f"Tool-call parameter '{key}': match_type must be 'exact', "
         f"'llm_judge', or 'any' (got {match_type!r})."
@@ -839,6 +893,7 @@ def _collect_arg_diffs(
     *,
     criteria_aware: bool = True,
     records: Optional[List[dict]] = None,
+    ignore_case: bool = False,
 ) -> None:
     """Recursively diff expected vs. actual argument dicts.
 
@@ -887,7 +942,10 @@ def _collect_arg_diffs(
         if _is_any_spec(expected[key]):
             continue
 
-        spec = _param_criteria_spec(expected[key], path) if criteria_aware else None
+        if criteria_aware:
+            spec = _param_criteria_spec(expected[key], path)
+        else:
+            spec = _exact_param_spec(expected[key], path)
         if spec is not None and spec["match_type"] == "llm_judge":
             if not in_act:
                 _record_failure(
@@ -912,6 +970,9 @@ def _collect_arg_diffs(
             continue
 
         ev = spec["value"] if spec is not None else expected[key]
+        leaf_ignore_case = (
+            spec.get("ignore_case", False) if spec is not None else ignore_case
+        )
         if not in_act:
             _record_failure(
                 path,
@@ -922,17 +983,20 @@ def _collect_arg_diffs(
             )
             continue
         av = actual[key]
-        if ev == av:
+        if _values_equal(ev, av, ignore_case=leaf_ignore_case):
             if records is not None:
-                records.append(
-                    {"param": path, "match_type": "exact", "match": True}
-                )
+                record = {"param": path, "match_type": "exact", "match": True}
+                if leaf_ignore_case:
+                    record["ignore_case"] = True
+                records.append(record)
             continue
         if isinstance(ev, dict) and isinstance(av, dict):
             if spec is not None:
                 # exact spec → compare its value literally (specs inside an
                 # exact value are not re-interpreted)
-                sub_lines = _tool_call_arguments_diff_lines(ev, av, path)
+                sub_lines = _tool_call_arguments_diff_lines(
+                    ev, av, path, ignore_case=leaf_ignore_case
+                )
                 lines.extend(sub_lines)
                 if records is not None:
                     records.append(
@@ -954,6 +1018,7 @@ def _collect_arg_diffs(
                     judge_jobs,
                     criteria_aware=criteria_aware,
                     records=records,
+                    ignore_case=ignore_case,
                 )
             continue
         _record_failure(path, _value_mismatch_detail(ev, av), lines, records)

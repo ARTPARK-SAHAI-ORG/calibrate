@@ -401,6 +401,36 @@ class TestParamCriteriaSpec(unittest.TestCase):
         spec = _param_criteria_spec({"match_type": "exact", "value": 42}, "x")
         self.assertEqual(spec, {"match_type": "exact", "value": 42})
 
+    def test_exact_spec_ignore_case_true(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        spec = _param_criteria_spec(
+            {"match_type": "exact", "value": "Hello", "ignore_case": True},
+            "x",
+        )
+        self.assertEqual(
+            spec,
+            {"match_type": "exact", "value": "Hello", "ignore_case": True},
+        )
+
+    def test_exact_spec_ignore_case_false_omitted(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        spec = _param_criteria_spec(
+            {"match_type": "exact", "value": "Hello", "ignore_case": False},
+            "x",
+        )
+        self.assertEqual(spec, {"match_type": "exact", "value": "Hello"})
+
+    def test_exact_spec_ignore_case_must_be_bool(self):
+        from calibrate.llm.run_tests import _param_criteria_spec
+
+        with self.assertRaises(ValueError):
+            _param_criteria_spec(
+                {"match_type": "exact", "value": "Hello", "ignore_case": "true"},
+                "x",
+            )
+
     def test_exact_requires_value(self):
         from calibrate.llm.run_tests import _param_criteria_spec
 
@@ -523,6 +553,56 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
                 [{"tool": "a", "arguments": {
                     "x": {"match_type": "exact",
                           "value": {"match_type": "exact", "value": 1}}}}],
+            ))
+        self.assertTrue(result["passed"])
+        mock_judge.assert_not_called()
+
+    def test_exact_spec_ignore_case_pass(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"city": "mumbai"}}],
+                [{"tool": "a", "arguments": {
+                    "city": {
+                        "match_type": "exact",
+                        "value": "Mumbai",
+                        "ignore_case": True,
+                    },
+                }}],
+            ))
+        self.assertTrue(result["passed"])
+        mock_judge.assert_not_called()
+
+    def test_exact_spec_ignore_case_fail_when_disabled(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        result = asyncio.run(evaluate_tool_calls(
+            [{"tool": "a", "arguments": {"city": "mumbai"}}],
+            [{"tool": "a", "arguments": {
+                "city": {
+                    "match_type": "exact",
+                    "value": "Mumbai",
+                    "ignore_case": False,
+                },
+            }}],
+        ))
+        self.assertFalse(result["passed"])
+        self.assertIn("city", result["reasoning"])
+
+    def test_exact_spec_ignore_case_nested_dict(self):
+        from calibrate.llm.run_tests import evaluate_tool_calls
+
+        with patch("calibrate.llm.run_tests.text_judge") as mock_judge:
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"loc": {"city": "paris"}}}],
+                [{"tool": "a", "arguments": {
+                    "loc": {
+                        "match_type": "exact",
+                        "value": {"city": "Paris"},
+                        "ignore_case": True,
+                    },
+                }}],
             ))
         self.assertTrue(result["passed"])
         mock_judge.assert_not_called()
@@ -771,6 +851,20 @@ class TestAnyWildcardParam(unittest.TestCase):
         self.assertIsNone(_tool_call_pair_mismatch(
             {"tool": "lookup", "arguments": {"city": "London", "token": "xyz-123"}},
             {"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}},
+        ))
+
+    def test_sync_pair_mismatch_ignore_case_matches(self):
+        from calibrate.llm.run_tests import _tool_call_pair_mismatch
+
+        self.assertIsNone(_tool_call_pair_mismatch(
+            {"tool": "lookup", "arguments": {"city": "mumbai"}},
+            {"tool": "lookup", "arguments": {
+                "city": {
+                    "match_type": "exact",
+                    "value": "Mumbai",
+                    "ignore_case": True,
+                },
+            }},
         ))
 
 
