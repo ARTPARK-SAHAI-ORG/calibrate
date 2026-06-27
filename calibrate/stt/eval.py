@@ -4,8 +4,6 @@ import sys
 import os
 import json
 import base64
-import time
-import httpx
 from os.path import join, exists
 from datetime import datetime
 from pathlib import Path
@@ -14,9 +12,7 @@ from urllib.parse import urlencode
 import backoff
 from sarvamai import AsyncSarvamAI
 from openai import AsyncOpenAI
-from elevenlabs.client import AsyncElevenLabs
 from groq import AsyncGroq
-from deepgram import DeepgramClient, PrerecordedOptions, FileSource
 from cartesia import AsyncCartesia
 import uuid
 from google.cloud.speech_v2 import SpeechClient
@@ -49,7 +45,11 @@ from calibrate.langfuse import (
     langfuse,
     langfuse_enabled,
 )
-from calibrate.rate_limit import SARVAM_STT_STREAMING_LIMITER
+from calibrate.rate_limit import (
+    STT_PROVIDER_TIMEOUT_SECONDS,
+    STT_STREAMING_IDLE_TIMEOUT_SECONDS,
+    SARVAM_STT_STREAMING_LIMITER,
+)
 
 
 # =============================================================================
@@ -100,36 +100,124 @@ def load_audio(audio_path: Path, as_file: bool = False, raw_pcm: bool = False):
     return out_io.getvalue()
 
 
-async def transcribe_deepgram(audio_path: Path, language: str) -> str:
-    """Transcribe audio using Deepgram's REST API."""
+async def _aiter_with_idle_timeout(aiter, timeout: float):
+    """Async-iterate ``aiter`` enforcing a per-message idle timeout.
+
+    Raises ``asyncio.TimeoutError`` if no next message arrives within
+    ``timeout`` seconds. Useful for STT WebSocket loops where the SDK's
+    own timeout settings don't apply to the receive side and a stalled
+    server can otherwise block forever.
+    """
+    it = aiter.__aiter__() if hasattr(aiter, "__aiter__") else aiter
+    while True:
+        try:
+            msg = await asyncio.wait_for(it.__anext__(), timeout=timeout)
+        except StopAsyncIteration:
+            return
+        yield msg
+
+
+async def transcribe_deepgram_streaming(audio_path: Path, language: str) -> str:
+    """Transcribe audio using Deepgram's live streaming WebSocket API.
+
+    Uses the raw WebSocket protocol (``wss://api.deepgram.com/v1/listen``)
+    rather than the threaded SDK because the SDK's live client is sync /
+    callback-based and doesn't compose with our async pipeline. See
+    https://developers.deepgram.com/docs/live-streaming-audio.
+    """
+    try:
+        from websockets.asyncio.client import connect as websocket_connect
+    except ModuleNotFoundError as e:
+        raise ImportError(
+            "websockets is required for Deepgram streaming STT. "
+            "Install with 'pip install websockets'."
+        ) from e
+
     api_key = os.getenv("DEEPGRAM_API_KEY")
     if not api_key:
         raise ValueError("DEEPGRAM_API_KEY environment variable not set")
 
     lang_code = get_stt_language_code(language, "deepgram")
 
-    client = DeepgramClient(api_key=api_key)
-
-    audio_file = load_audio(audio_path)
-
-    options = PrerecordedOptions(model="nova-3", language=lang_code)
-
-    payload: FileSource = {
-        "buffer": audio_file,
+    endpoint = "wss://api.deepgram.com/v1/listen"
+    params = {
+        "model": "nova-3",
+        "language": lang_code,
+        "encoding": "linear16",
+        "sample_rate": "16000",
+        "channels": "1",
+        "smart_format": "true",
     }
+    ws_url = f"{endpoint}?{urlencode(params)}"
+    headers = {"Authorization": f"Token {api_key}"}
 
-    response = await client.listen.asyncrest.v("1").transcribe_file(
-        source=payload, options=options
-    )
-    transcript = response.results.channels[0].alternatives[0].transcript.strip()
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 4096
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+
+        async def send_audio():
+            for start in range(0, len(audio), chunk_size):
+                chunk = audio[start : start + chunk_size]
+                if chunk:
+                    await ws.send(chunk)
+
+            # Tells Deepgram we've sent all audio so it flushes and closes.
+            await ws.send(json.dumps({"type": "CloseStream"}))
+
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+
+        try:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
+                try:
+                    output = json.loads(message)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+                if not isinstance(output, dict):
+                    continue
+
+                msg_type = output.get("type")
+
+                if msg_type == "Results":
+                    alternatives = output.get("channel", {}).get("alternatives") or []
+                    if not alternatives:
+                        continue
+
+                    transcript = alternatives[0].get("transcript", "")
+                    if output.get("is_final") and transcript:
+                        transcript_parts.append(transcript)
+                elif msg_type == "Metadata":
+                    # Sent after CloseStream once Deepgram has flushed all
+                    # final transcripts — safe to stop reading.
+                    break
+        finally:
+            if sender.done():
+                await sender
+            else:
+                sender.cancel()
+                try:
+                    await sender
+                except asyncio.CancelledError:
+                    pass
 
     return {
-        "transcript": transcript,
+        "transcript": " ".join(
+            part.strip() for part in transcript_parts if part.strip()
+        ),
     }
 
 
-async def transcribe_openai(audio_path: Path, language: str) -> str:
-    """Transcribe audio using OpenAI's Whisper API."""
+async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
+    """Transcribe audio using OpenAI's transcriptions API with ``stream=True``.
+
+    Streams ``transcript.text.delta`` events as soon as each segment is ready
+    and finishes on ``transcript.text.done`` which carries the full transcript.
+    See https://developers.openai.com/api/docs/guides/speech-to-text#streaming.
+    """
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set")
@@ -138,10 +226,22 @@ async def transcribe_openai(audio_path: Path, language: str) -> str:
 
     audio_file = load_audio(audio_path, as_file=True)
 
-    response = await client.audio.transcriptions.create(
-        model="gpt-4o-transcribe", file=audio_file
+    stream = await client.audio.transcriptions.create(
+        model="gpt-4o-transcribe",
+        file=audio_file,
+        response_format="text",
+        stream=True,
     )
-    transcript = response.text
+
+    transcript = ""
+
+    async for event in _aiter_with_idle_timeout(
+        stream, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+    ):
+        event_type = getattr(event, "type", None)
+        if event_type == "transcript.text.done":
+            transcript = getattr(event, "text", "") or ""
+            break
 
     return {
         "transcript": transcript,
@@ -160,12 +260,15 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
 
     audio_file = load_audio(audio_path, as_file=True)
 
-    transcription = await client.audio.transcriptions.create(
-        file=audio_file,  # Required audio file
-        model="whisper-large-v3-turbo",  # Required model to use for transcription
-        response_format="text",  # Optional
-        language=lang_code,  # Optional
-        temperature=0.0,  # Optional
+    transcription = await asyncio.wait_for(
+        client.audio.transcriptions.create(
+            file=audio_file,  # Required audio file
+            model="whisper-large-v3-turbo",  # Required model to use for transcription
+            response_format="text",  # Optional
+            language=lang_code,  # Optional
+            temperature=0.0,  # Optional
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
     )
 
     return {
@@ -219,7 +322,10 @@ def _transcribe_google_streaming(
         model=model,
     )
     streaming_config = cloud_speech_types.StreamingRecognitionConfig(
-        config=recognition_config
+        config=recognition_config,
+        streaming_features=cloud_speech_types.StreamingRecognitionFeatures(
+            interim_results=True,
+        ),
     )
     config_request = cloud_speech_types.StreamingRecognizeRequest(
         recognizer=f"projects/{PROJECT_ID}/locations/{region}/recognizers/_",
@@ -233,30 +339,32 @@ def _transcribe_google_streaming(
         yield config
         for req in audio:
             yield req
-            # Pace 24KB chunks to avoid flooding Google's streaming gRPC endpoint.
-            time.sleep(0.5)
 
     # Transcribes the audio into text
     responses_iterator = client.streaming_recognize(
         requests=requests(config_request, audio_requests)
     )
-    all_interim_transcripts = []
+    final_transcripts = []
 
     for response in responses_iterator:
         for result in response.results:
-            interim_transcript = result.alternatives[0].transcript.strip()
-            if not interim_transcript:
+            transcript = result.alternatives[0].transcript.strip()
+            if not transcript:
                 continue
 
-            all_interim_transcripts.append(interim_transcript)
+            # Interim results are enabled, so only final results contribute to
+            # the transcript to avoid concatenating duplicated, evolving partial
+            # hypotheses.
+            if result.is_final:
+                final_transcripts.append(transcript)
 
-    return " ".join(all_interim_transcripts)
+    return {
+        "transcript": " ".join(final_transcripts),
+    }
 
 
 async def transcribe_google(audio_path: Path, language: str) -> str:
     """Transcribe audio using Google Cloud Speech-to-Text API."""
-    from google.cloud import speech_v1 as speech
-
     credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
     if not credentials_path:
         raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
@@ -271,16 +379,19 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
         model = "chirp_3"
         region = "us"
 
-    transcript = await asyncio.to_thread(
-        _transcribe_google_streaming,
-        audio_path,
-        lang_code,
-        model,
-        region,
+    result = await asyncio.wait_for(
+        asyncio.to_thread(
+            _transcribe_google_streaming,
+            audio_path,
+            lang_code,
+            model,
+            region,
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
     )
 
     return {
-        "transcript": transcript.strip(),
+        "transcript": result["transcript"].strip(),
     }
 
 
@@ -348,31 +459,6 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
     }
 
 
-async def transcribe_elevenlabs(audio_path: Path, language: str) -> str:
-    """Transcribe audio using ElevenLabs' STT API."""
-    api_key = os.getenv("ELEVENLABS_API_KEY")
-    if not api_key:
-        raise ValueError("ELEVENLABS_API_KEY environment variable not set")
-
-    lang_code = get_stt_language_code(language, "elevenlabs")
-
-    elevenlabs = AsyncElevenLabs(api_key=api_key)
-
-    audio_data = load_audio(audio_path)
-
-    response = await elevenlabs.speech_to_text.convert(
-        file=audio_data,
-        model_id="scribe_v2",
-        language_code=lang_code,
-    )
-
-    transcript = response.text
-
-    return {
-        "transcript": transcript,
-    }
-
-
 async def transcribe_cartesia(audio_path: Path, language: str) -> str:
     """Transcribe audio using Cartesia's STT API."""
     api_key = os.getenv("CARTESIA_API_KEY")
@@ -407,8 +493,6 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
                 chunk = audio_data[i : i + chunk_size]
                 if chunk:
                     yield chunk
-                    # Simulate real-time streaming delay
-                    await asyncio.sleep(0.1)
 
         # Send audio and receive results concurrently
         async def send_audio():
@@ -416,88 +500,38 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
             async for chunk in audio_stream():
                 await ws.send(chunk)
                 # print(f"Sent audio chunk of {len(chunk)} bytes")
-                # Small delay to simulate realtime applications
-                await asyncio.sleep(0.02)
 
             # Signal end of audio stream
             await ws.send("finalize")
-            await ws.send("done")
+            await ws.send("close")
             # print("Audio streaming completed")
 
         async def receive_transcripts():
             """Receive and process transcription results with word timestamps"""
             full_transcript = ""
 
-            async for result in ws.receive():
+            async for result in _aiter_with_idle_timeout(
+                ws.receive(), STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
                 if result["type"] == "transcript":
                     text = result["text"]
                     is_final = result["is_final"]
-
                     if is_final:
-                        # Final result - this text won't change
                         full_transcript += text + " "
-                        # print(f"FINAL: {text}")
-                    # else:
-                    # Partial result - may change as more audio is processed
-                    # print(f"PARTIAL: {text}")
 
                 elif result["type"] == "done":
-                    # print("Transcription completed")
                     break
 
             return full_transcript.strip()
 
-        # print("Starting streaming STT...")
+        _, final_transcript = await asyncio.gather(send_audio(), receive_transcripts())
 
-        # Use asyncio.gather to run audio sending and transcript receiving concurrently
-        _, (final_transcript) = await asyncio.gather(
-            send_audio(), receive_transcripts()
-        )
-
-        # print(f"\nComplete transcript: {final_transcript}")
-        # print(f"Total words with timestamps: {len(word_timestamps)}")
-
-        # Clean up
         await ws.close()
 
         return {"transcript": final_transcript}
 
     finally:
         await client.close()
-
-
-async def transcribe_smallest(audio_path: Path, language: str) -> str:
-    """Transcribe audio using Smallest's STT API."""
-    api_key = os.getenv("SMALLEST_API_KEY")
-    if not api_key:
-        raise ValueError("SMALLEST_API_KEY environment variable not set")
-
-    lang_code = get_stt_language_code(language, "smallest")
-
-    endpoint = "https://api.smallest.ai/waves/v1/pulse/get_text"
-    params = {
-        "model": "pulse",
-        "language": lang_code,
-        "word_timestamps": "false",
-    }
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "audio/wav",
-    }
-
-    audio = load_audio(audio_path)
-
-    async with httpx.AsyncClient(timeout=120.0) as client:
-        response = await client.post(
-            endpoint, params=params, headers=headers, content=audio
-        )
-
-    output = response.json()
-    transcript = output.get("transcription", "")
-
-    return {
-        "transcript": transcript,
-    }
 
 
 async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
@@ -515,8 +549,9 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
         raise ValueError("SMALLEST_API_KEY environment variable not set")
 
     lang_code = get_stt_language_code(language, "smallest")
-    endpoint = "wss://api.smallest.ai/waves/v1/pulse/get_text"
+    endpoint = "wss://api.smallest.ai/waves/v1/stt/live"
     params = {
+        "model": "pulse",
         "language": lang_code,
         "encoding": "linear16",
         "sample_rate": "16000",
@@ -534,17 +569,16 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
                 chunk = audio[start : start + chunk_size]
                 if chunk:
                     await ws.send(chunk)
-                    await asyncio.sleep(0.05)
 
             await ws.send(json.dumps({"type": "close_stream"}))
 
-        start_time = time.perf_counter()
-        ttft = None
         sender = asyncio.create_task(send_audio())
         transcript_parts = []
 
         try:
-            async for message in ws:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
                 try:
                     output = json.loads(message)
                 except json.JSONDecodeError:
@@ -558,9 +592,6 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
                     raise RuntimeError(f"Smallest streaming STT error: {error}")
 
                 transcript = output.get("transcript", "")
-                if transcript and ttft is None:
-                    ttft = time.perf_counter() - start_time
-
                 if output.get("is_final") and transcript:
                     transcript_parts.append(transcript)
 
@@ -580,7 +611,148 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
         "transcript": " ".join(
             part.strip() for part in transcript_parts if part.strip()
         ),
-        "ttft": ttft,
+    }
+
+
+# How long to wait for another ElevenLabs ``committed_transcript`` segment
+# before treating the stream as finished. The server auto-commits long audio
+# into multiple segments (~every 36s) and sends no end-of-transcript marker,
+# so completion is detected by this inter-segment idle gap.
+ELEVENLABS_SEGMENT_IDLE_SECONDS = 3.0
+
+
+async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> str:
+    """Transcribe audio using ElevenLabs' Scribe v2 Realtime via the official SDK.
+
+    Uses the SDK's ``speech_to_text.realtime.connect`` (manual commit strategy).
+    See https://elevenlabs.io/docs/eleven-api/guides/how-to/speech-to-text/realtime/server-side-streaming.
+    """
+    from elevenlabs import (
+        AudioFormat,
+        CommitStrategy,
+        ElevenLabs,
+        RealtimeAudioOptions,
+        RealtimeEvents,
+    )
+
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise ValueError("ELEVENLABS_API_KEY environment variable not set")
+
+    lang_code = get_stt_language_code(language, "elevenlabs")
+
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 32000  # 1s of 16 kHz, 16-bit mono PCM
+
+    transcript_parts: List[str] = []
+    fatal_error: Dict[str, object] = {"data": None}
+    session_started = asyncio.Event()
+    # Set whenever a committed_transcript arrives (to detect the stream going
+    # idle) and whenever the stream closes or errors.
+    segment_event = asyncio.Event()
+    closed = asyncio.Event()
+
+    def _on_session_started(_data):
+        session_started.set()
+
+    def _on_committed_transcript(data):
+        # The server segments long audio and auto-commits roughly every 36s, so
+        # a single manual commit can still yield MULTIPLE committed_transcript
+        # messages (one per segment) with no terminal marker. Accumulate every
+        # segment instead of stopping at the first, or long audio gets truncated.
+        if isinstance(data, dict):
+            text = data.get("text", "")
+            if text:
+                transcript_parts.append(text)
+        segment_event.set()
+
+    def _on_error(data):
+        # ``insufficient_audio_activity`` fires for clips with no committable
+        # speech — treat it as a graceful end-of-stream (empty transcript)
+        # rather than a hard error that would trigger the @backoff retries.
+        if (
+            isinstance(data, dict)
+            and data.get("message_type") == "insufficient_audio_activity"
+        ):
+            closed.set()
+            segment_event.set()
+            return
+        fatal_error["data"] = data
+        closed.set()
+        segment_event.set()
+
+    def _on_close(*_args):
+        closed.set()
+        segment_event.set()
+
+    client = ElevenLabs(api_key=api_key)
+    connection = await client.speech_to_text.realtime.connect(
+        RealtimeAudioOptions(
+            model_id="scribe_v2_realtime",
+            audio_format=AudioFormat.PCM_16000,
+            sample_rate=16000,
+            commit_strategy=CommitStrategy.MANUAL,
+            language_code=lang_code,
+        )
+    )
+
+    connection.on(RealtimeEvents.SESSION_STARTED, _on_session_started)
+    connection.on(RealtimeEvents.COMMITTED_TRANSCRIPT, _on_committed_transcript)
+    connection.on(RealtimeEvents.ERROR, _on_error)
+    connection.on(RealtimeEvents.CLOSE, _on_close)
+
+    try:
+        # The server emits ``session_started`` before accepting audio.
+        try:
+            await asyncio.wait_for(
+                session_started.wait(), timeout=STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            )
+        except asyncio.TimeoutError:
+            pass
+
+        for start in range(0, len(audio), chunk_size):
+            chunk = audio[start : start + chunk_size]
+            if chunk:
+                await connection.send(
+                    {"audio_base_64": base64.b64encode(chunk).decode("utf-8")}
+                )
+
+        # Let the trailing chunk land before finalising (per ElevenLabs docs);
+        # without this, sub-second clips close with insufficient_audio_activity
+        # and never emit a committed_transcript.
+        await asyncio.sleep(0.5)
+        await connection.commit()
+
+        # Collect ALL committed segments. There is no end-of-transcript marker,
+        # so we finish once the stream goes idle (no new segment within the idle
+        # window), closes, or errors. The first segment is bounded by the longer
+        # streaming idle timeout; once segments start arriving they come
+        # back-to-back, so a short inter-segment gap signals completion.
+        received_any = bool(transcript_parts)
+        while not closed.is_set():
+            segment_event.clear()
+            timeout = (
+                ELEVENLABS_SEGMENT_IDLE_SECONDS
+                if received_any
+                else STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            )
+            try:
+                await asyncio.wait_for(segment_event.wait(), timeout=timeout)
+            except asyncio.TimeoutError:
+                break
+            received_any = True
+    finally:
+        await connection.close()
+
+    if fatal_error["data"] is not None and not transcript_parts:
+        raise RuntimeError(
+            f"ElevenLabs streaming STT error: {fatal_error['data']}"
+        )
+
+    return {
+        "transcript": " ".join(
+            part.strip() for part in transcript_parts if part.strip()
+        ),
     }
 
 
@@ -600,14 +772,13 @@ async def transcribe_audio(
 ) -> str:
     """Route audio transcription to the appropriate provider."""
     provider_methods = {
-        "deepgram": transcribe_deepgram,
-        "openai": transcribe_openai,
+        "deepgram": transcribe_deepgram_streaming,
+        "openai": transcribe_openai_streaming,
         "groq": transcribe_groq,
         "google": transcribe_google,
         "sarvam": transcribe_sarvam,
-        "elevenlabs": transcribe_elevenlabs,
+        "elevenlabs": transcribe_elevenlabs_streaming,
         "cartesia": transcribe_cartesia,
-        # "smallest": transcribe_smallest,
         "smallest": transcribe_smallest_streaming,
     }
 
@@ -639,7 +810,9 @@ async def transcribe_audio(
             session_id=unique_id,
         )
 
-    return transcript
+    return {
+        "transcript": transcript,
+    }
 
 
 # =============================================================================
@@ -690,9 +863,10 @@ async def run_stt_eval(
         _log(f"Processing audio [{i + 1}/{len(gt_data)}]: {audio_path.name}")
 
         try:
-            transcript = await transcribe_audio(
+            output = await transcribe_audio(
                 audio_path, gt_info["gt"], provider, language, unique_id
             )
+            transcript = output["transcript"]
             _log(f"\033[33mTranscript: {transcript}\033[0m")
             if transcript:
                 success_count += 1
@@ -958,7 +1132,11 @@ async def run_single_provider_eval(
                 for gt_info in gt_data:
                     if gt_info["id"] not in processed_ids:
                         results.append(
-                            {"id": gt_info["id"], "gt": gt_info["gt"], "pred": ""}
+                            {
+                                "id": gt_info["id"],
+                                "gt": gt_info["gt"],
+                                "pred": "",
+                            }
                         )
 
                 pd.DataFrame(results).to_csv(results_csv_path, index=False)

@@ -38,32 +38,30 @@ class SmallestSTTService(WebsocketSTTService):
     """Speech-to-text service implementation for the Smallest.ai WebSocket API."""
 
     class SmallestInputParams(BaseModel):
-        """Configuration options used to build the Smallest.ai connection string."""
+        """Configuration options used to build the Smallest.ai Pulse STT connection."""
 
-        audioLanguage: str = Field(default=Language.EN.value)
-        audioEncoding: str = "linear16"
-        audioSampleRate: int = 16000
-        audioChannels: int = 1
-        addPunctuation: bool = True
+        model: str = "pulse"
+        language: str = Field(default=Language.EN.value)
+        encoding: str = "linear16"
+        sample_rate: int = 16000
+        word_timestamps: bool = False
 
         # Allow arbitrary additional parameters to be forwarded to the service.
         class Config:
             extra = "allow"
             populate_by_name = True
 
-        @field_validator("audioLanguage", mode="before")
+        @field_validator("language", mode="before")
         @classmethod
         def _normalise_language(cls, value: Union[Language, str]) -> str:
             if isinstance(value, Language):
                 return value.value
             if isinstance(value, str):
                 return value
-            raise ValueError("audioLanguage must be a Language or string")
+            raise ValueError("language must be a Language or string")
 
-        def to_query_params(self, api_key: Optional[str] = None) -> Dict[str, str]:
-            params = self.model_dump(exclude_none=True, by_alias=True)
-            if api_key:
-                params["api_key"] = api_key
+        def to_query_params(self) -> Dict[str, str]:
+            params = self.model_dump(exclude_none=True)
 
             normalised: Dict[str, str] = {}
             for key, value in params.items():
@@ -78,7 +76,7 @@ class SmallestSTTService(WebsocketSTTService):
         self,
         *,
         api_key: Optional[str],
-        url: str = "wss://waves-api.smallest.ai/api/v1/asr",
+        url: str = "wss://api.smallest.ai/waves/v1/stt/live",
         params: Optional["SmallestSTTService.SmallestInputParams"] = None,
         sample_rate: Optional[int] = None,
         reconnect_on_error: bool = True,
@@ -87,7 +85,7 @@ class SmallestSTTService(WebsocketSTTService):
         self._api_key = api_key
         self._url = url.rstrip("?")
         self._input_params = params or self.SmallestInputParams()
-        effective_sample_rate = sample_rate or int(self._input_params.audioSampleRate)
+        effective_sample_rate = sample_rate or int(self._input_params.sample_rate)
 
         super().__init__(
             sample_rate=effective_sample_rate,
@@ -99,7 +97,7 @@ class SmallestSTTService(WebsocketSTTService):
 
         self._receive_task: Optional[asyncio.Task] = None
         self._reset_connection_task: Optional[asyncio.Task] = None
-        self._default_language = self._coerce_language(self._input_params.audioLanguage)
+        self._default_language = self._coerce_language(self._input_params.language)
         self._awaiting_end_of_turn = False
 
     async def start(self, frame: StartFrame):
@@ -177,7 +175,7 @@ class SmallestSTTService(WebsocketSTTService):
             if self._websocket and self._websocket.state is State.OPEN:
                 return
 
-            params = self._input_params.to_query_params(self._api_key)
+            params = self._input_params.to_query_params()
             query_string = urllib.parse.urlencode(params)
             url = self._url
 
@@ -185,8 +183,14 @@ class SmallestSTTService(WebsocketSTTService):
                 separator = "&" if "?" in url else "?"
                 url = f"{url}{separator}{query_string}"
 
+            headers = (
+                {"Authorization": f"Bearer {self._api_key}"} if self._api_key else None
+            )
+
             logger.debug("Connecting to Smallest STT service")
-            self._websocket = await websocket_connect(url)
+            self._websocket = await websocket_connect(
+                url, additional_headers=headers
+            )
             await self._call_event_handler("on_connected")
         except Exception as e:
             logger.error(f"{self}: unable to connect to Smallest STT: {e}")
@@ -351,7 +355,7 @@ class SmallestSTTService(WebsocketSTTService):
             return
 
         try:
-            await self._websocket.send(b"")
+            await self._websocket.send(json.dumps({"type": "close_stream"}))
         except Exception as e:
             logger.warning(f"{self} error sending end-of-stream marker: {e}")
 
