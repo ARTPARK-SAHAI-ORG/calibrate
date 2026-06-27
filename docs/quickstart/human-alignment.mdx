@@ -1,0 +1,96 @@
+---
+title: "Human Alignment"
+description: "Iteratively close the gap between your LLM judges and human intuition"
+---
+
+[Calibrate](https://calibrate.artpark.ai) helps you ensure your automated LLM judges are reliable by comparing them against human ground truth. This guide will walk you through your first alignment cycle—from collecting human labels to refining your AI evaluator prompts.
+
+## 1. Create a Labelling Task
+
+A task is the container for your alignment research. It defines the type of data (LLM response, STT, or Simulation) and the evaluators you want to calibrate.
+
+1. From the sidebar, click **Human alignment**.
+2. Click **Create new labelling task**.
+3. Give your task a name (e.g., `Helpfulness Audit - V1`) and select a **Type**.
+4. Choose the **Evaluators** you want humans to grade against.
+
+<Frame>
+  <img src="../core-concepts/images/human-alignment-task-create.jpeg" alt="Create labelling task" />
+</Frame>
+
+## 2. Add your items
+
+Add the conversation samples you want humans to review.
+
+<AccordionGroup>
+  <Accordion title="Add samples inline" icon="plus">
+    Click **Add item** to build a conversation turn-by-turn. The last agent message is automatically marked as the evaluation target.
+
+    <Frame>
+      <img src="../core-concepts/images/human-alignment-add-item.jpeg" alt="Add item inline" />
+    </Frame>
+  </Accordion>
+  <Accordion title="Bulk upload via CSV" icon="file-csv">
+    If you have hundreds of samples, click **Bulk upload**. You can choose to upload items with or without existing human labels.
+
+    <Tip>
+      Always download the **CSV format guidelines** from the upload dialog to ensure your columns match the required structure.
+    </Tip>
+
+    <Frame>
+      <img src="../core-concepts/images/human-alignment-bulk-upload.jpeg" alt="Bulk upload items" />
+    </Frame>
+  </Accordion>
+</AccordionGroup>
+
+## 3. Assign Human Annotators
+
+To establish a ground truth, you need human experts to label your items.
+
+1. Go to the **Annotators** tab and add your team members by name.
+2. Back on the **Items** tab, select the items you want labelled and click **Label selected**.
+3. Select your annotators and click **Assign**.
+4. **Share the Link:** Copy the unique job link generated for each annotator and send it to them.
+
+<Frame>
+  <img src="../core-concepts/images/human-alignment-job-link.jpeg" alt="Share job links" />
+</Frame>
+
+<Note>
+  Assigning the same items to multiple annotators allows Calibrate to calculate **Inter-Annotator Agreement (IAA)**, a key signal for label quality.
+</Note>
+
+## 4. Run AI Evaluation
+
+Once you have human labels, it's time to see how your LLM judge compares.
+
+1. Select the same items and click **Evaluate selected**.
+2. Pick the version of the evaluator you want to test.
+3. Click **Run** and monitor the results in real-time.
+
+<Frame>
+  <img src="../core-concepts/images/human-alignment-run-in-progress.jpeg" alt="Running evaluators" />
+</Frame>
+
+## 5. Analyze and Iterate
+
+The **Alignment Score** tells you the percentage of items where the LLM judge matched human judgment.
+
+1. **Find Disagreements:** Click **Show disagreements only** to isolate cases where the AI and human disagreed.
+2. **Diagnose:** Read the evaluator's reasoning alongside the human feedback to identify prompt weaknesses.
+3. **Iterate:** Go to **Evaluators**, create a **New version** of your prompt, and re-run the evaluation on the same items to see the alignment score improve.
+
+<Frame>
+  <img src="../core-concepts/images/human-alignment-results-filtered.jpeg" alt="Analyze disagreements" />
+</Frame>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Human Alignment Concepts" icon="book" href="/core-concepts/human-alignment">
+    Deep dive into IAA, Alignment Scores, and prompt versioning
+  </Card>
+  <Card title="Simulations" icon="comments" href="/quickstart/simulations">
+    Test your agent with realistic personas and scenarios
+  </Card>
+</CardGroup>
