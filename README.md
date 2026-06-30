@@ -36,6 +36,8 @@ calibrate simulations  # Interactive text or voice simulations
 
 ## Contributing
 
+For the web version, see the [frontend](https://github.com/ARTPARK-SAHAI-ORG/calibrate-frontend) and [backend](https://github.com/ARTPARK-SAHAI-ORG/calibrate-backend) repositories.
+
 Install development dependencies once (requires [uv](https://docs.astral.sh/uv/)):
 
 ```bash
