@@ -3,13 +3,13 @@ STT evaluation metrics.
 """
 
 import asyncio
+import unicodedata
 from functools import lru_cache
 from typing import List, Optional
 
 import numpy as np
-from evaluate import load
+import jiwer
 from tqdm.asyncio import tqdm_asyncio
-from transformers.models.whisper.english_normalizer import BasicTextNormalizer
 import backoff
 
 from calibrate.judges import (
@@ -26,10 +26,22 @@ from calibrate.langfuse import observe, langfuse, langfuse_enabled
 # indic-nlp, and joblib, which we want to avoid unless intent/entity scoring is
 # actually requested (it's opt-in via ``--sarvam-judges``).
 
-normalizer = BasicTextNormalizer()
-
 # Re-export for existing imports
 DEFAULT_STT_JUDGE_MODEL = DEFAULT_TEXT_JUDGE_MODEL
+
+# jiwer preprocessing pipeline, following Gnani.ai's Indic ASR benchmarking
+# methodology (https://www.gnani.ai/resources/research/benchmarking-indic-asr-models-a-technical-deep-dive):
+# collapse whitespace, strip, case-fold, and drop punctuation before scoring.
+# Unicode NFC normalization is applied separately (below) so composed vs.
+# decomposed forms of Indic vowel diacritics don't register as spurious edits.
+_EDIT_CLEANUP = [
+    jiwer.RemoveMultipleSpaces(),
+    jiwer.Strip(),
+    jiwer.ToLowerCase(),
+    jiwer.RemovePunctuation(),
+]
+_WER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfWords()])
+_CER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfChars()])
 
 
 @lru_cache(maxsize=1)
@@ -72,35 +84,61 @@ def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
     return list(evaluators) if evaluators else [DEFAULT_STT_EVALUATOR]
 
 
-def _edit_metric(name: str, references: List[str], predictions: List[str]) -> dict:
-    """Compute a normalized per-row edit-distance metric from ``evaluate``.
+def _nfc(text: str) -> str:
+    """Unicode NFC-normalize so composed/decomposed Indic diacritics match."""
+    return unicodedata.normalize("NFC", text)
 
-    Shared by WER and CER: both normalize ref/pred with the Whisper
-    ``BasicTextNormalizer``, score each row independently via the
-    HuggingFace ``evaluate`` metric ``name`` (``"wer"`` / ``"cer"``), and
-    return the macro-mean plus the per-row list.
+
+def _edit_metric(
+    metric_fn, transform, references: List[str], predictions: List[str]
+) -> dict:
+    """Compute a jiwer edit-distance metric, dataset-level plus per-row.
+
+    Shared by WER and CER. References/predictions are NFC-normalized, then
+    ``jiwer`` applies ``transform`` (whitespace collapse, strip, case-fold,
+    punctuation removal, tokenization) before scoring.
+
+    ``score`` is the **dataset-level** rate — total substitutions, deletions,
+    and insertions across all utterances divided by total reference length —
+    matching the NIST definition Gnani.ai uses. This differs from a macro-mean
+    of per-utterance rates, which over-weights short utterances. ``per_row``
+    holds the per-utterance rates, kept for row-level reporting.
     """
-    metric = load(name)
-
-    references = [normalizer(str(ref)) for ref in references]
+    references = [_nfc(str(ref)) for ref in references]
     predictions = [
-        normalizer(str(pred)) if isinstance(pred, str) else "" for pred in predictions
+        _nfc(str(pred)) if isinstance(pred, str) else "" for pred in predictions
     ]
 
     per_row = [
-        metric.compute(predictions=[p], references=[r])
-        for p, r in zip(predictions, references)
+        metric_fn(
+            reference=[r],
+            hypothesis=[p],
+            reference_transform=transform,
+            hypothesis_transform=transform,
+        )
+        for r, p in zip(references, predictions)
     ]
 
-    return {"score": np.mean(per_row), "per_row": per_row}
+    score = (
+        metric_fn(
+            reference=references,
+            hypothesis=predictions,
+            reference_transform=transform,
+            hypothesis_transform=transform,
+        )
+        if references
+        else 0.0
+    )
+
+    return {"score": float(score), "per_row": per_row}
 
 
 def get_wer_score(references: List[str], predictions: List[str]) -> dict:
-    return _edit_metric("wer", references, predictions)
+    return _edit_metric(jiwer.wer, _WER_TRANSFORM, references, predictions)
 
 
 def get_cer_score(references: List[str], predictions: List[str]) -> dict:
-    return _edit_metric("cer", references, predictions)
+    return _edit_metric(jiwer.cer, _CER_TRANSFORM, references, predictions)
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
