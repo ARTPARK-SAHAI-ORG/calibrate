@@ -325,3 +325,172 @@ class TestVerifyFailureDuringRun:
         assert "✗" in result.stdout or "Verification failed" in result.stdout, (
             f"No error message in stdout: {result.stdout}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Voice simulation pre-verify (external WebSocket agent)
+# ---------------------------------------------------------------------------
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def _write_voice_config(path, agent_url=None, **extra):
+    """Write a voice simulation config JSON and return the path."""
+    config = {"test_cases": TEST_CASES_TOOL_CALL}
+    if agent_url is not None:
+        config["agent_url"] = agent_url
+    config.update(extra)
+    with open(path, "w") as f:
+        json.dump(config, f)
+    return str(path)
+
+
+def _run_voice_cli_in_process(cfg, out, *extra_argv):
+    """
+    Invoke `calibrate simulations --type voice` in-process with the
+    WebSocket connection and the voice runner patched out.
+
+    Returns (mock_ws_cls, mock_agent_main, raised_systemexit).
+    `mock_ws_cls.return_value.verify` is the AsyncMock verify; configure its
+    return value before calling.
+    """
+    import calibrate.cli as cli_module
+
+    mock_ws_cls = MagicMock()
+    mock_ws_cls.return_value.verify = AsyncMock(return_value={"ok": True, "error": None})
+
+    mock_agent_main = AsyncMock()
+    fake_run_simulation = MagicMock()
+    fake_run_simulation.main = mock_agent_main
+
+    fake_connections = MagicMock()
+    fake_connections.WebSocketAgentConnection = mock_ws_cls
+
+    argv = [
+        "calibrate",
+        "simulations",
+        "--type",
+        "voice",
+        "-c",
+        cfg,
+        "-o",
+        out,
+        *extra_argv,
+    ]
+
+    raised = None
+    with patch.dict(
+        "sys.modules",
+        {
+            "calibrate.agent.run_simulation": fake_run_simulation,
+            "calibrate.connections": fake_connections,
+        },
+    ), patch.object(cli_module.sys, "argv", argv):
+        try:
+            cli_module.main()
+        except SystemExit as exc:
+            raised = exc
+
+    return mock_ws_cls, mock_agent_main, raised
+
+
+class TestVoicePreVerify:
+    """Pre-verify step for external WebSocket voice agents."""
+
+    def test_ws_url_verify_ok_launches(self, tmp_path):
+        cfg = _write_voice_config(
+            tmp_path / "config.json", agent_url="ws://localhost:8765/ws"
+        )
+        out = str(tmp_path / "out")
+        ws_cls, agent_main, raised = _run_voice_cli_in_process(cfg, out)
+
+        assert raised is None
+        ws_cls.assert_called_once()
+        _, kwargs = ws_cls.call_args
+        assert kwargs["url"] == "ws://localhost:8765/ws"
+        assert kwargs["serializer"] == "protobuf"
+        assert kwargs["headers"] is None
+        ws_cls.return_value.verify.assert_awaited_once()
+        agent_main.assert_awaited_once()
+
+    def test_wss_url_passes_serializer_and_headers(self, tmp_path):
+        cfg = _write_voice_config(
+            tmp_path / "config.json",
+            agent_url="wss://example.com/ws",
+            agent_serializer="twilio",
+            agent_headers={"Authorization": "Bearer tok"},
+        )
+        out = str(tmp_path / "out")
+        ws_cls, agent_main, raised = _run_voice_cli_in_process(cfg, out)
+
+        assert raised is None
+        _, kwargs = ws_cls.call_args
+        assert kwargs["serializer"] == "twilio"
+        assert kwargs["headers"] == {"Authorization": "Bearer tok"}
+        agent_main.assert_awaited_once()
+
+    def test_verify_failure_exits_1(self, tmp_path):
+        cfg = _write_voice_config(
+            tmp_path / "config.json", agent_url="ws://localhost:8765/ws"
+        )
+        out = str(tmp_path / "out")
+
+        import calibrate.cli as cli_module
+
+        mock_ws_cls = MagicMock()
+        mock_ws_cls.return_value.verify = AsyncMock(
+            return_value={"ok": False, "error": "connection refused"}
+        )
+        fake_run_simulation = MagicMock()
+        fake_run_simulation.main = AsyncMock()
+        fake_connections = MagicMock()
+        fake_connections.WebSocketAgentConnection = mock_ws_cls
+
+        argv = [
+            "calibrate", "simulations", "--type", "voice", "-c", cfg, "-o", out,
+        ]
+        with patch.dict(
+            "sys.modules",
+            {
+                "calibrate.agent.run_simulation": fake_run_simulation,
+                "calibrate.connections": fake_connections,
+            },
+        ), patch.object(cli_module.sys, "argv", argv):
+            with pytest.raises(SystemExit) as exc_info:
+                cli_module.main()
+
+        assert exc_info.value.code == 1
+        fake_run_simulation.main.assert_not_awaited()
+
+    def test_skip_verify_skips_verification(self, tmp_path):
+        cfg = _write_voice_config(
+            tmp_path / "config.json", agent_url="ws://localhost:8765/ws"
+        )
+        out = str(tmp_path / "out")
+        ws_cls, agent_main, raised = _run_voice_cli_in_process(
+            cfg, out, "--skip-verify"
+        )
+
+        assert raised is None
+        ws_cls.assert_not_called()
+        agent_main.assert_awaited_once()
+
+    def test_no_agent_url_skips_verification(self, tmp_path):
+        cfg = _write_voice_config(tmp_path / "config.json")
+        out = str(tmp_path / "out")
+        ws_cls, agent_main, raised = _run_voice_cli_in_process(cfg, out)
+
+        assert raised is None
+        ws_cls.assert_not_called()
+        agent_main.assert_awaited_once()
+
+    def test_http_agent_url_skips_ws_verification(self, tmp_path):
+        cfg = _write_voice_config(
+            tmp_path / "config.json", agent_url="http://localhost:8000/chat"
+        )
+        out = str(tmp_path / "out")
+        ws_cls, agent_main, raised = _run_voice_cli_in_process(cfg, out)
+
+        assert raised is None
+        ws_cls.assert_not_called()
+        agent_main.assert_awaited_once()

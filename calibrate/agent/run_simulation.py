@@ -169,6 +169,7 @@ from pipecat.transports.websocket.client import (
     WebsocketClientTransport,
 )
 
+from pipecat.serializers.base_serializer import FrameSerializer
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
 from calibrate.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
 from pipecat.utils.time import time_now_iso8601
@@ -176,6 +177,46 @@ from pipecat.utils.time import time_now_iso8601
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
 TRANSCRIPT_FILE_NAME = "transcript.json"
+
+DEFAULT_SERIALIZER_NAME = "protobuf"
+SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
+
+
+def resolve_serializer(name: str) -> FrameSerializer:
+    """Return a new serializer instance for ``name``.
+
+    Raises ``ValueError`` for an unknown serializer name so misconfigured
+    external-agent specs fail loudly rather than silently defaulting.
+    """
+    factory = SERIALIZER_REGISTRY.get(name)
+    if factory is None:
+        raise ValueError(
+            f"Unknown serializer '{name}'. "
+            f"Available: {sorted(SERIALIZER_REGISTRY)}"
+        )
+    return factory()
+
+
+def is_external_ws_agent(config: dict) -> bool:
+    """True when ``config`` points at an already-running external WS agent.
+
+    External WS mode is keyed off ``agent_url`` using a ``ws://`` or ``wss://``
+    scheme. Any other scheme (e.g. ``http(s)://``) or a missing url means the
+    internal pipecat bot should be spawned instead.
+    """
+    agent_url = (config or {}).get("agent_url")
+    if not isinstance(agent_url, str):
+        return False
+    return agent_url.startswith("ws://") or agent_url.startswith("wss://")
+
+
+def select_transport_uri(agent_uri: Optional[str], port: int) -> str:
+    """Pick the simulator client transport URI.
+
+    Uses an explicit external ``agent_uri`` when provided, otherwise targets the
+    internal bot on ``ws://localhost:{port}``.
+    """
+    return agent_uri if agent_uri else f"ws://localhost:{port}"
 
 
 def find_available_port() -> int:
@@ -244,6 +285,38 @@ async def start_bot(
     )
 
 
+class EndToEndLatencyTracker:
+    """Sim-side wall-clock latency from end of user turn to first agent audio.
+
+    Works for both internal and external agents because it only relies on frames
+    the simulator itself observes: the simulated user finishes speaking when its
+    TTS stops (``mark_user_turn_end``), and the agent's first audible response is
+    the next inbound ``OutputAudioRawFrame`` from the agent (``mark_agent_audio``).
+    Per-turn deltas are recorded once each (the first agent audio after each user
+    turn end); ``mean`` aggregates them.
+    """
+
+    def __init__(self) -> None:
+        self._pending_user_turn_end: Optional[float] = None
+        self.deltas: list[float] = []
+
+    def mark_user_turn_end(self) -> None:
+        self._pending_user_turn_end = asyncio.get_event_loop().time()
+
+    def mark_agent_audio(self) -> None:
+        if self._pending_user_turn_end is None:
+            return
+        delta = asyncio.get_event_loop().time() - self._pending_user_turn_end
+        self._pending_user_turn_end = None
+        if delta >= 0:
+            self.deltas.append(delta)
+
+    def mean(self) -> Optional[float]:
+        if not self.deltas:
+            return None
+        return float(np.mean(self.deltas))
+
+
 class RTVIMessageFrameAdapter(FrameProcessor):
     def __init__(
         self,
@@ -258,10 +331,12 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         audio_save_dir: str,
         agent_speaks_first: bool = True,
         max_turns: int = DEFAULT_MAX_TURNS,
+        latency_tracker: Optional["EndToEndLatencyTracker"] = None,
     ):
         super().__init__(enable_direct_mode=True, name="RTVIMessageFrameAdapter")
         self._context = context
         self._audio_buffer = audio_buffer
+        self._latency_tracker = latency_tracker
         self._agent_speaks_first = agent_speaks_first
         self._max_turns = max_turns
         self._interrupt_probability = interrupt_probability
@@ -528,6 +603,11 @@ class RTVIMessageFrameAdapter(FrameProcessor):
             # don't forward bot audio frames after the interruption has been triggered
             return
         elif isinstance(frame, InputAudioRawFrame):
+            # Inbound audio from the agent under test — the first such frame after
+            # the simulated user stopped speaking marks the end-to-end response
+            # latency (works identically for internal and external agents).
+            if self._latency_tracker is not None:
+                self._latency_tracker.mark_agent_audio()
             # Never reserve a line from raw inbound audio: tool rounds can still
             # carry silence or noise. Lines are reserved from ``spoken`` RTVI only.
             if self._awaiting_first_bot_audio_chunk and self._audio_save_dir:
@@ -880,6 +960,7 @@ class SilencePadder(FrameProcessor):
         chunk_ms: int = 40,
         audio_save_dir: str = None,
         rtvi_message_adapter: "RTVIMessageFrameAdapter" = None,
+        latency_tracker: Optional["EndToEndLatencyTracker"] = None,
     ):
         super().__init__(enable_direct_mode=True, name="SilencePadder")
         self._silence_duration_ms = silence_duration_ms
@@ -888,6 +969,7 @@ class SilencePadder(FrameProcessor):
         self._last_num_channels = 1
         self._audio_save_dir = audio_save_dir
         self._rtvi_message_adapter = rtvi_message_adapter
+        self._latency_tracker = latency_tracker
         self._user_audio_chunk_indices = (
             {}
         )  # Track chunk indices for user audio per turn
@@ -932,6 +1014,9 @@ class SilencePadder(FrameProcessor):
 
         # When TTS stops, add silence padding before pushing the frame
         if isinstance(frame, TTSStoppedFrame):
+            # Sim user's turn just ended — start the end-to-end latency clock.
+            if self._latency_tracker is not None:
+                self._latency_tracker.mark_user_turn_end()
             await self._push_silence()
 
         await self.push_frame(frame, direction)
@@ -1081,6 +1166,8 @@ async def run_simulation(
     tools: list[dict] = None,
     fallback_judge_model: str = DEFAULT_SIMULATION_JUDGE_MODEL,
     fallback_stt_judge_model: str = DEFAULT_STT_JUDGE_MODEL,
+    agent_uri: Optional[str] = None,
+    serializer_name: str = DEFAULT_SERIALIZER_NAME,
 ) -> dict:
     require_simulation_evaluators(evaluators)
 
@@ -1133,6 +1220,8 @@ async def run_simulation(
             pipeline_task_ref=_pipeline_task_ref,
             fallback_judge_model=fallback_judge_model,
             fallback_stt_judge_model=fallback_stt_judge_model,
+            agent_uri=agent_uri,
+            serializer_name=serializer_name,
         )
     finally:
         logger.remove(error_sink_id)
@@ -1153,7 +1242,18 @@ async def _run_simulation_inner(
     pipeline_task_ref: list,
     fallback_judge_model: str = DEFAULT_SIMULATION_JUDGE_MODEL,
     fallback_stt_judge_model: str = DEFAULT_STT_JUDGE_MODEL,
+    agent_uri: Optional[str] = None,
+    serializer_name: str = DEFAULT_SERIALIZER_NAME,
 ) -> dict:
+    if agent_uri:
+        log_and_print(
+            f"{GENERAL_LOG_COLOR}External WS agent mode ({agent_uri}): "
+            "per-processor TTFT/processing_time are unavailable for external "
+            "agents, and interruption behavior reflects the external agent's own "
+            "turn-taking rather than a controlled variable. Sim-side end-to-end "
+            f"latency is still measured.{RESET_COLOR}"
+        )
+
     # Build webhook configs from tools for function call handling
     webhook_configs = {}
     if tools:
@@ -1171,13 +1271,16 @@ async def _run_simulation_inner(
 
     os.makedirs(audio_save_dir, exist_ok=True)
 
+    latency_tracker = EndToEndLatencyTracker()
+
+    uri = select_transport_uri(agent_uri, port)
     transport = WebsocketClientTransport(
-        uri=f"ws://localhost:{port}",
+        uri=uri,
         params=WebsocketClientParams(
             audio_in_enabled=True,
             audio_out_enabled=True,
             add_wav_header=False,
-            serializer=ProtobufFrameSerializer(),
+            serializer=resolve_serializer(serializer_name),
             # vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
             # turn_analyzer=LocalSmartTurnAnalyzerV3(),
         ),
@@ -1287,6 +1390,7 @@ async def _run_simulation_inner(
         audio_save_dir,
         agent_speaks_first=agent_speaks_first,
         max_turns=max_turns,
+        latency_tracker=latency_tracker,
     )
 
     simulated_user_turn_index_hook = SimulatedUserTurnIndexHook(rtvi_message_adapter)
@@ -1303,6 +1407,7 @@ async def _run_simulation_inner(
         chunk_ms=40,
         audio_save_dir=audio_save_dir,
         rtvi_message_adapter=rtvi_message_adapter,
+        latency_tracker=latency_tracker,
     )
 
     pipeline = Pipeline(
@@ -1523,10 +1628,12 @@ async def _run_simulation_inner(
     # Build comprehensive metrics
     ttft_dict = dict(ttft)
     processing_time_dict = dict(processing_time)
+    e2e_latency_mean = latency_tracker.mean()
 
     metrics = {
         "ttft": ttft_dict,
         "processing_time": processing_time_dict,
+        "e2e_latency": e2e_latency_mean,
         "evaluation_results": evaluation_results,
         "stt_llm_judge": stt_llm_judge_result,
     }
@@ -1575,6 +1682,16 @@ async def _run_simulation_inner(
             {
                 "name": f"{component}/processing_time",
                 "value": float(np.mean(values)),
+                "reasoning": "",
+            }
+        )
+
+    # Sim-side wall-clock end-to-end latency (works for external agents too).
+    if e2e_latency_mean is not None:
+        evaluation_results_rows.append(
+            {
+                "name": "e2e_latency",
+                "value": e2e_latency_mean,
                 "reasoning": "",
             }
         )
@@ -1725,6 +1842,12 @@ async def _run_single_simulation_inner(
     configure_print_logger(print_log_save_path, simulation_name=simulation_run_id)
     current_simulation_name.set(simulation_run_id)
 
+    # External WS agents own their own prompt/STT/TTS/LLM — only the internal
+    # bot needs these configs (and a system prompt + tools) to be spawned.
+    external_ws_mode = is_external_ws_agent(config)
+    agent_uri = config["agent_url"] if external_ws_mode else None
+    serializer_name = config.get("agent_serializer", DEFAULT_SERIALIZER_NAME)
+
     # Extract STT and TTS configs from config dict
     stt_config_data = config.get("stt", {})
     stt_config = STTConfig(provider=stt_config_data.get("provider", "google"))
@@ -1767,31 +1890,32 @@ async def _run_single_simulation_inner(
         bot_task = None
         sim_task = None
         try:
-            bot_task = asyncio.create_task(
-                start_bot(
-                    config["system_prompt"]
-                    + f"\n\nYou must always speak in {language}.",
-                    config["tools"],
-                    language,
-                    port=port,
-                    stt_config=stt_config,
-                    tts_config=tts_config,
-                    llm_config=llm_config,
-                    agent_speaks_first=agent_speaks_first,
+            if not external_ws_mode:
+                bot_task = asyncio.create_task(
+                    start_bot(
+                        config["system_prompt"]
+                        + f"\n\nYou must always speak in {language}.",
+                        config["tools"],
+                        language,
+                        port=port,
+                        stt_config=stt_config,
+                        tts_config=tts_config,
+                        llm_config=llm_config,
+                        agent_speaks_first=agent_speaks_first,
+                    )
                 )
-            )
-            # Give the bot a moment to start listening before connecting
-            await asyncio.sleep(1.0)
+                # Give the bot a moment to start listening before connecting
+                await asyncio.sleep(1.0)
 
-            # Check if bot_task failed during startup - if so, get its result to surface the error
-            if bot_task.done():
-                # This will raise if the bot task failed with an exception
-                bot_task.result()
-                # If we get here, bot completed without exception but also without starting server
-                # this is still wrong because the bot should be running, not completed
-                raise RuntimeError(
-                    "Bot task completed unexpectedly before simulation could connect"
-                )
+                # Check if bot_task failed during startup - if so, get its result to surface the error
+                if bot_task.done():
+                    # This will raise if the bot task failed with an exception
+                    bot_task.result()
+                    # If we get here, bot completed without exception but also without starting server
+                    # this is still wrong because the bot should be running, not completed
+                    raise RuntimeError(
+                        "Bot task completed unexpectedly before simulation could connect"
+                    )
 
             evaluators = config.get("evaluators") or []
 
@@ -1807,9 +1931,13 @@ async def _run_single_simulation_inner(
                     agent_speaks_first=agent_speaks_first,
                     max_turns=max_turns,
                     tools=config.get("tools", []),
+                    agent_uri=agent_uri,
+                    serializer_name=serializer_name,
                 )
             )
-            simulation_tasks = [bot_task, sim_task]
+            # In external mode there is no bot task to wait on — the external
+            # agent runs its own server. Await only the sim task.
+            simulation_tasks = [t for t in (bot_task, sim_task) if t is not None]
             done, pending = await asyncio.wait(
                 simulation_tasks, timeout=EVAL_TIMEOUT_SECS
             )
@@ -1830,7 +1958,7 @@ async def _run_single_simulation_inner(
                 if sim_task.cancelled():
                     # Simulation was cancelled (likely due to websocket disconnect from error)
                     # Check if bot_task has an exception that caused this
-                    if bot_task in done and not bot_task.cancelled():
+                    if bot_task is not None and bot_task in done and not bot_task.cancelled():
                         # This will raise if bot_task failed with an exception
                         bot_task.result()
                     raise RuntimeError("Simulation task was cancelled unexpectedly")

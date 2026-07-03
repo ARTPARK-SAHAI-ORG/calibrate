@@ -21,10 +21,13 @@ Usage:
     result = asyncio.run(simulations.run(agent=agent, personas=[...], ...))
 """
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Optional
+from urllib.parse import urlsplit
 import backoff
 import httpx
+import websockets
 
 
 # Default messages used by verify() when no custom input is provided
@@ -340,4 +343,94 @@ class TextAgentConnection:
         return resp
 
 
-__all__ = ["TextAgentConnection"]
+# Timeout (seconds) for the WebSocket reachability handshake in verify().
+_WS_VERIFY_TIMEOUT_SECONDS = 10.0
+
+
+@dataclass
+class WebSocketAgentConnection:
+    """
+    Connect to an external voice agent over a WebSocket.
+
+    The agent runs its own pipecat pipeline and exposes a WebSocket server;
+    Calibrate's voice simulator connects to it as a client. The ``serializer``
+    names the pipecat frame serializer the agent speaks (e.g. ``"protobuf"``)
+    and is recorded for the simulator to use later.
+
+    Use :meth:`verify` to confirm the server is reachable before running a full
+    simulation.
+
+    Example:
+        >>> import asyncio
+        >>> from calibrate.connections import WebSocketAgentConnection
+        >>> agent = WebSocketAgentConnection(
+        ...     url="ws://your-agent.com/ws",
+        ...     serializer="protobuf",
+        ...     headers={"Authorization": "Bearer sk-..."},
+        ... )
+        >>> asyncio.run(agent.verify())
+    """
+
+    url: str
+    """WebSocket endpoint to connect to, e.g. ``ws://host:port/ws`` or ``wss://...``."""
+
+    serializer: str = field(default="protobuf")
+    """Pipecat frame serializer the agent speaks. Stored for the simulator; not used by verify()."""
+
+    headers: Optional[dict] = field(default=None)
+    """Optional handshake headers, e.g. ``{"Authorization": "Bearer sk-..."}``. Default: none."""
+
+    async def verify(self) -> dict:
+        """Check the WebSocket server is reachable.
+
+        Opens a WebSocket connection to ``url`` (sending ``headers`` as extra
+        handshake headers), confirms the handshake succeeds, then closes. This
+        is a reachability check only — a successful TCP connection and WebSocket
+        handshake. It does NOT validate the pipecat frame protocol or the
+        ``serializer``.
+
+        Returns:
+            ``{"ok": True, "error": None}`` on success, or
+            ``{"ok": False, "error": "<reason>"}`` on any failure (bad scheme,
+            connection refused, invalid URI, timeout, handshake error). Never
+            raises.
+
+        Example:
+            >>> result = asyncio.run(agent.verify())
+        """
+        scheme = urlsplit(self.url).scheme.lower()
+        if scheme not in ("ws", "wss"):
+            return {
+                "ok": False,
+                "error": (
+                    f"URL scheme must be 'ws' or 'wss', got "
+                    f"{scheme or 'none'!r}: {self.url}"
+                ),
+            }
+
+        async def _handshake() -> None:
+            async with websockets.connect(
+                self.url, additional_headers=self.headers
+            ):
+                pass
+
+        try:
+            await asyncio.wait_for(_handshake(), timeout=_WS_VERIFY_TIMEOUT_SECONDS)
+        except asyncio.TimeoutError:
+            return {
+                "ok": False,
+                "error": (
+                    f"WebSocket handshake timed out "
+                    f"({_WS_VERIFY_TIMEOUT_SECONDS:.0f}s): {self.url}"
+                ),
+            }
+        except Exception as e:
+            return {
+                "ok": False,
+                "error": f"Could not connect to agent at {self.url}: {e}",
+            }
+
+        return {"ok": True, "error": None}
+
+
+__all__ = ["TextAgentConnection", "WebSocketAgentConnection"]

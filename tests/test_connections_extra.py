@@ -1,5 +1,6 @@
 """Additional tests covering error branches and edge cases in connections.py."""
 
+import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 import httpx
@@ -208,6 +209,109 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
             result = await agent.verify()
         self.assertFalse(result["ok"])
         self.assertIn("HTTP 404", result["error"])
+
+
+def _mk_ws_cm(enter_side_effect=None):
+    """Return a mock that quacks like the async context manager from
+    ``websockets.connect(...)``."""
+    cm = MagicMock()
+    if enter_side_effect is not None:
+        cm.__aenter__ = AsyncMock(side_effect=enter_side_effect)
+    else:
+        cm.__aenter__ = AsyncMock(return_value=MagicMock())
+    cm.__aexit__ = AsyncMock(return_value=False)
+    return cm
+
+
+class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
+    async def test_verify_happy_path(self):
+        from calibrate.connections import WebSocketAgentConnection
+
+        agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
+        connect = MagicMock(return_value=_mk_ws_cm())
+        with patch("websockets.connect", connect):
+            result = await agent.verify()
+
+        self.assertTrue(result["ok"])
+        self.assertIsNone(result["error"])
+        connect.assert_called_once()
+        self.assertEqual(connect.call_args.kwargs["additional_headers"], None)
+
+    async def test_verify_passes_headers(self):
+        from calibrate.connections import WebSocketAgentConnection
+
+        agent = WebSocketAgentConnection(
+            url="wss://fake-agent/ws", headers={"Authorization": "Bearer sk-x"}
+        )
+        connect = MagicMock(return_value=_mk_ws_cm())
+        with patch("websockets.connect", connect):
+            result = await agent.verify()
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(
+            connect.call_args.kwargs["additional_headers"],
+            {"Authorization": "Bearer sk-x"},
+        )
+
+    async def test_verify_connection_error(self):
+        from calibrate.connections import WebSocketAgentConnection
+
+        agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
+        connect = MagicMock(
+            return_value=_mk_ws_cm(
+                enter_side_effect=ConnectionRefusedError("refused")
+            )
+        )
+        with patch("websockets.connect", connect):
+            result = await agent.verify()
+
+        self.assertFalse(result["ok"])
+        self.assertIn("Could not connect", result["error"])
+        self.assertIn("refused", result["error"])
+
+    async def test_verify_non_ws_scheme(self):
+        from calibrate.connections import WebSocketAgentConnection
+
+        agent = WebSocketAgentConnection(url="http://fake-agent/ws")
+        connect = MagicMock(return_value=_mk_ws_cm())
+        with patch("websockets.connect", connect):
+            result = await agent.verify()
+
+        self.assertFalse(result["ok"])
+        self.assertIn("scheme must be", result["error"])
+        connect.assert_not_called()
+
+    async def test_verify_timeout(self):
+        from calibrate.connections import WebSocketAgentConnection
+
+        agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
+        connect = MagicMock(
+            return_value=_mk_ws_cm(enter_side_effect=asyncio.TimeoutError())
+        )
+        with patch("websockets.connect", connect):
+            result = await agent.verify()
+
+        self.assertFalse(result["ok"])
+        self.assertIn("timed out", result["error"])
+
+    async def test_verify_invalid_uri(self):
+        from calibrate.connections import WebSocketAgentConnection
+
+        agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
+        connect = MagicMock(side_effect=ValueError("invalid uri"))
+        with patch("websockets.connect", connect):
+            result = await agent.verify()
+
+        self.assertFalse(result["ok"])
+        self.assertIn("Could not connect", result["error"])
+
+    def test_serializer_stored(self):
+        from calibrate.connections import WebSocketAgentConnection
+
+        default = WebSocketAgentConnection(url="ws://x")
+        self.assertEqual(default.serializer, "protobuf")
+        custom = WebSocketAgentConnection(url="ws://x", serializer="raw")
+        self.assertEqual(custom.serializer, "raw")
 
 
 if __name__ == "__main__":
