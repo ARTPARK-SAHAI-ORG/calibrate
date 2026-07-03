@@ -6,58 +6,132 @@ Run with:
 """
 
 import unittest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 
 
 class TestEditMetrics(unittest.TestCase):
-    """WER/CER share ``_edit_metric``; ``load`` is mocked to stay pure-unit."""
+    """WER/CER via jiwer — real computation, no network (jiwer is pure-Python)."""
 
-    def _fake_load(self, recorder):
-        """Return a fake ``evaluate`` metric that records the per-row inputs."""
-        metric = MagicMock()
-
-        def compute(predictions, references):
-            recorder.append((references[0], predictions[0]))
-            # toy score: 1.0 when ref/pred differ, else 0.0
-            return 0.0 if references[0] == predictions[0] else 1.0
-
-        metric.compute.side_effect = compute
-        return metric
-
-    def test_get_wer_score_loads_wer_and_normalizes(self):
+    def test_get_wer_score_normalizes_case_and_punctuation(self):
         from calibrate.stt import metrics as M
 
-        seen = []
-        with patch.object(M, "load", return_value=self._fake_load(seen)) as mock_load:
-            result = M.get_wer_score(["Hello World", "foo"], ["hello world", "bar"])
+        # Row 1: case-only diff normalizes to identical -> 0.0.
+        # Row 2: one of two words wrong -> 0.5.
+        result = M.get_wer_score(["Hello, World!", "foo bar"], ["hello world", "foo baz"])
 
-        mock_load.assert_called_once_with("wer")
-        # Row 1 ref/pred normalize identically (case-folded) -> 0.0; row 2 differs -> 1.0.
-        self.assertEqual(result["per_row"], [0.0, 1.0])
-        self.assertEqual(result["score"], 0.5)
-        # Normalizer was applied before scoring (case-folded to the same string).
-        self.assertEqual(seen[0], ("hello world", "hello world"))
+        self.assertEqual(result["per_row"], [0.0, 0.5])
 
-    def test_get_cer_score_loads_cer(self):
+    def test_score_is_dataset_level_not_macro_mean(self):
         from calibrate.stt import metrics as M
 
-        seen = []
-        with patch.object(M, "load", return_value=self._fake_load(seen)) as mock_load:
-            result = M.get_cer_score(["abc"], ["abc"])
+        # Row A: 1 error / 2 words. Row B: 0 errors / 4 words.
+        # Macro-mean of per-row = (0.5 + 0.0)/2 = 0.25.
+        # Dataset-level = total errors / total words = 1/6 ≈ 0.1667.
+        result = M.get_wer_score(["hello world", "a b c d"], ["hello word", "a b c d"])
 
-        mock_load.assert_called_once_with("cer")
+        self.assertEqual(result["per_row"], [0.5, 0.0])
+        self.assertAlmostEqual(result["score"], 1 / 6)
+        # Confirm it is NOT the naive macro-mean.
+        self.assertNotAlmostEqual(result["score"], 0.25)
+
+    def test_get_cer_score_character_level(self):
+        from calibrate.stt import metrics as M
+
+        result = M.get_cer_score(["abc"], ["abc"])
         self.assertEqual(result["per_row"], [0.0])
         self.assertEqual(result["score"], 0.0)
+
+        # One char substitution out of three source chars -> 1/3.
+        result = M.get_cer_score(["abc"], ["abx"])
+        self.assertAlmostEqual(result["score"], 1 / 3)
 
     def test_non_string_prediction_becomes_empty(self):
         from calibrate.stt import metrics as M
 
-        seen = []
-        with patch.object(M, "load", return_value=self._fake_load(seen)):
-            M.get_cer_score(["abc"], [None])
+        # None prediction is coerced to "" -> all reference chars are deletions.
+        result = M.get_cer_score(["abc"], [None])
+        self.assertEqual(result["score"], 1.0)
 
-        # None prediction is coerced to "" before scoring.
-        self.assertEqual(seen[0][1], "")
+    def test_nfc_normalization_matches_decomposed_forms(self):
+        from calibrate.stt import metrics as M
+
+        # Devanagari QA: precomposed single code point (U+0958) vs decomposed
+        # KA + NUKTA (U+0915 U+093C). Different raw code points, same character.
+        composed = "क़"
+        decomposed = "क़"
+        self.assertNotEqual(composed, decomposed)
+
+        # NFC folds them together, so no spurious character-level edit is counted.
+        result = M.get_cer_score([composed], [decomposed])
+        self.assertEqual(result["score"], 0.0)
+
+        # Also holds for Latin composed vs decomposed accents.
+        self.assertEqual(M.get_cer_score(["café"], ["café"])["score"], 0.0)
+
+    def test_empty_input_returns_zero_score(self):
+        from calibrate.stt import metrics as M
+
+        result = M.get_wer_score([], [])
+        self.assertEqual(result["score"], 0.0)
+        self.assertEqual(result["per_row"], [])
+
+    def test_language_aware_indic_normalization_folds_script_variants(self):
+        from calibrate.stt import metrics as M
+
+        # Same Hindi word with vs. without a zero-width joiner (ZWJ). NFC and
+        # punctuation removal leave the ZWJ in place; the Hindi IndicNormalizer
+        # strips it, so the two spellings become identical.
+        with_zwj = "क्‍ष"
+        without_zwj = "क्ष"
+        self.assertNotEqual(with_zwj, without_zwj)
+
+        # english path (no IndicNormalizer) still sees a difference...
+        self.assertGreater(
+            M.get_cer_score([with_zwj], [without_zwj], language="english")["score"],
+            0.0,
+        )
+        # ...but the Hindi path folds them to zero error.
+        self.assertEqual(
+            M.get_cer_score([with_zwj], [without_zwj], language="hindi")["score"],
+            0.0,
+        )
+
+    def test_empty_reference_pooled_correctly(self):
+        from calibrate.stt import metrics as M
+
+        # Empty GT + empty prediction is correct behaviour → contributes nothing
+        # to the pooled score (not penalized).
+        mixed = M.get_wer_score(["hello world", ""], ["hello world", ""])
+        self.assertEqual(mixed["score"], 0.0)
+
+        # Empty GT + hallucinated prediction → the extra words count as
+        # insertions and are penalized. One real ref (4 words, 1 sub) plus two
+        # inserted junk words → (1 + 2) / 4 = 0.75.
+        halluc = M.get_wer_score(
+            ["a b c d", ""], ["a b x d", "junk here"]
+        )
+        self.assertAlmostEqual(halluc["score"], 0.75)
+
+    def test_all_empty_references_guarded(self):
+        from calibrate.stt import metrics as M
+
+        # A dataset with no reference words at all would make jiwer return an
+        # unbounded count; the guard returns 0.0 instead.
+        self.assertEqual(M.get_wer_score(["", "..."], ["", "junk"])["score"], 0.0)
+        self.assertEqual(M.get_cer_score([""], ["hello"])["score"], 0.0)
+
+    def test_unsupported_language_falls_back_gracefully(self):
+        from calibrate.stt import metrics as M
+
+        # Urdu (needs an optional dep indic-nlp lacks here) and an unknown
+        # language must not crash — they fall back to NFC-only normalization.
+        for lang in ("urdu", "klingon"):
+            result = M.get_wer_score(
+                ["hello world"], ["hello world"], language=lang
+            )
+            self.assertEqual(result["score"], 0.0)
+        self.assertIsNone(M._indic_normalizer("english"))
+        self.assertIsNotNone(M._indic_normalizer("hindi"))
 
 
 class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
