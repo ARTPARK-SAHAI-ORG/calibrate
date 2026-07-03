@@ -190,13 +190,13 @@ async def run_bot(
     if llm_config.provider == "openrouter":
         llm = OpenRouterLLMService(
             api_key=llm_config.api_key or os.getenv("OPENROUTER_API_KEY"),
-            model=llm_config.model,
             base_url=llm_config.base_url or "https://openrouter.ai/api/v1",
+            settings=OpenRouterLLMService.Settings(model=llm_config.model),
         )
     elif llm_config.provider == "openai":
         llm = OpenAILLMService(
             api_key=llm_config.api_key or os.getenv("OPENAI_API_KEY"),
-            model=llm_config.model,
+            settings=OpenAILLMService.Settings(model=llm_config.model),
         )
     else:
         raise ValueError(f"Unknown LLM provider: {llm_config.provider}")

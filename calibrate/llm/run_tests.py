@@ -437,13 +437,13 @@ async def _run_inference_inner(
     if provider == "openrouter":
         llm = CostTrackingOpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            model=model,
             base_url="https://openrouter.ai/api/v1",
+            settings=OpenRouterLLMService.Settings(model=model),
         )
     else:
         llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            model=model,
+            settings=OpenAILLMService.Settings(model=model),
         )
 
     # Create context with system prompt

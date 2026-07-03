@@ -1355,12 +1355,16 @@ async def _run_simulation_inner(
     elevenlabs_http_session = aiohttp.ClientSession()
     tts = ElevenLabsHttpTTSService(
         api_key=os.getenv("ELEVENLABS_API_KEY"),
-        voice_id=voice_id,
         aiohttp_session=elevenlabs_http_session,
-        settings=ElevenLabsHttpTTSService.Settings(language=tts_language),
+        settings=ElevenLabsHttpTTSService.Settings(
+            voice=voice_id, language=tts_language
+        ),
     )
 
-    llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-5.2")
+    llm = OpenAILLMService(
+        api_key=os.getenv("OPENAI_API_KEY"),
+        settings=OpenAILLMService.Settings(model="gpt-5.2"),
+    )
 
     simulation_system_prompt = system_prompt
     if not agent_speaks_first:

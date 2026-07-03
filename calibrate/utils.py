@@ -1751,8 +1751,9 @@ def create_stt_service(
     elif provider == "openai":
         return OpenAISTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            model=model or "gpt-4o-transcribe",
-            settings=OpenAISTTService.Settings(language=stt_language),
+            settings=OpenAISTTService.Settings(
+                language=stt_language, model=model or "gpt-4o-transcribe"
+            ),
         )
     elif provider == "cartesia":
         return CartesiaSTTService(
@@ -1767,8 +1768,9 @@ def create_stt_service(
     elif provider == "groq":
         return GroqSTTService(
             api_key=os.getenv("GROQ_API_KEY"),
-            model=model or "whisper-large-v3",
-            settings=GroqSTTService.Settings(language=stt_language),
+            settings=GroqSTTService.Settings(
+                language=stt_language, model=model or "whisper-large-v3"
+            ),
         )
     elif provider == "google":
         return GoogleSTTService(
@@ -1825,48 +1827,60 @@ def create_tts_service(
     if provider == "cartesia":
         return CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            model=model or "sonic-3",
-            settings=CartesiaTTSService.Settings(language=tts_language),
-            voice_id=voice_id or "95d51f79-c397-46f9-b49a-23763d3eaa2d",
+            settings=CartesiaTTSService.Settings(
+                language=tts_language,
+                model=model or "sonic-3",
+                voice=voice_id or "95d51f79-c397-46f9-b49a-23763d3eaa2d",
+            ),
         )
     elif provider == "openai":
         return OpenAITTSService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            voice=voice_id or "fable",
-            instructions=instructions,
+            settings=OpenAITTSService.Settings(
+                voice=voice_id or "fable",
+                instructions=instructions,
+            ),
         )
     elif provider == "groq":
         return GroqTTSService(
             api_key=os.getenv("GROQ_API_KEY"),
-            model_name=model or "canopylabs/orpheus-v1-english",
-            voice_id=voice_id or "autumn",
+            settings=GroqTTSService.Settings(
+                model=model or "canopylabs/orpheus-v1-english",
+                voice=voice_id or "autumn",
+            ),
         )
     elif provider == "google":
         return GoogleTTSService(
-            voice_id=voice_id
-            or TTS_VOICE_IDS["google"].get(language, "en-US-Chirp3-HD-Charon"),
-            settings=GoogleTTSService.Settings(language=tts_language),
+            settings=GoogleTTSService.Settings(
+                language=tts_language,
+                voice=voice_id
+                or TTS_VOICE_IDS["google"].get(language, "en-US-Chirp3-HD-Charon"),
+            ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )
     elif provider == "elevenlabs":
         return ElevenLabsTTSService(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            model="eleven_multilingual_v2",
-            voice_id=voice_id
-            or TTS_VOICE_IDS["elevenlabs"].get(language, "90ipbRoKi4CpHXvKVtl0"),
-            settings=ElevenLabsTTSService.Settings(language=tts_language),
+            settings=ElevenLabsTTSService.Settings(
+                language=tts_language,
+                model="eleven_multilingual_v2",
+                voice=voice_id
+                or TTS_VOICE_IDS["elevenlabs"].get(language, "90ipbRoKi4CpHXvKVtl0"),
+            ),
         )
     elif provider == "sarvam":
         return SarvamTTSService(
             api_key=os.getenv("SARVAM_API_KEY"),
-            model=model or "bulbul:v2",
-            voice_id=voice_id or "abhilash",
-            settings=SarvamTTSService.Settings(language=tts_language),
+            settings=SarvamTTSService.Settings(
+                language=tts_language,
+                model=model or "bulbul:v2",
+                voice=voice_id or "abhilash",
+            ),
         )
     elif provider == "deepgram":
         return DeepgramTTSService(
             api_key=os.getenv("DEEPGRAM_API_KEY"),
-            voice=voice_id or "aura-2-andromeda-en",
+            settings=DeepgramTTSService.Settings(voice=voice_id or "aura-2-andromeda-en"),
         )
     elif provider == "smallest":
         return SmallestTTSService(

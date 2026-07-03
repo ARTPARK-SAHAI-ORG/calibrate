@@ -157,13 +157,14 @@ async def run_bot(
 
     if llm_config.provider == "openai":
         llm = OpenAILLMService(
-            api_key=os.getenv("OPENAI_API_KEY"), model=llm_config.model
+            api_key=os.getenv("OPENAI_API_KEY"),
+            settings=OpenAILLMService.Settings(model=llm_config.model),
         )
     elif llm_config.provider == "openrouter":
         llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            model=llm_config.model,
             base_url="https://openrouter.ai/api/v1",
+            settings=OpenRouterLLMService.Settings(model=llm_config.model),
         )
 
     ml = MetricsLogger()

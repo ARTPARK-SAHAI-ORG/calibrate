@@ -342,25 +342,25 @@ async def run_simulation(
     if bot_provider == "openrouter":
         bot_llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            model=bot_model,
             base_url="https://openrouter.ai/api/v1",
+            settings=OpenRouterLLMService.Settings(model=bot_model),
         )
     else:
         bot_llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            model=bot_model,
+            settings=OpenAILLMService.Settings(model=bot_model),
         )
 
     if user_provider == "openrouter":
         user_llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
-            model=user_model,
             base_url="https://openrouter.ai/api/v1",
+            settings=OpenRouterLLMService.Settings(model=user_model),
         )
     else:
         user_llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            model=user_model,
+            settings=OpenAILLMService.Settings(model=user_model),
         )
 
     conversation_state = ConversationState(max_turns=max_turns)
