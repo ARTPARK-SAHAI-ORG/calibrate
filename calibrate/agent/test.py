@@ -28,7 +28,10 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
 )
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.runner.types import RunnerArguments
@@ -39,15 +42,12 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 
 from pipecat.transports.base_transport import BaseTransport, TransportParams
-from pipecat.processors.frameworks.rtvi import RTVIConfig, RTVIObserver, RTVIProcessor
+from pipecat.processors.frameworks.rtvi import RTVIObserver, RTVIProcessor
 
 from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
-from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 
-from pipecat.observers.loggers.user_bot_latency_log_observer import (
-    UserBotLatencyLogObserver,
-)
+from pipecat.observers.user_bot_latency_observer import UserBotLatencyObserver
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 
 
@@ -71,14 +71,10 @@ transport_params = {
     "twilio": lambda: FastAPIWebsocketParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-        turn_analyzer=LocalSmartTurnAnalyzerV3(),
     ),
     "webrtc": lambda: TransportParams(
         audio_in_enabled=True,
         audio_out_enabled=True,
-        vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-        turn_analyzer=LocalSmartTurnAnalyzerV3(),
     ),
 }
 
@@ -194,13 +190,13 @@ async def run_bot(
     if llm_config.provider == "openrouter":
         llm = OpenRouterLLMService(
             api_key=llm_config.api_key or os.getenv("OPENROUTER_API_KEY"),
-            model=llm_config.model,
             base_url=llm_config.base_url or "https://openrouter.ai/api/v1",
+            settings=OpenRouterLLMService.Settings(model=llm_config.model),
         )
     elif llm_config.provider == "openai":
         llm = OpenAILLMService(
             api_key=llm_config.api_key or os.getenv("OPENAI_API_KEY"),
-            model=llm_config.model,
+            settings=OpenAILLMService.Settings(model=llm_config.model),
         )
     else:
         raise ValueError(f"Unknown LLM provider: {llm_config.provider}")
@@ -274,11 +270,17 @@ async def run_bot(
 
     tools = ToolsSchema(standard_tools=standard_tools)
     context = LLMContext(messages, tools)
-    context_aggregator = LLMContextAggregatorPair(context)
+    context_aggregator = LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+            ),
+        ),
+    )
 
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
-
-    transcript = TranscriptProcessor()
+    rtvi = RTVIProcessor()
 
     audio_buffer = AudioBufferProcessor(
         enable_turn_audio=True,  # Enable per-turn audio recording
@@ -291,16 +293,20 @@ async def run_bot(
             transport.input(),  # Transport user input
             rtvi,  # RTVI processor
             stt,
-            transcript.user(),
             context_aggregator.user(),  # User responses
             llm,  # LLM
             tts,  # TTS
             transport.output(),  # Transport bot output
             audio_buffer,
-            transcript.assistant(),
             context_aggregator.assistant(),  # Assistant spoken responses
         ]
     )
+
+    latency_observer = UserBotLatencyObserver()
+
+    @latency_observer.event_handler("on_latency_measured")
+    async def on_latency_measured(observer, latency_seconds):
+        logger.info(f"User-bot latency: {latency_seconds:.3f}s")
 
     task = PipelineTask(
         pipeline,
@@ -308,7 +314,7 @@ async def run_bot(
             enable_metrics=True,
             enable_usage_metrics=True,
         ),
-        observers=[RTVIObserver(rtvi), UserBotLatencyLogObserver(), LLMLogObserver()],
+        observers=[RTVIObserver(rtvi), latency_observer, LLMLogObserver()],
         idle_timeout_secs=runner_args.pipeline_idle_timeout_secs,
     )
 
@@ -327,11 +333,13 @@ async def run_bot(
         logger.info(f"Client disconnected")
         await task.cancel()
 
-    @transcript.event_handler("on_transcript_update")
-    async def handle_transcript_update(processor, frame):
-        # Each message contains role (user/assistant), content, and timestamp
-        for message in frame.messages:
-            print(f"[{message.timestamp}] {message.role}: {message.content}")
+    @context_aggregator.user().event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, message):
+        print(f"[{message.timestamp}] user: {message.content}")
+
+    @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
+    async def on_assistant_turn_stopped(aggregator, message):
+        print(f"[{message.timestamp}] assistant: {message.content}")
 
     audio_dir = join(output_dir, "audios")
 

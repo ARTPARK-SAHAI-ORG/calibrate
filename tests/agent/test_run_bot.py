@@ -50,7 +50,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(T, "OpenAILLMService"), \
              patch.object(T, "OpenRouterLLMService", return_value=fake_llm), \
              patch.object(T, "RTVIProcessor"), \
-             patch.object(T, "TranscriptProcessor"), \
+             patch.object(T, "SileroVADAnalyzer"), \
+             patch.object(T, "LocalSmartTurnAnalyzerV3"), \
              patch.object(T, "AudioBufferProcessor"), \
              patch.object(T, "Pipeline"), \
              patch.object(T, "PipelineTask"), \
@@ -84,7 +85,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(T, "OpenAILLMService", return_value=fake_llm), \
              patch.object(T, "OpenRouterLLMService"), \
              patch.object(T, "RTVIProcessor"), \
-             patch.object(T, "TranscriptProcessor"), \
+             patch.object(T, "SileroVADAnalyzer"), \
+             patch.object(T, "LocalSmartTurnAnalyzerV3"), \
              patch.object(T, "AudioBufferProcessor"), \
              patch.object(T, "Pipeline"), \
              patch.object(T, "PipelineTask"), \
@@ -149,7 +151,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(T, "create_tts_service", MagicMock()), \
              patch.object(T, "OpenRouterLLMService", return_value=fake_llm), \
              patch.object(T, "RTVIProcessor"), \
-             patch.object(T, "TranscriptProcessor"), \
+             patch.object(T, "SileroVADAnalyzer"), \
+             patch.object(T, "LocalSmartTurnAnalyzerV3"), \
              patch.object(T, "AudioBufferProcessor"), \
              patch.object(T, "Pipeline"), \
              patch.object(T, "PipelineTask"), \

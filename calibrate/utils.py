@@ -1721,65 +1721,63 @@ def create_stt_service(
         ValueError: If provider is not supported
     """
     # Import services here to avoid circular imports
-    from pipecat.services.deepgram.stt import DeepgramSTTService, LiveOptions
+    from pipecat.services.deepgram.stt import DeepgramSTTService
     from pipecat.services.openai.stt import OpenAISTTService
     from pipecat.services.google.stt import GoogleSTTService
-    from pipecat.services.cartesia.stt import CartesiaSTTService, CartesiaLiveOptions
+    from pipecat.services.cartesia.stt import CartesiaSTTService
     from pipecat.services.groq.stt import GroqSTTService
     from pipecat.services.sarvam.stt import SarvamSTTService
     from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
-    from calibrate.integrations.smallest.stt import SmallestSTTService
+    from pipecat.services.smallest.stt import SmallestSTTService
 
     stt_language = get_stt_language(language, provider)
 
     if provider == "deepgram":
         return DeepgramSTTService(
             api_key=os.getenv("DEEPGRAM_API_KEY"),
-            live_options=LiveOptions(language=stt_language.value, encoding="linear16"),
+            encoding="linear16",
+            settings=DeepgramSTTService.Settings(language=stt_language),
         )
     elif provider == "sarvam":
         return SarvamSTTService(
             api_key=os.getenv("SARVAM_API_KEY"),
-            params=SarvamSTTService.InputParams(language=stt_language.value),
+            settings=SarvamSTTService.Settings(language=stt_language),
         )
     elif provider == "elevenlabs":
         return ElevenLabsRealtimeSTTService(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            params=ElevenLabsRealtimeSTTService.InputParams(
-                language_code=stt_language.value,
-            ),
+            settings=ElevenLabsRealtimeSTTService.Settings(language=stt_language),
         )
     elif provider == "openai":
         return OpenAISTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            model=model or "gpt-4o-transcribe",
-            language=stt_language,
+            settings=OpenAISTTService.Settings(
+                language=stt_language, model=model or "gpt-4o-transcribe"
+            ),
         )
     elif provider == "cartesia":
         return CartesiaSTTService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            live_options=CartesiaLiveOptions(language=stt_language.value),
+            settings=CartesiaSTTService.Settings(language=stt_language),
         )
     elif provider == "smallest":
         return SmallestSTTService(
             api_key=os.getenv("SMALLEST_API_KEY"),
-            url="wss://waves-api.smallest.ai/api/v1/asr",
-            params=SmallestSTTService.SmallestInputParams(
-                audioLanguage=stt_language.value,
-            ),
+            settings=SmallestSTTService.Settings(language=stt_language),
         )
     elif provider == "groq":
         return GroqSTTService(
             api_key=os.getenv("GROQ_API_KEY"),
-            model=model or "whisper-large-v3",
-            language=stt_language,
+            settings=GroqSTTService.Settings(
+                language=stt_language, model=model or "whisper-large-v3"
+            ),
         )
     elif provider == "google":
         return GoogleSTTService(
             sample_rate=16000,
             location="us",
-            params=GoogleSTTService.InputParams(
-                languages=stt_language,
+            settings=GoogleSTTService.Settings(
+                languages=[stt_language],
                 model=model or "chirp_3",
             ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
@@ -1818,7 +1816,7 @@ def create_tts_service(
     from pipecat.services.elevenlabs.tts import ElevenLabsTTSService
     from pipecat.services.sarvam.tts import SarvamTTSService
     from pipecat.services.deepgram.tts import DeepgramTTSService
-    from calibrate.integrations.smallest.tts import SmallestTTSService
+    from pipecat.services.smallest.tts import SmallestTTSService
 
     tts_language = get_tts_language(language, provider)
 
@@ -1829,54 +1827,68 @@ def create_tts_service(
     if provider == "cartesia":
         return CartesiaTTSService(
             api_key=os.getenv("CARTESIA_API_KEY"),
-            model=model or "sonic-3",
-            params=CartesiaTTSService.InputParams(language=tts_language),
-            voice_id=voice_id or "95d51f79-c397-46f9-b49a-23763d3eaa2d",
+            settings=CartesiaTTSService.Settings(
+                language=tts_language,
+                model=model or "sonic-3",
+                voice=voice_id or "95d51f79-c397-46f9-b49a-23763d3eaa2d",
+            ),
         )
     elif provider == "openai":
         return OpenAITTSService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            voice=voice_id or "fable",
-            instructions=instructions,
+            settings=OpenAITTSService.Settings(
+                voice=voice_id or "fable",
+                instructions=instructions,
+            ),
         )
     elif provider == "groq":
         return GroqTTSService(
             api_key=os.getenv("GROQ_API_KEY"),
-            model_name=model or "canopylabs/orpheus-v1-english",
-            voice_id=voice_id or "autumn",
+            settings=GroqTTSService.Settings(
+                model=model or "canopylabs/orpheus-v1-english",
+                voice=voice_id or "autumn",
+            ),
         )
     elif provider == "google":
         return GoogleTTSService(
-            voice_id=voice_id
-            or TTS_VOICE_IDS["google"].get(language, "en-US-Chirp3-HD-Charon"),
-            params=GoogleTTSService.InputParams(language=tts_language),
+            settings=GoogleTTSService.Settings(
+                language=tts_language,
+                voice=voice_id
+                or TTS_VOICE_IDS["google"].get(language, "en-US-Chirp3-HD-Charon"),
+            ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )
     elif provider == "elevenlabs":
         return ElevenLabsTTSService(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
-            model="eleven_multilingual_v2",
-            voice_id=voice_id
-            or TTS_VOICE_IDS["elevenlabs"].get(language, "90ipbRoKi4CpHXvKVtl0"),
-            params=ElevenLabsTTSService.InputParams(language=tts_language),
+            settings=ElevenLabsTTSService.Settings(
+                language=tts_language,
+                model="eleven_multilingual_v2",
+                voice=voice_id
+                or TTS_VOICE_IDS["elevenlabs"].get(language, "90ipbRoKi4CpHXvKVtl0"),
+            ),
         )
     elif provider == "sarvam":
         return SarvamTTSService(
             api_key=os.getenv("SARVAM_API_KEY"),
-            model=model or "bulbul:v2",
-            voice_id=voice_id or "abhilash",
-            params=SarvamTTSService.InputParams(language=tts_language),
+            settings=SarvamTTSService.Settings(
+                language=tts_language,
+                model=model or "bulbul:v2",
+                voice=voice_id or "abhilash",
+            ),
         )
     elif provider == "deepgram":
         return DeepgramTTSService(
             api_key=os.getenv("DEEPGRAM_API_KEY"),
-            voice=voice_id or "aura-2-andromeda-en",
+            settings=DeepgramTTSService.Settings(voice=voice_id or "aura-2-andromeda-en"),
         )
     elif provider == "smallest":
         return SmallestTTSService(
             api_key=os.getenv("SMALLEST_API_KEY"),
-            voice_id=voice_id or TTS_VOICE_IDS["smallest"].get(language, "aarushi"),
-            params=SmallestTTSService.InputParams(language=tts_language),
+            settings=SmallestTTSService.Settings(
+                voice=voice_id or TTS_VOICE_IDS["smallest"].get(language, "aarushi"),
+                language=tts_language,
+            ),
         )
     else:
         raise ValueError(f"Unsupported TTS provider: {provider}")

@@ -20,7 +20,7 @@ class TestCreateSTTService(unittest.TestCase):
             patch("pipecat.services.groq.stt.GroqSTTService"),
             patch("pipecat.services.sarvam.stt.SarvamSTTService"),
             patch("pipecat.services.elevenlabs.stt.ElevenLabsRealtimeSTTService"),
-            patch("calibrate.integrations.smallest.stt.SmallestSTTService"),
+            patch("pipecat.services.smallest.stt.SmallestSTTService"),
         ]
         return patches
 
@@ -71,7 +71,7 @@ class TestCreateTTSService(unittest.TestCase):
             patch("pipecat.services.elevenlabs.tts.ElevenLabsTTSService"),
             patch("pipecat.services.sarvam.tts.SarvamTTSService"),
             patch("pipecat.services.deepgram.tts.DeepgramTTSService"),
-            patch("calibrate.integrations.smallest.tts.SmallestTTSService"),
+            patch("pipecat.services.smallest.tts.SmallestTTSService"),
         ]
 
     def test_each_provider(self):
