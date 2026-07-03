@@ -1445,6 +1445,13 @@ async def _run_simulation_inner(
             audio_in_sample_rate=16000,
             audio_out_sample_rate=16000,
         ),
+        # The simulated-user side interprets the agent's RTVI messages with its
+        # own RTVIMessageFrameAdapter. Disable pipecat's auto RTVIProcessor
+        # (added by default since 1.0) so it doesn't strict-validate the agent's
+        # id-less RTVI messages (e.g. user-mute-started) and bounce id-less
+        # error responses back — which creates an infinite error storm with the
+        # agent's own RTVI processor and kills the connection.
+        enable_rtvi=False,
         observers=[LLMLogObserver()],
         idle_timeout_secs=PIPELINE_IDLE_TIMEOUT_SECS,
         idle_timeout_frames=(
