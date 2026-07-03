@@ -830,7 +830,6 @@ Examples:
                     _voice_agent = WebSocketAgentConnection(
                         url=_voice_url,
                         serializer=_voice_config.get("agent_serializer", "protobuf"),
-                        headers=_voice_config.get("agent_headers"),
                     )
                     print(f"\nVerifying agent connection: {_voice_url}")
                     _verify = asyncio.run(_voice_agent.verify())

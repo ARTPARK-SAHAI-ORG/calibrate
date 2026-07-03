@@ -235,23 +235,15 @@ class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["ok"])
         self.assertIsNone(result["error"])
         connect.assert_called_once()
-        self.assertEqual(connect.call_args.kwargs["additional_headers"], None)
+        # No auth headers are sent — the real sim transport can't send them, so
+        # verify must not either (would give a false pass on a secured agent).
+        self.assertNotIn("additional_headers", connect.call_args.kwargs)
 
-    async def test_verify_passes_headers(self):
+    async def test_no_headers_field(self):
         from calibrate.connections import WebSocketAgentConnection
 
-        agent = WebSocketAgentConnection(
-            url="wss://fake-agent/ws", headers={"Authorization": "Bearer sk-x"}
-        )
-        connect = MagicMock(return_value=_mk_ws_cm())
-        with patch("websockets.connect", connect):
-            result = await agent.verify()
-
-        self.assertTrue(result["ok"])
-        self.assertEqual(
-            connect.call_args.kwargs["additional_headers"],
-            {"Authorization": "Bearer sk-x"},
-        )
+        with self.assertRaises(TypeError):
+            WebSocketAgentConnection(url="ws://x", headers={"A": "B"})
 
     async def test_verify_connection_error(self):
         from calibrate.connections import WebSocketAgentConnection

@@ -360,13 +360,18 @@ class WebSocketAgentConnection:
     Use :meth:`verify` to confirm the server is reachable before running a full
     simulation.
 
+    Note: no auth headers are supported. The pipecat WebSocket client transport
+    that runs the actual simulation cannot send handshake headers, so accepting
+    them here would let ``verify`` pass while the real run fails against a
+    header-authenticated agent. Authenticate via the URL (e.g. a query-param
+    token) instead.
+
     Example:
         >>> import asyncio
         >>> from calibrate.connections import WebSocketAgentConnection
         >>> agent = WebSocketAgentConnection(
         ...     url="ws://your-agent.com/ws",
         ...     serializer="protobuf",
-        ...     headers={"Authorization": "Bearer sk-..."},
         ... )
         >>> asyncio.run(agent.verify())
     """
@@ -377,17 +382,13 @@ class WebSocketAgentConnection:
     serializer: str = field(default="protobuf")
     """Pipecat frame serializer the agent speaks. Stored for the simulator; not used by verify()."""
 
-    headers: Optional[dict] = field(default=None)
-    """Optional handshake headers, e.g. ``{"Authorization": "Bearer sk-..."}``. Default: none."""
-
     async def verify(self) -> dict:
         """Check the WebSocket server is reachable.
 
-        Opens a WebSocket connection to ``url`` (sending ``headers`` as extra
-        handshake headers), confirms the handshake succeeds, then closes. This
-        is a reachability check only — a successful TCP connection and WebSocket
-        handshake. It does NOT validate the pipecat frame protocol or the
-        ``serializer``.
+        Opens a WebSocket connection to ``url``, confirms the handshake
+        succeeds, then closes. This is a reachability check only — a successful
+        TCP connection and WebSocket handshake. It does NOT validate the pipecat
+        frame protocol or the ``serializer``.
 
         Returns:
             ``{"ok": True, "error": None}`` on success, or
@@ -409,9 +410,7 @@ class WebSocketAgentConnection:
             }
 
         async def _handshake() -> None:
-            async with websockets.connect(
-                self.url, additional_headers=self.headers
-            ):
+            async with websockets.connect(self.url):
                 pass
 
         try:
