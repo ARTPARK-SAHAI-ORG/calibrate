@@ -13,20 +13,18 @@ description: "Run simulated conversations to test your agent end-to-end"
 
 ## Set up your agent
 
-There are three ways to run simulations:
+There are two ways to run simulations:
 
-- **Calibrate agent** — define your agent's system prompt and tools directly in the config file. Works for both text and voice simulations.
-- **Agent connection (text)** — point calibrate at your existing agent's HTTP endpoint. The user simulator sends messages to it and evaluates the full conversation.
-- **External voice agent (WebSocket)** — for voice simulations, point calibrate at an existing pipecat agent's WebSocket endpoint via `agent_url`. Calibrate streams real audio to it instead of running its own agent. See [Agent Connections → Pipecat WebSocket agents](/cli/agent-connections/outbound-voice).
+<CardGroup cols={2}>
+  <Card title="Calibrate agent" icon="robot" href="/cli/calibrate-agent">
+    Define your agent completely within Calibrate
+  </Card>
+  <Card title="Agent connection" icon="link" href="/cli/agent-connections/overview">
+    Connect your existing text or voice agent
+  </Card>
+</CardGroup>
 
-<Note>
-  The HTTP agent connection (over `http(s)://`) is for **text** simulations. For
-  **voice** simulations against an existing agent, use a WebSocket `agent_url`
-  (over `ws(s)://`) — see [Agent Connections → Pipecat WebSocket
-  agents](/cli/agent-connections/outbound-voice).
-</Note>
-
-For the full setup details, see [Set up your agent](/cli/text-to-text#set-up-your-agent).
+---
 
 ## Personas
 

@@ -5,7 +5,9 @@ description: "Define your agent within Calibrate"
 
 Define your agent within Calibrate using the config file.
 
-## `system_prompt`
+## Configuration
+
+### `system_prompt`
 
 The system prompt that defines your agent's behavior — the same prompt you use in production.
 
@@ -18,13 +20,15 @@ You help customers with:
 3. Answering product questions
 ```
 
-## `tools`
+### `tools`
 
 A list of tools available to your agent. See [Tools](/guides/tools) for how to set it up, with examples for different tool types.
 
-<Tip>
-  Already have a deployed agent? Connect it directly instead of redefining it
-  here — see [Agent Connections](/cli/agent-connections/overview).
-</Tip>
+## Example
 
-Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-internal-agent.json) for a full template.
+Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-internal-agent.json).
+
+<Tip>
+  Already have a deployed agent? See [Agent
+  Connections](/cli/agent-connections/overview).
+</Tip>

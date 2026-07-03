@@ -74,7 +74,7 @@
               "guides/tools",
               "cli/calibrate-agent",
               {
-                "group": "Agent Connections",
+                "group": "Agent Connection",
                 "pages": [
                   "cli/agent-connections/overview",
                   "cli/agent-connections/chat",
