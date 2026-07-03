@@ -1,0 +1,30 @@
+---
+title: "Calibrate agent"
+description: "Define your agent's system prompt and tools directly in the config"
+---
+
+Define your agent inside the config file — system prompt and tools — and Calibrate runs the evaluation using an LLM of your choice. This is what lets you benchmark the same agent across models.
+
+Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-internal-agent.json) for a full template.
+
+## `system_prompt`
+
+The system prompt that defines your agent's behavior — the same prompt you use in production.
+
+```
+You are a helpful customer support assistant for an online store.
+
+You help customers with:
+1. Checking order status
+2. Processing returns
+3. Answering product questions
+```
+
+## `tools`
+
+A list of tools available to your agent. See [Configuring Tools](/guides/configuring-tools) for how to set it up, with examples for different tool types.
+
+<Tip>
+  Already have a deployed agent? Connect it directly instead of redefining it
+  here — see [Agent Connections](/cli/agent-connections/overview).
+</Tip>

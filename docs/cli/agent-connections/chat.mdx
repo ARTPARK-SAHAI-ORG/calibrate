@@ -1,6 +1,6 @@
 ---
 title: "Chat agent"
-description: "Connect a text chat agent over HTTP, including OpenAI-compatible APIs"
+description: "Connect a text chat agent over a standard HTTP endpoint to evaluate it"
 ---
 
 Connect a text chat agent over HTTP to simulate conversations — useful for chat agents, or for testing a voice agent's logic without audio. Set an `http(s)://` `agent_url` in your config; used for LLM tests and `--type text` simulations.
@@ -16,8 +16,8 @@ At minimum you need:
 
 | Field           | Required | Description                                                 |
 | --------------- | -------- | ----------------------------------------------------------- |
-| `agent_url`     | Yes      | Endpoint, e.g. `https://your-agent.example.com/chat`         |
-| `agent_headers` | No       | Auth/custom headers, e.g. `{ "Authorization": "Bearer …" }`  |
+| `agent_url`     | Yes      | Endpoint, e.g. `https://your-agent.example.com/chat`        |
+| `agent_headers` | No       | Auth/custom headers, e.g. `{ "Authorization": "Bearer …" }` |
 
 ## Chat messages
 
@@ -32,7 +32,10 @@ Your agent returns a `response` (and optional `tool_calls`):
 
 ```json
 // Response
-{ "response": "...", "tool_calls": [{ "tool": "get_schedule", "arguments": {} }] }
+{
+  "response": "...",
+  "tool_calls": [{ "tool": "get_schedule", "arguments": {} }]
+}
 ```
 
 The output must include `response` or `tool_calls`. This is standard HTTP/JSON — an OpenAI-compatible chat endpoint works as-is.

@@ -15,105 +15,23 @@ description: "Create edge cases to test the LLM powering your agent"
 
 There are two ways to run LLM evaluations:
 
-- **Calibrate agent** — define your agent inside the config file and evaluate across models.
-- **Agent connection** — connect your existing agent via HTTP and run tests against it directly.
+<CardGroup cols={2}>
+  <Card title="Calibrate agent" icon="robot" href="/cli/calibrate-agent">
+    Define your agent's `system_prompt` and `tools` in the config file and
+    evaluate across models.
+  </Card>
+  <Card title="Agent connection" icon="link" href="/cli/agent-connections/overview">
+    Connect your existing agent — a [chat agent](/cli/agent-connections/chat)
+    over HTTP for LLM tests — and run tests against it directly.
+  </Card>
+</CardGroup>
 
-### Calibrate agent
-
-Define your agent's system prompt and tools directly in the config file. Calibrate runs the evaluation using an LLM of your choice.
-
-Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-internal-agent.json) for a full template.
-
-#### `system_prompt`
-
-The system prompt that defines your agent's behavior. This is the same prompt you use in production.
-
-```
-You are a helpful customer support assistant for an online store.
-
-You help customers with:
-1. Checking order status
-2. Processing returns
-3. Answering product questions
-```
-
-#### `tools`
-
-A list of tools available to your agent. See the guide on [Configuring Tools](/guides/configuring-tools) for how to set it up along with examples for different tool types.
-
-### Agent connection
-
-If you already have an agent running, you can connect calibrate directly to it instead of redefining your agent's system prompt and tools.
-
-Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-external-agent.json) for a full template.
-
-#### Connect your agent
-
-| Key             | Required | Description                                                 |
-| --------------- | -------- | ----------------------------------------------------------- |
-| `agent_url`     | Yes      | The URL calibrate will make a POST request to               |
-| `agent_headers` | No       | HTTP headers included in every request — typically for auth |
-
-```json
-{
-  "agent_url": "https://your-agent.com/chat",
-  "agent_headers": {
-    "Authorization": "Bearer YOUR_API_KEY"
-  }
-}
-```
-
-#### Request format
-
-Calibrate will make a POST request to your `agent_url` with the following body:
-
-```json
-{
-  "messages": [
-    { "role": "assistant", "content": "Hello! How can I help you?" },
-    { "role": "user", "content": "Check order ORD-12345" }
-  ]
-}
-```
-
-When benchmarking across models, a `model` field is added so your agent can route to the right model:
-
-```json
-{
-  "messages": [...],
-  "model": "gemma-4-26b-a4b-it"
-}
-```
-
-To enable benchmarking multiple models, your API must support the `model` field and you must implement the model routing in your agent. The easiest way is to use an existing framework like `OpenRouter` and select among a wide range of models.
-
-#### Response format
-
-Your agent must return a JSON response with at least one of these keys:
-
-| Key          | Type           | Description                  |
-| ------------ | -------------- | ---------------------------- |
-| `response`   | string or null | The agent's text reply       |
-| `tool_calls` | array          | Tool calls made by the agent |
-
-Each item in `tool_calls` must have:
-
-```json
-{
-  "tool": "function_name",
-  "arguments": { "key": "value" }
-}
-```
-
-#### Verify your connection
-
-Before running evaluations, you can verify that your agent endpoint is reachable and returns the expected format:
-
-```bash
-calibrate llm --verify --agent-url https://your-agent.com/chat --agent-headers '{"Authorization": "Bearer YOUR_API_KEY"}'
-```
-
-This sends a test message and checks that the response matches the required format, printing a clear error if something is wrong.
+<Note>
+  To benchmark across models, Calibrate adds a `model` field to each request
+  (`{ "messages": [...], "model": "..." }`). Your agent must read it and route
+  to the right model — the easiest way is a framework like OpenRouter. For a
+  Calibrate agent, the model is selected directly.
+</Note>
 
 ---
 

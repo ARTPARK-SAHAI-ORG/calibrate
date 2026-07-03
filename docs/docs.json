@@ -66,6 +66,7 @@
               "cli/text-to-text",
               "cli/text-to-speech",
               "cli/simulations",
+              "cli/calibrate-agent",
               {
                 "group": "Agent Connections",
                 "pages": [
