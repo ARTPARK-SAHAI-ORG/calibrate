@@ -339,7 +339,7 @@ calibrate simulations
 4. **Output directory** — where results will be saved (defaults to `./out`)
 5. **API keys** — enter the API keys for the selected providers
 
-**Agent connection (text only):**
+**Chat agent (text):**
 
 1. **Simulation type** — select "Text"
 2. **Config file** — path to your config file (with `agent_url` and optionally `agent_headers`)
@@ -363,11 +363,19 @@ calibrate simulations --type text -c config.json -m openai/gpt-4.1 -p openrouter
 calibrate simulations --type voice -c config.json -o ./out
 ```
 
-**Agent connection (text only):**
+**Chat agent (text):**
 
 ```bash
 calibrate simulations --type text -c config.json -o ./out
 ```
+
+**Outbound voice agent (voice):**
+
+```bash
+calibrate simulations --type voice -c config.json -o ./out
+```
+
+where `config.json` sets a `ws(s)://` `agent_url` (see [Agent Connections → Outbound voice agent](/cli/agent-connections/outbound-voice)).
 
 Run multiple simulations in parallel with `-n`:
 
