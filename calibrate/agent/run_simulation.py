@@ -244,7 +244,7 @@ def find_available_port() -> int:
 async def start_bot(
     system_prompt: str,
     tools: list[dict] = [],
-    language: Literal["english", "hindi"] = "english",
+    language: Literal["english", "hindi", "kannada"] = "english",
     port: int = DEFAULT_PORT,
     stt_config: STTConfig = STTConfig(),
     tts_config: TTSConfig = TTSConfig(),
@@ -1162,6 +1162,7 @@ async def run_simulation(
     language: Literal[
         "english",
         "hindi",
+        "kannada",
     ],
     gender: Literal["male", "female"],
     evaluators: list[dict],
@@ -1236,7 +1237,7 @@ async def run_simulation(
 
 async def _run_simulation_inner(
     system_prompt: str,
-    language: Literal["english", "hindi"],
+    language: Literal["english", "hindi", "kannada"],
     gender: Literal["male", "female"],
     evaluators: list[dict],
     output_dir: str,
@@ -1338,28 +1339,45 @@ async def _run_simulation_inner(
         else Language.HI if language == "hindi" else Language.EN
     )
 
-    # ElevenLabs voice IDs for the simulated user. Word-level TTS so that
-    # mid-utterance interrupts commit only the words actually spoken.
-
-    if language == "hindi":
-        if gender == "female":
-            voice_id = "dVTC43Yewy5fAIcmsISI"
-        else:
-            voice_id = "hdkYGMdbdWZpANLZvmnk"
-    else:
-        # Default to English voices
+    # ElevenLabs has no real Kannada voice (it falls back to English), so the
+    # Kannada simulated user speaks via Google TTS (Chirp3 kn-IN). English and
+    # Hindi keep ElevenLabs word-level TTS, so mid-utterance interrupts commit
+    # only the words actually spoken.
+    elevenlabs_http_session = None
+    if language == "kannada":
         voice_id = (
-            "OHY6EjdeHKeQymoihwfz" if gender == "female" else "fPIfC3elMLbN9tNwMXkw"
+            "kn-IN-Chirp3-HD-Achernar"
+            if gender == "female"
+            else "kn-IN-Chirp3-HD-Achird"
         )
-    eval_logger.info(f"Using ElevenLabs voice ID: {voice_id}")
-    elevenlabs_http_session = aiohttp.ClientSession()
-    tts = ElevenLabsHttpTTSService(
-        api_key=os.getenv("ELEVENLABS_API_KEY"),
-        aiohttp_session=elevenlabs_http_session,
-        settings=ElevenLabsHttpTTSService.Settings(
-            voice=voice_id, language=tts_language
-        ),
-    )
+        tts = GoogleTTSService(
+            settings=GoogleTTSService.Settings(
+                language=Language.KN_IN,
+                voice=voice_id,
+            ),
+            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        )
+        eval_logger.info(f"Using Google TTS voice: {voice_id}")
+    else:
+        if language == "hindi":
+            if gender == "female":
+                voice_id = "dVTC43Yewy5fAIcmsISI"
+            else:
+                voice_id = "hdkYGMdbdWZpANLZvmnk"
+        else:
+            # Default to English voices
+            voice_id = (
+                "OHY6EjdeHKeQymoihwfz" if gender == "female" else "fPIfC3elMLbN9tNwMXkw"
+            )
+        eval_logger.info(f"Using ElevenLabs voice ID: {voice_id}")
+        elevenlabs_http_session = aiohttp.ClientSession()
+        tts = ElevenLabsHttpTTSService(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            aiohttp_session=elevenlabs_http_session,
+            settings=ElevenLabsHttpTTSService.Settings(
+                voice=voice_id, language=tts_language
+            ),
+        )
 
     llm = OpenAILLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
@@ -1535,7 +1553,8 @@ async def _run_simulation_inner(
     try:
         await runner.run(task)
     finally:
-        await elevenlabs_http_session.close()
+        if elevenlabs_http_session is not None:
+            await elevenlabs_http_session.close()
 
     transcript = rtvi_message_adapter._serialized_transcript
 
