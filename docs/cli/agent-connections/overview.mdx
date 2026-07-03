@@ -3,44 +3,37 @@ title: "Overview"
 description: "Point the Calibrate CLI at an existing agent over HTTP or WebSocket"
 ---
 
-Instead of defining an agent inside Calibrate, you can point the CLI at an agent you've already deployed. Set `agent_url` in your config JSON — the scheme decides the connection type.
-
-Pick the connection that matches your agent:
+Instead of defining an agent inside Calibrate, you can point the CLI at an agent you've already deployed. Pick the connection type that matches your agent:
 
 <CardGroup cols={2}>
   <Card title="Chat agent" icon="message" href="/cli/agent-connections/chat">
-    Standard HTTP chat, including OpenAI-compatible APIs. For LLM tests and
-    `--type text` simulations.
+    Standard HTTP chat, including OpenAI-compatible APIs, for evaluating the
+    agent's logic
   </Card>
   <Card
     title="Outbound voice agent"
     icon="phone-arrow-up-right"
     href="/cli/agent-connections/outbound-voice"
   >
-    Real-audio voice over a pipecat WebSocket. For `--type voice` simulations.
+    End-to-end evaluation by simulating real audio calls with the agent
   </Card>
 </CardGroup>
 
-| Type             | Description                                          | Required fields            |
-| ---------------- | --------------------------------------------------- | -------------------------- |
-| `chat`           | Standard HTTP chat, including OpenAI-compatible APIs | `agent_url` (`http(s)://`) |
-| `outbound-voice` | Pipecat voice agent over WebSocket                  | `agent_url` (`ws(s)://`)   |
-
 ## Verify your connection
 
-Confirm Calibrate can reach your agent before running a simulation.
+Confirm Calibrate can verify your agent is reachable and returns the correct response format before running any evaluation.
 
-**Chat agent** — checks reachability and response format:
+**Chat agent** — checks the agent's reachability and the correctness of its response format. It sends a sample request to the agent and expects a JSON response with at least one of `response` or `tool_calls`:
 
 ```bash
 calibrate simulations --verify --agent-url https://your-agent.example.com/chat \
   --agent-headers '{"Authorization": "Bearer YOUR_API_KEY"}'
 ```
 
-**Outbound voice agent** — Calibrate opens the WebSocket and confirms the handshake automatically before each voice run. This is a reachability check only; it does not confirm the frame protocol or serializer is compatible.
+**Outbound voice agent** — Calibrate opens the WebSocket and confirms the handshake automatically before each voice run. This is a reachability check only and does not confirm whether the frame protocol or serializer is compatible.
 
 <Note>
-  Pass `--skip-verify` to a run to bypass the pre-run connection check — useful
-  when you've already verified the agent or want to run against an endpoint that
-  rejects the check.
+  Pass `--skip-verify` to a run to bypass the pre-run connection check, which
+  can useful when you've already verified the agent and don't want to run the
+  check again.
 </Note>

@@ -15,7 +15,7 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": [ "getting-started/introduction" ]
+            "pages": ["getting-started/introduction"]
           },
           {
             "group": "Quickstart",
@@ -65,7 +65,13 @@
               "cli/speech-to-text",
               "cli/text-to-text",
               "cli/text-to-speech",
-              "cli/simulations",
+              "cli/simulations"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/tools",
               "cli/calibrate-agent",
               {
                 "group": "Agent Connections",
@@ -76,10 +82,6 @@
                 ]
               }
             ]
-          },
-          {
-            "group": "Guides",
-            "pages": [ "guides/configuring-tools" ]
           }
         ]
       },
@@ -88,7 +90,7 @@
         "groups": [
           {
             "group": "Browse use cases",
-            "pages": [ "examples/overview" ]
+            "pages": ["examples/overview"]
           }
         ]
       }
