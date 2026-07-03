@@ -81,7 +81,7 @@ def _resolve_indic_code(language: Optional[str]) -> Optional[str]:
 
 
 @lru_cache(maxsize=None)
-def _indic_normalizer_for_code(lang_code: str):
+def _indic_normalizer_for_lang_code(lang_code: str):
     """Build (and cache) the indic-nlp normalizer for ``lang_code``, or None.
 
     ``lang_code`` is an indic-nlp-library language code (e.g. ``"hi"``,
@@ -103,7 +103,7 @@ def _indic_normalizer_for_code(lang_code: str):
 def _indic_normalizer(language: Optional[str]):
     """Return the indic-nlp normalizer for ``language``, or None if unsupported."""
     lang_code = _resolve_indic_code(language)
-    return _indic_normalizer_for_code(lang_code) if lang_code else None
+    return _indic_normalizer_for_lang_code(lang_code) if lang_code else None
 
 
 def _normalize_text(text: str, normalizer) -> str:
