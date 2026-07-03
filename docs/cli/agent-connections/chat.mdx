@@ -3,21 +3,52 @@ title: "Chat agent"
 description: "Connect a text chat agent over a standard HTTP endpoint to evaluate it"
 ---
 
-Connect a text chat agent over HTTP to simulate conversations — useful for chat agents, or for testing a voice agent's logic without audio. Set an `http(s)://` `agent_url` in your config; used for LLM tests and `--type text` simulations.
+Connect a text chat agent to evaluate your agent's logic without placing calls by [simulating conversations](/cli/simulations) or [evaluating each turn](/cli/text-to-text).
 
 ## Quick start
-
-At minimum you need:
 
 - **`agent_url`** — the HTTP(S) endpoint Calibrate sends conversation messages to.
 - **`agent_headers`** — optional; auth or custom headers.
 
-## Configuration
+## Chat endpoint (required)
 
-| Field           | Required | Description                                                 |
-| --------------- | -------- | ----------------------------------------------------------- |
-| `agent_url`     | Yes      | Endpoint, e.g. `https://your-agent.example.com/chat`        |
-| `agent_headers` | No       | Auth/custom headers, e.g. `{ "Authorization": "Bearer …" }` |
+The primary URL where Calibrate sends conversation messages during a simulation. Set it as `agent_url`.
+
+**Format:** Full HTTP(S) URL
+
+```
+https://api.yourdomain.com/chat
+```
+
+**Requirements:**
+
+- HTTP or HTTPS (use `http://localhost:…` for a local agent)
+- Reachable from where you run the CLI
+- Must return a JSON response
+
+**Example:**
+
+```
+https://api.yourdomain.com/v1/chat
+```
+
+## Authorization header
+
+Authentication credentials sent with every request. Add them under `agent_headers` — optional, only if your agent requires auth.
+
+**Common formats:**
+
+**Bearer token**
+
+```json
+{ "Authorization": "Bearer your-secret-token-here" }
+```
+
+**API key**
+
+```json
+{ "X-API-Key": "your-api-key-here" }
+```
 
 ## Chat messages
 
