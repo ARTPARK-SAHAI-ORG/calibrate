@@ -1523,6 +1523,13 @@ async def _run_simulation_inner(
             f"{AGENT_MESSAGE_COLOR}[Agent]{RESET_COLOR}: {message.content}{RESET_COLOR}"
         )
 
+    @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
+    async def on_assistant_turn_stopped(aggregator, message):
+        # The "assistant" for the simulation pipeline is the simulated user
+        eval_logger.info(
+            f"Eval transcript: [{message.timestamp}] assistant: {message.content}"
+        )
+
     runner = PipelineRunner(handle_sigint=False)
 
     try:
