@@ -347,21 +347,13 @@ calibrate simulations
 4. **Output directory** — where results will be saved (defaults to `./out`)
 5. **API keys** — enter the API keys for the selected providers
 
-**Chat agent (text):**
+**Agent connection (text & voice):**
 
-1. **Simulation type** — select "Text"
-2. **Config file** — path to your config file (with `agent_url` and optionally `agent_headers`)
+1. **Simulation type** — select `Text` or `Voice`
+2. **Config file** — path to your config file
 3. **Parallel count** — how many simulations to run simultaneously (default: `1`)
 4. **Output directory** — where results will be saved (defaults to `./out`)
 5. **API keys** — only `OPENAI_API_KEY` is required (used by the user simulator and LLM judge)
-
-**Outbound voice agent (voice):**
-
-1. **Simulation type** — select "Voice"
-2. **Config file** — path to your config file (with a `ws(s)://` `agent_url`)
-3. **Parallel count** — how many simulations to run simultaneously (default: `1`)
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — enter the API keys for the user simulator's STT/TTS providers and the LLM judge
 
 ### Non-interactive mode
 
@@ -390,8 +382,6 @@ calibrate simulations --type text -c config.json -o ./out
 ```bash
 calibrate simulations --type voice -c config.json -o ./out
 ```
-
-where `config.json` sets a `ws(s)://` `agent_url` (see [Agent Connections → Outbound voice agent](/cli/agent-connections/outbound-voice)).
 
 Run multiple simulations in parallel with `-n`:
 
