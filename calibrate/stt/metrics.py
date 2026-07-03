@@ -81,27 +81,29 @@ def _resolve_indic_code(language: Optional[str]) -> Optional[str]:
 
 
 @lru_cache(maxsize=None)
-def _indic_normalizer_for_code(code: str):
-    """Build (and cache) the indic-nlp normalizer for ``code``, or None.
+def _indic_normalizer_for_code(lang_code: str):
+    """Build (and cache) the indic-nlp normalizer for ``lang_code``, or None.
 
-    This is the lightweight ``indic-nlp-library`` normalizer Vistaar uses —
-    distinct from the heavy vendored Sarvam ``IndicNormalizer`` in
-    ``_get_indic_normalizer`` (which loads a Whisper processor). Any failure
-    (unsupported language, missing optional dep like ``urduhack`` for Urdu)
-    falls back to None so scoring proceeds with NFC-only normalization.
+    ``lang_code`` is an indic-nlp-library language code (e.g. ``"hi"``,
+    ``"ta"``) as produced by ``_resolve_indic_code``. This is the lightweight
+    ``indic-nlp-library`` normalizer Vistaar uses — distinct from the heavy
+    vendored Sarvam ``IndicNormalizer`` in ``_get_indic_normalizer`` (which
+    loads a Whisper processor). Any failure (unsupported language, missing
+    optional dep like ``urduhack`` for Urdu) falls back to None so scoring
+    proceeds with NFC-only normalization.
     """
     try:
         from indicnlp.normalize.indic_normalize import IndicNormalizerFactory
 
-        return IndicNormalizerFactory().get_normalizer(code)
+        return IndicNormalizerFactory().get_normalizer(lang_code)
     except Exception:
         return None
 
 
 def _indic_normalizer(language: Optional[str]):
     """Return the indic-nlp normalizer for ``language``, or None if unsupported."""
-    code = _resolve_indic_code(language)
-    return _indic_normalizer_for_code(code) if code else None
+    lang_code = _resolve_indic_code(language)
+    return _indic_normalizer_for_code(lang_code) if lang_code else None
 
 
 def _normalize_text(text: str, normalizer) -> str:
