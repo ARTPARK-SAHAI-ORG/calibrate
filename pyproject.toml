@@ -5,7 +5,7 @@ description = "An open-source evaluation framework for voice agents"
 readme = "README.md"
 license = "CC-BY-SA-4.0"
 license-files = ["LICENSE.md"]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     {name = "Aman Dalmia", email = "aman.dalmia@artpark.in"},
 ]
@@ -15,7 +15,6 @@ classifiers = [
     "Intended Audience :: Developers",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -23,6 +22,7 @@ classifiers = [
 ]
 dependencies = [
     "backoff>=2.2.1",
+    "cartesia>=2.0.15,<3",
     "elevenlabs>=2.31.0",
     "evaluate>=0.4.6",
     "indic-nlp-library>=0.92",
@@ -39,7 +39,7 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.38.0",
     "opentelemetry-sdk>=1.38.0",
     "pipecat-ai-small-webrtc-prebuilt==1.0.0",
-    "pipecat-ai[cartesia,deepgram,google,groq,local-smart-turn-v3,openrouter,tracing,webrtc,websocket]==0.0.98",
+    "pipecat-ai[cartesia,deepgram,google,groq,local-smart-turn-v3,openrouter,smallest,tracing,webrtc,websocket]==1.0.0",
     "python-dotenv>=1.2.1",
     "sarvamai>=0.1.21",
     "simpleaudio>=1.0.4",

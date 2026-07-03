@@ -12,7 +12,6 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple, Literal
 import traceback
 from uuid import uuid4
-from deepgram import LiveOptions
 from loguru import logger
 from PIL.ImageFile import ImageFile
 from dataclasses import dataclass
@@ -154,7 +153,6 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.services.google.tts import GoogleTTSService
 from pipecat.services.elevenlabs.tts import ElevenLabsHttpTTSService
 
@@ -262,8 +260,6 @@ async def start_bot(
             audio_in_enabled=True,
             audio_out_enabled=True,
             add_wav_header=False,
-            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            turn_analyzer=LocalSmartTurnAnalyzerV3(),
             session_timeout=60 * 3,  # 3 minutes
         ),
     )
@@ -1361,12 +1357,10 @@ async def _run_simulation_inner(
         api_key=os.getenv("ELEVENLABS_API_KEY"),
         voice_id=voice_id,
         aiohttp_session=elevenlabs_http_session,
-        params=ElevenLabsHttpTTSService.InputParams(language=tts_language),
+        settings=ElevenLabsHttpTTSService.Settings(language=tts_language),
     )
 
     llm = OpenAILLMService(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-5.2")
-
-    transcript = TranscriptProcessor()
 
     simulation_system_prompt = system_prompt
     if not agent_speaks_first:
@@ -1428,7 +1422,6 @@ async def _run_simulation_inner(
             rtvi_message_adapter,
             metrics_logger,
             stt_logger,
-            transcript.user(),
             context_aggregator.user(),  # User responses
             llm,  # LLM
             simulated_user_turn_index_hook,
@@ -1447,7 +1440,6 @@ async def _run_simulation_inner(
         params=PipelineParams(
             audio_in_sample_rate=16000,
             audio_out_sample_rate=16000,
-            allow_interruptions=True,
         ),
         observers=[LLMLogObserver()],
         idle_timeout_secs=PIPELINE_IDLE_TIMEOUT_SECS,
@@ -1509,21 +1501,16 @@ async def _run_simulation_inner(
         eval_logger.info(f"WebSocket disconnected")
         await task.cancel()
 
-    @transcript.event_handler("on_transcript_update")
-    async def handle_transcript_update(processor, frame):
-        # Each message contains role (user/assistant), content, and timestamp
-        for message in frame.messages:
-            eval_logger.info(
-                f"Eval transcript: [{message.timestamp}] {message.role}: {message.content}"
-            )
+    @context_aggregator.user().event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, message):
+        # The "user" for the simulation pipeline is the agent we are testing
+        eval_logger.info(
+            f"Eval transcript: [{message.timestamp}] user: {message.content}"
+        )
 
-            # since the user for the simulation pipeline is the agent we are testing
-            if message.role != "user":
-                continue
-
-            log_and_print(
-                f"{AGENT_MESSAGE_COLOR}[Agent]{RESET_COLOR}: {message.content}{RESET_COLOR}"
-            )
+        log_and_print(
+            f"{AGENT_MESSAGE_COLOR}[Agent]{RESET_COLOR}: {message.content}{RESET_COLOR}"
+        )
 
     runner = PipelineRunner(handle_sigint=False)
 

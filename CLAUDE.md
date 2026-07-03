@@ -66,12 +66,10 @@ calibrate/                 # Python package (the importable library + CLI)
 │   ├── simulation_leaderboard.py
 │   ├── metrics.py
 │   └── _output.py         # Shared print_benchmark_summary
-├── agent/
-│   ├── bot.py             # Pipecat bot bootstrap
-│   ├── run_simulation.py  # Voice-agent simulation driver
-│   └── test.py            # Voice-agent tests
-└── integrations/
-    └── smallest/          # Smallest.ai STT/TTS provider integration
+└── agent/
+    ├── bot.py             # Pipecat bot bootstrap
+    ├── run_simulation.py  # Voice-agent simulation driver
+    └── test.py            # Voice-agent tests
 
 tests/                     # Test suite — mirrors the calibrate/ structure
 ├── stt/        test_eval.py, test_metrics.py, test_leaderboard.py

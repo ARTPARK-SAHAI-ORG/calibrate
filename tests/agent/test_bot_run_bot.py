@@ -49,7 +49,8 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(B, "OpenAILLMService"), \
              patch.object(B, "OpenRouterLLMService", return_value=fake_llm), \
              patch.object(B, "RTVIProcessor"), \
-             patch.object(B, "TranscriptProcessor"), \
+             patch.object(B, "SileroVADAnalyzer"), \
+             patch.object(B, "LocalSmartTurnAnalyzerV3"), \
              patch.object(B, "Pipeline"), \
              patch.object(B, "PipelineTask"), \
              patch.object(B, "PipelineRunner", return_value=fake_runner), \
@@ -85,7 +86,8 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(B, "OpenAILLMService", return_value=fake_llm), \
              patch.object(B, "OpenRouterLLMService"), \
              patch.object(B, "RTVIProcessor"), \
-             patch.object(B, "TranscriptProcessor"), \
+             patch.object(B, "SileroVADAnalyzer"), \
+             patch.object(B, "LocalSmartTurnAnalyzerV3"), \
              patch.object(B, "Pipeline"), \
              patch.object(B, "PipelineTask"), \
              patch.object(B, "PipelineRunner", return_value=fake_runner), \

@@ -52,20 +52,21 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.transports.base_transport import BaseTransport
 
 # from pipecat.transports.daily.transport import DailyParams
-from pipecat.processors.transcript_processor import TranscriptProcessor
 from pipecat.processors.frameworks.rtvi import (
-    RTVIConfig,
     RTVIObserver,
     RTVIProcessor,
     RTVIClientMessageFrame,
 )
+from pipecat.audio.vad.silero import SileroVADAnalyzer
+from pipecat.audio.vad.vad_analyzer import VADParams
+from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
 from pipecat.utils.time import time_now_iso8601
 
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.observers.loggers.user_bot_latency_log_observer import (
-    UserBotLatencyLogObserver,
-)
+from pipecat.observers.user_bot_latency_observer import UserBotLatencyObserver
 
 from pipecat.utils.tracing.setup import setup_tracing
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -166,8 +167,6 @@ async def run_bot(
         )
 
     ml = MetricsLogger()
-
-    transcript = TranscriptProcessor()
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -346,10 +345,15 @@ async def run_bot(
     context = LLMContext(messages, tools)
     context_aggregator = LLMContextAggregatorPair(
         context,
-        user_params=LLMUserAggregatorParams(enable_emulated_vad_interruptions=True),
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            user_turn_strategies=UserTurnStrategies(
+                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+            ),
+        ),
     )
 
-    rtvi = RTVIProcessor(config=RTVIConfig(config=[]))
+    rtvi = RTVIProcessor()
 
     pending_tool_calls: Dict[str, FunctionCallParams] = {}
     pending_tool_call_events: Dict[str, asyncio.Event] = {}
@@ -368,7 +372,7 @@ async def run_bot(
 
             if isinstance(frame, RTVIClientMessageFrame) and frame.type == "interrupt":
                 logger.info(f"Simulating user interruption of the bot")
-                await self.push_interruption_task_frame_and_wait()
+                await self.broadcast_interruption()
                 await self.push_frame(UserStartedSpeakingFrame())
                 await self.push_frame(
                     TranscriptionFrame(
@@ -436,19 +440,23 @@ async def run_bot(
     pipeline_processors.extend(
         [
             stt,
-            transcript.user(),
             context_aggregator.user(),
             llm,
             tts,
             ml,
             OutputLogger(),
             transport.output(),
-            transcript.assistant(),
             context_aggregator.assistant(),
         ]
     )
 
     pipeline = Pipeline(pipeline_processors)
+
+    latency_observer = UserBotLatencyObserver()
+
+    @latency_observer.event_handler("on_latency_measured")
+    async def on_latency_measured(observer, latency_seconds):
+        bot_logger.info(f"User-bot latency: {latency_seconds:.3f}s")
 
     task = PipelineTask(
         pipeline,
@@ -461,7 +469,7 @@ async def run_bot(
         observers=[
             RTVIObserver(rtvi),
             LLMLogObserver(),
-            UserBotLatencyLogObserver(),
+            latency_observer,
         ],  # RTVI protocol events
         idle_timeout_secs=120,  # 2 minutes idle timeout
         idle_timeout_frames=(
@@ -497,13 +505,13 @@ async def run_bot(
         bot_logger.info(f"Client disconnected")
         await task.cancel()
 
-    @transcript.event_handler("on_transcript_update")
-    async def handle_transcript_update(processor, frame):
-        # Each message contains role (user/assistant), content, and timestamp
-        for message in frame.messages:
-            bot_logger.info(
-                f"Bot transcript:[{message.timestamp}] {message.role}: {message.content}"
-            )
+    @context_aggregator.user().event_handler("on_user_turn_stopped")
+    async def on_user_turn_stopped(aggregator, strategy, message):
+        bot_logger.info(f"Bot transcript:[{message.timestamp}] user: {message.content}")
+
+    @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
+    async def on_assistant_turn_stopped(aggregator, message):
+        bot_logger.info(f"Bot transcript:[{message.timestamp}] assistant: {message.content}")
 
     # Handle client connection
     @rtvi.event_handler("on_client_ready")
