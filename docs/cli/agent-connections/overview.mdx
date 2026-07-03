@@ -8,25 +8,33 @@ Instead of defining an agent inside Calibrate, you can point the CLI at an agent
 Pick the connection that matches your agent:
 
 <CardGroup cols={2}>
-  <Card
-    title="Chat agent"
-    icon="message"
-    href="/cli/agent-connections/http"
-  >
-    OpenAI-compatible request/response over `http(s)://`. For LLM tests, model
-    benchmarks, and `--type text` simulations.
+  <Card title="Chat agent" icon="message" href="/cli/agent-connections/chat">
+    Standard HTTP chat, including OpenAI-compatible APIs. For LLM tests and
+    `--type text` simulations.
   </Card>
   <Card
-    title="WebSocket agent"
-    icon="microphone"
-    href="/cli/agent-connections/websocket"
+    title="Outbound voice agent"
+    icon="phone-arrow-up-right"
+    href="/cli/agent-connections/outbound-voice"
   >
-    Real-audio pipecat frame protocol over `ws(s)://`. For `--type voice`
-    simulations against a deployed pipecat agent.
+    Real-audio voice over a pipecat WebSocket. For `--type voice` simulations.
   </Card>
 </CardGroup>
 
-| Type        | Description                         | Required fields            |
-| ----------- | ----------------------------------- | -------------------------- |
-| `chat`      | Text / OpenAI-compatible HTTP agent | `agent_url` (`http(s)://`) |
-| `websocket` | Pipecat voice agent over WebSocket  | `agent_url` (`ws(s)://`)   |
+| Type             | Description                                          | Required fields            |
+| ---------------- | --------------------------------------------------- | -------------------------- |
+| `chat`           | Standard HTTP chat, including OpenAI-compatible APIs | `agent_url` (`http(s)://`) |
+| `outbound-voice` | Pipecat voice agent over WebSocket                  | `agent_url` (`ws(s)://`)   |
+
+## Verify your connection
+
+Confirm Calibrate can reach your agent before running a simulation.
+
+**Chat agent** — checks reachability and response format:
+
+```bash
+calibrate simulations --verify --agent-url https://your-agent.example.com/chat \
+  --agent-headers '{"Authorization": "Bearer YOUR_API_KEY"}'
+```
+
+**Outbound voice agent** — Calibrate opens the WebSocket and confirms the handshake automatically before each voice run. This is a reachability check only; it does not confirm the frame protocol or serializer is compatible.

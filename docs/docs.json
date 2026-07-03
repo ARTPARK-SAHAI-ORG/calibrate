@@ -70,8 +70,8 @@
                 "group": "Agent Connections",
                 "pages": [
                   "cli/agent-connections/overview",
-                  "cli/agent-connections/http",
-                  "cli/agent-connections/websocket"
+                  "cli/agent-connections/chat",
+                  "cli/agent-connections/outbound-voice"
                 ]
               }
             ]

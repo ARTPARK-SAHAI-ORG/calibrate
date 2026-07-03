@@ -1,0 +1,38 @@
+---
+title: "Chat agent"
+description: "Connect a text chat agent over HTTP, including OpenAI-compatible APIs"
+---
+
+Connect a text chat agent over HTTP to simulate conversations — useful for chat agents, or for testing a voice agent's logic without audio. Set an `http(s)://` `agent_url` in your config; used for LLM tests and `--type text` simulations.
+
+## Quick start
+
+At minimum you need:
+
+- **`agent_url`** — the HTTP(S) endpoint Calibrate sends conversation messages to.
+- **`agent_headers`** — optional; auth or custom headers.
+
+## Configuration
+
+| Field           | Required | Description                                                 |
+| --------------- | -------- | ----------------------------------------------------------- |
+| `agent_url`     | Yes      | Endpoint, e.g. `https://your-agent.example.com/chat`         |
+| `agent_headers` | No       | Auth/custom headers, e.g. `{ "Authorization": "Bearer …" }`  |
+
+## Chat messages
+
+Calibrate `POST`s the full conversation history to `agent_url`:
+
+```json
+// Request from Calibrate
+{ "messages": [{ "role": "user", "content": "..." }] }
+```
+
+Your agent returns a `response` (and optional `tool_calls`):
+
+```json
+// Response
+{ "response": "...", "tool_calls": [{ "tool": "get_schedule", "arguments": {} }] }
+```
+
+The output must include `response` or `tool_calls`. This is standard HTTP/JSON — an OpenAI-compatible chat endpoint works as-is.

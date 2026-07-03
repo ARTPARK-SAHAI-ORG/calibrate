@@ -17,13 +17,13 @@ There are three ways to run simulations:
 
 - **Calibrate agent** — define your agent's system prompt and tools directly in the config file. Works for both text and voice simulations.
 - **Agent connection (text)** — point calibrate at your existing agent's HTTP endpoint. The user simulator sends messages to it and evaluates the full conversation.
-- **External voice agent (WebSocket)** — for voice simulations, point calibrate at an existing pipecat agent's WebSocket endpoint via `agent_url`. Calibrate streams real audio to it instead of running its own agent. See [Agent Connections → Pipecat WebSocket agents](/cli/agent-connections/websocket).
+- **External voice agent (WebSocket)** — for voice simulations, point calibrate at an existing pipecat agent's WebSocket endpoint via `agent_url`. Calibrate streams real audio to it instead of running its own agent. See [Agent Connections → Pipecat WebSocket agents](/cli/agent-connections/outbound-voice).
 
 <Note>
   The HTTP agent connection (over `http(s)://`) is for **text** simulations. For
   **voice** simulations against an existing agent, use a WebSocket `agent_url`
   (over `ws(s)://`) — see [Agent Connections → Pipecat WebSocket
-  agents](/cli/agent-connections/websocket).
+  agents](/cli/agent-connections/outbound-voice).
 </Note>
 
 For the full setup details, see [Set up your agent](/cli/text-to-text#set-up-your-agent).
@@ -275,7 +275,7 @@ For voice simulations, specify the STT, LLM, and TTS providers:
   </Accordion>
 
   <Accordion title="External voice agent (WebSocket) example">
-    For voice simulations against an existing pipecat agent, set a `ws(s)://` `agent_url` and omit `system_prompt`, `tools`, `stt`, `tts`, and `llm`. See [Agent Connections → Pipecat WebSocket agents](/cli/agent-connections/websocket) for the full reference and metric caveats.
+    For voice simulations against an existing pipecat agent, set a `ws(s)://` `agent_url` and omit `system_prompt`, `tools`, `stt`, `tts`, and `llm`. See [Agent Connections → Pipecat WebSocket agents](/cli/agent-connections/outbound-voice) for the full reference and metric caveats.
 
     ```json
     {

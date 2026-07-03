@@ -1,0 +1,52 @@
+---
+title: "Outbound voice agent"
+description: "Run voice simulations against a deployed pipecat voice agent over WebSocket"
+---
+
+Simulate your voice agent taking a call: Calibrate connects to your deployed [pipecat](https://github.com/pipecat-ai/pipecat) agent over a WebSocket and drives a real-audio conversation with a simulated user. Set a `ws(s)://` `agent_url` for `--type voice` simulations.
+
+## How it works
+
+1. Set a `ws(s)://` `agent_url` in your config. Calibrate does **not** launch its own agent — yours owns the pipeline (STT, LLM, TTS).
+2. Calibrate opens a WebSocket to your agent and connects as a pipecat client.
+3. The simulated user (persona + scenario) speaks; audio streams to your agent as pipecat frames.
+4. Your agent's audio streams back; Calibrate transcribes it as the "heard" side of the conversation.
+5. Evaluators and metrics run over the resulting transcript.
+
+Because your agent owns the pipeline, you don't provide `system_prompt`, `tools`, `stt`, `tts`, or `llm`. `personas`, `scenarios`, `evaluators`, and `settings` work as usual.
+
+## Configuration
+
+| Field              | Type   | Required | Description                                       |
+| ------------------ | ------ | -------- | ------------------------------------------------- |
+| `agent_url`        | string | Yes      | WebSocket endpoint, e.g. `ws://host:port`          |
+| `agent_serializer` | string | No       | Wire serializer: `protobuf` (default)              |
+
+<Warning>
+  Your agent must speak pipecat's WebSocket frame protocol with the same
+  serializer (`protobuf`) and audio format. A non-pipecat socket won't work.
+</Warning>
+
+## Example
+
+```json
+{
+  "agent_url": "ws://localhost:8765",
+  "personas": [{ "label": "customer", "characteristics": "...", "gender": "female", "language": "english" }],
+  "scenarios": [{ "name": "order inquiry", "description": "Ask about your order status." }],
+  "evaluators": [{ "name": "order_resolved", "system_prompt": "...", "judge_model": "openai/gpt-4.1" }],
+  "settings": { "agent_speaks_first": true, "max_turns": 5 }
+}
+```
+
+```bash
+calibrate simulations --type voice -c config.json -o ./out
+```
+
+## Metric differences
+
+Because your agent owns the pipeline, some metrics differ from the built-in agent:
+
+- **Per-processor latency (TTFT, `processing_time`) is unavailable** — it comes from the internal pipeline.
+- **`interruption_sensitivity` is no longer controlled** — it reflects the agent's own barge-in behavior.
+- **Latency is measured end-to-end** from the simulator side instead.
