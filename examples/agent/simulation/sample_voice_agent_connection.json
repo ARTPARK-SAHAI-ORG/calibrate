@@ -1,6 +1,5 @@
 {
   "agent_url": "ws://localhost:8765",
-  "agent_serializer": "protobuf",
   "personas": [
     {
       "label": "friendly customer",
