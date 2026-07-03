@@ -848,6 +848,12 @@ Examples:
                     "type",
                     "model",
                     "provider",
+                    "verify",
+                    "skip_verify",
+                    "agent_url",
+                    "agent_headers",
+                    "eval_only",
+                    "dataset",
                 },
             )
             asyncio.run(agent_main())

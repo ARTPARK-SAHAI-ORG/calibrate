@@ -652,6 +652,17 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     else:
                         self._awaiting_first_bot_audio_chunk = True
                         self._pending_user_turn = True
+                        # A new bot utterance starts with a clean interrupt slate.
+                        # These flags are otherwise only cleared on
+                        # ``user-stopped-speaking``; when an agent speaks a turn as
+                        # separate utterances (e.g. a short acknowledgement followed
+                        # by the actual reply), a decided/triggered flag left over
+                        # from the previous utterance would cause this utterance's
+                        # audio to be dropped and its text ignored, so the simulated
+                        # user never "hears" it and the run deadlocks.
+                        self._is_bot_interrupt_decided = False
+                        self._is_bot_interrupt_triggered = False
+                        self._spoken_text_buffer = ""
                         # Cancel any pending sim-user line allocation: bot has
                         # the floor and any in-flight sim-user TTS will be
                         # killed by the upcoming InterruptionTaskFrame.
