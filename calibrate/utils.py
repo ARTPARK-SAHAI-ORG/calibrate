@@ -1711,14 +1711,14 @@ TTS_VOICE_IDS = {
 # (calibrate/stt/eval.py, calibrate/tts/eval.py) both read these, so a change in
 # one place applies to both and a leaderboard always reflects the deployed
 # config. See CLAUDE.md ("Keeping live-agent and eval defaults in sync"); the
-# parity is guarded by tests/test_utils_factories.py. Sarvam is intentionally
-# excluded from STT only — the live agent stays on pipecat's default and its STT
-# model is tracked separately (a parked decision: pipecat 0.0.98 couldn't
-# reproduce the benchmark's saaras:v3 transcribe path, and pipecat 1.0.0 now
-# exposes mode="transcribe" but this hasn't been wired in yet). Sarvam TTS has no
-# such history and is included below. Providers absent here have no shared model
-# string (e.g. Google/Smallest/Deepgram TTS carry the model in the voice name or
-# set no model at all).
+# parity is guarded by tests/test_utils_factories.py. Sarvam STT uses saaras:v3
+# with mode="transcribe" — under pipecat 1.0.0 that routes to the plain STT
+# streaming endpoint (use_translate_endpoint=False), matching the benchmark's
+# transcribe_sarvam. (Under pipecat 0.0.98 this wasn't possible — its wrapper
+# forced saaras onto the translate endpoint with no mode param — which is why it
+# was previously excluded.) Providers absent here have no shared model string
+# (e.g. Google/Smallest/Deepgram TTS carry the model in the voice name or set no
+# model at all).
 STT_PROVIDER_MODELS = {
     "deepgram": "nova-3",
     "openai": "gpt-4o-transcribe",
@@ -1727,6 +1727,7 @@ STT_PROVIDER_MODELS = {
     "cartesia": "ink-whisper",
     "elevenlabs": "scribe_v2_realtime",
     "smallest": "pulse",
+    "sarvam": "saaras:v3",
 }
 
 TTS_PROVIDER_MODELS = {
@@ -1780,7 +1781,11 @@ def create_stt_service(
     elif provider == "sarvam":
         return SarvamSTTService(
             api_key=os.getenv("SARVAM_API_KEY"),
-            settings=SarvamSTTService.Settings(language=stt_language),
+            mode="transcribe",
+            settings=SarvamSTTService.Settings(
+                language=stt_language,
+                model=STT_PROVIDER_MODELS["sarvam"],
+            ),
         )
     elif provider == "elevenlabs":
         return ElevenLabsRealtimeSTTService(

@@ -171,14 +171,13 @@ per-provider params still need manual mirroring.)
 `tests/test_utils_factories.py` guards this: it asserts every provider's model
 in `create_*_service` comes from the shared constant, and that TTS voices match
 the eval literals. If you add a provider or change a default, update both sides
-and that test. **Sarvam STT is the known exception** — its STT model is
-intentionally left out of `STT_PROVIDER_MODELS` (the live agent stays on
-pipecat's default) and tracked separately. This started as a hard limitation in
-pipecat 0.0.98 (its `SarvamSTTService` routed `saaras` models to the *translate*
-endpoint with no `mode`, so it couldn't reproduce the benchmark's `saaras:v3`
-transcribe path); pipecat 1.0.0 now exposes `mode="transcribe"`, so it's a
-*parked* decision rather than a blocker — revisit before wiring it in. Sarvam
-**TTS** has no such history and *is* in `TTS_PROVIDER_MODELS` (`bulbul:v3`).
+and that test. **Sarvam STT** uses `saaras:v3` with `mode="transcribe"` (passed
+to pipecat's `SarvamSTTService`), which under pipecat 1.0.0 routes to the plain
+STT streaming endpoint — matching the benchmark's `transcribe_sarvam`. This was
+impossible under pipecat 0.0.98 (its wrapper forced `saaras` onto the *translate*
+endpoint with no `mode` param), so Sarvam STT was excluded there; the 1.0.0
+upgrade removed that limitation and it's now single-sourced like every other
+provider. Sarvam **TTS** is likewise in `TTS_PROVIDER_MODELS` (`bulbul:v3`).
 
 ### Resumability
 `run_stt_eval` / `run_tts_eval` write `results.csv` row-by-row and skip already

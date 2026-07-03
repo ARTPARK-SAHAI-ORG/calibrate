@@ -426,7 +426,7 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
 
     async with client.speech_to_text_streaming.connect(
         language_code=lang_code,
-        model="saaras:v3",
+        model=STT_PROVIDER_MODELS["sarvam"],
         mode="transcribe",
         flush_signal=True,
     ) as ws:

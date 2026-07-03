@@ -55,9 +55,7 @@ class TestCreateSTTService(unittest.TestCase):
     def test_stt_models_come_from_shared_constant(self):
         """Every provider's model in create_stt_service must come from
         utils.STT_PROVIDER_MODELS — the SAME dict calibrate/stt/eval.py reads —
-        so the live agent and the benchmark can't drift apart. Sarvam is excluded
-        (pipecat routes saaras to the translate endpoint, so it can't reproduce
-        eval's saaras:v3 transcribe path)."""
+        so the live agent and the benchmark can't drift apart."""
         from calibrate.utils import create_stt_service, STT_PROVIDER_MODELS
 
         for prov, expected in STT_PROVIDER_MODELS.items():
@@ -73,8 +71,24 @@ class TestCreateSTTService(unittest.TestCase):
         # parity coverage here.
         self.assertEqual(
             set(STT_PROVIDER_MODELS),
-            {"deepgram", "openai", "groq", "google", "cartesia", "elevenlabs", "smallest"},
+            {"deepgram", "openai", "groq", "google", "cartesia",
+             "elevenlabs", "smallest", "sarvam"},
         )
+
+    def test_sarvam_stt_transcribes(self):
+        """Sarvam STT must use saaras:v3 with mode="transcribe" so pipecat routes
+        it to the plain STT streaming endpoint (not translate), matching
+        stt/eval.py's transcribe_sarvam."""
+        from calibrate.utils import create_stt_service, STT_PROVIDER_MODELS
+
+        with patch.dict(os.environ, ALL_KEYS), \
+                patch(STT_SERVICE_TARGETS["sarvam"]) as svc:
+            create_stt_service("sarvam", "english")
+            self.assertEqual(svc.call_args.kwargs["mode"], "transcribe")
+            self.assertEqual(
+                svc.Settings.call_args.kwargs["model"], STT_PROVIDER_MODELS["sarvam"]
+            )
+            self.assertEqual(STT_PROVIDER_MODELS["sarvam"], "saaras:v3")
 
 
 class TestCreateTTSService(unittest.TestCase):
