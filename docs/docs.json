@@ -65,7 +65,8 @@
               "cli/speech-to-text",
               "cli/text-to-text",
               "cli/text-to-speech",
-              "cli/simulations"
+              "cli/simulations",
+              "cli/agent-connections"
             ]
           },
           {
