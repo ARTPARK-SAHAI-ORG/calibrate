@@ -7,12 +7,12 @@ Connect a text chat agent to evaluate your agent's logic without placing calls b
 
 ## Quick start
 
-- **`agent_url`** — the HTTP endpoint Calibrate sends conversation messages to.
-- **`agent_headers`** — optional; auth or custom headers.
+- **`agent_url`** — The URL where your agent receives messages
+- **`agent_headers`** — (optional) Authentication credentials for your API
 
 ## Chat endpoint (required)
 
-The primary URL where Calibrate sends conversation messages during a simulation. Set it as `agent_url`.
+The primary URL where Calibrate sends conversation messages during a test or a simulation. Set it as `agent_url`.
 
 **Format:** Full HTTP(S) URL
 
@@ -22,7 +22,7 @@ https://api.yourdomain.com/chat
 
 **Requirements:**
 
-- HTTP or HTTPS (use `http://localhost:…` for a local agent)
+- HTTP or HTTPS (use `http://localhost:...` for a local agent)
 - Reachable from where you run the CLI
 - Must return a JSON response
 
@@ -34,7 +34,7 @@ https://api.yourdomain.com/v1/chat
 
 ## Authorization header
 
-Authentication credentials sent with every request. Add them under `agent_headers` — optional, only if your agent requires auth.
+Authentication credentials sent with every request. Add them under `agent_headers`. It is optional, add it only if your agent requires authentication.
 
 **Common formats:**
 
@@ -50,17 +50,13 @@ Authentication credentials sent with every request. Add them under `agent_header
 { "X-API-Key": "your-api-key-here" }
 ```
 
-## Standard protocol
+## Protocol
 
-The standard integration uses an HTTP, JSON-based endpoint that you provide. When running a simulation, Calibrate's simulator — acting as the user — connects to your endpoint to get responses from your agent. Requests use OpenAI-style `messages`; your endpoint replies with Calibrate's response format below.
-
-## Chat messages
-
-Your chat endpoint should respond to `POST` requests with a JSON body. If `agent_headers` were provided, they are included in the request.
+You must provide an HTTP, JSON-based endpoint. For both LLM tests and simulations, Calibrate sends a `POST` request to your chat endpoint with a list of messages. Your endpoint should reply in the expected response format given below.
 
 **Request from Calibrate:**
 
-Calibrate sends the full conversation history so far:
+Calibrate sends the full conversation history so far (including the latest simulated user input for simulations):
 
 ```json
 {
@@ -89,13 +85,19 @@ Standard format — a text reply:
 }
 ```
 
-With tool calls — include a `tool_calls` array, each item a `tool` name and `arguments` object:
+With tool calls — include a `tool_calls` array, each item a `tool` name and `arguments` object. You may also include the tool's `output`:
 
 ```json
 {
   "response": "Let me check that order.",
   "tool_calls": [
-    { "tool": "get_order", "arguments": { "order_id": "ORD-12345" } }
+    {
+      "tool": "get_order",
+      "arguments": { "order_id": "ORD-12345" },
+      "output": { "status": "shipped", "eta": "Friday" }
+    }
   ]
 }
 ```
+
+`output` is optional — the result your tool returned (any JSON value). It's shown in the results view for review only and never affects whether a test passes.
