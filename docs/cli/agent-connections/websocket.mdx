@@ -1,84 +1,7 @@
 ---
-title: "Agent Connections"
-description: "Point the Calibrate CLI at an existing agent over HTTP or WebSocket"
+title: "Pipecat WebSocket agents (voice)"
+description: "Run voice simulations against an external pipecat agent over WebSocket"
 ---
-
-Instead of defining an agent inside Calibrate (`system_prompt`, `tools`, `stt`, `tts`, `llm`), you can point the CLI at an agent you've already deployed. Set `agent_url` in your config JSON — the scheme decides the connection type:
-
-| | **HTTP agent** (text / OpenAI-compatible) | **Pipecat WebSocket agent** (voice) |
-| --- | --- | --- |
-| Used for | LLM tests, benchmarks, `--type text` simulations | `--type voice` simulations |
-| `agent_url` scheme | `http(s)://` | `ws(s)://` |
-| Transport | HTTP request/response | WebSocket frame protocol (pipecat) |
-| Medium | Text only | Real audio |
-| Captured metrics | `tool_calls`, cost, token counts | end-to-end latency (no tool-call/cost metrics) |
-
-<Tip>
-  To build an agent inside Calibrate instead, see
-  [Core Concepts: Agents](/core-concepts/agents). For the UI-based HTTP
-  connection flow, see
-  [Agent Connections](/core-concepts/agent-connections).
-</Tip>
-
-## HTTP agents (text / OpenAI-compatible)
-
-Point Calibrate at an HTTP endpoint that takes a conversation history and returns a reply (and optionally tool calls). Used for LLM tests, model benchmarks, and `--type text` simulations.
-
-Config keys:
-
-| Key             | Type   | Description                                                                    |
-| --------------- | ------ | ------------------------------------------------------------------------------ |
-| `agent_url`     | string | Your agent's HTTP(S) endpoint, e.g. `https://your-agent.example.com/chat`       |
-| `agent_headers` | object | Optional headers, e.g. `{ "Authorization": "Bearer YOUR_API_KEY" }`             |
-
-Calibrate sends a `POST` to `agent_url` with the full conversation history:
-
-```json
-{
-  "messages": [
-    { "role": "assistant", "content": "Namaste! Main aapki kaise madad kar sakti hoon?" },
-    { "role": "user", "content": "Meri beti ka vaccination schedule kya hai?" }
-  ]
-}
-```
-
-Your agent must respond with a `response` field, and optionally `tool_calls`:
-
-```json
-{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
-  "tool_calls": [
-    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
-  ]
-}
-```
-
-<Warning>
-  Your agent's output **must** include either a `response` field or a
-  `tool_calls` field.
-</Warning>
-
-### Verify the connection
-
-Verify reachability and response format before running:
-
-```bash
-calibrate simulations --verify --agent-url https://your-agent.example.com/chat
-```
-
-Add `--agent-headers '{"Authorization": "Bearer YOUR_API_KEY"}'` if your agent needs authentication.
-
-### Benchmark across models
-
-To compare LLMs on your dataset, instrument your agent to read a `model` field. When benchmarking, Calibrate adds it to the request body:
-
-```json
-{ "messages": [...], "model": "openai/gpt-4.1" }
-```
-
-Your agent is responsible for reading `model` and running inference with it — Calibrate sends the field but does not control which model your agent uses.
-
-## Pipecat WebSocket agents (voice)
 
 For **voice** simulations, Calibrate can connect to an external voice agent that runs its own [pipecat](https://github.com/pipecat-ai/pipecat) pipeline and exposes a WebSocket server — instead of running its own agent. This lets you simulate real audio conversations against a deployed agent with your own STT, LLM, and TTS wiring intact.
 
@@ -91,7 +14,7 @@ Config keys:
 
 When `agent_url` uses a `ws`/`wss` scheme, Calibrate does **not** spin up its own agent. The external agent owns the pipeline, so you do **not** provide `system_prompt`, `tools`, `stt`, `tts`, or `llm` — those keys are ignored on this path. `personas`, `scenarios`, `evaluators`, and `settings` behave exactly as in a normal voice simulation.
 
-### Protocol requirement
+## Protocol requirement
 
 <Warning>
   The external agent must speak pipecat's WebSocket **frame protocol** using the
@@ -101,7 +24,7 @@ When `agent_url` uses a `ws`/`wss` scheme, Calibrate does **not** spin up its ow
   implements the same frame protocol.
 </Warning>
 
-### Verify the connection
+## Verify the connection
 
 Before running, Calibrate performs a reachability check: it opens the WebSocket and confirms the handshake succeeds.
 
@@ -112,7 +35,7 @@ Before running, Calibrate performs a reachability check: it opens the WebSocket 
   conversation still fails to produce audio.
 </Note>
 
-### Metric caveats
+## Metric caveats
 
 The WebSocket path measures real audio, but a few metrics differ from the built-in agent because Calibrate no longer owns the pipeline:
 
@@ -131,7 +54,7 @@ The WebSocket path measures real audio, but a few metrics differ from the built-
   place of the per-processor timings above.
 </Note>
 
-### Example config
+## Example config
 
 A minimal external voice-agent config — note the absence of `system_prompt`, `tools`, `stt`, `tts`, and `llm`:
 
@@ -180,7 +103,7 @@ calibrate simulations --type voice -c config.json -o ./out
   <Card title="Run Simulations" icon="play" href="/cli/simulations">
     Full simulation config reference and CLI usage
   </Card>
-  <Card title="Run LLM Tests" icon="list-check" href="/cli/text-to-text">
-    Test agent responses and tool calls from the CLI
+  <Card title="HTTP agents (text)" icon="message" href="/cli/agent-connections/http">
+    Connect an OpenAI-compatible text agent over HTTP
   </Card>
 </CardGroup>

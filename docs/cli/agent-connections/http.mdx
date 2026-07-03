@@ -1,0 +1,71 @@
+---
+title: "HTTP agents (text)"
+description: "Connect an OpenAI-compatible HTTP agent for text simulations, LLM tests, and benchmarks"
+---
+
+Point Calibrate at an HTTP endpoint that takes a conversation history and returns a reply (and optionally tool calls). Used for LLM tests, model benchmarks, and `--type text` simulations.
+
+Config keys:
+
+| Key             | Type   | Description                                                                    |
+| --------------- | ------ | ------------------------------------------------------------------------------ |
+| `agent_url`     | string | Your agent's HTTP(S) endpoint, e.g. `https://your-agent.example.com/chat`       |
+| `agent_headers` | object | Optional headers, e.g. `{ "Authorization": "Bearer YOUR_API_KEY" }`             |
+
+Calibrate sends a `POST` to `agent_url` with the full conversation history:
+
+```json
+{
+  "messages": [
+    { "role": "assistant", "content": "Namaste! Main aapki kaise madad kar sakti hoon?" },
+    { "role": "user", "content": "Meri beti ka vaccination schedule kya hai?" }
+  ]
+}
+```
+
+Your agent must respond with a `response` field, and optionally `tool_calls`:
+
+```json
+{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
+  "tool_calls": [
+    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
+  ]
+}
+```
+
+<Warning>
+  Your agent's output **must** include either a `response` field or a
+  `tool_calls` field.
+</Warning>
+
+## Verify the connection
+
+Verify reachability and response format before running:
+
+```bash
+calibrate simulations --verify --agent-url https://your-agent.example.com/chat
+```
+
+Add `--agent-headers '{"Authorization": "Bearer YOUR_API_KEY"}'` if your agent needs authentication.
+
+## Benchmark across models
+
+To compare LLMs on your dataset, instrument your agent to read a `model` field. When benchmarking, Calibrate adds it to the request body:
+
+```json
+{ "messages": [...], "model": "openai/gpt-4.1" }
+```
+
+Your agent is responsible for reading `model` and running inference with it — Calibrate sends the field but does not control which model your agent uses.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Run LLM Tests" icon="list-check" href="/cli/text-to-text">
+    Test agent responses and tool calls from the CLI
+  </Card>
+  <Card title="Run Simulations" icon="play" href="/cli/simulations">
+    Simulate conversations with realistic personas
+  </Card>
+</CardGroup>

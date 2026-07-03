@@ -1,0 +1,38 @@
+---
+title: "Agent Connections"
+description: "Point the Calibrate CLI at an existing agent over HTTP or WebSocket"
+---
+
+Instead of defining an agent inside Calibrate (`system_prompt`, `tools`, `stt`, `tts`, `llm`), you can point the CLI at an agent you've already deployed. Set `agent_url` in your config JSON — the scheme decides the connection type.
+
+Pick the connection that matches your agent:
+
+<CardGroup cols={2}>
+  <Card title="HTTP agent (text)" icon="message" href="/cli/agent-connections/http">
+    OpenAI-compatible request/response over `http(s)://`. For LLM tests,
+    model benchmarks, and `--type text` simulations.
+  </Card>
+  <Card
+    title="Pipecat WebSocket agent (voice)"
+    icon="microphone"
+    href="/cli/agent-connections/websocket"
+  >
+    Real-audio pipecat frame protocol over `ws(s)://`. For `--type voice`
+    simulations against a deployed pipecat agent.
+  </Card>
+</CardGroup>
+
+| | **HTTP agent** (text / OpenAI-compatible) | **Pipecat WebSocket agent** (voice) |
+| --- | --- | --- |
+| Used for | LLM tests, benchmarks, `--type text` simulations | `--type voice` simulations |
+| `agent_url` scheme | `http(s)://` | `ws(s)://` |
+| Transport | HTTP request/response | WebSocket frame protocol (pipecat) |
+| Medium | Text only | Real audio |
+| Captured metrics | `tool_calls`, cost, token counts | end-to-end latency (no tool-call/cost metrics) |
+
+<Tip>
+  To build an agent inside Calibrate instead, see
+  [Core Concepts: Agents](/core-concepts/agents). For the UI-based HTTP
+  connection flow, see
+  [Agent Connections](/core-concepts/agent-connections).
+</Tip>
