@@ -1,9 +1,9 @@
 ---
-title: "Chat agent (HTTP)"
-description: "Connect an OpenAI-compatible HTTP agent for text simulations, LLM tests, and benchmarks"
+title: "Chat agent"
+description: "Connect an OpenAI-compatible HTTP agent"
 ---
 
-Set an `http(s)://` `agent_url` in your config to point Calibrate at a deployed HTTP endpoint. Used for LLM tests, model benchmarks, and `--type text` simulations.
+Set an `http(s)://` `agent_url` in your config to point Calibrate at a deployed HTTP endpoint. Used for LLM tests and `--type text` simulations.
 
 ## Config
 
@@ -34,7 +34,3 @@ The output must include `response` or `tool_calls`.
 calibrate simulations --verify --agent-url https://your-agent.example.com/chat \
   --agent-headers '{"Authorization": "Bearer YOUR_API_KEY"}'
 ```
-
-## Benchmark across models
-
-To compare LLMs, have your agent read a `model` field — Calibrate adds it to the request body (`{ "messages": [...], "model": "openai/gpt-4.1" }`). Your agent runs inference with that model.
