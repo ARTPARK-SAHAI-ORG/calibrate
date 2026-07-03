@@ -222,5 +222,177 @@ class TestSilencePadder(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(padder._chunk_ms, 20)
 
 
+class TestResolveSerializer(unittest.TestCase):
+    def test_protobuf_returns_instance(self):
+        from calibrate.agent.run_simulation import resolve_serializer
+        from pipecat.serializers.protobuf import ProtobufFrameSerializer
+
+        ser = resolve_serializer("protobuf")
+        self.assertIsInstance(ser, ProtobufFrameSerializer)
+
+    def test_returns_new_instance_each_call(self):
+        from calibrate.agent.run_simulation import resolve_serializer
+
+        self.assertIsNot(resolve_serializer("protobuf"), resolve_serializer("protobuf"))
+
+    def test_unknown_raises_value_error(self):
+        from calibrate.agent.run_simulation import resolve_serializer
+
+        with self.assertRaises(ValueError):
+            resolve_serializer("nope")
+
+
+class TestIsExternalWsAgent(unittest.TestCase):
+    def test_ws_scheme_is_external(self):
+        from calibrate.agent.run_simulation import is_external_ws_agent
+
+        self.assertTrue(is_external_ws_agent({"agent_url": "ws://host:9000"}))
+
+    def test_wss_scheme_is_external(self):
+        from calibrate.agent.run_simulation import is_external_ws_agent
+
+        self.assertTrue(is_external_ws_agent({"agent_url": "wss://host/agent"}))
+
+    def test_http_scheme_is_internal(self):
+        from calibrate.agent.run_simulation import is_external_ws_agent
+
+        self.assertFalse(is_external_ws_agent({"agent_url": "http://host:9000"}))
+        self.assertFalse(is_external_ws_agent({"agent_url": "https://host"}))
+
+    def test_missing_url_is_internal(self):
+        from calibrate.agent.run_simulation import is_external_ws_agent
+
+        self.assertFalse(is_external_ws_agent({}))
+        self.assertFalse(is_external_ws_agent({"agent_url": None}))
+
+    def test_none_config_is_internal(self):
+        from calibrate.agent.run_simulation import is_external_ws_agent
+
+        self.assertFalse(is_external_ws_agent(None))
+
+
+class TestSelectTransportUri(unittest.TestCase):
+    def test_agent_uri_used_when_set(self):
+        from calibrate.agent.run_simulation import select_transport_uri
+
+        self.assertEqual(
+            select_transport_uri("wss://external/agent", 8765),
+            "wss://external/agent",
+        )
+
+    def test_falls_back_to_localhost_port(self):
+        from calibrate.agent.run_simulation import select_transport_uri
+
+        self.assertEqual(select_transport_uri(None, 1234), "ws://localhost:1234")
+
+    def test_empty_string_falls_back(self):
+        from calibrate.agent.run_simulation import select_transport_uri
+
+        self.assertEqual(select_transport_uri("", 4321), "ws://localhost:4321")
+
+
+class TestEndToEndLatencyTracker(unittest.TestCase):
+    def test_no_turns_mean_is_none(self):
+        from calibrate.agent.run_simulation import EndToEndLatencyTracker
+
+        self.assertIsNone(EndToEndLatencyTracker().mean())
+
+    def test_agent_audio_without_user_turn_is_ignored(self):
+        from calibrate.agent.run_simulation import EndToEndLatencyTracker
+
+        tracker = EndToEndLatencyTracker()
+        tracker.mark_agent_audio()  # no pending user turn end
+        self.assertEqual(tracker.deltas, [])
+        self.assertIsNone(tracker.mean())
+
+    def test_records_delta_and_mean(self):
+        from calibrate.agent.run_simulation import EndToEndLatencyTracker
+
+        loop = asyncio.new_event_loop()
+
+        async def scenario():
+            tracker = EndToEndLatencyTracker()
+            tracker.mark_user_turn_end()
+            await asyncio.sleep(0.01)
+            tracker.mark_agent_audio()
+            # only the first agent audio after a user turn end counts
+            tracker.mark_agent_audio()
+            return tracker
+
+        try:
+            tracker = loop.run_until_complete(scenario())
+        finally:
+            loop.close()
+
+        self.assertEqual(len(tracker.deltas), 1)
+        self.assertGreater(tracker.mean(), 0)
+
+
+class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
+    """A new bot utterance must clear stale interrupt flags.
+
+    Regression test: agents that speak a turn as separate utterances (a short
+    acknowledgement then the reply) previously left ``_is_bot_interrupt_decided``/
+    ``_is_bot_interrupt_triggered`` set across the utterance boundary, so the next
+    utterance's audio was dropped and its text ignored — the simulated user never
+    "heard" the reply and the run deadlocked.
+    """
+
+    def _make_adapter(self, max_turns=20):
+        from collections import defaultdict
+        from calibrate.agent.run_simulation import RTVIMessageFrameAdapter
+
+        ctx = MagicMock()
+        ctx.get_messages.return_value = []  # 0 agent turns < max_turns
+        audio_buffer = MagicMock()
+        return RTVIMessageFrameAdapter(
+            context=ctx,
+            audio_buffer=audio_buffer,
+            interrupt_probability=0.0,
+            tool_calls=[],
+            stt_outputs=[],
+            ttft=defaultdict(list),
+            processing_time=defaultdict(list),
+            output_dir="/tmp",
+            audio_save_dir="/tmp",
+            max_turns=max_turns,
+        )
+
+    async def _send_bot_started(self, adapter):
+        from calibrate.agent.run_simulation import RTVIMessageFrameAdapter
+        from pipecat.frames.frames import InputTransportMessageFrame
+        from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
+
+        frame = MagicMock(spec=InputTransportMessageFrame)
+        frame.message = {"label": "rtvi-ai", "type": "bot-started-speaking", "data": {}}
+        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
+             patch.object(RTVIMessageFrameAdapter, "push_frame", AsyncMock()):
+            await adapter.process_frame(frame, FrameDirection.DOWNSTREAM)
+
+    async def test_stale_interrupt_flags_cleared_on_new_utterance(self):
+        adapter = self._make_adapter()
+        # Simulate a prior utterance that decided/triggered an interrupt but never
+        # saw the clearing ``user-stopped-speaking``.
+        adapter._is_bot_interrupt_decided = True
+        adapter._is_bot_interrupt_triggered = True
+        adapter._spoken_text_buffer = "stale ack text"
+
+        await self._send_bot_started(adapter)
+
+        self.assertFalse(adapter._is_bot_interrupt_decided)
+        self.assertFalse(adapter._is_bot_interrupt_triggered)
+        self.assertEqual(adapter._spoken_text_buffer, "")
+
+    async def test_max_turns_branch_does_not_reset(self):
+        # When max turns is reached the adapter ends the run instead of starting a
+        # fresh utterance; the reset must not fire on that path.
+        adapter = self._make_adapter(max_turns=0)
+        adapter._is_bot_interrupt_decided = True
+
+        await self._send_bot_started(adapter)
+
+        self.assertTrue(adapter._is_bot_interrupt_decided)
+
+
 if __name__ == "__main__":
     unittest.main()

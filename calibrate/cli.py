@@ -811,6 +811,31 @@ Examples:
         elif args.type == "voice":
             from calibrate.agent.run_simulation import main as agent_main
 
+            # Pre-verify external WebSocket voice agent if config has a
+            # ws:// or wss:// agent_url.
+            if args.config:
+                import json as _json
+                from urllib.parse import urlparse as _urlparse
+
+                with open(args.config) as _f:
+                    _voice_config = _json.load(_f)
+                _voice_url = _voice_config.get("agent_url")
+                if (
+                    _voice_url
+                    and _urlparse(_voice_url).scheme in ("ws", "wss")
+                    and not getattr(args, "skip_verify", False)
+                ):
+                    from calibrate.connections import WebSocketAgentConnection
+
+                    _voice_agent = WebSocketAgentConnection(url=_voice_url)
+                    print(f"\nVerifying agent connection: {_voice_url}")
+                    _verify = asyncio.run(_voice_agent.verify())
+                    if not _verify["ok"]:
+                        print(f"✗ Verification failed: {_verify['error']}")
+                        sys.exit(1)
+                    print("✓ Verified")
+                    print()
+
             sys.argv = ["calibrate"] + _args_to_argv(
                 args,
                 exclude_keys={
@@ -819,6 +844,12 @@ Examples:
                     "type",
                     "model",
                     "provider",
+                    "verify",
+                    "skip_verify",
+                    "agent_url",
+                    "agent_headers",
+                    "eval_only",
+                    "dataset",
                 },
             )
             asyncio.run(agent_main())

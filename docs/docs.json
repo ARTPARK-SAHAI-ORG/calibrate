@@ -15,7 +15,7 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": [ "getting-started/introduction" ]
+            "pages": ["getting-started/introduction"]
           },
           {
             "group": "Quickstart",
@@ -70,7 +70,18 @@
           },
           {
             "group": "Guides",
-            "pages": [ "guides/configuring-tools" ]
+            "pages": [
+              "guides/tools",
+              "cli/calibrate-agent",
+              {
+                "group": "Agent Connection",
+                "pages": [
+                  "cli/agent-connections/overview",
+                  "cli/agent-connections/chat",
+                  "cli/agent-connections/outbound-voice"
+                ]
+              }
+            ]
           }
         ]
       },
@@ -79,7 +90,7 @@
         "groups": [
           {
             "group": "Browse use cases",
-            "pages": [ "examples/overview" ]
+            "pages": ["examples/overview"]
           }
         ]
       }

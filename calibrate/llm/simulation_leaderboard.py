@@ -81,8 +81,14 @@ def _read_metrics(
 
     for metric_name, metric_data in data.items():
         if isinstance(metric_data, dict) and "mean" in metric_data:
-            is_rating_metric = metric_data.get("type") == "rating"
             mean = float(metric_data["mean"])
+            if metric_data.get("type") == "latency":
+                # Latency is seconds, not a pass-rate — show it as-is and keep it
+                # out of ``normalized`` so it never skews the ``overall`` score.
+                display[metric_name] = mean
+                info[metric_name] = {"type": "latency"}
+                continue
+            is_rating_metric = metric_data.get("type") == "rating"
             if is_rating_metric:
                 display[metric_name] = mean
                 scale_min = float(metric_data.get("scale_min", 0))

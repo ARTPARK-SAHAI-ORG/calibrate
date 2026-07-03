@@ -1,0 +1,104 @@
+---
+title: "Chat agent"
+description: "Connect a text chat agent over a standard HTTP endpoint to evaluate it"
+---
+
+Connect a text chat agent to evaluate your agent's logic without placing calls by [simulating conversations](/cli/simulations) or [evaluating each turn](/cli/text-to-text).
+
+## Quick start
+
+- **`agent_url`** — The URL where your agent receives messages
+- **`agent_headers`** — (optional) Authentication credentials for your API
+
+## Chat endpoint (required)
+
+The primary URL where Calibrate sends conversation messages during a test or a simulation. Set it as `agent_url`.
+
+**Format:** Full HTTP(S) URL
+
+```
+https://api.yourdomain.com/chat
+```
+
+**Requirements:**
+
+- HTTP or HTTPS (use `http://localhost:...` for a local agent)
+- Reachable from where you run the CLI
+- Must return a JSON response
+
+**Example:**
+
+```
+https://api.yourdomain.com/v1/chat
+```
+
+## Authorization header
+
+Authentication credentials sent with every request. Add them under `agent_headers`. It is optional, add it only if your agent requires authentication.
+
+**Common formats:**
+
+**Bearer token**
+
+```json
+{ "Authorization": "Bearer your-secret-token-here" }
+```
+
+**API key**
+
+```json
+{ "X-API-Key": "your-api-key-here" }
+```
+
+## Protocol
+
+You must provide an HTTP, JSON-based endpoint. For both LLM tests and simulations, Calibrate sends a `POST` request to your chat endpoint with a list of messages. Your endpoint should reply in the expected response format given below.
+
+### Request format
+
+Calibrate sends the full conversation history so far (including the latest simulated user input for simulations):
+
+```json
+{
+  "messages": [
+    { "role": "assistant", "content": "Hello! How can I help you?" },
+    { "role": "user", "content": "Check order ORD-12345" }
+  ]
+}
+```
+
+<Note>
+  To benchmark across models, Calibrate adds a `model` field to each request
+  (`{ "messages": [...], "model": "..." }`). Your agent must read it and route
+  to the right model — the easiest way is a framework like OpenRouter. For a
+  Calibrate agent, the model is selected directly.
+</Note>
+
+### Expected response format
+
+Your agent must return a JSON response with at least one of `response` or `tool_calls`.
+
+For simply returning a text reply:
+
+```json
+{
+  "response": "Your order ORD-12345 shipped yesterday and arrives Friday."
+}
+```
+
+#### Tool calls
+
+For evaluating tool calls, return a list of `tool_calls`. Each item indicates the `tool` name, the `arguments` passed to the tool, and the tool's `output`:
+
+```json
+{
+  "response": "Let me check that order.",
+  "tool_calls": [
+    {
+      "tool": "get_order",
+      "arguments": { "order_id": "ORD-12345" },
+      "output": { "status": "shipped", "eta": "Friday" }
+    }
+  ]
+}
+```
