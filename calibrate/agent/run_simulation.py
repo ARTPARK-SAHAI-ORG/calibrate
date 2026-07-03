@@ -1857,7 +1857,6 @@ async def _run_single_simulation_inner(
     # bot needs these configs (and a system prompt + tools) to be spawned.
     external_ws_mode = is_external_ws_agent(config)
     agent_uri = config["agent_url"] if external_ws_mode else None
-    serializer_name = config.get("agent_serializer", DEFAULT_SERIALIZER_NAME)
 
     # Extract STT and TTS configs from config dict
     stt_config_data = config.get("stt", {})
@@ -1943,7 +1942,6 @@ async def _run_single_simulation_inner(
                     max_turns=max_turns,
                     tools=config.get("tools", []),
                     agent_uri=agent_uri,
-                    serializer_name=serializer_name,
                 )
             )
             # In external mode there is no bot task to wait on — the external

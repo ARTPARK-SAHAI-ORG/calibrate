@@ -408,14 +408,14 @@ class TestVoicePreVerify:
         ws_cls.assert_called_once()
         _, kwargs = ws_cls.call_args
         assert kwargs["url"] == "ws://localhost:8765/ws"
-        assert kwargs["serializer"] == "protobuf"
-        # Auth headers are not supported for WS voice agents — the sim transport
-        # can't send them, so verify must not receive them either.
+        # Only protobuf is supported, so serializer isn't a config option and is
+        # never forwarded; and auth headers aren't supported either.
+        assert "serializer" not in kwargs
         assert "headers" not in kwargs
         ws_cls.return_value.verify.assert_awaited_once()
         agent_main.assert_awaited_once()
 
-    def test_wss_url_passes_serializer_no_headers(self, tmp_path):
+    def test_wss_url_ignores_serializer_and_headers(self, tmp_path):
         cfg = _write_voice_config(
             tmp_path / "config.json",
             agent_url="wss://example.com/ws",
@@ -427,8 +427,9 @@ class TestVoicePreVerify:
 
         assert raised is None
         _, kwargs = ws_cls.call_args
-        assert kwargs["serializer"] == "twilio"
-        # agent_headers in the config is ignored — never forwarded to the connection.
+        # agent_serializer and agent_headers in the config are ignored — never
+        # forwarded to the connection.
+        assert "serializer" not in kwargs
         assert "headers" not in kwargs
         agent_main.assert_awaited_once()
 

@@ -827,10 +827,7 @@ Examples:
                 ):
                     from calibrate.connections import WebSocketAgentConnection
 
-                    _voice_agent = WebSocketAgentConnection(
-                        url=_voice_url,
-                        serializer=_voice_config.get("agent_serializer", "protobuf"),
-                    )
+                    _voice_agent = WebSocketAgentConnection(url=_voice_url)
                     print(f"\nVerifying agent connection: {_voice_url}")
                     _verify = asyncio.run(_voice_agent.verify())
                     if not _verify["ok"]:
