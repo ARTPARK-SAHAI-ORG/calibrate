@@ -30,6 +30,7 @@ from calibrate.utils import (
     combine_audio_files,
     build_tools_schema,
     make_webhook_call,
+    create_tts_service,
     provider_log_file,
     summarize_metric_distribution,
 )
@@ -153,7 +154,6 @@ from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
-from pipecat.services.google.tts import GoogleTTSService
 from pipecat.services.elevenlabs.tts import ElevenLabsHttpTTSService
 
 # from pipecat.processors.transcript_processor import TranscriptProcessor
@@ -1350,13 +1350,7 @@ async def _run_simulation_inner(
             if gender == "female"
             else "kn-IN-Chirp3-HD-Achird"
         )
-        tts = GoogleTTSService(
-            settings=GoogleTTSService.Settings(
-                language=Language.KN_IN,
-                voice=voice_id,
-            ),
-            credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
-        )
+        tts = create_tts_service("google", language, voice_id=voice_id)
         eval_logger.info(f"Using Google TTS voice: {voice_id}")
     else:
         if language == "hindi":
