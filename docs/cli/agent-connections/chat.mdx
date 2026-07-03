@@ -54,7 +54,7 @@ Authentication credentials sent with every request. Add them under `agent_header
 
 You must provide an HTTP, JSON-based endpoint. For both LLM tests and simulations, Calibrate sends a `POST` request to your chat endpoint with a list of messages. Your endpoint should reply in the expected response format given below.
 
-**Request from Calibrate:**
+### Request format
 
 Calibrate sends the full conversation history so far (including the latest simulated user input for simulations):
 
@@ -73,11 +73,11 @@ Calibrate sends the full conversation history so far (including the latest simul
   to the right model.
 </Note>
 
-**Expected response format:**
+### Expected response format
 
-Your agent must return JSON with at least one of `response` or `tool_calls`.
+Your agent must return a JSON response with at least one of `response` or `tool_calls`.
 
-Standard format — a text reply:
+For simply returning a text reply:
 
 ```json
 {
@@ -85,7 +85,9 @@ Standard format — a text reply:
 }
 ```
 
-With tool calls — include a `tool_calls` array, each item a `tool` name and `arguments` object. You may also include the tool's `output`:
+#### Tool calls
+
+For evaluating tool calls, return a list of `tool_calls`. Each item indicates the `tool` name, the `arguments` passed to the tool, and the tool's `output`:
 
 ```json
 {
@@ -99,5 +101,3 @@ With tool calls — include a `tool_calls` array, each item a `tool` name and `a
   ]
 }
 ```
-
-`output` is optional — the result your tool returned (any JSON value). It's shown in the results view for review only and never affects whether a test passes.

@@ -38,3 +38,9 @@ calibrate simulations --verify --agent-url https://your-agent.example.com/chat \
 ```
 
 **Outbound voice agent** — Calibrate opens the WebSocket and confirms the handshake automatically before each voice run. This is a reachability check only; it does not confirm the frame protocol or serializer is compatible.
+
+<Note>
+  Pass `--skip-verify` to a run to bypass the pre-run connection check — useful
+  when you've already verified the agent or want to run against an endpoint that
+  rejects the check.
+</Note>
