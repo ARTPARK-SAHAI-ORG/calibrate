@@ -278,7 +278,7 @@ class _Simulation:
     @staticmethod
     async def run_single(
         system_prompt: str,
-        language: Literal["english", "hindi"],
+        language: Literal["english", "hindi", "kannada"],
         gender: Literal["male", "female"],
         evaluators: List[dict],
         output_dir: str,
