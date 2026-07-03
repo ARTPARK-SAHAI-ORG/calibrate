@@ -29,11 +29,11 @@ from calibrate.langfuse import observe, langfuse, langfuse_enabled
 # Re-export for existing imports
 DEFAULT_STT_JUDGE_MODEL = DEFAULT_TEXT_JUDGE_MODEL
 
-# jiwer preprocessing pipeline, following Gnani.ai's Indic ASR benchmarking
-# methodology (https://www.gnani.ai/resources/research/benchmarking-indic-asr-models-a-technical-deep-dive):
+# jiwer preprocessing pipeline, following AI4Bharat's Vistaar Indic ASR
+# benchmark (https://github.com/AI4Bharat/vistaar/blob/master/evaluation.py):
 # collapse whitespace, strip, case-fold, and drop punctuation before scoring.
-# Unicode NFC normalization is applied separately (below) so composed vs.
-# decomposed forms of Indic vowel diacritics don't register as spurious edits.
+# Text normalization (NFC + language-specific ``IndicNormalizer``) is applied
+# separately, upstream of these transforms — see ``_normalize_text``.
 _EDIT_CLEANUP = [
     jiwer.RemoveMultipleSpaces(),
     jiwer.Strip(),
@@ -42,6 +42,79 @@ _EDIT_CLEANUP = [
 ]
 _WER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfWords()])
 _CER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfChars()])
+
+# Placeholder swapped in for a reference that normalizes to nothing, mirroring
+# Vistaar. An empty reference would otherwise make jiwer's dataset-level rate
+# divide by ~0 and blow past 1.0.
+_EMPTY_REF = "<empty>"
+
+# calibrate language name / ISO code -> indic-nlp-library normalizer code.
+# Languages absent here (english, urdu, …) get NFC-only normalization: Vistaar
+# skips the IndicNormalizer for Urdu, and indic-nlp has no English normalizer.
+_INDIC_NLP_LANG_CODES = {
+    "hindi": "hi",
+    "marathi": "mr",
+    "sanskrit": "sa",
+    "nepali": "ne",
+    "konkani": "kK",
+    "bengali": "bn",
+    "assamese": "as",
+    "punjabi": "pa",
+    "gujarati": "gu",
+    "odia": "or",
+    "oriya": "or",
+    "tamil": "ta",
+    "telugu": "te",
+    "kannada": "kn",
+    "malayalam": "ml",
+}
+
+
+def _resolve_indic_code(language: Optional[str]) -> Optional[str]:
+    """Map a language name or ISO code to an indic-nlp normalizer code."""
+    key = (language or "").strip().lower()
+    if key in _INDIC_NLP_LANG_CODES:
+        return _INDIC_NLP_LANG_CODES[key]
+    if key in set(_INDIC_NLP_LANG_CODES.values()):
+        return key
+    return None
+
+
+@lru_cache(maxsize=None)
+def _indic_normalizer_for_code(code: str):
+    """Build (and cache) the indic-nlp normalizer for ``code``, or None.
+
+    This is the lightweight ``indic-nlp-library`` normalizer Vistaar uses —
+    distinct from the heavy vendored Sarvam ``IndicNormalizer`` in
+    ``_get_indic_normalizer`` (which loads a Whisper processor). Any failure
+    (unsupported language, missing optional dep like ``urduhack`` for Urdu)
+    falls back to None so scoring proceeds with NFC-only normalization.
+    """
+    try:
+        from indicnlp.normalize.indic_normalize import IndicNormalizerFactory
+
+        return IndicNormalizerFactory().get_normalizer(code)
+    except Exception:
+        return None
+
+
+def _indic_normalizer(language: Optional[str]):
+    """Return the indic-nlp normalizer for ``language``, or None if unsupported."""
+    code = _resolve_indic_code(language)
+    return _indic_normalizer_for_code(code) if code else None
+
+
+def _normalize_text(text: str, normalizer) -> str:
+    """NFC-normalize, then apply ``normalizer`` (indic-nlp) if provided.
+
+    NFC folds composed vs. decomposed diacritics; the ``IndicNormalizer``
+    additionally canonicalizes script variants (nukta forms, ZWJ/ZWNJ,
+    alternate spellings) that NFC alone leaves distinct.
+    """
+    text = unicodedata.normalize("NFC", str(text))
+    if normalizer is not None:
+        text = normalizer.normalize(text)
+    return text
 
 
 @lru_cache(maxsize=1)
@@ -84,31 +157,38 @@ def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
     return list(evaluators) if evaluators else [DEFAULT_STT_EVALUATOR]
 
 
-def _nfc(text: str) -> str:
-    """Unicode NFC-normalize so composed/decomposed Indic diacritics match."""
-    return unicodedata.normalize("NFC", text)
-
-
 def _edit_metric(
-    metric_fn, transform, references: List[str], predictions: List[str]
+    metric_fn,
+    transform,
+    references: List[str],
+    predictions: List[str],
+    language: str,
 ) -> dict:
     """Compute a jiwer edit-distance metric, dataset-level plus per-row.
 
-    Shared by WER and CER. References/predictions are NFC-normalized, then
-    ``jiwer`` applies ``transform`` (whitespace collapse, strip, case-fold,
-    punctuation removal, tokenization) before scoring.
+    Shared by WER and CER, mirroring AI4Bharat's Vistaar benchmark.
+    References/predictions are normalized (NFC + language-specific
+    ``IndicNormalizer``), then ``jiwer`` applies ``transform`` (whitespace
+    collapse, strip, case-fold, punctuation removal, tokenization) before
+    scoring. References that reduce to nothing are replaced with a placeholder
+    (see ``_EMPTY_REF``).
 
     ``score`` is the **dataset-level** rate — total substitutions, deletions,
     and insertions across all utterances divided by total reference length —
-    matching the NIST definition Gnani.ai uses. This differs from a macro-mean
+    matching the NIST definition Vistaar uses. This differs from a macro-mean
     of per-utterance rates, which over-weights short utterances. ``per_row``
     holds the per-utterance rates, kept for row-level reporting.
     """
-    references = [_nfc(str(ref)) for ref in references]
-    predictions = [
-        _nfc(str(pred)) if isinstance(pred, str) else "" for pred in predictions
-    ]
+    normalizer = _indic_normalizer(language)
 
+    references = [_normalize_text(ref, normalizer) for ref in references]
+    predictions = [
+        _normalize_text(pred, normalizer) if isinstance(pred, str) else ""
+        for pred in predictions
+    ]
+    references = [ref if transform([ref])[0] else _EMPTY_REF for ref in references]
+
+    # Per-clip rates — for results.csv only, never averaged into `score`.
     per_row = [
         metric_fn(
             reference=[r],
@@ -119,6 +199,7 @@ def _edit_metric(
         for r, p in zip(references, predictions)
     ]
 
+    # Headline score — pooled over the whole dataset, not a per-row average.
     score = (
         metric_fn(
             reference=references,
@@ -133,12 +214,16 @@ def _edit_metric(
     return {"score": float(score), "per_row": per_row}
 
 
-def get_wer_score(references: List[str], predictions: List[str]) -> dict:
-    return _edit_metric(jiwer.wer, _WER_TRANSFORM, references, predictions)
+def get_wer_score(
+    references: List[str], predictions: List[str], language: str = "english"
+) -> dict:
+    return _edit_metric(jiwer.wer, _WER_TRANSFORM, references, predictions, language)
 
 
-def get_cer_score(references: List[str], predictions: List[str]) -> dict:
-    return _edit_metric(jiwer.cer, _CER_TRANSFORM, references, predictions)
+def get_cer_score(
+    references: List[str], predictions: List[str], language: str = "english"
+) -> dict:
+    return _edit_metric(jiwer.cer, _CER_TRANSFORM, references, predictions, language)
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)

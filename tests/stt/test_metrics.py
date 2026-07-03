@@ -75,6 +75,49 @@ class TestEditMetrics(unittest.TestCase):
         self.assertEqual(result["score"], 0.0)
         self.assertEqual(result["per_row"], [])
 
+    def test_language_aware_indic_normalization_folds_script_variants(self):
+        from calibrate.stt import metrics as M
+
+        # Same Hindi word with vs. without a zero-width joiner (ZWJ). NFC and
+        # punctuation removal leave the ZWJ in place; the Hindi IndicNormalizer
+        # strips it, so the two spellings become identical.
+        with_zwj = "क्‍ष"
+        without_zwj = "क्ष"
+        self.assertNotEqual(with_zwj, without_zwj)
+
+        # english path (no IndicNormalizer) still sees a difference...
+        self.assertGreater(
+            M.get_cer_score([with_zwj], [without_zwj], language="english")["score"],
+            0.0,
+        )
+        # ...but the Hindi path folds them to zero error.
+        self.assertEqual(
+            M.get_cer_score([with_zwj], [without_zwj], language="hindi")["score"],
+            0.0,
+        )
+
+    def test_empty_reference_uses_sentinel_not_inflated_score(self):
+        from calibrate.stt import metrics as M
+
+        # A reference that normalizes to nothing becomes the <empty> sentinel:
+        # it contributes one ordinary word error, so the score stays at 1.0
+        # instead of blowing past 1.0 (the pre-sentinel behaviour).
+        result = M.get_wer_score(["", "..."], ["hello", "world"], language="hindi")
+        self.assertEqual(result["score"], 1.0)
+
+    def test_unsupported_language_falls_back_gracefully(self):
+        from calibrate.stt import metrics as M
+
+        # Urdu (needs an optional dep indic-nlp lacks here) and an unknown
+        # language must not crash — they fall back to NFC-only normalization.
+        for lang in ("urdu", "klingon"):
+            result = M.get_wer_score(
+                ["hello world"], ["hello world"], language=lang
+            )
+            self.assertEqual(result["score"], 0.0)
+        self.assertIsNone(M._indic_normalizer("english"))
+        self.assertIsNotNone(M._indic_normalizer("hindi"))
+
 
 class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
     async def test_default_evaluator_single_judge(self):

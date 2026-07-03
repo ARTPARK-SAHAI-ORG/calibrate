@@ -1244,10 +1244,10 @@ async def _score_and_write_results(
     judge is skipped entirely — no normalizer model is loaded, no judge calls
     are made, and the ``sarvam_*`` columns/metrics are omitted.
     """
-    wer_results = get_wer_score(gt_transcripts, pred_transcripts)
+    wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
 
-    cer_results = get_cer_score(gt_transcripts, pred_transcripts)
+    cer_results = get_cer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
     # Intent + entity preservation are opt-in via ``run_sarvam_judges``;
