@@ -110,6 +110,9 @@ def _normalize_text(text: str, normalizer) -> str:
     NFC folds composed vs. decomposed diacritics; the ``IndicNormalizer``
     additionally canonicalizes script variants (nukta forms, ZWJ/ZWNJ,
     alternate spellings) that NFC alone leaves distinct.
+
+    Mirrors the per-utterance normalization in AI4Bharat's Vistaar:
+    https://github.com/AI4Bharat/vistaar/blob/master/evaluation.py
     """
     text = unicodedata.normalize("NFC", str(text))
     if normalizer is not None:
