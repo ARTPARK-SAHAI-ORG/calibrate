@@ -2022,6 +2022,11 @@ async def _run_single_simulation_inner(
         if stt_judge and "score" in stt_judge:
             sim_metrics_row["stt_llm_judge_score"] = stt_judge["score"]
 
+        # Sim-side end-to-end latency (seconds), when measured
+        e2e_latency = simulation_result.get("metrics", {}).get("e2e_latency")
+        if e2e_latency is not None:
+            sim_metrics_row["e2e_latency"] = e2e_latency
+
         return (
             sim_metrics_row,
             simulation_result.get("evaluation_results", []),
@@ -2110,6 +2115,7 @@ async def main():
     all_simulation_metrics = []
     metrics_by_criterion = defaultdict(list)
     stt_llm_judge_scores = []
+    e2e_latencies = []
 
     # Collect metrics from results
     failed_simulations = []
@@ -2124,6 +2130,9 @@ async def main():
             continue
 
         all_simulation_metrics.append(sim_metrics_row)
+
+        if sim_metrics_row.get("e2e_latency") is not None:
+            e2e_latencies.append(float(sim_metrics_row["e2e_latency"]))
 
         # Evaluation criteria metrics (value works for both binary 0/1 and rating score)
         for eval_result in evaluation_results:
@@ -2176,6 +2185,14 @@ async def main():
         metrics_summary["stt_llm_judge"] = summarize_metric_distribution(
             stt_llm_judge_scores
         )
+
+    # Aggregate sim-side end-to-end latency (seconds). Typed "latency" so the
+    # leaderboard shows raw seconds and keeps it out of the pass-rate `overall`.
+    if e2e_latencies:
+        metrics_summary["e2e_latency"] = {
+            "type": "latency",
+            "mean": float(np.mean(e2e_latencies)),
+        }
 
     # Save overall results.csv
     if all_simulation_metrics:
