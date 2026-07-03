@@ -144,6 +144,42 @@ the per-provider implementation in a dict and `await` it. For unit testing,
 call `router.__wrapped__(...)` to skip the decorators (the `@backoff` retry
 would otherwise mask `ValueError`s).
 
+### Keeping live-agent and eval defaults in sync
+There are **two** places that talk to each STT/TTS provider, and they MUST use
+the same per-provider defaults:
+
+- **The benchmarks** — the `transcribe_*` (`stt/eval.py`) and `synthesize_*`
+  (`tts/eval.py`) functions, which produce the leaderboards.
+- **The live agent** — `create_stt_service` / `create_tts_service` in
+  `calibrate/utils.py`, which the voice-agent simulation / tests actually run
+  (`agent/bot.py`, `agent/test.py`).
+
+If these drift, a leaderboard stops reflecting the config the agent deploys —
+you'd benchmark one voice/model and ship another. **Any time you change a
+provider's model, voice, endpoint, or other default on one side, change the
+other side too.**
+
+To make this structural rather than a discipline you have to remember, the
+**model names are single-sourced**: `STT_PROVIDER_MODELS` and
+`TTS_PROVIDER_MODELS` in `calibrate/utils.py` are the one place each provider's
+default model is defined, and **both** the eval functions and the
+`create_*_service` factories read from them. Change the model in that dict and
+both sides move together. Do **not** re-introduce a hardcoded model string in
+either place — reference the constant. (Voices live in `TTS_VOICE_IDS`; other
+per-provider params still need manual mirroring.)
+
+`tests/test_utils_factories.py` guards this: it asserts every provider's model
+in `create_*_service` comes from the shared constant, and that TTS voices match
+the eval literals. If you add a provider or change a default, update both sides
+and that test. **Sarvam STT is the known exception** — its STT model is
+intentionally left out of `STT_PROVIDER_MODELS` (the live agent stays on
+pipecat's default) and tracked separately. This started as a hard limitation in
+pipecat 0.0.98 (its `SarvamSTTService` routed `saaras` models to the *translate*
+endpoint with no `mode`, so it couldn't reproduce the benchmark's `saaras:v3`
+transcribe path); pipecat 1.0.0 now exposes `mode="transcribe"`, so it's a
+*parked* decision rather than a blocker — revisit before wiring it in. Sarvam
+**TTS** has no such history and *is* in `TTS_PROVIDER_MODELS` (`bulbul:v3`).
+
 ### Resumability
 `run_stt_eval` / `run_tts_eval` write `results.csv` row-by-row and skip already
 processed `id`s on retry. Use `--overwrite` to force a clean run. Beware:
@@ -244,7 +280,7 @@ pre-commit hook on `main`.
   `tests/`.
 - The `out/` folder appears inside several module dirs (e.g. `calibrate/stt/out`).
   These are gitignored runtime artifacts from local runs — don't commit them.
-- `pipecat-ai` is pinned to `0.0.98` because the API surface changes between
+- `pipecat-ai` is pinned to `1.0.0` because the API surface changes between
   versions; bump deliberately and re-test the agent simulation paths.
 
 ## Useful pointers when debugging

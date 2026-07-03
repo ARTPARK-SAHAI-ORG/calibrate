@@ -28,6 +28,7 @@ from calibrate.utils import (
     validate_tts_language,
     provider_log as _log,
     provider_log_file as _current_log_file,
+    TTS_PROVIDER_MODELS,
 )
 from calibrate.tts.metrics import get_tts_llm_judge_score
 from calibrate.llm._metrics_utils import _latency_percentiles
@@ -108,7 +109,7 @@ async def synthesize_openai(text: str, language: str, audio_path: str) -> Dict:
     # Stream directly to file
     with open(audio_path, "wb") as f:
         async with client.audio.speech.with_streaming_response.create(
-            model="gpt-4o-mini-tts",
+            model=TTS_PROVIDER_MODELS["openai"],
             voice="coral",
             input=text,
             response_format="wav",
@@ -234,7 +235,7 @@ async def synthesize_elevenlabs(text: str, language: str, audio_path: str) -> Di
         )
 
     else:
-        model_id = "eleven_multilingual_v2"
+        model_id = TTS_PROVIDER_MODELS["elevenlabs"]
 
         response = elevenlabs.text_to_speech.stream(
             voice_id=voice_id,  # Krishna pre-made voice
@@ -281,7 +282,7 @@ async def synthesize_cartesia(text: str, language: str, audio_path: str) -> Dict
         ttfb = None
 
         bytes_iter = client.tts.bytes(
-            model_id="sonic-3.5",
+            model_id=TTS_PROVIDER_MODELS["cartesia"],
             transcript=text,
             voice={
                 "mode": "id",
@@ -312,7 +313,7 @@ async def synthesize_groq(text: str, language: str, audio_path: str) -> Dict:
 
     client = AsyncGroq(api_key=api_key)
 
-    model = "canopylabs/orpheus-v1-english"
+    model = TTS_PROVIDER_MODELS["groq"]
     voice = "troy"
     response_format = "wav"
 
@@ -342,7 +343,7 @@ async def synthesize_sarvam(text: str, language: str, audio_path: str) -> Dict:
     ttfb = None
 
     async with client.text_to_speech_streaming.connect(
-        model="bulbul:v3", send_completion_event=True
+        model=TTS_PROVIDER_MODELS["sarvam"], send_completion_event=True
     ) as ws:
         await ws.configure(
             target_language_code=lang_code,
