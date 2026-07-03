@@ -19,7 +19,11 @@ There are two ways to run simulations:
   <Card title="Calibrate agent" icon="robot" href="/cli/calibrate-agent">
     Define your agent completely within Calibrate
   </Card>
-  <Card title="Agent connection" icon="link" href="/cli/agent-connections/overview">
+  <Card
+    title="Agent connection"
+    icon="link"
+    href="/cli/agent-connections/overview"
+  >
     Connect your existing text or voice agent
   </Card>
 </CardGroup>
@@ -92,15 +96,15 @@ You can also set the **`judge_model`** on an evaluator to use a different model.
 
 </Note>
 
-| Key             | Type    | Description                                                                                                           |
-| --------------- | ------- | --------------------------------------------------------------------------------------------------------------------- |
+| Key             | Type    | Description                                                                                                                        |
+| --------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `id`            | string  | Optional unique id. Result rows echo it as `evaluator_id`; output `config.json` includes raw `evaluators` and an `evaluators_map`. |
-| `name`          | string  | A short name (used in results and leaderboard columns)                                                                |
-| `system_prompt` | string  | Full system prompt for this evaluator's LLM judge call. Include any agent-context the judge needs to score correctly. |
-| `judge_model`   | string  | OpenRouter model id for this evaluator (default: `openai/gpt-5.4-mini`)                                               |
-| `type`          | string  | `"binary"` (default) or `"rating"`                                                                                    |
-| `scale_min`     | integer | Required when `type` is `"rating"`. Lowest allowed score.                                                             |
-| `scale_max`     | integer | Required when `type` is `"rating"`. Highest allowed score.                                                            |
+| `name`          | string  | A short name (used in results and leaderboard columns)                                                                             |
+| `system_prompt` | string  | Full system prompt for this evaluator's LLM judge call. Include any agent-context the judge needs to score correctly.              |
+| `judge_model`   | string  | OpenRouter model id for this evaluator (default: `openai/gpt-5.4-mini`)                                                            |
+| `type`          | string  | `"binary"` (default) or `"rating"`                                                                                                 |
+| `scale_min`     | integer | Required when `type` is `"rating"`. Lowest allowed score.                                                                          |
+| `scale_max`     | integer | Required when `type` is `"rating"`. Highest allowed score.                                                                         |
 
 ```json
 {
@@ -235,6 +239,8 @@ For voice simulations, specify the STT, LLM, and TTS providers:
   <Accordion title="Chat agent example">
     See the [full file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_text_agent_connection.json).
 
+    Refer to [Agent Connections → Chat agent](/cli/agent-connections/chat) for the full reference.
+
     ```json
     {
       "agent_url": "https://your-agent.com/chat",
@@ -273,7 +279,9 @@ For voice simulations, specify the STT, LLM, and TTS providers:
   </Accordion>
 
   <Accordion title="Outbound voice agent example">
-    For voice simulations against an existing pipecat agent, set a `ws(s)://` `agent_url` and omit `system_prompt`, `tools`, `stt`, `tts`, and `llm`. See [Agent Connections → Outbound voice agent](/cli/agent-connections/outbound-voice) for the full reference and metric caveats.
+    See the [full file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_voice_agent_connection.json).
+
+    Refer to [Agent Connections → Outbound voice agent](/cli/agent-connections/outbound-voice) for the full reference.
 
     ```json
     {
@@ -347,6 +355,14 @@ calibrate simulations
 4. **Output directory** — where results will be saved (defaults to `./out`)
 5. **API keys** — only `OPENAI_API_KEY` is required (used by the user simulator and LLM judge)
 
+**Outbound voice agent (voice):**
+
+1. **Simulation type** — select "Voice"
+2. **Config file** — path to your config file (with a `ws(s)://` `agent_url`)
+3. **Parallel count** — how many simulations to run simultaneously (default: `1`)
+4. **Output directory** — where results will be saved (defaults to `./out`)
+5. **API keys** — enter the API keys for the user simulator's STT/TTS providers and the LLM judge
+
 ### Non-interactive mode
 
 Pass `--type text` or `--type voice` and a config file directly to skip the UI.
@@ -384,9 +400,9 @@ calibrate simulations --type text -c config.json -o ./out -n 2
 ```
 
 <Note>
-  You can also set the default parallelism with the `CALIBRATE_SIMULATION_PARALLEL`
-  environment variable (defaults to `1`). The `-n`/`--parallel` flag takes precedence
-  over it when provided.
+  You can also set the default parallelism with the
+  `CALIBRATE_SIMULATION_PARALLEL` environment variable (defaults to `1`). The
+  `-n`/`--parallel` flag takes precedence over it when provided.
 </Note>
 
 Simulations run for every persona × scenario combination. For example, 2 personas × 2 scenarios = 4 simulations.
