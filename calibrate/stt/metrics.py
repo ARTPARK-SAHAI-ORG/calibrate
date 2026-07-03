@@ -43,11 +43,6 @@ _EDIT_CLEANUP = [
 _WER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfWords()])
 _CER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfChars()])
 
-# Placeholder swapped in for a reference that normalizes to nothing, mirroring
-# Vistaar. An empty reference would otherwise make jiwer's dataset-level rate
-# divide by ~0 and blow past 1.0.
-_EMPTY_REF = "<empty>"
-
 # calibrate language name / ISO code -> indic-nlp-library normalizer code.
 # Languages absent here (english, urdu, …) get NFC-only normalization: Vistaar
 # skips the IndicNormalizer for Urdu, and indic-nlp has no English normalizer.
@@ -175,14 +170,19 @@ def _edit_metric(
     References/predictions are normalized (NFC + language-specific
     ``IndicNormalizer``), then ``jiwer`` applies ``transform`` (whitespace
     collapse, strip, case-fold, punctuation removal, tokenization) before
-    scoring. References that reduce to nothing are replaced with a placeholder
-    (see ``_EMPTY_REF``).
+    scoring.
 
     ``score`` is the **dataset-level** rate — total substitutions, deletions,
     and insertions across all utterances divided by total reference length —
     matching the NIST definition Vistaar uses. This differs from a macro-mean
     of per-utterance rates, which over-weights short utterances. ``per_row``
     holds the per-utterance rates, kept for row-level reporting.
+
+    Empty references need no placeholder: jiwer pools them correctly at the
+    dataset level (an empty ref with an empty hypothesis contributes nothing;
+    a hallucinated hypothesis contributes insertions). The only degenerate
+    case is a dataset with *no* reference words at all — guarded below to
+    avoid jiwer returning an unbounded count instead of a rate.
     """
     normalizer = _indic_normalizer(language)
 
@@ -191,7 +191,6 @@ def _edit_metric(
         _normalize_text(pred, normalizer) if isinstance(pred, str) else ""
         for pred in predictions
     ]
-    references = [ref if transform([ref])[0] else _EMPTY_REF for ref in references]
 
     # Per-clip rates — for results.csv only, never averaged into `score`.
     per_row = [
@@ -212,7 +211,7 @@ def _edit_metric(
             reference_transform=transform,
             hypothesis_transform=transform,
         )
-        if references
+        if any(transform([ref])[0] for ref in references)
         else 0.0
     )
 

@@ -96,14 +96,29 @@ class TestEditMetrics(unittest.TestCase):
             0.0,
         )
 
-    def test_empty_reference_uses_sentinel_not_inflated_score(self):
+    def test_empty_reference_pooled_correctly(self):
         from calibrate.stt import metrics as M
 
-        # A reference that normalizes to nothing becomes the <empty> sentinel:
-        # it contributes one ordinary word error, so the score stays at 1.0
-        # instead of blowing past 1.0 (the pre-sentinel behaviour).
-        result = M.get_wer_score(["", "..."], ["hello", "world"], language="hindi")
-        self.assertEqual(result["score"], 1.0)
+        # Empty GT + empty prediction is correct behaviour → contributes nothing
+        # to the pooled score (not penalized).
+        mixed = M.get_wer_score(["hello world", ""], ["hello world", ""])
+        self.assertEqual(mixed["score"], 0.0)
+
+        # Empty GT + hallucinated prediction → the extra words count as
+        # insertions and are penalized. One real ref (4 words, 1 sub) plus two
+        # inserted junk words → (1 + 2) / 4 = 0.75.
+        halluc = M.get_wer_score(
+            ["a b c d", ""], ["a b x d", "junk here"]
+        )
+        self.assertAlmostEqual(halluc["score"], 0.75)
+
+    def test_all_empty_references_guarded(self):
+        from calibrate.stt import metrics as M
+
+        # A dataset with no reference words at all would make jiwer return an
+        # unbounded count; the guard returns 0.0 instead.
+        self.assertEqual(M.get_wer_score(["", "..."], ["", "junk"])["score"], 0.0)
+        self.assertEqual(M.get_cer_score([""], ["hello"])["score"], 0.0)
 
     def test_unsupported_language_falls_back_gracefully(self):
         from calibrate.stt import metrics as M
