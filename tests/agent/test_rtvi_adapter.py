@@ -217,5 +217,193 @@ class TestResetBuffers(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(adapter._spoken_text_buffer, "")
 
 
+def _rtvi_frame(msg_type):
+    from pipecat.frames.frames import InputTransportMessageFrame
+
+    return InputTransportMessageFrame(
+        message={"label": "rtvi-ai", "type": msg_type}
+    )
+
+
+async def _drive_bot_started(adapter, pushed=None):
+    """Push a ``bot-started-speaking`` RTVI frame through the adapter."""
+    return await _drive_rtvi(adapter, "bot-started-speaking", pushed)
+
+
+async def _drive_rtvi(adapter, msg_type, pushed=None):
+    """Push one RTVI message through the adapter, capturing pushed frames."""
+    from pipecat.processors.frame_processor import FrameDirection
+
+    if pushed is None:
+        pushed = []
+
+    async def _capture(frame, direction):
+        pushed.append((frame, direction))
+
+    adapter.push_frame = _capture
+    await adapter.process_frame(_rtvi_frame(msg_type), FrameDirection.DOWNSTREAM)
+    return pushed
+
+
+def _count_frames(pushed, frame_cls):
+    return sum(1 for frame, _ in pushed if isinstance(frame, frame_cls))
+
+
+def _count_interruptions(pushed):
+    from pipecat.frames.frames import InterruptionTaskFrame
+
+    return _count_frames(pushed, InterruptionTaskFrame)
+
+
+class TestNaturalInterrupt(unittest.IsolatedAsyncioTestCase):
+    """Every agent utterance interrupts the simulated user (natural full-duplex).
+
+    Turn boundaries are driven by the aggregator's audio strategies, so the adapter
+    no longer emits UserStarted/UserStopped — it just fires the interrupt and the
+    utterance transcription.
+    """
+
+    async def test_bot_started_interrupts_without_manual_userstarted(self):
+        from pipecat.frames.frames import UserStartedSpeakingFrame
+
+        adapter = _make_adapter()
+        pushed = await _drive_bot_started(adapter)
+        # Fires the interrupt to cut the sim user's in-flight TTS...
+        self.assertEqual(_count_interruptions(pushed), 1)
+        # ...but does NOT manually open the turn (audio strategies do that).
+        self.assertEqual(_count_frames(pushed, UserStartedSpeakingFrame), 0)
+
+    async def test_every_consecutive_utterance_interrupts(self):
+        adapter = _make_adapter()
+        pushed = []
+        await _drive_bot_started(adapter, pushed)
+        await _drive_bot_started(adapter, pushed)
+        # Unlike the old gated behavior, a follow-on utterance still interrupts.
+        self.assertEqual(_count_interruptions(pushed), 2)
+
+    async def test_bot_stopped_emits_stripped_transcription_no_userstopped(self):
+        from pipecat.frames.frames import (
+            TranscriptionFrame,
+            UserStoppedSpeakingFrame,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(output_dir=tmp)
+            adapter._pending_user_turn = True
+            adapter._heard_text_buffer = " नमस्ते!"
+            pushed = await _drive_rtvi(adapter, "bot-stopped-speaking")
+
+        transcriptions = [f for f, _ in pushed if isinstance(f, TranscriptionFrame)]
+        self.assertEqual(len(transcriptions), 1)
+        # Leading space stripped so coalesced turns don't double-space.
+        self.assertEqual(transcriptions[0].text, "नमस्ते!")
+        # Turn-end is decided by smart-turn, not a manual UserStopped.
+        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 0)
+
+
+def _bot_output_frame(text, spoken):
+    from pipecat.frames.frames import InputTransportMessageFrame
+
+    return InputTransportMessageFrame(
+        message={
+            "label": "rtvi-ai",
+            "type": "bot-output",
+            "data": {"text": text, "spoken": spoken},
+        }
+    )
+
+
+async def _drive_frame(adapter, frame, pushed=None):
+    from pipecat.processors.frame_processor import FrameDirection
+
+    if pushed is None:
+        pushed = []
+
+    async def _capture(f, direction):
+        pushed.append((f, direction))
+
+    adapter.push_frame = _capture
+    await adapter.process_frame(frame, FrameDirection.DOWNSTREAM)
+    return pushed
+
+
+def _count_interrupt_messages(pushed):
+    from pipecat.frames.frames import OutputTransportMessageUrgentFrame
+
+    return sum(
+        1
+        for f, _ in pushed
+        if isinstance(f, OutputTransportMessageUrgentFrame)
+        and (getattr(f, "message", {}) or {}).get("data", {}).get("t") == "interrupt"
+    )
+
+
+class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
+    """External agents get the block model: a decided interrupt cuts the agent off
+    at once and blocks its output until the sim user finishes. Internal agents keep
+    the word-level path (decision only; trigger later on stream/spoken match)."""
+
+    async def test_external_interrupt_executes_immediately(self):
+        from pipecat.frames.frames import (
+            TranscriptionFrame,
+            UserStoppedSpeakingFrame,
+            InterimTranscriptionFrame,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, interrupt_probability=1.0, is_external=True
+            )
+            pushed = await _drive_frame(adapter, _bot_output_frame("नमस्ते!", True))
+
+        self.assertTrue(adapter._is_bot_interrupt_triggered)
+        # Tells the agent to stop, commits the partial, ends the turn.
+        self.assertEqual(_count_interrupt_messages(pushed), 1)
+        self.assertEqual(_count_frames(pushed, TranscriptionFrame), 1)
+        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 1)
+        # Nothing more is fed to the sim user (no interim after cutting in).
+        self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 0)
+
+    async def test_internal_interrupt_only_decides(self):
+        from pipecat.frames.frames import (
+            UserStoppedSpeakingFrame,
+            InterimTranscriptionFrame,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, interrupt_probability=1.0, is_external=False
+            )
+            pushed = await _drive_frame(adapter, _bot_output_frame("नमस्ते!", True))
+
+        # Internal: decision is made but the interrupt is NOT executed yet; it waits
+        # for the spoken text to catch up (word-level control).
+        self.assertTrue(adapter._is_bot_interrupt_decided)
+        self.assertFalse(adapter._is_bot_interrupt_triggered)
+        self.assertEqual(_count_interrupt_messages(pushed), 0)
+        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 0)
+        # Internal still feeds what was heard up to the cut-in point.
+        self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 1)
+
+    async def test_bot_started_blocked_while_external_interrupt_active(self):
+        adapter = _make_adapter(is_external=True)
+        adapter._is_bot_interrupt_triggered = True
+        pushed = await _drive_bot_started(adapter)
+        # Agent's attempt to speak is ignored: no interrupt of the sim user's turn.
+        self.assertEqual(_count_interruptions(pushed), 0)
+
+    async def test_agent_audio_dropped_while_external_interrupt_active(self):
+        from pipecat.frames.frames import InputAudioRawFrame
+
+        adapter = _make_adapter(is_external=True)
+        adapter._is_bot_interrupt_triggered = True
+        frame = InputAudioRawFrame(
+            audio=b"\x00\x00", sample_rate=16000, num_channels=1
+        )
+        pushed = await _drive_frame(adapter, frame)
+        # Dropped, not forwarded to the aggregator's VAD (would cancel the sim user).
+        self.assertEqual(_count_frames(pushed, InputAudioRawFrame), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

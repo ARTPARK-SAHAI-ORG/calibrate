@@ -62,6 +62,12 @@ DEFAULT_MAX_TURNS = 10
 DEFAULT_PORT = 8765
 DEFAULT_AGENT_SPEAKS_FIRST = True
 
+# Fallback for when the smart-turn analyzer can't decide the agent has yielded the
+# floor. Smart-turn v3 is trained on human prosody and often reads synthesized TTS
+# audio as "not turn-final", stalling until this fires; 2.0s keeps recovery quick
+# (vs pipecat's 5s default) without cutting off a genuinely mid-turn agent.
+SIM_USER_TURN_STOP_TIMEOUT_SECS = 2.0
+
 # Pipecat logs Google STT gRPC 409 (idle stream) at ERROR while reconnecting; that is
 # recoverable and must not trigger our error sink (which cancels the eval pipeline).
 _BENIGN_GOOGLE_STT_IDLE_TIMEOUT = (
@@ -111,18 +117,15 @@ from pipecat.frames.frames import (
     EndFrame,
     BotSpeakingFrame,
     UserSpeakingFrame,
-    EndTaskFrame,
     LLMContextFrame,
     StopFrame,
     CancelFrame,
-    EndFrame,
     InterimTranscriptionFrame,
     LLMRunFrame,
     TTSTextFrame,
     TranscriptionFrame,
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
-    UserStartedSpeakingFrame,
     UserStoppedSpeakingFrame,
     InputAudioRawFrame,
     OutputAudioRawFrame,
@@ -145,6 +148,12 @@ from pipecat.pipeline.task import PipelineParams, PipelineTask
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
+    LLMUserAggregatorParams,
+)
+from pipecat.turns.user_turn_strategies import UserTurnStrategies
+from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
+    ExternalUserTurnStopStrategy,
 )
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
@@ -216,6 +225,54 @@ def resolve_serializer(name: str) -> FrameSerializer:
             f"Available: {sorted(SERIALIZER_REGISTRY)}"
         )
     return factory()
+
+
+def build_user_context_aggregator(context: LLMContext) -> LLMContextAggregatorPair:
+    """Build the simulation context aggregator pair.
+
+    In this pipeline the agent under test is the "user": the agent's audio and its
+    RTVI ``bot-output`` transcriptions are the user input, and turn-taking is driven
+    by the agent's audio (mirroring the internal ``bot.py`` config):
+
+    - Start: the default audio-driven start strategies (VAD on the agent's audio +
+      transcription). We deliberately do NOT use a manual
+      ``ExternalUserTurnStartStrategy`` — a manually emitted ``UserStartedSpeakingFrame``
+      gets swallowed when a follow-on utterance arrives while the turn is still open,
+      leaving the next turn without a smart-turn re-arm so it stalls to the timeout.
+      Keeping start audio-driven keeps it consistent with the audio-driven stop.
+    - Stop: ``TurnAnalyzerUserTurnStopStrategy`` (smart-turn v3) decides when the
+      agent has actually *yielded the floor* from the audio prosody. A greeting spoken
+      with turn-final intonation ends its own turn (a real user would respond), while
+      a run-on acknowledgement ("okay, and...") is coalesced with what follows — no
+      fixed debounce. ``SIM_USER_TURN_STOP_TIMEOUT_SECS`` bounds the wait for the
+      cases where smart-turn stalls on synthesized TTS audio.
+
+    The ``vad_analyzer`` feeds the smart-turn model the speech/silence boundaries it
+    needs (same as ``bot.py``).
+
+    ``ExternalUserTurnStopStrategy(timeout=None)`` is included only so a
+    simulated-user interrupt (which emits an explicit ``UserStoppedSpeakingFrame``)
+    hard-stops the agent's turn immediately — for both internal (word-level) and
+    external (block) interrupts. ``timeout=None`` disables that strategy's built-in
+    transcription auto-timeout (which would otherwise pre-empt smart-turn on every
+    turn); it keeps the strategy's ``UserStoppedSpeakingFrame`` handling and its
+    transcription guards intact, so normal turn-ends are still decided by smart-turn.
+    """
+    return LLMContextAggregatorPair(
+        context,
+        user_params=LLMUserAggregatorParams(
+            vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+            user_turn_stop_timeout=SIM_USER_TURN_STOP_TIMEOUT_SECS,
+            user_turn_strategies=UserTurnStrategies(
+                stop=[
+                    ExternalUserTurnStopStrategy(timeout=None),
+                    TurnAnalyzerUserTurnStopStrategy(
+                        turn_analyzer=LocalSmartTurnAnalyzerV3()
+                    ),
+                ],
+            ),
+        ),
+    )
 
 
 def is_external_ws_agent(config: dict) -> bool:
@@ -351,11 +408,17 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         agent_speaks_first: bool = True,
         max_turns: int = DEFAULT_MAX_TURNS,
         latency_tracker: Optional["EndToEndLatencyTracker"] = None,
+        is_external: bool = False,
     ):
         super().__init__(enable_direct_mode=True, name="RTVIMessageFrameAdapter")
         self._context = context
         self._audio_buffer = audio_buffer
         self._latency_tracker = latency_tracker
+        # Whether the agent under test is an external WS agent. External agents give
+        # no word-level control, so an interrupt cuts the agent off wholesale and
+        # blocks its output until the sim user finishes, rather than the internal
+        # path's stream-vs-spoken word matching.
+        self._is_external = is_external
         self._agent_speaks_first = agent_speaks_first
         self._max_turns = max_turns
         self._interrupt_probability = interrupt_probability
@@ -457,6 +520,46 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 audio_save_path, frame.audio, frame.sample_rate, frame.num_channels
             )
         self._pending_bot_audio_frames = []
+
+    async def _commit_user_interrupt(
+        self, generated_frames: list, user_id: str, timestamp: str
+    ) -> None:
+        """Execute a simulated-user interrupt of the agent.
+
+        Tells the agent to stop (RTVI ``interrupt``), commits ``_text_buffer`` (what
+        the sim user heard up to the cut-in point) as the agent's partial turn, and
+        marks the interrupt triggered so further agent output stays blocked until the
+        sim user finishes (the block is cleared on ``user-stopped-speaking``). The
+        emitted ``UserStoppedSpeakingFrame`` hard-stops the turn via
+        ``ExternalUserTurnStopStrategy``, immediately handing the floor to the sim
+        user. Shared by the internal word-level path and the external block path.
+        """
+        self._is_bot_interrupt_triggered = True
+        self._pending_user_turn = False
+        self._awaiting_first_bot_audio_chunk = False
+        await self.push_frame(
+            OutputTransportMessageUrgentFrame(
+                message={
+                    "label": "rtvi-ai",
+                    "type": "client-message",
+                    "id": str(uuid4()),
+                    "data": {"t": "interrupt"},
+                }
+            ),
+            FrameDirection.DOWNSTREAM,
+        )
+        generated_frames.extend(
+            [
+                TranscriptionFrame(
+                    text=self._text_buffer.strip(),
+                    user_id=user_id,
+                    timestamp=timestamp,
+                    result={},
+                ),
+                UserStoppedSpeakingFrame(),
+            ]
+        )
+        await self._reset_buffers()
 
     def _assign_next_transcript_audio_line(self, role: str) -> int:
         """Next 1-based transcript line for ``{N}_bot`` / ``{N}_user`` chunk files.
@@ -622,6 +725,13 @@ class RTVIMessageFrameAdapter(FrameProcessor):
             # don't forward bot audio frames after the interruption has been triggered
             return
         elif isinstance(frame, InputAudioRawFrame):
+            if self._is_external and self._is_bot_interrupt_triggered:
+                # External interrupt in progress: block the agent's inbound audio so
+                # it never reaches the aggregator's VAD. Otherwise the agent's
+                # continued speech starts a phantom user turn and broadcasts an
+                # interruption that cancels the sim user's own reply mid-word. Drop
+                # it entirely (no latency mark, no save) until the block is lifted.
+                return
             # Inbound audio from the agent under test — the first such frame after
             # the simulated user stopped speaking marks the end-to-end response
             # latency (works identically for internal and external agents).
@@ -659,16 +769,20 @@ class RTVIMessageFrameAdapter(FrameProcessor):
 
                 if msg_type == "bot-started-speaking":
                     self._audio_buffer._reset_all_audio_buffers()
-                    agent_turns_so_far = count_agent_message_turns(
-                        self._context.get_messages()
-                    )
-                    if agent_turns_so_far >= self._max_turns:
+                    if self._is_external and self._is_bot_interrupt_triggered:
+                        # External interrupt in progress: the sim user has the floor.
+                        # Ignore the agent's attempt to speak — keep its output blocked
+                        # and do NOT interrupt the sim user's TTS or reset the interrupt
+                        # slate. The block is lifted on ``user-stopped-speaking`` once
+                        # the sim user is done, and the agent may speak again.
                         log_and_print(
-                            f"{INTERRUPTION_COLOR}Max turns ({self._max_turns}) reached, ending conversation{RESET_COLOR}"
+                            f"{PARTIAL_AGENT_MESSAGE_COLOR_IGNORED}Agent tried to speak during user interrupt — blocked{RESET_COLOR}"
                         )
-                        self._ended_due_to_max_turns = True
-                        await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
                     else:
+                        # max_turns is enforced when the agent's turn *commits*
+                        # (on_user_turn_stopped) so the conversation always ends on
+                        # the agent's turn with its final message captured — see
+                        # _run_simulation_inner.
                         self._awaiting_first_bot_audio_chunk = True
                         self._pending_user_turn = True
                         # A new bot utterance starts with a clean interrupt slate.
@@ -682,17 +796,16 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         self._is_bot_interrupt_decided = False
                         self._is_bot_interrupt_triggered = False
                         self._spoken_text_buffer = ""
-                        # Cancel any pending sim-user line allocation: bot has
-                        # the floor and any in-flight sim-user TTS will be
-                        # killed by the upcoming InterruptionTaskFrame.
                         self._sim_user_turn_pending = False
-                        # The bot has the floor: stop the sim user's in-flight TTS
-                        # and flush its assistant aggregator so anything spoken so
-                        # far is committed as its own turn.
+                        # Natural full-duplex: any agent utterance interrupts the sim
+                        # user (cut its in-flight TTS, flush its aggregation). The sim
+                        # user only keeps a reply once the agent has actually stopped.
+                        # Turn START is left to the aggregator's audio/transcription
+                        # start strategies (not a manual UserStartedSpeakingFrame),
+                        # so start and the smart-turn stop stay audio-consistent.
                         await self.push_frame(
                             InterruptionTaskFrame(), FrameDirection.UPSTREAM
                         )
-                        generated_frames.append(UserStartedSpeakingFrame())
                 elif msg_type == "bot-stopped-speaking" and self._pending_user_turn:
                     if self._awaiting_first_bot_audio_chunk:
                         # Tool-only turn: no ``spoken=True`` ever fired, so any
@@ -700,22 +813,27 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         self._pending_bot_audio_frames = []
                     self._awaiting_first_bot_audio_chunk = False
                     self._pending_user_turn = False
-                    generated_frames.extend(
-                        [
-                            TranscriptionFrame(
-                                text=self._heard_text_buffer,
-                                user_id=user_id,
-                                timestamp=timestamp,
-                                result={},
-                            ),
-                            UserStoppedSpeakingFrame(),
-                        ]
+                    # Emit this utterance's transcription (content). We do NOT emit
+                    # UserStoppedSpeakingFrame here: the smart-turn analyzer decides
+                    # when the agent has yielded the floor, coalescing consecutive
+                    # utterances into one sim-user turn.
+                    generated_frames.append(
+                        TranscriptionFrame(
+                            # Strip the buffer's leading space: the aggregator adds
+                            # its own separator between utterances, so a leading
+                            # space here would double up (``greeting  question``).
+                            text=self._heard_text_buffer.strip(),
+                            user_id=user_id,
+                            timestamp=timestamp,
+                            result={},
+                        )
                     )
                     await self._reset_buffers()
 
                 elif msg_type == "user-stopped-speaking":
-                    # once the simulated user stops speaking, mark the bot as not
-                    # interrupted anymore and spoken text buffer as not complete anymore
+                    # The simulated user has finished. Clear the interrupt slate,
+                    # which also lifts an external-interrupt block so the agent may
+                    # speak again.
                     self._is_bot_interrupt_decided = False
                     self._is_bot_interrupt_triggered = False
                     await self._save_intermediate_state(
@@ -751,40 +869,13 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                                 # the bot by the user has been made
                                 self._spoken_text_buffer += " " + text
 
-                                # once the spoken text buffer matches the text buffer, mark the spoken
-                                # text buffer as complete and interrupt the bot by the simulated user
+                                # Internal (word-level) path: once the spoken text has
+                                # caught up to the point the user decided to cut in,
+                                # execute the interrupt.
                                 if self._spoken_text_buffer == self._text_buffer:
-                                    self._is_bot_interrupt_triggered = True
-                                    self._pending_user_turn = False
-                                    self._awaiting_first_bot_audio_chunk = False
-
-                                    await self.push_frame(
-                                        OutputTransportMessageUrgentFrame(
-                                            message={
-                                                "label": "rtvi-ai",
-                                                "type": "client-message",
-                                                "id": str(uuid4()),
-                                                "data": {
-                                                    "t": "interrupt",
-                                                },
-                                            }
-                                        ),
-                                        FrameDirection.DOWNSTREAM,
+                                    await self._commit_user_interrupt(
+                                        generated_frames, user_id, timestamp
                                     )
-
-                                    generated_frames.extend(
-                                        [
-                                            TranscriptionFrame(
-                                                text=self._text_buffer,
-                                                user_id=user_id,
-                                                timestamp=timestamp,
-                                                result={},
-                                            ),
-                                            UserStoppedSpeakingFrame(),
-                                        ]
-                                    )
-
-                                    await self._reset_buffers()
                             elif not spoken and not self._is_bot_interrupt_decided:
                                 # Received stream only (not yet spoken): track for interrupt
                                 # completion matching but do not feed STT — the simulated user
@@ -810,15 +901,27 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                                     self._is_bot_interrupt_decided = True
                                     # Align interrupt target with heard text only (received may run ahead of TTS).
                                     self._text_buffer = self._heard_text_buffer
+                                    if self._is_external:
+                                        # No word-level control over an external agent:
+                                        # cut it off immediately and block its output
+                                        # until the sim user finishes speaking.
+                                        await self._commit_user_interrupt(
+                                            generated_frames, user_id, timestamp
+                                        )
 
-                                generated_frames.append(
-                                    InterimTranscriptionFrame(
-                                        text=self._heard_text_buffer,
-                                        user_id=user_id,
-                                        timestamp=timestamp,
-                                        result=result_payload,
+                                # Feed what the sim user heard so far — unless we just
+                                # cut the agent off (external interrupt), in which case
+                                # the partial is already committed and the sim user
+                                # should not "hear" anything more.
+                                if not self._is_bot_interrupt_triggered:
+                                    generated_frames.append(
+                                        InterimTranscriptionFrame(
+                                            text=self._heard_text_buffer,
+                                            user_id=user_id,
+                                            timestamp=timestamp,
+                                            result=result_payload,
+                                        )
                                     )
-                                )
 
                         else:
                             if not spoken:
@@ -1404,7 +1507,7 @@ async def _run_simulation_inner(
     ]
 
     context = LLMContext(messages)
-    context_aggregator = LLMContextAggregatorPair(context)
+    context_aggregator = build_user_context_aggregator(context)
 
     audio_buffer = AudioBufferProcessor(enable_turn_audio=True)
 
@@ -1426,6 +1529,7 @@ async def _run_simulation_inner(
         agent_speaks_first=agent_speaks_first,
         max_turns=max_turns,
         latency_tracker=latency_tracker,
+        is_external=bool(agent_uri),
     )
 
     simulated_user_turn_index_hook = SimulatedUserTurnIndexHook(rtvi_message_adapter)
@@ -1548,6 +1652,21 @@ async def _run_simulation_inner(
         log_and_print(
             f"{AGENT_MESSAGE_COLOR}[Agent]{RESET_COLOR}: {message.content}{RESET_COLOR}"
         )
+
+        # Enforce max_turns here, when the agent's turn has committed, rather than
+        # when its next turn starts. Ending on the next bot-started dropped that
+        # message and left the transcript ending on a user turn or an assistant
+        # turn depending on whether the sim user happened to reply first. Ending on
+        # commit is deterministic: the conversation always ends right after the
+        # agent's max_turns-th turn, with its final message captured.
+        if not rtvi_message_adapter._ended_due_to_max_turns:
+            agent_turns = count_agent_message_turns(context.get_messages())
+            if agent_turns >= max_turns:
+                rtvi_message_adapter._ended_due_to_max_turns = True
+                log_and_print(
+                    f"{INTERRUPTION_COLOR}Max turns ({max_turns}) reached, ending conversation{RESET_COLOR}"
+                )
+                await task.queue_frame(EndFrame())
 
     @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message):

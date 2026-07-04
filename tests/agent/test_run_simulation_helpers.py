@@ -167,6 +167,55 @@ class TestSimulatedUserTurnIndexHook(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(adapter._sim_user_turn_pending)
 
 
+class TestBuildUserContextAggregator(unittest.TestCase):
+    """Turn-taking must be audio-driven: smart-turn stop + a bounded fallback.
+
+    The agent under test is the "user"; turn boundaries come from its audio, not
+    manual UserStarted/UserStopped frames. Turn-end is decided by the smart-turn
+    analyzer, with a short user_turn_stop_timeout fallback for when it stalls on
+    synthesized TTS audio.
+    """
+
+    def test_uses_smart_turn_stop_and_bounded_timeout(self):
+        from calibrate.agent.run_simulation import (
+            build_user_context_aggregator,
+            SIM_USER_TURN_STOP_TIMEOUT_SECS,
+        )
+        from pipecat.processors.aggregators.llm_context import LLMContext
+        from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+        from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
+            ExternalUserTurnStopStrategy,
+        )
+        from pipecat.turns.user_start.external_user_turn_start_strategy import (
+            ExternalUserTurnStartStrategy,
+        )
+
+        ctx = LLMContext([{"role": "system", "content": "x"}])
+        pair = build_user_context_aggregator(ctx)
+        controller = pair.user()._user_turn_controller
+        strategies = controller._user_turn_strategies
+        # Smart-turn decides turn-end for normal turns.
+        self.assertTrue(
+            any(isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop)
+        )
+        # ExternalUserTurnStopStrategy is present ONLY to hard-stop the turn on an
+        # explicit interrupt UserStopped; timeout=None disables its auto-timeout so
+        # it never pre-empts smart-turn on normal turns.
+        external_stops = [
+            s for s in strategies.stop if isinstance(s, ExternalUserTurnStopStrategy)
+        ]
+        self.assertEqual(len(external_stops), 1)
+        self.assertIsNone(external_stops[0]._timeout)
+        # Turn-start is audio-driven (default strategies), NOT manual/external.
+        self.assertFalse(
+            any(isinstance(s, ExternalUserTurnStartStrategy) for s in strategies.start)
+        )
+        # Bounded fallback for smart-turn stalls on TTS audio.
+        self.assertEqual(
+            controller._user_turn_stop_timeout, SIM_USER_TURN_STOP_TIMEOUT_SECS
+        )
+
+
 class TestSTTLogger(unittest.IsolatedAsyncioTestCase):
     async def test_process_frame_user_transcription(self):
         from calibrate.agent.run_simulation import STTLogger
@@ -382,16 +431,6 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(adapter._is_bot_interrupt_decided)
         self.assertFalse(adapter._is_bot_interrupt_triggered)
         self.assertEqual(adapter._spoken_text_buffer, "")
-
-    async def test_max_turns_branch_does_not_reset(self):
-        # When max turns is reached the adapter ends the run instead of starting a
-        # fresh utterance; the reset must not fire on that path.
-        adapter = self._make_adapter(max_turns=0)
-        adapter._is_bot_interrupt_decided = True
-
-        await self._send_bot_started(adapter)
-
-        self.assertTrue(adapter._is_bot_interrupt_decided)
 
 
 if __name__ == "__main__":
