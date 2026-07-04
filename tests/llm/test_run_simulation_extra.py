@@ -1,4 +1,4 @@
-"""Extra coverage for calibrate/llm/run_simulation.py — helpers, eval-only path, agent simulation."""
+"""Extra coverage for calibrate_agent/llm/run_simulation.py — helpers, eval-only path, agent simulation."""
 
 import asyncio
 import json
@@ -22,7 +22,7 @@ def _rate_ev(name, lo=1, hi=5):
 
 class TestBuildEvaluationResult(unittest.TestCase):
     def test_binary(self):
-        from calibrate.llm.run_simulation import _build_evaluation_result
+        from calibrate_agent.llm.run_simulation import _build_evaluation_result
 
         result = _build_evaluation_result(
             _bin_ev("x"), {"match": True, "reasoning": "ok"}
@@ -31,7 +31,7 @@ class TestBuildEvaluationResult(unittest.TestCase):
         self.assertEqual(result["value"], 1.0)
 
     def test_rating(self):
-        from calibrate.llm.run_simulation import _build_evaluation_result
+        from calibrate_agent.llm.run_simulation import _build_evaluation_result
 
         result = _build_evaluation_result(
             _rate_ev("x", 1, 5), {"score": 4, "reasoning": "ok"}
@@ -41,7 +41,7 @@ class TestBuildEvaluationResult(unittest.TestCase):
         self.assertEqual(result["scale_max"], 5)
 
     def test_with_id(self):
-        from calibrate.llm.run_simulation import _build_evaluation_result
+        from calibrate_agent.llm.run_simulation import _build_evaluation_result
 
         ev = dict(_bin_ev("x"), id="ev1")
         result = _build_evaluation_result(ev, {"match": True, "reasoning": "ok"})
@@ -50,10 +50,10 @@ class TestBuildEvaluationResult(unittest.TestCase):
 
 class TestJudgeAndEmit(unittest.IsolatedAsyncioTestCase):
     async def test_emits_lines(self):
-        from calibrate.llm.run_simulation import _judge_and_emit
+        from calibrate_agent.llm.run_simulation import _judge_and_emit
 
         captured = []
-        with patch("calibrate.llm.run_simulation.evaluate_simuation",
+        with patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                    AsyncMock(return_value={"x": {"match": True, "reasoning": "ok"}})):
             results = await _judge_and_emit(
                 transcript=[{"role": "user", "content": "Hi"}],
@@ -67,7 +67,7 @@ class TestJudgeAndEmit(unittest.IsolatedAsyncioTestCase):
 
 class TestValidateSimulationEvalOnlyDataset(unittest.TestCase):
     def test_valid(self):
-        from calibrate.llm.run_simulation import validate_simulation_eval_only_dataset
+        from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset([
             {"conversation_history": [{"role": "user", "content": "hi"}]}
@@ -75,31 +75,31 @@ class TestValidateSimulationEvalOnlyDataset(unittest.TestCase):
         self.assertTrue(ok)
 
     def test_not_list(self):
-        from calibrate.llm.run_simulation import validate_simulation_eval_only_dataset
+        from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset({})
         self.assertFalse(ok)
 
     def test_item_not_dict(self):
-        from calibrate.llm.run_simulation import validate_simulation_eval_only_dataset
+        from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset(["x"])
         self.assertFalse(ok)
 
     def test_missing_history(self):
-        from calibrate.llm.run_simulation import validate_simulation_eval_only_dataset
+        from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset([{}])
         self.assertFalse(ok)
 
     def test_history_not_list(self):
-        from calibrate.llm.run_simulation import validate_simulation_eval_only_dataset
+        from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset([{"conversation_history": "no"}])
         self.assertFalse(ok)
 
     def test_invalid_name(self):
-        from calibrate.llm.run_simulation import validate_simulation_eval_only_dataset
+        from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset(
             [{"conversation_history": [], "name": 5}]
@@ -109,12 +109,12 @@ class TestValidateSimulationEvalOnlyDataset(unittest.TestCase):
 
 class TestSaveTranscript(unittest.TestCase):
     def test_no_output_dir_returns(self):
-        from calibrate.utils import save_transcript
+        from calibrate_agent.utils import save_transcript
 
         save_transcript(None, [{"role": "user", "content": "hi"}])
 
     def test_writes_file(self):
-        from calibrate.utils import save_transcript
+        from calibrate_agent.utils import save_transcript
 
         with tempfile.TemporaryDirectory() as tmp:
             save_transcript(tmp, [{"role": "user", "content": "hi"}])
@@ -123,10 +123,10 @@ class TestSaveTranscript(unittest.TestCase):
 
 class TestRunEvalOnlySimulationTask(unittest.IsolatedAsyncioTestCase):
     async def test_basic(self):
-        from calibrate.llm.run_simulation import run_eval_only_simulation_task
+        from calibrate_agent.llm.run_simulation import run_eval_only_simulation_task
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_simulation.evaluate_simuation",
+             patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                    AsyncMock(return_value={"x": {"match": True, "reasoning": "ok"}})):
             semaphore = asyncio.Semaphore(1)
             result = await run_eval_only_simulation_task(
@@ -144,11 +144,11 @@ class TestRunEvalOnlySimulationTask(unittest.IsolatedAsyncioTestCase):
 
 class TestRunEvalOnlySimulations(unittest.IsolatedAsyncioTestCase):
     async def test_run_eval_only_full(self):
-        from calibrate.llm.run_simulation import run_eval_only_simulations
+        from calibrate_agent.llm.run_simulation import run_eval_only_simulations
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "out"
-            with patch("calibrate.llm.run_simulation.evaluate_simuation",
+            with patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                        AsyncMock(return_value={"x": {"match": True, "reasoning": "ok"}})):
                 failed = await run_eval_only_simulations(
                     config={"evaluators": [_bin_ev("x")]},
@@ -165,7 +165,7 @@ class TestRunEvalOnlySimulations(unittest.IsolatedAsyncioTestCase):
 
 class TestAggregateAndWrite(unittest.TestCase):
     def test_aggregates(self):
-        from calibrate.llm.run_simulation import _aggregate_and_write_simulation_results
+        from calibrate_agent.llm.run_simulation import _aggregate_and_write_simulation_results
 
         with tempfile.TemporaryDirectory() as tmp:
             results = [
@@ -187,7 +187,7 @@ class TestAggregateAndWrite(unittest.TestCase):
 
 class TestRunSimulationWithAgent(unittest.IsolatedAsyncioTestCase):
     async def test_basic_flow(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         # Mock the user LLM
         fake_user_resp = MagicMock()
@@ -217,7 +217,7 @@ class TestRunSimulationWithAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result["evaluation_results"]), 1)
 
     async def test_agent_no_response_ends_early(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         fake_user_client = MagicMock()
         fake_agent = MagicMock()
@@ -237,7 +237,7 @@ class TestRunSimulationWithAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["transcript"], [])
 
     async def test_openrouter_user_provider(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         fake_user_resp = MagicMock()
         fake_user_resp.choices = [MagicMock(message=MagicMock(content="hi"))]
@@ -263,7 +263,7 @@ class TestRunSimulationWithAgent(unittest.IsolatedAsyncioTestCase):
 
 class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_main_eval_only_run(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
@@ -280,7 +280,7 @@ class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
                 await RS.main()
 
     async def test_main_invalid_evaluators_exits(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
@@ -291,7 +291,7 @@ class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
                     await RS.main()
 
     async def test_main_eval_only_missing_dataset(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
@@ -302,7 +302,7 @@ class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
                     await RS.main()
 
     async def test_main_eval_only_invalid_dataset_json(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
@@ -316,7 +316,7 @@ class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
                     await RS.main()
 
     async def test_main_eval_only_invalid_dataset_shape(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
@@ -332,17 +332,17 @@ class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
 
 class TestResolveSimulationParallel(unittest.TestCase):
     def test_cli_value_takes_precedence(self):
-        from calibrate.llm.run_simulation import _resolve_simulation_parallel
+        from calibrate_agent.llm.run_simulation import _resolve_simulation_parallel
         with patch.dict("os.environ", {"CALIBRATE_SIMULATION_PARALLEL": "7"}):
             self.assertEqual(_resolve_simulation_parallel(3), 3)
 
     def test_env_var_used_when_no_cli(self):
-        from calibrate.llm.run_simulation import _resolve_simulation_parallel
+        from calibrate_agent.llm.run_simulation import _resolve_simulation_parallel
         with patch.dict("os.environ", {"CALIBRATE_SIMULATION_PARALLEL": "7"}):
             self.assertEqual(_resolve_simulation_parallel(None), 7)
 
     def test_default_when_neither_set(self):
-        from calibrate.llm.run_simulation import (
+        from calibrate_agent.llm.run_simulation import (
             _resolve_simulation_parallel,
             DEFAULT_SIMULATION_PARALLEL,
         )
@@ -354,7 +354,7 @@ class TestResolveSimulationParallel(unittest.TestCase):
             )
 
     def test_invalid_env_falls_back_to_default(self):
-        from calibrate.llm.run_simulation import (
+        from calibrate_agent.llm.run_simulation import (
             _resolve_simulation_parallel,
             DEFAULT_SIMULATION_PARALLEL,
         )
@@ -364,7 +364,7 @@ class TestResolveSimulationParallel(unittest.TestCase):
             )
 
     def test_non_positive_values_ignored(self):
-        from calibrate.llm.run_simulation import (
+        from calibrate_agent.llm.run_simulation import (
             _resolve_simulation_parallel,
             DEFAULT_SIMULATION_PARALLEL,
         )

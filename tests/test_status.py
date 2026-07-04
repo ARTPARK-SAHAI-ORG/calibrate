@@ -1,4 +1,4 @@
-"""Tests for calibrate/status.py — provider checks and main()."""
+"""Tests for calibrate_agent/status.py — provider checks and main()."""
 
 import asyncio
 import os
@@ -89,7 +89,7 @@ def _patch_smallest_both(tts_ws, stt_ws):
 
 class TestSilenceWav(unittest.TestCase):
     def test_generate_silence(self):
-        from calibrate.status import _generate_silence_wav
+        from calibrate_agent.status import _generate_silence_wav
 
         wav = _generate_silence_wav(duration_s=0.1, sample_rate=8000)
         self.assertTrue(wav.startswith(b"RIFF"))
@@ -97,7 +97,7 @@ class TestSilenceWav(unittest.TestCase):
 
 class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
     async def test_check_openai_ok(self):
-        from calibrate.status import _check_openai
+        from calibrate_agent.status import _check_openai
 
         client = _mk_client(_mk_resp({"choices": [{"message": {"content": "Hi"}}]}))
         with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}):
@@ -105,7 +105,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "llm")
 
     async def test_check_openai_no_choices(self):
-        from calibrate.status import _check_openai
+        from calibrate_agent.status import _check_openai
 
         client = _mk_client(_mk_resp({}))
         with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}):
@@ -113,7 +113,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                 await _check_openai(client)
 
     async def test_check_openrouter_ok(self):
-        from calibrate.status import _check_openrouter
+        from calibrate_agent.status import _check_openrouter
 
         client = _mk_client(_mk_resp({"choices": [{"message": {"content": "Hi"}}]}))
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "k"}):
@@ -121,7 +121,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "llm")
 
     async def test_check_openrouter_no_choices(self):
-        from calibrate.status import _check_openrouter
+        from calibrate_agent.status import _check_openrouter
 
         client = _mk_client(_mk_resp({}))
         with patch.dict(os.environ, {"OPENROUTER_API_KEY": "k"}):
@@ -129,7 +129,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                 await _check_openrouter(client)
 
     async def test_check_groq_ok(self):
-        from calibrate.status import _check_groq
+        from calibrate_agent.status import _check_groq
 
         client = _mk_client(_mk_resp(content=b"x" * 200))
         with patch.dict(os.environ, {"GROQ_API_KEY": "k"}):
@@ -137,7 +137,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "tts")
 
     async def test_check_groq_empty(self):
-        from calibrate.status import _check_groq
+        from calibrate_agent.status import _check_groq
 
         client = _mk_client(_mk_resp(content=b"x"))
         with patch.dict(os.environ, {"GROQ_API_KEY": "k"}):
@@ -145,7 +145,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                 await _check_groq(client)
 
     async def test_check_google_missing_creds(self):
-        from calibrate.status import _check_google
+        from calibrate_agent.status import _check_google
 
         client = _mk_client()
         with patch.dict(os.environ, {}, clear=True):
@@ -153,7 +153,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                 await _check_google(client)
 
     async def test_check_google_missing_file(self):
-        from calibrate.status import _check_google
+        from calibrate_agent.status import _check_google
 
         client = _mk_client()
         with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/nonexistent.json"}):
@@ -161,7 +161,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                 await _check_google(client)
 
     async def test_check_google_missing_project(self):
-        from calibrate.status import _check_google
+        from calibrate_agent.status import _check_google
 
         client = _mk_client()
         with tempfile.TemporaryDirectory() as tmp:
@@ -174,7 +174,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                     await _check_google(client)
 
     async def test_check_elevenlabs_ok(self):
-        from calibrate.status import _check_elevenlabs
+        from calibrate_agent.status import _check_elevenlabs
 
         client = _mk_client(_mk_resp(content=b"x" * 200))
         with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "k"}):
@@ -182,7 +182,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "tts")
 
     async def test_check_elevenlabs_empty(self):
-        from calibrate.status import _check_elevenlabs
+        from calibrate_agent.status import _check_elevenlabs
 
         client = _mk_client(_mk_resp(content=b""))
         with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "k"}):
@@ -190,7 +190,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                 await _check_elevenlabs(client)
 
     async def test_check_cartesia_ok(self):
-        from calibrate.status import _check_cartesia
+        from calibrate_agent.status import _check_cartesia
 
         client = _mk_client(_mk_resp(content=b"x" * 200))
         with patch.dict(os.environ, {"CARTESIA_API_KEY": "k"}):
@@ -198,7 +198,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "tts")
 
     async def test_check_cartesia_empty(self):
-        from calibrate.status import _check_cartesia
+        from calibrate_agent.status import _check_cartesia
 
         client = _mk_client(_mk_resp(content=b""))
         with patch.dict(os.environ, {"CARTESIA_API_KEY": "k"}):
@@ -206,7 +206,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
                 await _check_cartesia(client)
 
     async def test_check_deepgram_ok(self):
-        from calibrate.status import _check_deepgram
+        from calibrate_agent.status import _check_deepgram
 
         client = _mk_client(_mk_resp())
         with patch.dict(os.environ, {"DEEPGRAM_API_KEY": "k"}):
@@ -215,7 +215,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_tts_ok(self):
         import json
-        from calibrate.status import _check_smallest_tts
+        from calibrate_agent.status import _check_smallest_tts
 
         chunk = json.dumps({"status": "chunk", "data": {"audio": "YWJj"}})
         patcher, ws = _patch_ws([chunk])
@@ -226,7 +226,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_tts_server_error(self):
         import json
-        from calibrate.status import _check_smallest_tts
+        from calibrate_agent.status import _check_smallest_tts
 
         err = json.dumps({"status": "error", "error": "MODEL_DEPRECATED"})
         patcher, _ = _patch_ws([err])
@@ -236,7 +236,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_tts_no_audio(self):
         import json
-        from calibrate.status import _check_smallest_tts
+        from calibrate_agent.status import _check_smallest_tts
 
         done = json.dumps({"status": "complete"})
         patcher, _ = _patch_ws([done])
@@ -246,7 +246,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_stt_ok(self):
         import json
-        from calibrate.status import _check_smallest_stt
+        from calibrate_agent.status import _check_smallest_stt
 
         msg = json.dumps({"type": "transcription", "transcript": "", "is_last": True})
         patcher, ws = _patch_ws([msg])
@@ -258,7 +258,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_stt_idle_closes_ok(self):
         # No messages -> recv() raises the end sentinel -> treated as success.
-        from calibrate.status import _check_smallest_stt
+        from calibrate_agent.status import _check_smallest_stt
 
         patcher, _ = _patch_ws([])
         with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), patcher:
@@ -267,7 +267,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_stt_server_error(self):
         import json
-        from calibrate.status import _check_smallest_stt
+        from calibrate_agent.status import _check_smallest_stt
 
         err = json.dumps({"type": "error", "message": "bad audio"})
         patcher, _ = _patch_ws([err])
@@ -277,7 +277,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_both_ok(self):
         import json
-        from calibrate.status import _check_smallest
+        from calibrate_agent.status import _check_smallest
 
         tts_ws = _FakeWS([json.dumps({"status": "chunk", "data": {"audio": "YWJj"}})])
         stt_ws = _FakeWS([json.dumps({"type": "transcription", "is_last": True})])
@@ -288,7 +288,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
     async def test_check_smallest_fails_if_stt_down(self):
         import json
-        from calibrate.status import _check_smallest
+        from calibrate_agent.status import _check_smallest
 
         tts_ws = _FakeWS([json.dumps({"status": "chunk", "data": {"audio": "YWJj"}})])
         stt_ws = _FakeWS([json.dumps({"type": "error", "message": "down"})])
@@ -300,7 +300,7 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
 
 class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
     async def test_missing_env_vars_skips(self):
-        from calibrate.status import _check_single_provider
+        from calibrate_agent.status import _check_single_provider
 
         provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
         with patch.dict(os.environ, {}, clear=True):
@@ -309,7 +309,7 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["missing_vars"], ["OPENAI_API_KEY"])
 
     async def test_ok_path(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
         with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), \
@@ -319,7 +319,7 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["check_type"], "llm")
 
     async def test_timeout(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
 
@@ -335,7 +335,7 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Timed out", result["error"])
 
     async def test_http_status_error(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
 
@@ -351,7 +351,7 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
         self.assertIn("HTTP 401", result["error"])
 
     async def test_other_exception(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
 
@@ -367,7 +367,7 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
 
 class TestPrintResults(unittest.TestCase):
     def test_mixed_statuses(self):
-        from calibrate.status import _print_results
+        from calibrate_agent.status import _print_results
 
         results = [
             {"name": "p1", "types": ["llm"], "key_set": True, "missing_vars": [],
@@ -382,7 +382,7 @@ class TestPrintResults(unittest.TestCase):
 
 class TestMain(unittest.IsolatedAsyncioTestCase):
     async def test_main_default(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         async def fake_check(provider, client, emit=None):
             return {"name": provider["name"], "types": provider["types"],
@@ -395,7 +395,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
         self.assertIsInstance(result, dict)
 
     async def test_main_quiet(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         async def fake_check(provider, client, emit=None):
             return {"name": provider["name"], "types": provider["types"],
@@ -412,7 +412,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
 
 class TestStreamingStatus(unittest.IsolatedAsyncioTestCase):
     async def test_iter_status_events_streams_live_progress(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         providers = [
             {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]},
@@ -432,7 +432,7 @@ class TestStreamingStatus(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events[-1]["result"]["status"], "pass")
 
     async def test_iter_status_yields_provider_results_as_ready(self):
-        from calibrate import status as S
+        from calibrate_agent import status as S
 
         release_slow = asyncio.Event()
         providers = [

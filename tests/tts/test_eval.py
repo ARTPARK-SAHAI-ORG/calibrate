@@ -1,5 +1,5 @@
 """
-Tests for calibrate/tts/eval.py — routers, validators, save_audio, run_tts_eval.
+Tests for calibrate_agent/tts/eval.py — routers, validators, save_audio, run_tts_eval.
 
 Run with:
     python -m unittest tests.tts.test_eval -v
@@ -17,7 +17,7 @@ import pandas as pd
 
 class TestSaveAudio(unittest.TestCase):
     def test_wav_passthrough(self):
-        from calibrate.tts.eval import save_audio
+        from calibrate_agent.tts.eval import save_audio
 
         import io
 
@@ -36,7 +36,7 @@ class TestSaveAudio(unittest.TestCase):
             self.assertEqual(Path(out).read_bytes(), wav_bytes)
 
     def test_raw_pcm_wrapped_in_wav(self):
-        from calibrate.tts.eval import save_audio
+        from calibrate_agent.tts.eval import save_audio
 
         pcm = b"\x00\x01" * 200
         with tempfile.TemporaryDirectory() as tmp:
@@ -51,7 +51,7 @@ class TestSaveAudio(unittest.TestCase):
 
 class TestTTSValidateInputFile(unittest.TestCase):
     def test_valid(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame({"id": ["1"], "text": ["hello"]}).to_csv(
@@ -65,14 +65,14 @@ class TestTTSValidateInputFile(unittest.TestCase):
             os.remove(path)
 
     def test_missing_file(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         ok, err = validate_tts_input_file("/nope.csv")
         self.assertFalse(ok)
         self.assertIn("does not exist", err)
 
     def test_not_csv_extension(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as f:
             f.write("hi")
@@ -85,7 +85,7 @@ class TestTTSValidateInputFile(unittest.TestCase):
             os.remove(path)
 
     def test_missing_columns(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame({"foo": ["1"], "bar": ["hi"]}).to_csv(f.name, index=False)
@@ -98,7 +98,7 @@ class TestTTSValidateInputFile(unittest.TestCase):
             os.remove(path)
 
     def test_empty(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame(columns=["id", "text"]).to_csv(f.name, index=False)
@@ -111,7 +111,7 @@ class TestTTSValidateInputFile(unittest.TestCase):
             os.remove(path)
 
     def test_empty_text_value(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame({"id": ["1", "2"], "text": ["hello", ""]}).to_csv(
@@ -128,13 +128,13 @@ class TestTTSValidateInputFile(unittest.TestCase):
 
 class TestTTSValidateExistingResultsCSV(unittest.TestCase):
     def test_nonexistent_is_valid(self):
-        from calibrate.tts.eval import validate_existing_results_csv
+        from calibrate_agent.tts.eval import validate_existing_results_csv
 
         ok, err = validate_existing_results_csv("/nonexistent.csv")
         self.assertTrue(ok)
 
     def test_valid_columns(self):
-        from calibrate.tts.eval import validate_existing_results_csv
+        from calibrate_agent.tts.eval import validate_existing_results_csv
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame(
@@ -148,7 +148,7 @@ class TestTTSValidateExistingResultsCSV(unittest.TestCase):
             os.remove(path)
 
     def test_incompatible(self):
-        from calibrate.tts.eval import validate_existing_results_csv
+        from calibrate_agent.tts.eval import validate_existing_results_csv
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame([{"foo": 1, "bar": 2}]).to_csv(f.name, index=False)
@@ -163,7 +163,7 @@ class TestTTSValidateExistingResultsCSV(unittest.TestCase):
 
 class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_provider_raises(self):
-        from calibrate.tts import eval as tts_eval
+        from calibrate_agent.tts import eval as tts_eval
 
         with self.assertRaises(ValueError):
             await tts_eval.synthesize_speech.__wrapped__(
@@ -171,7 +171,7 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_known_provider_routed(self):
-        from calibrate.tts import eval as tts_eval
+        from calibrate_agent.tts import eval as tts_eval
 
         fake = AsyncMock(return_value={"ttfb": 0.42})
 
@@ -187,7 +187,7 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
 
 class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
     async def test_synthesizes_and_writes_csv(self):
-        from calibrate.tts import eval as tts_eval
+        from calibrate_agent.tts import eval as tts_eval
 
         async def fake_synth(text, provider, language, audio_path):
             Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
@@ -220,7 +220,7 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
                 self.assertTrue(Path(p).exists())
 
     async def test_resume_skips_processed_ids(self):
-        from calibrate.tts import eval as tts_eval
+        from calibrate_agent.tts import eval as tts_eval
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
@@ -258,7 +258,7 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(set(df["id"].astype(str)), {"row_a", "row_b"})
 
     async def test_overwrite_deletes_existing(self):
-        from calibrate.tts import eval as tts_eval
+        from calibrate_agent.tts import eval as tts_eval
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)

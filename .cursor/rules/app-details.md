@@ -28,7 +28,7 @@ Calibrate uses direct API calls for STT and TTS provider evaluations, and [pipec
 
 ```
 /
-├── calibrate/                    # Main Python package
+├── calibrate_agent/                    # Main Python package
 │   ├── __init__.py
 │   ├── cli.py               # CLI entry point
 │   ├── utils.py             # Shared utilities
@@ -84,10 +84,10 @@ Calibrate uses direct API calls for STT and TTS provider evaluations, and [pipec
 │       ├── llm-app.tsx      # LLM tests interactive flow (config path, provider, model, run, results)
 │       ├── sim-app.tsx      # Simulations interactive flow (type, config path, provider, model, run, results)
 │       ├── resource-app.tsx # Resource CRUD UIs (agents, tools, personas, scenarios, metrics) — not in menu
-│       ├── storage.ts       # Persistent resource storage in ~/.calibrate/ (agents, tools, personas, etc.)
+│       ├── storage.ts       # Persistent resource storage in ~/.calibrate_agent/ (agents, tools, personas, etc.)
 │       ├── components.tsx   # Reusable UI components (Spinner, TextInput, TextArea, MultiSelect, etc.)
 │       ├── providers.ts     # TTS + STT provider definitions with per-language support
-│       └── credentials.ts   # Secure API key storage (~/.calibrate/credentials.json)
+│       └── credentials.ts   # Secure API key storage (~/.calibrate_agent/credentials.json)
 ├── .github/workflows/
 │   ├── docs.yml            # Mintlify docs deployment
 │   └── publish.yml         # PyPI publish on GitHub release
@@ -112,7 +112,7 @@ Calibrate is organized into four main modules, each providing both a Python API 
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                         │
 │   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐        │
-│   │   calibrate.stt     │  │   calibrate.tts     │  │   calibrate.llm     │        │
+│   │   calibrate_agent.stt     │  │   calibrate_agent.tts     │  │   calibrate_agent.llm     │        │
 │   │                 │  │                 │  │                 │        │
 │   │  run()          │  │  run()          │  │  tests.run()    │        │
 │   │  (eval+leader-  │  │  (eval+leader-  │  │  (multi-model,  │        │
@@ -123,7 +123,7 @@ Calibrate is organized into four main modules, each providing both a Python API 
 │            └──────────────────┬─┴────────────────────┘                  │
 │                               │                                         │
 │                    ┌──────────▼──────────┐                              │
-│                    │   calibrate.agent       │                              │
+│                    │   calibrate_agent.agent       │                              │
 │                    │                     │                              │
 │                    │  simulation.run()   │  Full STT → LLM → TTS        │
 │                    │  simulation.run_single()  pipeline testing         │
@@ -252,7 +252,7 @@ Before running a test, the conversation history is preprocessed to handle tool c
   - If a `role: "tool"` response already exists for that `tool_call_id` → **Error** (test fails with validation error)
   - If no tool response exists → Auto-insert: `{"role": "tool", "content": "{\"status\": \"received\"}", "tool_call_id": "<id>"}`
 
-This preprocessing is handled by `preprocess_conversation_history()` in `calibrate/llm/run_tests.py`.
+This preprocessing is handled by `preprocess_conversation_history()` in `calibrate_agent/llm/run_tests.py`.
 
 **Example history with tool calls:**
 
@@ -310,7 +310,7 @@ output_dir/
 
 **Model folder naming:** For `openai` provider, model folder is `{provider}__{model}` (e.g., `openai__gpt-4.1`). For `openrouter` provider, model folder is just `{model}` with slashes replaced (e.g., `openai/gpt-4.1` → `openai__gpt-4.1`).
 
-**Leaderboard:** Generated automatically by `benchmark.py` after all models complete. In the Ink UI, leaderboard is generated via `python -m calibrate.llm.tests_leaderboard` after all model evaluations finish.
+**Leaderboard:** Generated automatically by `benchmark.py` after all models complete. In the Ink UI, leaderboard is generated via `python -m calibrate_agent.llm.tests_leaderboard` after all model evaluations finish.
 
 ### 4. LLM Simulations
 
@@ -368,10 +368,10 @@ simulation_persona_N_scenario_M/
 
 ```python
 import asyncio
-from calibrate.stt import run as stt_run, run_single as stt_run_single, generate_leaderboard as stt_leaderboard
-from calibrate.tts import run as tts_run, run_single as tts_run_single, generate_leaderboard as tts_leaderboard
-from calibrate.llm import tests, simulations
-from calibrate.agent import simulation, STTConfig, TTSConfig, LLMConfig
+from calibrate_agent.stt import run as stt_run, run_single as stt_run_single, generate_leaderboard as stt_leaderboard
+from calibrate_agent.tts import run as tts_run, run_single as tts_run_single, generate_leaderboard as tts_leaderboard
+from calibrate_agent.llm import tests, simulations
+from calibrate_agent.agent import simulation, STTConfig, TTSConfig, LLMConfig
 
 # STT Benchmark (runs multiple providers in parallel + generates leaderboard)
 asyncio.run(stt_run(
@@ -617,14 +617,14 @@ Parameters are extracted from `webhook.queryParameters` and `webhook.body.parame
 
 **How tool parameters are processed:**
 
-Tool schema building is centralized in `calibrate/utils.py` via the `build_tools_schema(tools)` function, which returns `tuple[list[FunctionSchema], dict[str, dict]]` (schemas and webhook configs).
+Tool schema building is centralized in `calibrate_agent/utils.py` via the `build_tools_schema(tools)` function, which returns `tuple[list[FunctionSchema], dict[str, dict]]` (schemas and webhook configs).
 
 This function is used by all files that handle tools:
 
-- `calibrate/llm/run_tests.py` - Uses webhook configs to log webhook details (no actual HTTP call)
-- `calibrate/agent/bot.py` - Uses webhook configs to make actual HTTP calls
-- `calibrate/llm/run_simulation.py` - Uses webhook configs to make actual HTTP calls
-- `calibrate/agent/test.py` - Uses webhook configs to make actual HTTP calls
+- `calibrate_agent/llm/run_tests.py` - Uses webhook configs to log webhook details (no actual HTTP call)
+- `calibrate_agent/agent/bot.py` - Uses webhook configs to make actual HTTP calls
+- `calibrate_agent/llm/run_simulation.py` - Uses webhook configs to make actual HTTP calls
+- `calibrate_agent/agent/test.py` - Uses webhook configs to make actual HTTP calls
 
 **For `structured_output` type (or when `type` is not specified):**
 
@@ -641,7 +641,7 @@ This function is used by all files that handle tools:
 
 **Webhook HTTP calls:**
 
-The `make_webhook_call(webhook_config, arguments)` utility function in `calibrate/utils.py` makes actual HTTP requests:
+The `make_webhook_call(webhook_config, arguments)` utility function in `calibrate_agent/utils.py` makes actual HTTP requests:
 
 - Uses `aiohttp` for async HTTP calls
 - Converts headers list to dict format
@@ -654,15 +654,15 @@ The `make_webhook_call(webhook_config, arguments)` utility function in `calibrat
 
 | File                                | structured_output                                            | webhook                                                 |
 | ----------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------- |
-| `calibrate/llm/run_tests.py`        | `generic_tool_call` (logs only)                              | `webhook_tool_call` (logs only, no HTTP)                |
-| `calibrate/agent/bot.py`            | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call in "run" mode) |
-| `calibrate/llm/run_simulation.py`   | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call)               |
-| `calibrate/agent/test.py`           | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call)               |
-| `calibrate/agent/run_simulation.py` | `RTVIFunctionCallResponder` returns `{"status": "received"}` | `RTVIFunctionCallResponder` makes HTTP call             |
+| `calibrate_agent/llm/run_tests.py`        | `generic_tool_call` (logs only)                              | `webhook_tool_call` (logs only, no HTTP)                |
+| `calibrate_agent/agent/bot.py`            | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call in "run" mode) |
+| `calibrate_agent/llm/run_simulation.py`   | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call)               |
+| `calibrate_agent/agent/test.py`           | `generic_function_call`                                      | `webhook_function_call` (makes HTTP call)               |
+| `calibrate_agent/agent/run_simulation.py` | `RTVIFunctionCallResponder` returns `{"status": "received"}` | `RTVIFunctionCallResponder` makes HTTP call             |
 
-**Note on LLM tests tool handling:** In `calibrate/llm/run_tests.py`, conversation history with tool calls is preprocessed before passing to the LLM. For non-webhook tools, tool responses (`role: "tool"`) are auto-inserted with `{"status": "received"}`. For webhook tools, manual tool responses are expected in the history. See "Conversation History Preprocessing" in the LLM Tests section.
+**Note on LLM tests tool handling:** In `calibrate_agent/llm/run_tests.py`, conversation history with tool calls is preprocessed before passing to the LLM. For non-webhook tools, tool responses (`role: "tool"`) are auto-inserted with `{"status": "received"}`. For webhook tools, manual tool responses are expected in the history. See "Conversation History Preprocessing" in the LLM Tests section.
 
-**Voice agent simulation tool handling (`calibrate/agent/run_simulation.py`):**
+**Voice agent simulation tool handling (`calibrate_agent/agent/run_simulation.py`):**
 
 The `RTVIFunctionCallResponder` class handles function calls received via RTVI protocol in voice agent simulations:
 
@@ -883,7 +883,7 @@ All modules support leaderboard generation that:
 - Leaderboard generation is in a separate `leaderboard.py` file
 - When using `benchmark.py` (via `calibrate stt -p provider1 provider2 ...` or Python SDK `run()`), leaderboard is auto-generated after all providers complete
 - Optionally specify save directory with `-s/--save-dir` (defaults to `{output_dir}/leaderboard`)
-- The `generate_leaderboard(output_dir, save_dir)` function is exported from `calibrate.stt`
+- The `generate_leaderboard(output_dir, save_dir)` function is exported from `calibrate_agent.stt`
 - In the Ink UI, the last provider's eval includes `--leaderboard` flag to trigger leaderboard generation
 
 **TTS Leaderboard:**
@@ -891,7 +891,7 @@ All modules support leaderboard generation that:
 - Leaderboard generation is in a separate `leaderboard.py` file (same architecture as STT)
 - When using `benchmark.py` (via `calibrate tts -p provider1 provider2 ...` or Python SDK `run()`), leaderboard is auto-generated after all providers complete
 - Optionally specify save directory with `-s/--save-dir` (defaults to `{output_dir}/leaderboard`)
-- The `generate_leaderboard(output_dir, save_dir)` function is exported from `calibrate.tts`
+- The `generate_leaderboard(output_dir, save_dir)` function is exported from `calibrate_agent.tts`
 - In the Ink UI, the last provider's eval includes `--leaderboard` flag to trigger leaderboard generation
 
 **LLM Tests Leaderboard:**
@@ -899,7 +899,7 @@ All modules support leaderboard generation that:
 - Leaderboard generation is in `tests_leaderboard.py`
 - When using `benchmark.py` (via `calibrate llm -m model1 model2 ...` or Python SDK `tests.run()` with `models` list), leaderboard is auto-generated after all models complete
 - The `tests.leaderboard(output_dir, save_dir)` method can be called separately
-- In the Ink UI, leaderboard is generated via `python -m calibrate.llm.tests_leaderboard -o <output_dir> -s <output_dir>/leaderboard` after all model evaluations complete
+- In the Ink UI, leaderboard is generated via `python -m calibrate_agent.llm.tests_leaderboard -o <output_dir> -s <output_dir>/leaderboard` after all model evaluations complete
 - `tests_leaderboard.py` expects a flat structure: `output_dir/model_name/metrics.json` (no scenario/config_name nesting)
 
 **Output Files:**
@@ -964,18 +964,18 @@ mintlify dev
 
 ## Interactive CLI (`ui/`)
 
-An Ink-based (React for CLIs) interactive terminal UI. Source lives in `ui/`, bundled output ships inside the Python package at `calibrate/ui/cli.bundle.mjs`.
+An Ink-based (React for CLIs) interactive terminal UI. Source lives in `ui/`, bundled output ships inside the Python package at `calibrate_agent/ui/cli.bundle.mjs`.
 
 **Run:** `calibrate` (main menu), or directly: `calibrate stt`, `calibrate tts` (requires Node.js). Other modes (`llm`, `simulations`, `agents`, `tools`, `personas`, `scenarios`, `metrics`) are functional but hidden from `--help` and the main menu until ready.
 
 **Dev mode:** `cd ui && npx tsx source/cli.tsx` (menu) or `cd ui && npx tsx source/cli.tsx stt` etc.
 
-**Startup log suppression:** The CLI entry point (`calibrate/cli.py`) suppresses noisy startup logs from pipecat (loguru INFO) and transformers before any imports occur. This is done by:
+**Startup log suppression:** The CLI entry point (`calibrate_agent/cli.py`) suppresses noisy startup logs from pipecat (loguru INFO) and transformers before any imports occur. This is done by:
 
 - Calling `logger.remove()` then `logger.add(sys.stderr, level="WARNING")` at the very top of the file
 - Setting `TRANSFORMERS_VERBOSITY=error` environment variable
 
-**Mode selection:** The `App` component accepts a `mode` prop of type `AppMode`. `cli.tsx` reads `process.argv[2]` (passed by `calibrate/cli.py` via `_launch_ink_ui(mode)`) and passes it as the mode. Defaults to `"menu"` if no argument provided.
+**Mode selection:** The `App` component accepts a `mode` prop of type `AppMode`. `cli.tsx` reads `process.argv[2]` (passed by `calibrate_agent/cli.py` via `_launch_ink_ui(mode)`) and passes it as the mode. Defaults to `"menu"` if no argument provided.
 
 **Available modes (`AppMode` in `shared.ts`):** `menu`, `stt`, `tts`, `llm`, `simulations`, `agents`, `tools`, `personas`, `scenarios`, `metrics`
 
@@ -1017,9 +1017,9 @@ The UI validates inputs in `ConfigInputStep` (`app.tsx`) before proceeding:
 
 The eval scripts also validate inputs but exit with error instead of prompting:
 
-- `validate_stt_input_dir(input_dir, input_file_name)` in `calibrate/stt/eval.py`
-- `validate_tts_input_file(input_path)` in `calibrate/tts/eval.py`
-- These are exported from `calibrate.stt` and `calibrate.tts` for programmatic use
+- `validate_stt_input_dir(input_dir, input_file_name)` in `calibrate_agent/stt/eval.py`
+- `validate_tts_input_file(input_path)` in `calibrate_agent/tts/eval.py`
+- These are exported from `calibrate_agent.stt` and `calibrate_agent.tts` for programmatic use
 
 **Output directory validation (in Ink UI):**
 
@@ -1044,10 +1044,10 @@ When resuming an evaluation (not using `--overwrite`), the eval scripts validate
 **Ink UI flow** (handled by the `EvalApp` component in `app.tsx`):
 
 1. **Language selection** — user picks a language first
-2. **Provider selection** — only providers that support the chosen language are shown (filtered using `languages` in `providers.ts`, derived from the STT/TTS language dictionaries in `calibrate/utils.py`). Uses `STT_PROVIDERS` or `TTS_PROVIDERS` based on mode.
+2. **Provider selection** — only providers that support the chosen language are shown (filtered using `languages` in `providers.ts`, derived from the STT/TTS language dictionaries in `calibrate_agent/utils.py`). Uses `STT_PROVIDERS` or `TTS_PROVIDERS` based on mode.
 3. **Input path** — for TTS: path to `id,text` CSV file; for STT: path to directory containing `stt.csv` and `audios/`. **Full validation** runs before proceeding (CSV columns, audio file existence). A documentation link is displayed below the input prompt pointing to the relevant docs page (`https://calibrate.artpark.ai/cli/speech-to-text` or `https://calibrate.artpark.ai/cli/text-to-speech`).
 4. **Output directory** — optional, defaults to `./out`. **Prompts for overwrite confirmation** if provider directories already contain data. If confirmed, `--overwrite` is passed to the eval CLI.
-5. **API key setup** — checks `~/.calibrate/credentials.json` and env vars; only prompts for missing keys; always requires `OPENAI_API_KEY` for the LLM judge
+5. **API key setup** — checks `~/.calibrate_agent/credentials.json` and env vars; only prompts for missing keys; always requires `OPENAI_API_KEY` for the LLM judge
 6. **Evaluation** — The Ink UI's `RunStep` component spawns `calibrate <mode> -p <provider> ...` for each provider individually via `child_process.spawn`. **Max 2 providers run in parallel** to balance speed vs resource usage. Port availability is checked before starting each provider. The last provider's eval includes `--leaderboard` flag to generate the leaderboard. **Parallel provider logs are displayed side-by-side in vertical columns** (not stacked rows) for easy comparison. Real-time log streaming is enabled via `PYTHONUNBUFFERED=1` environment variable.
 7. **Results** — displays leaderboard table + charts after all providers complete. The `LeaderboardStep` component now supports two views:
    - **Leaderboard view** (default): Shows comparison table, bar charts for each metric, and output file paths. Below the charts, a "View Provider Details" menu allows selecting a provider to inspect.
@@ -1086,7 +1086,7 @@ Handled by `LlmTestsApp` in `llm-app.tsx`. Flow with free-form model entry and p
    - Default model: `gpt-4.1` for OpenAI, `openai/gpt-4.1` for OpenRouter
 4. **Output directory** — where results will be saved (default: `./out`). **Prompts for overwrite confirmation** if output directory already contains model directories or other data. If confirmed, sets `overwrite: true` in config. If declined, lets user enter a different path.
 5. **API key setup** — prompts only for missing keys (OPENAI_API_KEY, OPENROUTER_API_KEY)
-6. **Run** — Spawns `calibrate llm -c <path> -o <dir> -m <model> -p <provider>` **for each model individually** via `child_process.spawn`. **Max 2 models run in parallel** (same pattern as STT/TTS). After all models complete, leaderboard is generated via `python -m calibrate.llm.tests_leaderboard`. **Parallel model logs are displayed side-by-side in vertical columns** for easy comparison. Real-time log streaming is enabled via `PYTHONUNBUFFERED=1` environment variable. Each model shows:
+6. **Run** — Spawns `calibrate llm -c <path> -o <dir> -m <model> -p <provider>` **for each model individually** via `child_process.spawn`. **Max 2 models run in parallel** (same pattern as STT/TTS). After all models complete, leaderboard is generated via `python -m calibrate_agent.llm.tests_leaderboard`. **Parallel model logs are displayed side-by-side in vertical columns** for easy comparison. Real-time log streaming is enabled via `PYTHONUNBUFFERED=1` environment variable. Each model shows:
    - Status indicator (spinner for running, + for done, x for error, - for waiting)
    - Model name
    - Pass/fail count after completion (e.g., "5/8 passed")
@@ -1166,7 +1166,7 @@ All creation flows in `resource-app.tsx` are retained for future use. Currently 
 
 ### Persistent Resource Storage (`storage.ts`)
 
-Resources are stored as JSON files in `~/.calibrate/`:
+Resources are stored as JSON files in `~/.calibrate_agent/`:
 
 - `agents.json` — agents with system prompt, tools (inline copies), and settings
 - `tools.json` — tool definitions (structured output or webhook)
@@ -1182,9 +1182,9 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 
 ### Bundling & Distribution
 
-- `cd ui && npm run bundle` uses esbuild to compile the entire Ink app into a single self-contained `calibrate/ui/cli.bundle.mjs` (~2MB)
+- `cd ui && npm run bundle` uses esbuild to compile the entire Ink app into a single self-contained `calibrate_agent/ui/cli.bundle.mjs` (~2MB)
 - `pyproject.toml` includes `cli.bundle.mjs` via `[tool.setuptools.package-data]` so it ships with the Python package
-- `calibrate/cli.py` dispatches all interactive commands via the shared `_launch_ink_ui(mode)` helper, which checks for `node` then runs `node calibrate/ui/cli.bundle.mjs <mode>`
+- `calibrate_agent/cli.py` dispatches all interactive commands via the shared `_launch_ink_ui(mode)` helper, which checks for `node` then runs `node calibrate_agent/ui/cli.bundle.mjs <mode>`
 - STT and TTS commands accept arguments directly (no `eval` subcommand): `calibrate stt -p deepgram -i ./data` runs evaluation, `calibrate stt` without args launches interactive UI
 - Hidden internal CLI subcommands (`llm leaderboard`, `simulations leaderboard`, `agent test`) still exist in argparse because the Ink UI spawns them as child processes
 - The `--leaderboard` flag on STT/TTS commands triggers leaderboard generation after evaluation completes
@@ -1193,7 +1193,7 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 ### Key Patterns
 
 - **Calibrate binary resolution** (`findCalibrateBin()` in `shared.ts`): Checks PATH → `.venv/bin/calibrate` → `uv run calibrate`, in that order. Shared across all flow files via import.
-- **Credential storage** (`credentials.ts`): Keys saved to `~/.calibrate/credentials.json` with `0o600` permissions. Reads from stored file first, then falls back to env vars.
+- **Credential storage** (`credentials.ts`): Keys saved to `~/.calibrate_agent/credentials.json` with `0o600` permissions. Reads from stored file first, then falls back to env vars.
 - **Language-based provider filtering** (`providers.ts`): Each `ProviderInfo` has a `languages: Set<string>`. Mode-aware helpers `getProvidersForLanguage(language, mode)` and `getProviderById(id, mode)` select from the correct provider list.
 - **Config file based flows**: LLM tests and simulations flows now collect a user-provided config file path and pass it directly to the Python CLI commands. No temp files are created by the Ink UI for these flows.
 - **TextArea component** (`components.tsx`): Multi-line text input where Enter adds a newline and Escape submits. Used for system prompts, persona characteristics, scenario descriptions, and evaluation criteria.
@@ -1213,8 +1213,8 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 ### Gotchas
 
 - Ink requires a real TTY for interactive input (won't work in piped/non-interactive shells)
-- After changing UI source code, run `cd ui && npm run bundle` to regenerate `calibrate/ui/cli.bundle.mjs` before releasing
-- `languages` sets in `providers.ts` must be kept in sync with the language dictionaries in `calibrate/utils.py`
+- After changing UI source code, run `cd ui && npm run bundle` to regenerate `calibrate_agent/ui/cli.bundle.mjs` before releasing
+- `languages` sets in `providers.ts` must be kept in sync with the language dictionaries in `calibrate_agent/utils.py`
 - The bundle file (`cli.bundle.mjs`) should be committed to the repo so it ships with `pip install`
 - Hidden CLI subcommands (`llm leaderboard`, `simulations leaderboard`) must NOT be removed — the Ink UI spawns them as child processes. They are hidden from `--help` by registering subparsers without `help=` and using `metavar=""` on the parent subparser group
 - **STT/TTS/LLM architecture split**: Each module follows the same pattern:
@@ -1225,12 +1225,12 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 - **Ink UI vs CLI parallelization**: The Ink UI (`calibrate stt/tts/llm` interactive mode) handles parallelization in TypeScript via `RunStep` component (spawning individual single-provider/model commands that route to `eval.py` / `run_tests.py`). The direct CLI with multiple providers/models handles parallelization in Python via `benchmark.py`.
 - **Leaderboard generation timing**:
   - **STT/TTS Ink UI**: The last provider's call includes `--leaderboard` flag which triggers leaderboard generation after eval completes.
-  - **LLM Ink UI**: After all model evaluations complete, leaderboard is generated via `python -m calibrate.llm.tests_leaderboard` (no `--leaderboard` flag on individual model runs).
+  - **LLM Ink UI**: After all model evaluations complete, leaderboard is generated via `python -m calibrate_agent.llm.tests_leaderboard` (no `--leaderboard` flag on individual model runs).
   - **Direct CLI with multiple providers/models**: `benchmark.py` always generates leaderboard after all complete.
-- Tools stored inside agents in `~/.calibrate/agents.json` are inline copies. Updating a tool via `calibrate tools` does not update agents that already contain a copy of that tool
+- Tools stored inside agents in `~/.calibrate_agent/agents.json` are inline copies. Updating a tool via `calibrate tools` does not update agents that already contain a copy of that tool
 - The `App` component's `Mode` type is re-exported as `AppMode` from `shared.ts` with values: `menu`, `stt`, `tts`, `llm`, `simulations`. The internal `EvalMode` type (`"tts" | "stt"`) is separate and only used within `app.tsx` for STT/TTS-specific components
-- **Real-time log streaming**: The Ink UI sets `PYTHONUNBUFFERED=1` when spawning Python subprocesses to ensure logs appear immediately. The `log_and_print()` function in `calibrate/utils.py` uses `print(..., flush=True)` for the same reason. Without these, Python buffers stdout when piped to a subprocess, causing logs to appear in batches instead of real-time.
-- **Loguru logger thread safety in LLM tests**: The `run_inference()` function in `calibrate/llm/run_tests.py` uses a threading lock (`_logger_lock`) to protect `logger.add()` and `logger.remove()` operations. When running multiple models in parallel via `benchmark.py`, concurrent logger handler manipulation can cause "There is no existing handler with id X" errors. The lock prevents this race condition.
+- **Real-time log streaming**: The Ink UI sets `PYTHONUNBUFFERED=1` when spawning Python subprocesses to ensure logs appear immediately. The `log_and_print()` function in `calibrate_agent/utils.py` uses `print(..., flush=True)` for the same reason. Without these, Python buffers stdout when piped to a subprocess, causing logs to appear in batches instead of real-time.
+- **Loguru logger thread safety in LLM tests**: The `run_inference()` function in `calibrate_agent/llm/run_tests.py` uses a threading lock (`_logger_lock`) to protect `logger.add()` and `logger.remove()` operations. When running multiple models in parallel via `benchmark.py`, concurrent logger handler manipulation can cause "There is no existing handler with id X" errors. The lock prevents this race condition.
 
 ---
 
@@ -1252,7 +1252,7 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 - `license = "CC-BY-SA-4.0"` — plain SPDX string (not a table; the table format `{text = "..."}` is deprecated by setuptools)
 - `license-files = ["LICENSE.md"]` — explicitly declares the license file
 - `[tool.setuptools.packages.find]` excludes `ui*`, `examples*`, `docs*`, `images*` to prevent non-package directories from leaking into the wheel
-- `[tool.setuptools.package-data]` includes `calibrate/ui/cli.bundle.mjs` so the bundled Ink UI ships with the package
+- `[tool.setuptools.package-data]` includes `calibrate_agent/ui/cli.bundle.mjs` so the bundled Ink UI ships with the package
 - `pipecat-ai` and `pipecat-ai-small-webrtc-prebuilt` are pinned to exact versions (see Tech Stack section)
 - `[tool.setuptools_scm]` with `local_scheme = "no-local-version"` and `fallback_version = "0.0.0-dev"`
 - Build requires `setuptools>=64` and `setuptools_scm>=8`
@@ -1263,7 +1263,7 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 - Tag `v0.1.0` on the current commit → version `0.1.0`
 - 3 commits past `v0.1.0` → version `0.1.1.dev3` (dev version)
 - No tags at all → `fallback_version` of `0.0.0-dev`
-- **`calibrate/__init__.py`** reads the version dynamically via `importlib.metadata.version("calibrate-agent")`. Falls back to `"0.0.0-dev"` if the package isn't installed (e.g., during local development without `pip install -e .`)
+- **`calibrate_agent/__init__.py`** reads the version dynamically via `importlib.metadata.version("calibrate-agent")`. Falls back to `"0.0.0-dev"` if the package isn't installed (e.g., during local development without `pip install -e .`)
 - **`ui/package.json`** version is independent — the UI is bundled into the Python package and end users never interact with the npm package directly
 - **`uv.lock`** tracks dependency versions, not the project version — only needs updating when dependencies change (`uv lock`)
 - **Release tags must use `v` prefix** (e.g., `v0.1.0`, `v1.0.0`)
@@ -1300,7 +1300,7 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 
 ### Provider-Specific
 
-- **Separate STT/TTS language codes:** STT and TTS providers often support different languages. Language codes are managed separately in `calibrate/utils.py`:
+- **Separate STT/TTS language codes:** STT and TTS providers often support different languages. Language codes are managed separately in `calibrate_agent/utils.py`:
   - `get_stt_language_code(language, provider)` - For STT providers
   - `get_tts_language_code(language, provider)` - For TTS providers
   - `get_language_code()` - Deprecated, defaults to STT codes for backwards compatibility
@@ -1319,7 +1319,7 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
   - Most others use ISO 639-1 codes: `en`, `hi`, `kn`, etc.
 - Not all providers support all 12 languages - Sarvam has the most comprehensive support for Indian languages
 - **Sindhi language special handling:**
-  - **STT:** For Google STT, Sindhi requires a different model (`chirp_2`) and region (`asia-southeast1`) compared to the default (`chirp_3` model, `us` region). This is handled automatically in `calibrate/stt/eval.py` via `transcribe_google()`. Sindhi is supported by Google, Cartesia, and ElevenLabs for STT.
+  - **STT:** For Google STT, Sindhi requires a different model (`chirp_2`) and region (`asia-southeast1`) compared to the default (`chirp_3` model, `us` region). This is handled automatically in `calibrate_agent/stt/eval.py` via `transcribe_google()`. Sindhi is supported by Google, Cartesia, and ElevenLabs for STT.
   - **TTS:** Sindhi TTS requires special handling for both Google and ElevenLabs:
     - **Google:** Uses streaming API with `gemini-2.5-flash-lite-preview-tts` model. Key difference: voice name is just "Charon" (not locale-prefixed like `sd-IN-Chirp3-HD-Charon`) and requires `model_name` parameter in `VoiceSelectionParams`. See [Google Gemini-TTS docs](https://cloud.google.com/text-to-speech/docs/gemini-tts).
     - **ElevenLabs:** Uses `eleven_v3` model with `text_to_dialogue` API instead of the standard `text_to_speech` API
@@ -1373,7 +1373,7 @@ logger.remove(log_file_id)
 
 #### 2. Print Logger (`results.log` file) - Uses per-simulation loggers
 
-- **`calibrate/utils.py` logging utilities:**
+- **`calibrate_agent/utils.py` logging utilities:**
   - `_simulation_print_loggers: dict[str, logging.Logger]` - Stores per-simulation print loggers (keyed by UUID)
   - `current_simulation_name: ContextVar[str]` - Context variable to track active simulation (stores UUID)
   - `configure_print_logger(log_path, simulation_name="")` - Creates unique logger per simulation (pass UUID)
@@ -1418,7 +1418,7 @@ cleanup_print_logger(simulation_run_id)
 - **Non-streaming:** Groq does not support streaming and does not return TTFB
 - **Pipecat usage:** Only voice agent simulations use pipecat for the full STT→LLM→TTS pipeline
 - **TTS LLM Judge accuracy:** The audio-capable model (`gpt-audio`) may have reduced accuracy for low-resource languages like Sindhi due to limited training data
-- **Language validation:** `validate_stt_language()` and `validate_tts_language()` in `calibrate/utils.py` check if a language is supported by a provider before evaluation starts. Each function uses the appropriate STT or TTS language dictionaries. If invalid, the run stops with an error listing all supported languages for that provider.
+- **Language validation:** `validate_stt_language()` and `validate_tts_language()` in `calibrate_agent/utils.py` check if a language is supported by a provider before evaluation starts. Each function uses the appropriate STT or TTS language dictionaries. If invalid, the run stops with an error listing all supported languages for that provider.
 - **TTS audio saving patterns:** All TTS synthesize functions accept `audio_path` and save audio:
   - Streaming providers (OpenAI, Cartesia) write chunks directly to file as they arrive
   - Streaming providers (Google, Sarvam, Smallest) collect chunks then save combined audio (Google uses PCM encoding)

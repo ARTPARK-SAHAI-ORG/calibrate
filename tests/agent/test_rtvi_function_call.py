@@ -6,7 +6,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 
 def _make_responder(tool_calls=None, ctx=None, webhooks=None):
-    from calibrate.agent.run_simulation import RTVIFunctionCallResponder
+    from calibrate_agent.agent.run_simulation import RTVIFunctionCallResponder
 
     if ctx is None:
         ctx = MagicMock()
@@ -48,7 +48,7 @@ class TestRTVIFunctionCallResponder(unittest.IsolatedAsyncioTestCase):
         await post_cb()  # Should not crash even without callback set
 
     async def test_execute_webhook(self):
-        from calibrate.agent import run_simulation as RS
+        from calibrate_agent.agent import run_simulation as RS
 
         responder = _make_responder(webhooks={
             "fn1": {"url": "http://x", "method": "GET", "headers": []}
@@ -76,7 +76,7 @@ class TestRTVIFunctionCallResponder(unittest.IsolatedAsyncioTestCase):
         sender.assert_called_once()
 
     async def test_process_frame_function_call(self):
-        from calibrate.agent.run_simulation import RTVIFunctionCallResponder
+        from calibrate_agent.agent.run_simulation import RTVIFunctionCallResponder
         from pipecat.frames.frames import InputTransportMessageFrame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -102,7 +102,7 @@ class TestRTVIFunctionCallResponder(unittest.IsolatedAsyncioTestCase):
         sender.assert_called_once()
 
     async def test_process_frame_other(self):
-        from calibrate.agent.run_simulation import RTVIFunctionCallResponder
+        from calibrate_agent.agent.run_simulation import RTVIFunctionCallResponder
         from pipecat.frames.frames import InputTransportMessageFrame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 

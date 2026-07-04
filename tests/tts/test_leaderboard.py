@@ -1,5 +1,5 @@
 """
-Tests for calibrate/tts/leaderboard.py.
+Tests for calibrate_agent/tts/leaderboard.py.
 
 Run with:
     python -m unittest tests.tts.test_leaderboard -v
@@ -13,7 +13,7 @@ from pathlib import Path
 import pandas as pd
 import openpyxl  # noqa: F401
 
-from calibrate.tts.leaderboard import generate_leaderboard as generate_tts_leaderboard
+from calibrate_agent.tts.leaderboard import generate_leaderboard as generate_tts_leaderboard
 
 
 def _write_provider(

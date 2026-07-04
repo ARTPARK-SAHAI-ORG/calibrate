@@ -1,4 +1,4 @@
-"""Tests for calibrate/utils.py — language helpers, schema builders, webhook calls, factories."""
+"""Tests for calibrate_agent/utils.py — language helpers, schema builders, webhook calls, factories."""
 
 import asyncio
 import io
@@ -14,7 +14,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestLanguageCodes(unittest.TestCase):
     def test_get_stt_language_codes_per_provider(self):
-        from calibrate.utils import get_stt_language_code
+        from calibrate_agent.utils import get_stt_language_code
 
         # Sample a few providers + languages
         self.assertEqual(get_stt_language_code("hindi", "sarvam"), "hi-IN")
@@ -35,7 +35,7 @@ class TestLanguageCodes(unittest.TestCase):
         self.assertEqual(get_stt_language_code("english", "unknown"), "en")
 
     def test_get_tts_language_codes_per_provider(self):
-        from calibrate.utils import get_tts_language_code
+        from calibrate_agent.utils import get_tts_language_code
 
         self.assertEqual(get_tts_language_code("hindi", "sarvam"), "hi-IN")
         self.assertEqual(get_tts_language_code("english", "google"), "en-US")
@@ -47,46 +47,46 @@ class TestLanguageCodes(unittest.TestCase):
         self.assertEqual(get_tts_language_code("english", "unknown"), "en")
 
     def test_legacy_get_language_code(self):
-        from calibrate.utils import get_language_code
+        from calibrate_agent.utils import get_language_code
 
         self.assertEqual(get_language_code("hindi", "sarvam"), "hi-IN")
 
     def test_validate_stt_language_unknown_provider(self):
-        from calibrate.utils import validate_stt_language
+        from calibrate_agent.utils import validate_stt_language
 
         with self.assertRaises(ValueError):
             validate_stt_language("english", "bogus_provider")
 
     def test_validate_stt_language_unsupported(self):
-        from calibrate.utils import validate_stt_language
+        from calibrate_agent.utils import validate_stt_language
 
         with self.assertRaises(ValueError):
             validate_stt_language("klingon", "google")
 
     def test_validate_stt_language_supported(self):
-        from calibrate.utils import validate_stt_language
+        from calibrate_agent.utils import validate_stt_language
 
         validate_stt_language("english", "google")
 
     def test_validate_tts_language_unknown_provider(self):
-        from calibrate.utils import validate_tts_language
+        from calibrate_agent.utils import validate_tts_language
 
         with self.assertRaises(ValueError):
             validate_tts_language("english", "bogus_provider")
 
     def test_validate_tts_language_unsupported(self):
-        from calibrate.utils import validate_tts_language
+        from calibrate_agent.utils import validate_tts_language
 
         with self.assertRaises(ValueError):
             validate_tts_language("klingon", "google")
 
     def test_validate_tts_language_supported(self):
-        from calibrate.utils import validate_tts_language
+        from calibrate_agent.utils import validate_tts_language
 
         validate_tts_language("english", "google")
 
     def test_sarvam_maithili_stt_only(self):
-        from calibrate.utils import (
+        from calibrate_agent.utils import (
             get_stt_language_code,
             get_tts_language_code,
             validate_stt_language,
@@ -105,37 +105,37 @@ class TestLanguageCodes(unittest.TestCase):
 
 class TestGetSTTLanguageEnum(unittest.TestCase):
     def test_sarvam_kannada(self):
-        from calibrate.utils import get_stt_language
+        from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_stt_language("kannada", "sarvam"), Language.KN_IN)
 
     def test_sarvam_hindi(self):
-        from calibrate.utils import get_stt_language
+        from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_stt_language("hindi", "sarvam"), Language.HI_IN)
 
     def test_sarvam_english(self):
-        from calibrate.utils import get_stt_language
+        from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_stt_language("english", "sarvam"), Language.EN_IN)
 
     def test_default_kannada(self):
-        from calibrate.utils import get_stt_language
+        from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_stt_language("kannada", "deepgram"), Language.KN)
 
     def test_default_hindi(self):
-        from calibrate.utils import get_stt_language
+        from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_stt_language("hindi", "deepgram"), Language.HI)
 
     def test_default_english(self):
-        from calibrate.utils import get_stt_language
+        from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_stt_language("english", "deepgram"), Language.EN)
@@ -143,37 +143,37 @@ class TestGetSTTLanguageEnum(unittest.TestCase):
 
 class TestGetTTSLanguageEnum(unittest.TestCase):
     def test_sarvam_kannada(self):
-        from calibrate.utils import get_tts_language
+        from calibrate_agent.utils import get_tts_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_tts_language("kannada", "sarvam"), Language.KN_IN)
 
     def test_sarvam_hindi(self):
-        from calibrate.utils import get_tts_language
+        from calibrate_agent.utils import get_tts_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_tts_language("hindi", "sarvam"), Language.HI_IN)
 
     def test_sarvam_english(self):
-        from calibrate.utils import get_tts_language
+        from calibrate_agent.utils import get_tts_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_tts_language("english", "sarvam"), Language.EN_IN)
 
     def test_default_kannada(self):
-        from calibrate.utils import get_tts_language
+        from calibrate_agent.utils import get_tts_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_tts_language("kannada", "cartesia"), Language.KN)
 
     def test_default_hindi(self):
-        from calibrate.utils import get_tts_language
+        from calibrate_agent.utils import get_tts_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_tts_language("hindi", "cartesia"), Language.HI)
 
     def test_default_english(self):
-        from calibrate.utils import get_tts_language
+        from calibrate_agent.utils import get_tts_language
         from pipecat.transcriptions.language import Language
 
         self.assertEqual(get_tts_language("english", "cartesia"), Language.EN)
@@ -181,7 +181,7 @@ class TestGetTTSLanguageEnum(unittest.TestCase):
 
 class TestLoggerHelpers(unittest.TestCase):
     def test_configure_print_logger(self):
-        from calibrate.utils import configure_print_logger, cleanup_print_logger
+        from calibrate_agent.utils import configure_print_logger, cleanup_print_logger
 
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "test.log"
@@ -191,19 +191,19 @@ class TestLoggerHelpers(unittest.TestCase):
             cleanup_print_logger("test_sim_1")
 
     def test_configure_print_logger_default(self):
-        from calibrate.utils import configure_print_logger
+        from calibrate_agent.utils import configure_print_logger
 
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "test.log"
             configure_print_logger(str(log_path))
 
     def test_cleanup_nonexistent(self):
-        from calibrate.utils import cleanup_print_logger
+        from calibrate_agent.utils import cleanup_print_logger
 
         cleanup_print_logger("nonexistent_simulation")
 
     def test_log_and_print_with_simulation_name(self):
-        from calibrate.utils import (
+        from calibrate_agent.utils import (
             configure_print_logger,
             cleanup_print_logger,
             log_and_print,
@@ -216,14 +216,14 @@ class TestLoggerHelpers(unittest.TestCase):
             cleanup_print_logger("sim_xyz")
 
     def test_log_and_print_no_simulation(self):
-        from calibrate.utils import log_and_print
+        from calibrate_agent.utils import log_and_print
 
         log_and_print("simple message")
 
 
 class TestProviderLog(unittest.TestCase):
     def test_provider_log_with_file(self):
-        from calibrate.utils import provider_log, provider_log_file
+        from calibrate_agent.utils import provider_log, provider_log_file
 
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "log.log"
@@ -236,7 +236,7 @@ class TestProviderLog(unittest.TestCase):
                 provider_log_file.reset(token)
 
     def test_provider_log_no_terminal(self):
-        from calibrate.utils import provider_log, provider_log_file
+        from calibrate_agent.utils import provider_log, provider_log_file
 
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "log.log"
@@ -247,14 +247,14 @@ class TestProviderLog(unittest.TestCase):
                 provider_log_file.reset(token)
 
     def test_provider_log_no_file(self):
-        from calibrate.utils import provider_log
+        from calibrate_agent.utils import provider_log
 
         provider_log("no file set")
 
 
 class TestLogJudgeIO(unittest.TestCase):
     def test_writes_block_to_bound_file_without_terminal(self):
-        from calibrate.utils import log_judge_io, provider_log_file
+        from calibrate_agent.utils import log_judge_io, provider_log_file
 
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "logs"
@@ -283,7 +283,7 @@ class TestLogJudgeIO(unittest.TestCase):
             self.assertEqual(captured.getvalue(), "")
 
     def test_no_op_when_unbound(self):
-        from calibrate.utils import log_judge_io, provider_log_file
+        from calibrate_agent.utils import log_judge_io, provider_log_file
 
         self.assertIsNone(provider_log_file.get())
         # Must not raise when no run log file is bound.
@@ -295,7 +295,7 @@ class TestLogJudgeIO(unittest.TestCase):
     def test_concurrent_writes_are_not_interleaved(self):
         """Each judge entry stays intact when many write to one file at once."""
         import threading
-        from calibrate.utils import log_judge_io, provider_log_file
+        from calibrate_agent.utils import log_judge_io, provider_log_file
 
         with tempfile.TemporaryDirectory() as tmp:
             log_path = Path(tmp) / "logs"
@@ -341,7 +341,7 @@ class TestLogJudgeIO(unittest.TestCase):
 
 class TestStreamTee(unittest.TestCase):
     def test_writes_to_both(self):
-        from calibrate.utils import StreamTee
+        from calibrate_agent.utils import StreamTee
 
         original = io.StringIO()
         log = io.StringIO()
@@ -351,7 +351,7 @@ class TestStreamTee(unittest.TestCase):
         self.assertEqual(log.getvalue(), "hello")
 
     def test_flush(self):
-        from calibrate.utils import StreamTee
+        from calibrate_agent.utils import StreamTee
 
         original = MagicMock()
         log = MagicMock()
@@ -361,7 +361,7 @@ class TestStreamTee(unittest.TestCase):
         log.flush.assert_called_once()
 
     def test_isatty(self):
-        from calibrate.utils import StreamTee
+        from calibrate_agent.utils import StreamTee
 
         original = MagicMock()
         original.isatty.return_value = True
@@ -370,7 +370,7 @@ class TestStreamTee(unittest.TestCase):
         self.assertTrue(tee.isatty())
 
     def test_getattr_proxy(self):
-        from calibrate.utils import StreamTee
+        from calibrate_agent.utils import StreamTee
 
         original = MagicMock()
         original.custom_attr = "X"
@@ -381,7 +381,7 @@ class TestStreamTee(unittest.TestCase):
 
 class TestSaveAudioChunk(unittest.IsolatedAsyncioTestCase):
     async def test_empty_chunk_returns(self):
-        from calibrate.utils import save_audio_chunk
+        from calibrate_agent.utils import save_audio_chunk
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.wav"
@@ -389,7 +389,7 @@ class TestSaveAudioChunk(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(p.exists())
 
     async def test_creates_new_file(self):
-        from calibrate.utils import save_audio_chunk
+        from calibrate_agent.utils import save_audio_chunk
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.wav"
@@ -397,7 +397,7 @@ class TestSaveAudioChunk(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(p.exists())
 
     async def test_appends_to_existing(self):
-        from calibrate.utils import save_audio_chunk
+        from calibrate_agent.utils import save_audio_chunk
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.wav"
@@ -408,7 +408,7 @@ class TestSaveAudioChunk(unittest.IsolatedAsyncioTestCase):
             self.assertGreater(size2, size1)
 
     async def test_corrupt_file_rewrites(self):
-        from calibrate.utils import save_audio_chunk
+        from calibrate_agent.utils import save_audio_chunk
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "a.wav"
@@ -418,13 +418,13 @@ class TestSaveAudioChunk(unittest.IsolatedAsyncioTestCase):
 
 class TestBuildParamProperty(unittest.TestCase):
     def test_simple(self):
-        from calibrate.utils import _build_param_property
+        from calibrate_agent.utils import _build_param_property
 
         prop = _build_param_property({"type": "string", "description": "d"})
         self.assertEqual(prop, {"type": "string", "description": "d"})
 
     def test_with_items_and_enum(self):
-        from calibrate.utils import _build_param_property
+        from calibrate_agent.utils import _build_param_property
 
         prop = _build_param_property({
             "type": "array",
@@ -438,7 +438,7 @@ class TestBuildParamProperty(unittest.TestCase):
 
 class TestBuildToolsSchema(unittest.TestCase):
     def test_structured_tool(self):
-        from calibrate.utils import build_tools_schema
+        from calibrate_agent.utils import build_tools_schema
 
         schemas, webhooks = build_tools_schema([
             {
@@ -456,7 +456,7 @@ class TestBuildToolsSchema(unittest.TestCase):
         self.assertEqual(schemas[0].name, "get_weather")
 
     def test_webhook_tool_full(self):
-        from calibrate.utils import build_tools_schema
+        from calibrate_agent.utils import build_tools_schema
 
         schemas, webhooks = build_tools_schema([
             {
@@ -485,7 +485,7 @@ class TestBuildToolsSchema(unittest.TestCase):
         self.assertEqual(webhooks["post_data"]["method"], "POST")
 
     def test_webhook_missing_url(self):
-        from calibrate.utils import build_tools_schema
+        from calibrate_agent.utils import build_tools_schema
 
         with self.assertRaises(ValueError):
             build_tools_schema([{
@@ -494,7 +494,7 @@ class TestBuildToolsSchema(unittest.TestCase):
             }])
 
     def test_webhook_missing_method(self):
-        from calibrate.utils import build_tools_schema
+        from calibrate_agent.utils import build_tools_schema
 
         with self.assertRaises(ValueError):
             build_tools_schema([{
@@ -505,7 +505,7 @@ class TestBuildToolsSchema(unittest.TestCase):
 
 class TestMakeWebhookCall(unittest.IsolatedAsyncioTestCase):
     async def test_successful_get(self):
-        from calibrate import utils as U
+        from calibrate_agent import utils as U
 
         fake_response = MagicMock()
         fake_response.status = 200
@@ -527,7 +527,7 @@ class TestMakeWebhookCall(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status_code"], 200)
 
     async def test_post_with_body(self):
-        from calibrate import utils as U
+        from calibrate_agent import utils as U
 
         fake_response = MagicMock()
         fake_response.status = 201
@@ -550,7 +550,7 @@ class TestMakeWebhookCall(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["response"], "raw text")
 
     async def test_timeout(self):
-        from calibrate import utils as U
+        from calibrate_agent import utils as U
 
         fake_session = MagicMock()
         fake_session.request = MagicMock(side_effect=asyncio.TimeoutError())
@@ -566,7 +566,7 @@ class TestMakeWebhookCall(unittest.IsolatedAsyncioTestCase):
         self.assertIn("timed out", result["error"])
 
     async def test_client_error(self):
-        from calibrate import utils as U
+        from calibrate_agent import utils as U
         import aiohttp
 
         fake_session = MagicMock()
@@ -584,7 +584,7 @@ class TestMakeWebhookCall(unittest.IsolatedAsyncioTestCase):
 
 class TestCreateSTTService(unittest.TestCase):
     def test_unknown_provider(self):
-        from calibrate.utils import create_stt_service
+        from calibrate_agent.utils import create_stt_service
 
         with self.assertRaises(ValueError):
             create_stt_service("bogus", "english")
@@ -592,7 +592,7 @@ class TestCreateSTTService(unittest.TestCase):
 
 class TestCreateTTSService(unittest.TestCase):
     def test_unknown_provider(self):
-        from calibrate.utils import create_tts_service
+        from calibrate_agent.utils import create_tts_service
 
         with self.assertRaises(ValueError):
             create_tts_service("bogus", "english")
@@ -600,14 +600,14 @@ class TestCreateTTSService(unittest.TestCase):
 
 class TestAddDefaultSource(unittest.TestCase):
     def test_adds_source_when_missing(self):
-        from calibrate.utils import add_default_source
+        from calibrate_agent.utils import add_default_source
 
         record = {"extra": {}}
         add_default_source(record)
         self.assertIn("source", record["extra"])
 
     def test_keeps_existing_source(self):
-        from calibrate.utils import add_default_source
+        from calibrate_agent.utils import add_default_source
 
         record = {"extra": {"source": "FOO"}}
         add_default_source(record)
@@ -616,7 +616,7 @@ class TestAddDefaultSource(unittest.TestCase):
 
 class TestPatchLangfuseTrace(unittest.TestCase):
     def test_patches_and_exercises(self):
-        from calibrate.utils import patch_langfuse_trace
+        from calibrate_agent.utils import patch_langfuse_trace
         from pipecat.utils.tracing import service_decorators
 
         original = service_decorators.add_llm_span_attributes
@@ -635,7 +635,7 @@ class TestPatchLangfuseTrace(unittest.TestCase):
 
 class TestSummarizeMetricDistribution(unittest.TestCase):
     def test_minimal_entry_has_mean_std_values(self):
-        from calibrate.utils import summarize_metric_distribution
+        from calibrate_agent.utils import summarize_metric_distribution
 
         entry = summarize_metric_distribution([1.0, 2.0, 6.0])
         self.assertEqual(
@@ -650,7 +650,7 @@ class TestSummarizeMetricDistribution(unittest.TestCase):
             self.assertIs(type(entry[k]), float)
 
     def test_optional_fields_included_when_supplied(self):
-        from calibrate.utils import summarize_metric_distribution
+        from calibrate_agent.utils import summarize_metric_distribution
 
         entry = summarize_metric_distribution(
             [4, 4, 2],
@@ -664,7 +664,7 @@ class TestSummarizeMetricDistribution(unittest.TestCase):
         self.assertEqual(entry["evaluator_id"], "ev_123")
 
     def test_is_json_serializable(self):
-        from calibrate.utils import summarize_metric_distribution
+        from calibrate_agent.utils import summarize_metric_distribution
 
         entry = summarize_metric_distribution([0, 1, 1], metric_type="binary")
         json.dumps(entry)  # must not raise
@@ -676,7 +676,7 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
         return path
 
     def test_missing_file_returns_empty(self):
-        from calibrate.utils import read_leaderboard_metrics
+        from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             self.assertEqual(
@@ -684,7 +684,7 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
             )
 
     def test_current_format_extracts_mean(self):
-        from calibrate.utils import read_leaderboard_metrics
+        from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             p = self._write(Path(tmp) / "m.json", {
@@ -698,7 +698,7 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
             self.assertEqual(out["wer"], 0.1)
 
     def test_percentile_dict_fans_out(self):
-        from calibrate.utils import read_leaderboard_metrics
+        from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             p = self._write(Path(tmp) / "m.json", {
@@ -713,7 +713,7 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
             self.assertEqual(out["wer"], 0.1)
 
     def test_legacy_metric_name_format(self):
-        from calibrate.utils import read_leaderboard_metrics
+        from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             p = self._write(Path(tmp) / "m.json", {"metric_name": "wer", "mean": 0.2})
@@ -722,33 +722,33 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
 
 class TestApplyDebugLimit(unittest.TestCase):
     def test_truncates_to_debug_count(self):
-        from calibrate.utils import apply_debug_limit
+        from calibrate_agent.utils import apply_debug_limit
 
         items = list(range(10))
         result = apply_debug_limit(items, True, 3)
         self.assertEqual(result, [0, 1, 2])
 
     def test_noop_when_debug_off(self):
-        from calibrate.utils import apply_debug_limit
+        from calibrate_agent.utils import apply_debug_limit
 
         items = list(range(10))
         result = apply_debug_limit(items, False, 3)
         self.assertEqual(result, items)
 
     def test_count_larger_than_list_returns_all(self):
-        from calibrate.utils import apply_debug_limit
+        from calibrate_agent.utils import apply_debug_limit
 
         items = [1, 2]
         result = apply_debug_limit(items, True, 5)
         self.assertEqual(result, [1, 2])
 
     def test_empty_list(self):
-        from calibrate.utils import apply_debug_limit
+        from calibrate_agent.utils import apply_debug_limit
 
         self.assertEqual(apply_debug_limit([], True, 5), [])
 
     def test_prints_banner_only_when_truncating(self):
-        from calibrate.utils import apply_debug_limit
+        from calibrate_agent.utils import apply_debug_limit
 
         with patch("builtins.print") as mock_print:
             apply_debug_limit([1, 2, 3], True, 2)

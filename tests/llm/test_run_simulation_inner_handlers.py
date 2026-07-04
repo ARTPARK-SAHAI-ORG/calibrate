@@ -12,7 +12,7 @@ class TestRunSimulationWithTools(unittest.IsolatedAsyncioTestCase):
 
         Calling the registered functions exercises lines 369-437 in the source.
         """
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         bot_llm_registrations = {}
 

@@ -1,5 +1,5 @@
 """
-Tests for calibrate/stt/eval.py — routers, validators, and result writers.
+Tests for calibrate_agent/stt/eval.py — routers, validators, and result writers.
 
 Run with:
     python -m unittest tests.stt.test_eval -v
@@ -26,7 +26,7 @@ class TestSTTValidateInputDir(unittest.TestCase):
             (base / "audios" / f"{i}.wav").write_bytes(b"RIFF0000WAVE")
 
     def test_valid_layout(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -36,14 +36,14 @@ class TestSTTValidateInputDir(unittest.TestCase):
             self.assertEqual(err, "")
 
     def test_missing_directory(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         ok, err = validate_stt_input_dir("/nonexistent/path/xyz", "stt.csv")
         self.assertFalse(ok)
         self.assertIn("does not exist", err)
 
     def test_missing_csv(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -53,7 +53,7 @@ class TestSTTValidateInputDir(unittest.TestCase):
             self.assertIn("CSV file not found", err)
 
     def test_missing_audios_dir(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -65,7 +65,7 @@ class TestSTTValidateInputDir(unittest.TestCase):
             self.assertIn("Audios directory not found", err)
 
     def test_missing_required_columns(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -78,7 +78,7 @@ class TestSTTValidateInputDir(unittest.TestCase):
             self.assertIn("missing required column", err)
 
     def test_missing_audio_files(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -95,14 +95,14 @@ class TestSTTValidateInputDir(unittest.TestCase):
 
 class TestSTTValidateExistingResultsCSV(unittest.TestCase):
     def test_nonexistent_is_valid(self):
-        from calibrate.stt.eval import validate_existing_results_csv
+        from calibrate_agent.stt.eval import validate_existing_results_csv
 
         ok, err = validate_existing_results_csv("/nonexistent.csv")
         self.assertTrue(ok)
         self.assertEqual(err, "")
 
     def test_empty_is_valid(self):
-        from calibrate.stt.eval import validate_existing_results_csv
+        from calibrate_agent.stt.eval import validate_existing_results_csv
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame(columns=["id", "gt", "pred"]).to_csv(f.name, index=False)
@@ -114,7 +114,7 @@ class TestSTTValidateExistingResultsCSV(unittest.TestCase):
             os.remove(path)
 
     def test_valid_columns(self):
-        from calibrate.stt.eval import validate_existing_results_csv
+        from calibrate_agent.stt.eval import validate_existing_results_csv
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame(
@@ -128,7 +128,7 @@ class TestSTTValidateExistingResultsCSV(unittest.TestCase):
             os.remove(path)
 
     def test_incompatible_structure(self):
-        from calibrate.stt.eval import validate_existing_results_csv
+        from calibrate_agent.stt.eval import validate_existing_results_csv
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
             pd.DataFrame([{"foo": 1, "bar": 2}]).to_csv(f.name, index=False)
@@ -143,7 +143,7 @@ class TestSTTValidateExistingResultsCSV(unittest.TestCase):
 
 class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
     def test_valid(self):
-        from calibrate.stt.eval import validate_stt_eval_only_dataset
+        from calibrate_agent.stt.eval import validate_stt_eval_only_dataset
 
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump(
@@ -162,14 +162,14 @@ class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
             os.remove(path)
 
     def test_missing_file(self):
-        from calibrate.stt.eval import validate_stt_eval_only_dataset
+        from calibrate_agent.stt.eval import validate_stt_eval_only_dataset
 
         ok, err, rows = validate_stt_eval_only_dataset("/nope.json")
         self.assertFalse(ok)
         self.assertEqual(rows, [])
 
     def test_not_a_list(self):
-        from calibrate.stt.eval import validate_stt_eval_only_dataset
+        from calibrate_agent.stt.eval import validate_stt_eval_only_dataset
 
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump({"id": "1", "gt": "hi", "pred": "hi"}, f)
@@ -182,7 +182,7 @@ class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
             os.remove(path)
 
     def test_missing_fields(self):
-        from calibrate.stt.eval import validate_stt_eval_only_dataset
+        from calibrate_agent.stt.eval import validate_stt_eval_only_dataset
 
         with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
             json.dump([{"id": "1", "gt": "hi"}], f)
@@ -197,7 +197,7 @@ class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
 
 class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_provider_raises(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         # The router is wrapped in @backoff(max_tries=3), so ValueError
         # would be retried — call ``__wrapped__`` to skip the decorators
@@ -212,7 +212,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_known_provider_routed(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         fake = AsyncMock(return_value={"transcript": "  hello  "})
         with patch.dict(
@@ -255,7 +255,7 @@ def _fake_intent_entity(intent=1, entity=1.0):
 
 class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_writes_metrics_and_results(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
             return {
@@ -311,7 +311,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(df), 2)
 
     async def test_intent_entity_present_with_custom_evaluators_when_enabled(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         custom = [
             {
@@ -356,7 +356,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(df.iloc[0]["sarvam_entity_score"], 0.25)
 
     async def test_intent_entity_skipped_by_default(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
             return {
@@ -394,7 +394,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             self.assertIn("semantic_match", metrics)
 
     async def test_rating_evaluator_writes_numeric_score(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         rating = {
             "name": "accuracy",
@@ -442,7 +442,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
 
 class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_runs_evaluator_on_dataset(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
             return {
@@ -481,7 +481,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
             self.assertTrue((out / "results.csv").exists())
 
     async def test_invalid_dataset_returns_error(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         result = await stt_eval.run_eval_only(
             dataset_path="/nonexistent.json",
@@ -543,7 +543,7 @@ def _patch_sarvam(stt_eval, ws):
 
 class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
     async def test_returns_transcript_on_data_message(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         message = SimpleNamespace(
             type="data",
@@ -566,7 +566,7 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["ttft"], 0.42)
 
     async def test_timeout_yields_empty_transcript(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         ws = _FakeSarvamWS(hang=True)
         patches = _patch_sarvam(stt_eval, ws)
@@ -583,7 +583,7 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(result["ttft"])
 
     async def test_error_message_raises(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         message = SimpleNamespace(
             type="error", data=SimpleNamespace(error="boom")
@@ -602,7 +602,7 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
 
 class TestTranscribeOpenAIStreaming(unittest.IsolatedAsyncioTestCase):
     async def test_passes_language_code_to_api(self):
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         done_event = SimpleNamespace(type="transcript.text.done", text="hello world")
 

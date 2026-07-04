@@ -1,6 +1,6 @@
 """
 Integration tests for run_simulation_with_agent, run_single_simulation_task, and main()
-in calibrate.llm.run_simulation.
+in calibrate_agent.llm.run_simulation.
 
 Requires: pytest-httpserver
     pip install pytest-httpserver
@@ -8,7 +8,7 @@ Requires: pytest-httpserver
 Strategy:
   - pytest-httpserver for the external agent HTTP endpoint
   - unittest.mock.patch for openai.AsyncOpenAI (the user simulator)
-  - unittest.mock.patch for calibrate.llm.run_simulation.evaluate_simuation
+  - unittest.mock.patch for calibrate_agent.llm.run_simulation.evaluate_simuation
   - tmp_path fixture for output dirs
   - asyncio.run() to call async functions directly
 """
@@ -109,15 +109,15 @@ class TestRunSimulationWithAgent:
     """6 tests for run_simulation_with_agent."""
 
     def _run(self, agent_url, max_turns=2, agent_speaks_first=True, user_content="I need help"):
-        from calibrate.llm.run_simulation import run_simulation_with_agent
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.llm.run_simulation import run_simulation_with_agent
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url=agent_url)
         MockAsyncOpenAI = _make_mock_openai_client(user_content)
 
         async def _inner():
             with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate.llm.run_simulation.evaluate_simuation",
+                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                        AsyncMock(return_value=FAKE_EVAL_RESULT)):
                 return await run_simulation_with_agent(
                     agent=agent,
@@ -183,8 +183,8 @@ class TestRunSimulationWithAgent:
 
     def test_evaluate_called_with_transcript_and_evaluators(self, agent_server):
         """evaluate_simuation mock called once with the transcript and evaluators list."""
-        from calibrate.llm.run_simulation import run_simulation_with_agent
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.llm.run_simulation import run_simulation_with_agent
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url=agent_server.url_for("/chat"))
         MockAsyncOpenAI = _make_mock_openai_client()
@@ -193,7 +193,7 @@ class TestRunSimulationWithAgent:
 
         async def _inner():
             with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate.llm.run_simulation.evaluate_simuation", eval_mock):
+                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation", eval_mock):
                 return await run_simulation_with_agent(
                     agent=agent,
                     user_system_prompt="You are a friendly user.",
@@ -237,8 +237,8 @@ class TestRunSingleSimulationTask:
     """5 tests for run_single_simulation_task."""
 
     def _run_task(self, agent_url, tmp_path, persona_index=0, scenario_index=0, max_turns=2):
-        from calibrate.llm.run_simulation import run_single_simulation_task
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.llm.run_simulation import run_single_simulation_task
+        from calibrate_agent.connections import TextAgentConnection
 
         config = _make_config(agent_url, max_turns=max_turns)
         agent = TextAgentConnection(url=agent_url)
@@ -250,7 +250,7 @@ class TestRunSingleSimulationTask:
 
         async def _inner():
             with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate.llm.run_simulation.evaluate_simuation",
+                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                        AsyncMock(return_value=FAKE_EVAL_RESULT)):
                 return await run_single_simulation_task(
                     semaphore=semaphore,
@@ -308,8 +308,8 @@ class TestRunSingleSimulationTask:
 
     def test_exception_propagates(self, agent_server_500, tmp_path):
         """If agent returns 500, the task raises an exception."""
-        from calibrate.llm.run_simulation import run_single_simulation_task
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.llm.run_simulation import run_single_simulation_task
+        from calibrate_agent.connections import TextAgentConnection
 
         config = _make_config(agent_server_500.url_for("/chat"), max_turns=2)
         agent = TextAgentConnection(url=agent_server_500.url_for("/chat"))
@@ -321,7 +321,7 @@ class TestRunSingleSimulationTask:
 
         async def _inner():
             with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate.llm.run_simulation.evaluate_simuation",
+                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                        AsyncMock(return_value=FAKE_EVAL_RESULT)):
                 return await run_single_simulation_task(
                     semaphore=semaphore,
@@ -349,7 +349,7 @@ class TestSimulationMain:
 
     def _run_main(self, agent_url, tmp_path, num_personas=1, num_scenarios=1):
         """Call sim_main() with sys.argv patched, mocking openai and evaluate_simuation."""
-        from calibrate.llm.run_simulation import main as sim_main
+        from calibrate_agent.llm.run_simulation import main as sim_main
 
         config = _make_config(
             agent_url,
@@ -364,9 +364,9 @@ class TestSimulationMain:
 
         MockAsyncOpenAI = _make_mock_openai_client()
 
-        with patch("sys.argv", ["calibrate", "-c", str(config_path), "-o", str(output_dir)]), \
+        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
              patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-             patch("calibrate.llm.run_simulation.evaluate_simuation",
+             patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                    AsyncMock(return_value=FAKE_EVAL_RESULT)):
             asyncio.run(sim_main())
 
@@ -412,7 +412,7 @@ class TestSimulationMain:
 
     def test_exits_0_on_success(self, agent_server, tmp_path):
         """sys.exit is not called (or called with 0) when all tasks succeed."""
-        from calibrate.llm.run_simulation import main as sim_main
+        from calibrate_agent.llm.run_simulation import main as sim_main
 
         config = _make_config(agent_server.url_for("/chat"), max_turns=2)
         config_path = tmp_path / "sim_config.json"
@@ -426,9 +426,9 @@ class TestSimulationMain:
         def mock_exit(code=0):
             exit_calls.append(code)
 
-        with patch("sys.argv", ["calibrate", "-c", str(config_path), "-o", str(output_dir)]), \
+        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
              patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-             patch("calibrate.llm.run_simulation.evaluate_simuation",
+             patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                    AsyncMock(return_value=FAKE_EVAL_RESULT)), \
              patch("sys.exit", mock_exit):
             asyncio.run(sim_main())
@@ -439,7 +439,7 @@ class TestSimulationMain:
 
     def test_exits_1_on_failure(self, agent_server_500, tmp_path):
         """If all tasks fail (agent 500), sys.exit(1) is called."""
-        from calibrate.llm.run_simulation import main as sim_main
+        from calibrate_agent.llm.run_simulation import main as sim_main
 
         config = _make_config(agent_server_500.url_for("/chat"), max_turns=2)
         config_path = tmp_path / "sim_config.json"
@@ -453,9 +453,9 @@ class TestSimulationMain:
         def mock_exit(code=0):
             exit_calls.append(code)
 
-        with patch("sys.argv", ["calibrate", "-c", str(config_path), "-o", str(output_dir)]), \
+        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
              patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-             patch("calibrate.llm.run_simulation.evaluate_simuation",
+             patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
                    AsyncMock(return_value=FAKE_EVAL_RESULT)), \
              patch("sys.exit", mock_exit):
             asyncio.run(sim_main())
@@ -475,7 +475,7 @@ class TestAgentConnectionDetection:
 
     def _run_main_capturing_agent(self, config_dict, tmp_path):
         """Run main() and capture the agent argument passed to run_single_simulation_task."""
-        from calibrate.llm.run_simulation import main as sim_main
+        from calibrate_agent.llm.run_simulation import main as sim_main
 
         config_path = tmp_path / "config.json"
         output_dir = tmp_path / "out"
@@ -493,8 +493,8 @@ class TestAgentConnectionDetection:
                 [{"name": "helpfulness", "value": 1, "reasoning": "ok"}],
             )
 
-        with patch("sys.argv", ["calibrate", "-c", str(config_path), "-o", str(output_dir)]), \
-             patch("calibrate.llm.run_simulation.run_single_simulation_task", side_effect=mock_task):
+        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
+             patch("calibrate_agent.llm.run_simulation.run_single_simulation_task", side_effect=mock_task):
             asyncio.run(sim_main())
 
         return captured_agents
@@ -516,7 +516,7 @@ class TestAgentConnectionDetection:
 
     def test_config_with_agent_url_passes_agent_connection(self, tmp_path, httpserver: HTTPServer):
         """Config with agent_url means a TextAgentConnection is passed to each task."""
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         httpserver.expect_request("/chat", method="POST").respond_with_json(FAKE_AGENT_RESPONSE)
         config = {

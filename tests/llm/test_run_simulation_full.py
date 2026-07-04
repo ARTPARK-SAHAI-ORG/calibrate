@@ -10,7 +10,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
     async def test_basic_flow_openai(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         # Mock pipecat services and runners
         fake_bot_llm = MagicMock()
@@ -55,7 +55,7 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         self.assertIn("evaluation_results", result)
 
     async def test_with_openrouter_provider(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()
@@ -87,7 +87,7 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_pipeline_error_re_raised(self):
-        from calibrate.llm import run_simulation as RS
+        from calibrate_agent.llm import run_simulation as RS
 
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()

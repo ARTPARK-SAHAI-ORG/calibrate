@@ -1,4 +1,4 @@
-"""Tests for calibrate/agent/test.py — CLI args, parse_bot_config, bot() entry."""
+"""Tests for calibrate_agent/agent/test.py — CLI args, parse_bot_config, bot() entry."""
 
 import argparse
 import asyncio
@@ -12,21 +12,21 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestStoreAndGetCliArgs(unittest.TestCase):
     def test_store_and_get(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         T._store_cli_args(argparse.Namespace(config="/tmp/cfg.json", output_dir="/tmp/out"))
         self.assertEqual(T.get_cli_arg("config"), "/tmp/cfg.json")
         self.assertEqual(T.get_cli_arg("output_dir"), "/tmp/out")
 
     def test_get_default(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         T._store_cli_args(argparse.Namespace())
         self.assertIsNone(T.get_cli_arg("missing"))
         self.assertEqual(T.get_cli_arg("missing", "fallback"), "fallback")
 
     def test_filters_none(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         T._store_cli_args(argparse.Namespace(a="set", b=None))
         self.assertEqual(T.get_cli_arg("a"), "set")
@@ -35,7 +35,7 @@ class TestStoreAndGetCliArgs(unittest.TestCase):
 
 class TestParseBotConfig(unittest.TestCase):
     def test_minimal_config(self):
-        from calibrate.agent.test import parse_bot_config
+        from calibrate_agent.agent.test import parse_bot_config
 
         cfg = parse_bot_config({"system_prompt": "be helpful"})
         self.assertEqual(cfg.system_prompt, "be helpful")
@@ -46,7 +46,7 @@ class TestParseBotConfig(unittest.TestCase):
         self.assertEqual(cfg.llm.provider, "openrouter")
 
     def test_full_config(self):
-        from calibrate.agent.test import parse_bot_config
+        from calibrate_agent.agent.test import parse_bot_config
 
         cfg = parse_bot_config({
             "system_prompt": "sp",
@@ -63,7 +63,7 @@ class TestParseBotConfig(unittest.TestCase):
         self.assertEqual(cfg.llm.provider, "openai")
 
     def test_missing_system_prompt_raises(self):
-        from calibrate.agent.test import parse_bot_config
+        from calibrate_agent.agent.test import parse_bot_config
 
         with self.assertRaises(ValueError):
             parse_bot_config({})
@@ -71,14 +71,14 @@ class TestParseBotConfig(unittest.TestCase):
 
 class TestBotEntryPoint(unittest.IsolatedAsyncioTestCase):
     async def test_bot_missing_config_raises(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         T._store_cli_args(argparse.Namespace())
         with self.assertRaises(RuntimeError):
             await T.bot(MagicMock())
 
     async def test_bot_runs(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = Path(tmp) / "cfg.json"
@@ -101,7 +101,7 @@ class TestBotEntryPoint(unittest.IsolatedAsyncioTestCase):
                 await T.bot(runner_args)
 
     async def test_bot_pre_existing_logs(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = Path(tmp) / "cfg.json"

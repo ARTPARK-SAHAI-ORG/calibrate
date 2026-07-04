@@ -1,5 +1,5 @@
 """
-Tests for calibrate/tts/metrics.py — multi-evaluator judge aggregation.
+Tests for calibrate_agent/tts/metrics.py — multi-evaluator judge aggregation.
 
 Run with:
     python -m unittest tests.tts.test_metrics -v
@@ -11,7 +11,7 @@ from unittest.mock import patch, AsyncMock
 
 class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
     async def test_default_evaluator_single_judge(self):
-        from calibrate.tts import metrics as tts_metrics
+        from calibrate_agent.tts import metrics as tts_metrics
 
         # Patch tts_llm_judge directly (has @backoff + @observe decorators)
         mock_tts_judge = AsyncMock(
@@ -32,7 +32,7 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["score"], 0.5)
 
     async def test_multi_evaluators_per_row_and_aggregate(self):
-        from calibrate.tts import metrics as tts_metrics
+        from calibrate_agent.tts import metrics as tts_metrics
 
         custom_evaluators = [
             {
@@ -73,7 +73,7 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(result["score"], 0.75)
 
     async def test_rating_evaluator_aggregates_mean_score(self):
-        from calibrate.tts import metrics as tts_metrics
+        from calibrate_agent.tts import metrics as tts_metrics
 
         rating = {
             "name": "naturalness",
@@ -104,7 +104,7 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["scores"]["naturalness"]["scale_max"], 5)
 
     async def test_custom_evaluators_passed_through(self):
-        from calibrate.tts import metrics as tts_metrics
+        from calibrate_agent.tts import metrics as tts_metrics
 
         custom_evaluators = [
             {"name": "x", "system_prompt": "y", "judge_model": "openai/gpt-4o-audio-preview"}

@@ -1,4 +1,4 @@
-"""Tests for calibrate/agent/bot.py — MetricsLogger and config models."""
+"""Tests for calibrate_agent/agent/bot.py — MetricsLogger and config models."""
 
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
@@ -6,13 +6,13 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestSTTConfig(unittest.TestCase):
     def test_default(self):
-        from calibrate.agent.bot import STTConfig
+        from calibrate_agent.agent.bot import STTConfig
 
         cfg = STTConfig()
         self.assertEqual(cfg.provider, "deepgram")
 
     def test_custom_provider(self):
-        from calibrate.agent.bot import STTConfig
+        from calibrate_agent.agent.bot import STTConfig
 
         cfg = STTConfig(provider="google")
         self.assertEqual(cfg.provider, "google")
@@ -20,14 +20,14 @@ class TestSTTConfig(unittest.TestCase):
 
 class TestTTSConfig(unittest.TestCase):
     def test_default(self):
-        from calibrate.agent.bot import TTSConfig
+        from calibrate_agent.agent.bot import TTSConfig
 
         cfg = TTSConfig()
         self.assertEqual(cfg.provider, "google")
         self.assertIsNone(cfg.instructions)
 
     def test_with_instructions(self):
-        from calibrate.agent.bot import TTSConfig
+        from calibrate_agent.agent.bot import TTSConfig
 
         cfg = TTSConfig(provider="openai", instructions="be polite")
         self.assertEqual(cfg.instructions, "be polite")
@@ -35,14 +35,14 @@ class TestTTSConfig(unittest.TestCase):
 
 class TestLLMConfig(unittest.TestCase):
     def test_default(self):
-        from calibrate.agent.bot import DEFAULT_TEST_AGENT_LLM_MODEL, LLMConfig
+        from calibrate_agent.agent.bot import DEFAULT_TEST_AGENT_LLM_MODEL, LLMConfig
 
         cfg = LLMConfig()
         self.assertEqual(cfg.provider, "openrouter")
         self.assertEqual(cfg.model, DEFAULT_TEST_AGENT_LLM_MODEL)
 
     def test_custom(self):
-        from calibrate.agent.bot import LLMConfig
+        from calibrate_agent.agent.bot import LLMConfig
 
         cfg = LLMConfig(provider="openai", model="gpt-4")
         self.assertEqual(cfg.provider, "openai")
@@ -50,7 +50,7 @@ class TestLLMConfig(unittest.TestCase):
 
 class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
     async def test_metrics_frame_with_data(self):
-        from calibrate.agent.bot import MetricsLogger
+        from calibrate_agent.agent.bot import MetricsLogger
         from pipecat.frames.frames import MetricsFrame
         from pipecat.metrics.metrics import (
             TTFBMetricsData, ProcessingMetricsData,
@@ -77,7 +77,7 @@ class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
             await ml.process_frame(frame, FrameDirection.DOWNSTREAM)
 
     async def test_non_metrics_frame(self):
-        from calibrate.agent.bot import MetricsLogger
+        from calibrate_agent.agent.bot import MetricsLogger
         from pipecat.frames.frames import Frame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 

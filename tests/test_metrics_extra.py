@@ -6,7 +6,7 @@ from unittest.mock import patch, AsyncMock
 
 class TestSTTLlmJudge(unittest.IsolatedAsyncioTestCase):
     async def test_stt_llm_judge_default_evaluator_no_langfuse(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         with patch.object(M, "text_judge", AsyncMock(return_value={"semantic_match": {"reasoning": "r", "match": True}})), \
              patch.object(M, "langfuse_enabled", False):
@@ -16,7 +16,7 @@ class TestSTTLlmJudge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["semantic_match"]["match"], True)
 
     async def test_stt_llm_judge_with_langfuse(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
         fake_lf = unittest.mock.MagicMock()
 
         with patch.object(M, "text_judge", AsyncMock(return_value={"semantic_match": {"reasoning": "r", "match": True}})), \
@@ -29,7 +29,7 @@ class TestSTTLlmJudge(unittest.IsolatedAsyncioTestCase):
 
 class TestTTSLlmJudge(unittest.IsolatedAsyncioTestCase):
     async def test_tts_llm_judge_default_evaluator(self):
-        from calibrate.tts import metrics as M
+        from calibrate_agent.tts import metrics as M
 
         with patch.object(M, "audio_judge", AsyncMock(return_value={"pronunciation": {"reasoning": "r", "match": True}})):
             inner = M.tts_llm_judge.__wrapped__ if hasattr(M.tts_llm_judge, "__wrapped__") else M.tts_llm_judge
@@ -39,7 +39,7 @@ class TestTTSLlmJudge(unittest.IsolatedAsyncioTestCase):
 
 class TestLlmMetrics(unittest.IsolatedAsyncioTestCase):
     async def test_test_response_llm_judge(self):
-        from calibrate.llm import metrics as M
+        from calibrate_agent.llm import metrics as M
 
         with patch.object(M, "text_judge", AsyncMock(return_value={"correctness": {"reasoning": "r", "match": True}})) as mock_tj:
             result = await M.test_response_llm_judge(
@@ -55,7 +55,7 @@ class TestLlmMetrics(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Hi there", user_prompt)
 
     async def test_evaluate_simulation_delegates(self):
-        from calibrate.llm import metrics as M
+        from calibrate_agent.llm import metrics as M
 
         with patch.object(M, "simulation_judge", AsyncMock(return_value={"x": {"match": True}})) as mock_sj:
             result = await M.evaluate_simuation(

@@ -1,5 +1,5 @@
 """
-Tests for calibrate/llm/tests_leaderboard.py.
+Tests for calibrate_agent/llm/tests_leaderboard.py.
 
 Covers:
 - Multi-model leaderboard with per-criterion columns
@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from calibrate.llm.tests_leaderboard import generate_leaderboard
+from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
 
 
 def _write_model(base: Path, model_name: str, metrics: dict) -> None:
@@ -29,13 +29,13 @@ def _write_model(base: Path, model_name: str, metrics: dict) -> None:
 
 class TestNumericOrNone(unittest.TestCase):
     def test_numbers_pass_through(self):
-        from calibrate.llm._metrics_utils import _numeric_or_none
+        from calibrate_agent.llm._metrics_utils import _numeric_or_none
 
         self.assertEqual(_numeric_or_none(0.0), 0.0)
         self.assertEqual(_numeric_or_none(3), 3)
 
     def test_non_numbers_and_bools_become_none(self):
-        from calibrate.llm._metrics_utils import _numeric_or_none
+        from calibrate_agent.llm._metrics_utils import _numeric_or_none
 
         self.assertIsNone(_numeric_or_none(None))
         self.assertIsNone(_numeric_or_none("0.02"))

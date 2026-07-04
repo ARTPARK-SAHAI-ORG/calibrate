@@ -48,7 +48,7 @@ def _patch_httpx(response_body: dict, status: int = 200):
 class TestCallTextAgentModelParams(unittest.IsolatedAsyncioTestCase):
 
     async def test_model_included_in_body(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "ok"})
@@ -64,7 +64,7 @@ class TestCallTextAgentModelParams(unittest.IsolatedAsyncioTestCase):
         self.assertIn("messages", body)
 
     async def test_model_absent_when_not_passed(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "ok"})
@@ -78,7 +78,7 @@ class TestCallTextAgentModelParams(unittest.IsolatedAsyncioTestCase):
 
     async def test_model_included_openrouter_format(self):
         """OpenRouter format model string passed as-is (no splitting)."""
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "ok"})
@@ -100,8 +100,8 @@ class TestCallTextAgentModelParams(unittest.IsolatedAsyncioTestCase):
 class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
 
     async def test_model_passed_to_agent_call(self):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm.run_tests import run_test_external
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm.run_tests import run_test_external
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "Sure, the weather is sunny."})
@@ -111,7 +111,7 @@ class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
             return_value={"correctness": {"match": True, "reasoning": "ok"}}
         )
 
-        with ctx, patch("calibrate.llm.run_tests.test_response_llm_judge", mock_judge):
+        with ctx, patch("calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge):
             await run_test_external(
                 chat_history=[{"role": "user", "content": "What's the weather?"}],
                 evaluation=evaluation,
@@ -124,8 +124,8 @@ class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("provider", body)
 
     async def test_no_model_param_when_not_passed(self):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm.run_tests import run_test_external
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm.run_tests import run_test_external
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "hello"})
@@ -133,7 +133,7 @@ class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
             return_value={"correctness": {"match": True, "reasoning": "ok"}}
         )
 
-        with ctx, patch("calibrate.llm.run_tests.test_response_llm_judge", mock_judge):
+        with ctx, patch("calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge):
             await run_test_external(
                 chat_history=[{"role": "user", "content": "Hi"}],
                 evaluation={"type": "response", "criteria": "greet"},
@@ -152,7 +152,7 @@ class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
 class TestVerifyWithModelParams(unittest.IsolatedAsyncioTestCase):
 
     async def test_verify_includes_model(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "hi"})
@@ -165,7 +165,7 @@ class TestVerifyWithModelParams(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("provider", body)
 
     async def test_verify_without_model_has_only_messages(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "hi"})
@@ -180,7 +180,7 @@ class TestVerifyWithModelParams(unittest.IsolatedAsyncioTestCase):
 
     async def test_verify_passes_even_when_agent_ignores_model(self):
         """Agent that returns valid format regardless of model param should pass."""
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "I am using gemma", "tool_calls": []})
@@ -191,7 +191,7 @@ class TestVerifyWithModelParams(unittest.IsolatedAsyncioTestCase):
 
     async def test_verify_openrouter_format_model_passed_as_is(self):
         """OpenRouter format model string is passed as-is, no provider split."""
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx({"response": "hi"})
@@ -214,8 +214,8 @@ class TestFolderNaming(unittest.IsolatedAsyncioTestCase):
         """Run _run_single_model and capture the output dir it creates."""
         import os
         import tempfile
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm import _Tests
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm import _Tests
 
         fake_agent = TextAgentConnection(url="http://fake-agent/chat") if agent else None
         fake_body = {"response": "hello", "tool_calls": []}
@@ -231,7 +231,7 @@ class TestFolderNaming(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ctx, _ = _patch_httpx(fake_body)
-            with ctx, patch("calibrate.llm.run_tests.test_response_llm_judge", mock_judge):
+            with ctx, patch("calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge):
                 await _Tests._run_single_model(
                     system_prompt="",
                     tools=[],
@@ -266,8 +266,8 @@ class TestFolderNaming(unittest.IsolatedAsyncioTestCase):
         """Single agent run with no model saves directly to output_dir — no subfolders created."""
         import os
         import tempfile
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm import tests as _tests
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm import tests as _tests
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         test_cases = [
@@ -282,7 +282,7 @@ class TestFolderNaming(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ctx, _ = _patch_httpx({"response": "hello"})
-            with ctx, patch("calibrate.llm.run_tests.test_response_llm_judge", mock_judge):
+            with ctx, patch("calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge):
                 await _tests.run(
                     agent=agent,
                     test_cases=test_cases,
@@ -306,7 +306,7 @@ class TestBenchmarkDebugFlag(unittest.IsolatedAsyncioTestCase):
         import os
         import sys
         import tempfile
-        from calibrate.llm import benchmark
+        from calibrate_agent.llm import benchmark
 
         config = {
             "system_prompt": "p",
@@ -333,11 +333,11 @@ class TestBenchmarkDebugFlag(unittest.IsolatedAsyncioTestCase):
             with open(cfg_path, "w") as f:
                 json.dump(config, f)
 
-            argv = ["calibrate", "-c", cfg_path, "-m", "gpt-4.1", "-o", tmpdir]
+            argv = ["calibrate_agent", "-c", cfg_path, "-m", "gpt-4.1", "-o", tmpdir]
             argv.extend(argv_extra)
             with patch.object(sys, "argv", argv), \
-                 patch("calibrate.llm.benchmark.run", side_effect=fake_run), \
-                 patch("calibrate.llm.benchmark.print_benchmark_summary", return_value=False):
+                 patch("calibrate_agent.llm.benchmark.run", side_effect=fake_run), \
+                 patch("calibrate_agent.llm.benchmark.print_benchmark_summary", return_value=False):
                 await benchmark.main()
         self._captured = captured
         return captured["config"]

@@ -20,10 +20,10 @@ from unittest.mock import patch
 class TestSDKSimulationMetricsCarryType(unittest.IsolatedAsyncioTestCase):
 
     async def test_rating_criterion_aggregate_gets_type_field(self):
-        """After `calibrate.llm.simulations.run(...)` completes, the saved
+        """After `calibrate_agent.llm.simulations.run(...)` completes, the saved
         metrics.json should include `type: "rating"` for each rating
         criterion so the leaderboard doesn't multiply its mean by 100."""
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
         # Fake `run_single_simulation_task` that returns the shape the SDK expects:
         # (simulation_metrics_row, evaluation_results)
@@ -43,7 +43,7 @@ class TestSDKSimulationMetricsCarryType(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp, \
              patch(
-                 "calibrate.llm.run_simulation.run_single_simulation_task",
+                 "calibrate_agent.llm.run_simulation.run_single_simulation_task",
                  side_effect=fake_task,
              ):
             await simulations.run(
@@ -98,7 +98,7 @@ class TestSimulationLeaderboardOverallUnitConsistent(unittest.TestCase):
         for rating, (mean - scale_min) / (scale_max - scale_min) * 100.
         """
         import pathlib
-        from calibrate.llm.simulation_leaderboard import generate_leaderboard
+        from calibrate_agent.llm.simulation_leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = pathlib.Path(tmp)
@@ -167,7 +167,7 @@ class TestSimulationMetricsPersistScaleBounds(unittest.IsolatedAsyncioTestCase):
         of 4.0 as 400% in the overall column. The SDK simulation writer
         must persist scale_min/scale_max for rating criteria.
         """
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
         async def fake_task(
             semaphore, config, persona_index, user_persona, scenario_index,
@@ -189,7 +189,7 @@ class TestSimulationMetricsPersistScaleBounds(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp, \
              patch(
-                 "calibrate.llm.run_simulation.run_single_simulation_task",
+                 "calibrate_agent.llm.run_simulation.run_single_simulation_task",
                  side_effect=fake_task,
              ):
             await simulations.run(
@@ -226,7 +226,7 @@ class TestSimulationLeaderboardNormalizesWithPersistedBounds(unittest.TestCase):
     def test_overall_uses_persisted_bounds(self):
         import pathlib
         import pandas as pd
-        from calibrate.llm.simulation_leaderboard import generate_leaderboard
+        from calibrate_agent.llm.simulation_leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = pathlib.Path(tmp)

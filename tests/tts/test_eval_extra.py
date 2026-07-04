@@ -16,7 +16,7 @@ import pandas as pd
 
 class TestSaveAudio(unittest.TestCase):
     def test_save_riff(self):
-        from calibrate.tts.eval import save_audio
+        from calibrate_agent.tts.eval import save_audio
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "audio.wav"
@@ -25,7 +25,7 @@ class TestSaveAudio(unittest.TestCase):
             self.assertEqual(p.read_bytes()[:4], b"RIFF")
 
     def test_save_raw_pcm(self):
-        from calibrate.tts.eval import save_audio
+        from calibrate_agent.tts.eval import save_audio
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "audio.wav"
@@ -36,7 +36,7 @@ class TestSaveAudio(unittest.TestCase):
                 self.assertEqual(wf.getframerate(), 16000)
 
     def test_save_creates_parent(self):
-        from calibrate.tts.eval import save_audio
+        from calibrate_agent.tts.eval import save_audio
 
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "nested" / "deep" / "audio.wav"
@@ -46,7 +46,7 @@ class TestSaveAudio(unittest.TestCase):
 
 class TestConvertMp3ToWav(unittest.TestCase):
     def test_convert(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         fake_audio = MagicMock()
         with tempfile.TemporaryDirectory() as tmp:
@@ -60,7 +60,7 @@ class TestConvertMp3ToWav(unittest.TestCase):
             self.assertFalse(mp3.exists())  # Cleanup is default True
 
     def test_convert_no_cleanup(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         fake_audio = MagicMock()
         with tempfile.TemporaryDirectory() as tmp:
@@ -75,49 +75,49 @@ class TestConvertMp3ToWav(unittest.TestCase):
 
 class TestProviderMissingKey(unittest.IsolatedAsyncioTestCase):
     async def test_openai_missing_key(self):
-        from calibrate.tts.eval import synthesize_openai
+        from calibrate_agent.tts.eval import synthesize_openai
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await synthesize_openai("text", "english", "/tmp/x.wav")
 
     async def test_google_missing_credentials(self):
-        from calibrate.tts.eval import synthesize_google
+        from calibrate_agent.tts.eval import synthesize_google
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await synthesize_google("text", "english", "/tmp/x.wav")
 
     async def test_elevenlabs_missing_key(self):
-        from calibrate.tts.eval import synthesize_elevenlabs
+        from calibrate_agent.tts.eval import synthesize_elevenlabs
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await synthesize_elevenlabs("text", "english", "/tmp/x.wav")
 
     async def test_cartesia_missing_key(self):
-        from calibrate.tts.eval import synthesize_cartesia
+        from calibrate_agent.tts.eval import synthesize_cartesia
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await synthesize_cartesia("text", "english", "/tmp/x.wav")
 
     async def test_groq_missing_key(self):
-        from calibrate.tts.eval import synthesize_groq
+        from calibrate_agent.tts.eval import synthesize_groq
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await synthesize_groq("text", "english", "/tmp/x.wav")
 
     async def test_sarvam_missing_key(self):
-        from calibrate.tts.eval import synthesize_sarvam
+        from calibrate_agent.tts.eval import synthesize_sarvam
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await synthesize_sarvam("text", "english", "/tmp/x.wav")
 
     async def test_smallest_missing_key(self):
-        from calibrate.tts.eval import synthesize_smallest
+        from calibrate_agent.tts.eval import synthesize_smallest
 
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
@@ -126,7 +126,7 @@ class TestProviderMissingKey(unittest.IsolatedAsyncioTestCase):
 
 class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_provider_raises(self):
-        from calibrate.tts.eval import synthesize_speech
+        from calibrate_agent.tts.eval import synthesize_speech
 
         inner = synthesize_speech
         while hasattr(inner, "__wrapped__"):
@@ -135,7 +135,7 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
             await inner("text", "bogus", "english", "/tmp/x.wav")
 
     async def test_routes_to_provider(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         fake_fn = AsyncMock(return_value={"ttfb": 0.5})
         inner = E.synthesize_speech
@@ -147,7 +147,7 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["ttfb"], 0.5)
 
     async def test_with_langfuse(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         fake_fn = AsyncMock(return_value={"ttfb": 0.5})
         inner = E.synthesize_speech
@@ -164,13 +164,13 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
 
 class TestValidateTTSInputFile(unittest.TestCase):
     def test_nonexistent(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         ok, _ = validate_tts_input_file("/nonexistent.csv")
         self.assertFalse(ok)
 
     def test_not_csv(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile(suffix=".txt", mode="w") as f:
             f.write("hi")
@@ -179,7 +179,7 @@ class TestValidateTTSInputFile(unittest.TestCase):
         self.assertFalse(ok)
 
     def test_invalid_csv(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             # Write a CSV with malformed structure that will fail pd.read_csv
@@ -192,7 +192,7 @@ class TestValidateTTSInputFile(unittest.TestCase):
             os.unlink(path)
 
     def test_missing_id_column(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             f.write("foo,text\n1,hi\n")
@@ -204,7 +204,7 @@ class TestValidateTTSInputFile(unittest.TestCase):
             os.unlink(path)
 
     def test_missing_text_column(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             f.write("id,foo\n1,hi\n")
@@ -216,7 +216,7 @@ class TestValidateTTSInputFile(unittest.TestCase):
             os.unlink(path)
 
     def test_empty_csv(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             f.write("id,text\n")
@@ -228,7 +228,7 @@ class TestValidateTTSInputFile(unittest.TestCase):
             os.unlink(path)
 
     def test_empty_text(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             f.write("id,text\n1,\n")
@@ -240,7 +240,7 @@ class TestValidateTTSInputFile(unittest.TestCase):
             os.unlink(path)
 
     def test_valid(self):
-        from calibrate.tts.eval import validate_tts_input_file
+        from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             f.write("id,text\n1,hello\n")
@@ -254,13 +254,13 @@ class TestValidateTTSInputFile(unittest.TestCase):
 
 class TestValidateExistingResultsCsv(unittest.TestCase):
     def test_nonexistent_is_ok(self):
-        from calibrate.tts.eval import validate_existing_results_csv
+        from calibrate_agent.tts.eval import validate_existing_results_csv
 
         ok, _ = validate_existing_results_csv("/nonexistent.csv")
         self.assertTrue(ok)
 
     def test_empty_is_ok(self):
-        from calibrate.tts.eval import validate_existing_results_csv
+        from calibrate_agent.tts.eval import validate_existing_results_csv
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             f.write("id,text,audio_path,ttfb\n")
@@ -272,7 +272,7 @@ class TestValidateExistingResultsCsv(unittest.TestCase):
             os.unlink(path)
 
     def test_missing_columns(self):
-        from calibrate.tts.eval import validate_existing_results_csv
+        from calibrate_agent.tts.eval import validate_existing_results_csv
 
         with tempfile.NamedTemporaryFile(suffix=".csv", mode="w", delete=False) as f:
             f.write("foo,bar\n1,2\n")
@@ -287,7 +287,7 @@ class TestValidateExistingResultsCsv(unittest.TestCase):
 
 class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
     async def test_processes_skipping_existing(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "out"
@@ -308,7 +308,7 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["success_count"], 1)
 
     async def test_overwrite_clears_existing(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "out"
@@ -332,7 +332,7 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
 
 class TestRunSingleProviderEvalTTS(unittest.IsolatedAsyncioTestCase):
     async def test_basic_flow(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             inp = Path(tmp) / "in.csv"
@@ -357,7 +357,7 @@ class TestRunSingleProviderEvalTTS(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["status"], "completed")
 
     async def test_existing_invalid_csv(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             inp = Path(tmp) / "in.csv"
@@ -379,7 +379,7 @@ class TestRunSingleProviderEvalTTS(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result["status"], "error")
 
     async def test_debug_with_rating(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             inp = Path(tmp) / "in.csv"
@@ -409,7 +409,7 @@ class TestRunSingleProviderEvalTTS(unittest.IsolatedAsyncioTestCase):
 
 class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
     async def test_main_invalid_provider(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             inp = Path(tmp) / "in.csv"
@@ -420,7 +420,7 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
                     await E.main()
 
     async def test_main_invalid_input(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         argv = ["e.py", "-p", "openai", "-i", "/nonexistent.csv", "-o", "/tmp/x"]
         with patch.object(sys, "argv", argv):
@@ -428,7 +428,7 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
                 await E.main()
 
     async def test_main_success(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             inp = Path(tmp) / "in.csv"
@@ -444,7 +444,7 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
                 await E.main()
 
     async def test_main_error_result(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             inp = Path(tmp) / "in.csv"

@@ -61,14 +61,14 @@ dev = [
 Documentation = "https://calibrate.artpark.ai/docs"
 
 [project.scripts]
-calibrate-agent = "calibrate.cli:main"
+calibrate-agent = "calibrate_agent.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
 exclude = ["ui*", "examples*", "docs*", "images*"]
 
 [tool.setuptools.package-data]
-"calibrate" = [
+"calibrate_agent" = [
     "ui/cli.bundle.mjs",
     "stt/sarvam_intent_entity/prompt_template.txt",
 ]

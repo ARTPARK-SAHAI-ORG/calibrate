@@ -1,8 +1,8 @@
 name: Eval providers (live)
 
 # Runs a live STT eval across all STT providers and a live TTS eval across all
-# TTS providers whenever either provider router (calibrate/stt/eval.py or
-# calibrate/tts/eval.py) changes. These make real API calls, so they rely on
+# TTS providers whenever either provider router (calibrate_agent/stt/eval.py or
+# calibrate_agent/tts/eval.py) changes. These make real API calls, so they rely on
 # provider API keys being configured as GitHub Actions secrets.
 #
 # Runs only on push to main (not on pull_request): the live eval needs secrets,
@@ -13,8 +13,8 @@ on:
   push:
     branches: [main]
     paths:
-      - "calibrate/stt/eval.py"
-      - "calibrate/tts/eval.py"
+      - "calibrate_agent/stt/eval.py"
+      - "calibrate_agent/tts/eval.py"
       - ".github/workflows/eval-providers.yml"
 
 jobs:

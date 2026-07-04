@@ -529,12 +529,12 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
 
       const lbDir = path.join(config.outputDir, "leaderboard");
 
-      // Generate leaderboard using python -m calibrate.llm.tests_leaderboard
+      // Generate leaderboard using python -m calibrate_agent.llm.tests_leaderboard
       const proc = spawn(
         "python",
         [
           "-m",
-          "calibrate.llm.tests_leaderboard",
+          "calibrate_agent.llm.tests_leaderboard",
           "-o",
           config.outputDir,
           "-s",

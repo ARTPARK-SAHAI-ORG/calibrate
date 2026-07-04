@@ -1,5 +1,5 @@
 """
-Tests for calibrate/stt/metrics.py — multi-evaluator judge aggregation.
+Tests for calibrate_agent/stt/metrics.py — multi-evaluator judge aggregation.
 
 Run with:
     python -m unittest tests.stt.test_metrics -v
@@ -13,7 +13,7 @@ class TestEditMetrics(unittest.TestCase):
     """WER/CER via jiwer — real computation, no network (jiwer is pure-Python)."""
 
     def test_get_wer_score_normalizes_case_and_punctuation(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # Row 1: case-only diff normalizes to identical -> 0.0.
         # Row 2: one of two words wrong -> 0.5.
@@ -22,7 +22,7 @@ class TestEditMetrics(unittest.TestCase):
         self.assertEqual(result["per_row"], [0.0, 0.5])
 
     def test_score_is_dataset_level_not_macro_mean(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # Row A: 1 error / 2 words. Row B: 0 errors / 4 words.
         # Macro-mean of per-row = (0.5 + 0.0)/2 = 0.25.
@@ -35,7 +35,7 @@ class TestEditMetrics(unittest.TestCase):
         self.assertNotAlmostEqual(result["score"], 0.25)
 
     def test_get_cer_score_character_level(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         result = M.get_cer_score(["abc"], ["abc"])
         self.assertEqual(result["per_row"], [0.0])
@@ -46,14 +46,14 @@ class TestEditMetrics(unittest.TestCase):
         self.assertAlmostEqual(result["score"], 1 / 3)
 
     def test_non_string_prediction_becomes_empty(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # None prediction is coerced to "" -> all reference chars are deletions.
         result = M.get_cer_score(["abc"], [None])
         self.assertEqual(result["score"], 1.0)
 
     def test_nfc_normalization_matches_decomposed_forms(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # Devanagari QA: precomposed single code point (U+0958) vs decomposed
         # KA + NUKTA (U+0915 U+093C). Different raw code points, same character.
@@ -69,14 +69,14 @@ class TestEditMetrics(unittest.TestCase):
         self.assertEqual(M.get_cer_score(["café"], ["café"])["score"], 0.0)
 
     def test_empty_input_returns_zero_score(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         result = M.get_wer_score([], [])
         self.assertEqual(result["score"], 0.0)
         self.assertEqual(result["per_row"], [])
 
     def test_language_aware_indic_normalization_folds_script_variants(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # Same Hindi word with vs. without a zero-width joiner (ZWJ). NFC and
         # punctuation removal leave the ZWJ in place; the Hindi IndicNormalizer
@@ -97,7 +97,7 @@ class TestEditMetrics(unittest.TestCase):
         )
 
     def test_empty_reference_pooled_correctly(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # Empty GT + empty prediction is correct behaviour → contributes nothing
         # to the pooled score (not penalized).
@@ -113,7 +113,7 @@ class TestEditMetrics(unittest.TestCase):
         self.assertAlmostEqual(halluc["score"], 0.75)
 
     def test_all_empty_references_guarded(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # A dataset with no reference words at all would make jiwer return an
         # unbounded count; the guard returns 0.0 instead.
@@ -121,7 +121,7 @@ class TestEditMetrics(unittest.TestCase):
         self.assertEqual(M.get_cer_score([""], ["hello"])["score"], 0.0)
 
     def test_unsupported_language_falls_back_gracefully(self):
-        from calibrate.stt import metrics as M
+        from calibrate_agent.stt import metrics as M
 
         # Urdu (needs an optional dep indic-nlp lacks here) and an unknown
         # language must not crash — they fall back to NFC-only normalization.
@@ -136,7 +136,7 @@ class TestEditMetrics(unittest.TestCase):
 
 class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
     async def test_default_evaluator_single_judge(self):
-        from calibrate.stt import metrics as stt_metrics
+        from calibrate_agent.stt import metrics as stt_metrics
 
         # Patch stt_llm_judge directly (it has @backoff + @observe decorators
         # so patching text_judge inside it is unreliable).
@@ -166,7 +166,7 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sorted(matches), [False, True])
 
     async def test_multi_evaluators_per_row_and_aggregate(self):
-        from calibrate.stt import metrics as stt_metrics
+        from calibrate_agent.stt import metrics as stt_metrics
 
         custom_evaluators = [
             {
@@ -210,7 +210,7 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(result["score"], 0.75)
 
     async def test_rating_evaluator_aggregates_mean_score(self):
-        from calibrate.stt import metrics as stt_metrics
+        from calibrate_agent.stt import metrics as stt_metrics
 
         rating_evaluator = {
             "name": "semantic_accuracy",
@@ -244,7 +244,7 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["scores"]["semantic_accuracy"]["scale_max"], 5)
 
     async def test_custom_evaluators_passed_through(self):
-        from calibrate.stt import metrics as stt_metrics
+        from calibrate_agent.stt import metrics as stt_metrics
 
         custom_evaluators = [
             {"name": "x", "system_prompt": "y", "judge_model": "openai/gpt-4.1"}

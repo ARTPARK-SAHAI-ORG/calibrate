@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 
 class TestBuildPrompt(unittest.TestCase):
     def test_prompt_carries_input_json_and_template(self):
-        from calibrate.stt.sarvam_intent_entity.main import build_prompt, PROMPT_TEMPLATE
+        from calibrate_agent.stt.sarvam_intent_entity.main import build_prompt, PROMPT_TEMPLATE
 
         prompt = build_prompt(
             {
@@ -31,13 +31,13 @@ class TestBuildPrompt(unittest.TestCase):
         self.assertIn('"context": "greeting"', prompt)
 
     def test_context_defaults_to_empty(self):
-        from calibrate.stt.sarvam_intent_entity.main import build_prompt
+        from calibrate_agent.stt.sarvam_intent_entity.main import build_prompt
 
         prompt = build_prompt({"index": 0, "hypothesis": "a", "ground_truth": "b"})
         self.assertIn('"context": ""', prompt)
 
     def test_response_model_fields_are_bare(self):
-        from calibrate.stt.sarvam_intent_entity.main import IntentEntityResponse
+        from calibrate_agent.stt.sarvam_intent_entity.main import IntentEntityResponse
 
         self.assertEqual(
             list(IntentEntityResponse.model_fields.keys()),
@@ -56,7 +56,7 @@ class TestBuildPrompt(unittest.TestCase):
 
 class TestScoreAggregators(unittest.TestCase):
     def test_intent_accuracy(self):
-        from calibrate.stt.sarvam_intent_entity.utilities import (
+        from calibrate_agent.stt.sarvam_intent_entity.utilities import (
             calculate_intent_accuracy,
         )
 
@@ -64,7 +64,7 @@ class TestScoreAggregators(unittest.TestCase):
         self.assertEqual(calculate_intent_accuracy([]), 0.0)
 
     def test_entity_metrics(self):
-        from calibrate.stt.sarvam_intent_entity.utilities import (
+        from calibrate_agent.stt.sarvam_intent_entity.utilities import (
             calculate_entity_metrics,
         )
 
@@ -76,7 +76,7 @@ class TestScoreAggregators(unittest.TestCase):
 
 def _normalizer_with_mocks():
     """IndicNormalizer instance with its model backends mocked (no download)."""
-    from calibrate.stt.sarvam_intent_entity.utilities import IndicNormalizer
+    from calibrate_agent.stt.sarvam_intent_entity.utilities import IndicNormalizer
 
     norm = object.__new__(IndicNormalizer)  # skip __init__ (model download)
     indic_normalizer = MagicMock()

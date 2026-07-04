@@ -17,7 +17,7 @@ Exact-only scenarios need no API; the `llm_judge` scenarios call the judge model
 (needs `OPENROUTER_API_KEY`).
 
 ```bash
-python -m calibrate.llm.run_tests --eval-only \
+python -m calibrate_agent.llm.run_tests --eval-only \
   --config  examples/llm/tool_call_scenarios/config.json \
   --dataset examples/llm/tool_call_scenarios/eval_only_dataset.json \
   -o ./out/tool_call_scenarios
@@ -26,7 +26,7 @@ python -m calibrate.llm.run_tests --eval-only \
 ## Run it (live — against a model)
 
 ```bash
-python -m calibrate.llm.run_tests \
+python -m calibrate_agent.llm.run_tests \
   --config examples/llm/tool_call_scenarios/config.json \
   -m openai/gpt-4.1 -p openrouter \
   -o ./out/tool_call_scenarios_live

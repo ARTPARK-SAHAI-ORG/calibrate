@@ -1,4 +1,4 @@
-"""Unit tests for calibrate/general/metrics.py.
+"""Unit tests for calibrate_agent/general/metrics.py.
 
 Covers the general (non-conversational) task scoring path:
 - _require_evaluators rejects empty / non-list evaluators
@@ -10,7 +10,7 @@ Covers the general (non-conversational) task scoring path:
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
-from calibrate.general.metrics import (
+from calibrate_agent.general.metrics import (
     general_judge,
     get_general_judge_score,
     _require_evaluators,
@@ -53,7 +53,7 @@ class TestRequireEvaluators(unittest.TestCase):
 class TestGeneralJudge(unittest.IsolatedAsyncioTestCase):
     async def test_delegates_with_input_and_output(self):
         mock = AsyncMock(return_value={"faithful": {"reasoning": "ok", "match": True}})
-        with patch("calibrate.general.metrics.general_task_judge", mock):
+        with patch("calibrate_agent.general.metrics.general_task_judge", mock):
             result = await general_judge(
                 input_text="the source",
                 output="the summary",
@@ -68,9 +68,9 @@ class TestGeneralJudge(unittest.IsolatedAsyncioTestCase):
     async def test_updates_langfuse_trace_when_enabled(self):
         judge = AsyncMock(return_value={"faithful": {"reasoning": "ok", "match": True}})
         lf = MagicMock()
-        with patch("calibrate.general.metrics.general_task_judge", judge), patch(
-            "calibrate.general.metrics.langfuse_enabled", True
-        ), patch("calibrate.general.metrics.langfuse", lf):
+        with patch("calibrate_agent.general.metrics.general_task_judge", judge), patch(
+            "calibrate_agent.general.metrics.langfuse_enabled", True
+        ), patch("calibrate_agent.general.metrics.langfuse", lf):
             await general_judge(
                 input_text="src", output="out", evaluators=[BINARY_EV]
             )
@@ -95,7 +95,7 @@ class TestGetGeneralJudgeScore(unittest.IsolatedAsyncioTestCase):
         async def fake(_input, output, **kwargs):
             return {"faithful": {"reasoning": output, "match": output == "o1"}}
 
-        with patch("calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)):
+        with patch("calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)):
             result = await get_general_judge_score(
                 inputs=["i1", "i2"],
                 outputs=["o1", "o2"],
@@ -119,7 +119,7 @@ class TestGetGeneralJudgeScore(unittest.IsolatedAsyncioTestCase):
         async def fake(_input, output, **kwargs):
             return {"quality": {"reasoning": output, "score": scores_by_output[output]}}
 
-        with patch("calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)):
+        with patch("calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)):
             result = await get_general_judge_score(
                 inputs=["i1", "i2"],
                 outputs=["o1", "o2"],
@@ -133,7 +133,7 @@ class TestGetGeneralJudgeScore(unittest.IsolatedAsyncioTestCase):
 
     async def test_none_input_passed_through(self):
         mock = AsyncMock(return_value={"faithful": {"reasoning": "ok", "match": True}})
-        with patch("calibrate.general.metrics.general_judge", mock):
+        with patch("calibrate_agent.general.metrics.general_judge", mock):
             await get_general_judge_score(
                 inputs=[None],
                 outputs=["only-output"],
@@ -162,7 +162,7 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
             return {"faithful": {"reasoning": output, "match": True}}
 
         with patch(
-            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+            "calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)
         ):
             result = await get_general_judge_score(
                 inputs=["i1", "i2"],
@@ -184,7 +184,7 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
             return {"faithful": {"reasoning": output, "match": True}}
 
         with patch(
-            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+            "calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)
         ):
             await get_general_judge_score(
                 inputs=["i1", "i2"],
@@ -216,7 +216,7 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
             }
 
         with patch(
-            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+            "calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)
         ):
             await get_general_judge_score(
                 inputs=["i1"],
@@ -256,7 +256,7 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
             return {"faithful": {"reasoning": output, "match": True}}
 
         with patch(
-            "calibrate.general.metrics.general_judge", AsyncMock(side_effect=fake)
+            "calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)
         ):
             await get_general_judge_score(
                 inputs=["i1", "i2"],

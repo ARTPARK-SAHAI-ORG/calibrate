@@ -11,7 +11,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_single_model_default(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
@@ -19,7 +19,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         }
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
+             patch("calibrate_agent.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
             result = await tests.run(
                 test_cases=[{
                     "id": "tc1",
@@ -36,7 +36,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["metrics"]["passed"], 1)
 
     async def test_run_multi_model_parallel(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
@@ -44,7 +44,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         }
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
+             patch("calibrate_agent.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
             result = await tests.run(
                 test_cases=[{
                     "history": [{"role": "user", "content": "hi"}],
@@ -58,10 +58,10 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(result["models"].keys()), {"m1", "m2"})
 
     async def test_run_multi_model_with_exception(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test", AsyncMock(side_effect=RuntimeError("nope"))):
+             patch("calibrate_agent.llm.run_tests.run_test", AsyncMock(side_effect=RuntimeError("nope"))):
             result = await tests.run(
                 test_cases=[{
                     "history": [{"role": "user", "content": "hi"}],
@@ -73,7 +73,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["models"]["m1"]["status"], "error")
 
     async def test_run_with_agent(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
@@ -82,7 +82,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         fake_agent = MagicMock()
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test_external", AsyncMock(return_value=fake_test_result)):
+             patch("calibrate_agent.llm.run_tests.run_test_external", AsyncMock(return_value=fake_test_result)):
             result = await tests.run(
                 test_cases=[{
                     "history": [{"role": "user", "content": "hi"}],
@@ -94,7 +94,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "completed")
 
     async def test_run_with_agent_resumes_completed_test_cases(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
@@ -127,7 +127,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
 
             mock_external = AsyncMock(return_value=fake_test_result)
             with patch(
-                "calibrate.llm.run_tests.run_test_external", mock_external
+                "calibrate_agent.llm.run_tests.run_test_external", mock_external
             ):
                 result = await tests.run(
                     test_cases=test_cases,
@@ -141,7 +141,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["metrics"]["total"], 2)
 
     async def test_run_with_agent_overwrite_reruns_everything(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
@@ -169,7 +169,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
 
             mock_external = AsyncMock(return_value=fake_test_result)
             with patch(
-                "calibrate.llm.run_tests.run_test_external", mock_external
+                "calibrate_agent.llm.run_tests.run_test_external", mock_external
             ):
                 await tests.run(
                     test_cases=test_cases,
@@ -182,7 +182,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_external.await_count, 2)
 
     async def test_run_raises_on_duplicate_ids_before_running(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_agent = MagicMock()
         test_cases = [
@@ -196,7 +196,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
             "metrics": {"passed": True, "judge_results": {}},
         })
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test_external", mock_external):
+             patch("calibrate_agent.llm.run_tests.run_test_external", mock_external):
             with self.assertRaises(ValueError):
                 await tests.run(
                     test_cases=test_cases, output_dir=tmp, agent=fake_agent,
@@ -205,7 +205,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_external.await_count, 0)
 
     async def test_run_without_ids_does_not_resume(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         async def fresh_result(*args, **kwargs):
             return {
@@ -226,7 +226,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             mock_external = AsyncMock(side_effect=fresh_result)
-            with patch("calibrate.llm.run_tests.run_test_external", mock_external):
+            with patch("calibrate_agent.llm.run_tests.run_test_external", mock_external):
                 await tests.run(
                     test_cases=make_cases(), output_dir=tmp, agent=fake_agent,
                 )
@@ -239,7 +239,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_external.await_count, 2)
 
     async def test_run_with_agent_aggregates_cost_latency_and_tokens(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {
@@ -255,7 +255,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         fake_agent = MagicMock()
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test_external", AsyncMock(return_value=fake_test_result)):
+             patch("calibrate_agent.llm.run_tests.run_test_external", AsyncMock(return_value=fake_test_result)):
             result = await tests.run(
                 test_cases=[{
                     "history": [{"role": "user", "content": "hi"}],
@@ -282,7 +282,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("total_tokens", written)
 
     async def test_run_agent_benchmark(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
@@ -291,7 +291,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         fake_agent = MagicMock()
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test_external", AsyncMock(return_value=fake_test_result)):
+             patch("calibrate_agent.llm.run_tests.run_test_external", AsyncMock(return_value=fake_test_result)):
             result = await tests.run(
                 test_cases=[{
                     "history": [{"role": "user", "content": "hi"}],
@@ -304,7 +304,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(result.keys()), {"m1", "m2"})
 
     async def test_run_agent_benchmark_failed_case_labeled(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         # A failing case in the agent-benchmark path exercises the labeled
         # "[model] ❌ ... failed" log branch (the passing branch is covered above).
@@ -315,7 +315,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         fake_agent = MagicMock()
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test_external",
+             patch("calibrate_agent.llm.run_tests.run_test_external",
                    AsyncMock(return_value=fake_test_result)):
             result = await tests.run(
                 test_cases=[{
@@ -330,7 +330,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["m1"]["metrics"]["passed"], 0)
 
     async def test_run_agent_benchmark_one_model_failure_isolated(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         # One model's hard failure must not cancel the others: it's recorded as
         # an error entry while the healthy model still completes.
@@ -346,7 +346,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
 
         fake_agent = MagicMock()
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test_external",
+             patch("calibrate_agent.llm.run_tests.run_test_external",
                    AsyncMock(side_effect=flaky_external)):
             result = await tests.run(
                 test_cases=[{
@@ -364,7 +364,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["good"]["metrics"]["passed"], 1)
 
     async def test_agent_benchmark_runs_models_concurrently(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         # A 2-party barrier proves real concurrency: each model's request blocks
         # until *both* models have arrived. If the runner were sequential the
@@ -380,7 +380,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
 
         fake_agent = MagicMock()
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test_external",
+             patch("calibrate_agent.llm.run_tests.run_test_external",
                    AsyncMock(side_effect=gated_external)):
             result = await tests.run(
                 test_cases=[{
@@ -397,7 +397,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["b"]["metrics"]["passed"], 1)
 
     async def test_run_single(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
@@ -405,7 +405,7 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         }
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
+             patch("calibrate_agent.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
             result = await tests.run_single(
                 test_cases=[{
                     "history": [{"role": "user", "content": "hi"}],
@@ -418,13 +418,13 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "completed")
 
     async def test_run_test_single(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_test_result = {
             "output": {"response": "Hi", "tool_calls": []},
             "metrics": {"passed": True, "judge_results": {}},
         }
-        with patch("calibrate.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
+        with patch("calibrate_agent.llm.run_tests.run_test", AsyncMock(return_value=fake_test_result)):
             result = await tests.run_test(
                 chat_history=[{"role": "user", "content": "hi"}],
                 evaluation={"type": "tool_call", "tool_calls": []},
@@ -435,10 +435,10 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["metrics"]["passed"])
 
     async def test_run_inference(self):
-        from calibrate.llm import tests
+        from calibrate_agent.llm import tests
 
         fake_inf_result = {"response": "Hi", "tool_calls": [], "captured_errors": []}
-        with patch("calibrate.llm.run_tests.run_inference", AsyncMock(return_value=fake_inf_result)):
+        with patch("calibrate_agent.llm.run_tests.run_inference", AsyncMock(return_value=fake_inf_result)):
             result = await tests.run_inference(
                 chat_history=[{"role": "user", "content": "hi"}],
                 system_prompt="sp",
@@ -448,23 +448,23 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["response"], "Hi")
 
     def test_leaderboard_delegates(self):
-        from calibrate.llm import tests as T
+        from calibrate_agent.llm import tests as T
 
-        with patch("calibrate.llm.tests_leaderboard.generate_leaderboard") as gl:
+        with patch("calibrate_agent.llm.tests_leaderboard.generate_leaderboard") as gl:
             T.leaderboard("/tmp/x", "/tmp/y")
             gl.assert_called_once_with(output_dir="/tmp/x", save_dir="/tmp/y")
 
 
 class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_single_model(self):
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
         fake_result = (
             {"persona_index": 0, "scenario_index": 0, "elapsed": 1.0},
             [{"name": "task_complete", "value": 1.0, "type": "binary"}],
         )
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_simulation.run_single_simulation_task",
+             patch("calibrate_agent.llm.run_simulation.run_single_simulation_task",
                    AsyncMock(return_value=fake_result)):
             result = await simulations.run(
                 personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
@@ -477,14 +477,14 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("task_complete", result["metrics"])
 
     async def test_run_multi_model(self):
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
         fake_result = (
             {"persona_index": 0, "scenario_index": 0, "elapsed": 1.0},
             [{"name": "task_complete", "value": 1.0, "type": "binary"}],
         )
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_simulation.run_single_simulation_task",
+             patch("calibrate_agent.llm.run_simulation.run_single_simulation_task",
                    AsyncMock(return_value=fake_result)):
             result = await simulations.run(
                 personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
@@ -497,11 +497,11 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(set(result["models"].keys()), {"m1", "m2"})
 
     async def test_run_multi_model_with_exception(self):
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
         # Force a require_simulation_evaluators failure at the multi-model level
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.judges.require_simulation_evaluators", side_effect=RuntimeError("fail")):
+             patch("calibrate_agent.judges.require_simulation_evaluators", side_effect=RuntimeError("fail")):
             result = await simulations.run(
                 personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
                 scenarios=[{"description": "s"}],
@@ -512,7 +512,7 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["models"]["m1"]["status"], "error")
 
     async def test_run_with_agent(self):
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
         fake_result = (
             {"persona_index": 0, "scenario_index": 0, "elapsed": 1.0},
@@ -522,7 +522,7 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
         fake_agent = MagicMock()
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_simulation.run_single_simulation_task",
+             patch("calibrate_agent.llm.run_simulation.run_single_simulation_task",
                    AsyncMock(return_value=fake_result)):
             result = await simulations.run(
                 personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
@@ -534,14 +534,14 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "completed")
 
     async def test_run_single(self):
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
         fake_result = (
             {"persona_index": 0, "scenario_index": 0, "elapsed": 1.0},
             [{"name": "x", "value": 1, "type": "binary"}],
         )
         with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate.llm.run_simulation.run_single_simulation_task",
+             patch("calibrate_agent.llm.run_simulation.run_single_simulation_task",
                    AsyncMock(return_value=fake_result)):
             result = await simulations.run_single(
                 personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
@@ -553,9 +553,9 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "completed")
 
     async def test_run_simulation_delegates(self):
-        from calibrate.llm import simulations
+        from calibrate_agent.llm import simulations
 
-        with patch("calibrate.llm.run_simulation.run_simulation",
+        with patch("calibrate_agent.llm.run_simulation.run_simulation",
                    AsyncMock(return_value={"status": "ok"})) as mocked:
             result = await simulations.run_simulation(
                 bot_system_prompt="bp",
@@ -567,9 +567,9 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
         mocked.assert_called_once()
 
     def test_leaderboard_delegates(self):
-        from calibrate.llm import simulations as S
+        from calibrate_agent.llm import simulations as S
 
-        with patch("calibrate.llm.simulation_leaderboard.generate_leaderboard") as gl:
+        with patch("calibrate_agent.llm.simulation_leaderboard.generate_leaderboard") as gl:
             S.leaderboard("/tmp/x", "/tmp/y")
             gl.assert_called_once_with(output_dir="/tmp/x", save_dir="/tmp/y")
 
