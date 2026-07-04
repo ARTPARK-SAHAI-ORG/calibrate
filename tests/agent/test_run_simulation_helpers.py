@@ -158,7 +158,6 @@ class TestSimulatedUserTurnIndexHook(unittest.IsolatedAsyncioTestCase):
 
         adapter = MagicMock()
         adapter._sim_user_turn_pending = False
-        adapter._agent_has_floor = True
         hook = SimulatedUserTurnIndexHook(adapter)
         frame = MagicMock(spec=LLMFullResponseStartFrame)
 
@@ -166,38 +165,43 @@ class TestSimulatedUserTurnIndexHook(unittest.IsolatedAsyncioTestCase):
              patch.object(SimulatedUserTurnIndexHook, "push_frame", AsyncMock()):
             await hook.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertTrue(adapter._sim_user_turn_pending)
-        # Sim user taking a turn releases the agent's floor so the agent's next
-        # utterance is treated as taking the floor back (and interrupts).
-        self.assertFalse(adapter._agent_has_floor)
 
 
 class TestBuildUserContextAggregator(unittest.TestCase):
-    """The sim aggregator must honor the explicit UserStarted/UserStopped frames.
+    """Turn-taking must be audio-driven: smart-turn stop + a bounded fallback.
 
-    Regression test: pipecat's default turn strategies (VAD + smart-turn) ignore
-    those frames and drop the first utterance of a multi-utterance agent turn
-    (e.g. a greeting spoken before the first question). The aggregator must be
-    built with ExternalUserTurnStrategies instead.
+    The agent under test is the "user"; turn boundaries come from its audio, not
+    manual UserStarted/UserStopped frames. Turn-end is decided by the smart-turn
+    analyzer, with a short user_turn_stop_timeout fallback for when it stalls on
+    synthesized TTS audio.
     """
 
-    def test_uses_external_turn_strategies(self):
-        from calibrate.agent.run_simulation import build_user_context_aggregator
+    def test_uses_smart_turn_stop_and_bounded_timeout(self):
+        from calibrate.agent.run_simulation import (
+            build_user_context_aggregator,
+            SIM_USER_TURN_STOP_TIMEOUT_SECS,
+        )
         from pipecat.processors.aggregators.llm_context import LLMContext
+        from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
         from pipecat.turns.user_start.external_user_turn_start_strategy import (
             ExternalUserTurnStartStrategy,
-        )
-        from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
-            ExternalUserTurnStopStrategy,
         )
 
         ctx = LLMContext([{"role": "system", "content": "x"}])
         pair = build_user_context_aggregator(ctx)
-        strategies = pair.user()._user_turn_controller._user_turn_strategies
+        controller = pair.user()._user_turn_controller
+        strategies = controller._user_turn_strategies
+        # Smart-turn decides turn-end.
         self.assertTrue(
+            any(isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop)
+        )
+        # Turn-start is audio-driven (default strategies), NOT manual/external.
+        self.assertFalse(
             any(isinstance(s, ExternalUserTurnStartStrategy) for s in strategies.start)
         )
-        self.assertTrue(
-            any(isinstance(s, ExternalUserTurnStopStrategy) for s in strategies.stop)
+        # Bounded fallback for smart-turn stalls on TTS audio.
+        self.assertEqual(
+            controller._user_turn_stop_timeout, SIM_USER_TURN_STOP_TIMEOUT_SECS
         )
 
 
