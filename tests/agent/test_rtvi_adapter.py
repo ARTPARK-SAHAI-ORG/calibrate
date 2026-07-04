@@ -52,8 +52,8 @@ class TestBuildSerializedTranscript(unittest.TestCase):
 
     def test_role_flipping(self):
         adapter = _make_adapter()
-        adapter.record_agent_turn("hi")             # agent → assistant
-        adapter.record_persona_committed("hello")   # persona → user
+        adapter.record_agent_turn("hi")        # agent → assistant
+        adapter.record_persona_text("hello")   # persona → user (flushed at build)
         result = adapter._build_serialized_transcript()
         self.assertEqual(result[0]["role"], "assistant")
         self.assertEqual(result[0]["content"], "hi")
@@ -73,7 +73,8 @@ class TestBuildSerializedTranscript(unittest.TestCase):
         adapter = _make_adapter()
         adapter.record_agent_turn("")
         adapter.record_agent_turn(None)
-        adapter.record_persona_committed("   ")
+        adapter.record_persona_text("   ")
+        adapter.record_persona_text(None)
         self.assertEqual(adapter._build_serialized_transcript(), [])
 
     def test_with_end_reason(self):
@@ -85,7 +86,7 @@ class TestBuildSerializedTranscript(unittest.TestCase):
     def test_tool_call_recorded_after_the_turn_it_followed(self):
         adapter = _make_adapter()
         adapter.record_agent_turn("what is your name?")
-        adapter.record_persona_committed("my name is Geeta")
+        adapter.record_persona_text("my name is Geeta")
         adapter.record_tool_call(
             {
                 "tool_call_id": "c1",
@@ -123,18 +124,16 @@ class TestBuildSerializedTranscript(unittest.TestCase):
         names = [c["function"]["name"] for c in tool_entries[0]["tool_calls"]]
         self.assertEqual(names, ["plan_next_question", "end_call"])
 
-    def test_final_persona_turn_captured_when_never_committed(self):
+    def test_final_persona_turn_captured_when_call_ends_abruptly(self):
         """The regression: agent ends the call the instant it hears the persona.
 
-        The persona turn never commits via ``on_assistant_turn_stopped`` (fires
-        empty), but its spoken ``TTSTextFrame`` fragments must still land in the
+        The persona turn's spoken ``TTSTextFrame`` fragments must still land in the
         transcript, ahead of the tool calls that ended the call.
         """
         adapter = _make_adapter()
         adapter.record_agent_turn("what is your name?")
         for frag in ["my", "name", "is", "Geeta", "Prasad"]:
             adapter.record_persona_text(frag)
-        adapter.record_persona_committed("")  # empty commit must not wipe buffer
         adapter.record_tool_call(
             {"tool_call_id": "c1", "function_name": "plan_next_question", "args": {}}
         )
@@ -148,14 +147,25 @@ class TestBuildSerializedTranscript(unittest.TestCase):
         self.assertEqual(result[1]["content"], "my name is Geeta Prasad")
         self.assertEqual(len(result[2]["tool_calls"]), 2)
 
-    def test_committed_text_supersedes_fragments(self):
+    def test_persona_turn_recorded_once(self):
+        """A persona turn flushed by a tool call is not duplicated afterwards."""
         adapter = _make_adapter()
-        for frag in ["my", "name"]:
+        for frag in ["my", "name", "is", "Geeta"]:
             adapter.record_persona_text(frag)
-        adapter.record_persona_committed("my name is Geeta")
+        adapter.record_tool_call(
+            {"tool_call_id": "c1", "function_name": "plan_next_question", "args": {}}
+        )
         result = adapter._build_serialized_transcript()
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["content"], "my name is Geeta")
+        persona_lines = [m for m in result if m.get("role") == "user"]
+        self.assertEqual(len(persona_lines), 1)
+        self.assertEqual(persona_lines[0]["content"], "my name is Geeta")
+
+    def test_punctuation_fragment_attaches_to_previous_word(self):
+        adapter = _make_adapter()
+        for frag in ["Geeta", "Prasad", "."]:
+            adapter.record_persona_text(frag)
+        result = adapter._build_serialized_transcript()
+        self.assertEqual(result[-1]["content"], "Geeta Prasad.")
 
     def test_pending_persona_included_when_ending_on_persona(self):
         adapter = _make_adapter()

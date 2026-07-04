@@ -190,6 +190,9 @@ from pipecat.utils.time import time_now_iso8601
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
 TRANSCRIPT_FILE_NAME = "transcript.json"
+# Punctuation that should attach to the preceding word when joining TTS text
+# fragments into a persona turn (covers Latin plus the Devanagari danda).
+_PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
 
 DEFAULT_SERIALIZER_NAME = "protobuf"
 SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
@@ -471,9 +474,10 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         #   {"role": "agent"|"persona", "content": str}
         #   {"role": "tool_calls", "tool_calls": [...]}
         self._transcript_events: list[dict] = []
-        # Text the sim user (persona) has spoken in the current, not-yet-committed
-        # turn, accumulated from ``TTSTextFrame``s. Flushed into an event when the
-        # turn commits, a tool call / agent turn follows it, or at teardown.
+        # Text the sim user (persona) has spoken in the current turn, accumulated
+        # from ``TTSTextFrame``s (what was actually said, so it survives a mid-turn
+        # teardown). Flushed into an event when a tool call / agent turn follows it,
+        # or included as the trailing turn at build time.
         self._pending_persona_text = ""
         self._ended_due_to_max_turns = False
         self._bot_audio_chunk_indices = {}  # Track chunk indices for bot audio per turn
@@ -626,28 +630,24 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 {"role": "agent", "content": content.strip()}
             )
 
-    def record_persona_committed(self, content: Optional[str]) -> None:
-        """Record the authoritative text of a committed persona turn.
-
-        Fired from ``on_assistant_turn_stopped``. When it carries content it
-        supersedes whatever ``TTSTextFrame`` fragments were buffered for the same
-        turn (cleaner text); an empty commit is ignored so the buffered spoken
-        text survives to be flushed later.
-        """
-        if content and content.strip():
-            self._pending_persona_text = ""
-            self._transcript_events.append(
-                {"role": "persona", "content": content.strip()}
-            )
-
     def record_persona_text(self, text: Optional[str]) -> None:
-        """Accumulate a ``TTSTextFrame`` fragment for the current persona turn."""
+        """Accumulate a ``TTSTextFrame`` fragment for the current persona turn.
+
+        Fragments arrive as whole words (sometimes bare punctuation). Join with a
+        single space, except a fragment that starts with closing punctuation
+        attaches to the previous word so we don't get ``foo ,``.
+        """
         if not text:
             return
-        if self._pending_persona_text:
-            self._pending_persona_text = f"{self._pending_persona_text} {text.strip()}"
+        fragment = text.strip()
+        if not fragment:
+            return
+        if not self._pending_persona_text:
+            self._pending_persona_text = fragment
+        elif fragment[0] in _PERSONA_TEXT_CLINGING_PUNCTUATION:
+            self._pending_persona_text += fragment
         else:
-            self._pending_persona_text = text.strip()
+            self._pending_persona_text = f"{self._pending_persona_text} {fragment}"
 
     def record_tool_call(self, data: Optional[dict]) -> None:
         """Record an agent tool call at arrival time, ordered after the turn it followed.
@@ -1744,12 +1744,13 @@ async def _run_simulation_inner(
 
     @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message):
-        # The "assistant" for the simulation pipeline is the simulated user
+        # The "assistant" for the simulation pipeline is the simulated user. Its
+        # spoken text is captured from TTSTextFrames (IOLogger → record_persona_text)
+        # rather than here, since this commit fires empty when the agent ends the
+        # call the instant it hears the sim user.
         eval_logger.info(
             f"Eval transcript: [{message.timestamp}] assistant: {message.content}"
         )
-
-        rtvi_message_adapter.record_persona_committed(message.content)
 
     runner = PipelineRunner(handle_sigint=False)
 
