@@ -47131,22 +47131,29 @@ import { execSync } from "node:child_process";
 import net from "node:net";
 import fs3 from "node:fs";
 import path2 from "node:path";
+var CALIBRATE_BIN_NAMES = ["calibrate-agent", "calibrate"];
 function findCalibrateBin() {
-  try {
-    execSync("which calibrate", { stdio: "pipe" });
-    return { cmd: "calibrate", args: [] };
-  } catch {
-  }
-  for (const rel of ["../.venv/bin/calibrate", ".venv/bin/calibrate"]) {
-    const abs = path2.resolve(rel);
-    if (fs3.existsSync(abs)) {
-      return { cmd: abs, args: [] };
+  for (const name of CALIBRATE_BIN_NAMES) {
+    try {
+      execSync(`which ${name}`, { stdio: "pipe" });
+      return { cmd: name, args: [] };
+    } catch {
     }
   }
-  try {
-    execSync("uv run which calibrate", { stdio: "pipe", cwd: path2.resolve("..") });
-    return { cmd: "uv", args: ["run", "calibrate"] };
-  } catch {
+  for (const name of CALIBRATE_BIN_NAMES) {
+    for (const dir of ["../.venv/bin", ".venv/bin"]) {
+      const abs = path2.resolve(dir, name);
+      if (fs3.existsSync(abs)) {
+        return { cmd: abs, args: [] };
+      }
+    }
+  }
+  for (const name of CALIBRATE_BIN_NAMES) {
+    try {
+      execSync(`uv run which ${name}`, { stdio: "pipe", cwd: path2.resolve("..") });
+      return { cmd: "uv", args: ["run", name] };
+    } catch {
+    }
   }
   return null;
 }
@@ -47262,7 +47269,7 @@ function LlmTestsApp({ onBack }) {
     outputDir: "./out",
     overwrite: false,
     envVars: {},
-    calibrate: { cmd: "calibrate", args: [] },
+    calibrate: { cmd: "calibrate-agent", args: [] },
     agentUrl: "",
     agentHeaders: {},
     agentBenchmark: false,
@@ -47401,7 +47408,7 @@ function LlmTestsApp({ onBack }) {
     if (step !== "init") return;
     calibrateBin.current = findCalibrateBin();
     if (!calibrateBin.current) {
-      setInitError("Error: calibrate binary not found");
+      setInitError("Error: calibrate-agent binary not found");
       setStep("leaderboard");
       return;
     }
@@ -47663,9 +47670,15 @@ function LlmTestsApp({ onBack }) {
     }
     setMetrics(results);
   };
-  const formatToolCalls = (toolCalls) => {
+  const formatToolCalls = (toolCalls, includeOutput = false) => {
     if (!toolCalls || toolCalls.length === 0) return "";
-    return toolCalls.map((tc) => `${tc.tool}(${JSON.stringify(tc.arguments)})`).join(", ");
+    return toolCalls.map((tc) => {
+      const call = `${tc.tool}(${JSON.stringify(tc.arguments)})`;
+      if (includeOutput && tc.output !== void 0) {
+        return `${call} => ${JSON.stringify(tc.output)}`;
+      }
+      return call;
+    }).join(", ");
   };
   (0, import_react23.useEffect)(() => {
     setModelResults([]);
@@ -47681,7 +47694,7 @@ function LlmTestsApp({ onBack }) {
             if (r.output?.response) {
               actualOutput = r.output.response;
             } else if (r.output?.tool_calls && r.output.tool_calls.length > 0) {
-              actualOutput = formatToolCalls(r.output.tool_calls);
+              actualOutput = formatToolCalls(r.output.tool_calls, true);
             }
             let evaluationCriteria = "";
             const evalType = r.test_case?.evaluation?.type || "";
@@ -48621,7 +48634,7 @@ function SimulationsApp({ onBack }) {
     parallel: 1,
     overwrite: false,
     envVars: {},
-    calibrate: { cmd: "calibrate", args: [] }
+    calibrate: { cmd: "calibrate-agent", args: [] }
   });
   const [existingDirs, setExistingDirs] = (0, import_react24.useState)([]);
   const [isAgentConnection, setIsAgentConnection] = (0, import_react24.useState)(false);
@@ -48751,7 +48764,7 @@ function SimulationsApp({ onBack }) {
     if (step !== "init") return;
     calibrateBin.current = findCalibrateBin();
     if (!calibrateBin.current) {
-      setInitError("Error: calibrate binary not found");
+      setInitError("Error: calibrate-agent binary not found");
       setStep("leaderboard");
       return;
     }
@@ -51356,7 +51369,7 @@ function EvalApp({
     outputDir: "./out",
     overwrite: false,
     envVars: {},
-    calibrate: { cmd: "calibrate", args: [] }
+    calibrate: { cmd: "calibrate-agent", args: [] }
   });
   const [initError, setInitError] = (0, import_react25.useState)("");
   (0, import_react25.useEffect)(() => {
@@ -51366,12 +51379,12 @@ function EvalApp({
       setStep("config-language");
     } else {
       setInitError(
-        "calibrate CLI not found. Install with: pip install -e . (from project root)"
+        "calibrate-agent CLI not found. Install with: pip install -e . (from project root)"
       );
     }
   }, []);
   if (step === "init" && !initError) {
-    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Spinner, { label: "Checking calibrate CLI..." }) });
+    return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Box_default, { padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Spinner, { label: "Checking calibrate-agent CLI..." }) });
   }
   if (initError) {
     return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Box_default, { flexDirection: "column", padding: 1, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(Text, { color: "red", children: [

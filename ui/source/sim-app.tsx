@@ -199,7 +199,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     parallel: 1,
     overwrite: false,
     envVars: {},
-    calibrate: { cmd: "calibrate", args: [] },
+    calibrate: { cmd: "calibrate-agent", args: [] },
   });
 
   // ── overwrite confirmation state ──
@@ -365,7 +365,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     if (step !== "init") return;
     calibrateBin.current = findCalibrateBin();
     if (!calibrateBin.current) {
-      setInitError("Error: calibrate binary not found");
+      setInitError("Error: calibrate-agent binary not found");
       setStep("leaderboard");
       return;
     }

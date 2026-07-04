@@ -117,7 +117,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
     outputDir: "./out",
     overwrite: false,
     envVars: {},
-    calibrate: { cmd: "calibrate", args: [] },
+    calibrate: { cmd: "calibrate-agent", args: [] },
     agentUrl: "",
     agentHeaders: {},
     agentBenchmark: false,
@@ -298,7 +298,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
     if (step !== "init") return;
     calibrateBin.current = findCalibrateBin();
     if (!calibrateBin.current) {
-      setInitError("Error: calibrate binary not found");
+      setInitError("Error: calibrate-agent binary not found");
       setStep("leaderboard");
       return;
     }
