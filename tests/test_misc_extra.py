@@ -101,28 +101,8 @@ class TestStatusSarvamCheck(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, "tts")
 
 
-class TestStatusSmallestCheck(unittest.IsolatedAsyncioTestCase):
-    async def test_smallest_check(self):
-        from calibrate.status import _check_smallest
-
-        fake_tts = MagicMock()
-        fake_tts.synthesize = MagicMock(return_value=iter([b"audio"]))
-
-        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), \
-             patch("smallestai.waves.WavesStreamingTTS", return_value=fake_tts):
-            result = await _check_smallest(MagicMock())
-        self.assertEqual(result, "tts")
-
-    async def test_smallest_check_no_audio(self):
-        from calibrate.status import _check_smallest
-
-        fake_tts = MagicMock()
-        fake_tts.synthesize = MagicMock(return_value=iter([]))
-
-        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), \
-             patch("smallestai.waves.WavesStreamingTTS", return_value=fake_tts):
-            with self.assertRaises(ValueError):
-                await _check_smallest(MagicMock())
+# Smallest status-check coverage lives in tests/test_status.py
+# (TestCheckProviders.test_check_smallest_*), alongside the STT/TTS sub-checks.
 
 
 # ── stt/eval - run_eval_only invalid dataset path ------------------------

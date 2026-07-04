@@ -17,7 +17,6 @@ from groq import AsyncGroq
 from cartesia import AsyncCartesia
 from sarvamai import AsyncSarvamAI, AudioOutput, EventResponse
 from google.cloud import texttospeech
-from smallestai.waves import TTSConfig, WavesStreamingTTS
 
 import numpy as np
 import pandas as pd
@@ -393,32 +392,51 @@ async def synthesize_sarvam(text: str, language: str, audio_path: str) -> Dict:
 
 
 async def synthesize_smallest(text: str, language: str, audio_path: str) -> Dict:
-    """Synthesize speech using Smallest AI's TTS API and save to file."""
+    """Synthesize speech using Smallest AI's lightning-v3.1 streaming TTS.
+
+    lightning-v2 (the standalone smallestai SDK's hard-coded model) was retired
+    and now returns HTTP 410, so this talks to the current lightning-v3.1
+    WebSocket directly — the same endpoint pipecat's SmallestTTSService uses.
+    """
+    from websockets.asyncio.client import connect as websocket_connect
+
     api_key = os.getenv("SMALLEST_API_KEY")
     if not api_key:
         raise ValueError("SMALLEST_API_KEY environment variable not set")
 
     lang_code = get_tts_language_code(language, "smallest")
-
-    config = TTSConfig(
-        voice_id="aditi",
-        language=lang_code,
-        api_key=api_key,
-        sample_rate=24000,
-        speed=1.0,
-        max_buffer_flush_ms=100,
-    )
-
-    streaming_tts = WavesStreamingTTS(config)
+    ws_url = "wss://waves-api.smallest.ai/api/v1/lightning-v3.1/get_speech/stream"
+    payload = {
+        "text": text,
+        "voice_id": "aditi",
+        "language": lang_code,
+        "sample_rate": 24000,
+        "speed": 1.0,
+    }
+    headers = {"Authorization": f"Bearer {api_key}"}
 
     start_time = time.time()
     ttfb = None
+    audio_chunks: List[bytes] = []
 
-    for chunk in streaming_tts.synthesize(text):
-        if ttfb is None:
-            ttfb = time.time() - start_time
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+        await ws.send(json.dumps(payload))
+        async for message in ws:
+            msg = json.loads(message)
+            status = msg.get("status")
+            if status == "chunk":
+                audio_b64 = msg.get("data", {}).get("audio")
+                if audio_b64:
+                    if ttfb is None:
+                        ttfb = time.time() - start_time
+                    audio_chunks.append(base64.b64decode(audio_b64))
+            elif status == "error":
+                error = msg.get("error") or msg.get("message") or msg
+                raise RuntimeError(f"Smallest TTS error: {error}")
+            elif status == "complete":
+                break
 
-        save_audio(chunk, audio_path, 24000)
+    save_audio(b"".join(audio_chunks), audio_path, sample_rate=24000)
 
     return {"ttfb": ttfb}
 

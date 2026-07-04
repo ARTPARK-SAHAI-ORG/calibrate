@@ -30,6 +30,63 @@ def _mk_client(post_resp=None):
     return client
 
 
+class _FakeWS:
+    """Websocket stand-in supporting both async iteration (TTS check) and
+    recv() (STT check)."""
+
+    def __init__(self, messages, recv_end=None):
+        self._messages = list(messages)
+        self.sent = []
+        self._recv_end = recv_end or asyncio.TimeoutError()
+
+    async def send(self, data):
+        self.sent.append(data)
+
+    def __aiter__(self):
+        self._it = iter(list(self._messages))
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._it)
+        except StopIteration:
+            raise StopAsyncIteration
+
+    async def recv(self):
+        if self._messages:
+            return self._messages.pop(0)
+        raise self._recv_end
+
+
+class _FakeConnect:
+    def __init__(self, ws):
+        self._ws = ws
+
+    async def __aenter__(self):
+        return self._ws
+
+    async def __aexit__(self, *exc):
+        return False
+
+
+def _patch_ws(messages, recv_end=None):
+    """Patch the websockets connect used by the Smallest checks to yield messages."""
+    ws = _FakeWS(messages, recv_end=recv_end)
+    return patch(
+        "websockets.asyncio.client.connect",
+        MagicMock(return_value=_FakeConnect(ws)),
+    ), ws
+
+
+def _patch_smallest_both(tts_ws, stt_ws):
+    """Route connect() to the right fake by URL for the combined check."""
+
+    def _connect(url, *a, **k):
+        return _FakeConnect(stt_ws if "stt/live" in url else tts_ws)
+
+    return patch("websockets.asyncio.client.connect", MagicMock(side_effect=_connect))
+
+
 class TestSilenceWav(unittest.TestCase):
     def test_generate_silence(self):
         from calibrate.status import _generate_silence_wav
@@ -155,6 +212,90 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {"DEEPGRAM_API_KEY": "k"}):
             result = await _check_deepgram(client)
         self.assertEqual(result, "stt")
+
+    async def test_check_smallest_tts_ok(self):
+        import json
+        from calibrate.status import _check_smallest_tts
+
+        chunk = json.dumps({"status": "chunk", "data": {"audio": "YWJj"}})
+        patcher, ws = _patch_ws([chunk])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), patcher:
+            result = await _check_smallest_tts()
+        self.assertEqual(result, "tts")
+        self.assertEqual(len(ws.sent), 1)
+
+    async def test_check_smallest_tts_server_error(self):
+        import json
+        from calibrate.status import _check_smallest_tts
+
+        err = json.dumps({"status": "error", "error": "MODEL_DEPRECATED"})
+        patcher, _ = _patch_ws([err])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), patcher:
+            with self.assertRaises(RuntimeError):
+                await _check_smallest_tts()
+
+    async def test_check_smallest_tts_no_audio(self):
+        import json
+        from calibrate.status import _check_smallest_tts
+
+        done = json.dumps({"status": "complete"})
+        patcher, _ = _patch_ws([done])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), patcher:
+            with self.assertRaises(ValueError):
+                await _check_smallest_tts()
+
+    async def test_check_smallest_stt_ok(self):
+        import json
+        from calibrate.status import _check_smallest_stt
+
+        msg = json.dumps({"type": "transcription", "transcript": "", "is_last": True})
+        patcher, ws = _patch_ws([msg])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), patcher:
+            result = await _check_smallest_stt()
+        self.assertEqual(result, "stt")
+        # Sent the silence buffer and a close_stream control message.
+        self.assertEqual(len(ws.sent), 2)
+
+    async def test_check_smallest_stt_idle_closes_ok(self):
+        # No messages -> recv() raises the end sentinel -> treated as success.
+        from calibrate.status import _check_smallest_stt
+
+        patcher, _ = _patch_ws([])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), patcher:
+            result = await _check_smallest_stt()
+        self.assertEqual(result, "stt")
+
+    async def test_check_smallest_stt_server_error(self):
+        import json
+        from calibrate.status import _check_smallest_stt
+
+        err = json.dumps({"type": "error", "message": "bad audio"})
+        patcher, _ = _patch_ws([err])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), patcher:
+            with self.assertRaises(RuntimeError):
+                await _check_smallest_stt()
+
+    async def test_check_smallest_both_ok(self):
+        import json
+        from calibrate.status import _check_smallest
+
+        tts_ws = _FakeWS([json.dumps({"status": "chunk", "data": {"audio": "YWJj"}})])
+        stt_ws = _FakeWS([json.dumps({"type": "transcription", "is_last": True})])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), \
+                _patch_smallest_both(tts_ws, stt_ws):
+            result = await _check_smallest(_mk_client())
+        self.assertEqual(result, "stt,tts")
+
+    async def test_check_smallest_fails_if_stt_down(self):
+        import json
+        from calibrate.status import _check_smallest
+
+        tts_ws = _FakeWS([json.dumps({"status": "chunk", "data": {"audio": "YWJj"}})])
+        stt_ws = _FakeWS([json.dumps({"type": "error", "message": "down"})])
+        with patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), \
+                _patch_smallest_both(tts_ws, stt_ws):
+            with self.assertRaises(RuntimeError):
+                await _check_smallest(_mk_client())
 
 
 class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
