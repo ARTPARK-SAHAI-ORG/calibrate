@@ -124,11 +124,9 @@ from pipecat.frames.frames import (
     EndFrame,
     BotSpeakingFrame,
     UserSpeakingFrame,
-    EndTaskFrame,
     LLMContextFrame,
     StopFrame,
     CancelFrame,
-    EndFrame,
     InterimTranscriptionFrame,
     LLMRunFrame,
     TTSTextFrame,
@@ -754,9 +752,6 @@ class RTVIMessageFrameAdapter(FrameProcessor):
 
                 if msg_type == "bot-started-speaking":
                     self._audio_buffer._reset_all_audio_buffers()
-                    agent_turns_so_far = count_agent_message_turns(
-                        self._context.get_messages()
-                    )
                     if self._is_external and self._is_bot_interrupt_triggered:
                         # External interrupt in progress: the sim user has the floor.
                         # Ignore the agent's attempt to speak — keep its output blocked
@@ -766,13 +761,11 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         log_and_print(
                             f"{PARTIAL_AGENT_MESSAGE_COLOR_IGNORED}Agent tried to speak during user interrupt — blocked{RESET_COLOR}"
                         )
-                    elif agent_turns_so_far >= self._max_turns:
-                        log_and_print(
-                            f"{INTERRUPTION_COLOR}Max turns ({self._max_turns}) reached, ending conversation{RESET_COLOR}"
-                        )
-                        self._ended_due_to_max_turns = True
-                        await self.push_frame(EndTaskFrame(), FrameDirection.UPSTREAM)
                     else:
+                        # max_turns is enforced when the agent's turn *commits*
+                        # (on_user_turn_stopped) so the conversation always ends on
+                        # the agent's turn with its final message captured — see
+                        # _run_simulation_inner.
                         self._awaiting_first_bot_audio_chunk = True
                         self._pending_user_turn = True
                         # A new bot utterance starts with a clean interrupt slate.
@@ -1651,6 +1644,21 @@ async def _run_simulation_inner(
         log_and_print(
             f"{AGENT_MESSAGE_COLOR}[Agent]{RESET_COLOR}: {message.content}{RESET_COLOR}"
         )
+
+        # Enforce max_turns here, when the agent's turn has committed, rather than
+        # when its next turn starts. Ending on the next bot-started dropped that
+        # message and left the transcript ending on a user turn or an assistant
+        # turn depending on whether the sim user happened to reply first. Ending on
+        # commit is deterministic: the conversation always ends right after the
+        # agent's max_turns-th turn, with its final message captured.
+        if not rtvi_message_adapter._ended_due_to_max_turns:
+            agent_turns = count_agent_message_turns(context.get_messages())
+            if agent_turns >= max_turns:
+                rtvi_message_adapter._ended_due_to_max_turns = True
+                log_and_print(
+                    f"{INTERRUPTION_COLOR}Max turns ({max_turns}) reached, ending conversation{RESET_COLOR}"
+                )
+                await task.queue_frame(EndFrame())
 
     @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message):

@@ -435,16 +435,6 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(adapter._is_bot_interrupt_triggered)
         self.assertEqual(adapter._spoken_text_buffer, "")
 
-    async def test_max_turns_branch_does_not_reset(self):
-        # When max turns is reached the adapter ends the run instead of starting a
-        # fresh utterance; the reset must not fire on that path.
-        adapter = self._make_adapter(max_turns=0)
-        adapter._is_bot_interrupt_decided = True
-
-        await self._send_bot_started(adapter)
-
-        self.assertTrue(adapter._is_bot_interrupt_decided)
-
 
 if __name__ == "__main__":
     unittest.main()
