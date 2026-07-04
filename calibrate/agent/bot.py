@@ -123,9 +123,13 @@ class TTSConfig(BaseModel):
     instructions: str = None
 
 
+DEFAULT_TEST_AGENT_LLM_MODEL = "openai/gpt-5.4-mini"
+DEFAULT_SIMULATED_USER_LLM_MODEL = "gpt-5.4-mini"
+
+
 class LLMConfig(BaseModel):
     provider: Literal["openai", "openrouter"] = "openrouter"
-    model: str = "openai/gpt-4.1"
+    model: str = DEFAULT_TEST_AGENT_LLM_MODEL
 
 
 async def run_bot(

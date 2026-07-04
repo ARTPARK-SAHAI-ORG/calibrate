@@ -177,7 +177,14 @@ from pipecat.transports.websocket.client import (
 
 from pipecat.serializers.base_serializer import FrameSerializer
 from pipecat.serializers.protobuf import ProtobufFrameSerializer
-from calibrate.agent.bot import run_bot, STTConfig, TTSConfig, LLMConfig
+from calibrate.agent.bot import (
+    run_bot,
+    STTConfig,
+    TTSConfig,
+    LLMConfig,
+    DEFAULT_TEST_AGENT_LLM_MODEL,
+    DEFAULT_SIMULATED_USER_LLM_MODEL,
+)
 from pipecat.utils.time import time_now_iso8601
 
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
@@ -1492,7 +1499,7 @@ async def _run_simulation_inner(
 
     llm = OpenAILLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
-        settings=OpenAILLMService.Settings(model="gpt-5.2"),
+        settings=OpenAILLMService.Settings(model=DEFAULT_SIMULATED_USER_LLM_MODEL),
     )
 
     simulation_system_prompt = system_prompt
@@ -2019,7 +2026,7 @@ async def _run_single_simulation_inner(
     llm_config_data = config.get("llm", {})
     llm_config = LLMConfig(
         provider=llm_config_data.get("provider", "openrouter"),
-        model=llm_config_data.get("model", "openai/gpt-4.1"),
+        model=llm_config_data.get("model", DEFAULT_TEST_AGENT_LLM_MODEL),
     )
     agent_speaks_first = config.get("settings", {}).get(
         "agent_speaks_first", DEFAULT_AGENT_SPEAKS_FIRST

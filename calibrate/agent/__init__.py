@@ -25,6 +25,11 @@ import asyncio
 from collections import defaultdict
 import pandas as pd
 
+from calibrate.agent.bot import (
+    DEFAULT_TEST_AGENT_LLM_MODEL,
+    DEFAULT_SIMULATED_USER_LLM_MODEL,
+)
+
 
 @dataclass
 class STTConfig:
@@ -55,7 +60,7 @@ class LLMConfig:
     """Configuration for LLM service."""
 
     provider: str = "openrouter"
-    model: str = "openai/gpt-4.1"
+    model: str = DEFAULT_TEST_AGENT_LLM_MODEL
 
     def to_dict(self) -> dict:
         return {"provider": self.provider, "model": self.model}
@@ -91,7 +96,7 @@ class _Simulation:
             output_dir: Path to output directory for results (default: ./out)
             stt: STT configuration (default: Google)
             tts: TTS configuration (default: Google)
-            llm: LLM configuration (default: OpenRouter with gpt-4.1)
+            llm: LLM configuration (default: OpenRouter with ``DEFAULT_TEST_AGENT_LLM_MODEL``)
             agent_speaks_first: Whether the agent initiates the conversation (default: True)
             max_turns: Maximum number of assistant turns (default: 50)
             port: Base WebSocket port for simulations (default: 8765)
@@ -116,7 +121,7 @@ class _Simulation:
             ...     output_dir="./out",
             ...     stt=STTConfig(provider="google"),
             ...     tts=TTSConfig(provider="google"),
-            ...     llm=LLMConfig(provider="openrouter", model="openai/gpt-4.1"),
+            ...     llm=LLMConfig(provider="openrouter", model=DEFAULT_TEST_AGENT_LLM_MODEL),
             ... ))
         """
         from calibrate.judges import require_simulation_evaluators, write_evaluator_config
@@ -338,4 +343,11 @@ class _Simulation:
 simulation = _Simulation()
 
 # Re-export config classes
-__all__ = ["simulation", "STTConfig", "TTSConfig", "LLMConfig"]
+__all__ = [
+    "simulation",
+    "STTConfig",
+    "TTSConfig",
+    "LLMConfig",
+    "DEFAULT_TEST_AGENT_LLM_MODEL",
+    "DEFAULT_SIMULATED_USER_LLM_MODEL",
+]
