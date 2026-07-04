@@ -55,7 +55,7 @@ class LLMConfig:
     """Configuration for LLM service."""
 
     provider: str = "openrouter"
-    model: str = "openai/gpt-4.1"
+    model: str = "openai/gpt-5.4-mini"
 
     def to_dict(self) -> dict:
         return {"provider": self.provider, "model": self.model}
@@ -91,7 +91,7 @@ class _Simulation:
             output_dir: Path to output directory for results (default: ./out)
             stt: STT configuration (default: Google)
             tts: TTS configuration (default: Google)
-            llm: LLM configuration (default: OpenRouter with gpt-4.1)
+            llm: LLM configuration (default: OpenRouter with gpt-5.4-mini)
             agent_speaks_first: Whether the agent initiates the conversation (default: True)
             max_turns: Maximum number of assistant turns (default: 50)
             port: Base WebSocket port for simulations (default: 8765)

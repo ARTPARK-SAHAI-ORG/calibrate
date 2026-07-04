@@ -1492,7 +1492,7 @@ async def _run_simulation_inner(
 
     llm = OpenAILLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
-        settings=OpenAILLMService.Settings(model="gpt-5.2"),
+        settings=OpenAILLMService.Settings(model="gpt-5.4-mini"),
     )
 
     simulation_system_prompt = system_prompt
@@ -2019,7 +2019,7 @@ async def _run_single_simulation_inner(
     llm_config_data = config.get("llm", {})
     llm_config = LLMConfig(
         provider=llm_config_data.get("provider", "openrouter"),
-        model=llm_config_data.get("model", "openai/gpt-4.1"),
+        model=llm_config_data.get("model", "openai/gpt-5.4-mini"),
     )
     agent_speaks_first = config.get("settings", {}).get(
         "agent_speaks_first", DEFAULT_AGENT_SPEAKS_FIRST

@@ -125,7 +125,7 @@ class TTSConfig(BaseModel):
 
 class LLMConfig(BaseModel):
     provider: Literal["openai", "openrouter"] = "openrouter"
-    model: str = "openai/gpt-4.1"
+    model: str = "openai/gpt-5.4-mini"
 
 
 async def run_bot(
