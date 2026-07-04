@@ -12,7 +12,7 @@
 - `Text to Speech (TTS)`: Benchmark generated speech by multiple providers automatically using an Audio LLM Judge across 10+ indic languages
 - `Simulations`: Simulate realistic conversations using realistic user personas and scenarios to test failure modes for your agent (including interruptions for voice agents)
 
-Calibrate is built on top of [pipecat](https://github.com/pipecat-ai/pipecat), a framework for building agents.
+This repo is the core engine powering Calibrate, built on top of [pipecat](https://github.com/pipecat-ai/pipecat).
 
 ## Installation
 
