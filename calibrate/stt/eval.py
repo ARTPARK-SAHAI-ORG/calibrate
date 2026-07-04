@@ -227,10 +227,7 @@ async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
     audio_file = load_audio(audio_path, as_file=True)
 
     stream = await client.audio.transcriptions.create(
-        model="gpt-4o-transcribe",
-        file=audio_file,
-        response_format="text",
-        stream=True,
+        model="gpt-4o-transcribe", file=audio_file, response_format="text", stream=True
     )
 
     transcript = ""
@@ -438,7 +435,9 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
             async with asyncio.timeout(SARVAM_STT_RECV_TIMEOUT):
                 async for message in ws:
                     if getattr(message, "type", None) == "error":
-                        error = getattr(message.data, "error", "Unknown Sarvam STT error")
+                        error = getattr(
+                            message.data, "error", "Unknown Sarvam STT error"
+                        )
                         raise RuntimeError(error)
                     if getattr(message, "type", None) != "data":
                         continue
@@ -745,9 +744,7 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
         await connection.close()
 
     if fatal_error["data"] is not None and not transcript_parts:
-        raise RuntimeError(
-            f"ElevenLabs streaming STT error: {fatal_error['data']}"
-        )
+        raise RuntimeError(f"ElevenLabs streaming STT error: {fatal_error['data']}")
 
     return {
         "transcript": " ".join(
