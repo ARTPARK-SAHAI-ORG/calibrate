@@ -93,6 +93,29 @@
             "pages": ["examples/overview"]
           }
         ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": ["api-reference/introduction"]
+          },
+          {
+            "group": "Agents",
+            "openapi": "api-reference/openapi.json",
+            "pages": ["GET /agents", "POST /agents/resolve"]
+          },
+          {
+            "group": "Agent tests",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /agent-tests/agent/{agent_uuid}/run",
+              "POST /agent-tests/run",
+              "GET /agent-tests/run/{task_id}"
+            ]
+          }
+        ]
       }
     ],
     "global": {
@@ -130,6 +153,16 @@
       "type": "button",
       "label": "Get Started",
       "href": "https://calibrate.artpark.ai"
+    }
+  },
+  "api": {
+    "openapi": "api-reference/openapi.json",
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": ["curl", "python"],
+      "defaults": "required"
     }
   },
   "contextual": {

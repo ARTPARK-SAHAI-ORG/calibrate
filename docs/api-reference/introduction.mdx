@@ -1,33 +1,85 @@
 ---
 title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+description: 'Authenticate and call the Calibrate Public API programmatically'
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launch LLM test runs, and poll results — all from CI or automation scripts.
 
-## Welcome
+## Most used
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+<CardGroup cols={2}>
+  <Card title="Agents" icon="robot" href="/api-reference/agents/list-agents">
+    List agents and resolve human-friendly names to UUIDs
+  </Card>
+  <Card title="Agent tests" icon="play" href="/api-reference/agent-tests/run-agent-test">
+    Launch test runs and poll for results
+  </Card>
+</CardGroup>
+
+## Getting started
+
+<Steps>
+  <Step title="Get your API key">
+    Sign in to [Calibrate](https://calibrate.artpark.ai), open **Settings → API keys**, and create an org-scoped key. The raw `sk_…` value is shown once — store it securely.
+  </Step>
+  <Step title="Authenticate your requests">
+    Pass your key in the `X-API-Key` header on every request:
+
+    ```bash
+    curl https://pense-backend.artpark.ai/agents \
+      -H "X-API-Key: sk_your_api_key"
+    ```
+  </Step>
+  <Step title="List agents">
+    Enumerate every agent in your org:
+
+    ```bash
+    curl https://pense-backend.artpark.ai/agents \
+      -H "X-API-Key: sk_your_api_key"
+    ```
+  </Step>
+  <Step title="Run tests">
+    Launch a test run for an agent, then poll the returned `task_id`:
+
+    ```bash
+    # Start a run (all linked tests when test_uuids is omitted)
+    curl -X POST "https://pense-backend.artpark.ai/agent-tests/agent/{agent_uuid}/run" \
+      -H "X-API-Key: sk_your_api_key" \
+      -H "Content-Type: application/json" \
+      -d '{}'
+
+    # Poll status + results
+    curl "https://pense-backend.artpark.ai/agent-tests/run/{task_id}" \
+      -H "X-API-Key: sk_your_api_key"
+    ```
+  </Step>
+</Steps>
+
+## Base URL
+
+```
+https://pense-backend.artpark.ai
+```
+
+## OpenAPI specification
+
+The public API schema is published at an unauthenticated endpoint and synced into this docs site on every deploy.
+
+```bash
+# Fetch the live spec (JSON)
+curl -s https://pense-backend.artpark.ai/public-api/openapi.json
+```
 
 <Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
+  title="OpenAPI specification"
+  icon="brackets-curly"
+  href="https://pense-backend.artpark.ai/public-api/openapi.json"
 >
-  View the OpenAPI specification file
+  View the machine-readable spec
 </Card>
 
 ## Authentication
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+All API requests require an `X-API-Key` header. Keys are scoped to one organization and grant owner-level access to that org's public API routes.
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
-```
+JWT bearer tokens (used by the Calibrate web UI) also work at the HTTP layer, but programmatic clients should use API keys exclusively.
