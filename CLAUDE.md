@@ -160,19 +160,21 @@ provider's model, voice, endpoint, or other default on one side, change the
 other side too.**
 
 To make this structural rather than a discipline you have to remember, the
-**model names and TTS voices are single-sourced**: `STT_PROVIDER_MODELS`,
-`TTS_PROVIDER_MODELS`, `TTS_PROVIDER_VOICES`, and `GOOGLE_TTS_VOICE_FAMILY` in
-`calibrate/utils.py` are the one place each provider's default model/voice is
-defined, and **both** the eval functions and the `create_*_service` factories
-read from them. Change a value in those dicts and both sides move together. Do
-**not** re-introduce a hardcoded model or voice string in either place —
-reference the constant. (Google's TTS voice name embeds the language code, so
-both sides build it as `{lang_code}-{GOOGLE_TTS_VOICE_FAMILY}`; other
+**model names and TTS voices are single-sourced** in `calibrate/utils.py`:
+`STT_PROVIDER_MODELS` / `TTS_PROVIDER_MODELS` define each provider's default
+model, and TTS voices resolve through `get_tts_voice(provider, language)` —
+which returns the per-language override in `TTS_PROVIDER_VOICES_BY_LANGUAGE` if
+one exists, else the provider default in `TTS_PROVIDER_VOICES` (Google builds
+`{lang_code}-{GOOGLE_TTS_VOICE_FAMILY}`). **Both** the eval functions and the
+`create_*_service` factories read from these. Change a value and both sides move
+together. Do **not** re-introduce a hardcoded model or voice string in either
+place — reference the constant / call `get_tts_voice`. (Voices are per-language:
+e.g. Cartesia and Smallest ship distinct Hindi/Kannada voices; other
 per-provider params still need manual mirroring.)
 
 `tests/test_utils_factories.py` guards this: it asserts every provider's model
-and voice in `create_*_service` comes from the shared constants. If you add a
-provider or change a default, update both sides
+and voice in `create_*_service` matches the shared source for every language. If
+you add a provider or change a default, update both sides
 and that test. **Sarvam STT** uses `saaras:v3` with `mode="transcribe"` (passed
 to pipecat's `SarvamSTTService`), which under pipecat 1.0.0 routes to the plain
 STT streaming endpoint — matching the benchmark's `transcribe_sarvam`. This was
@@ -226,6 +228,21 @@ Tests are pure unit tests — **no real API calls** are ever made:
   pass the "is the key set?" guard before the mocked code path runs.
 
 The suite runs in ~10s locally and contributes coverage to Codecov on CI.
+
+### Committing and pushing
+**Once a change is complete and its scoped tests pass, commit and push it
+without waiting for approval** — don't stop to ask first. This overrides the
+default "commit/push only when asked" behavior for this repo. Applies to normal
+feature/fix work on a branch:
+
+- Commit with a clear message; push the branch to its remote (`git push`, or
+  `git push -u origin HEAD` the first time).
+- If the branch already has an open PR whose commits were rebased/amended, use
+  `git push --force-with-lease` to update it.
+- If you're on `main`, branch first — never commit straight to `main`.
+- Still pause to ask before genuinely destructive or irreversible actions
+  (e.g. `git reset --hard` over uncommitted work, deleting remote branches,
+  history rewrites beyond your own un-merged branch, publishing a release).
 
 ### Git hooks
 `.githooks/pre-commit` runs `uv run --extra dev pytest tests/` **only when
