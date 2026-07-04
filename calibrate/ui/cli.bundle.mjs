@@ -47131,29 +47131,23 @@ import { execSync } from "node:child_process";
 import net from "node:net";
 import fs3 from "node:fs";
 import path2 from "node:path";
-var CALIBRATE_BIN_NAMES = ["calibrate-agent", "calibrate"];
+var CALIBRATE_BIN = "calibrate-agent";
 function findCalibrateBin() {
-  for (const name of CALIBRATE_BIN_NAMES) {
-    try {
-      execSync(`which ${name}`, { stdio: "pipe" });
-      return { cmd: name, args: [] };
-    } catch {
+  try {
+    execSync(`which ${CALIBRATE_BIN}`, { stdio: "pipe" });
+    return { cmd: CALIBRATE_BIN, args: [] };
+  } catch {
+  }
+  for (const dir of ["../.venv/bin", ".venv/bin"]) {
+    const abs = path2.resolve(dir, CALIBRATE_BIN);
+    if (fs3.existsSync(abs)) {
+      return { cmd: abs, args: [] };
     }
   }
-  for (const name of CALIBRATE_BIN_NAMES) {
-    for (const dir of ["../.venv/bin", ".venv/bin"]) {
-      const abs = path2.resolve(dir, name);
-      if (fs3.existsSync(abs)) {
-        return { cmd: abs, args: [] };
-      }
-    }
-  }
-  for (const name of CALIBRATE_BIN_NAMES) {
-    try {
-      execSync(`uv run which ${name}`, { stdio: "pipe", cwd: path2.resolve("..") });
-      return { cmd: "uv", args: ["run", name] };
-    } catch {
-    }
+  try {
+    execSync(`uv run which ${CALIBRATE_BIN}`, { stdio: "pipe", cwd: path2.resolve("..") });
+    return { cmd: "uv", args: ["run", CALIBRATE_BIN] };
+  } catch {
   }
   return null;
 }

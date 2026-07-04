@@ -28,12 +28,13 @@ describe("findCalibrateBin", () => {
     expect(findCalibrateBin()).toEqual({ cmd: "calibrate-agent", args: [] });
   });
 
-  it("falls back to the legacy `calibrate` name when `calibrate-agent` is absent", () => {
+  it("does NOT accept a bare `calibrate` binary (avoids an unrelated tool)", () => {
     execSync.mockImplementation((cmd: string) => {
       if (cmd === "which calibrate") return Buffer.from("/usr/bin/calibrate");
       throw new Error("not found");
     });
-    expect(findCalibrateBin()).toEqual({ cmd: "calibrate", args: [] });
+    existsSync.mockImplementation((p: string) => p.endsWith("/.venv/bin/calibrate"));
+    expect(findCalibrateBin()).toBeNull();
   });
 
   it("finds `calibrate-agent` in a local .venv when not on PATH", () => {
