@@ -29,6 +29,8 @@ from calibrate.utils import (
     provider_log as _log,
     provider_log_file as _current_log_file,
     TTS_PROVIDER_MODELS,
+    TTS_PROVIDER_VOICES,
+    GOOGLE_TTS_VOICE_FAMILY,
 )
 from calibrate.tts.metrics import get_tts_llm_judge_score
 from calibrate.llm._metrics_utils import _latency_percentiles
@@ -110,7 +112,7 @@ async def synthesize_openai(text: str, language: str, audio_path: str) -> Dict:
     with open(audio_path, "wb") as f:
         async with client.audio.speech.with_streaming_response.create(
             model=TTS_PROVIDER_MODELS["openai"],
-            voice="coral",
+            voice=TTS_PROVIDER_VOICES["openai"],
             input=text,
             response_format="wav",
         ) as response:
@@ -166,7 +168,7 @@ async def synthesize_google(text: str, language: str, audio_path: str) -> Dict:
     )
 
     voice_params = texttospeech.VoiceSelectionParams(
-        name=f"{lang_code}-Chirp3-HD-Charon",
+        name=f"{lang_code}-{GOOGLE_TTS_VOICE_FAMILY}",
         language_code=lang_code,
     )
 
@@ -219,7 +221,7 @@ async def synthesize_elevenlabs(text: str, language: str, audio_path: str) -> Di
 
     elevenlabs = AsyncElevenLabs(api_key=api_key)
 
-    voice_id = "m5qndnI7u4OAdXhH0Mr5"
+    voice_id = TTS_PROVIDER_VOICES["elevenlabs"]
     output_format = "mp3_24000_48"
 
     if language.lower() == "sindhi":
@@ -286,7 +288,7 @@ async def synthesize_cartesia(text: str, language: str, audio_path: str) -> Dict
             transcript=text,
             voice={
                 "mode": "id",
-                "id": "faf0731e-dfb9-4cfc-8119-259a79b27e12",  # riya
+                "id": TTS_PROVIDER_VOICES["cartesia"],  # riya
             },
             language=lang_code,
             output_format={
@@ -314,7 +316,7 @@ async def synthesize_groq(text: str, language: str, audio_path: str) -> Dict:
     client = AsyncGroq(api_key=api_key)
 
     model = TTS_PROVIDER_MODELS["groq"]
-    voice = "troy"
+    voice = TTS_PROVIDER_VOICES["groq"]
     response_format = "wav"
 
     response = await client.audio.speech.create(
@@ -347,7 +349,7 @@ async def synthesize_sarvam(text: str, language: str, audio_path: str) -> Dict:
     ) as ws:
         await ws.configure(
             target_language_code=lang_code,
-            speaker="aditya",
+            speaker=TTS_PROVIDER_VOICES["sarvam"],
             output_audio_codec="mp3",
             speech_sample_rate=22050,
             enable_preprocessing=True,
@@ -409,7 +411,7 @@ async def synthesize_smallest(text: str, language: str, audio_path: str) -> Dict
     ws_url = "wss://waves-api.smallest.ai/api/v1/lightning-v3.1/get_speech/stream"
     payload = {
         "text": text,
-        "voice_id": "aditi",
+        "voice_id": TTS_PROVIDER_VOICES["smallest"],
         "language": lang_code,
         "sample_rate": 24000,
         "speed": 1.0,

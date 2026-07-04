@@ -102,23 +102,36 @@ class TestCreateTTSService(unittest.TestCase):
 
     def test_defaults_match_tts_eval(self):
         """The live-agent TTS defaults must stay in sync with the benchmark
-        defaults in calibrate/tts/eval.py. Model names come from the shared
-        utils.TTS_PROVIDER_MODELS (which tts/eval.py also reads), so those can't
-        drift; voices are asserted against the eval literals directly. In pipecat
-        1.0.0 both are passed via <Service>.Settings(model=..., voice=...)."""
-        from calibrate.utils import create_tts_service, TTS_PROVIDER_MODELS
+        defaults in calibrate/tts/eval.py. Both models and voices come from the
+        shared utils.TTS_PROVIDER_MODELS / TTS_PROVIDER_VOICES (which tts/eval.py
+        also reads), so neither can drift. In pipecat 1.0.0 both are passed via
+        <Service>.Settings(model=..., voice=...)."""
+        from calibrate.utils import (
+            create_tts_service,
+            TTS_PROVIDER_MODELS,
+            TTS_PROVIDER_VOICES,
+            GOOGLE_TTS_VOICE_FAMILY,
+        )
 
         # provider -> (expected model or None, expected voice) for english.
         expected = {
-            "cartesia": (TTS_PROVIDER_MODELS["cartesia"],
-                         "faf0731e-dfb9-4cfc-8119-259a79b27e12"),
-            "openai": (TTS_PROVIDER_MODELS["openai"], "coral"),
-            "groq": (TTS_PROVIDER_MODELS["groq"], "troy"),
-            "google": (None, "en-US-Chirp3-HD-Charon"),
-            "elevenlabs": (TTS_PROVIDER_MODELS["elevenlabs"], "m5qndnI7u4OAdXhH0Mr5"),
-            "sarvam": (TTS_PROVIDER_MODELS["sarvam"], "aditya"),
-            "smallest": (None, "aditi"),
+            "cartesia": (TTS_PROVIDER_MODELS["cartesia"], TTS_PROVIDER_VOICES["cartesia"]),
+            "openai": (TTS_PROVIDER_MODELS["openai"], TTS_PROVIDER_VOICES["openai"]),
+            "groq": (TTS_PROVIDER_MODELS["groq"], TTS_PROVIDER_VOICES["groq"]),
+            "google": (None, f"en-US-{GOOGLE_TTS_VOICE_FAMILY}"),
+            "elevenlabs": (TTS_PROVIDER_MODELS["elevenlabs"], TTS_PROVIDER_VOICES["elevenlabs"]),
+            "sarvam": (TTS_PROVIDER_MODELS["sarvam"], TTS_PROVIDER_VOICES["sarvam"]),
+            "smallest": (None, TTS_PROVIDER_VOICES["smallest"]),
         }
+
+        # Completeness guard: `expected` must cover every single-sourced TTS
+        # provider (both dicts, plus Google which is single-sourced via
+        # GOOGLE_TTS_VOICE_FAMILY). Adding a provider to a constant without a
+        # parity row here fails the test until it's covered too.
+        self.assertEqual(
+            set(expected),
+            set(TTS_PROVIDER_MODELS) | set(TTS_PROVIDER_VOICES) | {"google"},
+        )
 
         for prov, (model_val, voice_val) in expected.items():
             with patch.dict(os.environ, ALL_KEYS), \

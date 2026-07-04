@@ -160,17 +160,19 @@ provider's model, voice, endpoint, or other default on one side, change the
 other side too.**
 
 To make this structural rather than a discipline you have to remember, the
-**model names are single-sourced**: `STT_PROVIDER_MODELS` and
-`TTS_PROVIDER_MODELS` in `calibrate/utils.py` are the one place each provider's
-default model is defined, and **both** the eval functions and the
-`create_*_service` factories read from them. Change the model in that dict and
-both sides move together. Do **not** re-introduce a hardcoded model string in
-either place — reference the constant. (Voices live in `TTS_VOICE_IDS`; other
+**model names and TTS voices are single-sourced**: `STT_PROVIDER_MODELS`,
+`TTS_PROVIDER_MODELS`, `TTS_PROVIDER_VOICES`, and `GOOGLE_TTS_VOICE_FAMILY` in
+`calibrate/utils.py` are the one place each provider's default model/voice is
+defined, and **both** the eval functions and the `create_*_service` factories
+read from them. Change a value in those dicts and both sides move together. Do
+**not** re-introduce a hardcoded model or voice string in either place —
+reference the constant. (Google's TTS voice name embeds the language code, so
+both sides build it as `{lang_code}-{GOOGLE_TTS_VOICE_FAMILY}`; other
 per-provider params still need manual mirroring.)
 
 `tests/test_utils_factories.py` guards this: it asserts every provider's model
-in `create_*_service` comes from the shared constant, and that TTS voices match
-the eval literals. If you add a provider or change a default, update both sides
+and voice in `create_*_service` comes from the shared constants. If you add a
+provider or change a default, update both sides
 and that test. **Sarvam STT** uses `saaras:v3` with `mode="transcribe"` (passed
 to pipecat's `SarvamSTTService`), which under pipecat 1.0.0 routes to the plain
 STT streaming endpoint — matching the benchmark's `transcribe_sarvam`. This was
