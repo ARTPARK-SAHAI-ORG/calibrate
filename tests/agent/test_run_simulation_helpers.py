@@ -158,6 +158,7 @@ class TestSimulatedUserTurnIndexHook(unittest.IsolatedAsyncioTestCase):
 
         adapter = MagicMock()
         adapter._sim_user_turn_pending = False
+        adapter._agent_has_floor = True
         hook = SimulatedUserTurnIndexHook(adapter)
         frame = MagicMock(spec=LLMFullResponseStartFrame)
 
@@ -165,6 +166,39 @@ class TestSimulatedUserTurnIndexHook(unittest.IsolatedAsyncioTestCase):
              patch.object(SimulatedUserTurnIndexHook, "push_frame", AsyncMock()):
             await hook.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertTrue(adapter._sim_user_turn_pending)
+        # Sim user taking a turn releases the agent's floor so the agent's next
+        # utterance is treated as taking the floor back (and interrupts).
+        self.assertFalse(adapter._agent_has_floor)
+
+
+class TestBuildUserContextAggregator(unittest.TestCase):
+    """The sim aggregator must honor the explicit UserStarted/UserStopped frames.
+
+    Regression test: pipecat's default turn strategies (VAD + smart-turn) ignore
+    those frames and drop the first utterance of a multi-utterance agent turn
+    (e.g. a greeting spoken before the first question). The aggregator must be
+    built with ExternalUserTurnStrategies instead.
+    """
+
+    def test_uses_external_turn_strategies(self):
+        from calibrate.agent.run_simulation import build_user_context_aggregator
+        from pipecat.processors.aggregators.llm_context import LLMContext
+        from pipecat.turns.user_start.external_user_turn_start_strategy import (
+            ExternalUserTurnStartStrategy,
+        )
+        from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
+            ExternalUserTurnStopStrategy,
+        )
+
+        ctx = LLMContext([{"role": "system", "content": "x"}])
+        pair = build_user_context_aggregator(ctx)
+        strategies = pair.user()._user_turn_controller._user_turn_strategies
+        self.assertTrue(
+            any(isinstance(s, ExternalUserTurnStartStrategy) for s in strategies.start)
+        )
+        self.assertTrue(
+            any(isinstance(s, ExternalUserTurnStopStrategy) for s in strategies.stop)
+        )
 
 
 class TestSTTLogger(unittest.IsolatedAsyncioTestCase):

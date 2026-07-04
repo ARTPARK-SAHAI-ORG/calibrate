@@ -217,5 +217,163 @@ class TestResetBuffers(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(adapter._spoken_text_buffer, "")
 
 
+def _rtvi_frame(msg_type):
+    from pipecat.frames.frames import InputTransportMessageFrame
+
+    return InputTransportMessageFrame(
+        message={"label": "rtvi-ai", "type": msg_type}
+    )
+
+
+def _stub_tasks(adapter):
+    """Replace the pipecat task-manager hooks so no real event loop tasks run.
+
+    ``_schedule_agent_turn_stop`` calls ``create_task`` (needs a running task
+    manager the unit-test adapter doesn't have); the coalescing tests drive the
+    debounce coroutine directly instead.
+    """
+    def _fake_create_task(coro, name=None):
+        coro.close()  # avoid "coroutine was never awaited" warnings
+        return MagicMock()
+
+    adapter.create_task = _fake_create_task
+    adapter.cancel_task = AsyncMock()
+
+
+async def _drive_bot_started(adapter, pushed=None):
+    """Push a ``bot-started-speaking`` RTVI frame through the adapter.
+
+    Captures every ``push_frame`` call and returns the pushed (frame, direction)
+    pairs so tests can assert whether an InterruptionTaskFrame was emitted.
+    """
+    return await _drive_rtvi(adapter, "bot-started-speaking", pushed)
+
+
+async def _drive_rtvi(adapter, msg_type, pushed=None):
+    from pipecat.processors.frame_processor import FrameDirection
+
+    if pushed is None:
+        pushed = []
+
+    async def _capture(frame, direction):
+        pushed.append((frame, direction))
+
+    _stub_tasks(adapter)
+    adapter.push_frame = _capture
+    await adapter.process_frame(_rtvi_frame(msg_type), FrameDirection.DOWNSTREAM)
+    return pushed
+
+
+def _count_frames(pushed, frame_cls):
+    return sum(1 for frame, _ in pushed if isinstance(frame, frame_cls))
+
+
+def _count_interruptions(pushed):
+    from pipecat.frames.frames import InterruptionTaskFrame
+
+    return _count_frames(pushed, InterruptionTaskFrame)
+
+
+class TestAgentFloorInterruptGating(unittest.IsolatedAsyncioTestCase):
+    """Consecutive agent utterances must not interrupt (and drop) one another.
+
+    Regression test for the bug where an external agent that speaks its opening
+    as two back-to-back utterances (e.g. a greeting then the first question) had
+    the greeting erased: the second utterance's InterruptionTaskFrame cancelled
+    the user context aggregator's queue before the greeting was committed.
+    """
+
+    async def test_first_utterance_interrupts(self):
+        adapter = _make_adapter()
+        self.assertFalse(adapter._agent_has_floor)
+        pushed = await _drive_bot_started(adapter)
+        self.assertEqual(_count_interruptions(pushed), 1)
+        self.assertTrue(adapter._agent_has_floor)
+
+    async def test_consecutive_utterance_does_not_interrupt(self):
+        adapter = _make_adapter()
+        await _drive_bot_started(adapter)  # first utterance takes the floor
+        pushed = await _drive_bot_started(adapter)  # second utterance, same turn
+        self.assertEqual(_count_interruptions(pushed), 0)
+        self.assertTrue(adapter._agent_has_floor)
+
+    async def test_interrupts_again_after_sim_user_turn(self):
+        from pipecat.frames.frames import LLMFullResponseStartFrame
+        from pipecat.processors.frame_processor import FrameDirection
+        from calibrate.agent.run_simulation import SimulatedUserTurnIndexHook
+
+        adapter = _make_adapter()
+        await _drive_bot_started(adapter)  # agent takes the floor
+
+        # Simulated user starts its own turn -> agent no longer holds the floor.
+        hook = SimulatedUserTurnIndexHook(adapter)
+        hook.push_frame = AsyncMock()
+        await hook.process_frame(
+            LLMFullResponseStartFrame(), FrameDirection.DOWNSTREAM
+        )
+        self.assertFalse(adapter._agent_has_floor)
+
+        # Agent taking the floor back should interrupt the sim user again.
+        pushed = await _drive_bot_started(adapter)
+        self.assertEqual(_count_interruptions(pushed), 1)
+        self.assertTrue(adapter._agent_has_floor)
+
+
+class TestAgentTurnCoalescing(unittest.IsolatedAsyncioTestCase):
+    """Consecutive agent utterances coalesce into one simulated-user turn.
+
+    Regression test for the follow-on bug: with per-utterance UserStopped frames,
+    the sim user's LLM fired on the greeting before it heard the first question,
+    so only sometimes did both land in the same turn. Now UserStopped is debounced
+    so a multi-utterance agent turn (greeting + question) forms one sim-user turn.
+    """
+
+    async def test_single_user_started_across_consecutive_utterances(self):
+        from pipecat.frames.frames import UserStartedSpeakingFrame
+
+        adapter = _make_adapter()
+        pushed = []
+        await _drive_bot_started(adapter, pushed)  # first utterance opens the turn
+        await _drive_bot_started(adapter, pushed)  # follow-on utterance, same turn
+        self.assertTrue(adapter._agent_turn_active)
+        # Only one turn opened, so exactly one UserStartedSpeakingFrame.
+        self.assertEqual(_count_frames(pushed, UserStartedSpeakingFrame), 1)
+
+    async def test_bot_stopped_defers_user_stop(self):
+        from pipecat.frames.frames import (
+            TranscriptionFrame,
+            UserStoppedSpeakingFrame,
+        )
+
+        adapter = _make_adapter()
+        adapter._heard_text_buffer = " नमस्ते!"
+        await _drive_bot_started(adapter)
+        pushed = await _drive_rtvi(adapter, "bot-stopped-speaking")
+        # The utterance's transcription is emitted immediately...
+        self.assertEqual(_count_frames(pushed, TranscriptionFrame), 1)
+        # ...but the turn-ending UserStopped is deferred to the debounce.
+        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 0)
+        self.assertTrue(adapter._agent_turn_active)
+
+    async def test_debounce_emits_user_stop(self):
+        from unittest.mock import patch
+        from pipecat.frames.frames import UserStoppedSpeakingFrame
+        from pipecat.processors.frame_processor import FrameDirection
+
+        adapter = _make_adapter()
+        adapter._agent_turn_active = True
+        pushed = []
+
+        async def _capture(frame, direction):
+            pushed.append((frame, direction))
+
+        adapter.push_frame = _capture
+        with patch("calibrate.agent.run_simulation.asyncio.sleep", AsyncMock()):
+            await adapter._end_agent_turn_after_debounce()
+
+        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 1)
+        self.assertFalse(adapter._agent_turn_active)
+
+
 if __name__ == "__main__":
     unittest.main()
