@@ -1811,7 +1811,7 @@ def create_stt_service(
             encoding="linear16",
             settings=DeepgramSTTService.Settings(
                 language=stt_language,
-                model=STT_PROVIDER_MODELS["deepgram"],
+                model=STT_PROVIDER_MODELS[provider],
             ),
         )
     elif provider == "sarvam":
@@ -1820,7 +1820,7 @@ def create_stt_service(
             mode="transcribe",
             settings=SarvamSTTService.Settings(
                 language=stt_language,
-                model=STT_PROVIDER_MODELS["sarvam"],
+                model=STT_PROVIDER_MODELS[provider],
             ),
         )
     elif provider == "elevenlabs":
@@ -1828,14 +1828,14 @@ def create_stt_service(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
             settings=ElevenLabsRealtimeSTTService.Settings(
                 language=stt_language,
-                model=STT_PROVIDER_MODELS["elevenlabs"],
+                model=STT_PROVIDER_MODELS[provider],
             ),
         )
     elif provider == "openai":
         return OpenAISTTService(
             api_key=os.getenv("OPENAI_API_KEY"),
             settings=OpenAISTTService.Settings(
-                language=stt_language, model=model or STT_PROVIDER_MODELS["openai"]
+                language=stt_language, model=model or STT_PROVIDER_MODELS[provider]
             ),
         )
     elif provider == "cartesia":
@@ -1843,7 +1843,7 @@ def create_stt_service(
             api_key=os.getenv("CARTESIA_API_KEY"),
             settings=CartesiaSTTService.Settings(
                 language=stt_language,
-                model=STT_PROVIDER_MODELS["cartesia"],
+                model=STT_PROVIDER_MODELS[provider],
             ),
         )
     elif provider == "smallest":
@@ -1851,14 +1851,14 @@ def create_stt_service(
             api_key=os.getenv("SMALLEST_API_KEY"),
             settings=SmallestSTTService.Settings(
                 language=stt_language,
-                model=STT_PROVIDER_MODELS["smallest"],
+                model=STT_PROVIDER_MODELS[provider],
             ),
         )
     elif provider == "groq":
         return GroqSTTService(
             api_key=os.getenv("GROQ_API_KEY"),
             settings=GroqSTTService.Settings(
-                language=stt_language, model=model or STT_PROVIDER_MODELS["groq"]
+                language=stt_language, model=model or STT_PROVIDER_MODELS[provider]
             ),
         )
     elif provider == "google":
@@ -1867,7 +1867,7 @@ def create_stt_service(
             location="us",
             settings=GoogleSTTService.Settings(
                 languages=[stt_language],
-                model=model or STT_PROVIDER_MODELS["google"],
+                model=model or STT_PROVIDER_MODELS[provider],
             ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )
@@ -1914,16 +1914,16 @@ def create_tts_service(
             api_key=os.getenv("CARTESIA_API_KEY"),
             settings=CartesiaTTSService.Settings(
                 language=tts_language,
-                model=model or TTS_PROVIDER_MODELS["cartesia"],
-                voice=voice_id or get_tts_voice("cartesia", language),
+                model=model or TTS_PROVIDER_MODELS[provider],
+                voice=voice_id or get_tts_voice(provider, language),
             ),
         )
     elif provider == "openai":
         return OpenAITTSService(
             api_key=os.getenv("OPENAI_API_KEY"),
             settings=OpenAITTSService.Settings(
-                model=model or TTS_PROVIDER_MODELS["openai"],
-                voice=voice_id or get_tts_voice("openai", language),
+                model=model or TTS_PROVIDER_MODELS[provider],
+                voice=voice_id or get_tts_voice(provider, language),
                 instructions=instructions,
             ),
         )
@@ -1931,15 +1931,15 @@ def create_tts_service(
         return GroqTTSService(
             api_key=os.getenv("GROQ_API_KEY"),
             settings=GroqTTSService.Settings(
-                model=model or TTS_PROVIDER_MODELS["groq"],
-                voice=voice_id or get_tts_voice("groq", language),
+                model=model or TTS_PROVIDER_MODELS[provider],
+                voice=voice_id or get_tts_voice(provider, language),
             ),
         )
     elif provider == "google":
         return GoogleTTSService(
             settings=GoogleTTSService.Settings(
                 language=tts_language,
-                voice=voice_id or get_tts_voice("google", language),
+                voice=voice_id or get_tts_voice(provider, language),
             ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )
@@ -1948,8 +1948,8 @@ def create_tts_service(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
             settings=ElevenLabsTTSService.Settings(
                 language=tts_language,
-                model=TTS_PROVIDER_MODELS["elevenlabs"],
-                voice=voice_id or get_tts_voice("elevenlabs", language),
+                model=TTS_PROVIDER_MODELS[provider],
+                voice=voice_id or get_tts_voice(provider, language),
             ),
         )
     elif provider == "sarvam":
@@ -1957,8 +1957,8 @@ def create_tts_service(
             api_key=os.getenv("SARVAM_API_KEY"),
             settings=SarvamTTSService.Settings(
                 language=tts_language,
-                model=model or TTS_PROVIDER_MODELS["sarvam"],
-                voice=voice_id or get_tts_voice("sarvam", language),
+                model=model or TTS_PROVIDER_MODELS[provider],
+                voice=voice_id or get_tts_voice(provider, language),
             ),
         )
     elif provider == "deepgram":
@@ -1970,7 +1970,7 @@ def create_tts_service(
         return SmallestTTSService(
             api_key=os.getenv("SMALLEST_API_KEY"),
             settings=SmallestTTSService.Settings(
-                voice=voice_id or get_tts_voice("smallest", language),
+                voice=voice_id or get_tts_voice(provider, language),
                 language=tts_language,
             ),
         )
