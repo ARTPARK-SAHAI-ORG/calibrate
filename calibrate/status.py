@@ -12,6 +12,7 @@ import asyncio
 import json
 import time
 import struct
+from urllib.parse import urlencode
 
 import httpx
 
@@ -288,28 +289,99 @@ async def _check_cartesia(client: httpx.AsyncClient) -> str:
     return "tts"
 
 
-async def _check_smallest(client: httpx.AsyncClient) -> str:
-    """TTS: synthesize 'hi' via Smallest streaming TTS."""
+# Smallest retired lightning-v2 (the standalone smallestai SDK's hard-coded
+# model), so it now returns HTTP 410 Gone. lightning-v3.1 is the current model
+# and matches what pipecat's SmallestTTSService uses in the real TTS/agent path
+# (see calibrate/utils.py:create_tts_service).
+_SMALLEST_TTS_WS_URL = (
+    "wss://waves-api.smallest.ai/api/v1/lightning-v3.1/get_speech/stream"
+)
+
+
+_SMALLEST_STT_WS_URL = "wss://api.smallest.ai/waves/v1/stt/live"
+
+
+async def _check_smallest_tts() -> str:
+    """TTS: synthesize 'hi' via Smallest lightning-v3.1 streaming TTS."""
+    from websockets.asyncio.client import connect as websocket_connect
+
     api_key = os.getenv("SMALLEST_API_KEY")
+    payload = {
+        "text": "hi",
+        "voice_id": "sophia",
+        "language": "en",
+        "sample_rate": 24000,
+    }
+    headers = {"Authorization": f"Bearer {api_key}"}
 
-    def _sync_check():
-        from smallestai.waves import TTSConfig, WavesStreamingTTS
+    async with websocket_connect(
+        _SMALLEST_TTS_WS_URL, additional_headers=headers
+    ) as ws:
+        await ws.send(json.dumps(payload))
+        async for message in ws:
+            msg = json.loads(message)
+            status = msg.get("status")
+            if status == "chunk" and msg.get("data", {}).get("audio"):
+                return "tts"  # Got audio — TTS works
+            if status == "error":
+                raise RuntimeError(msg.get("error") or msg.get("message") or msg)
+            if status == "complete":
+                break
+    raise ValueError("No audio generated")
 
-        config = TTSConfig(
-            voice_id="aditi",
-            language="en",
-            api_key=api_key,
-            sample_rate=24000,
-        )
-        tts = WavesStreamingTTS(config)
-        for chunk in tts.synthesize("hi"):
-            if chunk:
-                return  # Got audio — TTS works
-        raise ValueError("No audio generated")
 
-    loop = asyncio.get_running_loop()
-    await loop.run_in_executor(None, _sync_check)
-    return "tts"
+async def _check_smallest_stt() -> str:
+    """STT: stream silence through Smallest's Pulse STT WebSocket."""
+    from websockets.asyncio.client import connect as websocket_connect
+    from websockets.exceptions import ConnectionClosed
+
+    api_key = os.getenv("SMALLEST_API_KEY")
+    params = {
+        "model": "pulse",
+        "language": "en",
+        "encoding": "linear16",
+        "sample_rate": "16000",
+        "word_timestamps": "false",
+    }
+    ws_url = f"{_SMALLEST_STT_WS_URL}?{urlencode(params)}"
+    headers = {"Authorization": f"Bearer {api_key}"}
+    silence = b"\x00\x00" * 8000  # 0.5s @ 16 kHz, 16-bit mono PCM
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+        await ws.send(silence)
+        await ws.send(json.dumps({"type": "close_stream"}))
+        while True:
+            try:
+                message = await asyncio.wait_for(ws.recv(), timeout=5.0)
+            except (asyncio.TimeoutError, ConnectionClosed):
+                break  # Handshake + stream accepted, no error surfaced
+            try:
+                output = json.loads(message)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if isinstance(output, dict) and (
+                output.get("type") == "error" or output.get("error")
+            ):
+                error = output.get("message") or output.get("error") or output
+                raise RuntimeError(f"Smallest STT error: {error}")
+            break  # Got a valid response — STT pipeline is live
+    return "stt"
+
+
+async def _check_smallest(client: httpx.AsyncClient) -> str:
+    """Verify both of Smallest's declared capabilities: STT and TTS."""
+
+    async def _labeled(coro, label):
+        try:
+            return await coro
+        except Exception as e:
+            raise RuntimeError(f"{label} {e}") from e
+
+    await asyncio.gather(
+        _labeled(_check_smallest_tts(), "TTS:"),
+        _labeled(_check_smallest_stt(), "STT:"),
+    )
+    return "stt,tts"
 
 
 async def _check_deepgram(client: httpx.AsyncClient) -> str:

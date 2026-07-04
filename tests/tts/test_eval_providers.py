@@ -157,19 +157,72 @@ class TestSynthesizeSarvam(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(result.get("ttfb"))
 
 
+class _FakeSmallestWS:
+    def __init__(self, messages):
+        self._messages = messages
+        self.sent = []
+
+    async def send(self, data):
+        self.sent.append(data)
+
+    def __aiter__(self):
+        self._it = iter(self._messages)
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._it)
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+class _FakeSmallestConnect:
+    def __init__(self, ws):
+        self._ws = ws
+
+    async def __aenter__(self):
+        return self._ws
+
+    async def __aexit__(self, *exc):
+        return False
+
+
 class TestSynthesizeSmallest(unittest.IsolatedAsyncioTestCase):
     async def test_smallest_happy(self):
+        import base64
+        import json
         from calibrate.tts import eval as E
 
-        fake_streamer = MagicMock()
-        fake_streamer.synthesize = MagicMock(return_value=iter([b"RIFF" + b"\x00" * 100]))
+        audio_b64 = base64.b64encode(b"\x01\x02" * 100).decode()
+        messages = [
+            json.dumps({"status": "chunk", "data": {"audio": audio_b64}}),
+            json.dumps({"status": "chunk", "data": {"audio": audio_b64}}),
+            json.dumps({"status": "complete"}),
+        ]
+        ws = _FakeSmallestWS(messages)
 
         with tempfile.TemporaryDirectory() as tmp, \
              patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), \
-             patch.object(E, "WavesStreamingTTS", return_value=fake_streamer):
+             patch("websockets.asyncio.client.connect",
+                   MagicMock(return_value=_FakeSmallestConnect(ws))):
             path = Path(tmp) / "x.wav"
             result = await E.synthesize_smallest("hi", "english", str(path))
-        self.assertIsNotNone(result.get("ttfb"))
+            self.assertIsNotNone(result.get("ttfb"))
+            self.assertTrue(path.exists())
+            self.assertEqual(len(ws.sent), 1)  # one JSON synthesis request
+
+    async def test_smallest_server_error(self):
+        import json
+        from calibrate.tts import eval as E
+
+        ws = _FakeSmallestWS([json.dumps({"status": "error", "error": "boom"})])
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.dict(os.environ, {"SMALLEST_API_KEY": "k"}), \
+             patch("websockets.asyncio.client.connect",
+                   MagicMock(return_value=_FakeSmallestConnect(ws))):
+            path = Path(tmp) / "x.wav"
+            with self.assertRaises(RuntimeError):
+                await E.synthesize_smallest("hi", "english", str(path))
 
 
 class TestSynthesizeGoogle(unittest.IsolatedAsyncioTestCase):
