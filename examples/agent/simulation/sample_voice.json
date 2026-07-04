@@ -29,6 +29,14 @@
   ],
   "personas": [
     {
+      "label": "patient customer",
+      "characteristics": "You are a polite customer checking your order status. Your order ID is ORD-12345. You wait for the agent to finish speaking before responding.",
+      "gender": "neutral",
+      "language": "english",
+      "interruption_sensitivity": "none"
+    },
+
+    {
       "label": "impatient customer",
       "characteristics": "You are an impatient customer who has been waiting a long time for your order. Your order ID is ORD-67890. You are frustrated but not rude.",
       "gender": "neutral",
