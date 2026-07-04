@@ -24,6 +24,7 @@ import pandas as pd
 from calibrate.utils import (
     get_stt_language_code,
     validate_stt_language,
+    STT_PROVIDER_MODELS,
     provider_log as _log,
     provider_log_file as _current_log_file,
 )
@@ -141,7 +142,7 @@ async def transcribe_deepgram_streaming(audio_path: Path, language: str) -> str:
 
     endpoint = "wss://api.deepgram.com/v1/listen"
     params = {
-        "model": "nova-3",
+        "model": STT_PROVIDER_MODELS["deepgram"],
         "language": lang_code,
         "encoding": "linear16",
         "sample_rate": "16000",
@@ -231,7 +232,7 @@ async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
     # Supplying the input language (ISO-639-1) improves accuracy and latency
     # per the OpenAI transcription docs.
     stream = await client.audio.transcriptions.create(
-        model="gpt-4o-transcribe",
+        model=STT_PROVIDER_MODELS["openai"],
         file=audio_file,
         language=lang_code,
         response_format="text",
@@ -268,7 +269,7 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
     transcription = await asyncio.wait_for(
         client.audio.transcriptions.create(
             file=audio_file,  # Required audio file
-            model="whisper-large-v3-turbo",  # Required model to use for transcription
+            model=STT_PROVIDER_MODELS["groq"],  # Required model to use for transcription
             response_format="text",  # Optional
             language=lang_code,  # Optional
             temperature=0.0,  # Optional
@@ -381,7 +382,7 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
         model = "chirp_2"
         region = "asia-southeast1"
     else:
-        model = "chirp_3"
+        model = STT_PROVIDER_MODELS["google"]
         region = "us"
 
     result = await asyncio.wait_for(
@@ -425,7 +426,7 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
 
     async with client.speech_to_text_streaming.connect(
         language_code=lang_code,
-        model="saaras:v3",
+        model=STT_PROVIDER_MODELS["sarvam"],
         mode="transcribe",
         flush_signal=True,
     ) as ws:
@@ -479,7 +480,7 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
     try:
         # Create websocket connection with voice activity detection
         ws = await client.stt.websocket(
-            model="ink-whisper",  # Model (required)
+            model=STT_PROVIDER_MODELS["cartesia"],  # Model (required)
             language=lang_code,  # Language of your audio (required)
             encoding="pcm_s16le",  # Audio encoding format (required)
             sample_rate=16000,  # Audio sample rate (required)
@@ -558,7 +559,7 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
     lang_code = get_stt_language_code(language, "smallest")
     endpoint = "wss://api.smallest.ai/waves/v1/stt/live"
     params = {
-        "model": "pulse",
+        "model": STT_PROVIDER_MODELS["smallest"],
         "language": lang_code,
         "encoding": "linear16",
         "sample_rate": "16000",
@@ -695,7 +696,7 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
     client = ElevenLabs(api_key=api_key)
     connection = await client.speech_to_text.realtime.connect(
         RealtimeAudioOptions(
-            model_id="scribe_v2_realtime",
+            model_id=STT_PROVIDER_MODELS["elevenlabs"],
             audio_format=AudioFormat.PCM_16000,
             sample_rate=16000,
             commit_strategy=CommitStrategy.MANUAL,

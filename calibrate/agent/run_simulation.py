@@ -151,7 +151,6 @@ from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.deepgram.stt import DeepgramSTTService
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.elevenlabs.tts import ElevenLabsHttpTTSService
@@ -178,6 +177,30 @@ TRANSCRIPT_FILE_NAME = "transcript.json"
 
 DEFAULT_SERIALIZER_NAME = "protobuf"
 SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
+
+# Voices for the SIMULATED USER (the fake human), one place to see/edit them.
+# Deliberately kept distinct from the agent's voice (create_tts_service) so the
+# two speakers are distinguishable. ElevenLabs is used for its word-level HTTP
+# TTS (mid-utterance interrupts commit only the words actually spoken); Kannada
+# has no real ElevenLabs voice, so it uses Google Chirp3-HD (and its female voice
+# avoids the agent's Achernar default). Languages absent here fall back to english.
+SIMULATED_USER_VOICES = {
+    "kannada": {
+        "provider": "google",
+        "female": "kn-IN-Chirp3-HD-Kore",
+        "male": "kn-IN-Chirp3-HD-Achird",
+    },
+    "hindi": {
+        "provider": "elevenlabs",
+        "female": "dVTC43Yewy5fAIcmsISI",
+        "male": "hdkYGMdbdWZpANLZvmnk",
+    },
+    "english": {
+        "provider": "elevenlabs",
+        "female": "OHY6EjdeHKeQymoihwfz",
+        "male": "fPIfC3elMLbN9tNwMXkw",
+    },
+}
 
 
 def resolve_serializer(name: str) -> FrameSerializer:
@@ -1339,30 +1362,17 @@ async def _run_simulation_inner(
         else Language.HI if language == "hindi" else Language.EN
     )
 
-    # ElevenLabs has no real Kannada voice (it falls back to English), so the
-    # Kannada simulated user speaks via Google TTS (Chirp3 kn-IN). English and
-    # Hindi keep ElevenLabs word-level TTS, so mid-utterance interrupts commit
-    # only the words actually spoken.
+    # Simulated-user voice + provider come from SIMULATED_USER_VOICES (module
+    # top). Unlisted languages fall back to english, matching the previous
+    # behavior.
+    voices = SIMULATED_USER_VOICES.get(language, SIMULATED_USER_VOICES["english"])
+    voice_id = voices["female" if gender == "female" else "male"]
+
     elevenlabs_http_session = None
-    if language == "kannada":
-        voice_id = (
-            "kn-IN-Chirp3-HD-Achernar"
-            if gender == "female"
-            else "kn-IN-Chirp3-HD-Achird"
-        )
+    if voices["provider"] == "google":
         tts = create_tts_service("google", language, voice_id=voice_id)
         eval_logger.info(f"Using Google TTS voice: {voice_id}")
-    else:
-        if language == "hindi":
-            if gender == "female":
-                voice_id = "dVTC43Yewy5fAIcmsISI"
-            else:
-                voice_id = "hdkYGMdbdWZpANLZvmnk"
-        else:
-            # Default to English voices
-            voice_id = (
-                "OHY6EjdeHKeQymoihwfz" if gender == "female" else "fPIfC3elMLbN9tNwMXkw"
-            )
+    elif voices["provider"] == "elevenlabs":
         eval_logger.info(f"Using ElevenLabs voice ID: {voice_id}")
         elevenlabs_http_session = aiohttp.ClientSession()
         tts = ElevenLabsHttpTTSService(
@@ -1371,6 +1381,10 @@ async def _run_simulation_inner(
             settings=ElevenLabsHttpTTSService.Settings(
                 voice=voice_id, language=tts_language
             ),
+        )
+    else:
+        raise ValueError(
+            f"Unsupported simulated-user TTS provider: {voices['provider']}"
         )
 
     llm = OpenAILLMService(
