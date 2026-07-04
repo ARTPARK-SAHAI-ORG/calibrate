@@ -31,6 +31,7 @@ from calibrate_agent.utils import (
     build_tools_schema,
     make_webhook_call,
     create_tts_service,
+    wrap_tts_with_empty_response_retry,
     provider_log_file,
     summarize_metric_distribution,
     save_transcript,
@@ -1557,6 +1558,11 @@ async def _run_simulation_inner(
         raise ValueError(
             f"Unsupported simulated-user TTS provider: {voices['provider']}"
         )
+
+    # Guard against intermittent silent-TTS turns (e.g. ElevenLabs returning a
+    # 200 with an empty audio stream), which otherwise stall the sim until the
+    # pipeline idle timeout and truncate the transcript.
+    tts = wrap_tts_with_empty_response_retry(tts)
 
     llm = OpenAILLMService(
         api_key=os.getenv("OPENAI_API_KEY"),
