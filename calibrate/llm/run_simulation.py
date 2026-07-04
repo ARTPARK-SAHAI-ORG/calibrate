@@ -22,6 +22,7 @@ from calibrate.utils import (
     current_simulation_name,
     provider_log_file,
     summarize_metric_distribution,
+    save_transcript,
 )
 from pipecat.frames.frames import (
     TranscriptionFrame,
@@ -272,9 +273,7 @@ class Processor(FrameProcessor):
             if message["role"] not in ["system"]
         ]
 
-        transcript_path = join(self._output_dir, "transcript.json")
-        with open(transcript_path, "w") as f:
-            json.dump(transcript, f, indent=4)
+        save_transcript(self._output_dir, transcript)
 
     async def _handle_completed_response(self, response: str):
         should_continue = True
@@ -581,15 +580,6 @@ async def run_simulation(
     }
 
 
-def _save_transcript(output_dir: str | None, transcript: list[dict]) -> None:
-    if not output_dir:
-        return
-
-    transcript_path = join(output_dir, "transcript.json")
-    with open(transcript_path, "w") as f:
-        json.dump(transcript, f, indent=4)
-
-
 async def run_simulation_with_agent(
     agent: "TextAgentConnection",
     user_system_prompt: str,
@@ -686,7 +676,7 @@ async def run_simulation_with_agent(
         user_messages.append({"role": "assistant", "content": user_message})
         transcript.append({"role": "user", "content": user_message})
         log_and_print(f"\033[93m[User]: {user_message}\033[0m")
-        _save_transcript(output_dir, transcript)
+        save_transcript(output_dir, transcript)
 
         # --- External agent turn ---
         agent_messages.append({"role": "user", "content": user_message})
@@ -696,7 +686,7 @@ async def run_simulation_with_agent(
         agent_messages.append({"role": "assistant", "content": agent_text})
         transcript.append({"role": "assistant", "content": agent_text})
         log_and_print(f"\033[94m[Agent]: {agent_text}\033[0m")
-        _save_transcript(output_dir, transcript)
+        save_transcript(output_dir, transcript)
 
         # Prepare user simulator for next turn
         user_messages.append({"role": "user", "content": agent_text})
@@ -707,7 +697,7 @@ async def run_simulation_with_agent(
     if max_turns_reached:
         transcript.append({"role": "end_reason", "content": "max_turns"})
 
-    _save_transcript(output_dir, transcript)
+    save_transcript(output_dir, transcript)
 
     evaluation_results = await _judge_and_emit(
         transcript, evaluators, fallback_judge_model, emit=log_and_print
@@ -839,8 +829,7 @@ async def run_single_simulation_task(
                         metric_dict["value"]
                     )
 
-                with open(join(simulation_output_dir, "transcript.json"), "w") as f:
-                    json.dump(output["transcript"], f, indent=4)
+                save_transcript(simulation_output_dir, output["transcript"])
 
                 df = pd.DataFrame(output["evaluation_results"])
                 df.to_csv(
@@ -1135,8 +1124,7 @@ async def run_eval_only_simulation_task(
             emit=lambda line: print(f"[{display_name}] {line}"),
         )
 
-        with open(join(simulation_output_dir, "transcript.json"), "w") as f:
-            json.dump(transcript, f, indent=4)
+        save_transcript(simulation_output_dir, transcript)
 
         pd.DataFrame(evaluation_results).to_csv(
             join(simulation_output_dir, "evaluation_results.csv"), index=False

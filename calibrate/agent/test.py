@@ -13,6 +13,7 @@ from typing import Literal
 
 from calibrate.utils import (
     save_audio_chunk,
+    save_transcript,
     create_stt_service,
     create_tts_service,
     build_tools_schema,
@@ -384,8 +385,7 @@ async def run_bot(
         message for message in context.get_messages() if message.get("role") != "system"
     ]
 
-    with open(join(output_dir, "transcript.json"), "w") as transcript_file:
-        json.dump(transcript, transcript_file, indent=4)
+    save_transcript(output_dir, transcript)
 
     print(f"Conversation transcript saved to {join(output_dir, 'transcript.json')}")
 

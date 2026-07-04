@@ -33,6 +33,8 @@ from calibrate.utils import (
     create_tts_service,
     provider_log_file,
     summarize_metric_distribution,
+    save_transcript,
+    TRANSCRIPT_FILE_NAME,
 )
 from calibrate.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
 from calibrate.stt.metrics import (
@@ -189,7 +191,6 @@ from pipecat.utils.time import time_now_iso8601
 
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
-TRANSCRIPT_FILE_NAME = "transcript.json"
 # Punctuation that should attach to the preceding word when joining TTS text
 # fragments into a persona turn (covers Latin plus the Devanagari danda).
 _PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
@@ -750,11 +751,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         """
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self._serialized_transcript = transcript
-
-        with open(
-            os.path.join(self._output_dir, TRANSCRIPT_FILE_NAME), "w"
-        ) as transcripts_file:
-            json.dump(transcript, transcripts_file, indent=4)
+        save_transcript(self._output_dir, transcript)
 
     async def _save_intermediate_state(
         self,
