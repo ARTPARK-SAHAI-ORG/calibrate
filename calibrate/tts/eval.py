@@ -29,8 +29,7 @@ from calibrate.utils import (
     provider_log as _log,
     provider_log_file as _current_log_file,
     TTS_PROVIDER_MODELS,
-    TTS_PROVIDER_VOICES,
-    GOOGLE_TTS_VOICE_FAMILY,
+    get_tts_voice,
 )
 from calibrate.tts.metrics import get_tts_llm_judge_score
 from calibrate.llm._metrics_utils import _latency_percentiles
@@ -112,7 +111,7 @@ async def synthesize_openai(text: str, language: str, audio_path: str) -> Dict:
     with open(audio_path, "wb") as f:
         async with client.audio.speech.with_streaming_response.create(
             model=TTS_PROVIDER_MODELS["openai"],
-            voice=TTS_PROVIDER_VOICES["openai"],
+            voice=get_tts_voice("openai", language),
             input=text,
             response_format="wav",
         ) as response:
@@ -168,7 +167,7 @@ async def synthesize_google(text: str, language: str, audio_path: str) -> Dict:
     )
 
     voice_params = texttospeech.VoiceSelectionParams(
-        name=f"{lang_code}-{GOOGLE_TTS_VOICE_FAMILY}",
+        name=get_tts_voice("google", language),
         language_code=lang_code,
     )
 
@@ -221,7 +220,7 @@ async def synthesize_elevenlabs(text: str, language: str, audio_path: str) -> Di
 
     elevenlabs = AsyncElevenLabs(api_key=api_key)
 
-    voice_id = TTS_PROVIDER_VOICES["elevenlabs"]
+    voice_id = get_tts_voice("elevenlabs", language)
     output_format = "mp3_24000_48"
 
     if language.lower() == "sindhi":
@@ -240,7 +239,7 @@ async def synthesize_elevenlabs(text: str, language: str, audio_path: str) -> Di
         model_id = TTS_PROVIDER_MODELS["elevenlabs"]
 
         response = elevenlabs.text_to_speech.stream(
-            voice_id=voice_id,  # Krishna pre-made voice
+            voice_id=voice_id,
             output_format=output_format,
             text=text,
             model_id=model_id,
@@ -288,7 +287,7 @@ async def synthesize_cartesia(text: str, language: str, audio_path: str) -> Dict
             transcript=text,
             voice={
                 "mode": "id",
-                "id": TTS_PROVIDER_VOICES["cartesia"],  # riya
+                "id": get_tts_voice("cartesia", language),
             },
             language=lang_code,
             output_format={
@@ -316,7 +315,7 @@ async def synthesize_groq(text: str, language: str, audio_path: str) -> Dict:
     client = AsyncGroq(api_key=api_key)
 
     model = TTS_PROVIDER_MODELS["groq"]
-    voice = TTS_PROVIDER_VOICES["groq"]
+    voice = get_tts_voice("groq", language)
     response_format = "wav"
 
     response = await client.audio.speech.create(
@@ -349,7 +348,7 @@ async def synthesize_sarvam(text: str, language: str, audio_path: str) -> Dict:
     ) as ws:
         await ws.configure(
             target_language_code=lang_code,
-            speaker=TTS_PROVIDER_VOICES["sarvam"],
+            speaker=get_tts_voice("sarvam", language),
             output_audio_codec="mp3",
             speech_sample_rate=22050,
             enable_preprocessing=True,
@@ -411,7 +410,7 @@ async def synthesize_smallest(text: str, language: str, audio_path: str) -> Dict
     ws_url = "wss://waves-api.smallest.ai/api/v1/lightning-v3.1/get_speech/stream"
     payload = {
         "text": text,
-        "voice_id": TTS_PROVIDER_VOICES["smallest"],
+        "voice_id": get_tts_voice("smallest", language),
         "language": lang_code,
         "sample_rate": 24000,
         "speed": 1.0,

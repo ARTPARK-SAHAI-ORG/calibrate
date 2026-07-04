@@ -100,53 +100,61 @@ class TestCreateTTSService(unittest.TestCase):
             with patch.dict(os.environ, ALL_KEYS), patch(target):
                 create_tts_service(prov, "english")
 
+    # Providers whose model create_tts_service passes explicitly (the rest carry
+    # no shared TTS model — Google/Smallest set none, Deepgram isn't benchmarked).
+    _TTS_MODEL_PROVIDERS = {"cartesia", "openai", "groq", "elevenlabs", "sarvam"}
+
     def test_defaults_match_tts_eval(self):
-        """The live-agent TTS defaults must stay in sync with the benchmark
-        defaults in calibrate/tts/eval.py. Both models and voices come from the
-        shared utils.TTS_PROVIDER_MODELS / TTS_PROVIDER_VOICES (which tts/eval.py
-        also reads), so neither can drift. In pipecat 1.0.0 both are passed via
+        """create_tts_service must pick the same model (TTS_PROVIDER_MODELS) and
+        voice (get_tts_voice) that calibrate/tts/eval.py uses — for every provider
+        and every language — so the live agent and benchmark can't drift. Voices
+        are per-language: overrides in TTS_PROVIDER_VOICES_BY_LANGUAGE, else the
+        default. In pipecat 1.0.0 both are passed via
         <Service>.Settings(model=..., voice=...)."""
         from calibrate.utils import (
             create_tts_service,
             TTS_PROVIDER_MODELS,
             TTS_PROVIDER_VOICES,
-            GOOGLE_TTS_VOICE_FAMILY,
+            TTS_PROVIDER_VOICES_BY_LANGUAGE,
+            get_tts_voice,
         )
 
-        # provider -> (expected model or None, expected voice) for english.
-        expected = {
-            "cartesia": (TTS_PROVIDER_MODELS["cartesia"], TTS_PROVIDER_VOICES["cartesia"]),
-            "openai": (TTS_PROVIDER_MODELS["openai"], TTS_PROVIDER_VOICES["openai"]),
-            "groq": (TTS_PROVIDER_MODELS["groq"], TTS_PROVIDER_VOICES["groq"]),
-            "google": (None, f"en-US-{GOOGLE_TTS_VOICE_FAMILY}"),
-            "elevenlabs": (TTS_PROVIDER_MODELS["elevenlabs"], TTS_PROVIDER_VOICES["elevenlabs"]),
-            "sarvam": (TTS_PROVIDER_MODELS["sarvam"], TTS_PROVIDER_VOICES["sarvam"]),
-            "smallest": (None, TTS_PROVIDER_VOICES["smallest"]),
-        }
+        benchmarked = set(TTS_SERVICE_TARGETS) - {"deepgram"}
 
-        # Completeness guard: `expected` must cover every single-sourced TTS
-        # provider (both dicts, plus Google which is single-sourced via
-        # GOOGLE_TTS_VOICE_FAMILY). Adding a provider to a constant without a
-        # parity row here fails the test until it's covered too.
+        # Completeness guard: every provider carrying a shared model or voice
+        # (default or per-language override) must be exercised below. Adding one
+        # to a constant without covering it here fails the test.
         self.assertEqual(
-            set(expected),
-            set(TTS_PROVIDER_MODELS) | set(TTS_PROVIDER_VOICES) | {"google"},
+            benchmarked,
+            set(TTS_PROVIDER_MODELS)
+            | set(TTS_PROVIDER_VOICES)
+            | set(TTS_PROVIDER_VOICES_BY_LANGUAGE),
         )
 
-        for prov, (model_val, voice_val) in expected.items():
-            with patch.dict(os.environ, ALL_KEYS), \
-                    patch(TTS_SERVICE_TARGETS[prov]) as svc:
-                create_tts_service(prov, "english")
-                kwargs = svc.Settings.call_args.kwargs
-                if model_val is not None:
+        for prov in benchmarked:
+            for language in ("english", "hindi", "kannada"):
+                with patch.dict(os.environ, ALL_KEYS), \
+                        patch(TTS_SERVICE_TARGETS[prov]) as svc:
+                    create_tts_service(prov, language)
+                    kwargs = svc.Settings.call_args.kwargs
                     self.assertEqual(
-                        kwargs["model"], model_val,
-                        f"{prov}: TTS model drifted from tts/eval.py",
+                        kwargs["voice"], get_tts_voice(prov, language),
+                        f"{prov}/{language}: TTS voice drifted from get_tts_voice",
                     )
-                self.assertEqual(
-                    kwargs["voice"], voice_val,
-                    f"{prov}: TTS voice drifted from tts/eval.py",
-                )
+                    if prov in self._TTS_MODEL_PROVIDERS:
+                        self.assertEqual(
+                            kwargs["model"], TTS_PROVIDER_MODELS[prov],
+                            f"{prov}: TTS model drifted from TTS_PROVIDER_MODELS",
+                        )
+
+        # The per-language overrides must actually be distinct — i.e. not silently
+        # collapsed back to one voice per provider.
+        self.assertNotEqual(
+            get_tts_voice("cartesia", "hindi"), get_tts_voice("cartesia", "english")
+        )
+        self.assertNotEqual(
+            get_tts_voice("smallest", "kannada"), get_tts_voice("smallest", "english")
+        )
 
 
 if __name__ == "__main__":
