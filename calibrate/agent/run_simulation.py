@@ -68,13 +68,6 @@ DEFAULT_AGENT_SPEAKS_FIRST = True
 # (vs pipecat's 5s default) without cutting off a genuinely mid-turn agent.
 SIM_USER_TURN_STOP_TIMEOUT_SECS = 2.0
 
-# Normal agent turns are ended by smart-turn. ExternalUserTurnStopStrategy is kept
-# in the stop list ONLY so an explicit interrupt (the sim user cutting in emits a
-# UserStoppedSpeakingFrame) hard-stops the turn immediately. Its built-in
-# transcription auto-timeout would otherwise fire on every turn and pre-empt
-# smart-turn, so we set it high enough to never fire in practice.
-_INTERRUPT_ONLY_STOP_TIMEOUT_SECS = 86400.0
-
 # Pipecat logs Google STT gRPC 409 (idle stream) at ERROR while reconnecting; that is
 # recoverable and must not trigger our error sink (which cancels the eval pipeline).
 _BENIGN_GOOGLE_STT_IDLE_TIMEOUT = (
@@ -234,10 +227,13 @@ def build_user_context_aggregator(context: LLMContext) -> LLMContextAggregatorPa
     The ``vad_analyzer`` feeds the smart-turn model the speech/silence boundaries it
     needs (same as ``bot.py``).
 
-    ``ExternalUserTurnStopStrategy`` is included with its auto-timeout effectively
-    disabled: it does nothing for normal turns but lets a simulated-user interrupt
-    (which emits an explicit ``UserStoppedSpeakingFrame``) hard-stop the agent's turn
-    immediately, for both internal (word-level) and external (block) interrupts.
+    ``ExternalUserTurnStopStrategy(timeout=None)`` is included only so a
+    simulated-user interrupt (which emits an explicit ``UserStoppedSpeakingFrame``)
+    hard-stops the agent's turn immediately — for both internal (word-level) and
+    external (block) interrupts. ``timeout=None`` disables that strategy's built-in
+    transcription auto-timeout (which would otherwise pre-empt smart-turn on every
+    turn); it keeps the strategy's ``UserStoppedSpeakingFrame`` handling and its
+    transcription guards intact, so normal turn-ends are still decided by smart-turn.
     """
     return LLMContextAggregatorPair(
         context,
@@ -246,9 +242,7 @@ def build_user_context_aggregator(context: LLMContext) -> LLMContextAggregatorPa
             user_turn_stop_timeout=SIM_USER_TURN_STOP_TIMEOUT_SECS,
             user_turn_strategies=UserTurnStrategies(
                 stop=[
-                    ExternalUserTurnStopStrategy(
-                        timeout=_INTERRUPT_ONLY_STOP_TIMEOUT_SECS
-                    ),
+                    ExternalUserTurnStopStrategy(timeout=None),
                     TurnAnalyzerUserTurnStopStrategy(
                         turn_analyzer=LocalSmartTurnAnalyzerV3()
                     ),
