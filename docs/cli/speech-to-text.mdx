@@ -6,7 +6,7 @@ description: "Evaluate Speech to Text providers via CLI"
 ## Get started
 
 ```bash
-calibrate stt
+calibrate-agent stt
 ```
 
 <iframe
@@ -57,7 +57,7 @@ The evaluation runs providers in parallel (max 2 at a time), showing the transcr
 By default, a text LLM judge — routed through [OpenRouter](https://openrouter.ai/) (set `OPENROUTER_API_KEY` in your environment) — evaluates whether each transcription matches the reference text semantically using the built-in **`semantic_match`** evaluator; expand **Default evaluator: semantic_match** below for the exact `system_prompt` from the codebase. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
 
 ```bash
-calibrate stt -p deepgram google -i ./data -o ./out --config config.json
+calibrate-agent stt -p deepgram google -i ./data -o ./out --config config.json
 ```
 
 Each evaluator's `system_prompt` is sent as the system message to its own dedicated LLM judge call (one call per evaluator, run in parallel). The user message contains the source/transcription pair.

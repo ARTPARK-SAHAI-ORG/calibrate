@@ -7,14 +7,14 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
     async def _make_processor(self):
-        from calibrate.llm.run_simulation import Processor, ConversationState
+        from calibrate_agent.llm.run_simulation import Processor, ConversationState
 
         state = ConversationState(max_turns=5)
         proc = Processor(speaks_first=True, conversation_state=state)
         return proc, state
 
     async def test_first_frame_marks_ready_speaks_first(self):
-        from calibrate.llm.run_simulation import Processor
+        from calibrate_agent.llm.run_simulation import Processor
         from pipecat.frames.frames import Frame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -33,7 +33,7 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(proc._ready)
 
     async def test_text_frame_accumulates(self):
-        from calibrate.llm.run_simulation import Processor
+        from calibrate_agent.llm.run_simulation import Processor
         from pipecat.frames.frames import TextFrame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -48,7 +48,7 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(proc._current_response, "hello")
 
     async def test_end_frame_with_response(self):
-        from calibrate.llm.run_simulation import Processor
+        from calibrate_agent.llm.run_simulation import Processor
         from pipecat.frames.frames import LLMFullResponseEndFrame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -68,7 +68,7 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
         partner.queue_frames.assert_called_once()
 
     async def test_end_frame_no_response_state_finished(self):
-        from calibrate.llm.run_simulation import Processor, ConversationState
+        from calibrate_agent.llm.run_simulation import Processor, ConversationState
         from pipecat.frames.frames import LLMFullResponseEndFrame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -89,7 +89,7 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
             await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
 
     async def test_no_speaks_first_no_run(self):
-        from calibrate.llm.run_simulation import Processor, ConversationState
+        from calibrate_agent.llm.run_simulation import Processor, ConversationState
         from pipecat.frames.frames import Frame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 

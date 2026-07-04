@@ -8,22 +8,26 @@ export interface CalibrateCmd {
   args: string[];
 }
 
+// The console script is `calibrate-agent`. Only accept that exact name — a bare
+// `calibrate` on PATH may be an unrelated tool, so we never fall back to it.
+const CALIBRATE_BIN = 'calibrate-agent';
+
 export function findCalibrateBin(): CalibrateCmd | null {
   try {
-    execSync('which calibrate', { stdio: 'pipe' });
-    return { cmd: 'calibrate', args: [] };
+    execSync(`which ${CALIBRATE_BIN}`, { stdio: 'pipe' });
+    return { cmd: CALIBRATE_BIN, args: [] };
   } catch {}
 
-  for (const rel of ['../.venv/bin/calibrate', '.venv/bin/calibrate']) {
-    const abs = path.resolve(rel);
+  for (const dir of ['../.venv/bin', '.venv/bin']) {
+    const abs = path.resolve(dir, CALIBRATE_BIN);
     if (fs.existsSync(abs)) {
       return { cmd: abs, args: [] };
     }
   }
 
   try {
-    execSync('uv run which calibrate', { stdio: 'pipe', cwd: path.resolve('..') });
-    return { cmd: 'uv', args: ['run', 'calibrate'] };
+    execSync(`uv run which ${CALIBRATE_BIN}`, { stdio: 'pipe', cwd: path.resolve('..') });
+    return { cmd: 'uv', args: ['run', CALIBRATE_BIN] };
   } catch {}
 
   return null;

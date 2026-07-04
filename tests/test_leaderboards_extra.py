@@ -21,7 +21,7 @@ def _write_provider(base: Path, name: str, metrics=None, results=None):
 
 class TestSTTLeaderboardExtra(unittest.TestCase):
     def test_output_dir_missing_raises(self):
-        from calibrate.stt.leaderboard import generate_leaderboard
+        from calibrate_agent.stt.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             save_dir = Path(tmp) / "save"
@@ -29,14 +29,14 @@ class TestSTTLeaderboardExtra(unittest.TestCase):
                 generate_leaderboard(str(Path(tmp) / "missing"), str(save_dir))
 
     def test_no_provider_folders(self):
-        from calibrate.stt.leaderboard import generate_leaderboard
+        from calibrate_agent.stt.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             result = generate_leaderboard(tmp)
             self.assertTrue(Path(result).exists())
 
     def test_missing_metrics_json_warning(self):
-        from calibrate.stt.leaderboard import generate_leaderboard
+        from calibrate_agent.stt.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -46,7 +46,7 @@ class TestSTTLeaderboardExtra(unittest.TestCase):
             generate_leaderboard(tmp)
 
     def test_legacy_metrics_format(self):
-        from calibrate.stt.leaderboard import generate_leaderboard
+        from calibrate_agent.stt.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -66,7 +66,7 @@ class TestSTTLeaderboardExtra(unittest.TestCase):
             generate_leaderboard(tmp)
 
     def test_unique_sheet_name_collision(self):
-        from calibrate.stt.leaderboard import _unique_sheet_name
+        from calibrate_agent.stt.leaderboard import _unique_sheet_name
 
         existing = set()
         a = _unique_sheet_name("a" * 40, existing)
@@ -74,7 +74,7 @@ class TestSTTLeaderboardExtra(unittest.TestCase):
         self.assertNotEqual(a, b)
 
     def test_main_cli(self):
-        from calibrate.stt import leaderboard
+        from calibrate_agent.stt import leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -87,7 +87,7 @@ class TestSTTLeaderboardExtra(unittest.TestCase):
 
 class TestTTSLeaderboardExtra(unittest.TestCase):
     def test_output_dir_missing_raises(self):
-        from calibrate.tts.leaderboard import generate_leaderboard
+        from calibrate_agent.tts.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             save_dir = Path(tmp) / "save"
@@ -95,14 +95,14 @@ class TestTTSLeaderboardExtra(unittest.TestCase):
                 generate_leaderboard(str(Path(tmp) / "missing"), str(save_dir))
 
     def test_no_provider_folders(self):
-        from calibrate.tts.leaderboard import generate_leaderboard
+        from calibrate_agent.tts.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             result = generate_leaderboard(tmp)
             self.assertTrue(Path(result).exists())
 
     def test_missing_files(self):
-        from calibrate.tts.leaderboard import generate_leaderboard
+        from calibrate_agent.tts.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -110,7 +110,7 @@ class TestTTSLeaderboardExtra(unittest.TestCase):
             generate_leaderboard(tmp)
 
     def test_legacy_metrics_format(self):
-        from calibrate.tts.leaderboard import generate_leaderboard
+        from calibrate_agent.tts.leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -126,7 +126,7 @@ class TestTTSLeaderboardExtra(unittest.TestCase):
             generate_leaderboard(tmp)
 
     def test_main_cli(self):
-        from calibrate.tts import leaderboard
+        from calibrate_agent.tts import leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -138,7 +138,7 @@ class TestTTSLeaderboardExtra(unittest.TestCase):
 
 class TestSimulationLeaderboardExtra(unittest.TestCase):
     def test_no_runs(self):
-        from calibrate.llm.simulation_leaderboard import generate_leaderboard
+        from calibrate_agent.llm.simulation_leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             generate_leaderboard(tmp, str(Path(tmp) / "lb"))
@@ -146,7 +146,7 @@ class TestSimulationLeaderboardExtra(unittest.TestCase):
 
 class TestTestsLeaderboardExtra(unittest.TestCase):
     def test_no_runs(self):
-        from calibrate.llm.tests_leaderboard import generate_leaderboard
+        from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
 
         with tempfile.TemporaryDirectory() as tmp:
             generate_leaderboard(tmp, str(Path(tmp) / "lb"))

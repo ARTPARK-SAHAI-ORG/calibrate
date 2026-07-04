@@ -1,5 +1,5 @@
 """
-Integration tests for `calibrate llm` CLI against a fake HTTP agent server.
+Integration tests for `calibrate_agent llm` CLI against a fake HTTP agent server.
 
 Requires: pytest-httpserver
     pip install pytest-httpserver
@@ -51,7 +51,7 @@ TEST_CASES_TOOL_CALL = [
     }
 ]
 
-# The default verify message sent by calibrate (from calibrate/connections.py)
+# The default verify message sent by calibrate_agent (from calibrate_agent/connections.py)
 VERIFY_MESSAGE_CONTENT = "Hello, are you there?"
 
 
@@ -60,7 +60,7 @@ VERIFY_MESSAGE_CONTENT = "Hello, are you there?"
 # ---------------------------------------------------------------------------
 
 def run_cli(*args, extra_env=None):
-    """Run `calibrate llm ...` as a subprocess and return CompletedProcess."""
+    """Run `calibrate_agent llm ...` as a subprocess and return CompletedProcess."""
     env = {
         **os.environ,
         "OPENAI_API_KEY": "sk-fake",
@@ -69,7 +69,7 @@ def run_cli(*args, extra_env=None):
     if extra_env:
         env.update(extra_env)
     return subprocess.run(
-        [sys.executable, "-m", "calibrate.cli", *args],
+        [sys.executable, "-m", "calibrate_agent.cli", *args],
         capture_output=True,
         text=True,
         env=env,
@@ -347,14 +347,14 @@ def _write_voice_config(path, agent_url=None, **extra):
 
 def _run_voice_cli_in_process(cfg, out, *extra_argv):
     """
-    Invoke `calibrate simulations --type voice` in-process with the
+    Invoke `calibrate_agent simulations --type voice` in-process with the
     WebSocket connection and the voice runner patched out.
 
     Returns (mock_ws_cls, mock_agent_main, raised_systemexit).
     `mock_ws_cls.return_value.verify` is the AsyncMock verify; configure its
     return value before calling.
     """
-    import calibrate.cli as cli_module
+    import calibrate_agent.cli as cli_module
 
     mock_ws_cls = MagicMock()
     mock_ws_cls.return_value.verify = AsyncMock(return_value={"ok": True, "error": None})
@@ -367,7 +367,7 @@ def _run_voice_cli_in_process(cfg, out, *extra_argv):
     fake_connections.WebSocketAgentConnection = mock_ws_cls
 
     argv = [
-        "calibrate",
+        "calibrate_agent",
         "simulations",
         "--type",
         "voice",
@@ -382,8 +382,8 @@ def _run_voice_cli_in_process(cfg, out, *extra_argv):
     with patch.dict(
         "sys.modules",
         {
-            "calibrate.agent.run_simulation": fake_run_simulation,
-            "calibrate.connections": fake_connections,
+            "calibrate_agent.agent.run_simulation": fake_run_simulation,
+            "calibrate_agent.connections": fake_connections,
         },
     ), patch.object(cli_module.sys, "argv", argv):
         try:
@@ -439,7 +439,7 @@ class TestVoicePreVerify:
         )
         out = str(tmp_path / "out")
 
-        import calibrate.cli as cli_module
+        import calibrate_agent.cli as cli_module
 
         mock_ws_cls = MagicMock()
         mock_ws_cls.return_value.verify = AsyncMock(
@@ -451,13 +451,13 @@ class TestVoicePreVerify:
         fake_connections.WebSocketAgentConnection = mock_ws_cls
 
         argv = [
-            "calibrate", "simulations", "--type", "voice", "-c", cfg, "-o", out,
+            "calibrate_agent", "simulations", "--type", "voice", "-c", cfg, "-o", out,
         ]
         with patch.dict(
             "sys.modules",
             {
-                "calibrate.agent.run_simulation": fake_run_simulation,
-                "calibrate.connections": fake_connections,
+                "calibrate_agent.agent.run_simulation": fake_run_simulation,
+                "calibrate_agent.connections": fake_connections,
             },
         ), patch.object(cli_module.sys, "argv", argv):
             with pytest.raises(SystemExit) as exc_info:

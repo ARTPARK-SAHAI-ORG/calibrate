@@ -72,7 +72,7 @@ def _patch_httpx_sequence(outcomes):
 class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
 
     async def test_returns_response_text(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {"response": "Hello there!", "tool_calls": []}
@@ -85,7 +85,7 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["tool_calls"], [])
 
     async def test_returns_tool_calls(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {
@@ -103,7 +103,7 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
 
     async def test_preserves_tool_call_output(self):
         """Optional per-tool-call ``output`` rides through ``call`` verbatim."""
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {
@@ -126,7 +126,7 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_sends_auth_header(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(
             url="http://fake-agent/chat",
@@ -143,7 +143,7 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
 
     async def test_missing_keys_default_to_none_and_empty(self):
         """Agent response with neither key — should not crash."""
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
 
@@ -162,7 +162,7 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
 class TestCallRetry(unittest.IsolatedAsyncioTestCase):
 
     async def test_retries_then_succeeds_on_502(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([
@@ -178,7 +178,7 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
 
     async def test_retries_then_succeeds_on_connect_error(self):
         import httpx
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([
@@ -192,8 +192,8 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_client.post.await_count, 2)
 
     async def test_gives_up_after_max_attempts(self):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.connections import _MAX_ATTEMPTS
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.connections import _MAX_ATTEMPTS
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([({}, 502)] * _MAX_ATTEMPTS)
@@ -206,7 +206,7 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
         self.assertIn(str(_MAX_ATTEMPTS), str(cm.exception))
 
     async def test_no_retry_on_4xx(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([
@@ -228,8 +228,8 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
 class TestRunTestExternalToolCall(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, agent_tool_calls, expected_tool_calls):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm.run_tests import run_test_external
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm.run_tests import run_test_external
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {"response": None, "tool_calls": agent_tool_calls}
@@ -300,8 +300,8 @@ class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
         }
 
     async def _run(self, agent_response, judge_result, evaluators=None):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm.run_tests import run_test_external
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm.run_tests import run_test_external
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {"response": agent_response, "tool_calls": []}
@@ -316,7 +316,7 @@ class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
 
         ctx, _ = _patch_httpx(fake_body)
         with ctx, patch(
-            "calibrate.llm.run_tests.test_response_llm_judge", mock_judge
+            "calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge
         ):
             return await run_test_external(
                 chat_history=[{"role": "user", "content": "Who are you?"}],
@@ -351,8 +351,8 @@ class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["metrics"]["passed"])
 
     async def test_response_fail_when_no_response_returned(self):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm.run_tests import run_test_external
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm.run_tests import run_test_external
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {"tool_calls": [{"tool": "something", "arguments": {}}]}
@@ -378,8 +378,8 @@ class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
 class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
 
     async def _run(self, fake_body):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.llm.run_tests import run_test_external
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.llm.run_tests import run_test_external
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         evaluation = {"type": "tool_call", "tool_calls": []}
@@ -425,7 +425,7 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("cost", result["output"])
 
     async def test_agent_cost_feeds_aggregate_mean(self):
-        from calibrate.llm.run_tests import _aggregate_cost
+        from calibrate_agent.llm.run_tests import _aggregate_cost
 
         result = await self._run(
             {"response": "hi", "tool_calls": [], "metrics": {"cost": 0.05}}
@@ -449,7 +449,7 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("latency_ms", result)
 
     async def test_agent_latency_feeds_aggregate(self):
-        from calibrate.llm.run_tests import _aggregate_latency
+        from calibrate_agent.llm.run_tests import _aggregate_latency
 
         result = await self._run(
             {"response": "hi", "tool_calls": [], "metrics": {"latency_ms": 200}}
@@ -481,7 +481,7 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("total_tokens", result["output"])
 
     async def test_agent_total_tokens_feeds_aggregate(self):
-        from calibrate.llm.run_tests import _aggregate_total_tokens
+        from calibrate_agent.llm.run_tests import _aggregate_total_tokens
 
         result = await self._run(
             {"response": "hi", "tool_calls": [], "metrics": {"total_tokens": 4387}}
@@ -497,7 +497,7 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
 class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
 
     async def test_verify_passes_valid_response(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, _ = _patch_httpx({"response": "Hi! I'm your assistant.", "tool_calls": []})
@@ -509,7 +509,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["sample_output"]["tool_calls"], [])
 
     async def test_verify_passes_tool_calls_only(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, _ = _patch_httpx({"tool_calls": [{"tool": "fn", "arguments": {}}]})
@@ -522,7 +522,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
 
     async def test_verify_preserves_tool_call_output(self):
         """``verify`` accepts and echoes an optional per-tool-call ``output``."""
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         tool_call = {"tool": "fn", "arguments": {}, "output": {"status": "ok"}}
@@ -534,7 +534,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["sample_output"]["tool_calls"], [tool_call])
 
     async def test_verify_fails_empty_response(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, _ = _patch_httpx({})
@@ -544,7 +544,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["ok"])
 
     async def test_verify_fails_http_error(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, _ = _patch_httpx({}, status=500)
@@ -554,7 +554,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["ok"])
 
     async def test_verify_retries_then_succeeds_on_503(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([
@@ -568,8 +568,8 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_client.post.await_count, 2)
 
     async def test_verify_fails_after_retries_exhausted(self):
-        from calibrate.connections import TextAgentConnection
-        from calibrate.connections import _MAX_ATTEMPTS
+        from calibrate_agent.connections import TextAgentConnection
+        from calibrate_agent.connections import _MAX_ATTEMPTS
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         ctx, mock_client = _patch_httpx_sequence([({}, 502)] * _MAX_ATTEMPTS)
@@ -581,7 +581,7 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertIn("attempts", result["error"])
 
     async def test_verify_fails_wrong_tool_call_format(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
         # tool_calls items missing 'arguments'

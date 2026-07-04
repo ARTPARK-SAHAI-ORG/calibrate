@@ -9,7 +9,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 
 def _make_bot_config(provider="openrouter"):
-    from calibrate.agent.test import BotConfig, STTConfig, TTSConfig, LLMConfig
+    from calibrate_agent.agent.test import BotConfig, STTConfig, TTSConfig, LLMConfig
 
     return BotConfig(
         system_prompt="You are helpful",
@@ -23,7 +23,7 @@ def _make_bot_config(provider="openrouter"):
 
 class TestRunBot(unittest.IsolatedAsyncioTestCase):
     async def test_run_bot_basic(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()
@@ -61,7 +61,7 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
             await T.run_bot(_make_bot_config("openrouter"), fake_transport, runner_args, tmp)
 
     async def test_run_bot_openai(self):
-        from calibrate.agent import test as T
+        from calibrate_agent.agent import test as T
 
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()
@@ -96,8 +96,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
             await T.run_bot(_make_bot_config("openai"), fake_transport, runner_args, tmp)
 
     async def test_run_bot_unknown_provider(self):
-        from calibrate.agent import test as T
-        from calibrate.agent.test import BotConfig, STTConfig, TTSConfig, LLMConfig
+        from calibrate_agent.agent import test as T
+        from calibrate_agent.agent.test import BotConfig, STTConfig, TTSConfig, LLMConfig
 
         # Bypass dataclass validation by setting __dict__
         cfg = BotConfig(
@@ -113,8 +113,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
                 await T.run_bot(cfg, MagicMock(), MagicMock(), tmp)
 
     async def test_run_bot_with_webhook_tool(self):
-        from calibrate.agent import test as T
-        from calibrate.agent.test import BotConfig, STTConfig, TTSConfig, LLMConfig
+        from calibrate_agent.agent import test as T
+        from calibrate_agent.agent.test import BotConfig, STTConfig, TTSConfig, LLMConfig
 
         cfg = BotConfig(
             system_prompt="sp", language="english",

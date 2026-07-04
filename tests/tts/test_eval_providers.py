@@ -10,7 +10,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestSynthesizeOpenAI(unittest.IsolatedAsyncioTestCase):
     async def test_openai_happy(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         class FakeResponse:
             async def __aenter__(self):
@@ -36,7 +36,7 @@ class TestSynthesizeOpenAI(unittest.IsolatedAsyncioTestCase):
 
 class TestSynthesizeGroq(unittest.IsolatedAsyncioTestCase):
     async def test_groq_happy(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         fake_response = MagicMock()
         fake_response.write_to_file = AsyncMock()
@@ -53,7 +53,7 @@ class TestSynthesizeGroq(unittest.IsolatedAsyncioTestCase):
 
 class TestSynthesizeCartesia(unittest.IsolatedAsyncioTestCase):
     async def test_cartesia_happy(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         class FakeBytesIter:
             def __aiter__(self):
@@ -75,7 +75,7 @@ class TestSynthesizeCartesia(unittest.IsolatedAsyncioTestCase):
 
 class TestSynthesizeElevenlabs(unittest.IsolatedAsyncioTestCase):
     async def test_elevenlabs_happy(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         class FakeStream:
             def __aiter__(self):
@@ -95,7 +95,7 @@ class TestSynthesizeElevenlabs(unittest.IsolatedAsyncioTestCase):
             await E.synthesize_elevenlabs("hi", "english", str(path))
 
     async def test_elevenlabs_sindhi(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         class FakeStream:
             def __aiter__(self):
@@ -116,7 +116,7 @@ class TestSynthesizeElevenlabs(unittest.IsolatedAsyncioTestCase):
 
 class TestSynthesizeSarvam(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_happy(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
         from sarvamai import AudioOutput, EventResponse
 
         audio_msg = MagicMock()
@@ -191,7 +191,7 @@ class TestSynthesizeSmallest(unittest.IsolatedAsyncioTestCase):
     async def test_smallest_happy(self):
         import base64
         import json
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         audio_b64 = base64.b64encode(b"\x01\x02" * 100).decode()
         messages = [
@@ -213,7 +213,7 @@ class TestSynthesizeSmallest(unittest.IsolatedAsyncioTestCase):
 
     async def test_smallest_server_error(self):
         import json
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         ws = _FakeSmallestWS([json.dumps({"status": "error", "error": "boom"})])
         with tempfile.TemporaryDirectory() as tmp, \
@@ -227,7 +227,7 @@ class TestSynthesizeSmallest(unittest.IsolatedAsyncioTestCase):
 
 class TestSynthesizeGoogle(unittest.IsolatedAsyncioTestCase):
     async def test_google_streaming(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         fake_response1 = MagicMock()
         fake_response1.audio_content = b"chunk1"
@@ -241,15 +241,15 @@ class TestSynthesizeGoogle(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp, \
              patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/creds.json"}), \
-             patch("calibrate.tts.eval.texttospeech.TextToSpeechClient",
+             patch("calibrate_agent.tts.eval.texttospeech.TextToSpeechClient",
                    return_value=fake_client), \
-             patch("calibrate.tts.eval.save_audio"):
+             patch("calibrate_agent.tts.eval.save_audio"):
             path = Path(tmp) / "x.wav"
             result = await E.synthesize_google("hi", "english", str(path))
         self.assertIsNotNone(result.get("ttfb"))
 
     async def test_google_sindhi(self):
-        from calibrate.tts import eval as E
+        from calibrate_agent.tts import eval as E
 
         fake_response = MagicMock()
         fake_response.audio_content = b"audio"
@@ -259,9 +259,9 @@ class TestSynthesizeGoogle(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp, \
              patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/creds.json"}), \
-             patch("calibrate.tts.eval.texttospeech.TextToSpeechClient",
+             patch("calibrate_agent.tts.eval.texttospeech.TextToSpeechClient",
                    return_value=fake_client), \
-             patch("calibrate.tts.eval.save_audio"):
+             patch("calibrate_agent.tts.eval.save_audio"):
             path = Path(tmp) / "x.wav"
             result = await E.synthesize_google("hi", "sindhi", str(path))
 

@@ -2,7 +2,7 @@ import asyncio
 import unittest
 from unittest.mock import patch
 
-from calibrate.rate_limit import (
+from calibrate_agent.rate_limit import (
     AsyncRateLimiter,
     SARVAM_STT_STREAMING_LIMITER,
     SARVAM_TTS_STREAMING_LIMITER,
@@ -30,7 +30,7 @@ class TestAsyncRateLimiterValidation(unittest.TestCase):
 class TestAsyncRateLimiterBehavior(unittest.IsolatedAsyncioTestCase):
     async def test_under_limit_does_not_sleep(self):
         limiter = AsyncRateLimiter(max_calls=3, period=60.0)
-        with patch("calibrate.rate_limit.asyncio.sleep") as mock_sleep:
+        with patch("calibrate_agent.rate_limit.asyncio.sleep") as mock_sleep:
             for _ in range(3):
                 await limiter.acquire()
             mock_sleep.assert_not_called()
@@ -52,8 +52,8 @@ class TestAsyncRateLimiterBehavior(unittest.IsolatedAsyncioTestCase):
             sleep_calls.append(seconds)
             fake_now[0] += seconds
 
-        with patch("calibrate.rate_limit.time.monotonic", side_effect=mono):
-            with patch("calibrate.rate_limit.asyncio.sleep", side_effect=fake_sleep):
+        with patch("calibrate_agent.rate_limit.time.monotonic", side_effect=mono):
+            with patch("calibrate_agent.rate_limit.asyncio.sleep", side_effect=fake_sleep):
                 await limiter.acquire()
                 fake_now[0] = 1.0
                 await limiter.acquire()
@@ -72,8 +72,8 @@ class TestAsyncRateLimiterBehavior(unittest.IsolatedAsyncioTestCase):
         def mono():
             return fake_now[0]
 
-        with patch("calibrate.rate_limit.time.monotonic", side_effect=mono):
-            with patch("calibrate.rate_limit.asyncio.sleep") as mock_sleep:
+        with patch("calibrate_agent.rate_limit.time.monotonic", side_effect=mono):
+            with patch("calibrate_agent.rate_limit.asyncio.sleep") as mock_sleep:
                 await limiter.acquire()
                 fake_now[0] = 1.0
                 await limiter.acquire()
@@ -94,7 +94,7 @@ class TestAsyncRateLimiterBehavior(unittest.IsolatedAsyncioTestCase):
             # Simulate window expiry on sleep
             limiter._calls.clear()
 
-        with patch("calibrate.rate_limit.asyncio.sleep", side_effect=fake_sleep):
+        with patch("calibrate_agent.rate_limit.asyncio.sleep", side_effect=fake_sleep):
 
             async def worker():
                 await limiter.acquire()
@@ -123,7 +123,7 @@ class TestSarvamCallsAcquire(unittest.IsolatedAsyncioTestCase):
 
     async def test_transcribe_sarvam_acquires_before_client(self):
         from pathlib import Path
-        from calibrate.stt import eval as stt_eval
+        from calibrate_agent.stt import eval as stt_eval
 
         with patch.dict("os.environ", {"SARVAM_API_KEY": "sk-fake"}):
             with patch.object(
@@ -148,7 +148,7 @@ class TestSarvamCallsAcquire(unittest.IsolatedAsyncioTestCase):
                 mock_acquire.assert_awaited_once()
 
     async def test_synthesize_sarvam_acquires_before_client(self):
-        from calibrate.tts import eval as tts_eval
+        from calibrate_agent.tts import eval as tts_eval
 
         with patch.dict("os.environ", {"SARVAM_API_KEY": "sk-fake"}):
             with patch.object(

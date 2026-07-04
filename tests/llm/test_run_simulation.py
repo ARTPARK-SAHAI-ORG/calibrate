@@ -1,5 +1,5 @@
 """
-Unit tests for the ConversationState class in calibrate.llm.run_simulation.
+Unit tests for the ConversationState class in calibrate_agent.llm.run_simulation.
 
 All tests are pure async — no mocks or external dependencies needed.
 """
@@ -7,7 +7,7 @@ All tests are pure async — no mocks or external dependencies needed.
 import asyncio
 import pytest
 
-from calibrate.llm.run_simulation import ConversationState
+from calibrate_agent.llm.run_simulation import ConversationState
 
 
 # ---------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-"""Unit tests for calibrate/general/eval.py.
+"""Unit tests for calibrate_agent/general/eval.py.
 
 Covers dataset validation, evaluator resolution from config, and the
 end-to-end run_general_eval path (with the judge mocked) producing
@@ -14,7 +14,7 @@ from unittest.mock import patch, AsyncMock
 
 import pandas as pd
 
-from calibrate.general.eval import (
+from calibrate_agent.general.eval import (
     validate_general_eval_dataset,
     _resolve_evaluators,
     run_general_eval,
@@ -204,7 +204,7 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
                 with open(stale, "w") as f:
                     f.write("old log\n")
                 with patch(
-                    "calibrate.general.eval.get_general_judge_score",
+                    "calibrate_agent.general.eval.get_general_judge_score",
                     AsyncMock(return_value=fake_score),
                 ):
                     result = await run_general_eval(
@@ -237,7 +237,7 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
         try:
             with tempfile.TemporaryDirectory() as out_dir:
                 with patch(
-                    "calibrate.general.eval.get_general_judge_score",
+                    "calibrate_agent.general.eval.get_general_judge_score",
                     AsyncMock(return_value=fake_score),
                 ):
                     result = await run_general_eval(
@@ -290,7 +290,7 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
         try:
             with tempfile.TemporaryDirectory() as out_dir:
                 with patch(
-                    "calibrate.general.eval.get_general_judge_score", judge_mock
+                    "calibrate_agent.general.eval.get_general_judge_score", judge_mock
                 ):
                     result = await run_general_eval(
                         dataset_path=dataset_path,
@@ -309,10 +309,10 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
 
 
 class TestMain(unittest.IsolatedAsyncioTestCase):
-    """Cover the CLI entry point branches of calibrate.general.eval.main()."""
+    """Cover the CLI entry point branches of calibrate_agent.general.eval.main()."""
 
     def _argv(self, dataset, config, out):
-        return ["calibrate", "--dataset", dataset, "-c", config, "-o", out]
+        return ["calibrate_agent", "--dataset", dataset, "-c", config, "-o", out]
 
     async def test_config_not_found_exits(self):
         with tempfile.TemporaryDirectory() as out_dir:
@@ -363,7 +363,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
             cfg = _write_json({"evaluators": [BINARY_EV]})
             try:
                 with patch.object(sys, "argv", self._argv(ds, cfg, out_dir)), patch(
-                    "calibrate.general.eval.run_general_eval",
+                    "calibrate_agent.general.eval.run_general_eval",
                     AsyncMock(return_value={"status": "error", "error": "boom"}),
                 ):
                     with self.assertRaises(SystemExit) as cm:
@@ -385,7 +385,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
             run_mock = AsyncMock(return_value=completed)
             try:
                 with patch.object(sys, "argv", self._argv(ds, cfg, out_dir)), patch(
-                    "calibrate.general.eval.run_general_eval", run_mock
+                    "calibrate_agent.general.eval.run_general_eval", run_mock
                 ):
                     # Should not raise SystemExit on success
                     await eval_main()
@@ -405,7 +405,7 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
             completed = {"status": "completed", "metrics": {}, "output_dir": out_dir}
             try:
                 with patch.object(sys, "argv", self._argv(ds, cfg, out_dir)), patch(
-                    "calibrate.general.eval.run_general_eval",
+                    "calibrate_agent.general.eval.run_general_eval",
                     AsyncMock(return_value=completed),
                 ):
                     await eval_main()  # should not raise
@@ -415,36 +415,36 @@ class TestMain(unittest.IsolatedAsyncioTestCase):
 
 
 class TestCliDispatch(unittest.TestCase):
-    """Cover the `general` branch wired into calibrate.cli.main().
+    """Cover the `general` branch wired into calibrate_agent.cli.main().
 
     Plain (sync) TestCase because ``cli.main()`` calls ``asyncio.run()`` itself,
     which cannot nest inside a running event loop.
     """
 
     def test_dispatch_invokes_eval_main(self):
-        from calibrate import cli
+        from calibrate_agent import cli
 
         eval_main_mock = AsyncMock(return_value=None)
-        argv = ["calibrate", "general", "--dataset", "d.json", "-c", "c.json"]
+        argv = ["calibrate_agent", "general", "--dataset", "d.json", "-c", "c.json"]
         with patch.object(sys, "argv", argv), patch(
-            "calibrate.general.eval.main", eval_main_mock
+            "calibrate_agent.general.eval.main", eval_main_mock
         ):
             cli.main()
         eval_main_mock.assert_awaited_once()
 
     def test_dispatch_missing_dataset_exits(self):
-        from calibrate import cli
+        from calibrate_agent import cli
 
-        argv = ["calibrate", "general", "-c", "c.json"]
+        argv = ["calibrate_agent", "general", "-c", "c.json"]
         with patch.object(sys, "argv", argv):
             with self.assertRaises(SystemExit) as cm:
                 cli.main()
         self.assertEqual(cm.exception.code, 1)
 
     def test_dispatch_missing_config_exits(self):
-        from calibrate import cli
+        from calibrate_agent import cli
 
-        argv = ["calibrate", "general", "--dataset", "d.json"]
+        argv = ["calibrate_agent", "general", "--dataset", "d.json"]
         with patch.object(sys, "argv", argv):
             with self.assertRaises(SystemExit) as cm:
                 cli.main()

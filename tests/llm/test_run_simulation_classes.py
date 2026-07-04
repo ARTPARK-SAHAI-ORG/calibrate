@@ -11,7 +11,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestConversationState(unittest.IsolatedAsyncioTestCase):
     async def test_record_turn_normal(self):
-        from calibrate.llm.run_simulation import ConversationState
+        from calibrate_agent.llm.run_simulation import ConversationState
 
         state = ConversationState(max_turns=3)
         self.assertTrue(await state.record_turn())
@@ -21,14 +21,14 @@ class TestConversationState(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(state.finished)
 
     async def test_record_turn_after_finished(self):
-        from calibrate.llm.run_simulation import ConversationState
+        from calibrate_agent.llm.run_simulation import ConversationState
 
         state = ConversationState(max_turns=2)
         state.finished = True
         self.assertFalse(await state.record_turn())
 
     async def test_mark_finished_once(self):
-        from calibrate.llm.run_simulation import ConversationState
+        from calibrate_agent.llm.run_simulation import ConversationState
 
         state = ConversationState(max_turns=5)
         self.assertTrue(await state.mark_finished())
@@ -40,7 +40,7 @@ class TestProcessor(unittest.IsolatedAsyncioTestCase):
     """Smoke tests for Processor class — heavy pipecat dependencies."""
 
     def _make_processor(self, **kwargs):
-        from calibrate.llm.run_simulation import Processor, ConversationState
+        from calibrate_agent.llm.run_simulation import Processor, ConversationState
 
         state = ConversationState(max_turns=10)
         defaults = {
@@ -62,7 +62,7 @@ class TestProcessor(unittest.IsolatedAsyncioTestCase):
         self.assertIs(proc._partner_task, partner)
 
     async def test_save_intermediate_transcript(self):
-        from calibrate.llm.run_simulation import Processor, ConversationState
+        from calibrate_agent.llm.run_simulation import Processor, ConversationState
 
         with tempfile.TemporaryDirectory() as tmp:
             state = ConversationState(max_turns=5)
@@ -145,7 +145,7 @@ class TestProcessor(unittest.IsolatedAsyncioTestCase):
 
 class TestRunSimulationValidation(unittest.IsolatedAsyncioTestCase):
     async def test_empty_evaluators_raises(self):
-        from calibrate.llm.run_simulation import run_simulation
+        from calibrate_agent.llm.run_simulation import run_simulation
 
         with self.assertRaises(ValueError):
             await run_simulation(

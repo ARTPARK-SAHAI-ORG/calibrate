@@ -20,14 +20,14 @@ def _write_wav(path: Path, num_frames: int = 16000, sample_width: int = 2,
 
 class TestCombineTurnAudioChunksForTurn(unittest.TestCase):
     def test_no_chunks(self):
-        from calibrate.utils import combine_turn_audio_chunks_for_turn
+        from calibrate_agent.utils import combine_turn_audio_chunks_for_turn
 
         with tempfile.TemporaryDirectory() as tmp:
             result = combine_turn_audio_chunks_for_turn(tmp, 1)
             self.assertTrue(result)
 
     def test_combines_role_chunks(self):
-        from calibrate.utils import combine_turn_audio_chunks_for_turn
+        from calibrate_agent.utils import combine_turn_audio_chunks_for_turn
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -42,7 +42,7 @@ class TestCombineTurnAudioChunksForTurn(unittest.TestCase):
             self.assertFalse((base / "1_bot_0.wav").exists())
 
     def test_parameter_mismatch_skips_chunk(self):
-        from calibrate.utils import combine_turn_audio_chunks_for_turn
+        from calibrate_agent.utils import combine_turn_audio_chunks_for_turn
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -52,7 +52,7 @@ class TestCombineTurnAudioChunksForTurn(unittest.TestCase):
             self.assertTrue(result)
 
     def test_read_error_handled(self):
-        from calibrate.utils import combine_turn_audio_chunks_for_turn
+        from calibrate_agent.utils import combine_turn_audio_chunks_for_turn
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -61,7 +61,7 @@ class TestCombineTurnAudioChunksForTurn(unittest.TestCase):
             self.assertTrue(result)
 
     def test_no_chunk_match_pattern(self):
-        from calibrate.utils import combine_turn_audio_chunks_for_turn
+        from calibrate_agent.utils import combine_turn_audio_chunks_for_turn
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -73,14 +73,14 @@ class TestCombineTurnAudioChunksForTurn(unittest.TestCase):
 
 class TestCombineTurnAudioChunks(unittest.TestCase):
     def test_no_files(self):
-        from calibrate.utils import combine_turn_audio_chunks
+        from calibrate_agent.utils import combine_turn_audio_chunks
 
         with tempfile.TemporaryDirectory() as tmp:
             result = combine_turn_audio_chunks(tmp)
             self.assertFalse(result)
 
     def test_files_no_match(self):
-        from calibrate.utils import combine_turn_audio_chunks
+        from calibrate_agent.utils import combine_turn_audio_chunks
 
         with tempfile.TemporaryDirectory() as tmp:
             _write_wav(Path(tmp) / "random.wav")
@@ -88,7 +88,7 @@ class TestCombineTurnAudioChunks(unittest.TestCase):
             self.assertTrue(result)
 
     def test_combines_multiple_turns(self):
-        from calibrate.utils import combine_turn_audio_chunks
+        from calibrate_agent.utils import combine_turn_audio_chunks
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -102,7 +102,7 @@ class TestCombineTurnAudioChunks(unittest.TestCase):
             self.assertTrue((base / "2_bot.wav").exists())
 
     def test_param_mismatch(self):
-        from calibrate.utils import combine_turn_audio_chunks
+        from calibrate_agent.utils import combine_turn_audio_chunks
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -112,7 +112,7 @@ class TestCombineTurnAudioChunks(unittest.TestCase):
             self.assertTrue(result)
 
     def test_read_error(self):
-        from calibrate.utils import combine_turn_audio_chunks
+        from calibrate_agent.utils import combine_turn_audio_chunks
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -123,14 +123,14 @@ class TestCombineTurnAudioChunks(unittest.TestCase):
 
 class TestCombineAudioFiles(unittest.TestCase):
     def test_no_audio_files(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             result = combine_audio_files(tmp, "/tmp/out.wav", None)
             self.assertFalse(result)
 
     def test_missing_transcript_raises(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             _write_wav(Path(tmp) / "a.wav")
@@ -138,7 +138,7 @@ class TestCombineAudioFiles(unittest.TestCase):
                 combine_audio_files(tmp, "/tmp/out.wav", "/nonexistent.json")
 
     def test_no_transcript_path_raises(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             _write_wav(Path(tmp) / "a.wav")
@@ -146,7 +146,7 @@ class TestCombineAudioFiles(unittest.TestCase):
                 combine_audio_files(tmp, "/tmp/out.wav", None)
 
     def test_basic_flow(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -163,7 +163,7 @@ class TestCombineAudioFiles(unittest.TestCase):
             self.assertTrue(out.exists())
 
     def test_skips_tool_calls_only(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -178,7 +178,7 @@ class TestCombineAudioFiles(unittest.TestCase):
             self.assertTrue(result)
 
     def test_missing_audio_file_warning(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -193,7 +193,7 @@ class TestCombineAudioFiles(unittest.TestCase):
             self.assertTrue(result)
 
     def test_no_matches_raises(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -206,7 +206,7 @@ class TestCombineAudioFiles(unittest.TestCase):
                 combine_audio_files(tmp, str(base / "out.wav"), str(transcript))
 
     def test_param_mismatch_skipped(self):
-        from calibrate.utils import combine_audio_files
+        from calibrate_agent.utils import combine_audio_files
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -224,7 +224,7 @@ class TestCombineAudioFiles(unittest.TestCase):
 class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
     async def test_process_frame(self):
         from collections import defaultdict
-        from calibrate.utils import MetricsLogger
+        from calibrate_agent.utils import MetricsLogger
         from pipecat.frames.frames import InputTransportMessageFrame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -252,7 +252,7 @@ class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
 
     async def test_process_frame_non_rtvi(self):
         from collections import defaultdict
-        from calibrate.utils import MetricsLogger
+        from calibrate_agent.utils import MetricsLogger
         from pipecat.frames.frames import InputTransportMessageFrame
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 

@@ -2100,7 +2100,7 @@ function EvalApp({
     outputDir: "./out",
     overwrite: false,
     envVars: {},
-    calibrate: { cmd: "calibrate", args: [] },
+    calibrate: { cmd: "calibrate-agent", args: [] },
   });
   const [initError, setInitError] = useState("");
 
@@ -2111,7 +2111,7 @@ function EvalApp({
       setStep("config-language");
     } else {
       setInitError(
-        "calibrate CLI not found. Install with: pip install -e . (from project root)"
+        "calibrate-agent CLI not found. Install with: pip install -e . (from project root)"
       );
     }
   }, []);
@@ -2119,7 +2119,7 @@ function EvalApp({
   if (step === "init" && !initError) {
     return (
       <Box padding={1}>
-        <Spinner label="Checking calibrate CLI..." />
+        <Spinner label="Checking calibrate-agent CLI..." />
       </Box>
     );
   }

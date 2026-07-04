@@ -30,7 +30,7 @@ def _mk_resp(body, status=200, text="err body", raw_text=None, json_raises=False
 
 class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
     async def test_verify_connect_error(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         mock_client = _mk_mock_client(post_side_effect=httpx.ConnectError("boom"))
         with patch("httpx.AsyncClient", return_value=mock_client):
@@ -39,7 +39,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Could not connect", result["error"])
 
     async def test_verify_timeout(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         mock_client = _mk_mock_client(post_side_effect=httpx.TimeoutException("t"))
         with patch("httpx.AsyncClient", return_value=mock_client):
@@ -48,7 +48,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("timed out", result["error"])
 
     async def test_verify_generic_exception(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         mock_client = _mk_mock_client(post_side_effect=RuntimeError("nope"))
         with patch("httpx.AsyncClient", return_value=mock_client):
@@ -57,7 +57,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Unexpected error", result["error"])
 
     async def test_verify_invalid_json(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({}, json_raises=True)
         mock_client = _mk_mock_client(response=resp)
@@ -67,7 +67,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("not valid JSON", result["error"])
 
     async def test_verify_non_dict_json(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp(["a", "b"])
         mock_client = _mk_mock_client(response=resp)
@@ -77,7 +77,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("must be a JSON object", result["error"])
 
     async def test_verify_response_wrong_type(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({"response": 123})
         mock_client = _mk_mock_client(response=resp)
@@ -87,7 +87,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("must be a string", result["error"])
 
     async def test_verify_tool_calls_not_list(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({"tool_calls": {"not": "list"}})
         mock_client = _mk_mock_client(response=resp)
@@ -97,7 +97,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("must be a list", result["error"])
 
     async def test_verify_tool_call_not_dict(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({"tool_calls": ["not a dict"]})
         mock_client = _mk_mock_client(response=resp)
@@ -107,7 +107,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("must be an object", result["error"])
 
     async def test_verify_tool_call_missing_tool(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({"tool_calls": [{"arguments": {}}]})
         mock_client = _mk_mock_client(response=resp)
@@ -117,7 +117,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn('missing required key "tool"', result["error"])
 
     async def test_verify_tool_call_arguments_not_dict(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({"tool_calls": [{"tool": "x", "arguments": "no"}]})
         mock_client = _mk_mock_client(response=resp)
@@ -127,7 +127,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("must be an object", result["error"])
 
     async def test_verify_with_messages_and_model(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x", headers={"X": "Y"})
         resp = _mk_resp({"response": "hi"})
         mock_client = _mk_mock_client(response=resp)
@@ -144,7 +144,7 @@ class TestVerifyErrorPaths(unittest.IsolatedAsyncioTestCase):
 
 class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
     async def test_call_connect_error(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         mock_client = _mk_mock_client(post_side_effect=httpx.ConnectError("boom"))
         with patch("httpx.AsyncClient", return_value=mock_client):
@@ -153,7 +153,7 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Could not connect", str(ctx.exception))
 
     async def test_call_timeout(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         mock_client = _mk_mock_client(post_side_effect=httpx.TimeoutException("t"))
         with patch("httpx.AsyncClient", return_value=mock_client):
@@ -162,7 +162,7 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("timed out", str(ctx.exception))
 
     async def test_call_generic_exception(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         mock_client = _mk_mock_client(post_side_effect=RuntimeError("nope"))
         with patch("httpx.AsyncClient", return_value=mock_client):
@@ -171,7 +171,7 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Unexpected error", str(ctx.exception))
 
     async def test_call_non_200_status(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({}, status=500, text="server-down")
         mock_client = _mk_mock_client(response=resp)
@@ -181,7 +181,7 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("HTTP 500", str(ctx.exception))
 
     async def test_call_invalid_json(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({}, json_raises=True, text="not json")
         mock_client = _mk_mock_client(response=resp)
@@ -191,7 +191,7 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertIn("not valid JSON", str(ctx.exception))
 
     async def test_call_with_model(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x", headers={"K": "V"})
         resp = _mk_resp({"response": "ok"})
         mock_client = _mk_mock_client(response=resp)
@@ -201,7 +201,7 @@ class TestCallErrorPaths(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(body["model"], "m1")
 
     async def test_verify_non_200(self):
-        from calibrate.connections import TextAgentConnection
+        from calibrate_agent.connections import TextAgentConnection
         agent = TextAgentConnection(url="http://x")
         resp = _mk_resp({}, status=404, text="missing")
         mock_client = _mk_mock_client(response=resp)
@@ -225,7 +225,7 @@ def _mk_ws_cm(enter_side_effect=None):
 
 class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
     async def test_verify_happy_path(self):
-        from calibrate.connections import WebSocketAgentConnection
+        from calibrate_agent.connections import WebSocketAgentConnection
 
         agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
         connect = MagicMock(return_value=_mk_ws_cm())
@@ -240,13 +240,13 @@ class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("additional_headers", connect.call_args.kwargs)
 
     async def test_no_headers_field(self):
-        from calibrate.connections import WebSocketAgentConnection
+        from calibrate_agent.connections import WebSocketAgentConnection
 
         with self.assertRaises(TypeError):
             WebSocketAgentConnection(url="ws://x", headers={"A": "B"})
 
     async def test_verify_connection_error(self):
-        from calibrate.connections import WebSocketAgentConnection
+        from calibrate_agent.connections import WebSocketAgentConnection
 
         agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
         connect = MagicMock(
@@ -262,7 +262,7 @@ class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertIn("refused", result["error"])
 
     async def test_verify_non_ws_scheme(self):
-        from calibrate.connections import WebSocketAgentConnection
+        from calibrate_agent.connections import WebSocketAgentConnection
 
         agent = WebSocketAgentConnection(url="http://fake-agent/ws")
         connect = MagicMock(return_value=_mk_ws_cm())
@@ -274,7 +274,7 @@ class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         connect.assert_not_called()
 
     async def test_verify_timeout(self):
-        from calibrate.connections import WebSocketAgentConnection
+        from calibrate_agent.connections import WebSocketAgentConnection
 
         agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
         connect = MagicMock(
@@ -287,7 +287,7 @@ class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertIn("timed out", result["error"])
 
     async def test_verify_invalid_uri(self):
-        from calibrate.connections import WebSocketAgentConnection
+        from calibrate_agent.connections import WebSocketAgentConnection
 
         agent = WebSocketAgentConnection(url="ws://fake-agent/ws")
         connect = MagicMock(side_effect=ValueError("invalid uri"))
@@ -298,7 +298,7 @@ class TestWebSocketAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Could not connect", result["error"])
 
     def test_serializer_stored(self):
-        from calibrate.connections import WebSocketAgentConnection
+        from calibrate_agent.connections import WebSocketAgentConnection
 
         default = WebSocketAgentConnection(url="ws://x")
         self.assertEqual(default.serializer, "protobuf")

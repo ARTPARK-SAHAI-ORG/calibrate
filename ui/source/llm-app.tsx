@@ -117,7 +117,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
     outputDir: "./out",
     overwrite: false,
     envVars: {},
-    calibrate: { cmd: "calibrate", args: [] },
+    calibrate: { cmd: "calibrate-agent", args: [] },
     agentUrl: "",
     agentHeaders: {},
     agentBenchmark: false,
@@ -298,7 +298,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
     if (step !== "init") return;
     calibrateBin.current = findCalibrateBin();
     if (!calibrateBin.current) {
-      setInitError("Error: calibrate binary not found");
+      setInitError("Error: calibrate-agent binary not found");
       setStep("leaderboard");
       return;
     }
@@ -529,12 +529,12 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
 
       const lbDir = path.join(config.outputDir, "leaderboard");
 
-      // Generate leaderboard using python -m calibrate.llm.tests_leaderboard
+      // Generate leaderboard using python -m calibrate_agent.llm.tests_leaderboard
       const proc = spawn(
         "python",
         [
           "-m",
-          "calibrate.llm.tests_leaderboard",
+          "calibrate_agent.llm.tests_leaderboard",
           "-o",
           config.outputDir,
           "-s",
@@ -1510,7 +1510,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
               <Box marginBottom={1}>
                 <Text>
                   No results were produced for this model. The
-                  {" "}<Text color="cyan">calibrate llm</Text>{" "}
+                  {" "}<Text color="cyan">calibrate-agent llm</Text>{" "}
                   subprocess exited with an error.
                 </Text>
               </Box>

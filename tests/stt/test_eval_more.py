@@ -33,7 +33,7 @@ def _fake_intent_entity(intent=1, entity=1.0):
 
 class TestValidateSTTInputDirEdges(unittest.TestCase):
     def test_input_path_not_directory(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             f = Path(tmp) / "file.csv"
@@ -43,7 +43,7 @@ class TestValidateSTTInputDirEdges(unittest.TestCase):
             self.assertIn("not a directory", err)
 
     def test_audios_not_directory(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -54,7 +54,7 @@ class TestValidateSTTInputDirEdges(unittest.TestCase):
             self.assertIn("not a directory", err)
 
     def test_csv_read_failure(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -66,7 +66,7 @@ class TestValidateSTTInputDirEdges(unittest.TestCase):
             self.assertIn("Failed to read CSV", err)
 
     def test_many_missing_audio_files(self):
-        from calibrate.stt.eval import validate_stt_input_dir
+        from calibrate_agent.stt.eval import validate_stt_input_dir
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -81,7 +81,7 @@ class TestValidateSTTInputDirEdges(unittest.TestCase):
 
 class TestRunSinglProviderEvalProgressNoChange(unittest.IsolatedAsyncioTestCase):
     async def test_no_progress_writes_empty_transcripts(self):
-        from calibrate.stt import eval as E
+        from calibrate_agent.stt import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -133,7 +133,7 @@ class TestRunSinglProviderEvalProgressNoChange(unittest.IsolatedAsyncioTestCase)
 
 class TestRunSinglProviderEvalAlreadyAllProcessed(unittest.IsolatedAsyncioTestCase):
     async def test_all_processed_breaks(self):
-        from calibrate.stt import eval as E
+        from calibrate_agent.stt import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
@@ -175,7 +175,7 @@ class TestRunSinglProviderEvalAlreadyAllProcessed(unittest.IsolatedAsyncioTestCa
 class TestTranscribeAudioBackoff(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_provider_through_wrapper(self):
         """Going through __wrapped__ to skip backoff."""
-        from calibrate.stt.eval import transcribe_audio
+        from calibrate_agent.stt.eval import transcribe_audio
 
         inner = transcribe_audio
         while hasattr(inner, "__wrapped__"):

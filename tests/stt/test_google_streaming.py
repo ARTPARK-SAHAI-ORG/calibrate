@@ -8,7 +8,7 @@ from unittest.mock import patch, MagicMock
 
 class TestGoogleStreaming(unittest.TestCase):
     def test_google_streaming_happy(self):
-        from calibrate.stt import eval as E
+        from calibrate_agent.stt import eval as E
 
         # An interim hypothesis, then the final result, then an empty result.
         # Only the final should land in the transcript (interim filtered out).
@@ -39,7 +39,7 @@ class TestGoogleStreaming(unittest.TestCase):
         self.assertEqual(result["transcript"], "hello world")
 
     def test_google_streaming_interim_results_enabled(self):
-        from calibrate.stt import eval as E
+        from calibrate_agent.stt import eval as E
 
         captured = {}
 

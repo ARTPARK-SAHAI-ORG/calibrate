@@ -1,5 +1,5 @@
 """
-Tests for calibrate/llm/_output.py — print_benchmark_summary function.
+Tests for calibrate_agent/llm/_output.py — print_benchmark_summary function.
 
 Run with:
     python -m pytest tests/test_output.py -v
@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 def _call(models, model_results, leaderboard_dir="./leaderboard", model_label=None):
     """Helper: call print_benchmark_summary and return (printed_lines, return_value)."""
-    from calibrate.llm._output import print_benchmark_summary
+    from calibrate_agent.llm._output import print_benchmark_summary
 
     captured = []
     with patch("builtins.print", side_effect=lambda *args, **kwargs: captured.append(

@@ -322,10 +322,10 @@ For voice simulations, specify the STT, LLM, and TTS providers:
 
 ### Interactive mode
 
-Run `calibrate simulations` with no arguments to launch the interactive UI:
+Run `calibrate-agent simulations` with no arguments to launch the interactive UI:
 
 ```bash
-calibrate simulations
+calibrate-agent simulations
 ```
 
 **Calibrate agent (text):**
@@ -361,31 +361,31 @@ Pass `--type text` or `--type voice` and a config file directly to skip the UI.
 **Calibrate agent (text):**
 
 ```bash
-calibrate simulations --type text -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
+calibrate-agent simulations --type text -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
 ```
 
 **Calibrate agent (voice):**
 
 ```bash
-calibrate simulations --type voice -c config.json -o ./out
+calibrate-agent simulations --type voice -c config.json -o ./out
 ```
 
 **Chat agent (text):**
 
 ```bash
-calibrate simulations --type text -c config.json -o ./out
+calibrate-agent simulations --type text -c config.json -o ./out
 ```
 
 **Outbound voice agent (voice):**
 
 ```bash
-calibrate simulations --type voice -c config.json -o ./out
+calibrate-agent simulations --type voice -c config.json -o ./out
 ```
 
 Run multiple simulations in parallel with `-n`:
 
 ```bash
-calibrate simulations --type text -c config.json -o ./out -n 2
+calibrate-agent simulations --type text -c config.json -o ./out -n 2
 ```
 
 <Note>
@@ -401,7 +401,7 @@ Simulations run for every persona × scenario combination. For example, 2 person
 For agent connection configs, calibrate verifies the connection before running. Pass `--skip-verify` to skip this step — useful in CI/automation pipelines where you've already confirmed the agent is reachable:
 
 ```bash
-calibrate simulations --type text -c config.json -o ./out --skip-verify
+calibrate-agent simulations --type text -c config.json -o ./out --skip-verify
 ```
 
 ## Output

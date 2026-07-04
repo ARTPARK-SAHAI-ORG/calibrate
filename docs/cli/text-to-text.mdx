@@ -604,10 +604,10 @@ If you want thresholds different from “top-of-scale” (for example “tone at
 
 ### Interactive mode
 
-Run `calibrate llm` with no arguments to launch the interactive UI:
+Run `calibrate-agent llm` with no arguments to launch the interactive UI:
 
 ```bash
-calibrate llm
+calibrate-agent llm
 ```
 
 **Calibrate agent** — the UI detects that your config defines a system prompt and tools and guides you through:
@@ -647,13 +647,13 @@ _Benchmark across models:_
 Single model:
 
 ```bash
-calibrate llm -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
+calibrate-agent llm -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
 ```
 
 Multiple models (benchmark — runs in parallel, generates a leaderboard):
 
 ```bash
-calibrate llm -c config.json -m openai/gpt-4.1 claude-sonnet-4-5 -p openrouter -o ./out
+calibrate-agent llm -c config.json -m openai/gpt-4.1 claude-sonnet-4-5 -p openrouter -o ./out
 ```
 
 **Agent connection:**
@@ -672,7 +672,7 @@ Your config must include `agent_url` and optionally `agent_headers`:
 Single run (use the default model of the agent):
 
 ```bash
-calibrate llm -c config.json -o ./out
+calibrate-agent llm -c config.json -o ./out
 ```
 
 Calibrate verifies the connection before running. Results are saved directly to the output directory.
@@ -680,7 +680,7 @@ Calibrate verifies the connection before running. Results are saved directly to 
 Benchmark across models — calibrate verifies the connection for each model, then runs the test suite once per model. The model name is included in each request so your agent can route to the right model:
 
 ```bash
-calibrate llm -c config.json -m gemma-4-26b-a4b-it gpt-4o -o ./out
+calibrate-agent llm -c config.json -m gemma-4-26b-a4b-it gpt-4o -o ./out
 ```
 
 Each model gets its own results folder, and a summary with pass rates for all models is printed at the end.
@@ -690,11 +690,11 @@ Each model gets its own results folder, and a summary with pass rates for all mo
 Pass `--skip-verify` to skip the agent connection verification step. This is useful in CI/automation pipelines where you've already confirmed the agent is reachable:
 
 ```bash
-calibrate llm -c config.json -o ./out --skip-verify
+calibrate-agent llm -c config.json -o ./out --skip-verify
 ```
 
 ```bash
-calibrate llm -c config.json -m gemma-4-26b-a4b-it gpt-4o -o ./out --skip-verify
+calibrate-agent llm -c config.json -m gemma-4-26b-a4b-it gpt-4o -o ./out --skip-verify
 ```
 
 ## Output

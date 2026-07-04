@@ -6,7 +6,7 @@
     "dev": "tsx source/cli.tsx",
     "test": "vitest run",
     "build": "tsc",
-    "bundle": "esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate/ui/cli.bundle.mjs --format=esm --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
+    "bundle": "esbuild source/cli.tsx --bundle --platform=node --target=node18 --outfile=../calibrate_agent/ui/cli.bundle.mjs --format=esm --banner:js=\"import{createRequire}from'module';const require=createRequire(import.meta.url);\"",
     "start": "node dist/cli.js"
   },
   "dependencies": {

@@ -16,7 +16,7 @@ def _make_runner_args():
 
 class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
     async def test_invalid_language_raises(self):
-        from calibrate.agent import bot as B
+        from calibrate_agent.agent import bot as B
 
         with self.assertRaises(ValueError):
             await B.run_bot(
@@ -31,7 +31,7 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_basic_run_bot_openrouter(self):
-        from calibrate.agent import bot as B
+        from calibrate_agent.agent import bot as B
 
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()
@@ -68,7 +68,7 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_basic_run_bot_openai(self):
-        from calibrate.agent import bot as B
+        from calibrate_agent.agent import bot as B
 
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()

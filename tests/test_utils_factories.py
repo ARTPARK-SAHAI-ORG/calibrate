@@ -46,7 +46,7 @@ ALL_KEYS = {
 class TestCreateSTTService(unittest.TestCase):
     def test_each_provider(self):
         """Every provider branch constructs (pipecat service patched)."""
-        from calibrate.utils import create_stt_service
+        from calibrate_agent.utils import create_stt_service
 
         for prov, target in STT_SERVICE_TARGETS.items():
             with patch.dict(os.environ, ALL_KEYS), patch(target):
@@ -54,9 +54,9 @@ class TestCreateSTTService(unittest.TestCase):
 
     def test_stt_models_come_from_shared_constant(self):
         """Every provider's model in create_stt_service must come from
-        utils.STT_PROVIDER_MODELS — the SAME dict calibrate/stt/eval.py reads —
+        utils.STT_PROVIDER_MODELS — the SAME dict calibrate_agent/stt/eval.py reads —
         so the live agent and the benchmark can't drift apart."""
-        from calibrate.utils import create_stt_service, STT_PROVIDER_MODELS
+        from calibrate_agent.utils import create_stt_service, STT_PROVIDER_MODELS
 
         for prov, expected in STT_PROVIDER_MODELS.items():
             with patch.dict(os.environ, ALL_KEYS), \
@@ -79,7 +79,7 @@ class TestCreateSTTService(unittest.TestCase):
         """Sarvam STT must use saaras:v3 with mode="transcribe" so pipecat routes
         it to the plain STT streaming endpoint (not translate), matching
         stt/eval.py's transcribe_sarvam."""
-        from calibrate.utils import create_stt_service, STT_PROVIDER_MODELS
+        from calibrate_agent.utils import create_stt_service, STT_PROVIDER_MODELS
 
         with patch.dict(os.environ, ALL_KEYS), \
                 patch(STT_SERVICE_TARGETS["sarvam"]) as svc:
@@ -94,7 +94,7 @@ class TestCreateSTTService(unittest.TestCase):
 class TestCreateTTSService(unittest.TestCase):
     def test_each_provider(self):
         """Every provider branch constructs (pipecat service patched)."""
-        from calibrate.utils import create_tts_service
+        from calibrate_agent.utils import create_tts_service
 
         for prov, target in TTS_SERVICE_TARGETS.items():
             with patch.dict(os.environ, ALL_KEYS), patch(target):
@@ -106,12 +106,12 @@ class TestCreateTTSService(unittest.TestCase):
 
     def test_defaults_match_tts_eval(self):
         """create_tts_service must pick the same model (TTS_PROVIDER_MODELS) and
-        voice (get_tts_voice) that calibrate/tts/eval.py uses — for every provider
+        voice (get_tts_voice) that calibrate_agent/tts/eval.py uses — for every provider
         and every language — so the live agent and benchmark can't drift. Voices
         are per-language: overrides in TTS_PROVIDER_VOICES_BY_LANGUAGE, else the
         default. In pipecat 1.0.0 both are passed via
         <Service>.Settings(model=..., voice=...)."""
-        from calibrate.utils import (
+        from calibrate_agent.utils import (
             create_tts_service,
             TTS_PROVIDER_MODELS,
             TTS_PROVIDER_VOICES,

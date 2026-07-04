@@ -22,11 +22,11 @@ pip install calibrate-agent
 ## Usage
 
 ```bash
-calibrate              # Interactive main menu
-calibrate stt          # Benchmark STT providers
-calibrate tts          # Benchmark TTS providers
-calibrate llm          # Interactive LLM evaluation
-calibrate simulations  # Interactive text or voice simulations
+calibrate-agent              # Interactive main menu
+calibrate-agent stt          # Benchmark STT providers
+calibrate-agent tts          # Benchmark TTS providers
+calibrate-agent llm          # Interactive LLM evaluation
+calibrate-agent simulations  # Interactive text or voice simulations
 ```
 
 - [CLI Documentation](https://calibrate.artpark.ai/docs/cli/overview)
