@@ -51,28 +51,30 @@ class TestBuildSerializedTranscript(unittest.TestCase):
         self.assertEqual(result, [])
 
     def test_role_flipping(self):
-        ctx = MagicMock()
-        ctx.get_messages.return_value = [
-            {"role": "user", "content": "hi"},      # → assistant
-            {"role": "assistant", "content": "hello"},  # → user
-        ]
-        adapter = _make_adapter(context=ctx)
+        adapter = _make_adapter()
+        adapter.record_agent_turn("hi")             # agent → assistant
+        adapter.record_persona_committed("hello")   # persona → user
         result = adapter._build_serialized_transcript()
         self.assertEqual(result[0]["role"], "assistant")
         self.assertEqual(result[0]["content"], "hi")
         self.assertEqual(result[1]["role"], "user")
+        self.assertEqual(result[1]["content"], "hello")
 
     def test_merges_consecutive_same_role(self):
-        ctx = MagicMock()
-        ctx.get_messages.return_value = [
-            {"role": "user", "content": "a"},
-            {"role": "user", "content": "b"},
-        ]
-        adapter = _make_adapter(context=ctx)
+        adapter = _make_adapter()
+        adapter.record_agent_turn("a")
+        adapter.record_agent_turn("b")
         result = adapter._build_serialized_transcript()
-        # Both became assistant, merged
+        # Both agent turns became assistant and merged
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["content"], "a b")
+
+    def test_empty_turns_are_dropped(self):
+        adapter = _make_adapter()
+        adapter.record_agent_turn("")
+        adapter.record_agent_turn(None)
+        adapter.record_persona_committed("   ")
+        self.assertEqual(adapter._build_serialized_transcript(), [])
 
     def test_with_end_reason(self):
         adapter = _make_adapter()
@@ -80,53 +82,98 @@ class TestBuildSerializedTranscript(unittest.TestCase):
         self.assertEqual(result[-1]["role"], "end_reason")
         self.assertEqual(result[-1]["content"], "max_turns")
 
-    def test_tool_calls_inserted(self):
-        ctx = MagicMock()
-        ctx.get_messages.return_value = [
-            {"role": "user", "content": "hi"},
-        ]
-        tool_calls = [{
-            "position": 0,
-            "data": {
-                "tool_call_id": "call_1",
-                "function_name": "foo",
-                "args": {"x": 1},
-            },
-        }]
-        adapter = _make_adapter(context=ctx, tool_calls=tool_calls)
+    def test_tool_call_recorded_after_the_turn_it_followed(self):
+        adapter = _make_adapter()
+        adapter.record_agent_turn("what is your name?")
+        adapter.record_persona_committed("my name is Geeta")
+        adapter.record_tool_call(
+            {
+                "tool_call_id": "c1",
+                "function_name": "plan_next_question",
+                "args": {"i": 2},
+            }
+        )
         result = adapter._build_serialized_transcript()
-        # First entry is tool_calls, then the message
-        self.assertEqual(result[0]["role"], "assistant")
-        self.assertIn("tool_calls", result[0])
+        self.assertEqual(
+            [m["role"] for m in result], ["assistant", "user", "assistant"]
+        )
+        self.assertEqual(result[0]["content"], "what is your name?")
+        self.assertEqual(result[1]["content"], "my name is Geeta")
+        self.assertIn("tool_calls", result[2])
+        self.assertEqual(
+            result[2]["tool_calls"][0]["function"]["name"], "plan_next_question"
+        )
+        self.assertEqual(
+            result[2]["tool_calls"][0]["function"]["arguments"], '{"i": 2}'
+        )
 
-    def test_tool_calls_after_messages(self):
-        ctx = MagicMock()
-        ctx.get_messages.return_value = [
-            {"role": "user", "content": "hi"},
-        ]
-        tool_calls = [{
-            "position": 5,
-            "data": {
-                "tool_call_id": "call_x",
-                "function_name": "y",
-                "args": {},
-            },
-        }]
-        adapter = _make_adapter(context=ctx, tool_calls=tool_calls)
+    def test_consecutive_tool_calls_grouped(self):
+        adapter = _make_adapter()
+        adapter.record_agent_turn("hi")
+        adapter.record_tool_call(
+            {"tool_call_id": "c1", "function_name": "plan_next_question", "args": {}}
+        )
+        adapter.record_tool_call(
+            {"tool_call_id": "c2", "function_name": "end_call", "args": {}}
+        )
         result = adapter._build_serialized_transcript()
-        # Tool call at position 5 (after all messages) appended
-        self.assertEqual(result[-1]["role"], "assistant")
-        self.assertIn("tool_calls", result[-1])
+        # Both calls collapse into a single assistant tool_calls entry
+        tool_entries = [m for m in result if "tool_calls" in m]
+        self.assertEqual(len(tool_entries), 1)
+        names = [c["function"]["name"] for c in tool_entries[0]["tool_calls"]]
+        self.assertEqual(names, ["plan_next_question", "end_call"])
 
-    def test_skip_non_dict_messages(self):
-        ctx = MagicMock()
-        ctx.get_messages.return_value = [
-            "not a dict",
-            {"role": "user", "content": "hi"},
-        ]
-        adapter = _make_adapter(context=ctx)
+    def test_final_persona_turn_captured_when_never_committed(self):
+        """The regression: agent ends the call the instant it hears the persona.
+
+        The persona turn never commits via ``on_assistant_turn_stopped`` (fires
+        empty), but its spoken ``TTSTextFrame`` fragments must still land in the
+        transcript, ahead of the tool calls that ended the call.
+        """
+        adapter = _make_adapter()
+        adapter.record_agent_turn("what is your name?")
+        for frag in ["my", "name", "is", "Geeta", "Prasad"]:
+            adapter.record_persona_text(frag)
+        adapter.record_persona_committed("")  # empty commit must not wipe buffer
+        adapter.record_tool_call(
+            {"tool_call_id": "c1", "function_name": "plan_next_question", "args": {}}
+        )
+        adapter.record_tool_call(
+            {"tool_call_id": "c2", "function_name": "end_call", "args": {}}
+        )
+        result = adapter._build_serialized_transcript()
+        self.assertEqual(
+            [m["role"] for m in result], ["assistant", "user", "assistant"]
+        )
+        self.assertEqual(result[1]["content"], "my name is Geeta Prasad")
+        self.assertEqual(len(result[2]["tool_calls"]), 2)
+
+    def test_committed_text_supersedes_fragments(self):
+        adapter = _make_adapter()
+        for frag in ["my", "name"]:
+            adapter.record_persona_text(frag)
+        adapter.record_persona_committed("my name is Geeta")
         result = adapter._build_serialized_transcript()
         self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["content"], "my name is Geeta")
+
+    def test_pending_persona_included_when_ending_on_persona(self):
+        adapter = _make_adapter()
+        adapter.record_agent_turn("anything else?")
+        adapter.record_persona_text("no")
+        adapter.record_persona_text("thanks")
+        # No flush event follows; build must still surface the in-flight turn.
+        result = adapter._build_serialized_transcript()
+        self.assertEqual(result[-1]["role"], "user")
+        self.assertEqual(result[-1]["content"], "no thanks")
+
+    def test_build_does_not_mutate_pending(self):
+        adapter = _make_adapter()
+        adapter.record_persona_text("hello")
+        adapter._build_serialized_transcript()
+        # Building twice yields the same result (pending not consumed).
+        again = adapter._build_serialized_transcript()
+        self.assertEqual(again[-1]["content"], "hello")
 
 
 class TestSaveTranscript(unittest.TestCase):
