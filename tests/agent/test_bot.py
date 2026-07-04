@@ -35,11 +35,11 @@ class TestTTSConfig(unittest.TestCase):
 
 class TestLLMConfig(unittest.TestCase):
     def test_default(self):
-        from calibrate.agent.bot import LLMConfig
+        from calibrate.agent.bot import DEFAULT_TEST_AGENT_LLM_MODEL, LLMConfig
 
         cfg = LLMConfig()
         self.assertEqual(cfg.provider, "openrouter")
-        self.assertEqual(cfg.model, "openai/gpt-5.4-mini")
+        self.assertEqual(cfg.model, DEFAULT_TEST_AGENT_LLM_MODEL)
 
     def test_custom(self):
         from calibrate.agent.bot import LLMConfig
