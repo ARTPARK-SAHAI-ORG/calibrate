@@ -1693,9 +1693,11 @@ TTS_PROVIDER_VOICES = {
     "smallest": "aditi",
 }
 
-# Google TTS default voice family; the full name is "{lang_code}-{family}"
-# (e.g. en-US-Chirp3-HD-Charon), used when a language has no override below.
-GOOGLE_TTS_VOICE_FAMILY = "Chirp3-HD-Charon"
+# Google TTS voice family; the full name is "{lang_code}-{family}" (e.g.
+# en-US-Chirp3-HD-Achernar), built per language in get_tts_voice. Google needs no
+# TTS_PROVIDER_VOICES_BY_LANGUAGE entry — the language code in the name already
+# makes it per-language, so this family IS the single source for every language.
+GOOGLE_TTS_VOICE_FAMILY = "Chirp3-HD-Achernar"
 
 # Per-language voice OVERRIDES. A (provider, language) entry here wins over the
 # provider's TTS_PROVIDER_VOICES default; languages without an entry fall back to
@@ -1707,11 +1709,6 @@ TTS_PROVIDER_VOICES_BY_LANGUAGE = {
         "english": "66c6b81c-ddb7-4892-bdd5-19b5a7be38e7",
         "hindi": "28ca2041-5dda-42df-8123-f58ea9c3da00",
         "kannada": "7c6219d2-e8d2-462c-89d8-7ecba7c75d65",
-    },
-    "google": {
-        "english": "en-US-Chirp3-HD-Achernar",
-        "hindi": "hi-IN-Chirp3-HD-Achernar",
-        "kannada": "kn-IN-Chirp3-HD-Achernar",
     },
     "elevenlabs": {
         "english": "90ipbRoKi4CpHXvKVtl0",

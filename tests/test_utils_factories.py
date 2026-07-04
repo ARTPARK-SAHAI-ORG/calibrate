@@ -122,13 +122,14 @@ class TestCreateTTSService(unittest.TestCase):
         benchmarked = set(TTS_SERVICE_TARGETS) - {"deepgram"}
 
         # Completeness guard: every provider carrying a shared model or voice
-        # (default or per-language override) must be exercised below. Adding one
-        # to a constant without covering it here fails the test.
+        # (default, per-language override, or Google's family) must be exercised
+        # below. Adding one to a constant without covering it here fails the test.
         self.assertEqual(
             benchmarked,
             set(TTS_PROVIDER_MODELS)
             | set(TTS_PROVIDER_VOICES)
-            | set(TTS_PROVIDER_VOICES_BY_LANGUAGE),
+            | set(TTS_PROVIDER_VOICES_BY_LANGUAGE)
+            | {"google"},
         )
 
         for prov in benchmarked:
