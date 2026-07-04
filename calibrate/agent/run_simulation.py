@@ -1372,7 +1372,7 @@ async def _run_simulation_inner(
     if voices["provider"] == "google":
         tts = create_tts_service("google", language, voice_id=voice_id)
         eval_logger.info(f"Using Google TTS voice: {voice_id}")
-    else:
+    elif voices["provider"] == "elevenlabs":
         eval_logger.info(f"Using ElevenLabs voice ID: {voice_id}")
         elevenlabs_http_session = aiohttp.ClientSession()
         tts = ElevenLabsHttpTTSService(
@@ -1381,6 +1381,10 @@ async def _run_simulation_inner(
             settings=ElevenLabsHttpTTSService.Settings(
                 voice=voice_id, language=tts_language
             ),
+        )
+    else:
+        raise ValueError(
+            f"Unsupported simulated-user TTS provider: {voices['provider']}"
         )
 
     llm = OpenAILLMService(
