@@ -1344,8 +1344,12 @@ async def _run_simulation_inner(
     # only the words actually spoken.
     elevenlabs_http_session = None
     if language == "kannada":
+        # Keep the simulated user distinct from the agent: the agent's
+        # Google-Kannada voice defaults to Achernar (GOOGLE_TTS_VOICE_FAMILY), so
+        # the female user uses a different Chirp3-HD speaker (Kore) to avoid both
+        # sides sounding identical.
         voice_id = (
-            "kn-IN-Chirp3-HD-Achernar"
+            "kn-IN-Chirp3-HD-Kore"
             if gender == "female"
             else "kn-IN-Chirp3-HD-Achird"
         )
