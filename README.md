@@ -4,7 +4,7 @@
 [![codecov](https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate/branch/main/graph/badge.svg)](https://codecov.io/gh/ARTPARK-SAHAI-ORG/calibrate)
 [![CC BY-SA 4.0][cc-by-sa-shield]][cc-by-sa]
 
-[Calibrate](https://calibrate.artpark.ai) is a framework for evaluating AI agents. With [Calibrate](https://calibrate.artpark.ai), you can move from slow, manual testing to a fast, automated, and repeatable testing process for your entire agent stack:
+[Calibrate](https://calibrate.artpark.ai) is a framework for evaluating AI agents which let you move from slow, manual testing to a fast, automated, and repeatable testing process for your entire agent stack:
 
 - `Text to Text (LLMs)`: Evaluate the response quality and tool calling of your LLMs for multi-turn conversations and find the find LLM for your agent
 - `Human alignment`: Create LLM judges to make your evaluations scalable and reliable with human in the loop.
