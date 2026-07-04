@@ -6,7 +6,7 @@ description: "Evaluate Text to Speech providers via CLI"
 ## Get started
 
 ```bash
-calibrate tts
+calibrate-agent tts
 ```
 
 <iframe
@@ -43,7 +43,7 @@ The evaluation runs providers in parallel (max 2 at a time), showing the progres
 By default, an audio LLM judge — routed through [OpenRouter](https://openrouter.ai/) (set `OPENROUTER_API_KEY` in your environment) — evaluates whether the reference text is pronounced correctly in the synthesized audio using the built-in **`pronunciation`** evaluator; expand **Default evaluator: pronunciation** below for the exact `system_prompt` from the codebase. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
 
 ```bash
-calibrate tts -p openai google -i sample.csv -o ./out --config config.json
+calibrate-agent tts -p openai google -i sample.csv -o ./out --config config.json
 ```
 
 Each evaluator's `system_prompt` is sent as the system message to its own dedicated audio LLM judge call (one call per evaluator, run in parallel). The user message contains the reference text and the audio sample.

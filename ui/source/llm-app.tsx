@@ -1510,7 +1510,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
               <Box marginBottom={1}>
                 <Text>
                   No results were produced for this model. The
-                  {" "}<Text color="cyan">calibrate llm</Text>{" "}
+                  {" "}<Text color="cyan">calibrate-agent llm</Text>{" "}
                   subprocess exited with an error.
                 </Text>
               </Box>

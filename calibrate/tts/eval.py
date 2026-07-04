@@ -877,7 +877,7 @@ async def main():
     """CLI entry point for single-provider TTS evaluation.
 
     Used by the Ink UI which spawns individual provider processes.
-    For multi-provider benchmark, use benchmark.py via `calibrate tts -p provider1 provider2 ...`
+    For multi-provider benchmark, use benchmark.py via `calibrate-agent tts -p provider1 provider2 ...`
     """
     parser = argparse.ArgumentParser(
         description="Single-provider TTS evaluation (used by Ink UI)"
@@ -945,7 +945,7 @@ async def main():
         print(f"\033[31mInput validation error: {error_msg}\033[0m")
         sys.exit(1)
 
-    # ``exist_ok=True`` makes this safe when several ``calibrate tts``
+    # ``exist_ok=True`` makes this safe when several ``calibrate-agent tts``
     # subprocesses race to create the output dir on first use; the previous
     # ``if not exists: makedirs(...)`` pattern was non-atomic and the loser
     # raised ``FileExistsError``.

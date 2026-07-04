@@ -4,7 +4,7 @@ File-based pathway for the general (non-conversational) task judge. Reads a
 JSON dataset of ``{id, input, output}`` rows plus a list of evaluators, runs
 the judge over every row, and writes ``results.csv`` + ``metrics.json``.
 
-Invoked via ``calibrate general --dataset data.json --config config.json``.
+Invoked via ``calibrate-agent general --dataset data.json --config config.json``.
 """
 
 import argparse

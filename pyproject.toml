@@ -61,7 +61,7 @@ dev = [
 Documentation = "https://calibrate.artpark.ai/docs"
 
 [project.scripts]
-calibrate = "calibrate.cli:main"
+calibrate-agent = "calibrate.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

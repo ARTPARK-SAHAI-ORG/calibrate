@@ -5,7 +5,7 @@ This module handles running LLM tests across multiple models in parallel
 and automatically generates a leaderboard after all models complete.
 
 CLI Usage:
-    calibrate llm -c config.json -m model1 model2 -p openrouter -o ./out
+    calibrate-agent llm -c config.json -m model1 model2 -p openrouter -o ./out
 
 Python SDK:
     from calibrate.llm import tests
@@ -185,7 +185,7 @@ async def main():
             config["test_cases"], args.debug, args.debug_count
         )
 
-    # ``exist_ok=True`` makes this safe when several ``calibrate llm``
+    # ``exist_ok=True`` makes this safe when several ``calibrate-agent llm``
     # subprocesses (e.g. one per model spawned by the interactive UI) race to
     # create the output dir — the previous ``if not exists: makedirs(...)``
     # pattern was non-atomic and the loser raised ``FileExistsError``.
@@ -196,7 +196,7 @@ async def main():
     # leaderboard prints, summary) is captured in one place — same pattern as
     # the STT/TTS benchmark CLIs.
     #
-    # When the interactive UI runs each model in its own ``calibrate llm``
+    # When the interactive UI runs each model in its own ``calibrate-agent llm``
     # subprocess, multiple processes target the same ``logs`` path concurrently;
     # the UI sets ``CALIBRATE_LLM_LOG_APPEND=1`` so subprocesses append instead
     # of racing to truncate each other's output. The UI itself clears the file

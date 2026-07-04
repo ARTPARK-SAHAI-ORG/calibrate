@@ -5,7 +5,7 @@ This module handles running TTS evaluation across multiple providers in parallel
 and automatically generates a leaderboard after all providers complete.
 
 CLI Usage:
-    calibrate tts -p provider1 provider2 -i input.csv -l english -o ./out
+    calibrate-agent tts -p provider1 provider2 -i input.csv -l english -o ./out
 
 Python SDK:
     from calibrate.tts import run
@@ -210,7 +210,7 @@ async def main():
         print(f"\033[31mInput validation error: {error_msg}\033[0m")
         sys.exit(1)
 
-    # ``exist_ok=True`` makes this safe when several ``calibrate tts``
+    # ``exist_ok=True`` makes this safe when several ``calibrate-agent tts``
     # subprocesses race to create the output dir on first use; the previous
     # ``if not exists: makedirs(...)`` pattern was non-atomic and the loser
     # raised ``FileExistsError``.

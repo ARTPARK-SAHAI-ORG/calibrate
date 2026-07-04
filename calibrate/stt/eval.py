@@ -1431,7 +1431,7 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
 async def main():
     """CLI entry point for single-provider STT evaluation.
 
-    For multiple providers, use `calibrate stt -p provider1 provider2 ...` which
+    For multiple providers, use `calibrate-agent stt -p provider1 provider2 ...` which
     routes to benchmark.py, or use the Python SDK's `run()` function.
     """
     parser = argparse.ArgumentParser(
@@ -1522,7 +1522,7 @@ async def main():
         print(f"\033[31mInput validation error: {error_msg}\033[0m")
         sys.exit(1)
 
-    # ``exist_ok=True`` makes this safe when several ``calibrate stt``
+    # ``exist_ok=True`` makes this safe when several ``calibrate-agent stt``
     # subprocesses race to create the output dir on first use; the previous
     # ``if not exists: makedirs(...)`` pattern was non-atomic and the loser
     # raised ``FileExistsError``.

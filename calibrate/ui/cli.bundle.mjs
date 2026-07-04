@@ -48244,7 +48244,7 @@ function LlmTestsApp({ onBack }) {
             /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime2.jsxs)(Text, { children: [
               "No results were produced for this model. The",
               " ",
-              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { color: "cyan", children: "calibrate llm" }),
+              /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(Text, { color: "cyan", children: "calibrate-agent llm" }),
               " ",
               "subprocess exited with an error."
             ] }) }),

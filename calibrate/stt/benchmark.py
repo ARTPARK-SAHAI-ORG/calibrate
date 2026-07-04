@@ -14,7 +14,7 @@ Usage:
     ))
 
     # CLI
-    calibrate stt -p deepgram google sarvam -i ./data -o ./out
+    calibrate-agent stt -p deepgram google sarvam -i ./data -o ./out
 """
 
 import asyncio
@@ -284,7 +284,7 @@ async def main():
             print(f"\033[31mInput validation error: {error_msg}\033[0m")
             sys.exit(1)
 
-    # ``exist_ok=True`` makes this safe when several ``calibrate stt``
+    # ``exist_ok=True`` makes this safe when several ``calibrate-agent stt``
     # subprocesses race to create the output dir on first use; the previous
     # ``if not exists: makedirs(...)`` pattern was non-atomic and the loser
     # raised ``FileExistsError``.

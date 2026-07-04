@@ -3,17 +3,17 @@ CLI entry point for calibrate package.
 
 Usage:
     # Interactive mode (recommended):
-    calibrate                                        # Main menu
-    calibrate stt                                    # Interactive STT evaluation
-    calibrate tts                                    # Interactive TTS evaluation
-    calibrate llm                                    # Interactive LLM tests
-    calibrate simulations                            # Interactive simulations
-    calibrate status                                  # Check provider connectivity
+    calibrate-agent                                        # Main menu
+    calibrate-agent stt                                    # Interactive STT evaluation
+    calibrate-agent tts                                    # Interactive TTS evaluation
+    calibrate-agent llm                                    # Interactive LLM tests
+    calibrate-agent simulations                            # Interactive simulations
+    calibrate-agent status                                  # Check provider connectivity
 
     # Direct mode:
-    calibrate llm -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
-    calibrate simulations --type text -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
-    calibrate simulations --type voice -c config.json -o ./out
+    calibrate-agent llm -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
+    calibrate-agent simulations --type text -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
+    calibrate-agent simulations --type voice -c config.json -o ./out
 """
 
 import sys
@@ -60,7 +60,7 @@ def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
 
 
 def _load_cli_dotenv() -> None:
-    """Load .env from the directory where the calibrate command is run."""
+    """Load .env from the directory where the calibrate-agent command is run."""
     dotenv_path = find_dotenv(usecwd=True)
     load_dotenv(dotenv_path, override=True)
 
@@ -155,21 +155,21 @@ def main():
     _load_cli_dotenv()
 
     parser = argparse.ArgumentParser(
-        prog="calibrate",
-        usage="calibrate [-h] [-v] {stt,tts,llm,simulations,general,status} ...",
+        prog="calibrate-agent",
+        usage="calibrate-agent [-h] [-v] {stt,tts,llm,simulations,general,status} ...",
         description="Voice agent evaluation and benchmarking toolkit",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    calibrate                                        # Main menu (interactive)
-    calibrate stt                                    # Interactive STT evaluation
-    calibrate tts                                    # Interactive TTS evaluation
-    calibrate llm                                    # Interactive LLM tests
-    calibrate llm -c config.json                     # Run LLM tests directly
-    calibrate simulations                            # Interactive simulations
-    calibrate simulations --type text -c config.json # Run text simulation directly
-    calibrate general --dataset data.json -c config.json  # Score input/output pairs
-    calibrate status                                 # Check provider connectivity
+    calibrate-agent                                        # Main menu (interactive)
+    calibrate-agent stt                                    # Interactive STT evaluation
+    calibrate-agent tts                                    # Interactive TTS evaluation
+    calibrate-agent llm                                    # Interactive LLM tests
+    calibrate-agent llm -c config.json                     # Run LLM tests directly
+    calibrate-agent simulations                            # Interactive simulations
+    calibrate-agent simulations --type text -c config.json # Run text simulation directly
+    calibrate-agent general --dataset data.json -c config.json  # Score input/output pairs
+    calibrate-agent status                                 # Check provider connectivity
         """,
     )
 
@@ -185,11 +185,11 @@ Examples:
         help="Component to run",
         metavar="{stt,tts,llm,simulations,general,status}",
     )
-    subparsers.required = False  # Allow `calibrate` alone for main menu
+    subparsers.required = False  # Allow `calibrate-agent` alone for main menu
 
     # ── STT ───────────────────────────────────────────────────────
-    # `calibrate stt` with no args → interactive UI
-    # `calibrate stt -p provider1 provider2 ... -i input-dir ...` → run benchmark (multi) or eval (single)
+    # `calibrate-agent stt` with no args → interactive UI
+    # `calibrate-agent stt -p provider1 provider2 ... -i input-dir ...` → run benchmark (multi) or eval (single)
     stt_parser = subparsers.add_parser(
         "stt",
         help="Speech-to-text evaluation",
@@ -244,9 +244,9 @@ Examples:
     )
 
     # ── TTS ───────────────────────────────────────────────────────
-    # `calibrate tts` with no args → interactive UI
-    # `calibrate tts -p provider -i input ...` → single provider (eval.py)
-    # `calibrate tts -p provider1 provider2 -i input ...` → multi-provider (benchmark.py)
+    # `calibrate-agent tts` with no args → interactive UI
+    # `calibrate-agent tts -p provider -i input ...` → single provider (eval.py)
+    # `calibrate-agent tts -p provider1 provider2 -i input ...` → multi-provider (benchmark.py)
     tts_parser = subparsers.add_parser(
         "tts",
         help="Text-to-speech evaluation",
@@ -279,10 +279,10 @@ Examples:
     )
 
     # ── LLM tests ───────────────────────────────────────────────
-    # `calibrate llm` with no args → interactive UI
-    # `calibrate llm -c config.json -m model ...` → single model (run_tests.py)
-    # `calibrate llm -c config.json -m model1 model2 ...` → multi-model (benchmark.py)
-    # `calibrate llm --verify --agent-url URL` → verify external agent connection
+    # `calibrate-agent llm` with no args → interactive UI
+    # `calibrate-agent llm -c config.json -m model ...` → single model (run_tests.py)
+    # `calibrate-agent llm -c config.json -m model1 model2 ...` → multi-model (benchmark.py)
+    # `calibrate-agent llm --verify --agent-url URL` → verify external agent connection
     llm_parser = subparsers.add_parser(
         "llm",
         help="LLM evaluation — test agent responses and tool calls",
@@ -367,9 +367,9 @@ Examples:
         help="Path to dataset JSON for --eval-only (list of {test_case, output} items)",
     )
     # ── Simulations ─────────────────────────────────────────────
-    # `calibrate simulations` with no args → interactive UI
-    # `calibrate simulations --type text -c config.json ...` → run directly
-    # `calibrate simulations --verify --agent-url URL` → verify external agent
+    # `calibrate-agent simulations` with no args → interactive UI
+    # `calibrate-agent simulations --type text -c config.json ...` → run directly
+    # `calibrate-agent simulations --verify --agent-url URL` → verify external agent
     sim_parser = subparsers.add_parser(
         "simulations",
         help="Run text or voice simulations",
@@ -451,7 +451,7 @@ Examples:
     sim_lb_parser.add_argument("-s", "--save-dir", type=str, required=True)
 
     # ── General task eval ───────────────────────────────────────
-    # `calibrate general --dataset data.json --config config.json` →
+    # `calibrate-agent general --dataset data.json --config config.json` →
     # score a dataset of {id, input, output} rows with the general
     # (non-conversational) task judge.
     general_parser = subparsers.add_parser(
@@ -521,7 +521,7 @@ Examples:
                 print("\033[31mError: --dataset is required with --eval-only\033[0m")
                 sys.exit(1)
 
-            argv = ["calibrate", "--eval-only", "--dataset", args.dataset]
+            argv = ["calibrate-agent", "--eval-only", "--dataset", args.dataset]
             argv.extend(["-l", args.language])
             argv.extend(["-o", args.output_dir])
             if args.config:
@@ -535,7 +535,7 @@ Examples:
             from calibrate.stt.benchmark import main as stt_benchmark_main
 
             providers = args.provider
-            argv = ["calibrate", "-p"] + providers
+            argv = ["calibrate-agent", "-p"] + providers
             argv.extend(["-l", args.language])
             argv.extend(["-i", args.input_dir])
             argv.extend(["-o", args.output_dir])
@@ -565,7 +565,7 @@ Examples:
             from calibrate.tts.benchmark import main as tts_benchmark_main
 
             providers = args.provider
-            argv = ["calibrate", "-p"] + providers
+            argv = ["calibrate-agent", "-p"] + providers
             argv.extend(["-l", args.language])
             argv.extend(["-i", args.input])
             argv.extend(["-o", args.output_dir])
@@ -594,7 +594,7 @@ Examples:
             from calibrate.llm.run_tests import main as llm_run_tests_main
 
             argv = [
-                "calibrate",
+                "calibrate-agent",
                 "-c",
                 args.config,
                 "-o",
@@ -709,7 +709,7 @@ Examples:
 
                 models = args.model if args.model else ["gpt-4.1"]
 
-                argv = ["calibrate", "-c", args.config]
+                argv = ["calibrate-agent", "-c", args.config]
                 argv.extend(["-o", args.output_dir])
                 argv.extend(["-m"] + models)
                 argv.extend(["-p", args.provider])
@@ -741,7 +741,7 @@ Examples:
                 main as leaderboard_main,
             )
 
-            sys.argv = ["calibrate"] + _args_to_argv(
+            sys.argv = ["calibrate-agent"] + _args_to_argv(
                 args,
                 exclude_keys={
                     "component",
@@ -767,7 +767,7 @@ Examples:
                 if not getattr(args, "dataset", None):
                     print("Error: --dataset is required with --eval-only")
                     sys.exit(1)
-                sys.argv = ["calibrate"] + _args_to_argv(
+                sys.argv = ["calibrate-agent"] + _args_to_argv(
                     args,
                     exclude_keys={
                         "component",
@@ -804,7 +804,7 @@ Examples:
                     _print_sample_output(_verify)
                     print()
 
-            sys.argv = ["calibrate"] + _args_to_argv(
+            sys.argv = ["calibrate-agent"] + _args_to_argv(
                 args, exclude_keys={"component", "sim_subcmd", "type", "skip_verify"}
             )
             asyncio.run(llm_simulation_main())
@@ -836,7 +836,7 @@ Examples:
                     print("✓ Verified")
                     print()
 
-            sys.argv = ["calibrate"] + _args_to_argv(
+            sys.argv = ["calibrate-agent"] + _args_to_argv(
                 args,
                 exclude_keys={
                     "component",
@@ -864,7 +864,7 @@ Examples:
             print("\033[31mError: --config is required\033[0m")
             sys.exit(1)
 
-        argv = ["calibrate", "--dataset", args.dataset, "-c", args.config]
+        argv = ["calibrate-agent", "--dataset", args.dataset, "-c", args.config]
         argv.extend(["-o", args.output_dir])
         sys.argv = argv
         asyncio.run(general_eval_main())

@@ -2216,7 +2216,7 @@ async def main():
     """CLI entry point for single-model LLM test evaluation.
 
     Used by the Ink UI which spawns individual model processes.
-    For multi-model benchmark, use benchmark.py via `calibrate llm -m model1 model2 ...`
+    For multi-model benchmark, use benchmark.py via `calibrate-agent llm -m model1 model2 ...`
     """
     parser = argparse.ArgumentParser(
         description="Single-model LLM test evaluation (used by Ink UI)"
