@@ -33,6 +33,8 @@ from calibrate.utils import (
     create_tts_service,
     provider_log_file,
     summarize_metric_distribution,
+    save_transcript,
+    TRANSCRIPT_FILE_NAME,
 )
 from calibrate.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
 from calibrate.stt.metrics import (
@@ -189,7 +191,9 @@ from pipecat.utils.time import time_now_iso8601
 
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
-TRANSCRIPT_FILE_NAME = "transcript.json"
+# Punctuation that should attach to the preceding word when joining TTS text
+# fragments into a persona turn (covers Latin plus the Devanagari danda).
+_PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
 
 DEFAULT_SERIALIZER_NAME = "protobuf"
 SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
@@ -461,6 +465,21 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._pending_user_turn = False  # set True on bot-started-speaking; False on bot-stopped-speaking after frames are pushed
         self._turns_concluded = set()
         self._serialized_transcript = []  # Store transcripts for return
+        # Append-only, event-time record of the conversation — the source of truth
+        # for the serialized transcript. Entries are appended as turns commit and
+        # tool calls arrive, so order is preserved even when the pipeline is torn
+        # down mid-turn (e.g. the agent fires ``end_call`` the instant it hears the
+        # sim user, before the aggregator commits that turn to the LLM context).
+        # Reconstructing from the mutable context at teardown used to silently drop
+        # that final turn and misplace the tool calls; this list does not.
+        #   {"role": "agent"|"persona", "content": str}
+        #   {"role": "tool_calls", "tool_calls": [...]}
+        self._transcript_events: list[dict] = []
+        # Text the sim user (persona) has spoken in the current turn, accumulated
+        # from ``TTSTextFrame``s (what was actually said, so it survives a mid-turn
+        # teardown). Flushed into an event when a tool call / agent turn follows it,
+        # or included as the trailing turn at build time.
+        self._pending_persona_text = ""
         self._ended_due_to_max_turns = False
         self._bot_audio_chunk_indices = {}  # Track chunk indices for bot audio per turn
         self._awaiting_first_bot_audio_chunk = (
@@ -591,78 +610,108 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         # Save intermediate state after each turn
         await self._save_intermediate_state(concluded_turn)
 
+    def _flush_pending_persona_turn(self) -> None:
+        """Commit the buffered in-flight persona turn (if any) as an ordered event.
+
+        Called before recording an agent turn or a tool call — either of which
+        follows the sim user's turn in real time — so the persona's spoken text
+        keeps its position ahead of them even when its own turn never committed to
+        the LLM context.
+        """
+        text = self._pending_persona_text.strip()
+        self._pending_persona_text = ""
+        if text:
+            self._transcript_events.append({"role": "persona", "content": text})
+
+    def record_agent_turn(self, content: Optional[str]) -> None:
+        """Record a committed turn from the agent under test (``on_user_turn_stopped``)."""
+        self._flush_pending_persona_turn()
+        if content and content.strip():
+            self._transcript_events.append(
+                {"role": "agent", "content": content.strip()}
+            )
+
+    def record_persona_text(self, text: Optional[str]) -> None:
+        """Accumulate a ``TTSTextFrame`` fragment for the current persona turn.
+
+        Fragments arrive as whole words (sometimes bare punctuation). Join with a
+        single space, except a fragment that starts with closing punctuation
+        attaches to the previous word so we don't get ``foo ,``.
+        """
+        if not text:
+            return
+        fragment = text.strip()
+        if not fragment:
+            return
+        if not self._pending_persona_text:
+            self._pending_persona_text = fragment
+        elif fragment[0] in _PERSONA_TEXT_CLINGING_PUNCTUATION:
+            self._pending_persona_text += fragment
+        else:
+            self._pending_persona_text = f"{self._pending_persona_text} {fragment}"
+
+    def record_tool_call(self, data: Optional[dict]) -> None:
+        """Record an agent tool call at arrival time, ordered after the turn it followed.
+
+        Consecutive tool calls (no persona turn between them) are grouped into a
+        single ``assistant`` entry, matching how a model emits parallel calls.
+        """
+        data = data or {}
+        self._flush_pending_persona_turn()
+        entry = {
+            "id": data.get("tool_call_id"),
+            "function": {
+                "name": data.get("function_name"),
+                "arguments": json.dumps(data.get("args", {})),
+            },
+            "type": "function",
+        }
+        if self._transcript_events and self._transcript_events[-1].get("role") == (
+            "tool_calls"
+        ):
+            self._transcript_events[-1]["tool_calls"].append(entry)
+        else:
+            self._transcript_events.append(
+                {"role": "tool_calls", "tool_calls": [entry]}
+            )
+
     def _build_serialized_transcript(
         self, end_reason: Optional[str] = None
     ) -> list[dict]:
-        """Build serialized transcript from context messages and tool calls.
+        """Build the serialized transcript from the ordered event log.
+
+        Roles are flipped so the file reads from the tested agent's perspective:
+        the agent's turns become ``assistant`` and the sim user's (persona) turns
+        become ``user``. Any in-flight persona text that hasn't been flushed yet is
+        appended so a conversation that ends on the sim user's turn still captures
+        it.
 
         Args:
             end_reason: Optional reason for ending the conversation (e.g., "max_turns")
 
         Returns:
-            List of transcript entries with roles flipped (user becomes assistant and vice versa)
+            List of transcript entries with roles flipped.
         """
+        events = list(self._transcript_events)
+        pending = self._pending_persona_text.strip()
+        if pending:
+            events.append({"role": "persona", "content": pending})
+
         serialized_transcript: list[dict] = []
-
-        # Group tool calls by position
-        tool_calls_by_position = defaultdict(list)
-        for tool_call in self._tool_calls:
-            position = tool_call.get("position")
-            data = tool_call.get("data", {})
-            tool_calls_by_position[position].append(
-                {
-                    "id": data.get("tool_call_id"),
-                    "function": {
-                        "name": data.get("function_name"),
-                        "arguments": json.dumps(data.get("args", {})),
-                    },
-                    "type": "function",
-                }
-            )
-
-        for index, message in enumerate(self._context.get_messages()):
-            if not isinstance(message, dict):
-                continue
-            role = message.get("role")
-
-            # Add tool calls that occurred at this position
-            if index in tool_calls_by_position:
+        for event in events:
+            role = event.get("role")
+            if role == "tool_calls":
                 serialized_transcript.append(
-                    {
-                        "role": "assistant",
-                        "tool_calls": tool_calls_by_position[index],
-                    }
+                    {"role": "assistant", "tool_calls": event["tool_calls"]}
                 )
-
-            # flip the role as the user for the transcript is the agent and vice versa
-            if role == "user":
-                role = "assistant"
-            elif role == "assistant":
-                role = "user"
-
-            serialized_transcript.append(
-                {
-                    "role": role,
-                    "content": message.get("content", ""),
-                }
-            )
-
-        # Add any remaining tool calls that occurred after all messages
-        max_message_index = len(self._context.get_messages())
-        for position in sorted(tool_calls_by_position.keys()):
-            if position >= max_message_index:
+            elif role == "agent":
                 serialized_transcript.append(
-                    {
-                        "role": "assistant",
-                        "tool_calls": tool_calls_by_position[position],
-                    }
+                    {"role": "assistant", "content": event.get("content", "")}
                 )
-
-        serialized_transcript = [
-            message
-            for message in serialized_transcript
-            if message.get("role") in {"user", "assistant"}
-        ]
+            elif role == "persona":
+                serialized_transcript.append(
+                    {"role": "user", "content": event.get("content", "")}
+                )
 
         # Merge consecutive content messages from the same role into one. Tool-call
         # entries (no ``content`` key) act as separators and are left untouched.
@@ -702,11 +751,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         """
         self._output_dir.mkdir(parents=True, exist_ok=True)
         self._serialized_transcript = transcript
-
-        with open(
-            os.path.join(self._output_dir, TRANSCRIPT_FILE_NAME), "w"
-        ) as transcripts_file:
-            json.dump(transcript, transcripts_file, indent=4)
+        save_transcript(self._output_dir, transcript)
 
     async def _save_intermediate_state(
         self,
@@ -1047,8 +1092,10 @@ class STTLogger(FrameProcessor):
 class IOLogger(FrameProcessor):
     def __init__(
         self,
+        rtvi_adapter: Optional["RTVIMessageFrameAdapter"] = None,
     ):
         super().__init__()
+        self._rtvi_adapter = rtvi_adapter
 
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
@@ -1057,6 +1104,11 @@ class IOLogger(FrameProcessor):
             log_and_print(
                 f"{USER_MESSAGE_COLOR}[User]\033[0m: {frame.text}{RESET_COLOR}"
             )
+            # ``TTSTextFrame`` is the sim user's spoken output. Capture it here (the
+            # only point downstream of TTS) so the persona's turn is recorded even
+            # if the agent ends the call before the assistant aggregator commits it.
+            if self._rtvi_adapter is not None:
+                self._rtvi_adapter.record_persona_text(frame.text)
 
         await self.push_frame(frame, direction)
 
@@ -1197,12 +1249,16 @@ class RTVIFunctionCallResponder(FrameProcessor):
         self._tool_calls = tool_calls
         self._context = context
         self._webhook_configs = webhook_configs or {}
+        self._transcript_recorder = None
 
     def set_frame_sender(self, sender):
         self._send_frame = sender
 
     def set_end_call_callback(self, callback):
         self._end_call_callback = callback
+
+    def set_transcript_recorder(self, recorder):
+        self._transcript_recorder = recorder
 
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
@@ -1224,6 +1280,11 @@ class RTVIFunctionCallResponder(FrameProcessor):
                             "data": message.get("data"),
                         }
                     )
+
+                    if self._transcript_recorder is not None:
+                        self._transcript_recorder.record_tool_call(
+                            message.get("data")
+                        )
 
                     data = message.get("data") or {}
                     function_name = data.get("function_name")
@@ -1545,7 +1606,7 @@ async def _run_simulation_inner(
 
     stt_logger = STTLogger(stt_outputs, rtvi_message_adapter)
 
-    output_logger = IOLogger()
+    output_logger = IOLogger(rtvi_adapter=rtvi_message_adapter)
 
     # Add silence padding after TTS to help STT services (like Google, Sarvam) flush transcriptions
     silence_padder = SilencePadder(
@@ -1617,6 +1678,7 @@ async def _run_simulation_inner(
         await task.cancel()
 
     function_call_handler.set_end_call_callback(_handle_end_call_request)
+    function_call_handler.set_transcript_recorder(rtvi_message_adapter)
 
     # @audio_buffer.event_handler("on_user_turn_audio_data")
     # async def on_user_turn_audio_data(buffer, audio, sample_rate, num_channels):
@@ -1660,6 +1722,8 @@ async def _run_simulation_inner(
             f"{AGENT_MESSAGE_COLOR}[Agent]{RESET_COLOR}: {message.content}{RESET_COLOR}"
         )
 
+        rtvi_message_adapter.record_agent_turn(message.content)
+
         # Enforce max_turns here, when the agent's turn has committed, rather than
         # when its next turn starts. Ending on the next bot-started dropped that
         # message and left the transcript ending on a user turn or an assistant
@@ -1677,7 +1741,10 @@ async def _run_simulation_inner(
 
     @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message):
-        # The "assistant" for the simulation pipeline is the simulated user
+        # The "assistant" for the simulation pipeline is the simulated user. Its
+        # spoken text is captured from TTSTextFrames (IOLogger → record_persona_text)
+        # rather than here, since this commit fires empty when the agent ends the
+        # call the instant it hears the sim user.
         eval_logger.info(
             f"Eval transcript: [{message.timestamp}] assistant: {message.content}"
         )

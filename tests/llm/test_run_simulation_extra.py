@@ -109,15 +109,15 @@ class TestValidateSimulationEvalOnlyDataset(unittest.TestCase):
 
 class TestSaveTranscript(unittest.TestCase):
     def test_no_output_dir_returns(self):
-        from calibrate.llm.run_simulation import _save_transcript
+        from calibrate.utils import save_transcript
 
-        _save_transcript(None, [{"role": "user", "content": "hi"}])
+        save_transcript(None, [{"role": "user", "content": "hi"}])
 
     def test_writes_file(self):
-        from calibrate.llm.run_simulation import _save_transcript
+        from calibrate.utils import save_transcript
 
         with tempfile.TemporaryDirectory() as tmp:
-            _save_transcript(tmp, [{"role": "user", "content": "hi"}])
+            save_transcript(tmp, [{"role": "user", "content": "hi"}])
             self.assertTrue((Path(tmp) / "transcript.json").exists())
 
 
