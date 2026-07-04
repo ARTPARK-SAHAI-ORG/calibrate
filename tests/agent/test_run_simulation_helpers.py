@@ -180,9 +180,13 @@ class TestBuildUserContextAggregator(unittest.TestCase):
         from calibrate.agent.run_simulation import (
             build_user_context_aggregator,
             SIM_USER_TURN_STOP_TIMEOUT_SECS,
+            _INTERRUPT_ONLY_STOP_TIMEOUT_SECS,
         )
         from pipecat.processors.aggregators.llm_context import LLMContext
         from pipecat.turns.user_stop import TurnAnalyzerUserTurnStopStrategy
+        from pipecat.turns.user_stop.external_user_turn_stop_strategy import (
+            ExternalUserTurnStopStrategy,
+        )
         from pipecat.turns.user_start.external_user_turn_start_strategy import (
             ExternalUserTurnStartStrategy,
         )
@@ -191,9 +195,19 @@ class TestBuildUserContextAggregator(unittest.TestCase):
         pair = build_user_context_aggregator(ctx)
         controller = pair.user()._user_turn_controller
         strategies = controller._user_turn_strategies
-        # Smart-turn decides turn-end.
+        # Smart-turn decides turn-end for normal turns.
         self.assertTrue(
             any(isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop)
+        )
+        # ExternalUserTurnStopStrategy is present ONLY to hard-stop the turn on an
+        # explicit interrupt UserStopped; its auto-timeout is disabled so it never
+        # pre-empts smart-turn on normal turns.
+        external_stops = [
+            s for s in strategies.stop if isinstance(s, ExternalUserTurnStopStrategy)
+        ]
+        self.assertEqual(len(external_stops), 1)
+        self.assertEqual(
+            external_stops[0]._timeout, _INTERRUPT_ONLY_STOP_TIMEOUT_SECS
         )
         # Turn-start is audio-driven (default strategies), NOT manual/external.
         self.assertFalse(
