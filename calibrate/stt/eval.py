@@ -222,12 +222,20 @@ async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set")
 
+    lang_code = get_stt_language_code(language, "openai")
+
     client = AsyncOpenAI()
 
     audio_file = load_audio(audio_path, as_file=True)
 
+    # Supplying the input language (ISO-639-1) improves accuracy and latency
+    # per the OpenAI transcription docs.
     stream = await client.audio.transcriptions.create(
-        model="gpt-4o-transcribe", file=audio_file, response_format="text", stream=True
+        model="gpt-4o-transcribe",
+        file=audio_file,
+        language=lang_code,
+        response_format="text",
+        stream=True,
     )
 
     transcript = ""

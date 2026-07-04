@@ -600,5 +600,38 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
                 p.stop()
 
 
+class TestTranscribeOpenAIStreaming(unittest.IsolatedAsyncioTestCase):
+    async def test_passes_language_code_to_api(self):
+        from calibrate.stt import eval as stt_eval
+
+        done_event = SimpleNamespace(type="transcript.text.done", text="hello world")
+
+        async def _fake_stream():
+            yield done_event
+
+        create = AsyncMock(return_value=_fake_stream())
+        fake_client = MagicMock()
+        fake_client.audio.transcriptions.create = create
+
+        patches = (
+            patch.dict("os.environ", {"OPENAI_API_KEY": "sk-fake"}),
+            patch.object(stt_eval, "AsyncOpenAI", return_value=fake_client),
+            patch.object(stt_eval, "load_audio", return_value=SimpleNamespace()),
+        )
+        for p in patches:
+            p.start()
+        try:
+            result = await stt_eval.transcribe_openai_streaming(
+                Path("/tmp/x.wav"), "hindi"
+            )
+        finally:
+            for p in patches:
+                p.stop()
+
+        self.assertEqual(result["transcript"], "hello world")
+        # OpenAI STT expects an ISO-639-1 code — "hi" for hindi.
+        self.assertEqual(create.await_args.kwargs["language"], "hi")
+
+
 if __name__ == "__main__":
     unittest.main()
