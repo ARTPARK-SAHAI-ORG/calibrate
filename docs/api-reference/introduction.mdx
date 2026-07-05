@@ -26,7 +26,7 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 
 <Steps>
   <Step title="Get your API key">
-    Go to [Workspace settings → API keys](https://calibrate.artpark.ai/workspace-settings?tab=api-keys), click **Create key**, and copy the full key when it is shown — you cannot view it again after closing the dialog.
+    Obtain your API key from the [Calibrate dashboard](https://calibrate.artpark.ai/workspace-settings?tab=api-keys). See the [API keys guide](/reference/api-keys) for detailed setup instructions.
   </Step>
   <Step title="Authenticate your requests">
     Pass your key in the `X-API-Key` header on every request:
@@ -47,16 +47,31 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 
   </Step>
   <Step title="Run tests">
-    Launch a test run for an agent, then poll the returned `task_id`:
+    Launch a test run for an agent:
 
     ```bash
-    # Start a run (all linked tests when test_uuids is omitted)
     curl -X POST "https://pense-backend.artpark.ai/agent-tests/agent/{agent_uuid}/run" \
       -H "X-API-Key: your_api_key" \
       -H "Content-Type: application/json" \
       -d '{}'
+    ```
 
-    # Poll status + results
+    Since no `test_uuids` were passed, all linked tests for the agent will be run. The response returns a `task_id`:
+
+    ```json
+    {
+      "task_id": "abc123",
+      "status": "queued",
+      "dataset_id": null,
+      "dataset_name": null
+    }
+    ```
+
+  </Step>
+  <Step title="Poll results">
+    Poll the returned `task_id` for status and results:
+
+    ```bash
     curl "https://pense-backend.artpark.ai/agent-tests/run/{task_id}" \
       -H "X-API-Key: your_api_key"
     ```
@@ -66,29 +81,19 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 
 ## Base URL
 
-```
+```bash
 https://pense-backend.artpark.ai
 ```
 
 ## OpenAPI specification
 
-The public API schema is published at an unauthenticated endpoint and synced into this docs site on every deploy.
+The public API schema is published at an unauthenticated endpoint.
 
 ```bash
 # Fetch the live spec (JSON)
 curl -s https://pense-backend.artpark.ai/public-api/openapi.json
 ```
 
-<Card
-  title="OpenAPI specification"
-  icon="brackets-curly"
-  href="https://pense-backend.artpark.ai/public-api/openapi.json"
->
-  View the machine-readable spec
-</Card>
-
 ## Authentication
 
-All API requests require an `X-API-Key` header. Keys grant access to the public API routes for your workspace.
-
-JWT bearer tokens (used by the Calibrate web UI) also work at the HTTP layer, but programmatic clients should use API keys exclusively.
+All API requests require an `X-API-Key` header.

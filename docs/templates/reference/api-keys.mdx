@@ -19,8 +19,7 @@ API keys authenticate Calibrate in the [GitHub Action](/reference/github-actions
     Click **Create key** in the top right of the API keys section.
   </Step>
   <Step title="Name your key">
-    Enter a **Name** for the key — for example, `Form bharo` or `GitHub Action
-    CI`.
+    Enter a **Name** for the key (for example, `GitHub Action CI`).
   </Step>
   <Step title="Save your key">
     Click **Create key**. Your API key will be displayed once.
@@ -29,6 +28,7 @@ API keys authenticate Calibrate in the [GitHub Action](/reference/github-actions
       Copy the key immediately. You will not be able to view the full key again
       after closing the dialog.
     </Warning>
+
   </Step>
 </Steps>
 
@@ -41,7 +41,7 @@ curl __PUBLIC_API_BASE_URL__/agents \
   -H "X-API-Key: your_api_key"
 ```
 
-For CI, store the key as a GitHub secret named `CALIBRATE_API_KEY` and pass it to the [Calibrate GitHub Action](/reference/github-actions).
+For using it with the [Calibrate GitHub Action](/reference/github-actions), store the key as a GitHub secret named `CALIBRATE_API_KEY`.
 
 ## Managing keys
 
@@ -50,10 +50,10 @@ The API keys table lists every key with three columns:
 | Column        | Description                                          |
 | ------------- | ---------------------------------------------------- |
 | **Name**      | The label you gave the key when creating it          |
-| **Value**     | The masked key prefix (for example, `sk_....NsYs`)   |
+| **Value**     | The masked key prefix                                |
 | **Last used** | When the key was last used to authenticate a request |
 
-To permanently disable a key, click **Revoke** on its row. Any integration using that key will immediately lose access.
+To permanently disable a key, click **Revoke**. Any integration using that key will immediately lose access.
 
 ## Best practices
 
