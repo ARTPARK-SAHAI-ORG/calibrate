@@ -15,7 +15,7 @@ from fetch_public_openapi import (  # noqa: E402
     _normalize_for_docs,
     public_api_base_url,
     public_openapi_spec_url,
-    render_intro_template,
+    render_templates,
 )
 
 TEST_BASE_URL = "https://api.example.test"
@@ -57,7 +57,10 @@ def test_public_api_base_url_from_env() -> None:
 
 
 def test_public_api_base_url_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    import fetch_public_openapi as mod
+
     monkeypatch.delenv("PUBLIC_API_BASE_URL", raising=False)
+    monkeypatch.setattr(mod, "_load_dotenv", lambda: None)
     with pytest.raises(SystemExit):
         public_api_base_url()
 
@@ -76,17 +79,26 @@ def test_normalize_does_not_mutate_input(minimal_spec: dict) -> None:
     assert json.dumps(minimal_spec) == before
 
 
-def test_render_intro_template_substitutes_base_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    template = tmp_path / "intro.mdx"
-    template.write_text("curl __PUBLIC_API_BASE_URL__/agents\nspec __PUBLIC_OPENAPI_SPEC_URL__\n")
-    output = tmp_path / "out.mdx"
+def test_render_templates_substitutes_base_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    template_a = tmp_path / "intro.mdx"
+    template_a.write_text("curl __PUBLIC_API_BASE_URL__/agents\nspec __PUBLIC_OPENAPI_SPEC_URL__\n")
+    output_a = tmp_path / "out" / "intro.mdx"
+
+    template_b = tmp_path / "keys.mdx"
+    template_b.write_text("base __PUBLIC_API_BASE_URL__\n")
+    output_b = tmp_path / "out" / "keys.mdx"
 
     import fetch_public_openapi as mod
 
-    monkeypatch.setattr(mod, "INTRO_TEMPLATE", template)
-    monkeypatch.setattr(mod, "INTRO_OUTPUT", output)
-    render_intro_template(TEST_BASE_URL)
+    monkeypatch.setattr(
+        mod,
+        "TEMPLATED_PAGES",
+        [(template_a, output_a), (template_b, output_b)],
+    )
+    render_templates(TEST_BASE_URL)
 
-    text = output.read_text()
-    assert TEST_BASE_URL in text
-    assert f"{TEST_BASE_URL}/public-api/openapi.json" in text
+    text_a = output_a.read_text()
+    assert TEST_BASE_URL in text_a
+    assert f"{TEST_BASE_URL}/public-api/openapi.json" in text_a
+
+    assert output_b.read_text() == f"base {TEST_BASE_URL}\n"
