@@ -5,7 +5,7 @@ description: "Authenticate and call the Calibrate Public API programmatically"
 
 {/* Generated from docs/templates/api-reference/introduction.mdx — do not edit directly. */}
 
-The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launch LLM test runs, and poll results — all from CI or automation scripts.
+The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launch LLM test runs, and poll results.
 
 ## Most used
 
@@ -32,7 +32,7 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
     Pass your key in the `X-API-Key` header on every request:
 
     ```bash
-    curl http://localhost:8000/agents \
+    curl https://pense-backend.artpark.ai/agents \
       -H "X-API-Key: your_api_key"
     ```
 
@@ -41,7 +41,7 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
     Enumerate every agent in your org:
 
     ```bash
-    curl http://localhost:8000/agents \
+    curl https://pense-backend.artpark.ai/agents \
       -H "X-API-Key: your_api_key"
     ```
 
@@ -51,13 +51,13 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 
     ```bash
     # Start a run (all linked tests when test_uuids is omitted)
-    curl -X POST "http://localhost:8000/agent-tests/agent/{agent_uuid}/run" \
+    curl -X POST "https://pense-backend.artpark.ai/agent-tests/agent/{agent_uuid}/run" \
       -H "X-API-Key: your_api_key" \
       -H "Content-Type: application/json" \
       -d '{}'
 
     # Poll status + results
-    curl "http://localhost:8000/agent-tests/run/{task_id}" \
+    curl "https://pense-backend.artpark.ai/agent-tests/run/{task_id}" \
       -H "X-API-Key: your_api_key"
     ```
 
@@ -67,7 +67,7 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 ## Base URL
 
 ```
-http://localhost:8000
+https://pense-backend.artpark.ai
 ```
 
 ## OpenAPI specification
@@ -76,13 +76,13 @@ The public API schema is published at an unauthenticated endpoint and synced int
 
 ```bash
 # Fetch the live spec (JSON)
-curl -s http://localhost:8000/public-api/openapi.json
+curl -s https://pense-backend.artpark.ai/public-api/openapi.json
 ```
 
 <Card
   title="OpenAPI specification"
   icon="brackets-curly"
-  href="http://localhost:8000/public-api/openapi.json"
+  href="https://pense-backend.artpark.ai/public-api/openapi.json"
 >
   View the machine-readable spec
 </Card>

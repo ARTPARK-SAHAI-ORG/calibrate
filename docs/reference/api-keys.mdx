@@ -22,12 +22,27 @@ API keys authenticate Calibrate in the [GitHub Action](/reference/github-actions
     Enter a **Name** for the key — for example, `Form bharo` or `GitHub Action
     CI`.
   </Step>
-  <Step title="Copy your key">
-    Copy the full key immediately when it is shown. After you close the dialog,
-    only a masked value (for example, `sk_....NsYs`) appears in the table and
-    the full key cannot be viewed again.
+  <Step title="Save your key">
+    Click **Create key**. Your API key will be displayed once.
+
+    <Warning>
+      Copy the key immediately. You will not be able to view the full key again
+      after closing the dialog.
+    </Warning>
+
   </Step>
 </Steps>
+
+## Using your API key
+
+Include the key in the `X-API-Key` header with every request:
+
+```bash
+curl https://pense-backend.artpark.ai/agents \
+  -H "X-API-Key: your_api_key"
+```
+
+For using it with the [Calibrate GitHub Action](/reference/github-actions), store the key as a GitHub secret named `CALIBRATE_API_KEY`.
 
 ## Managing keys
 
@@ -36,21 +51,10 @@ The API keys table lists every key with three columns:
 | Column        | Description                                          |
 | ------------- | ---------------------------------------------------- |
 | **Name**      | The label you gave the key when creating it          |
-| **Value**     | The masked key prefix (for example, `sk_....NsYs`)   |
+| **Value**     | The masked key prefix                                |
 | **Last used** | When the key was last used to authenticate a request |
 
-To permanently disable a key, click **Revoke** on its row. Any integration using that key will immediately lose access.
-
-## Using your API key
-
-Include the key in the `X-API-Key` header with every request:
-
-```bash
-curl http://localhost:8000/agents \
-  -H "X-API-Key: your_api_key"
-```
-
-For CI, store the key as a GitHub secret named `CALIBRATE_API_KEY` and pass it to the [Calibrate GitHub Action](/reference/github-actions).
+To permanently disable a key, click **Revoke**. Any integration using that key will immediately lose access.
 
 ## Best practices
 
@@ -60,7 +64,7 @@ Name keys after their purpose (for example, `GitHub Action CI` or `Staging autom
 
 ### Rotate keys regularly
 
-Create a new key, update your integrations, then **Revoke** the old one — especially for production CI pipelines.
+Create a new key, update your integrations, then **Revoke** the old one, especially for production CI pipelines.
 
 ### Revoke unused keys
 
