@@ -11,7 +11,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Getting started",
+        "tab": "Home",
         "groups": [
           {
             "group": "Get Started",
@@ -39,19 +39,10 @@
               "core-concepts/scenarios",
               "core-concepts/metrics"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Integrations",
-        "groups": [
+          },
           {
-            "group": "Providers",
-            "pages": [
-              "integrations/stt",
-              "integrations/llm",
-              "integrations/tts"
-            ]
+            "group": "Reference",
+            "pages": ["reference/api-keys", "reference/github-actions"]
           }
         ]
       },
@@ -81,6 +72,42 @@
                   "cli/agent-connections/outbound-voice"
                 ]
               }
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "API",
+            "pages": ["api-reference/introduction"]
+          },
+          {
+            "group": "Agents",
+            "openapi": "api-reference/openapi.json",
+            "pages": ["GET /agents", "POST /agents/resolve"]
+          },
+          {
+            "group": "Agent tests",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /agent-tests/agent/{agent_uuid}/run",
+              "POST /agent-tests/run",
+              "GET /agent-tests/run/{task_id}"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Providers",
+            "pages": [
+              "integrations/stt",
+              "integrations/llm",
+              "integrations/tts"
             ]
           }
         ]
@@ -130,6 +157,16 @@
       "type": "button",
       "label": "Get Started",
       "href": "https://calibrate.artpark.ai"
+    }
+  },
+  "api": {
+    "openapi": "api-reference/openapi.json",
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": ["curl", "python"],
+      "defaults": "required"
     }
   },
   "contextual": {

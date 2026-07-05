@@ -5,7 +5,7 @@ description: "Understand the concepts for evaluating Speech To Text providers"
 
 ## Metrics
 
-### Word Error Rate (WER)
+### Word error rate (WER)
 
 Measures the edit distance between the predicted and reference transcripts at the word level. It calculates the minimum number of word insertions, deletions, and substitutions needed to transform the prediction into the reference, divided by the number of words in the reference.
 
@@ -20,7 +20,7 @@ Measures the edit distance between the predicted and reference transcripts at th
 | "Hello world"   | "Hello there" | 0.5 |
 | "one two three" | "1 2 3"       | 1.0 |
 
-### String Similarity
+### String similarity
 
 Computes the ratio of matching characters between the normalized reference and prediction.
 
@@ -35,7 +35,7 @@ Computes the ratio of matching characters between the normalized reference and p
 | "Geeta"   | "Gita"     | 0.8               |
 | "Geeta"   | "John"     | 0.2               |
 
-### LLM Judge Score
+### LLM judge score
 
 The LLM Judge uses a powerful LLM to semantically evaluate whether the transcription matches the source text. Unlike WER, it understands context and meaning.
 
@@ -114,7 +114,7 @@ From the **Datasets** tab, click the delete button next to a dataset to remove i
 
 Once your dataset has samples, click the **New evaluation** button on the dataset page. This pre-selects the dataset and takes you to the evaluation settings where you choose the language and providers to compare.
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="play" href="/quickstart/speech-to-text">

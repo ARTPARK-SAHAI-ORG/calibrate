@@ -5,7 +5,7 @@ description: "Understand the concepts for evaluating Text to Speech providers"
 
 ## Metrics
 
-### LLM Judge Score
+### LLM judge score
 
 An audio LLM Judge (`gpt-audio`) listens to the generated audio and evaluates whether the pronunciation matches the input text.
 
@@ -36,7 +36,7 @@ What the LLM Judge evaluates:
 | "Call 1-800-555-0123" | <audio controls src="/core-concepts/audios/phone_number.wav" /> | True      | The phone number is pronounced correctly.                        |
 | "Dr. Smith"           | <audio controls src="/core-concepts/audios/dr_smith.wav" />     | False     | "Dr." was pronounced as "dur" instead of "doctor".               |
 
-### Time to First Byte (TTFB)
+### Time to first byte (TTFB)
 
 Measures the time (in seconds) from when the request is made to the provider until the first audio chunk is received. It is critical for real-time voice agents where responsiveness matters.
 
@@ -90,7 +90,7 @@ From the **Datasets** tab, click the delete button next to a dataset to remove i
 
 Once your dataset has samples, click the **New evaluation** button on the dataset page. This pre-selects the dataset and takes you to the evaluation settings where you choose the language and providers to compare.
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
   <Card title="Quickstart" icon="play" href="/quickstart/text-to-speech">

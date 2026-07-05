@@ -1,94 +1,796 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "OpenAPI Plant Store",
-    "description": "A sample API that uses a plant store as an example to demonstrate features in the OpenAPI specification",
-    "license": {
-      "name": "MIT"
-    },
-    "version": "1.0.0"
+    "title": "Calibrate Public API",
+    "version": "0.1.0",
+    "description": "Programmatic API for CI/automation, authenticated with an org-scoped API key. Pass your key in the `X-API-Key: sk_\u2026` header."
   },
   "servers": [
     {
-      "url": "http://sandbox.mintlify.com"
+      "url": "https://pense-backend.artpark.ai",
+      "description": "Production"
     }
   ],
-  "security": [
-    {
-      "bearerAuth": []
+  "components": {
+    "schemas": {
+      "BatchRunRequest": {
+        "properties": {
+          "agent_names": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Names"
+          }
+        },
+        "type": "object",
+        "title": "BatchRunRequest"
+      },
+      "BatchTestRun": {
+        "properties": {
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "agent_uuid": {
+            "type": "string",
+            "title": "Agent Uuid"
+          },
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_name",
+          "agent_uuid",
+          "task_id",
+          "status"
+        ],
+        "title": "BatchTestRun"
+      },
+      "BatchTestRunResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/BatchTestRun"
+            },
+            "type": "array",
+            "title": "Runs"
+          },
+          "skipped": {
+            "items": {
+              "$ref": "#/components/schemas/BatchTestSkip"
+            },
+            "type": "array",
+            "title": "Skipped",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs"
+        ],
+        "title": "BatchTestRunResponse"
+      },
+      "BatchTestSkip": {
+        "properties": {
+          "agent_name": {
+            "type": "string",
+            "title": "Agent Name"
+          },
+          "agent_uuid": {
+            "type": "string",
+            "title": "Agent Uuid"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_name",
+          "agent_uuid",
+          "reason"
+        ],
+        "title": "BatchTestSkip"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "JudgeResult": {
+        "properties": {
+          "evaluator_uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator Uuid"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "match": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Match"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "value_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value Name"
+          },
+          "variable_values": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable Values"
+          }
+        },
+        "type": "object",
+        "title": "JudgeResult",
+        "description": "One evaluator's verdict for a response-type test case.\n\nPer-row data only \u2014 anything constant across rows for the same evaluator\n(name, description, output_type, output_config, scale_min/max) lives on\nthe response-level `evaluators[]` block; look it up by `evaluator_uuid`.\n\n`evaluator_uuid` is None for legacy runs that pre-date the evaluator-\nsnapshot capture or when the evaluator can't be resolved from the\nsnapshot.\n\nExactly one of `match` (binary) / `score` (rating) is set per entry;\nboth are None for tool-call tests, but tool-call tests don't carry\n`judge_results`.\n\n`variable_values` are the {{var}} substitutions used for this evaluator\non this test case, frozen from `test_evaluators.variable_values` at\nsubmission time \u2014 stays on the row because it varies per test case.\n\n`value_name` is the human-readable label for `match`/`score` resolved\nagainst the rubric the run actually used (snapshot's\n`output_config.scale.name`). Falls back to `Correct`/`Wrong` for binary\nor the stringified score for rating when the snapshot lacks named\nscale entries (e.g. legacy runs captured before the rubric was\nsnapshotted)."
+      },
+      "ResolveAgentNamesRequest": {
+        "properties": {
+          "names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Names"
+          }
+        },
+        "type": "object",
+        "required": [
+          "names"
+        ],
+        "title": "ResolveAgentNamesRequest"
+      },
+      "ResolveAgentNamesResponse": {
+        "properties": {
+          "resolved": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Resolved"
+          },
+          "not_found": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Not Found"
+          }
+        },
+        "type": "object",
+        "required": [
+          "resolved",
+          "not_found"
+        ],
+        "title": "ResolveAgentNamesResponse"
+      },
+      "RunTestRequest": {
+        "properties": {
+          "test_uuids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Uuids"
+          }
+        },
+        "type": "object",
+        "title": "RunTestRequest"
+      },
+      "TaskCreateResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "dataset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Id"
+          },
+          "dataset_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status"
+        ],
+        "title": "TaskCreateResponse"
+      },
+      "TestCaseResult": {
+        "properties": {
+          "test_case_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Case Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "test_case": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Case"
+          },
+          "judge_results": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/JudgeResult"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Judge Results"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          }
+        },
+        "type": "object",
+        "title": "TestCaseResult",
+        "description": "Result for a single test case matching calibrate results.json structure"
+      },
+      "TestOutput": {
+        "properties": {
+          "response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolCallOutput"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls"
+          }
+        },
+        "type": "object",
+        "title": "TestOutput"
+      },
+      "TestRunStatusResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "total_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tests"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          },
+          "evaluators": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluators"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TestCaseResult"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results"
+          },
+          "results_s3_prefix": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results S3 Prefix"
+          },
+          "error": {
+            "type": "boolean",
+            "title": "Error",
+            "default": false
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "default": false
+          },
+          "share_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status"
+        ],
+        "title": "TestRunStatusResponse"
+      },
+      "ToolCallOutput": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments"
+          },
+          "output": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool"
+        ],
+        "title": "ToolCallOutput"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "routers__agent_tools__AgentResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "title": "Uuid"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "connection"
+            ],
+            "title": "Type"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentResponse"
+      }
+    },
+    "securitySchemes": {
+      "ApiKeyAuth": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key. Create one under Workspace settings \u2192 API keys (https://calibrate.artpark.ai/workspace-settings?tab=api-keys). Prefix: `sk_\u2026`."
+      }
     }
-  ],
+  },
   "paths": {
-    "/plants": {
-      "get": {
-        "description": "Returns all plants from the system that the user has access to",
-        "parameters": [
+    "/agents/resolve": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Resolve Agent Names",
+        "description": "Resolve a list of agent names to their UUIDs within the caller's org.\n\nAuth accepts either a JWT (frontend) or an `sk_` API key (programmatic\nclients) via `get_org_jwt_or_api_key`, so CI tooling can map human-friendly\nagent names to the UUIDs the run/poll endpoints expect. Agent names are\nunique per org, so each name resolves to at most one agent. Names with no\nmatching (non-deleted) agent in the org are returned under `not_found`.",
+        "operationId": "resolve_agent_names_agents_resolve_post",
+        "security": [
           {
-            "name": "limit",
-            "in": "query",
-            "description": "The maximum number of results to return",
-            "schema": {
-              "type": "integer",
-              "format": "int32"
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveAgentNamesRequest"
+              }
             }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveAgentNamesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List Agents",
+        "description": "List all agents for the caller's current org.\n\nAuth accepts either a JWT (frontend) or an `sk_` API key (programmatic\nclients) via `get_org_jwt_or_api_key`, so CI tooling can enumerate every\nagent UUID in the org without knowing names up front (the run/poll and\n`/resolve` endpoints accept the same key).",
+        "operationId": "list_agents_agents_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
           }
         ],
         "responses": {
           "200": {
-            "description": "Plant response",
+            "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Plant"
-                  }
+                    "$ref": "#/components/schemas/routers__agent_tools__AgentResponse"
+                  },
+                  "title": "Response List Agents Agents Get"
                 }
               }
             }
           },
-          "400": {
-            "description": "Unexpected error",
+          "422": {
+            "description": "Validation Error",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "post": {
-        "description": "Creates a new plant in the store",
-        "requestBody": {
-          "description": "Plant to add to the store",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/NewPlant"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "plant response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Plant"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -96,121 +798,164 @@
         }
       }
     },
-    "/plants/{id}": {
-      "delete": {
-        "description": "Deletes a single plant based on the ID supplied",
+    "/agent-tests/agent/{agent_uuid}/run": {
+      "post": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Run Agent Test",
+        "description": "Run one or more tests for an agent.\n\nThis starts a background task that runs the calibrate LLM tests command\nwith the agent's config and the combined test cases from all specified tests.\n\nReturns a task ID that can be used to poll for status and results.\n\nAuth: requires either a JWT (frontend) or an `sk_` API key. The agent\nmust belong to the caller's org or this 404s.",
+        "operationId": "run_agent_test_agent_tests_agent__agent_uuid__run_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
         "parameters": [
           {
-            "name": "id",
+            "name": "agent_uuid",
             "in": "path",
-            "description": "ID of plant to delete",
             "required": true,
             "schema": {
-              "type": "integer",
-              "format": "int64"
+              "type": "string",
+              "title": "Agent Uuid"
             }
           }
         ],
-        "responses": {
-          "204": {
-            "description": "Plant deleted",
-            "content": {}
-          },
-          "400": {
-            "description": "unexpected error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  },
-  "webhooks": {
-    "/plant/webhook": {
-      "post": {
-        "description": "Information about a new plant added to the store",
         "requestBody": {
-          "description": "Plant added to the store",
+          "required": true,
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/NewPlant"
+                "$ref": "#/components/schemas/RunTestRequest"
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Return a 200 status to indicate that the data was received successfully"
-          }
-        }
-      }
-    }
-  },
-  "components": {
-    "schemas": {
-      "Plant": {
-        "required": [
-          "name"
-        ],
-        "type": "object",
-        "properties": {
-          "name": {
-            "description": "The name of the plant",
-            "type": "string"
-          },
-          "tag": {
-            "description": "Tag to specify the type",
-            "type": "string"
-          }
-        }
-      },
-      "NewPlant": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/Plant"
-          },
-          {
-            "required": [
-              "id"
-            ],
-            "type": "object",
-            "properties": {
-              "id": {
-                "description": "Identification number of the plant",
-                "type": "integer",
-                "format": "int64"
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreateResponse"
+                }
               }
             }
-          }
-        ]
-      },
-      "Error": {
-        "required": [
-          "error",
-          "message"
-        ],
-        "type": "object",
-        "properties": {
-          "error": {
-            "type": "integer",
-            "format": "int32"
           },
-          "message": {
-            "type": "string"
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
         }
       }
     },
-    "securitySchemes": {
-      "bearerAuth": {
-        "type": "http",
-        "scheme": "bearer"
+    "/agent-tests/run": {
+      "post": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Run Tests Batch",
+        "description": "Run every linked test for a set of agents, one ``llm-unit-test`` job per agent.\n\nScope is driven by the optional ``agent_names`` payload:\n\n- **Provided (non-empty)** \u2014 run only those agents. Names are unique per org\n  and **all are validated up front**: if any doesn't resolve to a\n  (non-deleted) agent in the caller's org, the call 404s with the offending\n  names and NO jobs are created.\n- **Omitted / null / empty** \u2014 run every agent in the caller's org.\n\nFor each selected agent, its linked tests are launched as one job. Agents\nwith no linked tests or an unverified connection are reported under\n``skipped`` instead of failing the batch. Subject to the normal per-org\nconcurrency queue, so over-limit jobs come back ``queued``.\n\nAuth accepts a JWT (frontend) or an `sk_` API key (programmatic clients).\nReturns one ``runs`` entry per launched agent with ``agent_name``,\n``agent_uuid``, ``task_id``, and ``status``.",
+        "operationId": "run_tests_batch_agent_tests_run_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/BatchRunRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchTestRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-tests/run/{task_id}": {
+      "get": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Get Agent Test Run Status",
+        "description": "Get the status of an agent test run.\n\nRequires either a JWT (frontend) or an `sk_` API key, plus org\nownership of the run. Unauthenticated access to a completed run is only\npossible once it is made public, via the share-token endpoint in the public\nrouter.\n\nReturns the current status and, if done, the test results.",
+        "operationId": "get_agent_test_run_status_agent_tests_run__task_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Task Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestRunStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
