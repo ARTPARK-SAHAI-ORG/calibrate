@@ -11,6 +11,8 @@ on:
     # Refresh weekly so docs track backend deploys even without agentloop changes.
     - cron: "0 6 * * 1"
   workflow_dispatch:
+  repository_dispatch:
+    types: [sync-api-spec]
 
 permissions:
   contents: write
