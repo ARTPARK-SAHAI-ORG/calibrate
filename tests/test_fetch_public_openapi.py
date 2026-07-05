@@ -11,7 +11,19 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from fetch_public_openapi import _normalize_for_docs  # noqa: E402
+from fetch_public_openapi import (  # noqa: E402
+    _normalize_for_docs,
+    public_api_base_url,
+    public_openapi_spec_url,
+    render_intro_template,
+)
+
+TEST_BASE_URL = "https://api.example.test"
+
+
+@pytest.fixture(autouse=True)
+def api_base_url_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("PUBLIC_API_BASE_URL", TEST_BASE_URL)
 
 
 @pytest.fixture
@@ -39,11 +51,20 @@ def minimal_spec() -> dict:
     }
 
 
+def test_public_api_base_url_from_env() -> None:
+    assert public_api_base_url() == TEST_BASE_URL
+    assert public_openapi_spec_url() == f"{TEST_BASE_URL}/public-api/openapi.json"
+
+
+def test_public_api_base_url_required(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("PUBLIC_API_BASE_URL", raising=False)
+    with pytest.raises(SystemExit):
+        public_api_base_url()
+
+
 def test_normalize_adds_servers_and_api_key_auth(minimal_spec: dict) -> None:
-    out = _normalize_for_docs(minimal_spec)
-    assert out["servers"] == [
-        {"url": "https://pense-backend.artpark.ai", "description": "Production"}
-    ]
+    out = _normalize_for_docs(minimal_spec, TEST_BASE_URL)
+    assert out["servers"] == [{"url": TEST_BASE_URL, "description": "Production"}]
     assert set(out["components"]["securitySchemes"]) == {"ApiKeyAuth"}
     assert out["paths"]["/agents"]["get"]["security"] == [{"ApiKeyAuth": []}]
     assert "parameters" not in out["paths"]["/agents"]["get"]
@@ -51,5 +72,21 @@ def test_normalize_adds_servers_and_api_key_auth(minimal_spec: dict) -> None:
 
 def test_normalize_does_not_mutate_input(minimal_spec: dict) -> None:
     before = json.dumps(minimal_spec)
-    _normalize_for_docs(minimal_spec)
+    _normalize_for_docs(minimal_spec, TEST_BASE_URL)
     assert json.dumps(minimal_spec) == before
+
+
+def test_render_intro_template_substitutes_base_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    template = tmp_path / "intro.mdx"
+    template.write_text("curl __PUBLIC_API_BASE_URL__/agents\nspec __PUBLIC_OPENAPI_SPEC_URL__\n")
+    output = tmp_path / "out.mdx"
+
+    import fetch_public_openapi as mod
+
+    monkeypatch.setattr(mod, "INTRO_TEMPLATE", template)
+    monkeypatch.setattr(mod, "INTRO_OUTPUT", output)
+    render_intro_template(TEST_BASE_URL)
+
+    text = output.read_text()
+    assert TEST_BASE_URL in text
+    assert f"{TEST_BASE_URL}/public-api/openapi.json" in text

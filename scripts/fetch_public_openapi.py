@@ -4,32 +4,65 @@
 Downloads from the live backend, then patches the spec so Mintlify's API
 playground and auth UI advertise X-API-Key (the public API's real auth path)
 and include a production server URL.
+
+Requires ``PUBLIC_API_BASE_URL`` (see ``.env.example``). Loads ``.env`` from
+the repo root when present.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.request
 from pathlib import Path
 from typing import Any
 
-DEFAULT_URL = "https://pense-backend.artpark.ai/public-api/openapi.json"
-DEFAULT_OUT = Path(__file__).resolve().parents[1] / "docs" / "api-reference" / "openapi.json"
-PRODUCTION_SERVER = "https://pense-backend.artpark.ai"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUT = REPO_ROOT / "docs" / "api-reference" / "openapi.json"
 API_KEY_SCHEME = "ApiKeyAuth"
 
+INTRO_TEMPLATE = REPO_ROOT / "docs/templates/api-reference/introduction.mdx"
+INTRO_OUTPUT = REPO_ROOT / "docs/api-reference/introduction.mdx"
 
-def _normalize_for_docs(spec: dict[str, Any]) -> dict[str, Any]:
+
+def _load_dotenv() -> None:
+    env_file = REPO_ROOT / ".env"
+    if not env_file.is_file():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, sep, value = line.partition("=")
+        if not sep:
+            continue
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+def public_api_base_url() -> str:
+    _load_dotenv()
+    url = os.getenv("PUBLIC_API_BASE_URL", "").strip().rstrip("/")
+    if not url:
+        raise SystemExit(
+            "PUBLIC_API_BASE_URL is required (set in .env or the environment). "
+            "See .env.example."
+        )
+    return url
+
+
+def public_openapi_spec_url(base_url: str | None = None) -> str:
+    return f"{base_url or public_api_base_url()}/public-api/openapi.json"
+
+
+def _normalize_for_docs(spec: dict[str, Any], base_url: str) -> dict[str, Any]:
     """Ensure servers + API-key auth match what Mintlify expects."""
     spec = json.loads(json.dumps(spec))  # deep copy
 
-    spec["servers"] = [
-        {
-            "url": PRODUCTION_SERVER,
-            "description": "Production",
-        }
-    ]
+    spec["servers"] = [{"url": base_url, "description": "Production"}]
 
     components = spec.setdefault("components", {})
     components["securitySchemes"] = {
@@ -51,8 +84,6 @@ def _normalize_for_docs(spec: dict[str, Any]) -> dict[str, Any]:
             if not isinstance(op, dict):
                 continue
             op["security"] = [{API_KEY_SCHEME: []}]
-            # Drop FastAPI's optional X-API-Key header param — it's the auth
-            # scheme, not a separate optional field.
             params = op.get("parameters")
             if params:
                 op["parameters"] = [
@@ -76,21 +107,31 @@ def _normalize_for_docs(spec: dict[str, Any]) -> dict[str, Any]:
     return spec
 
 
-def fetch(url: str = DEFAULT_URL) -> dict[str, Any]:
+def render_intro_template(base_url: str) -> None:
+    spec_url = public_openapi_spec_url(base_url)
+    text = INTRO_TEMPLATE.read_text(encoding="utf-8")
+    text = text.replace("__PUBLIC_API_BASE_URL__", base_url)
+    text = text.replace("__PUBLIC_OPENAPI_SPEC_URL__", spec_url)
+    INTRO_OUTPUT.write_text(text, encoding="utf-8")
+
+
+def fetch(url: str) -> dict[str, Any]:
     with urllib.request.urlopen(url, timeout=30) as resp:
         return json.loads(resp.read().decode())
 
 
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
-    url = argv[0] if argv else DEFAULT_URL
+    base_url = public_api_base_url()
+    url = argv[0] if argv else public_openapi_spec_url(base_url)
     out = Path(argv[1]) if len(argv) > 1 else DEFAULT_OUT
 
-    spec = _normalize_for_docs(fetch(url))
+    spec = _normalize_for_docs(fetch(url), base_url)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
+    render_intro_template(base_url)
     print(f"Wrote {out} ({len(spec.get('paths', {}))} paths)")
-    return 0
+    print(f"Wrote {INTRO_OUTPUT}")
 
 
 if __name__ == "__main__":

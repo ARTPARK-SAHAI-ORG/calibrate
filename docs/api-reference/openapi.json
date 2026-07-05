@@ -3,8 +3,14 @@
   "info": {
     "title": "Calibrate Public API",
     "version": "0.1.0",
-    "description": "Programmatic API for CI/automation, authenticated with an org-scoped API key. Pass your key as `X-API-Key: sk_\u2026` or `Authorization: Bearer sk_\u2026`."
+    "description": "Programmatic API for CI/automation, authenticated with an org-scoped API key. Pass your key in the `X-API-Key: sk_\u2026` header."
   },
+  "servers": [
+    {
+      "url": "https://pense-backend.artpark.ai",
+      "description": "Production"
+    }
+  ],
   "components": {
     "schemas": {
       "BatchRunRequest": {
@@ -952,11 +958,5 @@
         }
       }
     }
-  },
-  "servers": [
-    {
-      "url": "https://pense-backend.artpark.ai",
-      "description": "Production"
-    }
-  ]
+  }
 }

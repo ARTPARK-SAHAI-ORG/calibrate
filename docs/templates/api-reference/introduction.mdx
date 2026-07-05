@@ -28,7 +28,7 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
     Pass your key in the `X-API-Key` header on every request:
 
     ```bash
-    curl https://pense-backend.artpark.ai/agents \
+    curl __PUBLIC_API_BASE_URL__/agents \
       -H "X-API-Key: sk_your_api_key"
     ```
   </Step>
@@ -36,7 +36,7 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
     Enumerate every agent in your org:
 
     ```bash
-    curl https://pense-backend.artpark.ai/agents \
+    curl __PUBLIC_API_BASE_URL__/agents \
       -H "X-API-Key: sk_your_api_key"
     ```
   </Step>
@@ -45,13 +45,13 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 
     ```bash
     # Start a run (all linked tests when test_uuids is omitted)
-    curl -X POST "https://pense-backend.artpark.ai/agent-tests/agent/{agent_uuid}/run" \
+    curl -X POST "__PUBLIC_API_BASE_URL__/agent-tests/agent/{agent_uuid}/run" \
       -H "X-API-Key: sk_your_api_key" \
       -H "Content-Type: application/json" \
       -d '{}'
 
     # Poll status + results
-    curl "https://pense-backend.artpark.ai/agent-tests/run/{task_id}" \
+    curl "__PUBLIC_API_BASE_URL__/agent-tests/run/{task_id}" \
       -H "X-API-Key: sk_your_api_key"
     ```
   </Step>
@@ -60,7 +60,7 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 ## Base URL
 
 ```
-https://pense-backend.artpark.ai
+__PUBLIC_API_BASE_URL__
 ```
 
 ## OpenAPI specification
@@ -69,13 +69,13 @@ The public API schema is published at an unauthenticated endpoint and synced int
 
 ```bash
 # Fetch the live spec (JSON)
-curl -s https://pense-backend.artpark.ai/public-api/openapi.json
+curl -s __PUBLIC_OPENAPI_SPEC_URL__
 ```
 
 <Card
   title="OpenAPI specification"
   icon="brackets-curly"
-  href="https://pense-backend.artpark.ai/public-api/openapi.json"
+  href="__PUBLIC_OPENAPI_SPEC_URL__"
 >
   View the machine-readable spec
 </Card>

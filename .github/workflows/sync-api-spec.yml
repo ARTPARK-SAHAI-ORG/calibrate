@@ -6,6 +6,7 @@ on:
     paths:
       - ".github/workflows/sync-api-spec.yml"
       - "scripts/fetch_public_openapi.py"
+      - "docs/templates/**"
   schedule:
     # Refresh weekly so docs track backend deploys even without agentloop changes.
     - cron: "0 6 * * 1"
@@ -27,19 +28,21 @@ jobs:
           python-version: "3.12"
 
       - name: Fetch and normalize public OpenAPI spec
+        env:
+          PUBLIC_API_BASE_URL: ${{ secrets.PUBLIC_API_BASE_URL }}
         run: python scripts/fetch_public_openapi.py
 
-      - name: Commit spec if changed
+      - name: Commit generated docs if changed
         run: |
-          if git diff --quiet docs/api-reference/openapi.json; then
-            echo "OpenAPI spec unchanged"
+          git add docs/api-reference/openapi.json docs/api-reference/introduction.mdx
+          if git diff --cached --quiet; then
+            echo "Generated API docs unchanged"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/api-reference/openapi.json
           git commit -m "$(cat <<'EOF'
-Sync public OpenAPI spec for API reference docs.
+Sync public OpenAPI spec and API URL docs from PUBLIC_API_BASE_URL.
 
 EOF
 )"
