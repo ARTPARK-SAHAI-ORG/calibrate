@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://pense-backend.artpark.ai",
+      "url": "http://localhost:8000",
       "description": "Production"
     }
   ],
@@ -705,7 +705,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "Org-scoped API key. Create one in Calibrate under Settings \u2192 API keys. Prefix: `sk_\u2026`."
+        "description": "API key. Create one under Workspace settings \u2192 API keys (https://calibrate.artpark.ai/workspace-settings?tab=api-keys). Prefix: `sk_\u2026`."
       }
     }
   },

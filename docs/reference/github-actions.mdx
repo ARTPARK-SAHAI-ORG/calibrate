@@ -1,0 +1,381 @@
+---
+title: "GitHub Action"
+description: "Launch Calibrate agent test runs from GitHub Actions"
+---
+
+{/* Generated from docs/templates/reference/github-actions.mdx — do not edit directly. */}
+
+The [Calibrate GitHub Action](https://github.com/ARTPARK-SAHAI-ORG/calibrate-github-action) runs your agent tests automatically in CI.
+During deployment, you can choose what happens when a test fails:
+
+- **gate** (default) — Prevent merging the changes. This is the recommended mode for production CI pipelines to prevent deploying broken agents.
+- **report** — Report evaluation results without blocking merges. You may be aware of the mistakes but still want to merge the changes.
+
+On pull requests, the action posts a comment with the evaluation results.
+
+## Prerequisites
+
+<Steps>
+  <Step title="Get your API key">
+    Navigate to your [Calibrate dashboard](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) and generate an API key. See the [API keys guide](/reference/api-keys) for detailed instructions.
+
+  </Step>
+  <Step title="Add GitHub Secret">
+    1. Go to your repository **Settings > Secrets and variables > Actions**
+    2. Click **New repository secret**
+    3. Name: `CALIBRATE_API_KEY`
+    4. Value: Your Calibrate API key
+  </Step>
+  <Step title="Link tests to your agents">
+    The agents in Calibrate you want to evaluate must have tests linked to them. By default, the action runs all the tests for every agent in your workspace. 
+    
+    Optionally, if you want to restrict evaluation to a few specific agents, you can set that too. Gather the agent names from the [Agents](https://calibrate.artpark.ai/agents) page (for example, `checkout-bot`, `support-agent`).
+
+  </Step>
+</Steps>
+
+## Quick start
+
+### Automatic PR checks
+
+Create `.github/workflows/calibrate.yml`:
+
+```yaml
+name: Calibrate automatic evaluation
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  evaluate-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Calibrate Evaluation
+        uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+        with:
+          api-key: ${{ secrets.CALIBRATE_API_KEY }}
+          # Omit this field to run on all agents
+          agents: checkout-bot, support-agent
+```
+
+### Manual workflow dispatch
+
+Create `.github/workflows/manual-eval.yml`:
+
+```yaml
+name: Calibrate manual evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      agents:
+        description: "Agent names (comma-separated)"
+        required: true
+        type: string
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Evaluation
+        uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+        with:
+          api-key: ${{ secrets.CALIBRATE_API_KEY }}
+          agents: ${{ inputs.agents }}
+```
+
+To trigger:
+
+1. Navigate to **Actions** tab
+2. Select **Manual Evaluation**
+3. Click **Run workflow**
+4. Enter your agent names and click **Run workflow**
+
+## Advanced configuration
+
+### Custom options
+
+```yaml
+- name: Advanced Evaluation
+  uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+  with:
+    api-key: ${{ secrets.CALIBRATE_API_KEY }}
+    agents: checkout-bot, support-agent
+    # Fail the job on any test failure (default)
+    mode: gate
+    # Seconds between status polls
+    poll-interval: 5
+    # Max seconds to wait for runs to finish
+    timeout: 1800
+```
+
+### Using outputs
+
+```yaml
+- name: Run Evaluation
+  id: calibrate
+  uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+  with:
+    api-key: ${{ secrets.CALIBRATE_API_KEY }}
+    agents: checkout-bot
+
+- name: Post Results
+  run: |
+    echo "Total:  ${{ steps.calibrate.outputs.total }}"
+    echo "Passed: ${{ steps.calibrate.outputs.passed }}"
+    echo "Failed: ${{ steps.calibrate.outputs.failed }}"
+```
+
+## Configuration reference
+
+### Inputs
+
+| Parameter       | Type    | Required | Default                            | Description                                                                                                                             |
+| --------------- | ------- | -------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `api-key`       | string  | Yes      | —                                  | Calibrate API key (`sk_…`). Store as a secret.                                                                                          |
+| `agents`        | string  | No       | All agents                         | Agent names, comma- or newline-separated. Runs all linked tests for each. Omit to run every agent in the account linked to the API key. |
+| `base-url`      | string  | No       | `http://localhost:8000` | Backend API URL. Override only for self-hosted.                                                                                         |
+| `app-url`       | string  | No       | `https://calibrate.artpark.ai`     | Web UI base URL for view links in the report.                                                                                           |
+| `mode`          | string  | No       | `gate`                             | `gate` fails the job on any failure; `report` always succeeds.                                                                          |
+| `poll-interval` | integer | No       | `5`                                | Seconds between status polls.                                                                                                           |
+| `timeout`       | integer | No       | `1800`                             | Max seconds to wait for all runs to finish.                                                                                             |
+| `github-token`  | string  | No       | `${{ github.token }}`              | Token for PR comments. Requires `pull-requests: write`.                                                                                 |
+
+### Outputs
+
+| Output   | Type   | Description                                  |
+| -------- | ------ | -------------------------------------------- |
+| `total`  | string | Total test cases across all agents evaluated |
+| `passed` | string | Total test cases passed                      |
+| `failed` | string | Total test cases failed                      |
+
+### Environment variables
+
+| Variable            | Required | Description            |
+| ------------------- | -------- | ---------------------- |
+| `CALIBRATE_API_KEY` | Yes      | Your Calibrate API key |
+
+## API details
+
+The action talks to the Calibrate Public API with your API key. For each invocation it runs three steps.
+
+### Resolve agents
+
+When `agents` is set, it resolves the names to UUIDs:
+
+**Endpoint:** `POST http://localhost:8000/agents/resolve`
+
+**Request:**
+
+```json
+{
+  "names": ["checkout-bot", "support-agent"]
+}
+```
+
+**Response:**
+
+```json
+{
+  "resolved": {
+    "checkout-bot": "8f3c...",
+    "support-agent": "a91d..."
+  },
+  "not_found": []
+}
+```
+
+When `agents` is omitted, it lists every agent in the account instead:
+
+**Endpoint:** `GET http://localhost:8000/agents`
+
+**Response:**
+
+```json
+[{ "uuid": "8f3c...", "name": "checkout-bot" }]
+```
+
+### Launch run
+
+For each agent, it triggers all linked tests. The agent is selected by UUID in the URL path and the body is empty:
+
+**Endpoint:** `POST http://localhost:8000/agent-tests/agent/{agent_uuid}/run`
+
+**Request:**
+
+```json
+{}
+```
+
+**Response:**
+
+```json
+{
+  "task_id": "abc123"
+}
+```
+
+### Monitor run
+
+It polls each task until it finishes:
+
+**Endpoint:** `GET http://localhost:8000/agent-tests/run/{task_id}`
+
+**Response:**
+
+```json
+{
+  "status": "done",
+  "total_tests": 10,
+  "passed": 9,
+  "failed": 1
+}
+```
+
+### Run statuses
+
+| Status        | Description            |
+| ------------- | ---------------------- |
+| `queued`      | Waiting to start       |
+| `in_progress` | Running test cases     |
+| `done`        | Successfully completed |
+| `failed`      | Run failed             |
+| `cancelled`   | Run was cancelled      |
+
+## Examples
+
+### Environment-based testing
+
+```yaml
+name: Multi-Environment Testing
+
+on:
+  push:
+    branches: [main, staging, dev]
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set Environment
+        id: env
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "agents=checkout-bot" >> $GITHUB_OUTPUT
+            echo "env=production" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/staging" ]]; then
+            echo "agents=staging-bot" >> $GITHUB_OUTPUT
+            echo "env=staging" >> $GITHUB_OUTPUT
+          else
+            echo "agents=dev-bot" >> $GITHUB_OUTPUT
+            echo "env=development" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Evaluate
+        uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+        with:
+          api-key: ${{ secrets.CALIBRATE_API_KEY }}
+          agents: ${{ steps.env.outputs.agents }}
+```
+
+### Parallel agent testing
+
+```yaml
+name: Multi-Agent Testing
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        agent:
+          - { name: "checkout-bot" }
+          - { name: "support-agent" }
+          - { name: "returns-bot" }
+    steps:
+      - name: Test ${{ matrix.agent.name }}
+        uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+        with:
+          api-key: ${{ secrets.CALIBRATE_API_KEY }}
+          agents: ${{ matrix.agent.name }}
+```
+
+### Scheduled regression testing
+
+```yaml
+name: Nightly Regression
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 2 AM daily
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Tests
+        uses: ARTPARK-SAHAI-ORG/calibrate-github-action@v1
+        with:
+          api-key: ${{ secrets.CALIBRATE_API_KEY }}
+          timeout: 1800
+```
+
+## Troubleshooting
+
+### Invalid API key
+
+```
+authentication failed (HTTP 401) — check the api-key input
+```
+
+**Solution:** Verify `CALIBRATE_API_KEY` is set correctly in GitHub Secrets.
+
+### Invalid agent name
+
+```
+agent "my-agent": no agent with that name in this org
+```
+
+**Solution:** Confirm the agent name matches exactly and exists in your workspace.
+
+### Agent cannot run
+
+```
+agent my-agent: cannot run (HTTP 400): connection not verified
+```
+
+**Solution:** Open the agent in Calibrate, verify its connection, and ensure at least one test is linked.
+
+### Timeout
+
+**Solution:** Increase `timeout` for larger test suites or check the Calibrate dashboard for run status.
+
+## Resources
+
+<CardGroup cols={2}>
+  <Card
+    title="API keys"
+    icon="key"
+    href="https://calibrate.artpark.ai/workspace-settings?tab=api-keys"
+  >
+    Create and manage your API keys
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/introduction">
+    Full REST API documentation
+  </Card>
+  <Card
+    title="GitHub Action repository"
+    icon="github"
+    href="https://github.com/ARTPARK-SAHAI-ORG/calibrate-github-action"
+  >
+    Source, releases, and issue tracker
+  </Card>
+</CardGroup>

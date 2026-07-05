@@ -11,7 +11,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Getting started",
+        "tab": "Home",
         "groups": [
           {
             "group": "Get Started",
@@ -39,19 +39,10 @@
               "core-concepts/scenarios",
               "core-concepts/metrics"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Integrations",
-        "groups": [
+          },
           {
-            "group": "Providers",
-            "pages": [
-              "integrations/stt",
-              "integrations/llm",
-              "integrations/tts"
-            ]
+            "group": "Reference",
+            "pages": ["reference/api-keys", "reference/github-actions"]
           }
         ]
       },
@@ -86,19 +77,10 @@
         ]
       },
       {
-        "tab": "Use cases",
+        "tab": "API reference",
         "groups": [
           {
-            "group": "Browse use cases",
-            "pages": ["examples/overview"]
-          }
-        ]
-      },
-      {
-        "tab": "API Reference",
-        "groups": [
-          {
-            "group": "Getting started",
+            "group": "API",
             "pages": ["api-reference/introduction"]
           },
           {
@@ -114,6 +96,28 @@
               "POST /agent-tests/run",
               "GET /agent-tests/run/{task_id}"
             ]
+          }
+        ]
+      },
+      {
+        "tab": "Integrations",
+        "groups": [
+          {
+            "group": "Providers",
+            "pages": [
+              "integrations/stt",
+              "integrations/llm",
+              "integrations/tts"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Use cases",
+        "groups": [
+          {
+            "group": "Browse use cases",
+            "pages": ["examples/overview"]
           }
         ]
       }

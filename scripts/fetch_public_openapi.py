@@ -25,6 +25,20 @@ API_KEY_SCHEME = "ApiKeyAuth"
 INTRO_TEMPLATE = REPO_ROOT / "docs/templates/api-reference/introduction.mdx"
 INTRO_OUTPUT = REPO_ROOT / "docs/api-reference/introduction.mdx"
 
+# (template, output) pairs whose base-URL placeholders are single-sourced from
+# PUBLIC_API_BASE_URL. Keeps every docs page off a hardcoded backend host.
+TEMPLATED_PAGES = [
+    (INTRO_TEMPLATE, INTRO_OUTPUT),
+    (
+        REPO_ROOT / "docs/templates/reference/api-keys.mdx",
+        REPO_ROOT / "docs/reference/api-keys.mdx",
+    ),
+    (
+        REPO_ROOT / "docs/templates/reference/github-actions.mdx",
+        REPO_ROOT / "docs/reference/github-actions.mdx",
+    ),
+]
+
 
 def _load_dotenv() -> None:
     env_file = REPO_ROOT / ".env"
@@ -71,8 +85,9 @@ def _normalize_for_docs(spec: dict[str, Any], base_url: str) -> dict[str, Any]:
             "in": "header",
             "name": "X-API-Key",
             "description": (
-                "Org-scoped API key. Create one in Calibrate under "
-                "Settings → API keys. Prefix: `sk_…`."
+                "API key. Create one under Workspace settings → API keys "
+                "(https://calibrate.artpark.ai/workspace-settings?tab=api-keys). "
+                "Prefix: `sk_…`."
             ),
         }
     }
@@ -101,18 +116,20 @@ def _normalize_for_docs(spec: dict[str, Any], base_url: str) -> dict[str, Any]:
     info = spec.setdefault("info", {})
     info.setdefault(
         "description",
-        "Programmatic API for CI/automation, authenticated with an org-scoped API key.",
+        "Programmatic API for CI/automation, authenticated with an API key.",
     )
 
     return spec
 
 
-def render_intro_template(base_url: str) -> None:
+def render_templates(base_url: str) -> None:
     spec_url = public_openapi_spec_url(base_url)
-    text = INTRO_TEMPLATE.read_text(encoding="utf-8")
-    text = text.replace("__PUBLIC_API_BASE_URL__", base_url)
-    text = text.replace("__PUBLIC_OPENAPI_SPEC_URL__", spec_url)
-    INTRO_OUTPUT.write_text(text, encoding="utf-8")
+    for template, output in TEMPLATED_PAGES:
+        text = template.read_text(encoding="utf-8")
+        text = text.replace("__PUBLIC_API_BASE_URL__", base_url)
+        text = text.replace("__PUBLIC_OPENAPI_SPEC_URL__", spec_url)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(text, encoding="utf-8")
 
 
 def fetch(url: str) -> dict[str, Any]:
@@ -129,9 +146,10 @@ def main(argv: list[str] | None = None) -> int:
     spec = _normalize_for_docs(fetch(url), base_url)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
-    render_intro_template(base_url)
+    render_templates(base_url)
     print(f"Wrote {out} ({len(spec.get('paths', {}))} paths)")
-    print(f"Wrote {INTRO_OUTPUT}")
+    for _, output in TEMPLATED_PAGES:
+        print(f"Wrote {output}")
 
 
 if __name__ == "__main__":

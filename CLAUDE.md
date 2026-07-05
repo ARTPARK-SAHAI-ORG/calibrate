@@ -93,6 +93,21 @@ examples/                  # Example datasets + scripts users can run
 
 ## Conventions in this codebase
 
+### Docs (Mintlify) writing style
+The docs under `docs/` use **sentence case** for all headings (`##`/`###`),
+`Card`/`Step` titles, and frontmatter `title` fields — capitalize only the first
+word, e.g. `## Next steps`, `## Get started`, `### Launch run`. Do **not** use
+Title Case (`## Next Steps`). The only words that stay capitalized mid-heading
+are acronyms (API, LLM, STT, TTS, WER, TTFB, PR, HTML, URL) and proper nouns
+(Calibrate, GitHub, Mintlify, Markdown). Match this when adding or editing any
+`.mdx` page.
+
+Some pages are **generated** from templates in `docs/templates/` by
+`scripts/fetch_public_openapi.py` (which single-sources the backend host from
+`PUBLIC_API_BASE_URL` — never hardcode it). Edit the template, not the generated
+output, then re-run the script. Currently templated: `api-reference/introduction.mdx`,
+`reference/api-keys.mdx`, `reference/github-actions.mdx`.
+
 ### Evaluator dicts everywhere
 Every LLM/audio judge in the codebase takes a list of **evaluator** dicts of
 this shape:

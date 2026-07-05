@@ -1,6 +1,6 @@
 ---
-title: 'Introduction'
-description: 'Authenticate and call the Calibrate Public API programmatically'
+title: "Introduction"
+description: "Authenticate and call the Calibrate Public API programmatically"
 ---
 
 {/* Generated from docs/templates/api-reference/introduction.mdx — do not edit directly. */}
@@ -13,7 +13,11 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
   <Card title="Agents" icon="robot" href="/api-reference/agents/list-agents">
     List agents and resolve human-friendly names to UUIDs
   </Card>
-  <Card title="Agent tests" icon="play" href="/api-reference/agent-tests/run-agent-test">
+  <Card
+    title="Agent tests"
+    icon="play"
+    href="/api-reference/agent-tests/run-agent-test"
+  >
     Launch test runs and poll for results
   </Card>
 </CardGroup>
@@ -22,45 +26,48 @@ The Calibrate REST API lets you list agents, resolve agent names to UUIDs, launc
 
 <Steps>
   <Step title="Get your API key">
-    Sign in to [Calibrate](https://calibrate.artpark.ai), open **Settings → API keys**, and create an org-scoped key. The raw `sk_…` value is shown once — store it securely.
+    Go to [Workspace settings → API keys](https://calibrate.artpark.ai/workspace-settings?tab=api-keys), click **Create key**, and copy the full key when it is shown — you cannot view it again after closing the dialog.
   </Step>
   <Step title="Authenticate your requests">
     Pass your key in the `X-API-Key` header on every request:
 
     ```bash
-    curl https://pense-backend.artpark.ai/agents \
-      -H "X-API-Key: sk_your_api_key"
+    curl http://localhost:8000/agents \
+      -H "X-API-Key: your_api_key"
     ```
+
   </Step>
   <Step title="List agents">
     Enumerate every agent in your org:
 
     ```bash
-    curl https://pense-backend.artpark.ai/agents \
-      -H "X-API-Key: sk_your_api_key"
+    curl http://localhost:8000/agents \
+      -H "X-API-Key: your_api_key"
     ```
+
   </Step>
   <Step title="Run tests">
     Launch a test run for an agent, then poll the returned `task_id`:
 
     ```bash
     # Start a run (all linked tests when test_uuids is omitted)
-    curl -X POST "https://pense-backend.artpark.ai/agent-tests/agent/{agent_uuid}/run" \
-      -H "X-API-Key: sk_your_api_key" \
+    curl -X POST "http://localhost:8000/agent-tests/agent/{agent_uuid}/run" \
+      -H "X-API-Key: your_api_key" \
       -H "Content-Type: application/json" \
       -d '{}'
 
     # Poll status + results
-    curl "https://pense-backend.artpark.ai/agent-tests/run/{task_id}" \
-      -H "X-API-Key: sk_your_api_key"
+    curl "http://localhost:8000/agent-tests/run/{task_id}" \
+      -H "X-API-Key: your_api_key"
     ```
+
   </Step>
 </Steps>
 
 ## Base URL
 
 ```
-https://pense-backend.artpark.ai
+http://localhost:8000
 ```
 
 ## OpenAPI specification
@@ -69,19 +76,19 @@ The public API schema is published at an unauthenticated endpoint and synced int
 
 ```bash
 # Fetch the live spec (JSON)
-curl -s https://pense-backend.artpark.ai/public-api/openapi.json
+curl -s http://localhost:8000/public-api/openapi.json
 ```
 
 <Card
   title="OpenAPI specification"
   icon="brackets-curly"
-  href="https://pense-backend.artpark.ai/public-api/openapi.json"
+  href="http://localhost:8000/public-api/openapi.json"
 >
   View the machine-readable spec
 </Card>
 
 ## Authentication
 
-All API requests require an `X-API-Key` header. Keys are scoped to one organization and grant owner-level access to that org's public API routes.
+All API requests require an `X-API-Key` header. Keys grant access to the public API routes for your workspace.
 
 JWT bearer tokens (used by the Calibrate web UI) also work at the HTTP layer, but programmatic clients should use API keys exclusively.
