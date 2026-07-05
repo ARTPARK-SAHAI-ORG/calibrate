@@ -1,0 +1,170 @@
+---
+title: "SDKs"
+description: "Typed Python client for the Calibrate Public API, generated from the OpenAPI spec"
+---
+
+import { publicApiBaseUrl, publicOpenApiSpecUrl } from '/snippets/public-api-base-url.mdx';
+
+The Calibrate Python SDK is generated from the same [public OpenAPI spec](/api-reference/introduction) that powers this API reference. When the API changes, CI refreshes the spec and SDK snippets on endpoint pages stay aligned.
+
+<CardGroup cols={2}>
+  <Card title="Python" icon="python" href="https://pypi.org/project/calibrate-python-sdk/">
+    `calibrate-python-sdk` on PyPI
+  </Card>
+  <Card title="Source" icon="github" href="https://github.com/dalmia/calibrate-python-sdk">
+    Generated SDK repository
+  </Card>
+</CardGroup>
+
+<Info>
+  The SDK covers the **Public API** only — agents and agent-test run/poll endpoints authenticated with an API key. For the same API from your terminal, install the [Calibrate CLI](/cli/installation). Offline evaluations (STT, TTS, simulations) use the separate **`calibrate-agent`** package — see the [CLI tab](/cli/overview).
+</Info>
+
+## Install
+
+```bash
+pip install calibrate-python-sdk
+```
+
+## Quick start
+
+```python
+import os
+from artpark import Calibrate
+
+client = Calibrate(api_key=os.environ["CALIBRATE_API_KEY"])
+
+# List agents in your org
+for agent in client.agents.list():
+    print(agent.uuid, agent.name)
+
+# Launch a test run, then poll for results
+task = client.agent_tests.run(agent_uuid="your-agent-uuid")
+result = client.agent_tests.get_run(task_id=task.task_id)
+print(result.status, result.passed, result.failed)
+```
+
+The client exposes two resource groups:
+
+| Resource | Methods | Purpose |
+| --- | --- | --- |
+| `client.agents` | `list()`, `resolve()` | Enumerate agents; map names → UUIDs |
+| `client.agent_tests` | `run()`, `run_batch()`, `get_run()` | Start runs (single agent or batch) and poll status |
+
+Every endpoint page under **API reference** includes a **Python SDK** snippet generated from the same mapping CI uses to decorate the OpenAPI file.
+
+## Auth
+
+Pass your API key when constructing the client. Create one under **Workspace settings → API keys** — see the [API keys guide](/reference/api-keys).
+
+```python
+from artpark import Calibrate
+
+client = Calibrate(api_key="your_api_key")
+```
+
+The SDK sends `X-API-Key` on every request. JWT bearer tokens work at the HTTP layer (the web UI uses them) but programmatic clients should use API keys.
+
+<Warning>
+  The raw key is shown exactly once at creation. Store it in a secret manager or CI variable — never commit it.
+</Warning>
+
+## Errors
+
+Non-2xx responses raise `artpark.core.api_error.ApiError` with `status_code`, `headers`, and `body`:
+
+```python
+from artpark import Calibrate
+from artpark.core.api_error import ApiError
+
+client = Calibrate(api_key="your_api_key")
+
+try:
+    client.agent_tests.get_run(task_id="does-not-exist")
+except ApiError as err:
+    print(f"HTTP {err.status_code}")
+    print(err.body)
+```
+
+Validation failures (`422`) may deserialize to `artpark.errors.UnprocessableEntityError`.
+
+## Polling a run
+
+Test runs are asynchronous. `agent_tests.run()` returns a `task_id` immediately; poll `get_run()` until `status` is terminal (`completed`, `failed`, etc.):
+
+```python
+import time
+from artpark import Calibrate
+
+client = Calibrate(api_key="your_api_key")
+
+task = client.agent_tests.run(agent_uuid="your-agent-uuid")
+while True:
+    status = client.agent_tests.get_run(task_id=task.task_id)
+    if status.status not in ("queued", "in_progress"):
+        break
+    time.sleep(2)
+
+print(status.passed, status.failed)
+if status.results:
+    for row in status.results:
+        print(row.name, row.passed)
+```
+
+## Batch runs
+
+`agent_tests.run_batch()` fans out one job per agent in your org (or a named subset). Agents with no linked tests or an unverified connection appear in `skipped` rather than failing the whole batch:
+
+```python
+from artpark import Calibrate
+from artpark import BatchRunRequest
+
+client = Calibrate(api_key="your_api_key")
+
+batch = client.agent_tests.run_batch(
+    request=BatchRunRequest(agent_names=["agent-a", "agent-b"])
+)
+for run in batch.runs:
+    print(run.agent_name, run.task_id)
+```
+
+## Customization
+
+### Base URL
+
+Point the client at a self-hosted backend or staging gateway:
+
+```python
+from artpark import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+    base_url="https://your-calibrate-host.example.com",
+)
+```
+
+The default production host is `{publicApiBaseUrl}`.
+
+## Versioning
+
+The SDK is generated with [Fern](https://buildwithfern.com) from Calibrate's public OpenAPI spec. Releases are tagged `sdk-v*` on the backend repo; the PyPI version is the tag minus the `sdk-v` prefix.
+
+- **Patch/minor bumps** — new optional fields or endpoints; generally safe to upgrade.
+- **Check the changelog** on the [SDK repo](https://github.com/dalmia/calibrate-python-sdk) before major bumps.
+
+## Going deeper
+
+<CardGroup cols={2}>
+  <Card title="API reference" icon="book" href="/api-reference/introduction">
+    Interactive endpoint docs with curl and Python SDK examples
+  </Card>
+  <Card title="API keys" icon="key" href="/reference/api-keys">
+    Create and rotate keys in the Calibrate app
+  </Card>
+  <Card title="GitHub Action" icon="github" href="/reference/github-actions">
+    Reference CI consumer using the same endpoints
+  </Card>
+  <Card title="OpenAPI spec" icon="brackets-curly" href={publicOpenApiSpecUrl}>
+    Machine-readable source for the SDK and this reference
+  </Card>
+</CardGroup>

@@ -1,0 +1,139 @@
+---
+title: "Installation & Configuration"
+description: "Install the Calibrate cloud CLI and configure authentication"
+---
+
+{/* Generated from docs/templates/cli/installation.mdx — do not edit directly. */}
+
+The **`calibrate`** command is the cloud API client — list agents, launch test runs, and poll results from your terminal. It talks to the [Public API](/api-reference/introduction) using your API key.
+
+<Info>
+  For **offline evaluations** (STT, TTS, LLM benchmarks, simulations), use the separate **`calibrate-agent`** package instead — see the [CLI tab](/cli/overview).
+</Info>
+
+## Installation
+
+<Tabs>
+  <Tab title="Homebrew">
+    ```bash
+    brew install dalmia/tap/calibrate
+    ```
+  </Tab>
+
+  <Tab title="Cargo">
+    ```bash
+    cargo install calibrate
+    ```
+
+    Requires [Rust](https://rustup.rs/) to be installed.
+  </Tab>
+
+  <Tab title="Binary">
+    Download pre-built binaries from [GitHub Releases](https://github.com/dalmia/calibrate-cli/releases).
+  </Tab>
+</Tabs>
+
+Verify your installation:
+
+```bash
+calibrate --help
+```
+
+## Authentication
+
+### Interactive login
+
+```bash
+calibrate login
+```
+
+You will be prompted to enter your API key. Create one under **Workspace settings → API keys** — see the [API keys guide](/reference/api-keys).
+
+### API key flag
+
+Pass your API key directly:
+
+```bash
+calibrate login --api-key your_api_key
+```
+
+<Warning>
+  Passing API keys as command arguments can expose them in shell history and process lists. For CI/CD pipelines, prefer the `CALIBRATE_API_KEY` environment variable or your CI provider's secret management instead.
+</Warning>
+
+### Verify authentication
+
+```bash
+calibrate whoami
+```
+
+Displays your masked API key (e.g. `sk_…****`) to confirm you are authenticated.
+
+## Configuration
+
+The CLI stores configuration in a platform-specific config directory. Run `calibrate config path` to see the exact location on your system.
+
+### View config path
+
+```bash
+calibrate config path
+```
+
+### Get a config value
+
+```bash
+calibrate config get api_key
+calibrate config get api_url
+```
+
+### Set a config value
+
+```bash
+calibrate config set api_key your_api_key
+calibrate config set api_url __PUBLIC_API_BASE_URL__
+```
+
+### Config file format
+
+```toml
+api_key = "sk_..."
+api_url = "__PUBLIC_API_BASE_URL__"
+```
+
+## Environment variables
+
+Environment variables override config file values:
+
+| Variable            | Description                          |
+| ------------------- | ------------------------------------ |
+| `CALIBRATE_API_KEY` | API key (overrides config file)      |
+| `CALIBRATE_API_URL` | API base URL (overrides config file) |
+
+```bash
+# Use in CI/CD pipelines
+export CALIBRATE_API_KEY=your_api_key
+calibrate agent-tests run --agent-uuid your-agent-uuid
+```
+
+## Supported platforms
+
+- macOS (Intel and Apple Silicon)
+- Linux (x86\_64 and ARM64)
+- Windows
+
+## Going deeper
+
+<CardGroup cols={2}>
+  <Card title="Python SDK" icon="python" href="/sdk/overview">
+    `pip install calibrate-sdk` for programmatic access
+  </Card>
+  <Card title="API reference" icon="book" href="/api-reference/introduction">
+    Interactive endpoint docs with curl and Python examples
+  </Card>
+  <Card title="Offline CLI" icon="terminal" href="/cli/overview">
+    `calibrate-agent` for STT, TTS, and simulations
+  </Card>
+  <Card title="GitHub Releases" icon="github" href="https://github.com/dalmia/calibrate-cli/releases">
+    Pre-built binaries for every release
+  </Card>
+</CardGroup>

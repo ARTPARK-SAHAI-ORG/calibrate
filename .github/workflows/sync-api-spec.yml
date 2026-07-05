@@ -36,7 +36,12 @@ jobs:
 
       - name: Commit generated docs if changed
         run: |
-          git add docs/api-reference/openapi.json docs/api-reference/introduction.mdx docs/reference/api-keys.mdx docs/reference/github-actions.mdx
+          git add docs/api-reference/openapi.json \
+            docs/api-reference/introduction.mdx \
+            docs/reference/api-keys.mdx \
+            docs/reference/github-actions.mdx \
+            docs/cli/installation.mdx \
+            docs/snippets/public-api-base-url.mdx
           if git diff --cached --quiet; then
             echo "Generated API docs unchanged"
             exit 0

@@ -754,7 +754,14 @@
               }
             }
           }
-        }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "label": "Python SDK",
+            "source": "from artpark import Calibrate\n\nclient = Calibrate(api_key=\"your_api_key\")\n\nresult = client.agents.resolve(names=[\"my-agent\", \"other-agent\"])\nprint(result.resolved)  # name -> uuid\nprint(result.not_found)  # names with no match\n"
+          }
+        ]
       }
     },
     "/agents": {
@@ -795,7 +802,14 @@
               }
             }
           }
-        }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "label": "Python SDK",
+            "source": "from artpark import Calibrate\n\nclient = Calibrate(api_key=\"your_api_key\")\n\nagents = client.agents.list()\nfor agent in agents:\n    print(agent.uuid, agent.name)\n"
+          }
+        ]
       }
     },
     "/agent-tests/agent/{agent_uuid}/run": {
@@ -853,7 +867,14 @@
               }
             }
           }
-        }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "label": "Python SDK",
+            "source": "from artpark import Calibrate\n\nclient = Calibrate(api_key=\"your_api_key\")\n\n# Omit test_uuids to run every test linked to the agent.\ntask = client.agent_tests.run(agent_uuid=\"your-agent-uuid\")\nprint(task.task_id, task.status)\n\n# Or run a subset:\n# task = client.agent_tests.run(\n#     agent_uuid=\"your-agent-uuid\",\n#     test_uuids=[\"test-uuid-1\", \"test-uuid-2\"],\n# )\n"
+          }
+        ]
       }
     },
     "/agent-tests/run": {
@@ -907,7 +928,14 @@
               }
             }
           }
-        }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "label": "Python SDK",
+            "source": "from artpark import Calibrate\n\nclient = Calibrate(api_key=\"your_api_key\")\n\n# Omit agent_names to run every agent in your org.\nbatch = client.agent_tests.run_batch()\nfor run in batch.runs:\n    print(run.agent_name, run.task_id, run.status)\nfor skip in batch.skipped:\n    print(skip.agent_name, skip.reason)\n"
+          }
+        ]
       }
     },
     "/agent-tests/run/{task_id}": {
@@ -955,7 +983,14 @@
               }
             }
           }
-        }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "python",
+            "label": "Python SDK",
+            "source": "from artpark import Calibrate\n\nclient = Calibrate(api_key=\"your_api_key\")\n\nstatus = client.agent_tests.get_run(task_id=\"your-task-id\")\nprint(status.status, status.passed, status.failed)\nif status.results:\n    for row in status.results:\n        print(row.name, row.passed)\n"
+          }
+        ]
       }
     }
   }
