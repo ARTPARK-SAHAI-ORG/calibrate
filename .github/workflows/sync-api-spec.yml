@@ -41,9 +41,5 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "$(cat <<'EOF'
-Sync public OpenAPI spec and API URL docs from PUBLIC_API_BASE_URL.
-
-EOF
-)"
+          git commit -m "Sync public OpenAPI spec and API URL docs from PUBLIC_API_BASE_URL."
           git push
