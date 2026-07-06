@@ -1808,7 +1808,7 @@ def create_stt_service(
     from pipecat.services.google.stt import GoogleSTTService
     from pipecat.services.cartesia.stt import CartesiaSTTService
     from pipecat.services.groq.stt import GroqSTTService
-    from pipecat.services.sarvam.stt import SarvamSTTService
+    from calibrate_agent.stt_resilience import ResilientSarvamSTTService
     from pipecat.services.elevenlabs.stt import ElevenLabsRealtimeSTTService
     from pipecat.services.smallest.stt import SmallestSTTService
 
@@ -1824,10 +1824,13 @@ def create_stt_service(
             ),
         )
     elif provider == "sarvam":
-        return SarvamSTTService(
+        # ResilientSarvamSTTService adds transient-websocket-drop reconnection that
+        # the base pipecat service lacks; config is otherwise identical (saaras:v3,
+        # mode="transcribe" — kept in sync with stt/eval.py's transcribe_sarvam).
+        return ResilientSarvamSTTService(
             api_key=os.getenv("SARVAM_API_KEY"),
             mode="transcribe",
-            settings=SarvamSTTService.Settings(
+            settings=ResilientSarvamSTTService.Settings(
                 language=stt_language,
                 model=STT_PROVIDER_MODELS[provider],
             ),

@@ -76,12 +76,58 @@ _BENIGN_GOOGLE_STT_IDLE_TIMEOUT = (
     "409 Stream timed out after receiving no more client requests"
 )
 
+# Streaming STT services recover from a dropped websocket transparently: pipecat's
+# WebsocketService reconnects Cartesia / ElevenLabs / Smallest (and Deepgram/Google
+# reconnect inside their SDKs), while calibrate's ResilientSarvamSTTService does the
+# same for Sarvam. During that recovery, pipecat and calibrate emit ERROR-level logs
+# for the transient drop and for individual failed reconnect *attempts* — none of
+# which are terminal. Treat those as recoverable so the error sink doesn't cancel the
+# whole pipeline before reconnection completes. Substrings are matched case-insensitively.
+_RECOVERABLE_STT_STREAM_MARKERS = (
+    "no close frame received or sent",
+    "connection closed",
+    "connectionclosed",
+    "reconnecting",
+    "reconnection attempt",
+    "connection verification failed",
+    "will try to reconnect",
+    "transient sarvam stt disconnect",
+    "awaiting reconnect",
+    "keepalive ping timeout",
+)
+
+# Terminal STT-stream outcomes: reconnection has been exhausted (or the connection
+# keeps failing immediately). These MUST still cancel the pipeline, so they override
+# the recoverable markers above.
+_TERMINAL_STT_STREAM_MARKERS = (
+    "failed to reconnect after",
+    "times immediately after connecting",
+)
+
 
 def _is_benign_google_stt_idle_error(log_message: str) -> bool:
     return (
         "GoogleSTTService" in log_message
         and _BENIGN_GOOGLE_STT_IDLE_TIMEOUT in log_message
     )
+
+
+def _is_recoverable_stt_stream_error(log_message: str) -> bool:
+    """True when an ERROR log is a transient streaming-STT drop we can recover from.
+
+    Covers the Google idle-stream 409 plus the transient-disconnect / mid-reconnect
+    ERROR logs that pipecat's WebsocketService and calibrate's
+    ResilientSarvamSTTService emit while reconnecting. Terminal outcomes (reconnect
+    exhausted, immediate repeat failures) are excluded so they still cancel the run.
+    """
+    if _is_benign_google_stt_idle_error(log_message):
+        return True
+    lowered = log_message.lower()
+    if any(marker in lowered for marker in _TERMINAL_STT_STREAM_MARKERS):
+        return False
+    if "sttservice" not in lowered:
+        return False
+    return any(marker in lowered for marker in _RECOVERABLE_STT_STREAM_MARKERS)
 
 
 def count_agent_message_turns(messages: list) -> int:
@@ -1387,9 +1433,10 @@ async def run_simulation(
         record = message.record
         if record["level"].name in ("ERROR", "CRITICAL"):
             text = record["message"]
-            if _is_benign_google_stt_idle_error(text):
+            if _is_recoverable_stt_stream_error(text):
                 eval_logger.debug(
-                    "Skipping pipeline cancel for benign Google STT idle stream timeout",
+                    "Skipping pipeline cancel for recoverable streaming-STT error "
+                    "(transient websocket drop / mid-reconnect); reconnection handles it",
                 )
                 return
             captured_errors.append(text)

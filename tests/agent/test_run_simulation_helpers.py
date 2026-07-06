@@ -23,6 +23,81 @@ class TestIsBenignGoogleSttIdleError(unittest.TestCase):
         ))
 
 
+class TestIsRecoverableSttStreamError(unittest.TestCase):
+    """The error sink must let streaming-STT reconnection recover transient drops,
+    while still cancelling on terminal reconnect failures."""
+
+    def _fn(self):
+        from calibrate_agent.agent.run_simulation import (
+            _is_recoverable_stt_stream_error,
+        )
+
+        return _is_recoverable_stt_stream_error
+
+    def test_google_idle_still_recoverable(self):
+        fn = self._fn()
+        self.assertTrue(
+            fn(
+                "GoogleSTTService error: 409 Stream timed out after receiving no "
+                "more client requests"
+            )
+        )
+
+    def test_sarvam_transient_ws_drop_recoverable(self):
+        fn = self._fn()
+        self.assertTrue(
+            fn(
+                "SarvamSTTService#1 unexpected exception "
+                "(websockets/legacy/protocol.py:921): no close frame received or sent"
+            )
+        )
+        self.assertTrue(
+            fn(
+                "ResilientSarvamSTTService#1 transient Sarvam STT disconnect on send "
+                "(no close frame received or sent); reconnecting"
+            )
+        )
+
+    def test_websocketservice_midreconnect_logs_recoverable(self):
+        fn = self._fn()
+        # pipecat WebsocketService emits these at ERROR while reconnecting.
+        self.assertTrue(
+            fn("CartesiaSTTService#1 connection verification failed: timed out")
+        )
+        self.assertTrue(
+            fn("ElevenLabsRealtimeSTTService#1 reconnection attempt 2 failed: boom")
+        )
+
+    def test_terminal_reconnect_failure_not_recoverable(self):
+        fn = self._fn()
+        # Reconnect exhausted / immediate repeat failures MUST still cancel.
+        self.assertFalse(
+            fn("CartesiaSTTService#1 failed to reconnect after 3 attempts: boom")
+        )
+        self.assertFalse(
+            fn(
+                "ResilientSarvamSTTService#1 failed to reconnect after 4 attempts "
+                "(Sarvam STT)"
+            )
+        )
+        self.assertFalse(
+            fn(
+                "SmallestSTTService#1 connection failed 3 times immediately after "
+                "connecting"
+            )
+        )
+
+    def test_non_stt_errors_not_recoverable(self):
+        fn = self._fn()
+        # A websocket-ish message from something that isn't an STT service must not
+        # be swallowed.
+        self.assertFalse(fn("Some other error"))
+        self.assertFalse(
+            fn("WebsocketClientTransport#1 connection closed, but with an error")
+        )
+        self.assertFalse(fn("SarvamSTTService#1: totally unrelated failure"))
+
+
 class TestCountAgentMessageTurns(unittest.TestCase):
     def test_empty_messages(self):
         from calibrate_agent.agent.run_simulation import count_agent_message_turns

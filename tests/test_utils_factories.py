@@ -17,7 +17,10 @@ STT_SERVICE_TARGETS = {
     "cartesia": "pipecat.services.cartesia.stt.CartesiaSTTService",
     "elevenlabs": "pipecat.services.elevenlabs.stt.ElevenLabsRealtimeSTTService",
     "smallest": "pipecat.services.smallest.stt.SmallestSTTService",
-    "sarvam": "pipecat.services.sarvam.stt.SarvamSTTService",
+    # Sarvam is wrapped by calibrate's reconnecting subclass; create_stt_service
+    # instantiates it (not the base pipecat service) via a module-level import, so
+    # this is the patch target that intercepts construction.
+    "sarvam": "calibrate_agent.stt_resilience.ResilientSarvamSTTService",
 }
 
 TTS_SERVICE_TARGETS = {
