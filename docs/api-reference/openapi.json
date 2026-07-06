@@ -7,7 +7,7 @@
   },
   "servers": [
     {
-      "url": "https://pense-backend.artpark.ai",
+      "url": "https://api.calibrate.artpark.ai",
       "description": "Production"
     }
   ],

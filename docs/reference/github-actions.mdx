@@ -139,7 +139,7 @@ To trigger:
 | --------------- | ------- | -------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `api-key`       | string  | Yes      | —                                  | Calibrate API key (`sk_…`). Store as a secret.                                                                                          |
 | `agents`        | string  | No       | All agents                         | Agent names, comma- or newline-separated. Runs all linked tests for each. Omit to run every agent in the account linked to the API key. |
-| `base-url`      | string  | No       | `https://pense-backend.artpark.ai` | Backend API URL. Override only for self-hosted.                                                                                         |
+| `base-url`      | string  | No       | `https://api.calibrate.artpark.ai` | Backend API URL. Override only for self-hosted.                                                                                         |
 | `app-url`       | string  | No       | `https://calibrate.artpark.ai`     | Web UI base URL for view links in the report.                                                                                           |
 | `mode`          | string  | No       | `gate`                             | `gate` fails the job on any failure; `report` always succeeds.                                                                          |
 | `poll-interval` | integer | No       | `5`                                | Seconds between status polls.                                                                                                           |
@@ -168,7 +168,7 @@ The action talks to the Calibrate Public API with your API key. For each invocat
 
 When `agents` is set, it resolves the names to UUIDs:
 
-**Endpoint:** `POST https://pense-backend.artpark.ai/agents/resolve`
+**Endpoint:** `POST https://api.calibrate.artpark.ai/agents/resolve`
 
 **Request:**
 
@@ -192,7 +192,7 @@ When `agents` is set, it resolves the names to UUIDs:
 
 When `agents` is omitted, it lists every agent in the account instead:
 
-**Endpoint:** `GET https://pense-backend.artpark.ai/agents`
+**Endpoint:** `GET https://api.calibrate.artpark.ai/agents`
 
 **Response:**
 
@@ -204,7 +204,7 @@ When `agents` is omitted, it lists every agent in the account instead:
 
 For each agent, it triggers all linked tests. The agent is selected by UUID in the URL path and the body is empty:
 
-**Endpoint:** `POST https://pense-backend.artpark.ai/agent-tests/agent/{agent_uuid}/run`
+**Endpoint:** `POST https://api.calibrate.artpark.ai/agent-tests/agent/{agent_uuid}/run`
 
 **Request:**
 
@@ -224,7 +224,7 @@ For each agent, it triggers all linked tests. The agent is selected by UUID in t
 
 It polls each task until it finishes:
 
-**Endpoint:** `GET https://pense-backend.artpark.ai/agent-tests/run/{task_id}`
+**Endpoint:** `GET https://api.calibrate.artpark.ai/agent-tests/run/{task_id}`
 
 **Response:**
 
