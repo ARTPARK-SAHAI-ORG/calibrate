@@ -1,0 +1,24 @@
+---
+title: "Get test"
+description: "Get a test by ID, including its linked evaluators."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.tests.get(
+    test_uuid="b1c2d3e4-f5a6-7890-bcde-f12345678901",
+)
+```
+
+## API endpoint
+
+See **GET /tests/\{test_uuid}** in the [API reference](/api-reference/introduction) tab.

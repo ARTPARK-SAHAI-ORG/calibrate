@@ -15,7 +15,9 @@
         "groups": [
           {
             "group": "Get Started",
-            "pages": ["getting-started/introduction"]
+            "pages": [
+              "getting-started/introduction"
+            ]
           },
           {
             "group": "Quickstart",
@@ -34,7 +36,6 @@
               "core-concepts/agents",
               "core-concepts/agent-connections",
               "core-concepts/tools",
-
               "core-concepts/personas",
               "core-concepts/scenarios",
               "core-concepts/metrics"
@@ -42,7 +43,10 @@
           },
           {
             "group": "Reference",
-            "pages": ["reference/api-keys", "reference/github-actions"]
+            "pages": [
+              "reference/api-keys",
+              "reference/github-actions"
+            ]
           }
         ]
       },
@@ -77,12 +81,83 @@
         ]
       },
       {
-        "tab": "API reference",
-        "openapi": "api-reference/openapi.json",
+        "tab": "Python SDK",
         "groups": [
           {
             "group": "Overview",
-            "pages": ["api-reference/introduction"]
+            "pages": [
+              "sdk/overview"
+            ]
+          },
+          {
+            "group": "Agent tests",
+            "pages": [
+              "sdk/agent-tests/run",
+              "sdk/agent-tests/run_batch",
+              "sdk/agent-tests/get_run"
+            ]
+          },
+          {
+            "group": "Agents",
+            "pages": [
+              "sdk/agents/list",
+              "sdk/agents/create",
+              "sdk/agents/resolve",
+              "sdk/agents/get",
+              "sdk/agents/update"
+            ]
+          },
+          {
+            "group": "Tests",
+            "pages": [
+              "sdk/tests/list",
+              "sdk/tests/create",
+              "sdk/tests/bulk_create",
+              "sdk/tests/get",
+              "sdk/tests/update"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/introduction"
+            ]
+          },
+          {
+            "group": "Agent tests",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /agent-tests/agent/{agent_uuid}/run",
+              "POST /agent-tests/run",
+              "GET /agent-tests/run/{task_id}"
+            ]
+          },
+          {
+            "group": "Agents",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /agents",
+              "POST /agents",
+              "POST /agents/resolve",
+              "GET /agents/{agent_uuid}",
+              "PUT /agents/{agent_uuid}"
+            ]
+          },
+          {
+            "group": "Tests",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /tests",
+              "POST /tests",
+              "POST /tests/bulk",
+              "GET /tests/{test_uuid}",
+              "PUT /tests/{test_uuid}"
+            ]
           }
         ]
       },
@@ -104,7 +179,9 @@
         "groups": [
           {
             "group": "Browse use cases",
-            "pages": ["examples/overview"]
+            "pages": [
+              "examples/overview"
+            ]
           }
         ]
       }
@@ -116,7 +193,6 @@
           "href": "https://github.com/artpark-sahai-org/calibrate",
           "icon": "github"
         },
-
         {
           "anchor": "WhatsApp",
           "href": "https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z",
@@ -152,8 +228,12 @@
       "display": "interactive"
     },
     "examples": {
-      "languages": ["curl", "python"],
-      "defaults": "required"
+      "languages": [
+        "curl",
+        "python"
+      ],
+      "defaults": "required",
+      "autogenerate": true
     }
   },
   "contextual": {

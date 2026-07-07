@@ -1,0 +1,27 @@
+---
+title: "Resolve agent names to IDs"
+description: "Resolve agent names to their IDs."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agents.resolve(
+    names=[
+        "my-agent",
+        "support-bot"
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /agents/resolve** in the [API reference](/api-reference/introduction) tab.

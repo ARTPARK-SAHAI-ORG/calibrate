@@ -1,0 +1,24 @@
+---
+title: "Run agent tests in batch"
+description: "Run agent tests for every agent in your workspace, or for a selected set."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate, BatchRunRequest
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agent_tests.run_batch(
+    request=BatchRunRequest(),
+)
+```
+
+## API endpoint
+
+See **POST /agent-tests/run** in the [API reference](/api-reference/introduction) tab.

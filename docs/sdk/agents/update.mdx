@@ -1,0 +1,24 @@
+---
+title: "Update agent"
+description: "Update an agent's name and/or config. Changing `agent_url` or `agent_headers` resets connection and benchmark verification flags."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agents.update(
+    agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+)
+```
+
+## API endpoint
+
+See **PUT /agents/\{agent_uuid}** in the [API reference](/api-reference/introduction) tab.

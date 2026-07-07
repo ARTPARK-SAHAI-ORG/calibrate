@@ -1,0 +1,24 @@
+---
+title: "Create agent"
+description: "Create a new agent in your workspace. For `type=agent`, defaults are deep-merged with any config you supply."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agents.create(
+    name="name",
+)
+```
+
+## API endpoint
+
+See **POST /agents** in the [API reference](/api-reference/introduction) tab.

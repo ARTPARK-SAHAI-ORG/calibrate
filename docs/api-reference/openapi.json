@@ -88,8 +88,13 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/TaskStatus",
-            "description": "Current status of the test run: `queued` or `in_progress`"
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress"
+            ],
+            "title": "Status",
+            "description": "Current status of the test run"
           }
         },
         "type": "object",
@@ -210,8 +215,13 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/TaskStatus",
-            "description": "Initial status: `queued` or `in_progress`"
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress"
+            ],
+            "title": "Status",
+            "description": "Initial status of the test run"
           }
         },
         "type": "object",
@@ -969,7 +979,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
-            "description": "Current status: `queued`, `in_progress`, `done`, or `failed`"
+            "description": "Current status of the test run"
           },
           "total_tests": {
             "anyOf": [
@@ -1372,7 +1382,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "Test kind: `response`, `tool_call`, or `conversation`"
+            "description": "Test kind"
           },
           "config": {
             "anyOf": [
