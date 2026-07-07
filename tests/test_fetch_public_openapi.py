@@ -18,6 +18,7 @@ from fetch_public_openapi import (  # noqa: E402
     public_api_base_url,
     public_openapi_spec_url,
     render_templates,
+    sync_cli_docs,
 )
 from generate_sdk_docs import generate_sdk_docs  # noqa: E402
 from sdk_route_samples import SAMPLE_OPENAPI, SAMPLE_OVERRIDES  # noqa: E402
@@ -201,3 +202,40 @@ def test_generate_sdk_docs_writes_pages_and_updates_docs_json(
     assert "Python SDK" in tab_names
     assert docs["api"]["examples"]["languages"] == ["curl", "python"]
     assert docs["api"]["examples"]["autogenerate"] is True
+
+
+def test_sync_cli_docs_skips_when_env_unset(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.delenv("CLI_DOCS_PATH", raising=False)
+    assert sync_cli_docs() is None
+    assert "skipping" in capsys.readouterr().out.lower()
+
+
+def test_sync_cli_docs_skips_when_dir_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setenv("CLI_DOCS_PATH", str(tmp_path / "does-not-exist"))
+    assert sync_cli_docs() is None
+    out = capsys.readouterr().out.lower()
+    assert "skipping" in out
+    assert "not a directory" in out
+
+
+def test_sync_cli_docs_invokes_generator_when_dir_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    monkeypatch.setenv("CLI_DOCS_PATH", str(docs_dir))
+
+    import generate_cli_docs as gen_mod
+
+    calls: list[Path] = []
+    monkeypatch.setattr(gen_mod, "generate_cli_docs", lambda src_dir: calls.append(src_dir))
+
+    sync_cli_docs()
+
+    assert calls == [docs_dir]

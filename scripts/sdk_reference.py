@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OPENAPI = REPO_ROOT / "docs" / "api-reference" / "openapi.json"
 DEFAULT_FERN_OVERRIDE_CANDIDATES = (
@@ -84,6 +82,8 @@ def fern_overrides_path() -> Path:
 
 
 def parse_fern_overrides(path: Path) -> dict[str, Any]:
+    import yaml
+
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or "paths" not in data:
         raise ValueError(f"Invalid Fern overrides file: {path}")

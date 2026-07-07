@@ -1,0 +1,103 @@
+---
+title: "Tests"
+description: "Operations for tests"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Bulk create tests
+
+Create many test cases at once and link them to your agents
+
+```bash
+calibrate tests bulk-create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuids` | string | Agents (IDs) to link every created test to. Omit to link none |
+| `-l, --language` | config.settings.language | Language written to each test's config.settings.language. Omit to leave unset |
+| `--tests` | string | **Required.** Test items to create (non-empty, max 500 per request, names unique within the batch) |
+| `--type` | response | What the test judges: |
+
+**Examples**
+
+```bash
+calibrate tests bulk-create --type tool_call --tests '[{"name":"<value>","conversation_history":[{"role":"tool"}],"evaluators":[{"evaluator_uuid":"f47ac10b-58cc-4372-a567-0e02b2c3d479"}]}]'
+```
+
+## Create test
+
+Create a test that runs your agent against a conversation and evaluates its answer quality or the tools it calls
+
+```bash
+calibrate tests create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-c, --config-param` | history | The calibrate test config. Three top-level keys. |
+
+**Examples**
+
+```bash
+calibrate tests create --name <value> --type tool_call
+```
+
+## Get test
+
+Get an agent test case by its ID
+
+```bash
+calibrate tests get [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-t, --test-uuid` | string | **Required.** Test to retrieve |
+
+**Examples**
+
+```bash
+calibrate tests get --test-uuid b1c2d3e4-f5a6-7890-bcde-f12345678901
+```
+
+## List tests
+
+List all the test cases for your agents
+
+```bash
+calibrate tests list [flags]
+```
+
+**Examples**
+
+```bash
+calibrate tests list
+```
+
+## Update test
+
+Update an agent test case
+
+```bash
+calibrate tests update [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-c, --config-param` | history | The calibrate test config. Three top-level keys. |
+
+**Examples**
+
+```bash
+calibrate tests update --test-uuid b1c2d3e4-f5a6-7890-bcde-f12345678901
+```

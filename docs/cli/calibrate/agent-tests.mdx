@@ -1,0 +1,68 @@
+---
+title: "Agent tests"
+description: "Operations for agent-tests"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Get test run status
+
+Poll a test run for its status and evaluation results
+
+```bash
+calibrate agent-tests get-run [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-t, --task-id` | string | **Required.** Test run to poll for status and results |
+
+**Examples**
+
+```bash
+calibrate agent-tests get-run --task-id a3b2c1d0-e5f4-3210-abcd-ef1234567890
+```
+
+## Run agent tests
+
+Run an agent's linked tests as a background job, returning a task ID to poll
+
+```bash
+calibrate agent-tests run [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** The agent to test. |
+| `-t, --test-uuids` | string | Tests to run. Omit to run all tests linked to the agent |
+
+**Examples**
+
+```bash
+calibrate agent-tests run --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## Run agent tests in batch
+
+Run agent tests for every agent, or for a selected set
+
+```bash
+calibrate agent-tests run-batch [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `--body` | string | Request body as JSON (alternative to individual flags). Can also be provided via stdin. |
+| `-b, --body-param` | string | JSON object |
+
+**Examples**
+
+```bash
+calibrate agent-tests run-batch
+```
