@@ -110,8 +110,8 @@
           {
             "group": "Tests",
             "pages": [
-              "sdk/tests/create",
               "sdk/tests/list",
+              "sdk/tests/create",
               "sdk/tests/bulk_create",
               "sdk/tests/get",
               "sdk/tests/update"
@@ -152,8 +152,8 @@
             "group": "Tests",
             "openapi": "api-reference/openapi.json",
             "pages": [
-              "POST /tests",
               "GET /tests",
+              "POST /tests",
               "POST /tests/bulk",
               "GET /tests/{test_uuid}",
               "PUT /tests/{test_uuid}"
