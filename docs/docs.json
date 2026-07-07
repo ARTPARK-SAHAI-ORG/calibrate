@@ -217,7 +217,8 @@
     "examples": {
       "languages": [
         "curl",
-        "python"
+        "python",
+        "Python SDK"
       ],
       "defaults": "required",
       "autogenerate": true

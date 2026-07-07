@@ -132,7 +132,7 @@ def update_docs_json(
     docs["navigation"]["tabs"] = tabs_without_sdk
 
     examples = docs.setdefault("api", {}).setdefault("examples", {})
-    examples["languages"] = ["curl", "python"]
+    examples["languages"] = ["curl", "python", "Python SDK"]
     examples["defaults"] = "required"
     examples["autogenerate"] = True
 

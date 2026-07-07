@@ -80,7 +80,7 @@ def test_inject_sdk_code_samples(minimal_spec: dict) -> None:
     count = _inject_sdk_code_samples(minimal_spec, REFERENCE_FIXTURE)
     assert count == 1
     samples = minimal_spec["paths"]["/agents"]["get"]["x-codeSamples"]
-    assert samples[0]["lang"] == "python-sdk"
+    assert samples[0]["lang"] == "Python SDK"
     assert samples[0]["label"] == "Python SDK"
     assert "client.agents.list()" in samples[0]["source"]
 

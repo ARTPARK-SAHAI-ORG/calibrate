@@ -1476,7 +1476,7 @@
         },
         "x-codeSamples": [
           {
-            "lang": "python-sdk",
+            "lang": "Python SDK",
             "label": "Python SDK",
             "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agents.resolve(\n    names=[\n        \"names\"\n    ],\n)\n"
           }
@@ -1569,7 +1569,7 @@
         },
         "x-codeSamples": [
           {
-            "lang": "python-sdk",
+            "lang": "Python SDK",
             "label": "Python SDK",
             "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agents.list()\n"
           }
@@ -2000,7 +2000,7 @@
         },
         "x-codeSamples": [
           {
-            "lang": "python-sdk",
+            "lang": "Python SDK",
             "label": "Python SDK",
             "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agent_tests.run(\n    agent_uuid=\"agent_uuid\",\n)\n"
           }
@@ -2061,7 +2061,7 @@
         },
         "x-codeSamples": [
           {
-            "lang": "python-sdk",
+            "lang": "Python SDK",
             "label": "Python SDK",
             "source": "from calibrate import Calibrate, BatchRunRequest\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agent_tests.run_batch(\n    request=BatchRunRequest(),\n)\n"
           }
@@ -2121,7 +2121,7 @@
         },
         "x-codeSamples": [
           {
-            "lang": "python-sdk",
+            "lang": "Python SDK",
             "label": "Python SDK",
             "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agent_tests.get_run(\n    task_id=\"task_id\",\n)\n"
           }
