@@ -29,10 +29,6 @@ class SdkRoute:
     title: str
 
     @property
-    def openapi_key(self) -> tuple[str, str]:
-        return self.http.upper(), self.path
-
-    @property
     def sdk_key(self) -> tuple[str, str]:
         return self.sdk_group, self.sdk_method
 
@@ -50,7 +46,6 @@ class SdkRoute:
 class SdkMethodDoc:
     sdk_group: str
     sdk_method: str
-    signature: str
     description: str
     usage_code: str
 
@@ -122,17 +117,9 @@ def parse_reference_md(text: str) -> dict[tuple[str, str], SdkMethodDoc]:
         usage_match = USAGE_BLOCK.search(block)
         if not usage_match:
             continue
-        signature_match = re.search(
-            rf"client\.{re.escape(sdk_group)}\.{re.escape(sdk_method)}\([^)]*\)",
-            block,
-        )
-        signature = signature_match.group(0) if signature_match else (
-            f"client.{sdk_group}.{sdk_method}(...)"
-        )
         doc = SdkMethodDoc(
             sdk_group=sdk_group,
             sdk_method=sdk_method,
-            signature=signature,
             description=_extract_description(block),
             usage_code=_simplify_usage_code(usage_match.group(1)),
         )

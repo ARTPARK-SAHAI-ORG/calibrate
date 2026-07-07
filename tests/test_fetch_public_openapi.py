@@ -90,7 +90,6 @@ def test_render_method_page_skips_duplicate_summary_and_signature() -> None:
     doc = SdkMethodDoc(
         sdk_group="agent_tests",
         sdk_method="run",
-        signature='client.agent_tests.run(agent_uuid="agent_uuid")',
         description="Run tests for an agent as a background job.\n\nExtra detail.",
         usage_code='client.agent_tests.run(agent_uuid="agent_uuid")\n',
     )
