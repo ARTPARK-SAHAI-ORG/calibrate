@@ -1,6 +1,6 @@
 ---
 title: "Bulk create tests"
-description: "Create many tests of one type in a single call, optionally linking them to agents."
+description: "Create many test cases at once and link them to your agents"
 ---
 
 {/* Generated from Fern reference.md — do not edit directly. */}
@@ -21,7 +21,7 @@ client.tests.bulk_create(
             name="name",
             conversation_history=[
                 ChatMessage(
-                    role="system",
+                    role="user",
                 )
             ],
         )

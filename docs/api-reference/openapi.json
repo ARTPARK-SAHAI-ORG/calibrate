@@ -18,7 +18,7 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Human-readable agent name, unique within the workspace"
+            "description": "Agent name, unique within the workspace"
           },
           "type": {
             "type": "string",
@@ -27,7 +27,7 @@
               "connection"
             ],
             "title": "Type",
-            "description": "`agent` applies managed defaults deep-merged under any supplied `config`; `connection` stores the config you supply as-is (must eventually contain `agent_url`)",
+            "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate",
             "default": "agent"
           },
           "config": {
@@ -40,8 +40,7 @@
                 "type": "null"
               }
             ],
-            "title": "Config",
-            "description": "Behavioral config (system_prompt, llm, stt, tts, settings, \u2026). Deep-merged over defaults for `type=agent`; stored as-is for `type=connection`. Omit for `type=agent` to use defaults"
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`** (built inside Calibrate):\n- `system_prompt` (string): the agent's instructions\n- `llm.model` (string): `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider` (string): `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider` (string): `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first` (bool), `settings.max_assistant_turns` (int)\n- `system_tools.end_call` (bool, optional): let the agent end the call\n- `data_extraction_fields` (array, optional): `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`** (your own HTTP endpoint):\n- `agent_url` (string, required): public HTTPS endpoint the agent is called at\n- `agent_headers` (object, optional): headers sent on each request, e.g. auth\n- `benchmark_provider` (string, optional): `openrouter` (default), `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\nFor `type=agent`, omitted keys inherit managed defaults (omit `config` entirely to use all defaults). For `type=connection`, `config` is stored as-is and must contain `agent_url`."
           }
         },
         "type": "object",
@@ -65,7 +64,7 @@
           "message": {
             "type": "string",
             "title": "Message",
-            "description": "Human-readable confirmation message"
+            "description": "Confirmation message"
           }
         },
         "type": "object",
@@ -128,33 +127,7 @@
                 "type": "null"
               }
             ],
-            "title": "Config",
-            "description": "Replacement config, stored as-is (no deep-merge on update). Changing `agent_url` or `agent_headers` resets all connection/benchmark verification flags. Omit to leave config unchanged"
-          },
-          "connection_verified": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Connection Verified",
-            "description": "Directly set the `connection_verified` flag inside config. Omit to leave it untouched"
-          },
-          "benchmark_models_verified": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Benchmark Models Verified",
-            "description": "Directly set the per-model benchmark verification map inside config. Omit to leave it untouched"
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`** (built inside Calibrate):\n- `system_prompt` (string): the agent's instructions\n- `llm.model` (string): `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider` (string): `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider` (string): `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first` (bool), `settings.max_assistant_turns` (int)\n- `system_tools.end_call` (bool, optional): let the agent end the call\n- `data_extraction_fields` (array, optional): `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`** (your own HTTP endpoint):\n- `agent_url` (string, required): public HTTPS endpoint the agent is called at\n- `agent_headers` (object, optional): headers sent on each request, e.g. auth\n- `benchmark_provider` (string, optional): `openrouter` (default), `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\nReplaces the stored config. Omit to leave unchanged.\n\nFor `type=connection`, changing `agent_url` or `agent_headers` resets the connection and benchmark verification flags."
           }
         },
         "type": "object",
@@ -295,7 +268,7 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Test name, unique within the batch"
+            "description": "Name of the test, unique within the workspace and within the batch"
           },
           "conversation_history": {
             "items": {
@@ -318,7 +291,7 @@
               }
             ],
             "title": "Evaluators",
-            "description": "Evaluators to link. **Required for `response`/`conversation` batches**"
+            "description": "Evaluators to link. Used by `response` and `conversation` tests"
           },
           "tool_calls": {
             "anyOf": [
@@ -353,7 +326,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "Test kind applied to every item in the batch"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\nApplied to every test in the batch."
           },
           "tests": {
             "items": {
@@ -426,7 +399,7 @@
           "message": {
             "type": "string",
             "title": "Message",
-            "description": "Human-readable confirmation message"
+            "description": "Confirmation message"
           },
           "warnings": {
             "anyOf": [
@@ -457,7 +430,6 @@
           "role": {
             "type": "string",
             "enum": [
-              "system",
               "user",
               "assistant",
               "tool"
@@ -490,7 +462,6 @@
                 "type": "null"
               }
             ],
-            "title": "Tool Calls",
             "description": "Tool calls issued by the assistant. Omit for plain text turns"
           },
           "tool_call_id": {
@@ -541,7 +512,6 @@
                 "type": "null"
               }
             ],
-            "title": "Arguments",
             "description": "Expected argument values, diffed against the generated call. Omit to expect no arguments"
           },
           "accept_any_arguments": {
@@ -584,7 +554,7 @@
               }
             ],
             "title": "Evaluator Uuid",
-            "description": "ID of the evaluator that produced this verdict; null for legacy runs or when the evaluator can't be resolved from the snapshot"
+            "description": "ID of the evaluator that produced this verdict"
           },
           "reasoning": {
             "anyOf": [
@@ -608,7 +578,7 @@
               }
             ],
             "title": "Match",
-            "description": "Binary evaluator pass/fail. **Set only for binary evaluators** (else null; `score` is set instead)"
+            "description": "Pass/fail verdict, for binary evaluators"
           },
           "score": {
             "anyOf": [
@@ -620,7 +590,7 @@
               }
             ],
             "title": "Score",
-            "description": "Rating evaluator numeric score. **Set only for rating evaluators** (else null; `match` is set instead)"
+            "description": "Numeric score, for rating evaluators"
           },
           "value_name": {
             "anyOf": [
@@ -632,7 +602,7 @@
               }
             ],
             "title": "Value Name",
-            "description": "Human-readable label for `match`/`score` resolved against the run's rubric. Falls back to `Correct`/`Wrong` (binary) or the stringified score (rating) when the snapshot lacks named scale entries"
+            "description": "Readable label for the verdict, from the run's rubric"
           },
           "variable_values": {
             "anyOf": [
@@ -644,8 +614,7 @@
                 "type": "null"
               }
             ],
-            "title": "Variable Values",
-            "description": "`{{var}}` substitutions used for this evaluator on this test case, frozen at submission time; null when none"
+            "description": "`{{var}}` substitutions used for this evaluator on this test case"
           }
         },
         "type": "object",
@@ -681,7 +650,6 @@
               "type": "string"
             },
             "type": "object",
-            "title": "Resolved",
             "description": "Map of name to agent ID for each name that matched"
           },
           "not_found": {
@@ -749,7 +717,7 @@
               }
             ],
             "title": "Test Case Id",
-            "description": "Identifier of the test case within the run"
+            "description": "ID of the test case within the run"
           },
           "name": {
             "anyOf": [
@@ -761,7 +729,7 @@
               }
             ],
             "title": "Name",
-            "description": "Test name; present during in-progress and done states"
+            "description": "Name of the test"
           },
           "passed": {
             "anyOf": [
@@ -785,7 +753,7 @@
               }
             ],
             "title": "Reasoning",
-            "description": "LLM judge reasoning or deterministic tool-call diff; null for passing tool-call tests"
+            "description": "Judge reasoning, or the tool-call diff for tool-call tests"
           },
           "output": {
             "anyOf": [
@@ -808,7 +776,6 @@
                 "type": "null"
               }
             ],
-            "title": "Test Case",
             "description": "The input test case definition. Present only when done"
           },
           "judge_results": {
@@ -824,7 +791,7 @@
               }
             ],
             "title": "Judge Results",
-            "description": "Per-evaluator verdicts for response/conversation tests; null for tool-call tests or in-progress rows"
+            "description": "One verdict per evaluator, for response and conversation tests. Null for tool-call tests or rows still running"
           },
           "latency_ms": {
             "anyOf": [
@@ -836,7 +803,7 @@
               }
             ],
             "title": "Latency Ms",
-            "description": "Response-generation latency in ms for the agent under test (not the judge). Present only for live runs; null for in-progress and eval-only runs. Float, since external agents may self-report a fractional value"
+            "description": "Response latency in milliseconds for the agent under test"
           },
           "cost": {
             "anyOf": [
@@ -848,7 +815,7 @@
               }
             ],
             "title": "Cost",
-            "description": "Per-case cost in USD, lifted from calibrate's nested `output.cost`. Null when the provider/agent reports none (e.g. `--provider openai`)"
+            "description": "Cost of this case in USD"
           }
         },
         "type": "object",
@@ -859,7 +826,7 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Human-readable test name, unique within the workspace"
+            "description": "Name of the test, unique within the workspace"
           },
           "type": {
             "type": "string",
@@ -869,7 +836,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "Test kind (immutable after creation): `response` judges the generated reply, `tool_call` diffs generated tool calls, `conversation` judges the full conversation"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation"
           },
           "config": {
             "anyOf": [
@@ -881,8 +848,7 @@
                 "type": "null"
               }
             ],
-            "title": "Config",
-            "description": "Calibrate test config (`history`, `evaluation`, optional `settings`). Omit to create an empty shell to fill in later"
+            "description": "The calibrate test config. Three top-level keys.\n\n- `history` (array, required): the conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation` (object, required): `{type, ...}`, where `type` matches the test's `type` (below).\n- `settings` (object, optional): e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nOmit to create the test with no config and fill it in later via update."
           },
           "evaluators": {
             "anyOf": [
@@ -897,7 +863,7 @@
               }
             ],
             "title": "Evaluators",
-            "description": "Evaluators to link. **Required (>=1) for `type=conversation`** (no fallback judge). Omit for `response`/`tool_call` to link none"
+            "description": "Evaluators to link. Used by `response` and `conversation` tests"
           }
         },
         "type": "object",
@@ -922,7 +888,7 @@
           "message": {
             "type": "string",
             "title": "Message",
-            "description": "Human-readable confirmation message"
+            "description": "Confirmation message"
           }
         },
         "type": "object",
@@ -944,7 +910,7 @@
               }
             ],
             "title": "Response",
-            "description": "The agent's generated reply; null for tool-call-only cases"
+            "description": "The agent's generated reply. Null for tool-call-only cases"
           },
           "tool_calls": {
             "anyOf": [
@@ -959,11 +925,117 @@
               }
             ],
             "title": "Tool Calls",
-            "description": "Tool calls the agent generated; null when it made none"
+            "description": "Tool calls the agent generated. Null when it made none"
           }
         },
         "type": "object",
         "title": "TestOutput"
+      },
+      "TestRunEvaluator": {
+        "properties": {
+          "uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uuid",
+            "description": "ID of the evaluator"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Name of the evaluator"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the evaluator checks"
+          },
+          "output_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "binary",
+                  "rating"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Type",
+            "description": "Verdict shape: pass/fail or a numeric rating"
+          },
+          "output_config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Rubric: the scale values, labels, and colors a verdict maps to"
+          },
+          "scale_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Min",
+            "description": "Lowest rating value. Set for rating evaluators"
+          },
+          "scale_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Max",
+            "description": "Highest rating value. Set for rating evaluators"
+          },
+          "version_number": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Number",
+            "description": "Evaluator version this run used"
+          }
+        },
+        "type": "object",
+        "title": "TestRunEvaluator"
       },
       "TestRunStatusResponse": {
         "properties": {
@@ -991,7 +1063,7 @@
               }
             ],
             "title": "Total Tests",
-            "description": "Total number of test cases; null until known"
+            "description": "Total number of test cases. Null until known"
           },
           "passed": {
             "anyOf": [
@@ -1003,7 +1075,7 @@
               }
             ],
             "title": "Passed",
-            "description": "Number of test cases that passed; null until done"
+            "description": "Number of test cases that passed. Null until done"
           },
           "failed": {
             "anyOf": [
@@ -1015,7 +1087,7 @@
               }
             ],
             "title": "Failed",
-            "description": "Number of test cases that failed; null until done"
+            "description": "Number of test cases that failed. Null until done"
           },
           "latency_ms": {
             "anyOf": [
@@ -1027,8 +1099,7 @@
                 "type": "null"
               }
             ],
-            "title": "Latency Ms",
-            "description": "Aggregated response latency `{p50, p95, p99, count}` (ms; `p50` \u2248 the old mean). Null for eval-only runs"
+            "description": "Aggregated response latency in milliseconds: `{p50, p95, p99, count}`"
           },
           "cost": {
             "anyOf": [
@@ -1040,8 +1111,7 @@
                 "type": "null"
               }
             ],
-            "title": "Cost",
-            "description": "Aggregated cost `{mean, min, max, count}` (USD). Null when no case reported a cost (e.g. openai provider)"
+            "description": "Aggregated cost `{mean, min, max, count}` (USD)"
           },
           "total_tokens": {
             "anyOf": [
@@ -1053,15 +1123,13 @@
                 "type": "null"
               }
             ],
-            "title": "Total Tokens",
-            "description": "Aggregated token usage `{mean, min, max, count}` (values are `Any` \u2014 `mean` may be fractional). Null when no case reported usage"
+            "description": "Aggregated token usage `{mean, min, max, count}`"
           },
           "evaluators": {
             "anyOf": [
               {
                 "items": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/TestRunEvaluator"
                 },
                 "type": "array"
               },
@@ -1070,7 +1138,7 @@
               }
             ],
             "title": "Evaluators",
-            "description": "Top-level evaluator block (name/description/output_type/rubric) shared across every `judge_results` row, which references back via `evaluator_uuid` so the rubric isn't duplicated per case"
+            "description": "The evaluators used in this run. Each verdict in `judge_results` links to one of these by `evaluator_uuid`"
           },
           "results": {
             "anyOf": [
@@ -1085,19 +1153,7 @@
               }
             ],
             "title": "Results",
-            "description": "Per-test-case results; null until available"
-          },
-          "results_s3_prefix": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Results S3 Prefix",
-            "description": "S3 key prefix for the raw result artifacts; null until uploaded"
+            "description": "Results for each test case. Null until available"
           },
           "error": {
             "type": "boolean",
@@ -1121,7 +1177,7 @@
               }
             ],
             "title": "Share Token",
-            "description": "Public share token; null unless the run is public"
+            "description": "Public share token. Null unless the run is public"
           }
         },
         "type": "object",
@@ -1160,7 +1216,7 @@
               }
             ],
             "title": "Type",
-            "description": "Test type. Immutable \u2014 may only echo the existing value; a different value is rejected (400). Omit to leave unchanged"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\nImmutable. Omit, or send the existing value. A different value is rejected (400)."
           },
           "config": {
             "anyOf": [
@@ -1172,8 +1228,7 @@
                 "type": "null"
               }
             ],
-            "title": "Config",
-            "description": "Replacement calibrate config. Omit to leave unchanged"
+            "description": "The calibrate test config. Three top-level keys.\n\n- `history` (array, required): the conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation` (object, required): `{type, ...}`, where `type` matches the test's `type` (below).\n- `settings` (object, optional): e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nReplaces the stored config. Omit to leave unchanged."
           },
           "evaluators": {
             "anyOf": [
@@ -1188,7 +1243,7 @@
               }
             ],
             "title": "Evaluators",
-            "description": "Replacement evaluator links (replaces the existing set). Omit to leave links unchanged; an empty list clears them (**rejected for `conversation` tests**)"
+            "description": "New evaluator links for the test. Omit to leave unchanged. An empty list clears them, except on `conversation` tests, which must keep at least one"
           }
         },
         "type": "object",
@@ -1211,8 +1266,7 @@
                 "type": "null"
               }
             ],
-            "title": "Arguments",
-            "description": "Arguments the agent passed to the tool; null if none"
+            "description": "Arguments the agent passed to the tool. Null if none"
           },
           "output": {
             "anyOf": [
@@ -1222,7 +1276,7 @@
               }
             ],
             "title": "Output",
-            "description": "Tool execution result (any JSON value). Present only for agent-connection tests where the external agent runs the tool and echoes its return value; null for calibrate-agent mode (tools are declared, never executed) or agents that don't echo it"
+            "description": "Tool execution result (any JSON value). Present only when the agent runs the tool and returns its result"
           }
         },
         "type": "object",
@@ -1279,7 +1333,7 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Human-readable name of the agent"
+            "description": "Name of the agent"
           },
           "type": {
             "type": "string",
@@ -1288,7 +1342,7 @@
               "connection"
             ],
             "title": "Type",
-            "description": "`agent` (managed defaults) or `connection` (your own endpoint)"
+            "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate"
           },
           "config": {
             "anyOf": [
@@ -1300,7 +1354,6 @@
                 "type": "null"
               }
             ],
-            "title": "Config",
             "description": "Agent configuration"
           },
           "created_at": {
@@ -1346,8 +1399,7 @@
                 "type": "null"
               }
             ],
-            "title": "Variable Values",
-            "description": "Values for the evaluator's `{{placeholder}}` variables, pinned per-test on the pivot. Omit to inherit the evaluator version's defaults"
+            "description": "Values for the evaluator's `{{placeholder}}` variables, pinned per test. Omit to inherit the evaluator version's defaults"
           }
         },
         "additionalProperties": false,
@@ -1364,7 +1416,7 @@
             "maxLength": 36,
             "minLength": 36,
             "title": "Uuid",
-            "description": "Test ID",
+            "description": "Unique ID for the test",
             "examples": [
               "b1c2d3e4-f5a6-7890-bcde-f12345678901"
             ]
@@ -1372,7 +1424,7 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Human-readable test name"
+            "description": "Name of the test"
           },
           "type": {
             "type": "string",
@@ -1382,7 +1434,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "Test kind"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation"
           },
           "config": {
             "anyOf": [
@@ -1394,18 +1446,17 @@
                 "type": "null"
               }
             ],
-            "title": "Config",
-            "description": "Calibrate test config (`history`, `evaluation`, optional `settings`)"
+            "description": "Config for the test (`history`, `evaluation`, optional `settings`)"
           },
           "created_at": {
             "type": "string",
             "title": "Created At",
-            "description": "Creation timestamp (ISO 8601 UTC)"
+            "description": "Timestamp when the test was created (ISO 8601 UTC)"
           },
           "updated_at": {
             "type": "string",
             "title": "Updated At",
-            "description": "Last-update timestamp (ISO 8601 UTC)"
+            "description": "Timestamp when the test was last updated (ISO 8601 UTC)"
           },
           "evaluators": {
             "items": {
@@ -1413,7 +1464,6 @@
               "type": "object"
             },
             "type": "array",
-            "title": "Evaluators",
             "description": "Linked evaluators, resolved to their current live version at read time",
             "default": []
           }
@@ -1445,7 +1495,7 @@
           "agents"
         ],
         "summary": "Resolve agent names to IDs",
-        "description": "Resolve agent names to their IDs.",
+        "description": "Get the IDs for your agents by their names",
         "operationId": "resolve_agent_names_agents_resolve_post",
         "security": [
           {
@@ -1492,7 +1542,7 @@
           "agents"
         ],
         "summary": "Create agent",
-        "description": "Create a new agent in your workspace. For `type=agent`, defaults are deep-merged with any config you supply.",
+        "description": "Create an agent to test inside Calibrate or connect your existing agent to Calibrate",
         "operationId": "create_agent_endpoint_agents_post",
         "security": [
           {
@@ -1537,7 +1587,7 @@
           "agents"
         ],
         "summary": "List agents",
-        "description": "List all agents in your workspace.",
+        "description": "Get the list of all your agents",
         "operationId": "list_agents_agents_get",
         "security": [
           {
@@ -1578,7 +1628,7 @@
           "agents"
         ],
         "summary": "Get agent",
-        "description": "Get an agent in your workspace.",
+        "description": "Get one agent by its ID",
         "operationId": "get_agent_endpoint_agents__agent_uuid__get",
         "security": [
           {
@@ -1592,13 +1642,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The agent to retrieve. Must be in your workspace.",
+              "description": "The agent to retrieve.",
               "examples": [
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ],
               "title": "Agent Uuid"
             },
-            "description": "The agent to retrieve. Must be in your workspace."
+            "description": "The agent to retrieve."
           }
         ],
         "responses": {
@@ -1629,7 +1679,7 @@
           "agents"
         ],
         "summary": "Update agent",
-        "description": "Update an agent's name and/or config. Changing `agent_url` or `agent_headers` resets connection and benchmark verification flags.",
+        "description": "Update an agent's configuration",
         "operationId": "update_agent_endpoint_agents__agent_uuid__put",
         "security": [
           {
@@ -1643,13 +1693,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The agent to update. Must be in your workspace.",
+              "description": "The agent to update.",
               "examples": [
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ],
               "title": "Agent Uuid"
             },
-            "description": "The agent to update. Must be in your workspace."
+            "description": "The agent to update."
           }
         ],
         "requestBody": {
@@ -1692,7 +1742,7 @@
           "tests"
         ],
         "summary": "Bulk create tests",
-        "description": "Create many tests of one type in a single call, optionally linking them to agents.",
+        "description": "Create many test cases at once and link them to your agents",
         "operationId": "bulk_upload_tests_tests_bulk_post",
         "security": [
           {
@@ -1739,7 +1789,7 @@
           "tests"
         ],
         "summary": "Create test",
-        "description": "Create a test in your workspace.",
+        "description": "Create a test that runs your agent against a conversation and evaluates its answer quality or the tools it calls",
         "operationId": "create_test_endpoint_tests_post",
         "security": [
           {
@@ -1784,7 +1834,7 @@
           "tests"
         ],
         "summary": "List tests",
-        "description": "List all tests for your workspace, each with its linked evaluators.",
+        "description": "List all the test cases for your agents",
         "operationId": "list_tests_tests_get",
         "security": [
           {
@@ -1825,7 +1875,7 @@
           "tests"
         ],
         "summary": "Get test",
-        "description": "Get a test by ID, including its linked evaluators.",
+        "description": "Get an agent test case by its ID",
         "operationId": "get_test_endpoint_tests__test_uuid__get",
         "security": [
           {
@@ -1876,7 +1926,7 @@
           "tests"
         ],
         "summary": "Update test",
-        "description": "Update a test's name, config, and/or evaluator links.",
+        "description": "Update an agent test case",
         "operationId": "update_test_endpoint_tests__test_uuid__put",
         "security": [
           {
@@ -1939,7 +1989,7 @@
           "agent-tests"
         ],
         "summary": "Run agent tests",
-        "description": "Run tests for an agent as a background job.",
+        "description": "Run an agent's linked tests as a background job, returning a task ID to poll",
         "operationId": "run_agent_test_agent_tests_agent__agent_uuid__run_post",
         "security": [
           {
@@ -1953,13 +2003,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The agent to test. Must be in your workspace.",
+              "description": "The agent to test.",
               "examples": [
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ],
               "title": "Agent Uuid"
             },
-            "description": "The agent to test. Must be in your workspace."
+            "description": "The agent to test."
           }
         ],
         "requestBody": {
@@ -2002,7 +2052,7 @@
           "agent-tests"
         ],
         "summary": "Run agent tests in batch",
-        "description": "Run agent tests for every agent in your workspace, or for a selected set.",
+        "description": "Run agent tests for every agent, or for a selected set",
         "operationId": "run_tests_batch_agent_tests_run_post",
         "security": [
           {
@@ -2056,7 +2106,7 @@
           "agent-tests"
         ],
         "summary": "Get test run status",
-        "description": "Get the status and results of a test run.",
+        "description": "Poll a test run for its status and evaluation results",
         "operationId": "get_agent_test_run_status_agent_tests_run__task_id__get",
         "security": [
           {
