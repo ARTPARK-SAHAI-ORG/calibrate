@@ -84,11 +84,7 @@ def _normalize_for_docs(spec: dict[str, Any], base_url: str) -> dict[str, Any]:
             "type": "apiKey",
             "in": "header",
             "name": "X-API-Key",
-            "description": (
-                "API key. Create one under Workspace settings → API keys "
-                "(https://calibrate.artpark.ai/workspace-settings?tab=api-keys). "
-                "Prefix: `sk_…`."
-            ),
+            "description": "API key for authentication",
         }
     }
 
