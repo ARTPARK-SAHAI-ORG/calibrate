@@ -13,6 +13,68 @@
   ],
   "components": {
     "schemas": {
+      "AgentCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable agent name, unique within the workspace"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "connection"
+            ],
+            "title": "Type",
+            "description": "`agent` applies managed defaults deep-merged under any supplied `config`; `connection` stores the config you supply as-is (must eventually contain `agent_url`)",
+            "default": "agent"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config",
+            "description": "Behavioral config (system_prompt, llm, stt, tts, settings, \u2026). Deep-merged over defaults for `type=agent`; stored as-is for `type=connection`. Omit for `type=agent` to use defaults"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AgentCreate"
+      },
+      "AgentCreateResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the newly created agent",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable confirmation message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "message"
+        ],
+        "title": "AgentCreateResponse"
+      },
       "AgentTestRunCreateResponse": {
         "properties": {
           "task_id": {
@@ -37,6 +99,62 @@
           "status"
         ],
         "title": "AgentTestRunCreateResponse"
+      },
+      "AgentUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "New agent name. Omit to leave the name unchanged"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config",
+            "description": "Replacement config, stored as-is (no deep-merge on update). Changing `agent_url` or `agent_headers` resets all connection/benchmark verification flags. Omit to leave config unchanged"
+          },
+          "connection_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Verified",
+            "description": "Directly set the `connection_verified` flag inside config. Omit to leave it untouched"
+          },
+          "benchmark_models_verified": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Models Verified",
+            "description": "Directly set the per-model benchmark verification map inside config. Omit to leave it untouched"
+          }
+        },
+        "type": "object",
+        "title": "AgentUpdate"
       },
       "BatchRunRequest": {
         "properties": {
@@ -163,6 +281,273 @@
           "reason"
         ],
         "title": "BatchTestSkip"
+      },
+      "BulkTestItem": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Test name, unique within the batch"
+          },
+          "conversation_history": {
+            "items": {
+              "$ref": "#/components/schemas/ChatMessage"
+            },
+            "type": "array",
+            "title": "Conversation History",
+            "description": "Ordered messages ending at the user turn the agent should answer (must be non-empty)"
+          },
+          "evaluators": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/routers__tests__EvaluatorRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluators",
+            "description": "Evaluators to link. **Required for `response`/`conversation` batches**"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExpectedToolCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls",
+            "description": "Expected tool calls. **Required for `tool_call` batches**"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "conversation_history"
+        ],
+        "title": "BulkTestItem"
+      },
+      "BulkTestUpload": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "response",
+              "tool_call",
+              "conversation"
+            ],
+            "title": "Type",
+            "description": "Test kind applied to every item in the batch"
+          },
+          "tests": {
+            "items": {
+              "$ref": "#/components/schemas/BulkTestItem"
+            },
+            "type": "array",
+            "title": "Tests",
+            "description": "Test items to create (non-empty, max 500 per request, names unique within the batch)"
+          },
+          "agent_uuids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Uuids",
+            "description": "Agents (IDs) to link every created test to. Omit to link none",
+            "examples": [
+              [
+                "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+              ]
+            ]
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language",
+            "description": "Language written to each test's `config.settings.language`. Omit to leave unset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "tests"
+        ],
+        "title": "BulkTestUpload"
+      },
+      "BulkTestUploadResponse": {
+        "properties": {
+          "uuids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Uuids",
+            "description": "IDs of the created tests, in request order",
+            "examples": [
+              [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ]
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Number of tests created"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable confirmation message"
+          },
+          "warnings": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Warnings",
+            "description": "Non-fatal issues (e.g. agents some tests couldn't link to). Null when there were none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuids",
+          "count",
+          "message"
+        ],
+        "title": "BulkTestUploadResponse"
+      },
+      "ChatMessage": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "tool"
+            ],
+            "title": "Role",
+            "description": "Message author role in the conversation history"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "Message text. Omit for assistant messages that only carry `tool_calls`"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls",
+            "description": "Tool calls issued by the assistant. Omit for plain text turns"
+          },
+          "tool_call_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Call Id",
+            "description": "ID of the tool call this message responds to. **Required for `role=tool`**"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Tool name for `role=tool` messages. Omit otherwise"
+          }
+        },
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "ChatMessage"
+      },
+      "ExpectedToolCall": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "title": "Tool",
+            "description": "Name of the tool the agent is expected to call"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arguments",
+            "description": "Expected argument values, diffed against the generated call. Omit to expect no arguments"
+          },
+          "accept_any_arguments": {
+            "type": "boolean",
+            "title": "Accept Any Arguments",
+            "description": "When `true`, only the tool name must match and `arguments` is ignored",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "tool"
+        ],
+        "title": "ExpectedToolCall"
       },
       "HTTPValidationError": {
         "properties": {
@@ -450,6 +835,84 @@
         "type": "object",
         "title": "TestCaseResult"
       },
+      "TestCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable test name, unique within the workspace"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "response",
+              "tool_call",
+              "conversation"
+            ],
+            "title": "Type",
+            "description": "Test kind (immutable after creation): `response` judges the generated reply, `tool_call` diffs generated tool calls, `conversation` judges the full conversation"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config",
+            "description": "Calibrate test config (`history`, `evaluation`, optional `settings`). Omit to create an empty shell to fill in later"
+          },
+          "evaluators": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/routers__tests__EvaluatorRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluators",
+            "description": "Evaluators to link. **Required (>=1) for `type=conversation`** (no fallback judge). Omit for `response`/`tool_call` to link none"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "TestCreate"
+      },
+      "TestCreateResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the newly created test",
+            "examples": [
+              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Human-readable confirmation message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "message"
+        ],
+        "title": "TestCreateResponse"
+      },
       "TestOutput": {
         "properties": {
           "response": {
@@ -650,6 +1113,69 @@
         ],
         "title": "TestRunStatusResponse"
       },
+      "TestUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "New test name. Omit to leave unchanged"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "response",
+                  "tool_call",
+                  "conversation"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type",
+            "description": "Test type. Immutable \u2014 may only echo the existing value; a different value is rejected (400). Omit to leave unchanged"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config",
+            "description": "Replacement calibrate config. Omit to leave unchanged"
+          },
+          "evaluators": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/routers__tests__EvaluatorRef"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluators",
+            "description": "Replacement evaluator links (replaces the existing set). Omit to leave links unchanged; an empty list clears them (**rejected for `conversation` tests**)"
+          }
+        },
+        "type": "object",
+        "title": "TestUpdate"
+      },
       "ToolCallOutput": {
         "properties": {
           "tool": {
@@ -779,6 +1305,105 @@
           "updated_at"
         ],
         "title": "AgentResponse"
+      },
+      "routers__tests__EvaluatorRef": {
+        "properties": {
+          "evaluator_uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Evaluator Uuid",
+            "description": "Evaluator to attach to the test",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "variable_values": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variable Values",
+            "description": "Values for the evaluator's `{{placeholder}}` variables, pinned per-test on the pivot. Omit to inherit the evaluator version's defaults"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evaluator_uuid"
+        ],
+        "title": "EvaluatorRef"
+      },
+      "routers__tests__TestResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Test ID",
+            "examples": [
+              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Human-readable test name"
+          },
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "description": "Test kind: `response`, `tool_call`, or `conversation`"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config",
+            "description": "Calibrate test config (`history`, `evaluation`, optional `settings`)"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "Creation timestamp (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "Last-update timestamp (ISO 8601 UTC)"
+          },
+          "evaluators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Evaluators",
+            "description": "Linked evaluators, resolved to their current live version at read time",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TestResponse"
       }
     },
     "securitySchemes": {
@@ -839,6 +1464,51 @@
       }
     },
     "/agents": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Create agent",
+        "description": "Create a new agent in your workspace. For `type=agent`, defaults are deep-merged with any config you supply.",
+        "operationId": "create_agent_endpoint_agents_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
       "get": {
         "tags": [
           "agents"
@@ -862,6 +1532,367 @@
                     "$ref": "#/components/schemas/routers__agents__AgentResponse"
                   },
                   "title": "Response List Agents Agents Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/{agent_uuid}": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Get agent",
+        "description": "Get an agent in your workspace.",
+        "operationId": "get_agent_endpoint_agents__agent_uuid__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The agent to retrieve. Must be in your workspace.",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "The agent to retrieve. Must be in your workspace."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/routers__agents__AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Update agent",
+        "description": "Update an agent's name and/or config. Changing `agent_url` or `agent_headers` resets connection and benchmark verification flags.",
+        "operationId": "update_agent_endpoint_agents__agent_uuid__put",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The agent to update. Must be in your workspace.",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "The agent to update. Must be in your workspace."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/routers__agents__AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tests/bulk": {
+      "post": {
+        "tags": [
+          "tests"
+        ],
+        "summary": "Bulk create tests",
+        "description": "Create many tests of one type in a single call, optionally linking them to agents.",
+        "operationId": "bulk_upload_tests_tests_bulk_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkTestUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkTestUploadResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tests": {
+      "post": {
+        "tags": [
+          "tests"
+        ],
+        "summary": "Create test",
+        "description": "Create a test in your workspace.",
+        "operationId": "create_test_endpoint_tests_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "tests"
+        ],
+        "summary": "List tests",
+        "description": "List all tests for your workspace, each with its linked evaluators.",
+        "operationId": "list_tests_tests_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/routers__tests__TestResponse"
+                  },
+                  "title": "Response List Tests Tests Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tests/{test_uuid}": {
+      "get": {
+        "tags": [
+          "tests"
+        ],
+        "summary": "Get test",
+        "description": "Get a test by ID, including its linked evaluators.",
+        "operationId": "get_test_endpoint_tests__test_uuid__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "test_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Test to retrieve",
+              "examples": [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ],
+              "title": "Test Uuid"
+            },
+            "description": "Test to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/routers__tests__TestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "tests"
+        ],
+        "summary": "Update test",
+        "description": "Update a test's name, config, and/or evaluator links.",
+        "operationId": "update_test_endpoint_tests__test_uuid__put",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "test_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Test to update",
+              "examples": [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ],
+              "title": "Test Uuid"
+            },
+            "description": "Test to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/routers__tests__TestResponse"
                 }
               }
             }
