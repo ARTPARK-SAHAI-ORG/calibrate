@@ -8,7 +8,6 @@ on:
       - "scripts/fetch_public_openapi.py"
       - "scripts/generate_sdk_docs.py"
       - "scripts/sdk_reference.py"
-      - "tests/fixtures/fern_openapi_overrides.yml"
       - "docs/templates/**"
   schedule:
     # Refresh weekly so docs track backend deploys even without agentloop changes.

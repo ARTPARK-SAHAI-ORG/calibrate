@@ -7,9 +7,11 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "tests"))
 
 from fetch_public_openapi import (  # noqa: E402
     _normalize_for_docs,
@@ -18,6 +20,7 @@ from fetch_public_openapi import (  # noqa: E402
     render_templates,
 )
 from generate_sdk_docs import generate_sdk_docs  # noqa: E402
+from sdk_route_samples import SAMPLE_OPENAPI, SAMPLE_OVERRIDES  # noqa: E402
 
 TEST_BASE_URL = "https://api.example.test"
 REFERENCE_FIXTURE = ROOT / "tests" / "fixtures" / "reference.md"
@@ -182,16 +185,11 @@ def test_generate_sdk_docs_writes_pages_and_updates_docs_json(
     monkeypatch.setattr(mod, "OVERVIEW_TEMPLATE", overview_template)
     monkeypatch.setattr(mod, "OVERVIEW_OUTPUT", sdk_root / "overview.mdx")
 
-    openapi_fixture = ROOT / "docs" / "api-reference" / "openapi.json"
-    if not openapi_fixture.is_file():
-        pytest.skip("docs/api-reference/openapi.json not present")
-    openapi = json.loads(openapi_fixture.read_text(encoding="utf-8"))
-    monkeypatch.setenv(
-        "FERN_OVERRIDES_PATH",
-        str(ROOT / "tests" / "fixtures" / "fern_openapi_overrides.yml"),
-    )
+    overrides_file = tmp_path / "openapi-overrides.yml"
+    overrides_file.write_text(yaml.dump(SAMPLE_OVERRIDES), encoding="utf-8")
+    monkeypatch.setenv("FERN_OVERRIDES_PATH", str(overrides_file))
 
-    slugs = generate_sdk_docs(REFERENCE_FIXTURE, openapi)
+    slugs = generate_sdk_docs(REFERENCE_FIXTURE, SAMPLE_OPENAPI)
     assert "sdk/overview" in slugs
     assert (sdk_root / "agents" / "list.mdx").is_file()
 
