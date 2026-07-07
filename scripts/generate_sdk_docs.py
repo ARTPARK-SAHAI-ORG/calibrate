@@ -7,6 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from docs_nav import insert_tab
 from sdk_reference import (
     SdkMethodDoc,
     SdkRoute,
@@ -100,7 +101,7 @@ def _api_reference_groups(routes: list[SdkRoute]) -> list[dict[str, Any]]:
         if page not in by_group[route.api_group]:
             by_group[route.api_group].append(page)
     groups: list[dict[str, Any]] = [
-        {"group": "Overview", "pages": ["api-reference/introduction"]},
+        {"group": "Getting started", "pages": ["api-reference/introduction"]},
     ]
     for group_name in sorted(by_group):
         groups.append(
@@ -121,7 +122,7 @@ def _sdk_nav_groups(paired: list[tuple[SdkRoute, SdkMethodDoc]]) -> list[dict[st
         if slug not in by_group[label]:
             by_group[label].append(slug)
     groups: list[dict[str, Any]] = [
-        {"group": "Overview", "pages": ["sdk/overview"]},
+        {"group": "Getting started", "pages": ["sdk/overview"]},
     ]
     for group_name in sorted(by_group):
         groups.append({"group": group_name, "pages": by_group[group_name]})
@@ -145,15 +146,12 @@ def update_docs_json(
         "tab": SDK_TAB_NAME,
         "groups": _sdk_nav_groups(paired),
     }
-    tabs_without_sdk = [
-        t for t in tabs if t.get("tab") not in {SDK_TAB_NAME, "SDK"}
-    ]
-    cli_index = next(
-        (i for i, t in enumerate(tabs_without_sdk) if t.get("tab") == "CLI"),
-        len(tabs_without_sdk),
+    # Place the SDK tab after the cloud "CLI" tab when it exists, else after
+    # "Home" (the CLI tab is inserted later in the run). Drop any prior SDK tab
+    # (including the legacy "SDK" name) so re-runs replace rather than duplicate.
+    docs["navigation"]["tabs"] = insert_tab(
+        tabs, sdk_tab, after=("CLI", "Home"), remove={SDK_TAB_NAME, "SDK"}
     )
-    tabs_without_sdk.insert(cli_index + 1, sdk_tab)
-    docs["navigation"]["tabs"] = tabs_without_sdk
 
     examples = docs.setdefault("api", {}).setdefault("examples", {})
     examples["languages"] = ["curl", "python"]

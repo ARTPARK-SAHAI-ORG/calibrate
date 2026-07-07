@@ -1,0 +1,101 @@
+---
+title: "Agents"
+description: "Operations for agents"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Create agent
+
+Create an agent to test inside Calibrate or connect your existing agent to Calibrate
+
+```bash
+calibrate agents create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-c, --config-param` | type | Agent behavioral config. The keys depend on type. |
+
+**Examples**
+
+```bash
+calibrate agents create --name <value>
+```
+
+## Get agent
+
+Get one agent by its ID
+
+```bash
+calibrate agents get [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** The agent to retrieve. |
+
+**Examples**
+
+```bash
+calibrate agents get --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## List agents
+
+Get the list of all your agents
+
+```bash
+calibrate agents list [flags]
+```
+
+**Examples**
+
+```bash
+calibrate agents list
+```
+
+## Resolve agent names to IDs
+
+Get the IDs for your agents by their names
+
+```bash
+calibrate agents resolve [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-n, --names` | stringArray | **Required.** Agent names to resolve to IDs |
+
+**Examples**
+
+```bash
+calibrate agents resolve --names '["my-agent","support-bot"]'
+```
+
+## Update agent
+
+Update an agent's configuration
+
+```bash
+calibrate agents update [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** The agent to update. |
+| `-c, --config-param` | type | Agent behavioral config. The keys depend on type. |
+
+**Examples**
+
+```bash
+calibrate agents update --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```

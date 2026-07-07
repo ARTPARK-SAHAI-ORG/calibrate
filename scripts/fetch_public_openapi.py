@@ -142,6 +142,26 @@ def fetch(url: str) -> dict[str, Any]:
         return json.loads(resp.read().decode())
 
 
+def sync_cli_docs() -> None:
+    """Generate cloud-CLI docs when ``CLI_DOCS_PATH`` points at a checkout.
+
+    Optional: skipped (with a note) when the env var is unset or the directory
+    is missing, so a local ``fetch`` run without the CLI repo still works.
+    """
+    src = os.getenv("CLI_DOCS_PATH", "").strip()
+    if not src:
+        print("CLI_DOCS_PATH unset — skipping cloud CLI docs sync")
+        return
+    src_dir = Path(src)
+    if not src_dir.is_dir():
+        print(f"CLI_DOCS_PATH not a directory ({src_dir}) — skipping CLI docs sync")
+        return
+    # SCRIPTS_DIR is already on sys.path (module top), so this import resolves.
+    from generate_cli_docs import generate_cli_docs
+
+    generate_cli_docs(src_dir)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     base_url = public_api_base_url()
@@ -161,6 +181,7 @@ def main(argv: list[str] | None = None) -> int:
     for _, output in TEMPLATED_PAGES:
         print(f"Wrote {output}")
     print(f"Wrote {len(sdk_slugs)} SDK pages from {reference}")
+    sync_cli_docs()
     return 0
 
 

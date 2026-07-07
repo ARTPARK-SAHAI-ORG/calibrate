@@ -54,28 +54,18 @@
         "tab": "CLI",
         "groups": [
           {
-            "group": "CLI",
+            "group": "Getting started",
             "pages": [
-              "cli/overview",
-              "cli/speech-to-text",
-              "cli/text-to-text",
-              "cli/text-to-speech",
-              "cli/simulations"
+              "cli/calibrate/overview",
+              "cli/calibrate/agent-mode"
             ]
           },
           {
             "group": "Guides",
             "pages": [
-              "guides/tools",
-              "cli/calibrate-agent",
-              {
-                "group": "Agent Connection",
-                "pages": [
-                  "cli/agent-connections/overview",
-                  "cli/agent-connections/chat",
-                  "cli/agent-connections/outbound-voice"
-                ]
-              }
+              "cli/calibrate/agent-tests",
+              "cli/calibrate/agents",
+              "cli/calibrate/tests"
             ]
           }
         ]
@@ -84,7 +74,7 @@
         "tab": "Python SDK",
         "groups": [
           {
-            "group": "Overview",
+            "group": "Getting started",
             "pages": [
               "sdk/overview"
             ]
@@ -123,7 +113,7 @@
         "tab": "API reference",
         "groups": [
           {
-            "group": "Overview",
+            "group": "Getting started",
             "pages": [
               "api-reference/introduction"
             ]
@@ -157,6 +147,36 @@
               "POST /tests/bulk",
               "GET /tests/{test_uuid}",
               "PUT /tests/{test_uuid}"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Calibrate Local",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "cli/overview"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "cli/speech-to-text",
+              "cli/text-to-text",
+              "cli/text-to-speech",
+              "cli/simulations",
+              "guides/tools",
+              "cli/calibrate-agent",
+              {
+                "group": "Agent Connection",
+                "pages": [
+                  "cli/agent-connections/overview",
+                  "cli/agent-connections/chat",
+                  "cli/agent-connections/outbound-voice"
+                ]
+              }
             ]
           }
         ]

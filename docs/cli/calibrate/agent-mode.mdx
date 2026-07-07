@@ -1,0 +1,50 @@
+---
+title: "Agent mode"
+description: "Run the calibrate CLI from CI and AI coding agents with machine-readable output."
+---
+
+Agent mode makes the `calibrate` CLI friendlier for automation and AI coding
+agents: it returns **structured errors** and defaults output to **TOON** — a
+compact, token-efficient format — instead of the human `pretty` view.
+
+<Note>
+  Agent mode turns on automatically when a known agent environment is detected
+  (`CLAUDE_CODE`, `CURSOR_AGENT`, and similar), so you rarely set it by hand.
+</Note>
+
+## When to use it
+
+| Use ordinary mode when | Use agent mode when |
+| --- | --- |
+| A human is exploring at a terminal | A script or CI job runs the command |
+| You want spinners, prompts, and color | You want stable, parseable output |
+| You want a pager or table view | An AI agent consumes the result |
+
+## Toggle it
+
+Agent mode is the global `--agent-mode` flag, on by default inside agent
+environments:
+
+```bash
+# Force it on
+calibrate agents list --agent-mode
+
+# Force it off — get the human "pretty" output
+calibrate agents list --agent-mode=false
+```
+
+## What changes
+
+- **Structured errors** — failures come back as a machine-parseable object
+  instead of loose prose, so an agent can branch on them.
+- **TOON output by default** — `--output-format` defaults to `toon` (Token-
+  Oriented Object Notation, a compact JSON-like format that uses fewer tokens).
+  Override per command with `--output-format json` (or `yaml`, `table`,
+  `pretty`).
+- **Non-interactive by default** — pair with `--no-interactive` to disable
+  auto-prompting, the explorer auto-launch, and TUI forms in unattended runs.
+
+<Note>
+  See the [global flags](/cli/calibrate/overview#global-flags) for the full set
+  of output and automation options.
+</Note>
