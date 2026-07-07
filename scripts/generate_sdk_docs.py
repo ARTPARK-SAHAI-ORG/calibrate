@@ -114,7 +114,9 @@ def update_docs_json(
     tabs = docs["navigation"]["tabs"]
 
     api_tab = next(t for t in tabs if t.get("tab") == "API reference")
-    api_tab["openapi"] = "api-reference/openapi.json"
+    # Only explicit groups — tab-level openapi would also auto-generate tag groups
+    # (agents, tests, …) and duplicate our curated Agents/Tests/Agent tests sections.
+    api_tab.pop("openapi", None)
     api_tab["groups"] = _api_reference_groups(routes)
 
     sdk_tab = {
