@@ -3,7 +3,7 @@
   "info": {
     "title": "Calibrate Public API",
     "version": "0.1.0",
-    "description": "Programmatic API for CI/automation, authenticated with an org-scoped API key. Pass your key in the `X-API-Key: sk_\u2026` header."
+    "description": "Programmatic API for CI/automation. Pass your key in the `X-API-Key` header."
   },
   "servers": [
     {
@@ -13,6 +13,31 @@
   ],
   "components": {
     "schemas": {
+      "AgentTestRunCreateResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Task Id",
+            "description": "Test run job ID. Poll for status and results",
+            "examples": [
+              "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Current status of the test run: `queued` or `in_progress`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status"
+        ],
+        "title": "AgentTestRunCreateResponse"
+      },
       "BatchRunRequest": {
         "properties": {
           "agent_names": {
@@ -27,7 +52,14 @@
                 "type": "null"
               }
             ],
-            "title": "Agent Names"
+            "title": "Agent Names",
+            "description": "Agents to run. Omit to run every agent in your workspace",
+            "examples": [
+              [
+                "my-agent",
+                "support-bot"
+              ]
+            ]
           }
         },
         "type": "object",
@@ -37,19 +69,33 @@
         "properties": {
           "agent_name": {
             "type": "string",
-            "title": "Agent Name"
+            "title": "Agent Name",
+            "description": "Name of the agent"
           },
           "agent_uuid": {
             "type": "string",
-            "title": "Agent Uuid"
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Agent Uuid",
+            "description": "ID of the agent that was run",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
           },
           "task_id": {
             "type": "string",
-            "title": "Task Id"
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Task Id",
+            "description": "Test run job ID. Poll for status and results",
+            "examples": [
+              "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+            ]
           },
           "status": {
             "type": "string",
-            "title": "Status"
+            "title": "Status",
+            "description": "Initial status: `queued` or `in_progress`"
           }
         },
         "type": "object",
@@ -68,7 +114,8 @@
               "$ref": "#/components/schemas/BatchTestRun"
             },
             "type": "array",
-            "title": "Runs"
+            "title": "Runs",
+            "description": "Test runs that were launched"
           },
           "skipped": {
             "items": {
@@ -76,6 +123,7 @@
             },
             "type": "array",
             "title": "Skipped",
+            "description": "Agents that were skipped instead of failing the batch",
             "default": []
           }
         },
@@ -89,15 +137,23 @@
         "properties": {
           "agent_name": {
             "type": "string",
-            "title": "Agent Name"
+            "title": "Agent Name",
+            "description": "Name of the skipped agent"
           },
           "agent_uuid": {
             "type": "string",
-            "title": "Agent Uuid"
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Agent Uuid",
+            "description": "ID of the skipped agent",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
           },
           "reason": {
             "type": "string",
-            "title": "Reason"
+            "title": "Reason",
+            "description": "Why this agent was not run"
           }
         },
         "type": "object",
@@ -126,13 +182,16 @@
           "evaluator_uuid": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 36
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Evaluator Uuid"
+            "title": "Evaluator Uuid",
+            "description": "ID of the evaluator that produced this verdict; null for legacy runs or when the evaluator can't be resolved from the snapshot"
           },
           "reasoning": {
             "anyOf": [
@@ -143,7 +202,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reasoning"
+            "title": "Reasoning",
+            "description": "Judge's rationale for this verdict"
           },
           "match": {
             "anyOf": [
@@ -154,7 +214,8 @@
                 "type": "null"
               }
             ],
-            "title": "Match"
+            "title": "Match",
+            "description": "Binary evaluator pass/fail. **Set only for binary evaluators** (else null; `score` is set instead)"
           },
           "score": {
             "anyOf": [
@@ -165,7 +226,8 @@
                 "type": "null"
               }
             ],
-            "title": "Score"
+            "title": "Score",
+            "description": "Rating evaluator numeric score. **Set only for rating evaluators** (else null; `match` is set instead)"
           },
           "value_name": {
             "anyOf": [
@@ -176,7 +238,8 @@
                 "type": "null"
               }
             ],
-            "title": "Value Name"
+            "title": "Value Name",
+            "description": "Human-readable label for `match`/`score` resolved against the run's rubric. Falls back to `Correct`/`Wrong` (binary) or the stringified score (rating) when the snapshot lacks named scale entries"
           },
           "variable_values": {
             "anyOf": [
@@ -188,12 +251,12 @@
                 "type": "null"
               }
             ],
-            "title": "Variable Values"
+            "title": "Variable Values",
+            "description": "`{{var}}` substitutions used for this evaluator on this test case, frozen at submission time; null when none"
           }
         },
         "type": "object",
-        "title": "JudgeResult",
-        "description": "One evaluator's verdict for a response-type test case.\n\nPer-row data only \u2014 anything constant across rows for the same evaluator\n(name, description, output_type, output_config, scale_min/max) lives on\nthe response-level `evaluators[]` block; look it up by `evaluator_uuid`.\n\n`evaluator_uuid` is None for legacy runs that pre-date the evaluator-\nsnapshot capture or when the evaluator can't be resolved from the\nsnapshot.\n\nExactly one of `match` (binary) / `score` (rating) is set per entry;\nboth are None for tool-call tests, but tool-call tests don't carry\n`judge_results`.\n\n`variable_values` are the {{var}} substitutions used for this evaluator\non this test case, frozen from `test_evaluators.variable_values` at\nsubmission time \u2014 stays on the row because it varies per test case.\n\n`value_name` is the human-readable label for `match`/`score` resolved\nagainst the rubric the run actually used (snapshot's\n`output_config.scale.name`). Falls back to `Correct`/`Wrong` for binary\nor the stringified score for rating when the snapshot lacks named\nscale entries (e.g. legacy runs captured before the rubric was\nsnapshotted)."
+        "title": "JudgeResult"
       },
       "ResolveAgentNamesRequest": {
         "properties": {
@@ -202,7 +265,14 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Names"
+            "title": "Names",
+            "description": "Agent names to resolve to IDs",
+            "examples": [
+              [
+                "my-agent",
+                "support-bot"
+              ]
+            ]
           }
         },
         "type": "object",
@@ -218,14 +288,16 @@
               "type": "string"
             },
             "type": "object",
-            "title": "Resolved"
+            "title": "Resolved",
+            "description": "Map of name to agent ID for each name that matched"
           },
           "not_found": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Not Found"
+            "title": "Not Found",
+            "description": "Names with no matching agent in your workspace"
           }
         },
         "type": "object",
@@ -249,51 +321,17 @@
                 "type": "null"
               }
             ],
-            "title": "Test Uuids"
+            "title": "Test Uuids",
+            "description": "Tests to run. Omit to run all tests linked to the agent",
+            "examples": [
+              [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ]
+            ]
           }
         },
         "type": "object",
         "title": "RunTestRequest"
-      },
-      "TaskCreateResponse": {
-        "properties": {
-          "task_id": {
-            "type": "string",
-            "title": "Task Id"
-          },
-          "status": {
-            "type": "string",
-            "title": "Status"
-          },
-          "dataset_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dataset Id"
-          },
-          "dataset_name": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Dataset Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "task_id",
-          "status"
-        ],
-        "title": "TaskCreateResponse"
       },
       "TestCaseResult": {
         "properties": {
@@ -306,7 +344,8 @@
                 "type": "null"
               }
             ],
-            "title": "Test Case Id"
+            "title": "Test Case Id",
+            "description": "Identifier of the test case within the run"
           },
           "name": {
             "anyOf": [
@@ -317,7 +356,8 @@
                 "type": "null"
               }
             ],
-            "title": "Name"
+            "title": "Name",
+            "description": "Test name; present during in-progress and done states"
           },
           "passed": {
             "anyOf": [
@@ -328,7 +368,8 @@
                 "type": "null"
               }
             ],
-            "title": "Passed"
+            "title": "Passed",
+            "description": "Whether the case passed. Present only when done"
           },
           "reasoning": {
             "anyOf": [
@@ -339,7 +380,8 @@
                 "type": "null"
               }
             ],
-            "title": "Reasoning"
+            "title": "Reasoning",
+            "description": "LLM judge reasoning or deterministic tool-call diff; null for passing tool-call tests"
           },
           "output": {
             "anyOf": [
@@ -349,7 +391,8 @@
               {
                 "type": "null"
               }
-            ]
+            ],
+            "description": "The agent's output for this case. Present only when done"
           },
           "test_case": {
             "anyOf": [
@@ -361,7 +404,8 @@
                 "type": "null"
               }
             ],
-            "title": "Test Case"
+            "title": "Test Case",
+            "description": "The input test case definition. Present only when done"
           },
           "judge_results": {
             "anyOf": [
@@ -375,7 +419,8 @@
                 "type": "null"
               }
             ],
-            "title": "Judge Results"
+            "title": "Judge Results",
+            "description": "Per-evaluator verdicts for response/conversation tests; null for tool-call tests or in-progress rows"
           },
           "latency_ms": {
             "anyOf": [
@@ -386,7 +431,8 @@
                 "type": "null"
               }
             ],
-            "title": "Latency Ms"
+            "title": "Latency Ms",
+            "description": "Response-generation latency in ms for the agent under test (not the judge). Present only for live runs; null for in-progress and eval-only runs. Float, since external agents may self-report a fractional value"
           },
           "cost": {
             "anyOf": [
@@ -397,12 +443,12 @@
                 "type": "null"
               }
             ],
-            "title": "Cost"
+            "title": "Cost",
+            "description": "Per-case cost in USD, lifted from calibrate's nested `output.cost`. Null when the provider/agent reports none (e.g. `--provider openai`)"
           }
         },
         "type": "object",
-        "title": "TestCaseResult",
-        "description": "Result for a single test case matching calibrate results.json structure"
+        "title": "TestCaseResult"
       },
       "TestOutput": {
         "properties": {
@@ -415,7 +461,8 @@
                 "type": "null"
               }
             ],
-            "title": "Response"
+            "title": "Response",
+            "description": "The agent's generated reply; null for tool-call-only cases"
           },
           "tool_calls": {
             "anyOf": [
@@ -429,7 +476,8 @@
                 "type": "null"
               }
             ],
-            "title": "Tool Calls"
+            "title": "Tool Calls",
+            "description": "Tool calls the agent generated; null when it made none"
           }
         },
         "type": "object",
@@ -439,11 +487,18 @@
         "properties": {
           "task_id": {
             "type": "string",
-            "title": "Task Id"
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Task Id",
+            "description": "Test run job ID",
+            "examples": [
+              "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+            ]
           },
           "status": {
             "type": "string",
-            "title": "Status"
+            "title": "Status",
+            "description": "Current status: `queued`, `in_progress`, `done`, or `failed`"
           },
           "total_tests": {
             "anyOf": [
@@ -454,7 +509,8 @@
                 "type": "null"
               }
             ],
-            "title": "Total Tests"
+            "title": "Total Tests",
+            "description": "Total number of test cases; null until known"
           },
           "passed": {
             "anyOf": [
@@ -465,7 +521,8 @@
                 "type": "null"
               }
             ],
-            "title": "Passed"
+            "title": "Passed",
+            "description": "Number of test cases that passed; null until done"
           },
           "failed": {
             "anyOf": [
@@ -476,7 +533,8 @@
                 "type": "null"
               }
             ],
-            "title": "Failed"
+            "title": "Failed",
+            "description": "Number of test cases that failed; null until done"
           },
           "latency_ms": {
             "anyOf": [
@@ -488,7 +546,8 @@
                 "type": "null"
               }
             ],
-            "title": "Latency Ms"
+            "title": "Latency Ms",
+            "description": "Aggregated response latency `{p50, p95, p99, count}` (ms; `p50` \u2248 the old mean). Null for eval-only runs"
           },
           "cost": {
             "anyOf": [
@@ -500,7 +559,8 @@
                 "type": "null"
               }
             ],
-            "title": "Cost"
+            "title": "Cost",
+            "description": "Aggregated cost `{mean, min, max, count}` (USD). Null when no case reported a cost (e.g. openai provider)"
           },
           "total_tokens": {
             "anyOf": [
@@ -512,7 +572,8 @@
                 "type": "null"
               }
             ],
-            "title": "Total Tokens"
+            "title": "Total Tokens",
+            "description": "Aggregated token usage `{mean, min, max, count}` (values are `Any` \u2014 `mean` may be fractional). Null when no case reported usage"
           },
           "evaluators": {
             "anyOf": [
@@ -527,7 +588,8 @@
                 "type": "null"
               }
             ],
-            "title": "Evaluators"
+            "title": "Evaluators",
+            "description": "Top-level evaluator block (name/description/output_type/rubric) shared across every `judge_results` row, which references back via `evaluator_uuid` so the rubric isn't duplicated per case"
           },
           "results": {
             "anyOf": [
@@ -541,7 +603,8 @@
                 "type": "null"
               }
             ],
-            "title": "Results"
+            "title": "Results",
+            "description": "Per-test-case results; null until available"
           },
           "results_s3_prefix": {
             "anyOf": [
@@ -552,16 +615,19 @@
                 "type": "null"
               }
             ],
-            "title": "Results S3 Prefix"
+            "title": "Results S3 Prefix",
+            "description": "S3 key prefix for the raw result artifacts; null until uploaded"
           },
           "error": {
             "type": "boolean",
             "title": "Error",
+            "description": "True if the run failed",
             "default": false
           },
           "is_public": {
             "type": "boolean",
             "title": "Is Public",
+            "description": "Whether the run is shared publicly",
             "default": false
           },
           "share_token": {
@@ -573,7 +639,8 @@
                 "type": "null"
               }
             ],
-            "title": "Share Token"
+            "title": "Share Token",
+            "description": "Public share token; null unless the run is public"
           }
         },
         "type": "object",
@@ -587,7 +654,8 @@
         "properties": {
           "tool": {
             "type": "string",
-            "title": "Tool"
+            "title": "Tool",
+            "description": "Name of the tool the agent called"
           },
           "arguments": {
             "anyOf": [
@@ -599,7 +667,8 @@
                 "type": "null"
               }
             ],
-            "title": "Arguments"
+            "title": "Arguments",
+            "description": "Arguments the agent passed to the tool; null if none"
           },
           "output": {
             "anyOf": [
@@ -608,7 +677,8 @@
                 "type": "null"
               }
             ],
-            "title": "Output"
+            "title": "Output",
+            "description": "Tool execution result (any JSON value). Present only for agent-connection tests where the external agent runs the tool and echoes its return value; null for calibrate-agent mode (tools are declared, never executed) or agents that don't echo it"
           }
         },
         "type": "object",
@@ -650,15 +720,22 @@
         ],
         "title": "ValidationError"
       },
-      "routers__agent_tools__AgentResponse": {
+      "routers__agents__AgentResponse": {
         "properties": {
           "uuid": {
             "type": "string",
-            "title": "Uuid"
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the agent",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
           },
           "name": {
             "type": "string",
-            "title": "Name"
+            "title": "Name",
+            "description": "Human-readable name of the agent"
           },
           "type": {
             "type": "string",
@@ -666,7 +743,8 @@
               "agent",
               "connection"
             ],
-            "title": "Type"
+            "title": "Type",
+            "description": "`agent` (managed defaults) or `connection` (your own endpoint)"
           },
           "config": {
             "anyOf": [
@@ -678,15 +756,18 @@
                 "type": "null"
               }
             ],
-            "title": "Config"
+            "title": "Config",
+            "description": "Agent configuration"
           },
           "created_at": {
             "type": "string",
-            "title": "Created At"
+            "title": "Created At",
+            "description": "When the agent was created (ISO 8601 UTC)"
           },
           "updated_at": {
             "type": "string",
-            "title": "Updated At"
+            "title": "Updated At",
+            "description": "When the agent was last updated (ISO 8601 UTC)"
           }
         },
         "type": "object",
@@ -705,7 +786,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key",
-        "description": "API key. Create one under Workspace settings \u2192 API keys (https://calibrate.artpark.ai/workspace-settings?tab=api-keys). Prefix: `sk_\u2026`."
+        "description": "API key for authentication"
       }
     }
   },
@@ -715,8 +796,8 @@
         "tags": [
           "agents"
         ],
-        "summary": "Resolve Agent Names",
-        "description": "Resolve a list of agent names to their UUIDs within the caller's org.\n\nAuth accepts either a JWT (frontend) or an `sk_` API key (programmatic\nclients) via `get_org_jwt_or_api_key`, so CI tooling can map human-friendly\nagent names to the UUIDs the run/poll endpoints expect. Agent names are\nunique per org, so each name resolves to at most one agent. Names with no\nmatching (non-deleted) agent in the org are returned under `not_found`.",
+        "summary": "Resolve agent names to IDs",
+        "description": "Resolve agent names to their IDs.",
         "operationId": "resolve_agent_names_agents_resolve_post",
         "security": [
           {
@@ -762,8 +843,8 @@
         "tags": [
           "agents"
         ],
-        "summary": "List Agents",
-        "description": "List all agents for the caller's current org.\n\nAuth accepts either a JWT (frontend) or an `sk_` API key (programmatic\nclients) via `get_org_jwt_or_api_key`, so CI tooling can enumerate every\nagent UUID in the org without knowing names up front (the run/poll and\n`/resolve` endpoints accept the same key).",
+        "summary": "List agents",
+        "description": "List all agents in your workspace.",
         "operationId": "list_agents_agents_get",
         "security": [
           {
@@ -778,7 +859,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/routers__agent_tools__AgentResponse"
+                    "$ref": "#/components/schemas/routers__agents__AgentResponse"
                   },
                   "title": "Response List Agents Agents Get"
                 }
@@ -803,8 +884,8 @@
         "tags": [
           "agent-tests"
         ],
-        "summary": "Run Agent Test",
-        "description": "Run one or more tests for an agent.\n\nThis starts a background task that runs the calibrate LLM tests command\nwith the agent's config and the combined test cases from all specified tests.\n\nReturns a task ID that can be used to poll for status and results.\n\nAuth: requires either a JWT (frontend) or an `sk_` API key. The agent\nmust belong to the caller's org or this 404s.",
+        "summary": "Run agent tests",
+        "description": "Run tests for an agent as a background job.",
         "operationId": "run_agent_test_agent_tests_agent__agent_uuid__run_post",
         "security": [
           {
@@ -818,8 +899,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "The agent to test. Must be in your workspace.",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
               "title": "Agent Uuid"
-            }
+            },
+            "description": "The agent to test. Must be in your workspace."
           }
         ],
         "requestBody": {
@@ -838,7 +924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TaskCreateResponse"
+                  "$ref": "#/components/schemas/AgentTestRunCreateResponse"
                 }
               }
             }
@@ -861,8 +947,8 @@
         "tags": [
           "agent-tests"
         ],
-        "summary": "Run Tests Batch",
-        "description": "Run every linked test for a set of agents, one ``llm-unit-test`` job per agent.\n\nScope is driven by the optional ``agent_names`` payload:\n\n- **Provided (non-empty)** \u2014 run only those agents. Names are unique per org\n  and **all are validated up front**: if any doesn't resolve to a\n  (non-deleted) agent in the caller's org, the call 404s with the offending\n  names and NO jobs are created.\n- **Omitted / null / empty** \u2014 run every agent in the caller's org.\n\nFor each selected agent, its linked tests are launched as one job. Agents\nwith no linked tests or an unverified connection are reported under\n``skipped`` instead of failing the batch. Subject to the normal per-org\nconcurrency queue, so over-limit jobs come back ``queued``.\n\nAuth accepts a JWT (frontend) or an `sk_` API key (programmatic clients).\nReturns one ``runs`` entry per launched agent with ``agent_name``,\n``agent_uuid``, ``task_id``, and ``status``.",
+        "summary": "Run agent tests in batch",
+        "description": "Run agent tests for every agent in your workspace, or for a selected set.",
         "operationId": "run_tests_batch_agent_tests_run_post",
         "security": [
           {
@@ -915,8 +1001,8 @@
         "tags": [
           "agent-tests"
         ],
-        "summary": "Get Agent Test Run Status",
-        "description": "Get the status of an agent test run.\n\nRequires either a JWT (frontend) or an `sk_` API key, plus org\nownership of the run. Unauthenticated access to a completed run is only\npossible once it is made public, via the share-token endpoint in the public\nrouter.\n\nReturns the current status and, if done, the test results.",
+        "summary": "Get test run status",
+        "description": "Get the status and results of a test run.",
         "operationId": "get_agent_test_run_status_agent_tests_run__task_id__get",
         "security": [
           {
@@ -930,8 +1016,13 @@
             "required": true,
             "schema": {
               "type": "string",
+              "description": "Test run to poll for status and results",
+              "examples": [
+                "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+              ],
               "title": "Task Id"
-            }
+            },
+            "description": "Test run to poll for status and results"
           }
         ],
         "responses": {
