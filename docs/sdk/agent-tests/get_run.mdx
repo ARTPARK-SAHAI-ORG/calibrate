@@ -1,0 +1,37 @@
+---
+title: "get run"
+description: "Get the status of an agent test run."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+`client.agent_tests.get_run(
+    task_id="task_id",
+)`
+
+Get the status of an agent test run.
+
+Requires either a JWT (frontend) or an `sk_` API key, plus org
+ownership of the run. Unauthenticated access to a completed run is only
+possible once it is made public, via the share-token endpoint in the public
+router.
+
+Returns the current status and, if done, the test results.
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agent_tests.get_run(
+    task_id="task_id",
+)
+```
+
+## API endpoint
+
+See **GET /agent-tests/run/{task_id}** in the [API reference](/api-reference/introduction) tab.

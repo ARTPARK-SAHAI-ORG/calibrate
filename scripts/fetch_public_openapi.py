@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch Calibrate's public OpenAPI spec and normalize it for Mintlify docs.
-
-Downloads from the live backend, then patches the spec so Mintlify's API
-playground and auth UI advertise X-API-Key (the public API's real auth path)
-and include a production server URL.
-
-Requires ``PUBLIC_API_BASE_URL`` (see ``.env.example``). Loads ``.env`` from
-the repo root when present.
-"""
+"""Fetch public OpenAPI spec, inject SDK code samples, and render docs templates."""
 
 from __future__ import annotations
 
@@ -18,17 +10,23 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from generate_sdk_docs import generate_sdk_docs, prune_stale_sdk_pages
+from sdk_reference import load_route_map, parse_reference_file, routes_with_sdk_docs
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUT = REPO_ROOT / "docs" / "api-reference" / "openapi.json"
 API_KEY_SCHEME = "ApiKeyAuth"
+DEFAULT_REFERENCE = REPO_ROOT.parent / "calibrate-python-sdk" / "reference.md"
 
-INTRO_TEMPLATE = REPO_ROOT / "docs/templates/api-reference/introduction.mdx"
-INTRO_OUTPUT = REPO_ROOT / "docs/api-reference/introduction.mdx"
-
-# (template, output) pairs whose base-URL placeholders are single-sourced from
-# PUBLIC_API_BASE_URL. Keeps every docs page off a hardcoded backend host.
 TEMPLATED_PAGES = [
-    (INTRO_TEMPLATE, INTRO_OUTPUT),
+    (
+        REPO_ROOT / "docs/templates/api-reference/introduction.mdx",
+        REPO_ROOT / "docs/api-reference/introduction.mdx",
+    ),
     (
         REPO_ROOT / "docs/templates/reference/api-keys.mdx",
         REPO_ROOT / "docs/reference/api-keys.mdx",
@@ -72,9 +70,45 @@ def public_openapi_spec_url(base_url: str | None = None) -> str:
     return f"{base_url or public_api_base_url()}/public-api/openapi.json"
 
 
+def sdk_reference_path() -> Path:
+    raw = os.getenv("SDK_REFERENCE_PATH", "").strip()
+    if raw:
+        return Path(raw)
+    if DEFAULT_REFERENCE.is_file():
+        return DEFAULT_REFERENCE
+    raise SystemExit(
+        "SDK_REFERENCE_PATH is required when calibrate-python-sdk/reference.md "
+        "is not available locally."
+    )
+
+
+def _inject_sdk_code_samples(
+    spec: dict[str, Any],
+    reference_path: Path,
+) -> int:
+    routes = load_route_map()
+    methods = parse_reference_file(reference_path)
+    count = 0
+    for route, doc in routes_with_sdk_docs(routes, methods):
+        path_item = spec.get("paths", {}).get(route.path)
+        if not isinstance(path_item, dict):
+            continue
+        op = path_item.get(route.http.lower())
+        if not isinstance(op, dict):
+            continue
+        op["x-codeSamples"] = [
+            {
+                "lang": "python",
+                "label": "Python SDK",
+                "source": doc.usage_code.rstrip() + "\n",
+            }
+        ]
+        count += 1
+    return count
+
+
 def _normalize_for_docs(spec: dict[str, Any], base_url: str) -> dict[str, Any]:
-    """Ensure servers + API-key auth match what Mintlify expects."""
-    spec = json.loads(json.dumps(spec))  # deep copy
+    spec = json.loads(json.dumps(spec))
 
     spec["servers"] = [{"url": base_url, "description": "Production"}]
 
@@ -138,14 +172,22 @@ def main(argv: list[str] | None = None) -> int:
     base_url = public_api_base_url()
     url = argv[0] if argv else public_openapi_spec_url(base_url)
     out = Path(argv[1]) if len(argv) > 1 else DEFAULT_OUT
+    reference = sdk_reference_path()
 
     spec = _normalize_for_docs(fetch(url), base_url)
+    sample_count = _inject_sdk_code_samples(spec, reference)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
+
     render_templates(base_url)
-    print(f"Wrote {out} ({len(spec.get('paths', {}))} paths)")
+    sdk_slugs = generate_sdk_docs(reference)
+    prune_stale_sdk_pages(set(sdk_slugs))
+
+    print(f"Wrote {out} ({len(spec.get('paths', {}))} paths, {sample_count} SDK samples)")
     for _, output in TEMPLATED_PAGES:
         print(f"Wrote {output}")
+    print(f"Wrote {len(sdk_slugs)} SDK pages from {reference}")
+    return 0
 
 
 if __name__ == "__main__":

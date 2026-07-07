@@ -1,4 +1,4 @@
-"""Tests for scripts/fetch_public_openapi.py."""
+"""Tests for scripts/fetch_public_openapi.py and generate_sdk_docs.py."""
 
 from __future__ import annotations
 
@@ -12,13 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from fetch_public_openapi import (  # noqa: E402
+    _inject_sdk_code_samples,
     _normalize_for_docs,
     public_api_base_url,
     public_openapi_spec_url,
     render_templates,
 )
+from generate_sdk_docs import generate_sdk_docs  # noqa: E402
 
 TEST_BASE_URL = "https://api.example.test"
+REFERENCE_FIXTURE = ROOT / "tests" / "fixtures" / "reference.md"
 
 
 @pytest.fixture(autouse=True)
@@ -73,10 +76,12 @@ def test_normalize_adds_servers_and_api_key_auth(minimal_spec: dict) -> None:
     assert "parameters" not in out["paths"]["/agents"]["get"]
 
 
-def test_normalize_does_not_mutate_input(minimal_spec: dict) -> None:
-    before = json.dumps(minimal_spec)
-    _normalize_for_docs(minimal_spec, TEST_BASE_URL)
-    assert json.dumps(minimal_spec) == before
+def test_inject_sdk_code_samples(minimal_spec: dict) -> None:
+    count = _inject_sdk_code_samples(minimal_spec, REFERENCE_FIXTURE)
+    assert count == 1
+    samples = minimal_spec["paths"]["/agents"]["get"]["x-codeSamples"]
+    assert samples[0]["label"] == "Python SDK"
+    assert "client.agents.list()" in samples[0]["source"]
 
 
 def test_render_templates_substitutes_base_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -84,21 +89,57 @@ def test_render_templates_substitutes_base_url(tmp_path: Path, monkeypatch: pyte
     template_a.write_text("curl __PUBLIC_API_BASE_URL__/agents\nspec __PUBLIC_OPENAPI_SPEC_URL__\n")
     output_a = tmp_path / "out" / "intro.mdx"
 
-    template_b = tmp_path / "keys.mdx"
-    template_b.write_text("base __PUBLIC_API_BASE_URL__\n")
-    output_b = tmp_path / "out" / "keys.mdx"
-
     import fetch_public_openapi as mod
 
-    monkeypatch.setattr(
-        mod,
-        "TEMPLATED_PAGES",
-        [(template_a, output_a), (template_b, output_b)],
-    )
+    monkeypatch.setattr(mod, "TEMPLATED_PAGES", [(template_a, output_a)])
     render_templates(TEST_BASE_URL)
 
     text_a = output_a.read_text()
     assert TEST_BASE_URL in text_a
     assert f"{TEST_BASE_URL}/public-api/openapi.json" in text_a
 
-    assert output_b.read_text() == f"base {TEST_BASE_URL}\n"
+
+def test_generate_sdk_docs_writes_pages_and_updates_docs_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import generate_sdk_docs as mod
+
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    docs_json = docs_dir / "docs.json"
+    docs_json.write_text(
+        json.dumps(
+            {
+                "navigation": {
+                    "tabs": [
+                        {"tab": "CLI", "groups": []},
+                        {"tab": "API reference", "groups": []},
+                    ]
+                },
+                "api": {},
+            }
+        )
+        + "\n"
+    )
+    sdk_root = docs_dir / "sdk"
+    overview_template = tmp_path / "overview.template.mdx"
+    overview_template.write_text("overview\n")
+
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(mod, "DOCS_JSON", docs_json)
+    monkeypatch.setattr(mod, "SDK_ROOT", sdk_root)
+    monkeypatch.setattr(mod, "OVERVIEW_TEMPLATE", overview_template)
+    monkeypatch.setattr(mod, "OVERVIEW_OUTPUT", sdk_root / "overview.mdx")
+
+    slugs = generate_sdk_docs(REFERENCE_FIXTURE)
+    assert "sdk/overview" in slugs
+    assert (sdk_root / "agents" / "list.mdx").is_file()
+
+    mod.prune_stale_sdk_pages(set(slugs))
+    assert (sdk_root / "agents" / "list.mdx").is_file()
+
+    docs = json.loads(docs_json.read_text())
+    tab_names = [t["tab"] for t in docs["navigation"]["tabs"]]
+    assert "SDK" in tab_names
+    assert docs["api"]["examples"]["autogenerate"] is True

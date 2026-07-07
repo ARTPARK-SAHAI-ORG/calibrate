@@ -1,0 +1,38 @@
+---
+title: "run"
+description: "Run one or more tests for an agent."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+`client.agent_tests.run(
+    agent_uuid="agent_uuid",
+)`
+
+Run one or more tests for an agent.
+
+This starts a background task that runs the calibrate LLM tests command
+with the agent's config and the combined test cases from all specified tests.
+
+Returns a task ID that can be used to poll for status and results.
+
+Auth: requires either a JWT (frontend) or an `sk_` API key. The agent
+must belong to the caller's org or this 404s.
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agent_tests.run(
+    agent_uuid="agent_uuid",
+)
+```
+
+## API endpoint
+
+See **POST /agent-tests/agent/{agent_uuid}/run** in the [API reference](/api-reference/introduction) tab.

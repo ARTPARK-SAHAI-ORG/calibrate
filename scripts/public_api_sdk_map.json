@@ -1,0 +1,96 @@
+{
+  "_comment": "Keep in sync with pense-backend fern/openapi-overrides.yml for Public API routes.",
+  "routes": [
+    {
+      "http": "GET",
+      "path": "/agents",
+      "sdk_group": "agents",
+      "sdk_method": "list",
+      "api_group": "Agents"
+    },
+    {
+      "http": "POST",
+      "path": "/agents",
+      "sdk_group": "agents",
+      "sdk_method": "create",
+      "api_group": "Agents"
+    },
+    {
+      "http": "POST",
+      "path": "/agents/resolve",
+      "sdk_group": "agents",
+      "sdk_method": "resolve",
+      "api_group": "Agents"
+    },
+    {
+      "http": "GET",
+      "path": "/agents/{agent_uuid}",
+      "sdk_group": "agents",
+      "sdk_method": "get",
+      "api_group": "Agents"
+    },
+    {
+      "http": "PUT",
+      "path": "/agents/{agent_uuid}",
+      "sdk_group": "agents",
+      "sdk_method": "update",
+      "api_group": "Agents"
+    },
+    {
+      "http": "POST",
+      "path": "/tests",
+      "sdk_group": "tests",
+      "sdk_method": "create",
+      "api_group": "Tests"
+    },
+    {
+      "http": "GET",
+      "path": "/tests",
+      "sdk_group": "tests",
+      "sdk_method": "list",
+      "api_group": "Tests"
+    },
+    {
+      "http": "POST",
+      "path": "/tests/bulk",
+      "sdk_group": "tests",
+      "sdk_method": "bulk_create",
+      "api_group": "Tests"
+    },
+    {
+      "http": "GET",
+      "path": "/tests/{test_uuid}",
+      "sdk_group": "tests",
+      "sdk_method": "get",
+      "api_group": "Tests"
+    },
+    {
+      "http": "PUT",
+      "path": "/tests/{test_uuid}",
+      "sdk_group": "tests",
+      "sdk_method": "update",
+      "api_group": "Tests"
+    },
+    {
+      "http": "POST",
+      "path": "/agent-tests/agent/{agent_uuid}/run",
+      "sdk_group": "agent_tests",
+      "sdk_method": "run",
+      "api_group": "Agent tests"
+    },
+    {
+      "http": "POST",
+      "path": "/agent-tests/run",
+      "sdk_group": "agent_tests",
+      "sdk_method": "run_batch",
+      "api_group": "Agent tests"
+    },
+    {
+      "http": "GET",
+      "path": "/agent-tests/run/{task_id}",
+      "sdk_group": "agent_tests",
+      "sdk_method": "get_run",
+      "api_group": "Agent tests"
+    }
+  ]
+}

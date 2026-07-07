@@ -1,0 +1,31 @@
+---
+title: "list"
+description: "List all agents for the caller's current org."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+`client.agents.list()`
+
+List all agents for the caller's current org.
+
+Auth accepts either a JWT (frontend) or an `sk_` API key (programmatic
+clients) via `get_org_jwt_or_api_key`, so CI tooling can enumerate every
+agent UUID in the org without knowing names up front (the run/poll and
+`/resolve` endpoints accept the same key).
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agents.list()
+```
+
+## API endpoint
+
+See **GET /agents** in the [API reference](/api-reference/introduction) tab.
