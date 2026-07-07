@@ -155,8 +155,8 @@ def update_docs_json(
     DOCS_JSON.write_text(json.dumps(docs, indent=2) + "\n", encoding="utf-8")
 
 
-def generate_sdk_docs(reference_path: Path) -> list[str]:
-    routes = load_route_map()
+def generate_sdk_docs(reference_path: Path, openapi: dict[str, Any]) -> list[str]:
+    routes = load_route_map(openapi=openapi)
     methods = parse_reference_file(reference_path)
     paired = routes_with_sdk_docs(routes, methods)
     copy_overview()
@@ -185,6 +185,9 @@ if __name__ == "__main__":
     ref = Path(sys.argv[1]) if len(sys.argv) > 1 else None
     if ref is None:
         raise SystemExit("usage: generate_sdk_docs.py <path/to/reference.md>")
-    slugs = generate_sdk_docs(ref)
+    from sdk_reference import DEFAULT_OPENAPI
+
+    spec = json.loads(DEFAULT_OPENAPI.read_text(encoding="utf-8"))
+    slugs = generate_sdk_docs(ref, spec)
     prune_stale_sdk_pages(set(slugs))
     print(f"Wrote {len(slugs)} SDK pages")

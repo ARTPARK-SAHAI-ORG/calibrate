@@ -8,7 +8,7 @@ on:
       - "scripts/fetch_public_openapi.py"
       - "scripts/generate_sdk_docs.py"
       - "scripts/sdk_reference.py"
-      - "scripts/public_api_sdk_map.json"
+      - "tests/fixtures/fern_openapi_overrides.yml"
       - "docs/templates/**"
   schedule:
     # Refresh weekly so docs track backend deploys even without agentloop changes.
@@ -35,6 +35,13 @@ jobs:
           path: calibrate-python-sdk
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Checkout backend Fern overrides
+        uses: actions/checkout@v4
+        with:
+          repository: ARTPARK-SAHAI-ORG/calibrate-backend
+          path: calibrate-backend
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -44,6 +51,7 @@ jobs:
         env:
           PUBLIC_API_BASE_URL: ${{ secrets.PUBLIC_API_BASE_URL }}
           SDK_REFERENCE_PATH: calibrate-python-sdk/reference.md
+          FERN_OVERRIDES_PATH: calibrate-backend/fern/openapi-overrides.yml
         run: python scripts/fetch_public_openapi.py
 
       - name: Open PR for generated docs if changed

@@ -154,7 +154,7 @@ def main(argv: list[str] | None = None) -> int:
     out.write_text(json.dumps(spec, indent=2) + "\n", encoding="utf-8")
 
     render_templates(base_url)
-    sdk_slugs = generate_sdk_docs(reference)
+    sdk_slugs = generate_sdk_docs(reference, spec)
     prune_stale_sdk_pages(set(sdk_slugs))
 
     print(f"Wrote {out} ({len(spec.get('paths', {}))} paths)")

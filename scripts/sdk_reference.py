@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
-import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_MAP = REPO_ROOT / "scripts" / "public_api_sdk_map.json"
+DEFAULT_OPENAPI = REPO_ROOT / "docs" / "api-reference" / "openapi.json"
+DEFAULT_FERN_OVERRIDE_CANDIDATES = (
+    REPO_ROOT.parent / "pense-backend" / "fern" / "openapi-overrides.yml",
+    REPO_ROOT.parent / "calibrate-backend" / "fern" / "openapi-overrides.yml",
+)
 
 METHOD_HEADER = re.compile(
     r"<details><summary><code>client\.(\w+)\.<a[^>]+>(\w+)</a>",
@@ -54,22 +61,87 @@ class SdkMethodDoc:
         return self.sdk_group, self.sdk_method
 
 
-def load_route_map(path: Path | None = None) -> list[SdkRoute]:
-    map_path = path or DEFAULT_MAP
-    data = json.loads(map_path.read_text(encoding="utf-8"))
+def api_group_from_tag(tag: str) -> str:
+    parts = tag.replace("-", " ").split()
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        return parts[0].capitalize()
+    return parts[0].capitalize() + " " + " ".join(part.lower() for part in parts[1:])
+
+
+def fern_overrides_path() -> Path:
+    raw = os.getenv("FERN_OVERRIDES_PATH", "").strip()
+    if raw:
+        return Path(raw)
+    for candidate in DEFAULT_FERN_OVERRIDE_CANDIDATES:
+        if candidate.is_file():
+            return candidate
+    raise SystemExit(
+        "FERN_OVERRIDES_PATH is required when calibrate-backend/fern/openapi-overrides.yml "
+        "is not available locally."
+    )
+
+
+def parse_fern_overrides(path: Path) -> dict[str, Any]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or "paths" not in data:
+        raise ValueError(f"Invalid Fern overrides file: {path}")
+    return data
+
+
+def build_route_map(
+    overrides: dict[str, Any],
+    openapi: dict[str, Any],
+) -> list[SdkRoute]:
     routes: list[SdkRoute] = []
-    for entry in data["routes"]:
-        routes.append(
-            SdkRoute(
-                http=entry["http"],
-                path=entry["path"],
-                sdk_group=entry["sdk_group"],
-                sdk_method=entry["sdk_method"],
-                api_group=entry["api_group"],
-                title=entry["title"],
+    openapi_paths = openapi.get("paths", {})
+    for path in sorted(overrides.get("paths", {})):
+        methods = overrides["paths"][path]
+        if not isinstance(methods, dict):
+            continue
+        for method in sorted(methods):
+            override = methods[method]
+            if method.startswith("x") or not isinstance(override, dict):
+                continue
+            sdk_group = override.get("x-fern-sdk-group-name")
+            sdk_method = override.get("x-fern-sdk-method-name")
+            if not sdk_group or not sdk_method:
+                continue
+            op = openapi_paths.get(path, {}).get(method.lower())
+            if not isinstance(op, dict):
+                raise ValueError(f"OpenAPI spec missing {method.upper()} {path}")
+            tags = op.get("tags") or []
+            if not tags:
+                raise ValueError(f"OpenAPI op missing tags for {method.upper()} {path}")
+            routes.append(
+                SdkRoute(
+                    http=method.upper(),
+                    path=path,
+                    sdk_group=sdk_group,
+                    sdk_method=sdk_method,
+                    api_group=api_group_from_tag(tags[0]),
+                    title=(op.get("summary") or "").strip(),
+                )
             )
-        )
     return routes
+
+
+def load_route_map(
+    openapi: dict[str, Any] | None = None,
+    overrides_path: Path | None = None,
+) -> list[SdkRoute]:
+    spec = openapi
+    if spec is None:
+        if not DEFAULT_OPENAPI.is_file():
+            raise SystemExit(
+                "OpenAPI spec is required when docs/api-reference/openapi.json is missing."
+            )
+        import json
+
+        spec = json.loads(DEFAULT_OPENAPI.read_text(encoding="utf-8"))
+    overrides = parse_fern_overrides(overrides_path or fern_overrides_path())
+    return build_route_map(overrides, spec)
 
 
 def _strip_html(text: str) -> str:

@@ -377,6 +377,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-httpserver" },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -406,6 +407,7 @@ requires-dist = [
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
     { name = "pytest-httpserver", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "python-dotenv", specifier = ">=1.2.1" },
+    { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
     { name = "sarvamai", specifier = ">=0.1.21" },
     { name = "simpleaudio", specifier = ">=1.0.4" },
     { name = "sounddevice", specifier = ">=0.5.3" },

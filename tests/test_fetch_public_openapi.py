@@ -159,7 +159,16 @@ def test_generate_sdk_docs_writes_pages_and_updates_docs_json(
     monkeypatch.setattr(mod, "OVERVIEW_TEMPLATE", overview_template)
     monkeypatch.setattr(mod, "OVERVIEW_OUTPUT", sdk_root / "overview.mdx")
 
-    slugs = generate_sdk_docs(REFERENCE_FIXTURE)
+    openapi_fixture = ROOT / "docs" / "api-reference" / "openapi.json"
+    if not openapi_fixture.is_file():
+        pytest.skip("docs/api-reference/openapi.json not present")
+    openapi = json.loads(openapi_fixture.read_text(encoding="utf-8"))
+    monkeypatch.setenv(
+        "FERN_OVERRIDES_PATH",
+        str(ROOT / "tests" / "fixtures" / "fern_openapi_overrides.yml"),
+    )
+
+    slugs = generate_sdk_docs(REFERENCE_FIXTURE, openapi)
     assert "sdk/overview" in slugs
     assert (sdk_root / "agents" / "list.mdx").is_file()
 
