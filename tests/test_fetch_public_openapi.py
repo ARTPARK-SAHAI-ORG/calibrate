@@ -103,6 +103,29 @@ def test_render_method_page_skips_duplicate_summary_and_signature() -> None:
     assert "## Usage" in page
 
 
+def test_render_method_page_escapes_quotes_in_frontmatter() -> None:
+    from generate_sdk_docs import render_method_page
+    from sdk_reference import SdkMethodDoc, SdkRoute
+
+    route = SdkRoute(
+        http="PUT",
+        path="/agents/{agent_uuid}",
+        sdk_group="agents",
+        sdk_method="update",
+        api_group="Agents",
+        title='Update "legacy" agent',
+    )
+    doc = SdkMethodDoc(
+        sdk_group="agents",
+        sdk_method="update",
+        description='Rename the agent to "production".',
+        usage_code="client.agents.update()\n",
+    )
+    page = render_method_page(route, doc)
+    assert 'title: "Update \\"legacy\\" agent"' in page
+    assert 'description: "Rename the agent to \\"production\\"."' in page
+
+
 def test_normalize_strips_x_code_samples(minimal_spec: dict) -> None:
     minimal_spec["paths"]["/agents"]["get"]["x-codeSamples"] = [
         {"lang": "python", "source": "from calibrate import Calibrate\n"}

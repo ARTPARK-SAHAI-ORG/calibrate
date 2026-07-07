@@ -23,6 +23,12 @@ OVERVIEW_TEMPLATE = REPO_ROOT / "docs" / "templates" / "sdk" / "overview.mdx"
 OVERVIEW_OUTPUT = SDK_ROOT / "overview.mdx"
 
 
+def _frontmatter_value(text: str) -> str:
+    text = text.replace("\\", "\\\\")
+    text = text.replace('"', '\\"')
+    return text
+
+
 def _mdx_escape(text: str) -> str:
     return text.replace("{", "\\{")
 
@@ -48,10 +54,12 @@ def render_method_page(route: SdkRoute, doc: SdkMethodDoc) -> str:
         summary = f"client.{route.sdk_group}.{route.sdk_method}()"
     summary_escaped = _mdx_escape(summary)
     body_escaped = _mdx_escape(body) if body else ""
+    title_escaped = _frontmatter_value(route.title)
+    description_escaped = _frontmatter_value(summary_escaped[:160])
     parts = [
         "---\n",
-        f'title: "{route.title}"\n',
-        f'description: "{summary_escaped[:160]}"\n',
+        f'title: "{title_escaped}"\n',
+        f'description: "{description_escaped}"\n',
         "---\n\n",
         "{/* Generated from Fern reference.md — do not edit directly. */}\n\n",
     ]

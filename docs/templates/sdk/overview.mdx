@@ -19,12 +19,6 @@ Create an API key under **Workspace settings → API keys** — see the [API key
 from calibrate import Calibrate
 
 client = Calibrate(api_key="sk_your_api_key")
-```
-
-```python
-from calibrate import Calibrate
-
-client = Calibrate(api_key="sk_your_api_key")
 
 for agent in client.agents.list():
     print(agent.uuid, agent.name)
