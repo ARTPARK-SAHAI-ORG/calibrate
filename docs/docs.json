@@ -78,24 +78,11 @@
       },
       {
         "tab": "API reference",
+        "openapi": "api-reference/openapi.json",
         "groups": [
           {
-            "group": "API",
+            "group": "Overview",
             "pages": ["api-reference/introduction"]
-          },
-          {
-            "group": "Agents",
-            "openapi": "api-reference/openapi.json",
-            "pages": ["GET /agents", "POST /agents/resolve"]
-          },
-          {
-            "group": "Agent tests",
-            "openapi": "api-reference/openapi.json",
-            "pages": [
-              "POST /agent-tests/agent/{agent_uuid}/run",
-              "POST /agent-tests/run",
-              "GET /agent-tests/run/{task_id}"
-            ]
           }
         ]
       },
