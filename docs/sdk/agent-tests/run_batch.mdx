@@ -1,31 +1,9 @@
 ---
-title: "run batch"
-description: "Run every linked test for a set of agents, one ``llm-unit-test`` job per agent."
+title: "Run agent tests in batch"
+description: "Run agent tests for every agent in your workspace, or for a selected set."
 ---
 
 {/* Generated from Fern reference.md — do not edit directly. */}
-
-`client.agent_tests.run_batch(
-    request=BatchRunRequest()`
-
-Run every linked test for a set of agents, one ``llm-unit-test`` job per agent.
-
-Scope is driven by the optional ``agent_names`` payload:
-
-- **Provided (non-empty)** — run only those agents. Names are unique per org
-  and **all are validated up front**: if any doesn't resolve to a
-  (non-deleted) agent in the caller's org, the call 404s with the offending
-  names and NO jobs are created.
-- **Omitted / null / empty** — run every agent in the caller's org.
-
-For each selected agent, its linked tests are launched as one job. Agents
-with no linked tests or an unverified connection are reported under
-``skipped`` instead of failing the batch. Subject to the normal per-org
-concurrency queue, so over-limit jobs come back ``queued``.
-
-Auth accepts a JWT (frontend) or an `sk_` API key (programmatic clients).
-Returns one ``runs`` entry per launched agent with ``agent_name``,
-``agent_uuid``, ``task_id``, and ``status``.
 
 ## Usage
 

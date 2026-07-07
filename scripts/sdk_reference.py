@@ -26,6 +26,7 @@ class SdkRoute:
     sdk_group: str
     sdk_method: str
     api_group: str
+    title: str
 
     @property
     def openapi_key(self) -> tuple[str, str]:
@@ -70,6 +71,7 @@ def load_route_map(path: Path | None = None) -> list[SdkRoute]:
                 sdk_group=entry["sdk_group"],
                 sdk_method=entry["sdk_method"],
                 api_group=entry["api_group"],
+                title=entry["title"],
             )
         )
     return routes

@@ -88,8 +88,13 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/TaskStatus",
-            "description": "Current status of the test run: `queued` or `in_progress`"
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress"
+            ],
+            "title": "Status",
+            "description": "Current status of the test run"
           }
         },
         "type": "object",
@@ -210,8 +215,13 @@
             ]
           },
           "status": {
-            "$ref": "#/components/schemas/TaskStatus",
-            "description": "Initial status: `queued` or `in_progress`"
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress"
+            ],
+            "title": "Status",
+            "description": "Initial status of the test run"
           }
         },
         "type": "object",
@@ -969,7 +979,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
-            "description": "Current status: `queued`, `in_progress`, `done`, or `failed`"
+            "description": "Current status of the test run"
           },
           "total_tests": {
             "anyOf": [
@@ -1372,7 +1382,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "Test kind: `response`, `tool_call`, or `conversation`"
+            "description": "Test kind"
           },
           "config": {
             "anyOf": [
@@ -1473,14 +1483,7 @@
               }
             }
           }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "Python SDK",
-            "label": "Python SDK",
-            "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agents.resolve(\n    names=[\n        \"names\"\n    ],\n)\n"
-          }
-        ]
+        }
       }
     },
     "/agents": {
@@ -1566,14 +1569,7 @@
               }
             }
           }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "Python SDK",
-            "label": "Python SDK",
-            "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agents.list()\n"
-          }
-        ]
+        }
       }
     },
     "/agents/{agent_uuid}": {
@@ -1997,14 +1993,7 @@
               }
             }
           }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "Python SDK",
-            "label": "Python SDK",
-            "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agent_tests.run(\n    agent_uuid=\"agent_uuid\",\n)\n"
-          }
-        ]
+        }
       }
     },
     "/agent-tests/run": {
@@ -2058,14 +2047,7 @@
               }
             }
           }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "Python SDK",
-            "label": "Python SDK",
-            "source": "from calibrate import Calibrate, BatchRunRequest\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agent_tests.run_batch(\n    request=BatchRunRequest(),\n)\n"
-          }
-        ]
+        }
       }
     },
     "/agent-tests/run/{task_id}": {
@@ -2118,14 +2100,7 @@
               }
             }
           }
-        },
-        "x-codeSamples": [
-          {
-            "lang": "Python SDK",
-            "label": "Python SDK",
-            "source": "from calibrate import Calibrate\n\nclient = Calibrate(\n    api_key=\"sk_your_api_key\",\n)\n\nclient.agent_tests.get_run(\n    task_id=\"task_id\",\n)\n"
-          }
-        ]
+        }
       }
     }
   }

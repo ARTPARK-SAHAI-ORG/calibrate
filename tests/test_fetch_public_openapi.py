@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from fetch_public_openapi import (  # noqa: E402
-    _inject_sdk_code_samples,
     _normalize_for_docs,
     public_api_base_url,
     public_openapi_spec_url,
@@ -76,13 +75,41 @@ def test_normalize_adds_servers_and_api_key_auth(minimal_spec: dict) -> None:
     assert "parameters" not in out["paths"]["/agents"]["get"]
 
 
-def test_inject_sdk_code_samples(minimal_spec: dict) -> None:
-    count = _inject_sdk_code_samples(minimal_spec, REFERENCE_FIXTURE)
-    assert count == 1
-    samples = minimal_spec["paths"]["/agents"]["get"]["x-codeSamples"]
-    assert samples[0]["lang"] == "Python SDK"
-    assert samples[0]["label"] == "Python SDK"
-    assert "client.agents.list()" in samples[0]["source"]
+def test_render_method_page_skips_duplicate_summary_and_signature() -> None:
+    from generate_sdk_docs import render_method_page
+    from sdk_reference import SdkMethodDoc, SdkRoute
+
+    route = SdkRoute(
+        http="POST",
+        path="/agent-tests/agent/{agent_uuid}/run",
+        sdk_group="agent_tests",
+        sdk_method="run",
+        api_group="Agent tests",
+        title="Run agent tests",
+    )
+    doc = SdkMethodDoc(
+        sdk_group="agent_tests",
+        sdk_method="run",
+        signature='client.agent_tests.run(agent_uuid="agent_uuid")',
+        description="Run tests for an agent as a background job.\n\nExtra detail.",
+        usage_code='client.agent_tests.run(agent_uuid="agent_uuid")\n',
+    )
+    page = render_method_page(route, doc)
+    body = page.split("---", 2)[2].split("## Usage")[0]
+    assert 'description: "Run tests for an agent as a background job."' in page
+    assert "client.agent_tests.run(agent_uuid=" not in body
+    assert "Run tests for an agent as a background job." not in body
+    assert "Extra detail." in page
+    assert "POST /agent-tests/agent/\\{agent_uuid}/run" in page
+    assert "## Usage" in page
+
+
+def test_normalize_strips_x_code_samples(minimal_spec: dict) -> None:
+    minimal_spec["paths"]["/agents"]["get"]["x-codeSamples"] = [
+        {"lang": "python", "source": "from calibrate import Calibrate\n"}
+    ]
+    out = _normalize_for_docs(minimal_spec, TEST_BASE_URL)
+    assert "x-codeSamples" not in out["paths"]["/agents"]["get"]
 
 
 def test_render_templates_substitutes_base_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -142,5 +169,6 @@ def test_generate_sdk_docs_writes_pages_and_updates_docs_json(
 
     docs = json.loads(docs_json.read_text())
     tab_names = [t["tab"] for t in docs["navigation"]["tabs"]]
-    assert "SDK" in tab_names
+    assert "Python SDK" in tab_names
+    assert docs["api"]["examples"]["languages"] == ["curl", "python"]
     assert docs["api"]["examples"]["autogenerate"] is True

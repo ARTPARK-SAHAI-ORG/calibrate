@@ -1,23 +1,9 @@
 ---
-title: "resolve"
-description: "Resolve a list of agent names to their UUIDs within the caller's org."
+title: "Resolve agent names to IDs"
+description: "Resolve agent names to their IDs."
 ---
 
 {/* Generated from Fern reference.md — do not edit directly. */}
-
-`client.agents.resolve(
-    names=[
-        "names"
-    ],
-)`
-
-Resolve a list of agent names to their UUIDs within the caller's org.
-
-Auth accepts either a JWT (frontend) or an `sk_` API key (programmatic
-clients) via `get_org_jwt_or_api_key`, so CI tooling can map human-friendly
-agent names to the UUIDs the run/poll endpoints expect. Agent names are
-unique per org, so each name resolves to at most one agent. Names with no
-matching (non-deleted) agent in the org are returned under `not_found`.
 
 ## Usage
 
@@ -30,7 +16,8 @@ client = Calibrate(
 
 client.agents.resolve(
     names=[
-        "names"
+        "my-agent",
+        "support-bot"
     ],
 )
 ```

@@ -81,7 +81,7 @@
         ]
       },
       {
-        "tab": "SDK",
+        "tab": "Python SDK",
         "groups": [
           {
             "group": "Overview",
@@ -101,7 +101,20 @@
             "group": "Agents",
             "pages": [
               "sdk/agents/list",
-              "sdk/agents/resolve"
+              "sdk/agents/create",
+              "sdk/agents/resolve",
+              "sdk/agents/get",
+              "sdk/agents/update"
+            ]
+          },
+          {
+            "group": "Tests",
+            "pages": [
+              "sdk/tests/create",
+              "sdk/tests/list",
+              "sdk/tests/bulk_create",
+              "sdk/tests/get",
+              "sdk/tests/update"
             ]
           }
         ]
@@ -217,8 +230,7 @@
     "examples": {
       "languages": [
         "curl",
-        "python",
-        "Python SDK"
+        "python"
       ],
       "defaults": "required",
       "autogenerate": true

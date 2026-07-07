@@ -17,41 +17,56 @@ from sdk_reference import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SDK_TAB_NAME = "Python SDK"
 DOCS_JSON = REPO_ROOT / "docs" / "docs.json"
 SDK_ROOT = REPO_ROOT / "docs" / "sdk"
 OVERVIEW_TEMPLATE = REPO_ROOT / "docs" / "templates" / "sdk" / "overview.mdx"
 OVERVIEW_OUTPUT = SDK_ROOT / "overview.mdx"
 
 
-def _titleize_method(name: str) -> str:
-    return name.replace("_", " ")
-
-
 def _mdx_escape(text: str) -> str:
     return text.replace("{", "\\{")
 
 
+def _split_description(description: str) -> tuple[str, str]:
+    text = description.strip()
+    if not text:
+        return "", ""
+    lines = text.splitlines()
+    summary = lines[0].strip()
+    body = "\n".join(lines[1:]).strip()
+    return summary, body
+
+
 def render_method_page(route: SdkRoute, doc: SdkMethodDoc) -> str:
+    api_page = _mdx_escape(route.mintlify_api_page)
     api_callout = (
-        f"See **{route.mintlify_api_page}** in the "
+        f"See **{api_page}** in the "
         f"[API reference](/api-reference/introduction) tab."
     )
-    description = _mdx_escape(doc.description.strip()) if doc.description else (
-        f"`client.{route.sdk_group}.{route.sdk_method}()`"
+    summary, body = _split_description(doc.description)
+    if not summary:
+        summary = f"client.{route.sdk_group}.{route.sdk_method}()"
+    summary_escaped = _mdx_escape(summary)
+    body_escaped = _mdx_escape(body) if body else ""
+    parts = [
+        "---\n",
+        f'title: "{route.title}"\n',
+        f'description: "{summary_escaped[:160]}"\n',
+        "---\n\n",
+        "{/* Generated from Fern reference.md — do not edit directly. */}\n\n",
+    ]
+    if body_escaped:
+        parts.append(f"{body_escaped}\n\n")
+    parts.extend(
+        [
+            "## Usage\n\n",
+            f"```python\n{doc.usage_code.rstrip()}\n```\n\n",
+            "## API endpoint\n\n",
+            f"{api_callout}\n",
+        ]
     )
-    return (
-        "---\n"
-        f'title: "{_titleize_method(route.sdk_method)}"\n'
-        f'description: "{description.split(chr(10))[0][:160]}"\n'
-        "---\n\n"
-        f"{{/* Generated from Fern reference.md — do not edit directly. */}}\n\n"
-        f"`{doc.signature}`\n\n"
-        f"{description}\n\n"
-        "## Usage\n\n"
-        f"```python\n{doc.usage_code.rstrip()}\n```\n\n"
-        "## API endpoint\n\n"
-        f"{api_callout}\n"
-    )
+    return "".join(parts)
 
 
 def write_sdk_pages(
@@ -120,10 +135,12 @@ def update_docs_json(
     api_tab["groups"] = _api_reference_groups(routes)
 
     sdk_tab = {
-        "tab": "SDK",
+        "tab": SDK_TAB_NAME,
         "groups": _sdk_nav_groups(paired),
     }
-    tabs_without_sdk = [t for t in tabs if t.get("tab") != "SDK"]
+    tabs_without_sdk = [
+        t for t in tabs if t.get("tab") not in {SDK_TAB_NAME, "SDK"}
+    ]
     cli_index = next(
         (i for i, t in enumerate(tabs_without_sdk) if t.get("tab") == "CLI"),
         len(tabs_without_sdk),
@@ -132,7 +149,7 @@ def update_docs_json(
     docs["navigation"]["tabs"] = tabs_without_sdk
 
     examples = docs.setdefault("api", {}).setdefault("examples", {})
-    examples["languages"] = ["curl", "python", "Python SDK"]
+    examples["languages"] = ["curl", "python"]
     examples["defaults"] = "required"
     examples["autogenerate"] = True
 

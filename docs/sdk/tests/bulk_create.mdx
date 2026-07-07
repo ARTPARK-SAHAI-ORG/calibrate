@@ -1,0 +1,34 @@
+---
+title: "Bulk create tests"
+description: "Create many tests of one type in a single call, optionally linking them to agents."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate, BulkTestItem, ChatMessage
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.tests.bulk_create(
+    type="response",
+    tests=[
+        BulkTestItem(
+            name="name",
+            conversation_history=[
+                ChatMessage(
+                    role="system",
+                )
+            ],
+        )
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /tests/bulk** in the [API reference](/api-reference/introduction) tab.

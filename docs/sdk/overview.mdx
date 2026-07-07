@@ -1,36 +1,14 @@
 ---
-title: "Overview"
-description: "Install and authenticate the Calibrate Python SDK"
+title: "Introduction"
+description: "Get started with Calibrate's Python SDK"
 ---
 
 {/* Generated from docs/templates/sdk/overview.mdx — do not edit directly. */}
 
-The Calibrate Python SDK (`calibrate-sdk`) is generated from the same [public OpenAPI spec](/api-reference/introduction) as this API reference. Method pages below are synced from the published SDK on every docs update.
-
-<CardGroup cols={2}>
-  <Card title="PyPI" icon="python" href="https://pypi.org/project/calibrate-sdk/">
-    `pip install calibrate-sdk`
-  </Card>
-  <Card title="Source" icon="github" href="https://github.com/dalmia/calibrate-python-sdk">
-  Generated SDK repository
-  </Card>
-</CardGroup>
-
 ## Install
 
 ```bash
-pip install calibrate-sdk
-```
-
-## Quick start
-
-```python
-from calibrate import Calibrate
-
-client = Calibrate(api_key="sk_your_api_key")
-
-for agent in client.agents.list():
-    print(agent.uuid, agent.name)
+uv add calibrate-sdk
 ```
 
 ## Auth
@@ -43,12 +21,23 @@ from calibrate import Calibrate
 client = Calibrate(api_key="sk_your_api_key")
 ```
 
-The SDK sends `X-API-Key` on every request.
+```python
+from calibrate import Calibrate
 
-<Warning>
-  The raw key is shown exactly once at creation. Store it in a secret manager or CI variable — never commit it.
-</Warning>
+client = Calibrate(api_key="sk_your_api_key")
 
-## Without the SDK
+for agent in client.agents.list():
+    print(agent.uuid, agent.name)
+```
 
-Every API endpoint page also includes **Python** samples that use `requests` directly, if you prefer not to install the package.
+## Resources
+
+<CardGroup cols={1}>
+  <Card
+    title="Source"
+    icon="github"
+    href="https://github.com/dalmia/calibrate-python-sdk"
+  >
+    calibrate-python-sdk
+  </Card>
+</CardGroup>

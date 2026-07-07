@@ -1,6 +1,6 @@
 ---
-title: "Run agent tests"
-description: "Run tests for an agent as a background job."
+title: "Get agent"
+description: "Get an agent in your workspace."
 ---
 
 {/* Generated from Fern reference.md — do not edit directly. */}
@@ -14,11 +14,11 @@ client = Calibrate(
     api_key="sk_your_api_key",
 )
 
-client.agent_tests.run(
+client.agents.get(
     agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
 )
 ```
 
 ## API endpoint
 
-See **POST /agent-tests/agent/\{agent_uuid}/run** in the [API reference](/api-reference/introduction) tab.
+See **GET /agents/\{agent_uuid}** in the [API reference](/api-reference/introduction) tab.
