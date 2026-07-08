@@ -148,16 +148,19 @@ The **MCP docs** under `docs/mcp/**` are likewise generated — from the
 Speakeasy-generated MCP server the separate `dalmia/calibrate-mcp` repo ships
 under `src/mcp-server/tools/*.ts`. `scripts/generate_mcp_docs.py` (parser in
 `scripts/mcp_reference.py`) produces the "MCP" tab (inserted after "Python SDK"),
-whose flow mirrors [Coval's MCP docs](https://docs.coval.ai/mcp/overview): three
-pages — **Overview**, **Installation**, and a single **Tools** reference. Overview
-and Installation are hand-written templates under `docs/templates/mcp/`; the
-Tools page (`docs/mcp/tools.mdx`) is fully generated — tools grouped by API
-resource (`## Agents`, `## Agent tests`, `## Tests`), each tool a `###` section
-with its description, a scope / access line, a parameters table, and a cross-link
-to the matching API-reference operation. The overview's "Available tools"
-category table is injected into the template at the `{/* AVAILABLE_TOOLS */}`
-token (like the CLI overview's global-flags token), so it always lists the live
-tool set with links to the Tools-page anchors.
+whose flow mirrors [Coval's MCP docs](https://docs.coval.ai/mcp/overview): a
+single **"MCP server"** sidebar group with five pages in a fixed order
+(`NAV_ORDER`) — **Overview**, **Installation**, **Tools**, **Beginner's guide**,
+**Troubleshooting**. All four conceptual pages are hand-written templates under
+`docs/templates/mcp/` (`GUIDE_PAGES`); only the **Tools** page
+(`docs/mcp/tools.mdx`) is generated — tools grouped by API resource
+(`## Agents`, `## Agent tests`, `## Tests`), each tool a `###` section with its
+description, a scope / access line, a parameters table, and a cross-link to the
+matching API-reference operation. The overview's "Available tools" category table
+is injected into the template at the `{/* AVAILABLE_TOOLS */}` token (like the
+CLI overview's global-flags token), so it always lists the live tool set with
+links to the Tools-page anchors. Add or reorder a page by editing `NAV_ORDER` (and
+`GUIDE_PAGES` for a new hand-written page + its template).
 
 Like the SDK/CLI docs the structure is **single-sourced, not hand-maintained**:
 each Speakeasy tool imports one request model whose file stem equals the OpenAPI

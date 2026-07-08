@@ -155,16 +155,13 @@
         "tab": "MCP",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "MCP server",
             "pages": [
               "mcp/overview",
-              "mcp/installation"
-            ]
-          },
-          {
-            "group": "Tools reference",
-            "pages": [
-              "mcp/tools"
+              "mcp/installation",
+              "mcp/tools",
+              "mcp/beginners-guide",
+              "mcp/troubleshooting"
             ]
           }
         ]

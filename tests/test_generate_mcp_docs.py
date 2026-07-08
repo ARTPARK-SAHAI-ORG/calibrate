@@ -120,19 +120,32 @@ def test_operation_map_unwraps_optional_body_anyof() -> None:
 # --------------------------------------------------------------------------- #
 # build_tab
 # --------------------------------------------------------------------------- #
-def test_build_tab_shape() -> None:
-    tab = build_tab(["mcp/overview", "mcp/installation"], ["mcp/tools"])
+def test_build_tab_single_group_in_coval_order() -> None:
+    # A set of written pages (order irrelevant) becomes one group in NAV_ORDER.
+    tab = build_tab(
+        {
+            "mcp/troubleshooting",
+            "mcp/overview",
+            "mcp/tools",
+            "mcp/installation",
+            "mcp/beginners-guide",
+        }
+    )
     assert tab["tab"] == "MCP"
-    assert tab["groups"][0] == {
-        "group": "Getting started",
-        "pages": ["mcp/overview", "mcp/installation"],
-    }
-    assert tab["groups"][1] == {"group": "Tools reference", "pages": ["mcp/tools"]}
-
-
-def test_build_tab_omits_empty_reference_group() -> None:
-    tab = build_tab(["mcp/overview"], [])
     assert len(tab["groups"]) == 1
+    assert tab["groups"][0]["group"] == "MCP server"
+    assert tab["groups"][0]["pages"] == [
+        "mcp/overview",
+        "mcp/installation",
+        "mcp/tools",
+        "mcp/beginners-guide",
+        "mcp/troubleshooting",
+    ]
+
+
+def test_build_tab_skips_missing_tools_page() -> None:
+    tab = build_tab({"mcp/overview", "mcp/installation"})
+    assert tab["groups"][0]["pages"] == ["mcp/overview", "mcp/installation"]
 
 
 # --------------------------------------------------------------------------- #
@@ -160,12 +173,15 @@ def _docs_json(tmp_path: Path) -> Path:
 def _template_dir(tmp_path: Path) -> Path:
     tdir = tmp_path / "templates"
     tdir.mkdir(exist_ok=True)
-    # overview carries the injection token; installation is a plain page.
+    # overview carries the injection token; the rest are plain pages. All four
+    # hand-written guide templates must exist or the generator aborts.
     (tdir / "overview.mdx").write_text(
         "# MCP overview\n\n## Available tools\n\n{/* AVAILABLE_TOOLS */}\n",
         encoding="utf-8",
     )
     (tdir / "installation.mdx").write_text("# Install\n", encoding="utf-8")
+    (tdir / "beginners-guide.mdx").write_text("# Beginner's guide\n", encoding="utf-8")
+    (tdir / "troubleshooting.mdx").write_text("# Troubleshooting\n", encoding="utf-8")
     return tdir
 
 
@@ -183,13 +199,27 @@ def _run(tmp_path: Path, samples=None):
     return output_root, docs_json
 
 
-def test_generate_writes_overview_installation_and_tools(tmp_path: Path) -> None:
+def test_generate_writes_all_five_pages(tmp_path: Path) -> None:
     output_root, _ = _run(tmp_path)
-    assert (output_root / "overview.mdx").is_file()
-    assert (output_root / "installation.mdx").is_file()
-    assert (output_root / "tools.mdx").is_file()
+    for name in ("overview", "installation", "tools", "beginners-guide", "troubleshooting"):
+        assert (output_root / f"{name}.mdx").is_file()
     # no per-resource pages in the Coval-style structure
     assert not (output_root / "widgets.mdx").exists()
+
+
+def test_generate_single_group_sidebar_order(tmp_path: Path) -> None:
+    _, docs_json = _run(tmp_path)
+    tabs = json.loads(docs_json.read_text())["navigation"]["tabs"]
+    mcp = next(t for t in tabs if t["tab"] == "MCP")
+    assert len(mcp["groups"]) == 1
+    assert mcp["groups"][0]["group"] == "MCP server"
+    assert mcp["groups"][0]["pages"] == [
+        "mcp/overview",
+        "mcp/installation",
+        "mcp/tools",
+        "mcp/beginners-guide",
+        "mcp/troubleshooting",
+    ]
 
 
 def test_overview_gets_available_tools_injected(tmp_path: Path) -> None:

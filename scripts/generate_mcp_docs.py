@@ -52,8 +52,13 @@ TAB_NAME = "MCP"
 INSERT_AFTER = ("Python SDK", "CLI", "Home")
 
 TOOLS_SLUG = "mcp/tools"
-# Hand-written conceptual pages copied into the Getting-started group, in order.
-GETTING_STARTED = ["overview", "installation"]
+GROUP_NAME = "MCP server"
+# Hand-written conceptual pages copied verbatim from TEMPLATE_DIR (overview also
+# gets the AVAILABLE_TOOLS token substituted).
+GUIDE_PAGES = ["overview", "installation", "beginners-guide", "troubleshooting"]
+# Sidebar order, mirroring Coval: the generated Tools page sits between
+# Installation and the Beginner's guide. Pages absent from a run are skipped.
+NAV_ORDER = ["overview", "installation", "tools", "beginners-guide", "troubleshooting"]
 # Token in the overview template replaced with the generated "Available tools"
 # category table. Collapses to an empty comment if there are no tools.
 AVAILABLE_TOOLS_TOKEN = "{/* AVAILABLE_TOOLS */}"
@@ -320,15 +325,15 @@ def render_tools_page(grouped: list[tuple[str, list[tuple[McpTool, Operation]]]]
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def _copy_getting_started(
+def _copy_guides(
     output_root: Path, template_dir: Path, substitutions: dict[str, str]
 ) -> list[str]:
     output_root.mkdir(parents=True, exist_ok=True)
     page_ids: list[str] = []
-    for name in GETTING_STARTED:
+    for name in GUIDE_PAGES:
         template = template_dir / f"{name}.mdx"
         if not template.is_file():
-            raise SystemExit(f"Getting-started template missing: {template}")
+            raise SystemExit(f"MCP guide template missing: {template}")
         text = template.read_text(encoding="utf-8")
         for token, value in substitutions.items():
             text = text.replace(token, value)
@@ -348,11 +353,16 @@ def _prune_stale(output_root: Path, keep_page_ids: set[str]) -> list[Path]:
     return removed
 
 
-def build_tab(getting_started: list[str], reference: list[str]) -> dict:
-    groups: list[dict] = [{"group": "Getting started", "pages": getting_started}]
-    if reference:
-        groups.append({"group": "Tools reference", "pages": reference})
-    return {"tab": TAB_NAME, "groups": groups}
+def build_tab(page_ids: set[str]) -> dict:
+    """A single "MCP server" group with the pages in Coval's fixed order.
+
+    ``page_ids`` is the set of pages that actually got written this run; the
+    generated Tools page is included only when there are tools. Order follows
+    ``NAV_ORDER`` (Overview, Installation, Tools, Beginner's guide,
+    Troubleshooting), mirroring Coval's sidebar.
+    """
+    pages = [f"mcp/{name}" for name in NAV_ORDER if f"mcp/{name}" in page_ids]
+    return {"tab": TAB_NAME, "groups": [{"group": GROUP_NAME, "pages": pages}]}
 
 
 def patch_docs_json(docs_json: Path, tab: dict) -> None:
@@ -422,25 +432,26 @@ def generate_mcp_docs(
         grouped_pairs.append((title, [(t, op_map[t.operation_ref]) for t in ordered]))
 
     docs_root = output_root.parent
-    reference_pages: list[str] = []
+    page_ids: set[str] = set()
     if grouped_pairs:
         (docs_root / TOOLS_SLUG).parent.mkdir(parents=True, exist_ok=True)
         (docs_root / f"{TOOLS_SLUG}.mdx").write_text(
             render_tools_page(grouped_pairs), encoding="utf-8"
         )
-        reference_pages.append(TOOLS_SLUG)
+        page_ids.add(TOOLS_SLUG)
 
     tools_table = available_tools_table(grouped_tools) or GENERATED_BANNER
-    getting_started = _copy_getting_started(
+    guides = _copy_guides(
         output_root, template_dir, {AVAILABLE_TOOLS_TOKEN: tools_table}
     )
+    page_ids.update(guides)
 
-    tab = build_tab(getting_started, reference_pages)
-    removed = _prune_stale(output_root, {*getting_started, *reference_pages})
+    tab = build_tab(page_ids)
+    removed = _prune_stale(output_root, page_ids)
     patch_docs_json(docs_json, tab)
 
     print(
-        f"Generated MCP docs: {len(getting_started)} guide page(s) + "
+        f"Generated MCP docs: {len(guides)} guide page(s) + "
         f"{sum(len(p) for _, p in grouped_pairs)} tool(s) under {output_root}"
     )
     if removed:

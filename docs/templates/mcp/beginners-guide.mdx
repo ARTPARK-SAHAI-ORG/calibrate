@@ -1,0 +1,78 @@
+---
+title: "Beginner's guide"
+description: "Get more out of Calibrate by driving it from your coding agent"
+---
+
+{/* Generated from docs/templates/mcp/beginners-guide.mdx — do not edit directly. */}
+
+The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) lets an AI
+assistant like Claude Code or Cursor call external tools. The Calibrate MCP
+server exposes your Calibrate workspace as tools, so you can create and run
+evaluations just by describing what you want — no clicking through the UI or
+writing API calls by hand.
+
+If you've never set up an MCP server before, this page walks you through it end
+to end.
+
+## What you can do
+
+Once connected, ask your coding agent in plain English:
+
+### Manage agents
+
+"List my agents", "create an agent called support-bot", or "update support-bot's
+model" — the agent calls the right tool and shows you the result.
+
+### Build and update tests
+
+"Create a test for the billing flow" or "bulk-upload these test cases" — add and
+edit the tests your agents are evaluated against.
+
+### Launch and monitor runs
+
+"Run the tests for support-bot" or "run tests for every agent in my workspace" —
+kick off evaluation runs and get back a task id.
+
+### Check results and debug
+
+"What's the status of run abc123?" — poll a run and read per-test-case pass/fail
+results and evaluator judgments without leaving your editor.
+
+## How to get set up
+
+You need a Calibrate API key — create one under
+[**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys).
+Then connect the server one of two ways:
+
+<Steps>
+  <Step title="Pick hosted or local">
+    **Hosted** (recommended) needs nothing installed — your client connects to
+    Calibrate's managed endpoint. **Local** runs the server on your machine with
+    `npx` and needs [Node.js](https://nodejs.org) 20+.
+  </Step>
+  <Step title="Add the server to your client">
+    Copy the snippet for your editor from [Installation](/mcp/installation) and
+    paste in your API key.
+  </Step>
+  <Step title="Restart your client">
+    Fully quit and reopen the app so it loads the new server.
+  </Step>
+  <Step title="Ask it something">
+    Try "list my agents" — if you get your agents back, you're connected.
+  </Step>
+</Steps>
+
+<Info>
+  See [Installation](/mcp/installation) for per-client snippets (Claude Code,
+  Cursor, Claude Desktop) and OS-specific config-file paths.
+</Info>
+
+## Your first queries
+
+- "List all my agents"
+- "Resolve the names support-bot and billing-bot to UUIDs"
+- "Run the tests for support-bot and give me the task id"
+- "What's the status and results of run abc123?"
+
+When you're ready for the full list of what the agent can call, see the
+[Tools reference](/mcp/tools).
