@@ -5,9 +5,9 @@ description: "Configure the Calibrate MCP server in your coding agent"
 
 {/* Generated from docs/templates/mcp/installation.mdx — do not edit directly. */}
 
-The server runs locally via `npx` and talks to the Calibrate
-[public API](/api-reference/introduction). You need [Node.js](https://nodejs.org)
-20+ and a Calibrate API key — create one under
+Connect the Calibrate MCP server to your coding agent one of two ways: the
+**hosted** endpoint (recommended — nothing to install), or a **local** server run
+with `npx`. Both need a Calibrate API key — create one under
 [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys).
 
 ## Config file locations
@@ -32,7 +32,72 @@ For clients that use a JSON config file (Claude Desktop), it lives here:
   </Tab>
 </Tabs>
 
-## Connect your client
+## Hosted server (recommended)
+
+Point your client at the managed endpoint
+`https://calibrate-mcp-106430091675.asia-south1.run.app/mcp` via
+[`mcp-remote`](https://www.npmjs.com/package/mcp-remote), passing your API key in
+the `X-API-Key` header. Nothing to install or keep updated.
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add --transport http calibrate \
+      https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
+      --header "X-API-Key: sk_your_api_key"
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "mcp-remote",
+            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
+            "--header",
+            "X-API-Key: ${CALIBRATE_API_KEY}"
+          ],
+          "env": {
+            "CALIBRATE_API_KEY": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Claude Desktop">
+    Add to `claude_desktop_config.json` (see paths above):
+
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "mcp-remote",
+            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
+            "--header",
+            "X-API-Key: ${CALIBRATE_API_KEY}"
+          ],
+          "env": {
+            "CALIBRATE_API_KEY": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Local server (npx)
+
+Run the server on your own machine from the
+[`@dalmia/calibrate-mcp`](https://www.npmjs.com/package/@dalmia/calibrate-mcp)
+package. It talks directly to the Calibrate API — no `mcp-remote` in between.
 
 <Tabs>
   <Tab title="Claude Code">
@@ -41,8 +106,6 @@ For clients that use a JSON config file (Claude Desktop), it lives here:
     ```
   </Tab>
   <Tab title="Cursor">
-    Add to your MCP settings (`stdio` transport):
-
     ```json
     {
       "mcpServers": {
@@ -83,13 +146,14 @@ For clients that use a JSON config file (Claude Desktop), it lives here:
 
 ## Environment variables
 
-| Variable | Required | Description |
+| Variable | Used by | Description |
 | --- | --- | --- |
-| `CALIBRATE_API_KEY_AUTH` | Yes | Your Calibrate API key. Equivalent to the `--api-key-auth` flag. |
-| `CALIBRATE_DEBUG` | No | Set to `true` for verbose logging. |
+| `CALIBRATE_API_KEY_AUTH` | Local server | Your Calibrate API key. Equivalent to the `--api-key-auth` flag. |
+| `CALIBRATE_API_KEY` | Hosted server | Your Calibrate API key, injected into the `X-API-Key` header for `mcp-remote`. |
+| `CALIBRATE_DEBUG` | Local server | Set to `true` for verbose logging. |
 
-For self-hosted Calibrate deployments, pass `--server-url` to point the server
-at your API instance:
+For self-hosted Calibrate deployments, run the local server with `--server-url`
+pointing at your API instance:
 
 ```bash
 npx -y @dalmia/calibrate-mcp start \
@@ -115,6 +179,3 @@ Inspect the tools interactively with the
 ```bash
 npx @modelcontextprotocol/inspector node bin/mcp-server.js start
 ```
-
-Point your client at the local build by using `node` with the path to
-`bin/mcp-server.js` instead of `npx @dalmia/calibrate-mcp`.

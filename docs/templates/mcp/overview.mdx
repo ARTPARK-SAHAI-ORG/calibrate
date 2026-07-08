@@ -41,21 +41,25 @@ Ask your coding agent to:
 ## Configuration
 
 <Tabs>
-  <Tab title="Hosted (npx)">
+  <Tab title="Hosted (recommended)">
+    Connect to the managed endpoint via `mcp-remote` — nothing to install:
+
+    ```bash
+    claude mcp add --transport http calibrate \
+      https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
+      --header "X-API-Key: sk_your_api_key"
+    ```
+  </Tab>
+  <Tab title="Local (npx)">
+    Run the server on your own machine:
+
     ```bash
     npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
     ```
   </Tab>
-  <Tab title="Self-hosted">
-    Point the server at your own Calibrate deployment with `--server-url`:
-
-    ```bash
-    npx -y @dalmia/calibrate-mcp start \
-      --api-key-auth "$CALIBRATE_API_KEY_AUTH" \
-      --server-url https://calibrate.my-company.internal
-    ```
-  </Tab>
 </Tabs>
+
+See [Installation](/mcp/installation) for per-client config and self-hosting.
 
 ## Available tools
 
