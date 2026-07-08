@@ -1,0 +1,233 @@
+---
+title: "Tools"
+description: "Every tool the Calibrate MCP server exposes"
+---
+
+{/* Generated from calibrate-mcp/src/mcp-server/tools by scripts/generate_mcp_docs.py — do not edit directly. */}
+
+Each tool maps 1-to-1 to a [public API](/api-reference/introduction) operation. Tools are grouped by resource below.
+
+## Agent tests
+
+### get-agent-test-run
+
+Poll the status and results of an agent test run by task_id. Returns
+queued, in_progress, completed, failed, or aborted status. When
+completed, includes per-test-case pass/fail results and evaluator
+judgments. Use the task_id from run-agent-tests or
+run-agent-tests-batch.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_id` | string | Yes | Test run to poll for status and results |
+
+See **GET /agent-tests/run/&#123;task_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### run-agent-tests
+
+Start a background LLM unit-test job for one agent. Runs all tests
+linked to the agent unless test_uuids is provided. Returns a task_id
+to poll with get-agent-test-run. The agent must belong to the caller's
+org and have a verified connection; otherwise the call fails with 400
+or 404.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent to test. |
+| `test_uuids` | array of string | No | Tests to run. Omit to run all tests linked to the agent |
+
+See **POST /agent-tests/agent/&#123;agent_uuid&#125;/run** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### run-agent-tests-batch
+
+Launch one test job per agent in the caller's org. Optionally restrict
+to agent_names; omit or pass an empty list to run every org agent.
+Agents with no linked tests or an unverified connection are skipped
+(reported under skipped) rather than failing the batch. Returns
+task_id values to poll with get-agent-test-run.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_names` | array of string | No | Agents to run. Omit to run every agent in your workspace |
+
+See **POST /agent-tests/run** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## Agents
+
+### list-agents
+
+List every agent in the caller's organization. Returns each agent's
+UUID, name, type, and config. Use this to discover which agents exist
+before resolving names or launching test runs. Requires a Calibrate
+API key (CALIBRATE_API_KEY).
+
+**Scope:** `read` · **Access:** Read-only
+
+See **GET /agents** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-agent
+
+Fetch a single agent by UUID within the caller's org. Returns the
+agent's name, type, and config. Fails with 404 if the agent does not
+exist or belongs to another org.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent to retrieve. |
+
+See **GET /agents/&#123;agent_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### resolve-agent-names
+
+Map human-friendly agent names to UUIDs within the caller's org. Each
+name resolves to at most one agent; unknown names are returned under
+not_found. Use this before run-agent-tests when you have names instead
+of UUIDs. Does not create or modify agents.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `names` | array of string | Yes | Agent names to resolve to IDs |
+
+See **POST /agents/resolve** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-agent
+
+Create a new agent in the caller's organization. Provide the agent's
+name, type, and config. Returns the created agent including its UUID.
+Requires a Calibrate API key (CALIBRATE_API_KEY).
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Agent name, unique within the workspace |
+| `type` | string | No | - `agent`: built inside Calibrate |
+| `config` | object | No | Agent behavioral config. The keys depend on `type`. |
+
+See **POST /agents** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### update-agent
+
+Update an existing agent by UUID within the caller's org. Supply the
+fields to change (name, type, config). Returns the updated agent.
+Fails with 404 if the agent does not exist or belongs to another org.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent to update. |
+| `name` | string | No | New agent name. Omit to leave the name unchanged |
+| `config` | object | No | Agent behavioral config. The keys depend on `type`. |
+
+See **PUT /agents/&#123;agent_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## Tests
+
+### list-tests
+
+List every test in the caller's organization. Returns each test's
+UUID, name, type, and config. Use this to discover which tests exist
+before creating runs.
+
+**Scope:** `read` · **Access:** Read-only
+
+See **GET /tests** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-test
+
+Fetch a single test by UUID within the caller's org. Returns the
+test's name, type, and config. Fails with 404 if the test does not
+exist or belongs to another org.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `test_uuid` | string | Yes | Test to retrieve |
+
+See **GET /tests/&#123;test_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-test
+
+Create a new test in the caller's organization. Provide the test's
+name, type, and config. Returns the created test including its UUID.
+Requires a Calibrate API key (CALIBRATE_API_KEY).
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Name of the test, unique within the workspace |
+| `type` | string | Yes | What the test judges: |
+| `config` | object | No | The calibrate test config. Three top-level keys. |
+| `evaluators` | array of routers__tests__EvaluatorRef | No | Evaluators to link. Used by `response` and `conversation` tests |
+
+See **POST /tests** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### bulk-create-tests
+
+Create multiple tests in the caller's organization in one call. Provide
+a list of test definitions (name, type, config). Returns the created
+tests including their UUIDs.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `type` | string | Yes | What the test judges: |
+| `tests` | array of BulkTestItem | Yes | Test items to create (non-empty, max 500 per request, names unique within the batch) |
+| `agent_uuids` | array of string | No | Agents (IDs) to link every created test to. Omit to link none |
+| `language` | string | No | Language written to each test's `config.settings.language`. Omit to leave unset |
+
+See **POST /tests/bulk** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### update-test
+
+Update an existing test by UUID within the caller's org. Supply the
+fields to change (name, config). Returns the updated test. Fails with
+404 if the test does not exist or belongs to another org.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `test_uuid` | string | Yes | Test to update |
+| `name` | string | No | New test name. Omit to leave unchanged |
+| `type` | string | No | What the test judges: |
+| `config` | object | No | The calibrate test config. Three top-level keys. |
+| `evaluators` | array of routers__tests__EvaluatorRef | No | New evaluator links for the test. Omit to leave unchanged. An empty list clears them, except on `conversation` tests, which must keep at least one |
+
+See **PUT /tests/&#123;test_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.

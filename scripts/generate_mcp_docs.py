@@ -1,28 +1,32 @@
 #!/usr/bin/env python3
 """Generate Mintlify MDX pages for the Speakeasy-generated MCP server.
 
-Reads the tool definitions the ``calibrate-mcp`` repo ships under
-``src/mcp-server/tools/*.ts`` and produces one page per API resource (``agents``,
-``agent-tests``, ``tests``), each tool rendered as a ``##`` section — description,
-a scopes / read-only line, an arguments table, and a cross-link to the matching
-operation in the API reference tab.
+The MCP tab follows the same shape as Coval's MCP docs — a short **Overview**, an
+**Installation** page, and a single generated **Tools** reference:
+
+- ``mcp/overview``     — hand-written template; its "Available tools" table is
+                         injected from the live tool set (one row per resource).
+- ``mcp/installation`` — hand-written template (client config, env vars).
+- ``mcp/tools``        — fully generated: tools grouped by API resource, each a
+                         ``###`` section with description, a scope / access line,
+                         a parameters table, and a cross-link to the API operation.
 
 Like the SDK and CLI generators, the structure is single-sourced, not
 hand-maintained: each tool links to an OpenAPI operation via its request-model
 import (see ``mcp_reference.operation_key``), and the operation's tag drives the
 resource grouping (``api_group_from_tag`` — shared with the SDK/CLI generators,
 so ``agent-tests`` -> "Agent tests" everywhere) while its parameters and request
-body drive the arguments table. The Getting-started overview is a hand-written
-template under ``docs/templates/mcp/``.
+body drive the parameters table.
 
 Run by the sync workflow via ``fetch_public_openapi.py`` when ``MCP_DOCS_PATH``
 points at a ``calibrate-mcp`` checkout. Edit the tool definitions (in
-``calibrate-mcp``) or the overview template — never the generated pages.
+``calibrate-mcp``) or the Getting-started templates — never the generated pages.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
@@ -46,15 +50,31 @@ TEMPLATE_DIR = REPO_ROOT / "docs" / "templates" / "mcp"
 TAB_NAME = "MCP"
 # Place the MCP tab after "Python SDK" when present, else the cloud CLI, else Home.
 INSERT_AFTER = ("Python SDK", "CLI", "Home")
-OVERVIEW_SLUG = "mcp/overview"
 
-# Hand-written conceptual pages copied verbatim into the Getting-started group.
-GETTING_STARTED = ["overview"]
+TOOLS_SLUG = "mcp/tools"
+# Hand-written conceptual pages copied into the Getting-started group, in order.
+GETTING_STARTED = ["overview", "installation"]
+# Token in the overview template replaced with the generated "Available tools"
+# category table. Collapses to an empty comment if there are no tools.
+AVAILABLE_TOOLS_TOKEN = "{/* AVAILABLE_TOOLS */}"
 
 GENERATED_BANNER = (
     "{/* Generated from calibrate-mcp/src/mcp-server/tools by "
     "scripts/generate_mcp_docs.py — do not edit directly. */}"
 )
+
+# Read-before-write CRUD ordering within a resource, mirroring Coval's tool
+# tables (list, get, …, create, update). Verbs not listed sort last, by name.
+_VERB_ORDER = {
+    "list": 0,
+    "get": 1,
+    "resolve": 2,
+    "create": 3,
+    "bulk": 4,
+    "run": 5,
+    "update": 6,
+    "delete": 7,
+}
 
 
 @dataclass(frozen=True)
@@ -188,6 +208,16 @@ def build_operation_map(openapi: dict[str, Any]) -> dict[str, Operation]:
     return ops
 
 
+def _anchor(title: str) -> str:
+    """Mintlify heading anchor for a ``## Title`` (e.g. "Agent tests" -> agent-tests)."""
+    return re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
+
+
+def _tool_sort_key(tool: McpTool) -> tuple[int, str]:
+    verb = tool.name.split("-", 1)[0]
+    return (_VERB_ORDER.get(verb, 99), tool.name)
+
+
 def _summary_line(text: str) -> str:
     """First non-blank line of a (possibly multi-line) description.
 
@@ -202,11 +232,11 @@ def _summary_line(text: str) -> str:
     return ""
 
 
-def _args_table(args: list[Arg]) -> str:
+def _params_table(args: list[Arg]) -> str:
     if not args:
         return ""
     lines = [
-        "| Argument | Type | Required | Description |",
+        "| Parameter | Type | Required | Description |",
         "| --- | --- | --- | --- |",
     ]
     for a in args:
@@ -226,7 +256,7 @@ def _args_table(args: list[Arg]) -> str:
 
 
 def _tool_section(tool: McpTool, op: Operation) -> list[str]:
-    lines = [f"## {tool.name}", ""]
+    lines = [f"### {tool.name}", ""]
     if tool.description:
         lines += [escape_mdx_prose(tool.description), ""]
 
@@ -236,9 +266,9 @@ def _tool_section(tool: McpTool, op: Operation) -> list[str]:
     meta.append("**Access:** " + ("Read-only" if tool.read_only else "Write"))
     lines += [" · ".join(meta), ""]
 
-    table = _args_table(op.args)
+    table = _params_table(op.args)
     if table:
-        lines += ["**Arguments**", "", table, ""]
+        lines += ["**Parameters**", "", table, ""]
 
     api_page = escape_mdx_prose(op.api_page)
     lines += [
@@ -247,6 +277,21 @@ def _tool_section(tool: McpTool, op: Operation) -> list[str]:
         "",
     ]
     return lines
+
+
+def available_tools_table(grouped: list[tuple[str, list[McpTool]]]) -> str:
+    """The "Available tools" summary table injected into the overview.
+
+    One row per resource: the category links to its section on the Tools page,
+    followed by the tool names in the same order the Tools page lists them.
+    """
+    if not grouped:
+        return ""
+    lines = ["| Category | Tools |", "| --- | --- |"]
+    for title, tools in grouped:
+        names = ", ".join(f"`{t.name}`" for t in tools)
+        lines.append(f"| [{title}](/{TOOLS_SLUG}#{_anchor(title)}) | {names} |")
+    return "\n".join(lines)
 
 
 def _frontmatter(title: str, description: str) -> list[str]:
@@ -261,24 +306,33 @@ def _frontmatter(title: str, description: str) -> list[str]:
     ]
 
 
-def render_resource_page(title: str, tools: list[tuple[McpTool, Operation]]) -> str:
-    description = f"MCP tools for {title.lower()}."
-    lines = _frontmatter(title, description)
-    for tool, op in tools:
-        lines += _tool_section(tool, op)
+def render_tools_page(grouped: list[tuple[str, list[tuple[McpTool, Operation]]]]) -> str:
+    lines = _frontmatter("Tools", "Every tool the Calibrate MCP server exposes")
+    lines += [
+        "Each tool maps 1-to-1 to a [public API](/api-reference/introduction) "
+        "operation. Tools are grouped by resource below.",
+        "",
+    ]
+    for title, pairs in grouped:
+        lines += [f"## {title}", ""]
+        for tool, op in pairs:
+            lines += _tool_section(tool, op)
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def _copy_getting_started(output_root: Path, template_dir: Path) -> list[str]:
+def _copy_getting_started(
+    output_root: Path, template_dir: Path, substitutions: dict[str, str]
+) -> list[str]:
     output_root.mkdir(parents=True, exist_ok=True)
     page_ids: list[str] = []
     for name in GETTING_STARTED:
         template = template_dir / f"{name}.mdx"
         if not template.is_file():
             raise SystemExit(f"Getting-started template missing: {template}")
-        (output_root / f"{name}.mdx").write_text(
-            template.read_text(encoding="utf-8"), encoding="utf-8"
-        )
+        text = template.read_text(encoding="utf-8")
+        for token, value in substitutions.items():
+            text = text.replace(token, value)
+        (output_root / f"{name}.mdx").write_text(text, encoding="utf-8")
         page_ids.append(f"mcp/{name}")
     return page_ids
 
@@ -294,10 +348,10 @@ def _prune_stale(output_root: Path, keep_page_ids: set[str]) -> list[Path]:
     return removed
 
 
-def build_tab(getting_started: list[str], resources: list[str]) -> dict:
+def build_tab(getting_started: list[str], reference: list[str]) -> dict:
     groups: list[dict] = [{"group": "Getting started", "pages": getting_started}]
-    if resources:
-        groups.append({"group": "Tools", "pages": resources})
+    if reference:
+        groups.append({"group": "Tools reference", "pages": reference})
     return {"tab": TAB_NAME, "groups": groups}
 
 
@@ -313,7 +367,7 @@ def _fail_unmatched_tools(tools: list[McpTool]) -> None:
     """Abort when a tool matched no OpenAPI operation — args/cross-link would break.
 
     This runs unattended on a schedule, so instead of silently shipping a tool
-    page with no arguments or API link, emit a GitHub Actions error annotation and
+    with no arguments or API link, emit a GitHub Actions error annotation and
     raise — failing the sync so a human resolves the mismatch (a renamed operation
     or a stale OpenAPI spec) before anything is published.
     """
@@ -354,28 +408,41 @@ def generate_mcp_docs(
     if unmatched:
         _fail_unmatched_tools(unmatched)
 
-    by_tag: dict[str, list[tuple[McpTool, Operation]]] = defaultdict(list)
+    by_tag: dict[str, list[McpTool]] = defaultdict(list)
     for tool in tools:
-        op = op_map[tool.operation_ref]
-        by_tag[op.tag].append((tool, op))
+        by_tag[op_map[tool.operation_ref].tag].append(tool)
 
-    docs_root = output_root.parent
-    resource_pages: list[str] = []
+    # Resources sorted by title; tools within each in read-before-write order.
+    grouped_tools: list[tuple[str, list[McpTool]]] = []
+    grouped_pairs: list[tuple[str, list[tuple[McpTool, Operation]]]] = []
     for tag in sorted(by_tag, key=api_group_from_tag):
         title = api_group_from_tag(tag)
-        pairs = sorted(by_tag[tag], key=lambda pair: pair[0].name)
-        slug = f"mcp/{tag}"
-        out_path = docs_root / f"{slug}.mdx"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(render_resource_page(title, pairs), encoding="utf-8")
-        resource_pages.append(slug)
+        ordered = sorted(by_tag[tag], key=_tool_sort_key)
+        grouped_tools.append((title, ordered))
+        grouped_pairs.append((title, [(t, op_map[t.operation_ref]) for t in ordered]))
 
-    getting_started = _copy_getting_started(output_root, template_dir)
-    tab = build_tab(getting_started, resource_pages)
-    removed = _prune_stale(output_root, {*getting_started, *resource_pages})
+    docs_root = output_root.parent
+    reference_pages: list[str] = []
+    if grouped_pairs:
+        (docs_root / TOOLS_SLUG).parent.mkdir(parents=True, exist_ok=True)
+        (docs_root / f"{TOOLS_SLUG}.mdx").write_text(
+            render_tools_page(grouped_pairs), encoding="utf-8"
+        )
+        reference_pages.append(TOOLS_SLUG)
+
+    tools_table = available_tools_table(grouped_tools) or GENERATED_BANNER
+    getting_started = _copy_getting_started(
+        output_root, template_dir, {AVAILABLE_TOOLS_TOKEN: tools_table}
+    )
+
+    tab = build_tab(getting_started, reference_pages)
+    removed = _prune_stale(output_root, {*getting_started, *reference_pages})
     patch_docs_json(docs_json, tab)
 
-    print(f"Generated {len(resource_pages)} MCP resource page(s) under {output_root}")
+    print(
+        f"Generated MCP docs: {len(getting_started)} guide page(s) + "
+        f"{sum(len(p) for _, p in grouped_pairs)} tool(s) under {output_root}"
+    )
     if removed:
         print(f"Pruned {len(removed)} stale page(s)")
 

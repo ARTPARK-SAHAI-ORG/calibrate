@@ -157,15 +157,14 @@
           {
             "group": "Getting started",
             "pages": [
-              "mcp/overview"
+              "mcp/overview",
+              "mcp/installation"
             ]
           },
           {
-            "group": "Tools",
+            "group": "Tools reference",
             "pages": [
-              "mcp/agent-tests",
-              "mcp/agents",
-              "mcp/tests"
+              "mcp/tools"
             ]
           }
         ]

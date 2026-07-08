@@ -1,0 +1,120 @@
+---
+title: "Installation"
+description: "Configure the Calibrate MCP server in your coding agent"
+---
+
+{/* Generated from docs/templates/mcp/installation.mdx — do not edit directly. */}
+
+The server runs locally via `npx` and talks to the Calibrate
+[public API](/api-reference/introduction). You need [Node.js](https://nodejs.org)
+20+ and a Calibrate API key — create one under
+[**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys).
+
+## Config file locations
+
+For clients that use a JSON config file (Claude Desktop), it lives here:
+
+<Tabs>
+  <Tab title="macOS">
+    ```
+    ~/Library/Application Support/Claude/claude_desktop_config.json
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```
+    %APPDATA%\Claude\claude_desktop_config.json
+    ```
+  </Tab>
+  <Tab title="Linux">
+    ```
+    ~/.config/Claude/claude_desktop_config.json
+    ```
+  </Tab>
+</Tabs>
+
+## Connect your client
+
+<Tabs>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add calibrate -- npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Add to your MCP settings (`stdio` transport):
+
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": ["-y", "@dalmia/calibrate-mcp", "start"],
+          "env": {
+            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Claude Desktop">
+    Add to `claude_desktop_config.json` (see paths above):
+
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": ["-y", "@dalmia/calibrate-mcp", "start"],
+          "env": {
+            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  Fully quit and reopen your client after editing its config — Claude Desktop
+  needs a complete restart, not just a new window.
+</Warning>
+
+## Environment variables
+
+| Variable | Required | Description |
+| --- | --- | --- |
+| `CALIBRATE_API_KEY_AUTH` | Yes | Your Calibrate API key. Equivalent to the `--api-key-auth` flag. |
+| `CALIBRATE_DEBUG` | No | Set to `true` for verbose logging. |
+
+For self-hosted Calibrate deployments, pass `--server-url` to point the server
+at your API instance:
+
+```bash
+npx -y @dalmia/calibrate-mcp start \
+  --api-key-auth "$CALIBRATE_API_KEY_AUTH" \
+  --server-url https://calibrate.my-company.internal
+```
+
+## Local development
+
+To run from a local clone:
+
+```bash
+git clone https://github.com/dalmia/calibrate-mcp
+cd calibrate-mcp
+npm install
+npm run build
+node bin/mcp-server.js start --api-key-auth sk_your_api_key
+```
+
+Inspect the tools interactively with the
+[MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector):
+
+```bash
+npx @modelcontextprotocol/inspector node bin/mcp-server.js start
+```
+
+Point your client at the local build by using `node` with the path to
+`bin/mcp-server.js` instead of `npx @dalmia/calibrate-mcp`.

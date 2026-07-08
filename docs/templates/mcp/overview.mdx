@@ -5,71 +5,86 @@ description: "Expose Calibrate to coding agents over the Model Context Protocol"
 
 {/* Generated from docs/templates/mcp/overview.mdx — do not edit directly. */}
 
-The Calibrate [MCP server](https://modelcontextprotocol.io) exposes the public
-API as tools for coding agents like Cursor, Claude Code, or Codex — so they can
-list agents, resolve names to UUIDs, run tests, and poll results without leaving
-your editor. Every tool maps 1-to-1 to a [public API](/api-reference/introduction)
-operation.
+The Calibrate [MCP server](https://modelcontextprotocol.io) lets AI assistants
+like Claude Code, Cursor, and Codex work with Calibrate's evaluation API through
+the Model Context Protocol — so they can manage agents and tests and launch runs
+without leaving your editor. Every tool maps 1-to-1 to a
+[public API](/api-reference/introduction) operation.
 
-## Install
+## What you can do
 
-```bash
-npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
-```
+Ask your coding agent to:
 
-## Auth
+- List agents and resolve friendly names to UUIDs
+- Create and update agents
+- Create, bulk-upload, and update tests
+- Launch agent test runs — for one agent or every agent in your workspace
+- Poll a run for status and per-test-case results
 
-Create an API key under [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) — see the [API keys guide](/reference/api-keys). Pass it with `--api-key-auth` or the `CALIBRATE_API_KEY_AUTH` environment variable.
+## Quick start
 
-## Connect your editor
+<Steps>
+  <Step title="Get your API key">
+    Create one under [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) — see the [API keys guide](/reference/api-keys).
+  </Step>
+  <Step title="Configure your MCP client">
+    Add the server to your editor's MCP config with your API key. See [Installation](/mcp/installation) for per-client snippets.
+  </Step>
+  <Step title="Restart your client">
+    Fully quit and reopen your MCP-compatible app so it picks up the new server.
+  </Step>
+  <Step title="Start asking">
+    Query your agent — "list my agents", "run tests for support-bot", "what's the status of run abc123".
+  </Step>
+</Steps>
 
-<CodeGroup>
+## Configuration
 
-```json Cursor
-{
-  "mcpServers": {
-    "calibrate": {
-      "command": "npx",
-      "args": ["-y", "@dalmia/calibrate-mcp", "start"],
-      "env": {
-        "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
-      }
-    }
-  }
-}
-```
+<Tabs>
+  <Tab title="Hosted (npx)">
+    ```bash
+    npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+    ```
+  </Tab>
+  <Tab title="Self-hosted">
+    Point the server at your own Calibrate deployment with `--server-url`:
 
-```bash Claude Code
-claude mcp add calibrate -- npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
-```
+    ```bash
+    npx -y @dalmia/calibrate-mcp start \
+      --api-key-auth "$CALIBRATE_API_KEY_AUTH" \
+      --server-url https://calibrate.my-company.internal
+    ```
+  </Tab>
+</Tabs>
 
-</CodeGroup>
+## Available tools
 
-Once connected, ask your agent to list agents, resolve names to UUIDs, run tests, or poll run status.
+{/* AVAILABLE_TOOLS */}
 
-## Self-hosting
+See the [Tools reference](/mcp/tools) for each tool's parameters and the API
+operation it calls.
 
-For self-hosted Calibrate deployments, pass `--server-url` to point the server at your API instance:
+## Example queries
 
-```bash
-npx -y @dalmia/calibrate-mcp start \
-  --api-key-auth "$CALIBRATE_API_KEY_AUTH" \
-  --server-url https://calibrate.my-company.internal
-```
+- "List all my agents"
+- "Resolve the names support-bot and billing-bot to UUIDs"
+- "Run the tests for support-bot and give me the task id"
+- "Run tests for every agent in my workspace"
+- "What's the status and results of run abc123?"
 
-## Tools
+## Requirements
 
-The tool pages under this tab list every available tool, grouped by resource,
-with its arguments and a link to the underlying API operation.
+- Node.js 20+
+- A Calibrate API key
+- An MCP-compatible client (Claude Code, Cursor, Codex, Claude Desktop)
 
-## Resources
+## Support
 
-<CardGroup cols={1}>
-  <Card
-    title="Source"
-    icon="github"
-    href="https://github.com/dalmia/calibrate-mcp"
-  >
+<CardGroup cols={2}>
+  <Card title="Source" icon="github" href="https://github.com/dalmia/calibrate-mcp">
     calibrate-mcp
+  </Card>
+  <Card title="API keys" icon="key" href="/reference/api-keys">
+    Create and manage keys
   </Card>
 </CardGroup>
