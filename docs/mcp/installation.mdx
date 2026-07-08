@@ -12,23 +12,23 @@ with `npx`. Both need a Calibrate API key — create one under
 
 ## Config file locations
 
-For clients that use a JSON config file (Claude Desktop), it lives here:
+Where each client stores its MCP config:
 
 <Tabs>
   <Tab title="macOS">
-    ```
-    ~/Library/Application Support/Claude/claude_desktop_config.json
-    ```
+    - **Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`
+    - **Cursor** — `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project)
+    - **Claude Code** — `~/.claude.json` (or `.mcp.json` in a project)
   </Tab>
   <Tab title="Windows">
-    ```
-    %APPDATA%\Claude\claude_desktop_config.json
-    ```
+    - **Claude Desktop** — `%APPDATA%\Claude\claude_desktop_config.json`
+    - **Cursor** — `%USERPROFILE%\.cursor\mcp.json` (or `.cursor\mcp.json` in a project)
+    - **Claude Code** — `%USERPROFILE%\.claude.json` (or `.mcp.json` in a project)
   </Tab>
   <Tab title="Linux">
-    ```
-    ~/.config/Claude/claude_desktop_config.json
-    ```
+    - **Claude Desktop** — `~/.config/Claude/claude_desktop_config.json`
+    - **Cursor** — `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project)
+    - **Claude Code** — `~/.claude.json` (or `.mcp.json` in a project)
   </Tab>
 </Tabs>
 
@@ -40,101 +40,57 @@ Point your client at the managed endpoint
 the `X-API-Key` header. Nothing to install or keep updated.
 
 <Tabs>
+  <Tab title="Claude Desktop">
+    Add to `claude_desktop_config.json` (see paths above):
+
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "mcp-remote",
+            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
+            "--header",
+            "X-API-Key: ${CALIBRATE_API_KEY}"
+          ],
+          "env": {
+            "CALIBRATE_API_KEY": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    Add to `.cursor/mcp.json`:
+
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": [
+            "-y",
+            "mcp-remote",
+            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
+            "--header",
+            "X-API-Key: ${CALIBRATE_API_KEY}"
+          ],
+          "env": {
+            "CALIBRATE_API_KEY": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
   <Tab title="Claude Code">
     ```bash
     claude mcp add --transport http calibrate \
       https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
       --header "X-API-Key: sk_your_api_key"
-    ```
-  </Tab>
-  <Tab title="Cursor">
-    ```json
-    {
-      "mcpServers": {
-        "calibrate": {
-          "command": "npx",
-          "args": [
-            "-y",
-            "mcp-remote",
-            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
-            "--header",
-            "X-API-Key: ${CALIBRATE_API_KEY}"
-          ],
-          "env": {
-            "CALIBRATE_API_KEY": "sk_your_api_key"
-          }
-        }
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Claude Desktop">
-    Add to `claude_desktop_config.json` (see paths above):
-
-    ```json
-    {
-      "mcpServers": {
-        "calibrate": {
-          "command": "npx",
-          "args": [
-            "-y",
-            "mcp-remote",
-            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
-            "--header",
-            "X-API-Key: ${CALIBRATE_API_KEY}"
-          ],
-          "env": {
-            "CALIBRATE_API_KEY": "sk_your_api_key"
-          }
-        }
-      }
-    }
-    ```
-  </Tab>
-</Tabs>
-
-## Local server (npx)
-
-Run the server on your own machine from the
-[`@dalmia/calibrate-mcp`](https://www.npmjs.com/package/@dalmia/calibrate-mcp)
-package. It talks directly to the Calibrate API — no `mcp-remote` in between.
-
-<Tabs>
-  <Tab title="Claude Code">
-    ```bash
-    claude mcp add calibrate -- npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
-    ```
-  </Tab>
-  <Tab title="Cursor">
-    ```json
-    {
-      "mcpServers": {
-        "calibrate": {
-          "command": "npx",
-          "args": ["-y", "@dalmia/calibrate-mcp", "start"],
-          "env": {
-            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
-          }
-        }
-      }
-    }
-    ```
-  </Tab>
-  <Tab title="Claude Desktop">
-    Add to `claude_desktop_config.json` (see paths above):
-
-    ```json
-    {
-      "mcpServers": {
-        "calibrate": {
-          "command": "npx",
-          "args": ["-y", "@dalmia/calibrate-mcp", "start"],
-          "env": {
-            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
-          }
-        }
-      }
-    }
     ```
   </Tab>
 </Tabs>
@@ -144,13 +100,59 @@ package. It talks directly to the Calibrate API — no `mcp-remote` in between.
   needs a complete restart, not just a new window.
 </Warning>
 
+## Local server (npx)
+
+Run the server on your own machine from the
+[`@dalmia/calibrate-mcp`](https://www.npmjs.com/package/@dalmia/calibrate-mcp)
+package. It talks directly to the Calibrate API — no `mcp-remote` in between.
+
+<Tabs>
+  <Tab title="Claude Desktop">
+    Add to `claude_desktop_config.json` (see paths above):
+
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": ["-y", "@dalmia/calibrate-mcp", "start"],
+          "env": {
+            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Cursor">
+    ```json
+    {
+      "mcpServers": {
+        "calibrate": {
+          "command": "npx",
+          "args": ["-y", "@dalmia/calibrate-mcp", "start"],
+          "env": {
+            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
+          }
+        }
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Claude Code">
+    ```bash
+    claude mcp add calibrate -- npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+    ```
+  </Tab>
+</Tabs>
+
 ## Environment variables
 
-| Variable | Used by | Description |
-| --- | --- | --- |
-| `CALIBRATE_API_KEY_AUTH` | Local server | Your Calibrate API key. Equivalent to the `--api-key-auth` flag. |
-| `CALIBRATE_API_KEY` | Hosted server | Your Calibrate API key, injected into the `X-API-Key` header for `mcp-remote`. |
-| `CALIBRATE_DEBUG` | Local server | Set to `true` for verbose logging. |
+| Variable | Required | Default | Description |
+| --- | --- | --- | --- |
+| `CALIBRATE_API_KEY_AUTH` | Yes | — | Your API key for the **local** server. Equivalent to the `--api-key-auth` flag. |
+| `CALIBRATE_API_KEY` | Yes | — | Your API key for the **hosted** server, injected into the `X-API-Key` header for `mcp-remote`. |
+| `CALIBRATE_DEBUG` | No | `false` | Set to `true` for verbose logging (local server). |
 
 For self-hosted Calibrate deployments, run the local server with `--server-url`
 pointing at your API instance:
@@ -173,8 +175,11 @@ npm run build
 node bin/mcp-server.js start --api-key-auth sk_your_api_key
 ```
 
+### MCP Inspector
+
 Inspect the tools interactively with the
-[MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector):
+[MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) — a web UI
+for testing tool calls:
 
 ```bash
 npx @modelcontextprotocol/inspector node bin/mcp-server.js start

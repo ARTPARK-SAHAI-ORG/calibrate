@@ -68,6 +68,15 @@ GENERATED_BANNER = (
     "scripts/generate_mcp_docs.py — do not edit directly. */}"
 )
 
+# Short "purpose" blurb per API resource for the overview's Available-tools table
+# (Coval's third column). Keyed by OpenAPI tag; unknown tags fall back to "".
+# The only hand-maintained per-resource string — kept tiny and low-churn.
+RESOURCE_PURPOSES = {
+    "agents": "Manage the agents in your workspace",
+    "agent-tests": "Launch and monitor agent test runs",
+    "tests": "Create and manage tests",
+}
+
 # Read-before-write CRUD ordering within a resource, mirroring Coval's tool
 # tables (list, get, …, create, update). Verbs not listed sort last, by name.
 _VERB_ORDER = {
@@ -284,18 +293,27 @@ def _tool_section(tool: McpTool, op: Operation) -> list[str]:
     return lines
 
 
-def available_tools_table(grouped: list[tuple[str, list[McpTool]]]) -> str:
-    """The "Available tools" summary table injected into the overview.
+def available_tools_table(rows: list[tuple[str, str, list[McpTool]]]) -> str:
+    """The "Available tools" summary injected into the overview.
 
-    One row per resource: the category links to its section on the Tools page,
-    followed by the tool names in the same order the Tools page lists them.
+    A count lead-in ("… N tools across M categories:") followed by a
+    ``Category | Tools | Purpose`` table — mirroring Coval's three-column
+    layout. One row per resource: the category links to its section on the Tools
+    page, then the tool names (in Tools-page order) and the resource purpose.
     """
-    if not grouped:
+    if not rows:
         return ""
-    lines = ["| Category | Tools |", "| --- | --- |"]
-    for title, tools in grouped:
+    total = sum(len(tools) for _, _, tools in rows)
+    lead = (
+        f"The Calibrate MCP server exposes {total} tools across "
+        f"{len(rows)} categories:"
+    )
+    lines = [lead, "", "| Category | Tools | Purpose |", "| --- | --- | --- |"]
+    for title, purpose, tools in rows:
         names = ", ".join(f"`{t.name}`" for t in tools)
-        lines.append(f"| [{title}](/{TOOLS_SLUG}#{_anchor(title)}) | {names} |")
+        lines.append(
+            f"| [{title}](/{TOOLS_SLUG}#{_anchor(title)}) | {names} | {purpose or '—'} |"
+        )
     return "\n".join(lines)
 
 
@@ -423,12 +441,12 @@ def generate_mcp_docs(
         by_tag[op_map[tool.operation_ref].tag].append(tool)
 
     # Resources sorted by title; tools within each in read-before-write order.
-    grouped_tools: list[tuple[str, list[McpTool]]] = []
+    grouped_rows: list[tuple[str, str, list[McpTool]]] = []
     grouped_pairs: list[tuple[str, list[tuple[McpTool, Operation]]]] = []
     for tag in sorted(by_tag, key=api_group_from_tag):
         title = api_group_from_tag(tag)
         ordered = sorted(by_tag[tag], key=_tool_sort_key)
-        grouped_tools.append((title, ordered))
+        grouped_rows.append((title, RESOURCE_PURPOSES.get(tag, ""), ordered))
         grouped_pairs.append((title, [(t, op_map[t.operation_ref]) for t in ordered]))
 
     docs_root = output_root.parent
@@ -440,7 +458,7 @@ def generate_mcp_docs(
         )
         page_ids.add(TOOLS_SLUG)
 
-    tools_table = available_tools_table(grouped_tools) or GENERATED_BANNER
+    tools_table = available_tools_table(grouped_rows) or GENERATED_BANNER
     guides = _copy_guides(
         output_root, template_dir, {AVAILABLE_TOOLS_TOKEN: tools_table}
     )

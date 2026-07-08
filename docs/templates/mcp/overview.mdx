@@ -28,7 +28,28 @@ Ask your coding agent to:
     Create one under [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) — see the [API keys guide](/reference/api-keys).
   </Step>
   <Step title="Configure your MCP client">
-    Add the server to your editor's MCP config with your API key. See [Installation](/mcp/installation) for per-client snippets.
+    Add the Calibrate MCP server to your client's config:
+
+    <Tabs>
+      <Tab title="Hosted (recommended)">
+        Connects to Calibrate's managed MCP endpoint via `mcp-remote` — no local server to maintain:
+
+        ```bash
+        claude mcp add --transport http calibrate \
+          https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
+          --header "X-API-Key: sk_your_api_key"
+        ```
+      </Tab>
+      <Tab title="Local (npx)">
+        Runs the server on your own machine:
+
+        ```bash
+        npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+        ```
+      </Tab>
+    </Tabs>
+
+    See [Installation](/mcp/installation) for config file locations per client and platform.
   </Step>
   <Step title="Restart your client">
     Fully quit and reopen your MCP-compatible app so it picks up the new server.
@@ -38,29 +59,6 @@ Ask your coding agent to:
   </Step>
 </Steps>
 
-## Configuration
-
-<Tabs>
-  <Tab title="Hosted (recommended)">
-    Connect to the managed endpoint via `mcp-remote` — nothing to install:
-
-    ```bash
-    claude mcp add --transport http calibrate \
-      https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
-      --header "X-API-Key: sk_your_api_key"
-    ```
-  </Tab>
-  <Tab title="Local (npx)">
-    Run the server on your own machine:
-
-    ```bash
-    npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
-    ```
-  </Tab>
-</Tabs>
-
-See [Installation](/mcp/installation) for per-client config and self-hosting.
-
 ## Available tools
 
 {/* AVAILABLE_TOOLS */}
@@ -69,6 +67,8 @@ See the [Tools reference](/mcp/tools) for each tool's parameters and the API
 operation it calls.
 
 ## Example queries
+
+Once connected, you can ask your coding agent things like:
 
 - "List all my agents"
 - "Resolve the names support-bot and billing-bot to UUIDs"

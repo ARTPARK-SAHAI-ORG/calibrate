@@ -5,6 +5,12 @@ description: "Get more out of Calibrate by driving it from your coding agent"
 
 {/* Generated from docs/templates/mcp/beginners-guide.mdx — do not edit directly. */}
 
+<Tip>
+  Point your coding agent at the full docs index at
+  [calibrate.artpark.ai/llms.txt](https://calibrate.artpark.ai/llms.txt) so it can
+  discover every page on its own.
+</Tip>
+
 The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) lets an AI
 assistant like Claude Code or Cursor call external tools. The Calibrate MCP
 server exposes your Calibrate workspace as tools, so you can create and run
@@ -40,31 +46,61 @@ results and evaluator judgments without leaving your editor.
 
 ## How to get set up
 
-You need a Calibrate API key — create one under
+First, create a Calibrate API key under
 [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys).
-Then connect the server one of two ways:
+The snippets below use the **hosted** server (nothing to install); for the local
+`npx` server and other clients see [Installation](/mcp/installation).
 
-<Steps>
-  <Step title="Pick hosted or local">
-    **Hosted** (recommended) needs nothing installed — your client connects to
-    Calibrate's managed endpoint. **Local** runs the server on your machine with
-    `npx` and needs [Node.js](https://nodejs.org) 20+.
-  </Step>
-  <Step title="Add the server to your client">
-    Copy the snippet for your editor from [Installation](/mcp/installation) and
-    paste in your API key.
-  </Step>
-  <Step title="Restart your client">
-    Fully quit and reopen the app so it loads the new server.
-  </Step>
-  <Step title="Ask it something">
-    Try "list my agents" — if you get your agents back, you're connected.
-  </Step>
-</Steps>
+Then add the server to your client one of two ways.
+
+### Option 1: Via the app
+
+Some clients let you edit MCP config from their UI:
+
+1. Open your client's settings — in Claude Desktop, **Settings → Developer → Edit Config**.
+2. Paste the Calibrate server block (below) into the `mcpServers` object.
+3. Save, then fully quit and reopen the client.
+
+### Option 2: Via terminal
+
+Edit the config file directly:
+
+1. Open your client's [config file](/mcp/installation#config-file-locations) — e.g. on macOS:
+
+   ```bash
+   open "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+   ```
+
+2. Add the Calibrate server, pasting in your API key:
+
+   ```json
+   {
+     "mcpServers": {
+       "calibrate": {
+         "command": "npx",
+         "args": [
+           "-y",
+           "mcp-remote",
+           "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
+           "--header",
+           "X-API-Key: ${CALIBRATE_API_KEY}"
+         ],
+         "env": {
+           "CALIBRATE_API_KEY": "sk_your_api_key"
+         }
+       }
+     }
+   }
+   ```
+
+3. Save, then fully quit and reopen the client.
+
+Once it restarts, ask "list my agents" — if you get your agents back, you're
+connected.
 
 <Info>
   See [Installation](/mcp/installation) for per-client snippets (Claude Code,
-  Cursor, Claude Desktop) and OS-specific config-file paths.
+  Cursor, Claude Desktop), the local `npx` setup, and OS-specific config paths.
 </Info>
 
 ## Your first queries

@@ -80,12 +80,15 @@ def test_params_table_empty_when_no_args() -> None:
     assert _params_table([]) == ""
 
 
-def test_available_tools_table_links_to_anchors() -> None:
+def test_available_tools_table_links_and_columns() -> None:
     tools = [parse_tool_ts(GET_WIDGET_TS), parse_tool_ts(CREATE_WIDGET_TS)]
-    table = available_tools_table([("Widgets", tools)])
-    assert "| Category | Tools |" in table
+    table = available_tools_table([("Widgets", "Manage widgets", tools)])
+    # count lead-in + three-column table (Category | Tools | Purpose)
+    assert "exposes 2 tools across 1 categories:" in table
+    assert "| Category | Tools | Purpose |" in table
     assert "[Widgets](/mcp/tools#widgets)" in table
     assert "`get-widget`, `create-widget`" in table
+    assert "Manage widgets" in table
 
 
 # --------------------------------------------------------------------------- #
@@ -226,7 +229,8 @@ def test_overview_gets_available_tools_injected(tmp_path: Path) -> None:
     output_root, _ = _run(tmp_path)
     overview = (output_root / "overview.mdx").read_text(encoding="utf-8")
     assert "{/* AVAILABLE_TOOLS */}" not in overview  # token replaced
-    assert "| Category | Tools |" in overview
+    assert "| Category | Tools | Purpose |" in overview
+    assert "across 2 categories:" in overview  # count lead-in
     assert "[Widgets](/mcp/tools#widgets)" in overview
     assert "[Gadgets](/mcp/tools#gadgets)" in overview
 
