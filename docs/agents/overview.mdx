@@ -1,0 +1,67 @@
+---
+title: "Overview"
+description: "Give your AI agents the tools to evaluate voice agents on Calibrate through MCP, CLI, or API"
+---
+
+Calibrate meets your AI agent where it already works — Claude Code,
+Cursor, Codex, and others. Connect it once and your agent can manage agents,
+build test sets, launch runs, and score outputs from Calibrate through the
+interface that fits your workflow.
+
+## Get started
+
+<CardGroup cols={2}>
+  <Card title="MCP server" icon="plug" href="/mcp/overview">
+    Connect the Calibrate MCP server for native tool access in Claude Code,
+    Cursor, Codex, and other MCP clients.
+  </Card>
+  <Card title="CLI" icon="terminal" href="/cli/calibrate/overview">
+    The Calibrate CLI gives agents structured JSON output for scripting
+    evaluations in any terminal.
+  </Card>
+  <Card title="API" icon="code" href="/api-reference/introduction">
+    Call the Calibrate REST API directly from any language for full control
+    over agents, tests, and runs.
+  </Card>
+</CardGroup>
+
+## Access methods
+
+Every method maps to the same Calibrate evaluation API — pick the one that fits
+how your agent works.
+
+| Layer | Purpose | Installation |
+| --- | --- | --- |
+| MCP server | Gives agents native tools to manage agents, tests, and runs | `claude mcp add --transport http calibrate https://calibrate-mcp-106430091675.asia-south1.run.app/mcp --header "X-API-Key: sk_your_api_key"` |
+| CLI | Runs evaluations from any terminal with JSON output | `brew install dalmia/tap/calibrate` |
+| API | Direct HTTPS access for any language or runtime | REST over HTTPS — see the [API reference](/api-reference/introduction) |
+
+The [MCP server](/mcp/overview) and [CLI](/cli/calibrate/overview) both wrap the
+[public API](/api-reference/introduction), so you can mix and match — use the MCP
+server inside your editor and the CLI in CI, against the same workspace.
+
+## Supported agents
+
+| Agent | MCP | CLI | API |
+| --- | --- | --- | --- |
+| Claude Code | ✓ | ✓ | ✓ |
+| Cursor | ✓ | ✓ | ✓ |
+| Codex | ✓ | ✓ | ✓ |
+| Claude Desktop | ✓ | — | ✓ |
+| Windsurf | ✓ | ✓ | ✓ |
+| Any agent | — | ✓ | ✓ |
+
+All you need is a Calibrate API key — create one under
+[**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys)
+(see the [API keys guide](/reference/api-keys)).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Set up the MCP server" icon="plug" href="/mcp/installation">
+    Config file locations for each client and platform.
+  </Card>
+  <Card title="Install the CLI" icon="terminal" href="/cli/calibrate/overview">
+    Install, authenticate, and run your first evaluation.
+  </Card>
+</CardGroup>

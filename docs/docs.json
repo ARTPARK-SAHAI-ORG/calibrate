@@ -51,6 +51,17 @@
         ]
       },
       {
+        "tab": "Agents",
+        "groups": [
+          {
+            "group": "AI agents",
+            "pages": [
+              "agents/overview"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "API reference",
         "groups": [
           {
