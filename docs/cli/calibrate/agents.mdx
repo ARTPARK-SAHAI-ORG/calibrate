@@ -37,7 +37,7 @@ calibrate agents get [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `-a, --agent-uuid` | string | **Required.** The agent to retrieve. |
+| `-a, --agent-uuid` | string | **Required.** The agent to retrieve |
 
 **Examples**
 
@@ -91,11 +91,33 @@ calibrate agents update [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `-a, --agent-uuid` | string | **Required.** The agent to update. |
+| `-a, --agent-uuid` | string | **Required.** The agent to update |
 | `-c, --config-param` | type | Agent behavioral config. The keys depend on type. |
 
 **Examples**
 
 ```bash
 calibrate agents update --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## Verify agent connection
+
+Verify an agent's connection and persist the result when successful
+
+```bash
+calibrate agents verify-connection [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** The agent whose connection to verify |
+| `--messages` | string | Sample chat messages to send during verification. Omit to use the default probe |
+| `--model` | string | Model to verify. Omit for a basic connection check. Provide it for a model-specific check before benchmarking that model |
+
+**Examples**
+
+```bash
+calibrate agents verify-connection --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```

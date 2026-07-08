@@ -41,6 +41,9 @@ from cli_reference import (  # noqa: E402
     resource_slug,
     strip_md_suffix,
 )
+from docs_mdx import escape_mdx_prose as _escape_mdx_prose  # noqa: E402
+from docs_mdx import frontmatter_value as _frontmatter_value  # noqa: E402
+from docs_mdx import table_cell as _table_cell  # noqa: E402
 from docs_nav import insert_tab  # noqa: E402
 from sdk_reference import api_group_from_tag  # noqa: E402
 
@@ -81,32 +84,6 @@ DROPPED_FLAGS = {"-h, --help"}
 # way to pass input when it doesn't (e.g. run-batch's `agent_names`), so they're
 # dropped only when per-field flags exist.
 BODY_FLAGS = {"--body", "-b, --body-param"}
-
-
-def _escape_mdx_prose(text: str) -> str:
-    """Escape MDX-significant characters in prose, leaving inline code spans alone."""
-    out: list[str] = []
-    for i, part in enumerate(re.split(r"(`[^`]*`)", text)):
-        if i % 2 == 1:
-            out.append(part)
-            continue
-        part = (
-            part.replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("{", "&#123;")
-            .replace("}", "&#125;")
-        )
-        out.append(part)
-    return "".join(out)
-
-
-def _table_cell(text: str) -> str:
-    """Escape a value for use inside a markdown table cell."""
-    return _escape_mdx_prose(text).replace("|", "\\|").strip()
-
-
-def _frontmatter_value(text: str) -> str:
-    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
 def _keep_option(o: Option) -> bool:

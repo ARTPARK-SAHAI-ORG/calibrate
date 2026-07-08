@@ -1,0 +1,25 @@
+---
+title: "Create annotation task"
+description: "Create an annotation task for annotators to label items against evaluators"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.annotation_tasks.create(
+    name="name",
+    type="stt",
+)
+```
+
+## API endpoint
+
+See **POST /annotation-tasks** in the [API reference](/api-reference/introduction) tab.

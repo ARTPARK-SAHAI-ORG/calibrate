@@ -1,0 +1,98 @@
+---
+title: "Evaluators"
+description: "Operations for evaluators"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Create evaluator
+
+Create an evaluator along with its first version, which is set live
+
+```bash
+calibrate evaluators create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `--data-type` | text | The modality the judge reads: |
+| `--description` | string | Description. Omit to leave blank |
+| `-e, --evaluator-type` | tts | What the evaluator judges: |
+| `-n, --name` | string | **Required.** Evaluator name, unique within your workspace |
+| `--output-type` | binary | How the evaluator scores: |
+| `-v, --version-param` | string | **Required.** One version of an evaluator: its judge prompt, model, variables, and rubric. |
+
+**Examples**
+
+```bash
+calibrate evaluators create --name <value> --version-param '{"judge_model":"<value>","system_prompt":"<value>"}'
+```
+
+## Create evaluator version
+
+Add a new version to an evaluator you created
+
+```bash
+calibrate evaluators create-version [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-e, --evaluator-uuid` | string | **Required.** Evaluator to add a version to |
+| `-j, --judge-model` | openai/gpt-4.1 | **Required.** The model that runs the judge, named the way its provider does, for example openai/gpt-4.1 or `anthropic/claude-sonnet-4` |
+| `-m, --make-live` | true | When true, immediately point the evaluator's live version at this new version |
+| `--output-config` | rating | The scale points and their labels. Required for a rating evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own |
+| `-s, --system-prompt` | — | **Required.** &#123; &#123;variable&#125; &#125;   Judge system prompt. May contain &#123; &#123;variable&#125; &#125; placeholders |
+| `-v, --variables` | string | Declared prompt variables. Omit if the prompt has none. After the first version the variable names are fixed. You can change a variable's description or default, but not add, remove, or rename one |
+
+**Examples**
+
+```bash
+calibrate evaluators create-version --evaluator-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --judge-model <value> --system-prompt <value>
+```
+
+## Get evaluator
+
+Get one evaluator with its full version history
+
+```bash
+calibrate evaluators get [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-e, --evaluator-uuid` | string | **Required.** Evaluator to retrieve |
+
+**Examples**
+
+```bash
+calibrate evaluators get --evaluator-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## List evaluators
+
+List your evaluators
+
+```bash
+calibrate evaluators list [flags]
+```
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--data-type` | string | — | Filter by modality. Omit for all (options: text, audio) |
+| `-e, --evaluator-type` | string | — | Filter by what the evaluator judges. Omit for all types (options: tts, stt, llm, llm-general, conversation) |
+| `-i, --include-defaults` | true | `true` | When true, include the built-in default evaluators alongside the ones you created |
+
+**Examples**
+
+```bash
+calibrate evaluators list
+```

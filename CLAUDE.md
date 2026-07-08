@@ -144,6 +144,44 @@ so they don't drift; the live CLI is exercised by the sync workflow instead.
 `generate_cli_docs.py` and `generate_sdk_docs.py` share `scripts/docs_nav.py`
 for inserting their tab into `docs.json`.
 
+The **MCP docs** under `docs/mcp/**` are likewise generated — from the
+Speakeasy-generated MCP server the separate `dalmia/calibrate-mcp` repo ships
+under `src/mcp-server/tools/*.ts`. `scripts/generate_mcp_docs.py` (parser in
+`scripts/mcp_reference.py`) produces the "MCP" tab (inserted after "Python SDK"),
+whose flow mirrors [Coval's MCP docs](https://docs.coval.ai/mcp/overview): a
+single **"MCP server"** sidebar group with five pages in a fixed order
+(`NAV_ORDER`) — **Overview**, **Installation**, **Tools**, **Beginner's guide**,
+**Troubleshooting**. All four conceptual pages are hand-written templates under
+`docs/templates/mcp/` (`GUIDE_PAGES`); only the **Tools** page
+(`docs/mcp/tools.mdx`) is generated — tools grouped by API resource
+(`## Agents`, `## Agent tests`, `## Tests`), each tool a `###` section with its
+description, a scope / access line, a parameters table, and a cross-link to the
+matching API-reference operation. The overview's "Available tools" category table
+is injected into the template at the `{/* AVAILABLE_TOOLS */}` token (like the
+CLI overview's global-flags token), so it always lists the live tool set with
+links to the Tools-page anchors. Add or reorder a page by editing `NAV_ORDER` (and
+`GUIDE_PAGES` for a new hand-written page + its template).
+
+Like the SDK/CLI docs the structure is **single-sourced, not hand-maintained**:
+each Speakeasy tool imports one request model whose file stem equals the OpenAPI
+`operationId` with non-alphanumerics stripped plus `op`
+(`mcp_reference.operation_key`), so tools match operations deterministically; the
+operation's tag drives grouping (`api_group_from_tag`, shared with the SDK/CLI
+generators) and its parameters + request body (unwrapping `$ref` and optional
+`anyOf: [Ref, null]` bodies) drive the parameters table. Tools sort
+read-before-write within a resource (`_VERB_ORDER`: list, get, …, create,
+update), mirroring Coval. Multi-line OpenAPI property descriptions collapse to
+their first line in the table — the cross-link carries the full nested schema. A
+tool that matches **no** operation aborts the run (stale spec / renamed op)
+before any file is touched. Never edit the generated `docs/mcp/tools.mdx` (or the
+generated overview table) — edit the tool definitions in `calibrate-mcp` or the
+Getting-started templates, then re-run. `fetch_public_openapi.py` calls the
+generator when `MCP_DOCS_PATH` points at a `calibrate-mcp/src/mcp-server/tools`
+checkout (the `sync-api-spec.yml` workflow checks out that repo and sets it).
+Tests use synthetic Speakeasy tool samples (`tests/mcp_tool_samples.py`), **not**
+a live snapshot. All three generators share `scripts/docs_nav.py` (tab insertion)
+and `scripts/docs_mdx.py` (MDX escaping / frontmatter / table-cell helpers).
+
 ### Evaluator dicts everywhere
 Every LLM/audio judge in the codebase takes a list of **evaluator** dicts of
 this shape:

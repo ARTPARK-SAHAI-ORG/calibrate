@@ -5,9 +5,51 @@ description: "Operations for agent-tests"
 
 {/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
 
+## Run agent benchmark
+
+Run a multi-model benchmark on an agent's linked tests as a background job.
+
+```bash
+calibrate agent-tests benchmark [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** Agent to benchmark |
+| `-m, --models` | stringArray | **Required.** Model names to benchmark |
+| `-t, --test-uuids` | string | A subset of the agent's linked tests to benchmark. Each ID must be linked to the agent. Omit to run all linked tests |
+
+**Examples**
+
+```bash
+calibrate agent-tests benchmark --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --models '["openai/gpt-4.1","anthropic/claude-sonnet-4"]'
+```
+
+## Get benchmark status
+
+Get the results of a benchmark run
+
+```bash
+calibrate agent-tests get-benchmark [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-t, --task-id` | string | **Required.** Benchmark run to poll for status and results |
+
+**Examples**
+
+```bash
+calibrate agent-tests get-benchmark --task-id a3b2c1d0-e5f4-3210-abcd-ef1234567890
+```
+
 ## Get test run status
 
-Poll a test run for its status and evaluation results
+Poll a test run for its status and evaluation results.
 
 ```bash
 calibrate agent-tests get-run [flags]
@@ -25,9 +67,70 @@ calibrate agent-tests get-run [flags]
 calibrate agent-tests get-run --task-id a3b2c1d0-e5f4-3210-abcd-ef1234567890
 ```
 
+## Link tests to agent
+
+Link one or more tests to an agent. Tests that are already linked are skipped.
+
+```bash
+calibrate agent-tests link [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** Agent to link tests to |
+| `-t, --test-uuids` | stringArray | **Required.** Tests to link. Any that are already linked are skipped |
+
+**Examples**
+
+```bash
+calibrate agent-tests link --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --test-uuids '["b1c2d3e4-f5a6-7890-bcde-f12345678901"]'
+```
+
+## List tests for agent
+
+List the tests linked to an agent.
+
+```bash
+calibrate agent-tests list-for-agent [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** Agent whose linked tests to list |
+
+**Examples**
+
+```bash
+calibrate agent-tests list-for-agent --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## List test runs for agent
+
+List an agent's test runs with their results
+
+```bash
+calibrate agent-tests list-runs-for-agent [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** Agent whose test runs to list |
+
+**Examples**
+
+```bash
+calibrate agent-tests list-runs-for-agent --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
 ## Run agent tests
 
-Run an agent's linked tests as a background job, returning a task ID to poll
+Run an agent's linked tests as a background job, returning a task ID to poll.
 
 ```bash
 calibrate agent-tests run [flags]
@@ -37,7 +140,7 @@ calibrate agent-tests run [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `-a, --agent-uuid` | string | **Required.** The agent to test. |
+| `-a, --agent-uuid` | string | **Required.** Agent to test |
 | `-t, --test-uuids` | string | Tests to run. Omit to run all tests linked to the agent |
 
 **Examples**
@@ -48,7 +151,7 @@ calibrate agent-tests run --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
 
 ## Run agent tests in batch
 
-Run agent tests for every agent, or for a selected set
+Run agent tests for every agent, or for a selected set.
 
 ```bash
 calibrate agent-tests run-batch [flags]

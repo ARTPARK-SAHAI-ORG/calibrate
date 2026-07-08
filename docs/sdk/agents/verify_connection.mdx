@@ -1,6 +1,6 @@
 ---
-title: "Run agent tests"
-description: "Run an agent's linked tests as a background job, returning a task ID to poll."
+title: "Verify agent connection"
+description: "Verify an agent's connection and persist the result when successful"
 ---
 
 {/* Generated from Fern reference.md — do not edit directly. */}
@@ -14,11 +14,11 @@ client = Calibrate(
     api_key="sk_your_api_key",
 )
 
-client.agent_tests.run(
+client.agents.verify_connection(
     agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
 )
 ```
 
 ## API endpoint
 
-See **POST /agent-tests/agent/\{agent_uuid}/run** in the [API reference](/api-reference/introduction) tab.
+See **POST /agents/\{agent_uuid}/verify-connection** in the [API reference](/api-reference/introduction) tab.

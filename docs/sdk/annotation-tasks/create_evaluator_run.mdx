@@ -1,0 +1,29 @@
+---
+title: "Run evaluators on items"
+description: "Run evaluators on task items as a background job"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate, EvaluatorRunRequestEntry
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.annotation_tasks.create_evaluator_run(
+    task_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    evaluators=[
+        EvaluatorRunRequestEntry(
+            evaluator_id="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+        )
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /annotation-tasks/\{task_uuid}/evaluator-runs** in the [API reference](/api-reference/introduction) tab.

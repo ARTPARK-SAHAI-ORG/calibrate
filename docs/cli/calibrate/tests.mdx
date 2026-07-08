@@ -17,15 +17,15 @@ calibrate tests bulk-create [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `-a, --agent-uuids` | string | Agents (IDs) to link every created test to. Omit to link none |
+| `-a, --agent-uuids` | string | IDs of agents to link every created test to. Omit to link none |
 | `-l, --language` | config.settings.language | Language written to each test's config.settings.language. Omit to leave unset |
-| `--tests` | string | **Required.** Test items to create (non-empty, max 500 per request, names unique within the batch) |
+| `--tests` | string | **Required.** Test items to create, at most 500 per request, with names unique within the batch |
 | `--type` | response | What the test judges: |
 
 **Examples**
 
 ```bash
-calibrate tests bulk-create --type tool_call --tests '[{"name":"<value>","conversation_history":[{"role":"tool"}],"evaluators":[{"evaluator_uuid":"f47ac10b-58cc-4372-a567-0e02b2c3d479"}]}]'
+calibrate tests bulk-create --type tool_call --tests '[{"name":"<value>","conversation_history":[{"role":"tool"}],"evaluators":[{"evaluator_uuid":"f47ac10b-58cc-4372-a567-0e02b2c3d479","variable_values":{"criteria":"The reply must cite the refund window"} }]}]'
 ```
 
 ## Create test

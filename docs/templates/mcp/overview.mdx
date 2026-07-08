@@ -1,0 +1,94 @@
+---
+title: "Overview"
+description: "Expose Calibrate to coding agents over the Model Context Protocol"
+---
+
+{/* Generated from docs/templates/mcp/overview.mdx — do not edit directly. */}
+
+The Calibrate [MCP server](https://modelcontextprotocol.io) lets AI assistants
+like Claude Code, Cursor, and Codex work with Calibrate's evaluation API through
+the Model Context Protocol — so they can manage agents and tests and launch runs
+without leaving your editor. Every tool maps 1-to-1 to a
+[public API](/api-reference/introduction) operation.
+
+## What you can do
+
+Ask your coding agent to:
+
+- List agents and resolve friendly names to UUIDs
+- Create and update agents
+- Create, bulk-upload, and update tests
+- Launch agent test runs — for one agent or every agent in your workspace
+- Poll a run for status and per-test-case results
+
+## Quick start
+
+<Steps>
+  <Step title="Get your API key">
+    Create one under [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) — see the [API keys guide](/reference/api-keys).
+  </Step>
+  <Step title="Configure your MCP client">
+    Add the Calibrate MCP server to your client's config:
+
+    <Tabs>
+      <Tab title="Hosted (recommended)">
+        Connects to Calibrate's managed MCP endpoint via `mcp-remote` — no local server to maintain:
+
+        ```bash
+        claude mcp add --transport http calibrate \
+          https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
+          --header "X-API-Key: sk_your_api_key"
+        ```
+      </Tab>
+      <Tab title="Local (npx)">
+        Runs the server on your own machine:
+
+        ```bash
+        npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+        ```
+      </Tab>
+    </Tabs>
+
+    See [Installation](/mcp/installation) for config file locations per client and platform.
+  </Step>
+  <Step title="Restart your client">
+    Fully quit and reopen your MCP-compatible app so it picks up the new server.
+  </Step>
+  <Step title="Start asking">
+    Query your agent — "list my agents", "run tests for support-bot", "what's the status of run abc123".
+  </Step>
+</Steps>
+
+## Available tools
+
+{/* AVAILABLE_TOOLS */}
+
+See the [Tools reference](/mcp/tools) for each tool's parameters and the API
+operation it calls.
+
+## Example queries
+
+Once connected, you can ask your coding agent things like:
+
+- "List all my agents"
+- "Resolve the names support-bot and billing-bot to UUIDs"
+- "Run the tests for support-bot and give me the task id"
+- "Run tests for every agent in my workspace"
+- "What's the status and results of run abc123?"
+
+## Requirements
+
+- Node.js 20+
+- A Calibrate API key
+- An MCP-compatible client (Claude Code, Cursor, Codex, Claude Desktop)
+
+## Support
+
+<CardGroup cols={2}>
+  <Card title="Source" icon="github" href="https://github.com/dalmia/calibrate-mcp">
+    calibrate-mcp
+  </Card>
+  <Card title="API keys" icon="key" href="/reference/api-keys">
+    Create and manage keys
+  </Card>
+</CardGroup>

@@ -1,0 +1,221 @@
+---
+title: "Annotation tasks"
+description: "Operations for annotation-tasks"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Bulk create items
+
+Bulk-create annotation items in a task, optionally seeding human annotations
+
+```bash
+calibrate annotation-tasks add-items [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --annotator-id` | string | Annotator these initial annotations belong to. Required when any item carries annotations |
+| `-i, --items` | string | **Required.** Items to insert. Insertion order is preserved |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks add-items --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --items '[]'
+```
+
+## Create annotation task
+
+Create an annotation task for annotators to label items against evaluators
+
+```bash
+calibrate annotation-tasks create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `--description` | string | A description for the task. Omit for none |
+| `-e, --evaluator-ids` | string | IDs of evaluators to link when the task is created, in order. Each must be one you created or a built-in default. Omit to create with no linked evaluators |
+| `-n, --name` | string | **Required.** Task name, unique within your workspace |
+| `-t, --type` | stt | Task type. Determines the shape of each item's payload. |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks create --name <value> --type conversation
+```
+
+## Run evaluators on items
+
+Run evaluators on task items as a background job
+
+```bash
+calibrate annotation-tasks create-evaluator-run [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-e, --evaluators` | string | **Required.** The evaluators to run. Each must be linked to the task |
+| `-i, --item-ids` | select_all=false | Item IDs to run on. **Required when select_all=false**. Ignored when `select_all=true` |
+| `--q` | payload.name | Case-insensitive substring filter on payload.name. Applies only when `select_all=true` |
+| `-s, --select-all` | true | When true, run on every item in the task. Set `q` to run only items whose name matches it |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks create-evaluator-run --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --evaluators '[]'
+```
+
+## Get annotation task
+
+Get one annotation task with linked evaluators, items, and labelling jobs
+
+```bash
+calibrate annotation-tasks get [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-t, --task-uuid` | string | **Required.** Task to retrieve |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks get --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## Get task agreement
+
+Get human-vs-human and human-vs-evaluator agreement metrics for a task
+
+```bash
+calibrate annotation-tasks get-agreement [flags]
+```
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-b, --bucket` | string | `week` | How to bucket points in the trend series (options: week, month, year) |
+| `--days` | int | `90` | Trailing window in days for the trend series |
+| `-t, --task-uuid` | string | — | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks get-agreement --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## Get evaluator run
+
+Get one evaluator-run job with results and human-agreement summary
+
+```bash
+calibrate annotation-tasks get-evaluator-run [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-j, --job-uuid` | string | **Required.** The evaluator run to act on |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks get-evaluator-run --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --job-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## Get task summary
+
+Get a paginated summary table of items, evaluator runs, and human annotations for a task
+
+```bash
+calibrate annotation-tasks get-summary [flags]
+```
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-i, --item-id` | annotators | — | Filter rows to a single item. The full task-wide annotator union is still returned in annotators |
+| `--limit` | int | `50` | Maximum number of items to return |
+| `--live-only` | — | — | When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded |
+| `--offset` | int | — | Number of items to skip before returning results |
+| `--order` | string | `desc` | Sort direction (options: asc, desc) |
+| `--q` | payload.name | — | Case-insensitive substring search on payload.name. Blank is a no-op |
+| `-s, --sort-by` | string | `created_at` | Sort key for the results |
+| `-t, --task-uuid` | string | — | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks get-summary --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## Link evaluator to task
+
+Link an evaluator to a task, appending it to the display order
+
+```bash
+calibrate annotation-tasks link-evaluator [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-e, --evaluator-id` | string | **Required.** The evaluator to link. Must be one you created or a built-in default |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks link-evaluator --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --evaluator-id f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## List annotation tasks
+
+List annotation tasks with linked evaluators
+
+```bash
+calibrate annotation-tasks list [flags]
+```
+
+**Examples**
+
+```bash
+calibrate annotation-tasks list
+```
+
+## Bulk update items
+
+Bulk-update item payloads in a task
+
+```bash
+calibrate annotation-tasks update-items [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
+| `-u, --updates` | string | **Required.** The new payload for each item you're updating. Entries not in this task, or referencing deleted items, are skipped |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks update-items --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --updates '[{"uuid":"f47ac10b-58cc-4372-a567-0e02b2c3d479","payload":"<value>"}]'
+```

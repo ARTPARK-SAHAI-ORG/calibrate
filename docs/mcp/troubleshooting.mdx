@@ -1,0 +1,129 @@
+---
+title: "Troubleshooting"
+description: "Fix common issues connecting the Calibrate MCP server"
+---
+
+{/* Generated from docs/templates/mcp/troubleshooting.mdx — do not edit directly. */}
+
+Most problems come down to the config file, the API key, or a client that needs a
+full restart. Work through the section that matches your symptom.
+
+## Server not connecting
+
+<AccordionGroup>
+  <Accordion title="Try the hosted server first">
+    The [hosted server](/mcp/installation#hosted-server-recommended) needs no
+    local install and sidesteps Node.js version issues. If the local `npx` server
+    won't start, switch to the hosted config while you debug.
+  </Accordion>
+  <Accordion title="Check your Node.js version (local server)">
+    The local server needs Node.js 20+. Check with:
+
+    ```bash
+    node --version
+    ```
+
+    If it's older, install Node 20+ from [nodejs.org](https://nodejs.org) or use
+    the hosted server instead.
+  </Accordion>
+  <Accordion title="Confirm the config file location">
+    The file must be in the exact place your client reads. For Claude Desktop see
+    [Config file locations](/mcp/installation#config-file-locations); Cursor uses
+    `.cursor/mcp.json` and Claude Code manages config via `claude mcp`.
+  </Accordion>
+  <Accordion title="Validate the JSON">
+    A stray trailing comma or a curly "smart quote" breaks the whole config. Paste
+    it into a JSON validator and confirm every quote is a straight `"`.
+  </Accordion>
+  <Accordion title="Fully restart the client">
+    Closing the window is not enough — quit the app completely (Claude Desktop:
+    Cmd/Ctrl+Q) and reopen it so it reloads the MCP config.
+  </Accordion>
+</AccordionGroup>
+
+## Authentication errors
+
+<AccordionGroup>
+  <Accordion title="Check the key is active">
+    Confirm the key exists and is enabled under
+    [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys).
+    Copy it fresh rather than retyping it.
+  </Accordion>
+  <Accordion title="Watch for stray whitespace or smart quotes">
+    A leading/trailing space, a newline, or a curly quote around the key will fail
+    auth. Paste it as plain text with no surrounding characters.
+  </Accordion>
+  <Accordion title="Check the header format (hosted server)">
+    For the hosted server the header must be exactly `X-API-Key: sk_your_api_key`
+    (or `X-API-Key: ${CALIBRATE_API_KEY}` with the env var set). For the local
+    server the key goes in `CALIBRATE_API_KEY_AUTH` or the `--api-key-auth` flag.
+  </Accordion>
+</AccordionGroup>
+
+## Tools not appearing
+
+<AccordionGroup>
+  <Accordion title="Check the MCP logs">
+    Your client logs MCP connection and auth errors — Claude Desktop writes them
+    under `~/Library/Logs/Claude/` (macOS). Look for a failed connection or a 401.
+  </Accordion>
+  <Accordion title="Run the server by hand">
+    Test the local server directly and watch the output:
+
+    ```bash
+    CALIBRATE_API_KEY_AUTH=sk_your_api_key npx -y @dalmia/calibrate-mcp start
+    ```
+
+    Or list the tools over the hosted endpoint:
+
+    ```bash
+    curl -s -X POST https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json, text/event-stream" \
+      -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+    ```
+  </Accordion>
+  <Accordion title="Confirm the key's permissions">
+    A tool that reads works but a write fails? Check the key is allowed to perform
+    that action in your workspace.
+  </Accordion>
+</AccordionGroup>
+
+## Permission denied errors
+
+<AccordionGroup>
+  <Accordion title="macOS / Linux">
+    Fix config-file permissions and create the directory if it's missing:
+
+    ```bash
+    chmod 644 "~/Library/Application Support/Claude/claude_desktop_config.json"
+    ```
+  </Accordion>
+  <Accordion title="Windows">
+    Run your editor as Administrator and make sure the config file isn't marked
+    **Read-only** in its file properties.
+  </Accordion>
+  <Accordion title="npx cache errors">
+    Clear the npx cache if a stale download blocks startup:
+
+    ```bash
+    npx clear-npx-cache
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Firewall or proxy issues
+
+The server needs outbound HTTPS to the Calibrate API and, for the hosted setup,
+to the MCP endpoint on `*.run.app`. Behind a proxy, set `HTTPS_PROXY` before
+launching:
+
+```bash
+export HTTPS_PROXY=http://your-proxy:8080
+```
+
+## Still stuck?
+
+Gather your client's MCP logs and the exact config you used (with the key
+redacted), then open an issue on
+[github.com/dalmia/calibrate-mcp](https://github.com/dalmia/calibrate-mcp/issues).

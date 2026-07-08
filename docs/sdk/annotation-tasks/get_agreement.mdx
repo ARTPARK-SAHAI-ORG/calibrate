@@ -1,0 +1,24 @@
+---
+title: "Get task agreement"
+description: "Get human-vs-human and human-vs-evaluator agreement metrics for a task"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.annotation_tasks.get_agreement(
+    task_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+)
+```
+
+## API endpoint
+
+See **GET /annotation-tasks/\{task_uuid}/agreement** in the [API reference](/api-reference/introduction) tab.
