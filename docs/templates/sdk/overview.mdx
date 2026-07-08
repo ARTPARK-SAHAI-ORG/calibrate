@@ -5,6 +5,8 @@ description: "Get started with Calibrate's Python SDK"
 
 {/* Generated from docs/templates/sdk/overview.mdx — do not edit directly. */}
 
+The Calibrate Python SDK is a typed client for the full evaluation loop — manage agents, tests, and evaluators, launch runs and benchmarks, and set up human-in-the-loop annotation tasks, all from Python.
+
 ## Install
 
 ```bash
@@ -23,6 +25,18 @@ client = Calibrate(api_key="sk_your_api_key")
 for agent in client.agents.list():
     print(agent.uuid, agent.name)
 ```
+
+## What you can do
+
+Every REST resource maps to a namespace on the client:
+
+| Namespace | Methods |
+| --- | --- |
+| `client.agents` | `create`, `list`, `get`, `resolve`, `update`, `verify_connection` |
+| `client.tests` | `create`, `bulk_create`, `list`, `get`, `update` |
+| `client.evaluators` | `create`, `create_version`, `list`, `get` |
+| `client.agent_tests` | `link`, `run`, `run_batch`, `benchmark`, `list_for_agent`, `list_runs_for_agent`, `get_run`, `get_benchmark` |
+| `client.annotation_tasks` | `create`, `add_items`, `update_items`, `link_evaluator`, `create_evaluator_run`, `get_evaluator_run`, `get_agreement`, `get_summary`, `list`, `get` |
 
 ## Resources
 
