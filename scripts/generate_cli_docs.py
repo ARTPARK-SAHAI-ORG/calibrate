@@ -52,7 +52,7 @@ OUTPUT_ROOT = DOCS_ROOT / "cli" / "calibrate"
 TEMPLATE_DIR = REPO_ROOT / "docs" / "templates" / "cli" / "calibrate"
 
 TAB_NAME = "CLI"
-INSERT_AFTER_TAB = "Home"
+INSERT_AFTER_TAB = ("API reference", "Home")
 ROOT_FILE = "calibrate.md"
 
 # Hand-written conceptual pages copied verbatim into the Getting-started group,
@@ -340,7 +340,9 @@ def _prune_stale(output_root: Path, keep_page_ids: set[str]) -> list[Path]:
     return removed
 
 
-def patch_docs_json(docs_json: Path, tab: dict, insert_after_tab: str) -> None:
+def patch_docs_json(
+    docs_json: Path, tab: dict, insert_after_tab: str | tuple[str, ...]
+) -> None:
     data = json.loads(docs_json.read_text(encoding="utf-8"))
     data["navigation"]["tabs"] = insert_tab(
         data["navigation"]["tabs"], tab, after=insert_after_tab

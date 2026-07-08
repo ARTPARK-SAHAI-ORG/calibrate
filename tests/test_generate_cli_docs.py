@@ -378,8 +378,8 @@ def test_generate_cli_docs_end_to_end(tmp_path: Path) -> None:
     assert not (output_root / "widgets" / "list.mdx").exists()
 
     tabs = json.loads(docs_json.read_text())["navigation"]["tabs"]
-    # the cloud CLI tab is named "CLI", inserted after "Home"
-    assert [t["tab"] for t in tabs] == ["Home", "CLI", "API reference"]
+    # the cloud CLI tab is named "CLI", inserted after "API reference"
+    assert [t["tab"] for t in tabs] == ["Home", "API reference", "CLI"]
     cli_tab = next(t for t in tabs if t["tab"] == "CLI")
     groups = {g["group"]: g["pages"] for g in cli_tab["groups"]}
     assert groups["Getting started"] == ["cli/calibrate/overview", "cli/calibrate/agent-mode"]
