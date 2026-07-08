@@ -48,9 +48,24 @@ _SCOPES = re.compile(r"^\s*scopes:\s*\[([^\]]*)\]", re.MULTILINE)
 _READ_ONLY = re.compile(r'"?readOnlyHint"?:\s*(true|false)')
 _DESTRUCTIVE = re.compile(r'"?destructiveHint"?:\s*(true|false)')
 # ``description:`` followed by a backtick template literal (possibly on the next
-# line). Non-greedy up to the closing backtick; template literals never contain a
-# bare backtick in this generated code.
-_DESCRIPTION = re.compile(r"description:\s*`(.*?)`", re.DOTALL)
+# line). The body is a run of escaped chars (``\x``) or any non-backtick,
+# non-backslash char, so it stops only at an *unescaped* closing backtick — a
+# literal backtick inside the description is emitted as ``\```` by Speakeasy and
+# must not truncate the match. Escapes are undone by ``_unescape_template``.
+_DESCRIPTION = re.compile(r"description:\s*`((?:\\.|[^`\\])*)`", re.DOTALL)
+
+# JS template-literal escapes Speakeasy actually emits: a literal backtick,
+# ``$`` (from ``\${``), and backslash. Any other ``\x`` is left untouched.
+_TEMPLATE_ESCAPES = {"`": "`", "$": "$", "\\": "\\"}
+
+
+def _unescape_template(body: str) -> str:
+    return re.sub(
+        r"\\(.)",
+        lambda m: _TEMPLATE_ESCAPES.get(m.group(1), "\\" + m.group(1)),
+        body,
+        flags=re.DOTALL,
+    )
 
 
 @dataclass
@@ -102,7 +117,7 @@ def parse_tool_ts(text: str) -> McpTool | None:
 
     return McpTool(
         name=name_match.group(1),
-        description=desc_match.group(1).strip() if desc_match else "",
+        description=_unescape_template(desc_match.group(1)).strip() if desc_match else "",
         scopes=_parse_scopes(scopes_match.group(1)) if scopes_match else [],
         read_only=bool(read_only_match) and read_only_match.group(1) == "true",
         destructive=bool(destructive_match) and destructive_match.group(1) == "true",
