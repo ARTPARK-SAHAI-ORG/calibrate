@@ -162,6 +162,28 @@ def sync_cli_docs() -> None:
     generate_cli_docs(src_dir)
 
 
+def sync_mcp_docs() -> None:
+    """Generate MCP docs when ``MCP_DOCS_PATH`` points at a tools directory.
+
+    Optional: skipped (with a note) when the env var is unset or the directory is
+    missing, so a local ``fetch`` run without the calibrate-mcp repo still works.
+    ``MCP_DOCS_PATH`` points at ``calibrate-mcp/src/mcp-server/tools``; the docs
+    read the freshly written OpenAPI spec (``DEFAULT_OUT``) for tool arguments.
+    """
+    src = os.getenv("MCP_DOCS_PATH", "").strip()
+    if not src:
+        print("MCP_DOCS_PATH unset — skipping MCP docs sync")
+        return
+    src_dir = Path(src)
+    if not src_dir.is_dir():
+        print(f"MCP_DOCS_PATH not a directory ({src_dir}) — skipping MCP docs sync")
+        return
+    # SCRIPTS_DIR is already on sys.path (module top), so this import resolves.
+    from generate_mcp_docs import generate_mcp_docs
+
+    generate_mcp_docs(src_dir)
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     base_url = public_api_base_url()
@@ -182,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote {output}")
     print(f"Wrote {len(sdk_slugs)} SDK pages from {reference}")
     sync_cli_docs()
+    sync_mcp_docs()
     return 0
 
 

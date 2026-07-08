@@ -1,0 +1,61 @@
+---
+title: "Agent tests"
+description: "MCP tools for agent tests."
+---
+
+{/* Generated from calibrate-mcp/src/mcp-server/tools by scripts/generate_mcp_docs.py — do not edit directly. */}
+
+## get-agent-test-run
+
+Poll the status and results of an agent test run by task_id. Returns
+queued, in_progress, completed, failed, or aborted status. When
+completed, includes per-test-case pass/fail results and evaluator
+judgments. Use the task_id from run-agent-tests or
+run-agent-tests-batch.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Arguments**
+
+| Argument | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_id` | string | Yes | Test run to poll for status and results |
+
+See **GET /agent-tests/run/&#123;task_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## run-agent-tests
+
+Start a background LLM unit-test job for one agent. Runs all tests
+linked to the agent unless test_uuids is provided. Returns a task_id
+to poll with get-agent-test-run. The agent must belong to the caller's
+org and have a verified connection; otherwise the call fails with 400
+or 404.
+
+**Scope:** `write` · **Access:** Write
+
+**Arguments**
+
+| Argument | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent to test. |
+| `test_uuids` | array of string | No | Tests to run. Omit to run all tests linked to the agent |
+
+See **POST /agent-tests/agent/&#123;agent_uuid&#125;/run** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## run-agent-tests-batch
+
+Launch one test job per agent in the caller's org. Optionally restrict
+to agent_names; omit or pass an empty list to run every org agent.
+Agents with no linked tests or an unverified connection are skipped
+(reported under skipped) rather than failing the batch. Returns
+task_id values to poll with get-agent-test-run.
+
+**Scope:** `write` · **Access:** Write
+
+**Arguments**
+
+| Argument | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_names` | array of string | No | Agents to run. Omit to run every agent in your workspace |
+
+See **POST /agent-tests/run** in the [API reference](/api-reference/introduction) tab for the full schema.

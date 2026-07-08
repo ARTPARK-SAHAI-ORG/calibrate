@@ -1,0 +1,75 @@
+---
+title: "Overview"
+description: "Expose Calibrate to coding agents over the Model Context Protocol"
+---
+
+{/* Generated from docs/templates/mcp/overview.mdx — do not edit directly. */}
+
+The Calibrate [MCP server](https://modelcontextprotocol.io) exposes the public
+API as tools for coding agents like Cursor, Claude Code, or Codex — so they can
+list agents, resolve names to UUIDs, run tests, and poll results without leaving
+your editor. Every tool maps 1-to-1 to a [public API](/api-reference/introduction)
+operation.
+
+## Install
+
+```bash
+npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+```
+
+## Auth
+
+Create an API key under [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) — see the [API keys guide](/reference/api-keys). Pass it with `--api-key-auth` or the `CALIBRATE_API_KEY_AUTH` environment variable.
+
+## Connect your editor
+
+<CodeGroup>
+
+```json Cursor
+{
+  "mcpServers": {
+    "calibrate": {
+      "command": "npx",
+      "args": ["-y", "@dalmia/calibrate-mcp", "start"],
+      "env": {
+        "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
+      }
+    }
+  }
+}
+```
+
+```bash Claude Code
+claude mcp add calibrate -- npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+```
+
+</CodeGroup>
+
+Once connected, ask your agent to list agents, resolve names to UUIDs, run tests, or poll run status.
+
+## Self-hosting
+
+For self-hosted Calibrate deployments, pass `--server-url` to point the server at your API instance:
+
+```bash
+npx -y @dalmia/calibrate-mcp start \
+  --api-key-auth "$CALIBRATE_API_KEY_AUTH" \
+  --server-url https://calibrate.my-company.internal
+```
+
+## Tools
+
+The tool pages under this tab list every available tool, grouped by resource,
+with its arguments and a link to the underlying API operation.
+
+## Resources
+
+<CardGroup cols={1}>
+  <Card
+    title="Source"
+    icon="github"
+    href="https://github.com/dalmia/calibrate-mcp"
+  >
+    calibrate-mcp
+  </Card>
+</CardGroup>

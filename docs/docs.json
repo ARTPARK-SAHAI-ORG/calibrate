@@ -152,6 +152,25 @@
         ]
       },
       {
+        "tab": "MCP",
+        "groups": [
+          {
+            "group": "Getting started",
+            "pages": [
+              "mcp/overview"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "mcp/agent-tests",
+              "mcp/agents",
+              "mcp/tests"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Calibrate Local",
         "groups": [
           {
