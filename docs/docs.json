@@ -54,7 +54,7 @@
         "tab": "Agents",
         "groups": [
           {
-            "group": "AI coding agents",
+            "group": "AI agents",
             "pages": [
               "agents/overview"
             ]
