@@ -56,7 +56,9 @@
           {
             "group": "AI agents",
             "pages": [
-              "agents/overview"
+              "agents/overview",
+              "agents/skills",
+              "agents/onboarding"
             ]
           }
         ]

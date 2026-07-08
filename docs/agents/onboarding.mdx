@@ -1,0 +1,107 @@
+---
+title: "Guided onboarding"
+description: "Run /onboard and your agent takes you from nothing to a trustworthy first evaluation on Calibrate"
+---
+
+The `/onboard` skill guides you through setting up your first Calibrate
+evaluation step by step. It's an **orchestrator** — each phase delegates to a
+feature skill and produces a real Calibrate object, so you finish with a working
+evaluation, not a tutorial.
+
+## Quick start
+
+<Steps>
+  <Step title="Install the skills">
+    ```bash
+    npx skills add dalmia/calibrate-skills
+    ```
+    See [Agent skills](/agents/skills) for the full pack.
+  </Step>
+  <Step title="Open your AI coding agent">
+    Claude Code, Cursor, Codex, Windsurf, or any Agent Skills–compatible agent.
+  </Step>
+  <Step title="Run the onboarding skill">
+    ```
+    /onboard
+    ```
+    The skill handles everything from there — including installing the CLI and
+    authenticating if you haven't already.
+  </Step>
+</Steps>
+
+The onboarding is **resumable and adaptive**: progress is saved to
+`.calibrate/onboard.md`, so a later session picks up at the first incomplete
+phase, and the skill compresses or skips phases you've already answered.
+
+## What it creates
+
+By the end you have a real, inspectable evaluation on Calibrate:
+
+| Resource | What it is |
+| --- | --- |
+| Agent | Your system under test, connected and verified against its endpoint |
+| Tests | Test cases turning your goal into falsifiable `tool_call` / `response` checks |
+| Evaluator | An LLM or audio judge, if any case scores response quality |
+| Run | The first evaluation run, with pass/fail and judge reasoning |
+| Calibrated judge | The judge tuned against human labels, so you can trust the scores |
+| Benchmark | Optional model comparison across the linked tests |
+
+## The workflow
+
+`/onboard` walks these phases in order for a first-time user, and lets an expert
+compress or skip any they've already answered.
+
+<Steps>
+  <Step title="Setup">
+    Confirms the CLI is installed and authenticated (`calibrate whoami`, else
+    `calibrate login`) and scaffolds the resumable state file.
+  </Step>
+  <Step title="Connect the agent">
+    Asks what the agent does, who uses it, and where it fails today, then
+    delegates to `/connect-agent` to register and verify the connection.
+  </Step>
+  <Step title="Build the tests">
+    Turns your goal into a falsifiable hypothesis, then delegates to
+    `/build-test-suite` (or `/import-dataset` if you already have a dataset) to
+    author and upload test cases.
+  </Step>
+  <Step title="Design the evaluators">
+    Only if a case judges response quality — delegates to `/design-evaluator` to
+    create a judge. Skipped entirely when every case is a deterministic
+    `tool_call`.
+  </Step>
+  <Step title="Run">
+    Delegates to `/run-tests` to link the tests, run them, poll for results, and
+    present **failures first**.
+  </Step>
+  <Step title="Calibrate the judge">
+    Offered, not forced — when you care whether the scores are trustworthy,
+    `/calibrate-evaluator` measures human ↔ judge agreement and tunes the judge
+    until it matches humans. This is the step that makes it *Calibrate*, not just
+    a test runner.
+  </Step>
+  <Step title="Scale and wire into CI">
+    Delegates to `/benchmark-models` to compare models, and — when you mention
+    PRs, releases, or shipping — proposes wiring
+    `calibrate agent-tests run` into CI in agent mode.
+  </Step>
+</Steps>
+
+## Evaluation is a loop
+
+After the first run, `/onboard` expects one of: expand the test set when a defect
+surfaces, tune the hypothesis when the bar is too loose or strict, add a model,
+or tune the judge when agreement is too low. Each pass appends to the state file
+so prior baselines stay inspectable — stop when you've shipped or wired it into
+CI.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Browse the skills" icon="graduation-cap" href="/agents/skills">
+    See every skill `/onboard` orchestrates, and invoke them on their own.
+  </Card>
+  <Card title="Connect the MCP server" icon="plug" href="/mcp/overview">
+    Give your agent native Calibrate tools alongside the skills.
+  </Card>
+</CardGroup>
