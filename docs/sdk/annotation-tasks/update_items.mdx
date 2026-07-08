@@ -1,0 +1,25 @@
+---
+title: "Bulk update items"
+description: "Bulk-update item payloads in a task"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.annotation_tasks.update_items(
+    task_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    updates=[],
+)
+```
+
+## API endpoint
+
+See **PUT /annotation-tasks/\{task_uuid}/items** in the [API reference](/api-reference/introduction) tab.

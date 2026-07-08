@@ -40,7 +40,7 @@
                 "type": "null"
               }
             ],
-            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`** (built inside Calibrate):\n- `system_prompt` (string): the agent's instructions\n- `llm.model` (string): `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider` (string): `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider` (string): `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first` (bool), `settings.max_assistant_turns` (int)\n- `system_tools.end_call` (bool, optional): let the agent end the call\n- `data_extraction_fields` (array, optional): `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`** (your own HTTP endpoint):\n- `agent_url` (string, required): public HTTPS endpoint the agent is called at\n- `agent_headers` (object, optional): headers sent on each request, e.g. auth\n- `benchmark_provider` (string, optional): `openrouter` (default), `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\nFor `type=agent`, omitted keys inherit managed defaults (omit `config` entirely to use all defaults). For `type=connection`, `config` is stored as-is and must contain `agent_url`."
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\nFor `type=agent`, omitted keys inherit managed defaults. Omit `config` entirely to use all defaults. For `type=connection`, `config` is stored as-is and must contain `agent_url`"
           }
         },
         "type": "object",
@@ -81,7 +81,7 @@
             "maxLength": 36,
             "minLength": 36,
             "title": "Task Id",
-            "description": "Test run job ID. Poll for status and results",
+            "description": "Test run job ID. Poll it for status and results",
             "examples": [
               "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
             ]
@@ -93,7 +93,7 @@
               "in_progress"
             ],
             "title": "Status",
-            "description": "Current status of the test run"
+            "description": "Current status of the run"
           }
         },
         "type": "object",
@@ -102,6 +102,294 @@
           "status"
         ],
         "title": "AgentTestRunCreateResponse"
+      },
+      "AgentTestRunListItem": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Test run job ID",
+            "examples": [
+              "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Display name, such as `Run 1` for a unit test or `Benchmark 1` for a benchmark"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus",
+            "description": "Current status of the run"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "llm-unit-test",
+              "llm-benchmark"
+            ],
+            "title": "Type",
+            "description": "What kind of run this is:\n- `llm-unit-test`: a single run of the agent's tests\n- `llm-benchmark`: a multi-model comparison"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the run was last updated (ISO 8601 UTC)"
+          },
+          "evaluators": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TestRunEvaluator"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluators",
+            "description": "The evaluators used in this run. Each verdict in `judge_results` links to one of these by `evaluator_uuid`"
+          },
+          "total_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tests",
+            "description": "Total number of test cases"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed",
+            "description": "Number of test cases that passed"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed",
+            "description": "Number of test cases that failed"
+          },
+          "results": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TestCaseResult"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Results",
+            "description": "Results for each test case"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aggregated latency in milliseconds, as `{p50, p95, p99, count}`"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aggregated cost as `{mean, min, max, count}` (USD)"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aggregated token usage as `{mean, min, max, count}`"
+          },
+          "model_results": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ModelResult"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Results",
+            "description": "Results for each model in a benchmark run"
+          },
+          "leaderboard_summary": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Leaderboard comparing the models, one row per model. Columns vary by benchmark: a `model` column plus pass/fail counts, latency, cost, and one score column per evaluator, keyed by evaluator name",
+            "examples": [
+              [
+                {
+                  "cost": 0.0021,
+                  "failed": 2,
+                  "helpfulness": 0.92,
+                  "latency_p50": 480,
+                  "model": "openai/gpt-4.1",
+                  "passed": 8,
+                  "safety": 1.0
+                },
+                {
+                  "cost": 0.0034,
+                  "failed": 1,
+                  "helpfulness": 0.95,
+                  "latency_p50": 520,
+                  "model": "anthropic/claude-sonnet-4",
+                  "passed": 9,
+                  "safety": 1.0
+                }
+              ]
+            ]
+          },
+          "error": {
+            "type": "boolean",
+            "title": "Error",
+            "description": "True if the run failed",
+            "default": false
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the run is shared publicly",
+            "default": false
+          },
+          "share_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Token",
+            "description": "Token for building the public share URL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "status",
+          "type",
+          "updated_at"
+        ],
+        "title": "AgentTestRunListItem"
+      },
+      "AgentTestRunsResponse": {
+        "properties": {
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTestRunListItem"
+            },
+            "type": "array",
+            "title": "Runs",
+            "description": "Test runs for the agent, most recently created first"
+          }
+        },
+        "type": "object",
+        "required": [
+          "runs"
+        ],
+        "title": "AgentTestRunsResponse"
+      },
+      "AgentTestsCreate": {
+        "properties": {
+          "agent_uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Agent Uuid",
+            "description": "Agent to link tests to",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "test_uuids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Test Uuids",
+            "description": "Tests to link. Any that are already linked are skipped",
+            "examples": [
+              [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_uuid",
+          "test_uuids"
+        ],
+        "title": "AgentTestsCreate"
+      },
+      "AgentTestsCreateResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "AgentTestsCreateResponse"
       },
       "AgentUpdate": {
         "properties": {
@@ -127,11 +415,276 @@
                 "type": "null"
               }
             ],
-            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`** (built inside Calibrate):\n- `system_prompt` (string): the agent's instructions\n- `llm.model` (string): `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider` (string): `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider` (string): `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first` (bool), `settings.max_assistant_turns` (int)\n- `system_tools.end_call` (bool, optional): let the agent end the call\n- `data_extraction_fields` (array, optional): `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`** (your own HTTP endpoint):\n- `agent_url` (string, required): public HTTPS endpoint the agent is called at\n- `agent_headers` (object, optional): headers sent on each request, e.g. auth\n- `benchmark_provider` (string, optional): `openrouter` (default), `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\nReplaces the stored config. Omit to leave unchanged.\n\nFor `type=connection`, changing `agent_url` or `agent_headers` resets the connection and benchmark verification flags."
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\nReplaces the stored config. Omit to leave unchanged\n\nFor `type=connection`, changing `agent_url` or `agent_headers` resets the connection and benchmark verification flags"
           }
         },
         "type": "object",
         "title": "AgentUpdate"
+      },
+      "AgentVerifyRequest": {
+        "properties": {
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "Model to verify. Omit for a basic connection check. Provide it for a model-specific check before benchmarking that model",
+            "examples": [
+              "openai/gpt-4.1"
+            ]
+          },
+          "messages": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample chat messages to send during verification. Omit to use the default probe",
+            "examples": [
+              [
+                {
+                  "content": "Hello",
+                  "role": "user"
+                }
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "title": "AgentVerifyRequest",
+        "description": "Body for verifying an existing agent by ID. The endpoint (`agent_url`,\n`agent_headers`) comes from the agent's stored config, so only the probe\ninputs are accepted here."
+      },
+      "AnnotationItemPayload": {
+        "properties": {
+          "payload": {
+            "title": "Payload",
+            "description": "The item's payload. Its shape depends on the task `type`. `payload['name']` is **required** for every type and must be unique within the task"
+          },
+          "annotations": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Human annotations to seed, keyed by evaluator ID. Each evaluator ID must be linked to the task. Put the judgement in `value`, a bool for binary or a number for rating, with optional `reasoning`. Requires `annotator_id`",
+            "examples": [
+              {
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
+                  "reasoning": "meets the bar",
+                  "value": true
+                }
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "payload"
+        ],
+        "title": "AnnotationItemPayload"
+      },
+      "AnnotationTaskCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Task name, unique within your workspace"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "stt",
+              "tts",
+              "llm",
+              "llm-general",
+              "conversation"
+            ],
+            "title": "Type",
+            "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `tts`: judge synthesized speech output\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description for the task. Omit for none"
+          },
+          "evaluator_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator Ids",
+            "description": "IDs of evaluators to link when the task is created, in order. Each must be one you created or a built-in default. Omit to create with no linked evaluators",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "type"
+        ],
+        "title": "AnnotationTaskCreate"
+      },
+      "AnnotationTaskCreateResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the newly created task",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation that the task was created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "message"
+        ],
+        "title": "AnnotationTaskCreateResponse"
+      },
+      "AnnotationTaskResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Unique ID for the task",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the task"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "stt",
+              "tts",
+              "llm",
+              "llm-general",
+              "conversation"
+            ],
+            "title": "Type",
+            "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `tts`: judge synthesized speech output\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "The task's description"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the task was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the task was last updated (ISO 8601 UTC)"
+          },
+          "evaluators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The evaluators linked to this task, in display order, each with its live version's rubric",
+            "default": []
+          },
+          "item_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Count",
+            "description": "Number of items in the task"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The task's items, each with its agreement stats. You get these when you fetch one task by ID, not when you list tasks",
+            "default": []
+          },
+          "jobs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The task's labelling jobs. You get these when you fetch one task by ID, not when you list tasks",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AnnotationTaskResponse"
       },
       "BatchRunRequest": {
         "properties": {
@@ -182,7 +735,7 @@
             "maxLength": 36,
             "minLength": 36,
             "title": "Task Id",
-            "description": "Test run job ID. Poll for status and results",
+            "description": "Test run job ID. Poll it for status and results",
             "examples": [
               "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
             ]
@@ -194,7 +747,7 @@
               "in_progress"
             ],
             "title": "Status",
-            "description": "Initial status of the test run"
+            "description": "Current status of the run"
           }
         },
         "type": "object",
@@ -251,8 +804,12 @@
           },
           "reason": {
             "type": "string",
+            "enum": [
+              "no_linked_tests",
+              "connection_not_verified"
+            ],
             "title": "Reason",
-            "description": "Why this agent was not run"
+            "description": "Why this agent was not run:\n- `no_linked_tests`: the agent has no tests linked\n- `connection_not_verified`: the agent's connection is not verified"
           }
         },
         "type": "object",
@@ -262,6 +819,268 @@
           "reason"
         ],
         "title": "BatchTestSkip"
+      },
+      "BenchmarkRequest": {
+        "properties": {
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models",
+            "description": "Model names to benchmark",
+            "examples": [
+              [
+                "openai/gpt-4.1",
+                "anthropic/claude-sonnet-4"
+              ]
+            ]
+          },
+          "test_uuids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Uuids",
+            "description": "A subset of the agent's linked tests to benchmark. Each ID must be linked to the agent. Omit to run all linked tests",
+            "examples": [
+              [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "models"
+        ],
+        "title": "BenchmarkRequest"
+      },
+      "BenchmarkStatusResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Task Id",
+            "description": "Benchmark run job ID",
+            "examples": [
+              "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus",
+            "description": "Current status of the run"
+          },
+          "evaluators": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TestRunEvaluator"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluators",
+            "description": "The evaluators used in this run. Each verdict in `judge_results` links to one of these by `evaluator_uuid`"
+          },
+          "model_results": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ModelResult"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Results",
+            "description": "Results for each model"
+          },
+          "leaderboard_summary": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Leaderboard comparing the models, one row per model. Columns vary by benchmark: a `model` column plus pass/fail counts, latency, cost, and one score column per evaluator, keyed by evaluator name",
+            "examples": [
+              [
+                {
+                  "cost": 0.0021,
+                  "failed": 2,
+                  "helpfulness": 0.92,
+                  "latency_p50": 480,
+                  "model": "openai/gpt-4.1",
+                  "passed": 8,
+                  "safety": 1.0
+                },
+                {
+                  "cost": 0.0034,
+                  "failed": 1,
+                  "helpfulness": 0.95,
+                  "latency_p50": 520,
+                  "model": "anthropic/claude-sonnet-4",
+                  "passed": 9,
+                  "safety": 1.0
+                }
+              ]
+            ]
+          },
+          "error": {
+            "type": "boolean",
+            "title": "Error",
+            "description": "True if the run failed",
+            "default": false
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the run is shared publicly",
+            "default": false
+          },
+          "share_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Token",
+            "description": "Token for building the public share URL"
+          }
+        },
+        "type": "object",
+        "required": [
+          "task_id",
+          "status"
+        ],
+        "title": "BenchmarkStatusResponse"
+      },
+      "BulkCreateItemsResponse": {
+        "properties": {
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "IDs of every item the request resolved to, in request order",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "How many items the request resolved to"
+          },
+          "new_item_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Item Ids",
+            "description": "IDs of the items that were newly created"
+          },
+          "existing_item_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Existing Item Ids",
+            "description": "IDs of items that already existed by name and were reused"
+          },
+          "annotation_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Job Id",
+            "description": "ID of the labelling job that holds the annotations you provided, present only when you send annotations with the items"
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_ids",
+          "count"
+        ],
+        "title": "BulkCreateItemsResponse"
+      },
+      "BulkItemsRequest": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationItemPayload"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "Items to insert. Insertion order is preserved"
+          },
+          "annotator_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotator Id",
+            "description": "Annotator these initial annotations belong to. Required when any item carries annotations",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "BulkItemsRequest"
       },
       "BulkTestItem": {
         "properties": {
@@ -276,7 +1095,7 @@
             },
             "type": "array",
             "title": "Conversation History",
-            "description": "Ordered messages ending at the user turn the agent should answer (must be non-empty)"
+            "description": "Ordered messages ending at the user turn the agent should answer"
           },
           "evaluators": {
             "anyOf": [
@@ -326,7 +1145,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\nApplied to every test in the batch."
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\n\nApplied to every test in the batch"
           },
           "tests": {
             "items": {
@@ -334,7 +1153,7 @@
             },
             "type": "array",
             "title": "Tests",
-            "description": "Test items to create (non-empty, max 500 per request, names unique within the batch)"
+            "description": "Test items to create, at most 500 per request, with names unique within the batch"
           },
           "agent_uuids": {
             "anyOf": [
@@ -349,7 +1168,7 @@
               }
             ],
             "title": "Agent Uuids",
-            "description": "Agents (IDs) to link every created test to. Omit to link none",
+            "description": "IDs of agents to link every created test to. Omit to link none",
             "examples": [
               [
                 "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
@@ -414,7 +1233,7 @@
               }
             ],
             "title": "Warnings",
-            "description": "Non-fatal issues (e.g. agents some tests couldn't link to). Null when there were none"
+            "description": "Non-fatal issues, such as agents some tests could not be linked to"
           }
         },
         "type": "object",
@@ -424,6 +1243,37 @@
           "message"
         ],
         "title": "BulkTestUploadResponse"
+      },
+      "BulkUpdateItemsRequest": {
+        "properties": {
+          "updates": {
+            "items": {
+              "$ref": "#/components/schemas/ItemUpdatePayload"
+            },
+            "type": "array",
+            "title": "Updates",
+            "description": "The new payload for each item you're updating. Entries not in this task, or referencing deleted items, are skipped"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updates"
+        ],
+        "title": "BulkUpdateItemsRequest"
+      },
+      "BulkUpdateItemsResponse": {
+        "properties": {
+          "updated_count": {
+            "type": "integer",
+            "title": "Updated Count",
+            "description": "How many items were updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "updated_count"
+        ],
+        "title": "BulkUpdateItemsResponse"
       },
       "ChatMessage": {
         "properties": {
@@ -495,6 +1345,672 @@
         ],
         "title": "ChatMessage"
       },
+      "EvaluatorCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Evaluator name, unique within your workspace"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Description. Omit to leave blank"
+          },
+          "evaluator_type": {
+            "type": "string",
+            "enum": [
+              "tts",
+              "stt",
+              "llm",
+              "llm-general",
+              "conversation"
+            ],
+            "title": "Evaluator Type",
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n",
+            "default": "llm"
+          },
+          "data_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "audio"
+            ],
+            "title": "Data Type",
+            "description": "The modality the judge reads:\n\n- `text`\n- `audio`\n",
+            "default": "text"
+          },
+          "output_type": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "rating"
+            ],
+            "title": "Output Type",
+            "description": "How the evaluator scores:\n\n- `binary`: pass or fail\n- `rating`: a numeric score, using the scale in `output_config`\n",
+            "default": "binary"
+          },
+          "version": {
+            "$ref": "#/components/schemas/EvaluatorVersionCreate",
+            "description": "The evaluator's first version. Set as live when you create the evaluator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "EvaluatorCreate"
+      },
+      "EvaluatorCreateResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the created evaluator",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "version_uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Version Uuid",
+            "description": "ID of its initial version",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "version_uuid"
+        ],
+        "title": "EvaluatorCreateResponse"
+      },
+      "EvaluatorDetailResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Evaluator ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Evaluator name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the evaluator checks"
+          },
+          "evaluator_type": {
+            "type": "string",
+            "enum": [
+              "tts",
+              "stt",
+              "llm",
+              "llm-general",
+              "conversation"
+            ],
+            "title": "Evaluator Type",
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n"
+          },
+          "data_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "audio"
+            ],
+            "title": "Data Type",
+            "description": "The modality the judge reads:\n\n- `text`\n- `audio`\n"
+          },
+          "output_type": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "rating"
+            ],
+            "title": "Output Type",
+            "description": "How the evaluator scores:\n\n- `binary`: pass or fail\n- `rating`: a numeric score, using the scale in `output_config`\n"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "description": "True for a built-in default evaluator, which you can't edit. False for an evaluator you created, which you can edit and add versions to"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug",
+            "description": "Stable slug for a built-in default evaluator"
+          },
+          "live_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Version Id",
+            "description": "ID of the version that is currently live",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the evaluator was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the evaluator was last updated (ISO 8601 UTC)"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluatorVersionResponse"
+            },
+            "type": "array",
+            "title": "Versions",
+            "description": "Full version history, oldest first"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "evaluator_type",
+          "data_type",
+          "output_type",
+          "is_default",
+          "created_at",
+          "updated_at",
+          "versions"
+        ],
+        "title": "EvaluatorDetailResponse"
+      },
+      "EvaluatorLinkRequest": {
+        "properties": {
+          "evaluator_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Evaluator Id",
+            "description": "The evaluator to link. Must be one you created or a built-in default",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_id"
+        ],
+        "title": "EvaluatorLinkRequest"
+      },
+      "EvaluatorLinkResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation that the evaluator was linked",
+            "examples": [
+              "Evaluator linked to annotation task"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "EvaluatorLinkResponse"
+      },
+      "EvaluatorRunLaunchResponse": {
+        "properties": {
+          "job_uuid": {
+            "type": "string",
+            "title": "Job Uuid",
+            "description": "ID of the evaluator-run job. Poll it for status and results",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress"
+            ],
+            "title": "Status",
+            "description": "Status of the job right after you launch it"
+          },
+          "evaluator_count": {
+            "type": "integer",
+            "title": "Evaluator Count",
+            "description": "How many evaluators the job will run"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "How many items the job will run on"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_uuid",
+          "status",
+          "evaluator_count",
+          "item_count"
+        ],
+        "title": "EvaluatorRunLaunchResponse"
+      },
+      "EvaluatorRunRequestEntry": {
+        "properties": {
+          "evaluator_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Evaluator Id",
+            "description": "Evaluator ID to run. Must be linked to the task",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "evaluator_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator Version Id",
+            "description": "Evaluator version ID to run. Omit to use the evaluator's live version",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_id"
+        ],
+        "title": "EvaluatorRunRequestEntry"
+      },
+      "EvaluatorRunResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "title": "Uuid",
+            "description": "ID of the evaluator-run job",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id",
+            "description": "ID of the task the job ran on"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "in_progress",
+              "completed",
+              "failed"
+            ],
+            "title": "Status",
+            "description": "Current status of the job"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Failure reason, present when the job failed"
+          },
+          "completed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completed At",
+            "description": "When the job finished (ISO 8601 UTC)"
+          },
+          "evaluators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The evaluators the job ran, each pinned to the version it used, with that version's rubric"
+          },
+          "runs": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "One result per item and evaluator. Each keys back to `evaluators` by its evaluator and version IDs"
+          },
+          "human_agreement": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "How each evaluator's judgements line up with the human annotations on the same items"
+          },
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The exact item set the job ran on, frozen when the job started"
+          },
+          "is_public": {
+            "type": "boolean",
+            "title": "Is Public",
+            "description": "Whether the run is shared publicly"
+          },
+          "share_token": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Share Token",
+            "description": "Token for building the public share URL"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "uuid",
+          "task_id",
+          "status",
+          "error",
+          "completed_at",
+          "evaluators",
+          "runs",
+          "human_agreement",
+          "items",
+          "is_public",
+          "share_token"
+        ],
+        "title": "EvaluatorRunResponse"
+      },
+      "EvaluatorRunStartRequest": {
+        "properties": {
+          "evaluators": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluatorRunRequestEntry"
+            },
+            "type": "array",
+            "title": "Evaluators",
+            "description": "The evaluators to run. Each must be linked to the task"
+          },
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "Item IDs to run on. **Required when `select_all=false`**. Ignored when `select_all=true`",
+            "default": []
+          },
+          "select_all": {
+            "type": "boolean",
+            "title": "Select All",
+            "description": "When `true`, run on every item in the task. Set `q` to run only items whose name matches it",
+            "default": false
+          },
+          "q": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q",
+            "description": "Case-insensitive substring filter on `payload.name`. Applies only when `select_all=true`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluators"
+        ],
+        "title": "EvaluatorRunStartRequest"
+      },
+      "EvaluatorVersionCreate": {
+        "properties": {
+          "judge_model": {
+            "type": "string",
+            "title": "Judge Model",
+            "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "Judge system prompt. May contain `{{variable}}` placeholders"
+          },
+          "output_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutputConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VariableSpec"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Declared prompt variables. Omit if the prompt has no `{{placeholders}}`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "judge_model",
+          "system_prompt"
+        ],
+        "title": "EvaluatorVersionCreate",
+        "description": "One version of an evaluator: its judge prompt, model, variables, and rubric."
+      },
+      "EvaluatorVersionCreateRequest": {
+        "properties": {
+          "judge_model": {
+            "type": "string",
+            "title": "Judge Model",
+            "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "Judge system prompt. May contain `{{variable}}` placeholders"
+          },
+          "output_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutputConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VariableSpec"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Declared prompt variables. Omit if the prompt has none. After the first version the variable names are fixed. You can change a variable's description or default, but not add, remove, or rename one"
+          },
+          "make_live": {
+            "type": "boolean",
+            "title": "Make Live",
+            "description": "When `true`, immediately point the evaluator's live version at this new version",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "judge_model",
+          "system_prompt"
+        ],
+        "title": "EvaluatorVersionCreateRequest",
+        "description": "Request body for adding a version to an existing evaluator."
+      },
+      "EvaluatorVersionResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Version ID",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number",
+            "description": "The version's number. The first version is 1, and it goes up by one for each new version of the evaluator"
+          },
+          "judge_model": {
+            "type": "string",
+            "title": "Judge Model",
+            "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
+          },
+          "system_prompt": {
+            "type": "string",
+            "title": "System Prompt",
+            "description": "Judge system prompt, with `{{variable}}` placeholders unrendered"
+          },
+          "output_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutputConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VariableSpec"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Declared prompt variables"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the version was created (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "version_number",
+          "judge_model",
+          "system_prompt",
+          "created_at"
+        ],
+        "title": "EvaluatorVersionResponse"
+      },
       "ExpectedToolCall": {
         "properties": {
           "tool": {
@@ -540,6 +2056,67 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "HumanAgreementBlock": {
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current",
+            "description": "Current mean pairwise agreement among annotators"
+          },
+          "pair_count": {
+            "type": "integer",
+            "title": "Pair Count",
+            "description": "How many annotator pairs the current value averages over"
+          },
+          "series": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "Agreement over time, one point per time bucket"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "current",
+          "pair_count",
+          "series"
+        ],
+        "title": "HumanAgreementBlock"
+      },
+      "ItemUpdatePayload": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the item to update",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "payload": {
+            "title": "Payload",
+            "description": "The item's new payload. `payload['name']` is still required and must be unique within the task"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "payload"
+        ],
+        "title": "ItemUpdatePayload"
+      },
       "JudgeResult": {
         "properties": {
           "evaluator_uuid": {
@@ -566,7 +2143,7 @@
               }
             ],
             "title": "Reasoning",
-            "description": "Judge's rationale for this verdict"
+            "description": "The judge's rationale for this verdict"
           },
           "match": {
             "anyOf": [
@@ -578,7 +2155,7 @@
               }
             ],
             "title": "Match",
-            "description": "Pass/fail verdict, for binary evaluators"
+            "description": "Pass/fail verdict, set for binary evaluators"
           },
           "score": {
             "anyOf": [
@@ -590,7 +2167,7 @@
               }
             ],
             "title": "Score",
-            "description": "Numeric score, for rating evaluators"
+            "description": "Numeric score, set for rating evaluators"
           },
           "value_name": {
             "anyOf": [
@@ -602,7 +2179,7 @@
               }
             ],
             "title": "Value Name",
-            "description": "Readable label for the verdict, from the run's rubric"
+            "description": "Readable label for the verdict, taken from the run's rubric"
           },
           "variable_values": {
             "anyOf": [
@@ -614,11 +2191,244 @@
                 "type": "null"
               }
             ],
-            "description": "`{{var}}` substitutions used for this evaluator on this test case"
+            "description": "Values filled into the evaluator prompt's `{{variable}}` placeholders for this test case, keyed by variable name",
+            "examples": [
+              {
+                "criteria": "Is the reply correct and helpful?"
+              }
+            ]
           }
         },
         "type": "object",
         "title": "JudgeResult"
+      },
+      "ModelResult": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Model name these results are for",
+            "examples": [
+              "openai/gpt-4.1"
+            ]
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success",
+            "description": "Whether this model's run succeeded"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Status or result message for this model"
+          },
+          "total_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tests",
+            "description": "Total test cases for this model"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed",
+            "description": "Number of test cases that passed"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed",
+            "description": "Number of test cases that failed"
+          },
+          "evaluator_summary": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aggregate summary for each evaluator for this model"
+          },
+          "test_results": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TestCaseResult"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Results",
+            "description": "Results for each test case for this model"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aggregated latency in milliseconds, as `{p50, p95, p99, count}`"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aggregated cost as `{mean, min, max, count}` (USD)"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Aggregated token usage as `{mean, min, max, count}`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model",
+          "message"
+        ],
+        "title": "ModelResult"
+      },
+      "OutputConfig": {
+        "properties": {
+          "scale": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/OutputScaleEntry"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale",
+            "description": "The ordered scale points that make up the rubric, each with its label"
+          }
+        },
+        "type": "object",
+        "title": "OutputConfig"
+      },
+      "OutputScaleEntry": {
+        "properties": {
+          "value": {
+            "title": "Value",
+            "description": "The value for this scale point. Use a boolean for a `binary` evaluator, a number for a `rating` one"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Short label for this scale point"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Rubric text for this level, added to the judge prompt. Omit to leave this level undescribed"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Color",
+            "description": "Color to show for this level. Omit for the default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "value",
+          "name"
+        ],
+        "title": "OutputScaleEntry",
+        "description": "One entry in an evaluator's output_config.scale. `value` is bool|number|string\ndepending on output_type."
+      },
+      "PaginationMeta": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items that match, across all pages"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "description": "Maximum number of items returned in this page"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "Number of items skipped before this page"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "PaginationMeta"
       },
       "ResolveAgentNamesRequest": {
         "properties": {
@@ -694,6 +2504,50 @@
         "type": "object",
         "title": "RunTestRequest"
       },
+      "TaskAgreementResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "ID of the task",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket",
+            "description": "Time bucket used for the trend series"
+          },
+          "days": {
+            "type": "integer",
+            "title": "Days",
+            "description": "Length of the trailing window in days"
+          },
+          "human_human": {
+            "$ref": "#/components/schemas/HumanAgreementBlock",
+            "description": "Agreement between annotators who labelled the same items"
+          },
+          "evaluators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "Agreement between each evaluator and the annotators, one entry per linked evaluator"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "task_id",
+          "bucket",
+          "days",
+          "human_human",
+          "evaluators"
+        ],
+        "title": "TaskAgreementResponse"
+      },
       "TaskStatus": {
         "type": "string",
         "enum": [
@@ -704,6 +2558,75 @@
           "failed"
         ],
         "title": "TaskStatus"
+      },
+      "TaskSummaryResponse": {
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "title": "Task Id",
+            "description": "ID of the task",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "task_type": {
+            "type": "string",
+            "enum": [
+              "stt",
+              "tts",
+              "llm",
+              "llm-general",
+              "conversation"
+            ],
+            "title": "Task Type",
+            "description": "Type of the task"
+          },
+          "evaluators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The task's evaluators, stable across pages, each with its live rubric"
+          },
+          "annotators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "The annotators who labelled or commented on items in the task, stable across pages"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "One row per item, evaluator, and version on this page, with the evaluator's value and each annotator's label"
+          },
+          "item_comments": {
+            "additionalProperties": true,
+            "type": "object",
+            "description": "Annotator comments, keyed by item ID"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/PaginationMeta",
+            "description": "Where this page sits in the full item list"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "task_id",
+          "task_type",
+          "evaluators",
+          "annotators",
+          "rows",
+          "item_comments",
+          "pagination"
+        ],
+        "title": "TaskSummaryResponse"
       },
       "TestCaseResult": {
         "properties": {
@@ -741,7 +2664,7 @@
               }
             ],
             "title": "Passed",
-            "description": "Whether the case passed. Present only when done"
+            "description": "Whether the case passed"
           },
           "reasoning": {
             "anyOf": [
@@ -753,7 +2676,7 @@
               }
             ],
             "title": "Reasoning",
-            "description": "Judge reasoning, or the tool-call diff for tool-call tests"
+            "description": "The judge's reasoning, or the tool-call diff for a tool-call test"
           },
           "output": {
             "anyOf": [
@@ -764,7 +2687,7 @@
                 "type": "null"
               }
             ],
-            "description": "The agent's output for this case. Present only when done"
+            "description": "The agent's output for this case"
           },
           "test_case": {
             "anyOf": [
@@ -776,7 +2699,7 @@
                 "type": "null"
               }
             ],
-            "description": "The input test case definition. Present only when done"
+            "description": "The test case definition that was run"
           },
           "judge_results": {
             "anyOf": [
@@ -791,7 +2714,7 @@
               }
             ],
             "title": "Judge Results",
-            "description": "One verdict per evaluator, for response and conversation tests. Null for tool-call tests or rows still running"
+            "description": "One verdict for each evaluator"
           },
           "latency_ms": {
             "anyOf": [
@@ -803,7 +2726,7 @@
               }
             ],
             "title": "Latency Ms",
-            "description": "Response latency in milliseconds for the agent under test"
+            "description": "How long the agent took to respond, in milliseconds"
           },
           "cost": {
             "anyOf": [
@@ -815,7 +2738,7 @@
               }
             ],
             "title": "Cost",
-            "description": "Cost of this case in USD"
+            "description": "Cost of this case (USD)"
           }
         },
         "type": "object",
@@ -836,7 +2759,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
           },
           "config": {
             "anyOf": [
@@ -848,7 +2771,23 @@
                 "type": "null"
               }
             ],
-            "description": "The calibrate test config. Three top-level keys.\n\n- `history` (array, required): the conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation` (object, required): `{type, ...}`, where `type` matches the test's `type` (below).\n- `settings` (object, optional): e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nOmit to create the test with no config and fill it in later via update."
+            "description": "The calibrate test config. Three top-level keys.\n\n- `history`: the required conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation`: the required `{type, ...}`, where `type` matches the test's `type` below.\n- `settings`: an optional object, e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nOmit to create the test with no config and fill it in later via update",
+            "examples": [
+              {
+                "evaluation": {
+                  "type": "response"
+                },
+                "history": [
+                  {
+                    "content": "What is your return policy?",
+                    "role": "user"
+                  }
+                ],
+                "settings": {
+                  "language": "en"
+                }
+              }
+            ]
           },
           "evaluators": {
             "anyOf": [
@@ -910,7 +2849,7 @@
               }
             ],
             "title": "Response",
-            "description": "The agent's generated reply. Null for tool-call-only cases"
+            "description": "The reply the agent generated"
           },
           "tool_calls": {
             "anyOf": [
@@ -925,7 +2864,7 @@
               }
             ],
             "title": "Tool Calls",
-            "description": "Tool calls the agent generated. Null when it made none"
+            "description": "Tool calls the agent generated"
           }
         },
         "type": "object",
@@ -983,7 +2922,7 @@
               }
             ],
             "title": "Output Type",
-            "description": "Verdict shape: pass/fail or a numeric rating"
+            "description": "The shape of the verdict:\n- `binary`: a pass/fail verdict\n- `rating`: a numeric score"
           },
           "output_config": {
             "anyOf": [
@@ -995,7 +2934,23 @@
                 "type": "null"
               }
             ],
-            "description": "Rubric: the scale values, labels, and colors a verdict maps to"
+            "description": "The rubric: the scale values, labels, and colors a verdict maps to",
+            "examples": [
+              {
+                "scale": [
+                  {
+                    "color": "#e5484d",
+                    "name": "Wrong",
+                    "value": false
+                  },
+                  {
+                    "color": "#30a46c",
+                    "name": "Correct",
+                    "value": true
+                  }
+                ]
+              }
+            ]
           },
           "scale_min": {
             "anyOf": [
@@ -1007,7 +2962,7 @@
               }
             ],
             "title": "Scale Min",
-            "description": "Lowest rating value. Set for rating evaluators"
+            "description": "Lowest value on a rating scale"
           },
           "scale_max": {
             "anyOf": [
@@ -1019,7 +2974,7 @@
               }
             ],
             "title": "Scale Max",
-            "description": "Highest rating value. Set for rating evaluators"
+            "description": "Highest value on a rating scale"
           },
           "version_number": {
             "anyOf": [
@@ -1031,7 +2986,7 @@
               }
             ],
             "title": "Version Number",
-            "description": "Evaluator version this run used"
+            "description": "The evaluator version this run used"
           }
         },
         "type": "object",
@@ -1051,7 +3006,7 @@
           },
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
-            "description": "Current status of the test run"
+            "description": "Current status of the run"
           },
           "total_tests": {
             "anyOf": [
@@ -1063,7 +3018,7 @@
               }
             ],
             "title": "Total Tests",
-            "description": "Total number of test cases. Null until known"
+            "description": "Total number of test cases"
           },
           "passed": {
             "anyOf": [
@@ -1075,7 +3030,7 @@
               }
             ],
             "title": "Passed",
-            "description": "Number of test cases that passed. Null until done"
+            "description": "Number of test cases that passed"
           },
           "failed": {
             "anyOf": [
@@ -1087,7 +3042,7 @@
               }
             ],
             "title": "Failed",
-            "description": "Number of test cases that failed. Null until done"
+            "description": "Number of test cases that failed"
           },
           "latency_ms": {
             "anyOf": [
@@ -1099,7 +3054,7 @@
                 "type": "null"
               }
             ],
-            "description": "Aggregated response latency in milliseconds: `{p50, p95, p99, count}`"
+            "description": "Aggregated response latency in milliseconds, as `{p50, p95, p99, count}`"
           },
           "cost": {
             "anyOf": [
@@ -1111,7 +3066,7 @@
                 "type": "null"
               }
             ],
-            "description": "Aggregated cost `{mean, min, max, count}` (USD)"
+            "description": "Aggregated cost as `{mean, min, max, count}` (USD)"
           },
           "total_tokens": {
             "anyOf": [
@@ -1123,7 +3078,7 @@
                 "type": "null"
               }
             ],
-            "description": "Aggregated token usage `{mean, min, max, count}`"
+            "description": "Aggregated token usage as `{mean, min, max, count}`"
           },
           "evaluators": {
             "anyOf": [
@@ -1153,7 +3108,7 @@
               }
             ],
             "title": "Results",
-            "description": "Results for each test case. Null until available"
+            "description": "Results for each test case"
           },
           "error": {
             "type": "boolean",
@@ -1177,7 +3132,7 @@
               }
             ],
             "title": "Share Token",
-            "description": "Public share token. Null unless the run is public"
+            "description": "Token for building the public share URL"
           }
         },
         "type": "object",
@@ -1216,7 +3171,7 @@
               }
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\nImmutable. Omit, or send the existing value. A different value is rejected (400)."
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\n\nImmutable. Omit it, or send the current value"
           },
           "config": {
             "anyOf": [
@@ -1228,7 +3183,23 @@
                 "type": "null"
               }
             ],
-            "description": "The calibrate test config. Three top-level keys.\n\n- `history` (array, required): the conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation` (object, required): `{type, ...}`, where `type` matches the test's `type` (below).\n- `settings` (object, optional): e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nReplaces the stored config. Omit to leave unchanged."
+            "description": "The calibrate test config. Three top-level keys.\n\n- `history`: the required conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation`: the required `{type, ...}`, where `type` matches the test's `type` below.\n- `settings`: an optional object, e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nReplaces the stored config. Omit to leave unchanged",
+            "examples": [
+              {
+                "evaluation": {
+                  "type": "response"
+                },
+                "history": [
+                  {
+                    "content": "What is your return policy?",
+                    "role": "user"
+                  }
+                ],
+                "settings": {
+                  "language": "en"
+                }
+              }
+            ]
           },
           "evaluators": {
             "anyOf": [
@@ -1266,7 +3237,12 @@
                 "type": "null"
               }
             ],
-            "description": "Arguments the agent passed to the tool. Null if none"
+            "description": "Arguments the agent passed to the tool",
+            "examples": [
+              {
+                "city": "Paris"
+              }
+            ]
           },
           "output": {
             "anyOf": [
@@ -1276,7 +3252,7 @@
               }
             ],
             "title": "Output",
-            "description": "Tool execution result (any JSON value). Present only when the agent runs the tool and returns its result"
+            "description": "Tool execution result, when the agent ran the tool and returned its result"
           }
         },
         "type": "object",
@@ -1317,6 +3293,167 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VariableSpec": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of a `{{placeholder}}` used in the system prompt"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the variable is for. Omit if self-evident"
+          },
+          "default": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default",
+            "description": "Default value used when you omit this variable. Omit for no default"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "VariableSpec"
+      },
+      "VerifyConnectionResponse": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "description": "True if the agent responded successfully to the verification probe"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error",
+            "description": "Reason the verification failed"
+          },
+          "sample_response": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Sample output returned by the agent during verification"
+          }
+        },
+        "type": "object",
+        "required": [
+          "success"
+        ],
+        "title": "VerifyConnectionResponse"
+      },
+      "VersionCreateResponse": {
+        "properties": {
+          "version_uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Version Uuid",
+            "description": "ID of the newly created version",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number",
+            "description": "The version's number. The first version is 1, and it goes up by one for each new version of the evaluator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "version_uuid",
+          "version_number"
+        ],
+        "title": "VersionCreateResponse"
+      },
+      "routers__agent_tests__TestResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Test ID",
+            "examples": [
+              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the test"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "response",
+              "tool_call",
+              "conversation"
+            ],
+            "title": "Type",
+            "description": "What the test checks:\n- `response`: judges the reply the agent generates\n- `tool_call`: checks the tool calls the agent makes\n- `conversation`: judges the full conversation after the agent replies"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Test configuration"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the test was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the test was last updated (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TestResponse"
       },
       "routers__agents__AgentResponse": {
         "properties": {
@@ -1377,6 +3514,134 @@
         ],
         "title": "AgentResponse"
       },
+      "routers__evaluators__EvaluatorResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Evaluator ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Evaluator name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the evaluator checks"
+          },
+          "evaluator_type": {
+            "type": "string",
+            "enum": [
+              "tts",
+              "stt",
+              "llm",
+              "llm-general",
+              "conversation"
+            ],
+            "title": "Evaluator Type",
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n"
+          },
+          "data_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "audio"
+            ],
+            "title": "Data Type",
+            "description": "The modality the judge reads:\n\n- `text`\n- `audio`\n"
+          },
+          "output_type": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "rating"
+            ],
+            "title": "Output Type",
+            "description": "How the evaluator scores:\n\n- `binary`: pass or fail\n- `rating`: a numeric score, using the scale in `output_config`\n"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "description": "True for a built-in default evaluator, which you can't edit. False for an evaluator you created, which you can edit and add versions to"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug",
+            "description": "Stable slug for a built-in default evaluator"
+          },
+          "live_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Version Id",
+            "description": "ID of the version that is currently live",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the evaluator was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the evaluator was last updated (ISO 8601 UTC)"
+          },
+          "live_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluatorVersionResponse"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version that is currently live"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "evaluator_type",
+          "data_type",
+          "output_type",
+          "is_default",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "EvaluatorResponse"
+      },
       "routers__tests__EvaluatorRef": {
         "properties": {
           "evaluator_uuid": {
@@ -1399,7 +3664,12 @@
                 "type": "null"
               }
             ],
-            "description": "Values for the evaluator's `{{placeholder}}` variables, pinned per test. Omit to inherit the evaluator version's defaults"
+            "description": "Values for the evaluator's `{{placeholder}}` variables, pinned on this test. Omit to inherit the evaluator version's defaults",
+            "examples": [
+              {
+                "criteria": "The reply must cite the refund window"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -1434,7 +3704,7 @@
               "conversation"
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
           },
           "config": {
             "anyOf": [
@@ -1446,17 +3716,17 @@
                 "type": "null"
               }
             ],
-            "description": "Config for the test (`history`, `evaluation`, optional `settings`)"
+            "description": "The stored config: `history`, `evaluation`, and an optional `settings`"
           },
           "created_at": {
             "type": "string",
             "title": "Created At",
-            "description": "Timestamp when the test was created (ISO 8601 UTC)"
+            "description": "When the test was created (ISO 8601 UTC)"
           },
           "updated_at": {
             "type": "string",
             "title": "Updated At",
-            "description": "Timestamp when the test was last updated (ISO 8601 UTC)"
+            "description": "When the test was last updated (ISO 8601 UTC)"
           },
           "evaluators": {
             "items": {
@@ -1489,6 +3759,69 @@
     }
   },
   "paths": {
+    "/agents/{agent_uuid}/verify-connection": {
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Verify agent connection",
+        "description": "Verify an agent's connection and persist the result when successful",
+        "operationId": "verify_agent_connection_agents__agent_uuid__verify_connection_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The agent whose connection to verify",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "The agent whose connection to verify"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentVerifyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VerifyConnectionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agents/resolve": {
       "post": {
         "tags": [
@@ -1642,13 +3975,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The agent to retrieve.",
+              "description": "The agent to retrieve",
               "examples": [
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ],
               "title": "Agent Uuid"
             },
-            "description": "The agent to retrieve."
+            "description": "The agent to retrieve"
           }
         ],
         "responses": {
@@ -1693,13 +4026,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The agent to update.",
+              "description": "The agent to update",
               "examples": [
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ],
               "title": "Agent Uuid"
             },
-            "description": "The agent to update."
+            "description": "The agent to update"
           }
         ],
         "requestBody": {
@@ -1983,13 +4316,170 @@
         }
       }
     },
+    "/agent-tests": {
+      "post": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Link tests to agent",
+        "description": "Link one or more tests to an agent. Tests that are already linked are skipped.",
+        "operationId": "create_agent_test_links_agent_tests_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTestsCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTestsCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-tests/agent/{agent_uuid}/tests": {
+      "get": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "List tests for agent",
+        "description": "List the tests linked to an agent.",
+        "operationId": "get_agent_tests_endpoint_agent_tests_agent__agent_uuid__tests_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent whose linked tests to list",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "Agent whose linked tests to list"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/routers__agent_tests__TestResponse"
+                  },
+                  "title": "Response Get Agent Tests Endpoint Agent Tests Agent  Agent Uuid  Tests Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-tests/agent/{agent_uuid}/runs": {
+      "get": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "List test runs for agent",
+        "description": "List an agent's test runs with their results",
+        "operationId": "get_agent_test_runs_agent_tests_agent__agent_uuid__runs_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent whose test runs to list",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "Agent whose test runs to list"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTestRunsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/agent-tests/agent/{agent_uuid}/run": {
       "post": {
         "tags": [
           "agent-tests"
         ],
         "summary": "Run agent tests",
-        "description": "Run an agent's linked tests as a background job, returning a task ID to poll",
+        "description": "Run an agent's linked tests as a background job, returning a task ID to poll.",
         "operationId": "run_agent_test_agent_tests_agent__agent_uuid__run_post",
         "security": [
           {
@@ -2003,13 +4493,13 @@
             "required": true,
             "schema": {
               "type": "string",
-              "description": "The agent to test.",
+              "description": "Agent to test",
               "examples": [
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ],
               "title": "Agent Uuid"
             },
-            "description": "The agent to test."
+            "description": "Agent to test"
           }
         ],
         "requestBody": {
@@ -2052,7 +4542,7 @@
           "agent-tests"
         ],
         "summary": "Run agent tests in batch",
-        "description": "Run agent tests for every agent, or for a selected set",
+        "description": "Run agent tests for every agent, or for a selected set.",
         "operationId": "run_tests_batch_agent_tests_run_post",
         "security": [
           {
@@ -2106,7 +4596,7 @@
           "agent-tests"
         ],
         "summary": "Get test run status",
-        "description": "Poll a test run for its status and evaluation results",
+        "description": "Poll a test run for its status and evaluation results.",
         "operationId": "get_agent_test_run_status_agent_tests_run__task_id__get",
         "security": [
           {
@@ -2136,6 +4626,1081 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TestRunStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-tests/agent/{agent_uuid}/benchmark": {
+      "post": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Run agent benchmark",
+        "description": "Run a multi-model benchmark on an agent's linked tests as a background job.",
+        "operationId": "run_agent_benchmark_agent_tests_agent__agent_uuid__benchmark_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Agent to benchmark",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "Agent to benchmark"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BenchmarkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTestRunCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-tests/benchmark/{task_id}": {
+      "get": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Get benchmark status",
+        "description": "Get the results of a benchmark run",
+        "operationId": "get_benchmark_status_agent_tests_benchmark__task_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Benchmark run to poll for status and results",
+              "examples": [
+                "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+              ],
+              "title": "Task Id"
+            },
+            "description": "Benchmark run to poll for status and results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluators": {
+      "post": {
+        "tags": [
+          "evaluators"
+        ],
+        "summary": "Create evaluator",
+        "description": "Create an evaluator along with its first version, which is set live",
+        "operationId": "create_evaluator_endpoint_evaluators_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluatorCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluatorCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "evaluators"
+        ],
+        "summary": "List evaluators",
+        "description": "List your evaluators",
+        "operationId": "list_evaluators_evaluators_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "evaluator_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "tts",
+                    "stt",
+                    "llm",
+                    "llm-general",
+                    "conversation"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by what the evaluator judges. Omit for all types",
+              "title": "Evaluator Type"
+            },
+            "description": "Filter by what the evaluator judges. Omit for all types"
+          },
+          {
+            "name": "data_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "text",
+                    "audio"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by modality. Omit for all",
+              "title": "Data Type"
+            },
+            "description": "Filter by modality. Omit for all"
+          },
+          {
+            "name": "include_defaults",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When `true`, include the built-in default evaluators alongside the ones you created",
+              "default": true,
+              "title": "Include Defaults"
+            },
+            "description": "When `true`, include the built-in default evaluators alongside the ones you created"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/routers__evaluators__EvaluatorResponse"
+                  },
+                  "title": "Response List Evaluators Evaluators Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluators/{evaluator_uuid}": {
+      "get": {
+        "tags": [
+          "evaluators"
+        ],
+        "summary": "Get evaluator",
+        "description": "Get one evaluator with its full version history",
+        "operationId": "get_evaluator_endpoint_evaluators__evaluator_uuid__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "evaluator_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Evaluator to retrieve",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Evaluator Uuid"
+            },
+            "description": "Evaluator to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluatorDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluators/{evaluator_uuid}/versions": {
+      "post": {
+        "tags": [
+          "evaluators"
+        ],
+        "summary": "Create evaluator version",
+        "description": "Add a new version to an evaluator you created",
+        "operationId": "create_version_evaluators__evaluator_uuid__versions_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "evaluator_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Evaluator to add a version to",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Evaluator Uuid"
+            },
+            "description": "Evaluator to add a version to"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluatorVersionCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks": {
+      "post": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Create annotation task",
+        "description": "Create an annotation task for annotators to label items against evaluators",
+        "operationId": "create_annotation_task_endpoint_annotation_tasks_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotationTaskCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationTaskCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "List annotation tasks",
+        "description": "List annotation tasks with linked evaluators",
+        "operationId": "list_annotation_tasks_annotation_tasks_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnnotationTaskResponse"
+                  },
+                  "title": "Response List Annotation Tasks Annotation Tasks Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}": {
+      "get": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Get annotation task",
+        "description": "Get one annotation task with linked evaluators, items, and labelling jobs",
+        "operationId": "get_annotation_task_endpoint_annotation_tasks__task_uuid__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Task to retrieve",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Task to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotationTaskResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}/evaluators": {
+      "post": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Link evaluator to task",
+        "description": "Link an evaluator to a task, appending it to the display order",
+        "operationId": "link_evaluator_to_task_annotation_tasks__task_uuid__evaluators_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluatorLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluatorLinkResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}/items": {
+      "post": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Bulk create items",
+        "description": "Bulk-create annotation items in a task, optionally seeding human annotations",
+        "operationId": "bulk_create_items_annotation_tasks__task_uuid__items_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkItemsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkCreateItemsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Bulk update items",
+        "description": "Bulk-update item payloads in a task",
+        "operationId": "bulk_update_items_annotation_tasks__task_uuid__items_put",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateItemsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BulkUpdateItemsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}/evaluator-runs": {
+      "post": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Run evaluators on items",
+        "description": "Run evaluators on task items as a background job",
+        "operationId": "start_evaluator_run_annotation_tasks__task_uuid__evaluator_runs_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluatorRunStartRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluatorRunLaunchResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}/evaluator-runs/{job_uuid}": {
+      "get": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Get evaluator run",
+        "description": "Get one evaluator-run job with results and human-agreement summary",
+        "operationId": "get_evaluator_run_job_annotation_tasks__task_uuid__evaluator_runs__job_uuid__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          },
+          {
+            "name": "job_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The evaluator run to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Job Uuid"
+            },
+            "description": "The evaluator run to act on"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvaluatorRunResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}/agreement": {
+      "get": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Get task agreement",
+        "description": "Get human-vs-human and human-vs-evaluator agreement metrics for a task",
+        "operationId": "task_agreement_annotation_tasks__task_uuid__agreement_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          },
+          {
+            "name": "bucket",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "week",
+                "month",
+                "year"
+              ],
+              "type": "string",
+              "description": "How to bucket points in the trend series",
+              "default": "week",
+              "title": "Bucket"
+            },
+            "description": "How to bucket points in the trend series"
+          },
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 3650,
+              "minimum": 1,
+              "description": "Trailing window in days for the trend series",
+              "default": 90,
+              "title": "Days"
+            },
+            "description": "Trailing window in days for the trend series"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskAgreementResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}/summary": {
+      "get": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Get task summary",
+        "description": "Get a paginated summary table of items, evaluator runs, and human annotations for a task",
+        "operationId": "task_summary_annotation_tasks__task_uuid__summary_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          },
+          {
+            "name": "item_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter rows to a single item. The full task-wide annotator union is still returned in `annotators`",
+              "title": "Item Id"
+            },
+            "description": "Filter rows to a single item. The full task-wide annotator union is still returned in `annotators`"
+          },
+          {
+            "name": "live_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded",
+              "default": false,
+              "title": "Live Only"
+            },
+            "description": "When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring search on `payload.name`. Blank is a no-op",
+              "title": "Q"
+            },
+            "description": "Case-insensitive substring search on `payload.name`. Blank is a no-op"
+          },
+          {
+            "name": "sort_by",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Sort key for the results",
+              "default": "created_at",
+              "title": "Sort By"
+            },
+            "description": "Sort key for the results"
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "Sort direction",
+              "default": "desc",
+              "title": "Order"
+            },
+            "description": "Sort direction"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 1,
+              "description": "Maximum number of items to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskSummaryResponse"
                 }
               }
             }

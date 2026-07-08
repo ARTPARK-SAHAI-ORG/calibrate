@@ -9,6 +9,48 @@ Each tool maps 1-to-1 to a [public API](/api-reference/introduction) operation. 
 
 ## Agent tests
 
+### list-agent-test-runs
+
+List an agent's test and benchmark runs, most recently created first, with their status and results.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | Agent whose test runs to list |
+
+See **GET /agent-tests/agent/&#123;agent_uuid&#125;/runs** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### list-agent-tests
+
+List the tests linked to an agent.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | Agent whose linked tests to list |
+
+See **GET /agent-tests/agent/&#123;agent_uuid&#125;/tests** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-agent-benchmark
+
+Get the results of a benchmark run, including per-model scores and the leaderboard.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_id` | string | Yes | Benchmark run to poll for status and results |
+
+See **GET /agent-tests/benchmark/&#123;task_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ### get-agent-test-run
 
 Poll the status and results of an agent test run by task_id. Returns
@@ -27,6 +69,22 @@ run-agent-tests-batch.
 
 See **GET /agent-tests/run/&#123;task_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
+### run-agent-benchmark
+
+Start a multi-model benchmark over an agent's linked tests as a background job. Optionally restrict to a subset of linked tests. Returns a task_id to poll with get-agent-benchmark.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | Agent to benchmark |
+| `models` | array of string | Yes | Model names to benchmark |
+| `test_uuids` | array of string | No | A subset of the agent's linked tests to benchmark. Each ID must be linked to the agent. Omit to run all linked tests |
+
+See **POST /agent-tests/agent/&#123;agent_uuid&#125;/benchmark** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ### run-agent-tests
 
 Start a background LLM unit-test job for one agent. Runs all tests
@@ -41,7 +99,7 @@ or 404.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `agent_uuid` | string | Yes | The agent to test. |
+| `agent_uuid` | string | Yes | Agent to test |
 | `test_uuids` | array of string | No | Tests to run. Omit to run all tests linked to the agent |
 
 See **POST /agent-tests/agent/&#123;agent_uuid&#125;/run** in the [API reference](/api-reference/introduction) tab for the full schema.
@@ -63,6 +121,21 @@ task_id values to poll with get-agent-test-run.
 | `agent_names` | array of string | No | Agents to run. Omit to run every agent in your workspace |
 
 See **POST /agent-tests/run** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### link-tests-to-agent
+
+Link one or more existing tests to an agent so they run together. Tests already linked are skipped. The agent and every test must be in your workspace.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | Agent to link tests to |
+| `test_uuids` | array of string | Yes | Tests to link. Any that are already linked are skipped |
+
+See **POST /agent-tests** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ## Agents
 
@@ -89,7 +162,7 @@ exist or belongs to another org.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `agent_uuid` | string | Yes | The agent to retrieve. |
+| `agent_uuid` | string | Yes | The agent to retrieve |
 
 See **GET /agents/&#123;agent_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -140,11 +213,254 @@ Fails with 404 if the agent does not exist or belongs to another org.
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `agent_uuid` | string | Yes | The agent to update. |
+| `agent_uuid` | string | Yes | The agent to update |
 | `name` | string | No | New agent name. Omit to leave the name unchanged |
 | `config` | object | No | Agent behavioral config. The keys depend on `type`. |
 
 See **PUT /agents/&#123;agent_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### verify-agent-connection
+
+Verify that a connection-type agent responds. Optionally pass a model to verify it before benchmarking. The endpoint and headers come from the agent's stored config; a successful check is recorded on the agent.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent whose connection to verify |
+| `model` | string | No | Model to verify. Omit for a basic connection check. Provide it for a model-specific check before benchmarking that model |
+| `messages` | array of object | No | Sample chat messages to send during verification. Omit to use the default probe |
+
+See **POST /agents/&#123;agent_uuid&#125;/verify-connection** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## Annotation tasks
+
+### list-annotation-tasks
+
+List your annotation tasks with their linked evaluators.
+
+**Scope:** `read` · **Access:** Read-only
+
+See **GET /annotation-tasks** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-annotation-agreement
+
+Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a trend series.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `bucket` | string | No | How to bucket points in the trend series |
+| `days` | integer | No | Trailing window in days for the trend series |
+
+See **GET /annotation-tasks/&#123;task_uuid&#125;/agreement** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-annotation-evaluator-run
+
+Get one evaluator-run job with its results and human-agreement summary.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `job_uuid` | string | Yes | The evaluator run to act on |
+
+See **GET /annotation-tasks/&#123;task_uuid&#125;/evaluator-runs/&#123;job_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-annotation-summary
+
+Get a paginated summary table for a task, with each item's evaluator values and human labels.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `item_id` | string | No | Filter rows to a single item. The full task-wide annotator union is still returned in `annotators` |
+| `live_only` | boolean | No | When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded |
+| `q` | string | No | Case-insensitive substring search on `payload.name`. Blank is a no-op |
+| `sort_by` | string | No | Sort key for the results |
+| `order` | string | No | Sort direction |
+| `limit` | integer | No | Maximum number of items to return |
+| `offset` | integer | No | Number of items to skip before returning results |
+
+See **GET /annotation-tasks/&#123;task_uuid&#125;/summary** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-annotation-task
+
+Get one annotation task with its evaluators, items, and labelling jobs.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Task to retrieve |
+
+See **GET /annotation-tasks/&#123;task_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-annotation-task
+
+Create an annotation task for labelling items against evaluators. Optionally link evaluators in order.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Task name, unique within your workspace |
+| `type` | string | Yes | Task type. Determines the shape of each item's payload. |
+| `description` | string | No | A description for the task. Omit for none |
+| `evaluator_ids` | array of string | No | IDs of evaluators to link when the task is created, in order. Each must be one you created or a built-in default. Omit to create with no linked evaluators |
+
+See **POST /annotation-tasks** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### run-annotation-evaluators
+
+Run one or more of a task's evaluators over its items as a background job. Returns a job_uuid to poll with get-annotation-evaluator-run.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `evaluators` | array of EvaluatorRunRequestEntry | Yes | The evaluators to run. Each must be linked to the task |
+| `item_ids` | array of string | No | Item IDs to run on. **Required when `select_all=false`**. Ignored when `select_all=true` |
+| `select_all` | boolean | No | When `true`, run on every item in the task. Set `q` to run only items whose name matches it |
+| `q` | string | No | Case-insensitive substring filter on `payload.name`. Applies only when `select_all=true` |
+
+See **POST /annotation-tasks/&#123;task_uuid&#125;/evaluator-runs** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### update-annotation-items
+
+Bulk-update item payloads in an annotation task.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `updates` | array of ItemUpdatePayload | Yes | The new payload for each item you're updating. Entries not in this task, or referencing deleted items, are skipped |
+
+See **PUT /annotation-tasks/&#123;task_uuid&#125;/items** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### add-annotation-items
+
+Bulk-create items in an annotation task, optionally seeding human annotations.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `items` | array of AnnotationItemPayload | Yes | Items to insert. Insertion order is preserved |
+| `annotator_id` | string | No | Annotator these initial annotations belong to. Required when any item carries annotations |
+
+See **POST /annotation-tasks/&#123;task_uuid&#125;/items** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### link-evaluator-to-task
+
+Link an evaluator to an annotation task, appending it to the display order.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `evaluator_id` | string | Yes | The evaluator to link. Must be one you created or a built-in default |
+
+See **POST /annotation-tasks/&#123;task_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## Evaluators
+
+### list-evaluators
+
+List your evaluators. Optionally filter by what they judge or their modality, and include the built-in defaults.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `evaluator_type` | string | No | Filter by what the evaluator judges. Omit for all types |
+| `data_type` | string | No | Filter by modality. Omit for all |
+| `include_defaults` | boolean | No | When `true`, include the built-in default evaluators alongside the ones you created |
+
+See **GET /evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### get-evaluator
+
+Get one evaluator with its full version history.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `evaluator_uuid` | string | Yes | Evaluator to retrieve |
+
+See **GET /evaluators/&#123;evaluator_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-evaluator
+
+Create an evaluator and its first version, which is set live. An evaluator judges an output against a prompt and rubric.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Evaluator name, unique within your workspace |
+| `description` | string | No | Description. Omit to leave blank |
+| `evaluator_type` | string | No | What the evaluator judges: |
+| `data_type` | string | No | The modality the judge reads: |
+| `output_type` | string | No | How the evaluator scores: |
+| `version` | EvaluatorVersionCreate | Yes | The evaluator's first version. Set as live when you create the evaluator |
+
+See **POST /evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-evaluator-version
+
+Add a new version to an evaluator you created, optionally making it live. The variable names must match the previous version.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `evaluator_uuid` | string | Yes | Evaluator to add a version to |
+| `judge_model` | string | Yes | The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4` |
+| `system_prompt` | string | Yes | Judge system prompt. May contain `{{variable}}` placeholders |
+| `output_config` | OutputConfig | No | The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own |
+| `variables` | array of VariableSpec | No | Declared prompt variables. Omit if the prompt has none. After the first version the variable names are fixed. You can change a variable's description or default, but not add, remove, or rename one |
+| `make_live` | boolean | No | When `true`, immediately point the evaluator's live version at this new version |
+
+See **POST /evaluators/&#123;evaluator_uuid&#125;/versions** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ## Tests
 
@@ -206,8 +522,8 @@ tests including their UUIDs.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `type` | string | Yes | What the test judges: |
-| `tests` | array of BulkTestItem | Yes | Test items to create (non-empty, max 500 per request, names unique within the batch) |
-| `agent_uuids` | array of string | No | Agents (IDs) to link every created test to. Omit to link none |
+| `tests` | array of BulkTestItem | Yes | Test items to create, at most 500 per request, with names unique within the batch |
+| `agent_uuids` | array of string | No | IDs of agents to link every created test to. Omit to link none |
 | `language` | string | No | Language written to each test's `config.settings.language`. Omit to leave unset |
 
 See **POST /tests/bulk** in the [API reference](/api-reference/introduction) tab for the full schema.

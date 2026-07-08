@@ -63,7 +63,12 @@
             "group": "Agent tests",
             "openapi": "api-reference/openapi.json",
             "pages": [
+              "POST /agent-tests",
+              "POST /agent-tests/agent/{agent_uuid}/benchmark",
               "POST /agent-tests/agent/{agent_uuid}/run",
+              "GET /agent-tests/agent/{agent_uuid}/runs",
+              "GET /agent-tests/agent/{agent_uuid}/tests",
+              "GET /agent-tests/benchmark/{task_id}",
               "POST /agent-tests/run",
               "GET /agent-tests/run/{task_id}"
             ]
@@ -76,7 +81,34 @@
               "POST /agents",
               "POST /agents/resolve",
               "GET /agents/{agent_uuid}",
-              "PUT /agents/{agent_uuid}"
+              "PUT /agents/{agent_uuid}",
+              "POST /agents/{agent_uuid}/verify-connection"
+            ]
+          },
+          {
+            "group": "Annotation tasks",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /annotation-tasks",
+              "POST /annotation-tasks",
+              "GET /annotation-tasks/{task_uuid}",
+              "GET /annotation-tasks/{task_uuid}/agreement",
+              "POST /annotation-tasks/{task_uuid}/evaluator-runs",
+              "GET /annotation-tasks/{task_uuid}/evaluator-runs/{job_uuid}",
+              "POST /annotation-tasks/{task_uuid}/evaluators",
+              "POST /annotation-tasks/{task_uuid}/items",
+              "PUT /annotation-tasks/{task_uuid}/items",
+              "GET /annotation-tasks/{task_uuid}/summary"
+            ]
+          },
+          {
+            "group": "Evaluators",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /evaluators",
+              "POST /evaluators",
+              "GET /evaluators/{evaluator_uuid}",
+              "POST /evaluators/{evaluator_uuid}/versions"
             ]
           },
           {
@@ -107,6 +139,8 @@
             "pages": [
               "cli/calibrate/agent-tests",
               "cli/calibrate/agents",
+              "cli/calibrate/annotation-tasks",
+              "cli/calibrate/evaluators",
               "cli/calibrate/tests"
             ]
           }
@@ -124,7 +158,12 @@
           {
             "group": "Agent tests",
             "pages": [
+              "sdk/agent-tests/link",
+              "sdk/agent-tests/benchmark",
               "sdk/agent-tests/run",
+              "sdk/agent-tests/list_runs_for_agent",
+              "sdk/agent-tests/list_for_agent",
+              "sdk/agent-tests/get_benchmark",
               "sdk/agent-tests/run_batch",
               "sdk/agent-tests/get_run"
             ]
@@ -136,7 +175,32 @@
               "sdk/agents/create",
               "sdk/agents/resolve",
               "sdk/agents/get",
-              "sdk/agents/update"
+              "sdk/agents/update",
+              "sdk/agents/verify_connection"
+            ]
+          },
+          {
+            "group": "Annotation tasks",
+            "pages": [
+              "sdk/annotation-tasks/list",
+              "sdk/annotation-tasks/create",
+              "sdk/annotation-tasks/get",
+              "sdk/annotation-tasks/get_agreement",
+              "sdk/annotation-tasks/create_evaluator_run",
+              "sdk/annotation-tasks/get_evaluator_run",
+              "sdk/annotation-tasks/link_evaluator",
+              "sdk/annotation-tasks/add_items",
+              "sdk/annotation-tasks/update_items",
+              "sdk/annotation-tasks/get_summary"
+            ]
+          },
+          {
+            "group": "Evaluators",
+            "pages": [
+              "sdk/evaluators/list",
+              "sdk/evaluators/create",
+              "sdk/evaluators/get",
+              "sdk/evaluators/create_version"
             ]
           },
           {

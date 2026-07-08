@@ -1,0 +1,28 @@
+---
+title: "Create evaluator"
+description: "Create an evaluator along with its first version, which is set live"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate, EvaluatorVersionCreate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.evaluators.create(
+    name="name",
+    version=EvaluatorVersionCreate(
+        judge_model="judge_model",
+        system_prompt="system_prompt",
+    ),
+)
+```
+
+## API endpoint
+
+See **POST /evaluators** in the [API reference](/api-reference/introduction) tab.

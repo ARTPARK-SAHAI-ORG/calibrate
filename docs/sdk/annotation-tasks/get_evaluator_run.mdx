@@ -1,0 +1,25 @@
+---
+title: "Get evaluator run"
+description: "Get one evaluator-run job with results and human-agreement summary"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.annotation_tasks.get_evaluator_run(
+    task_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    job_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+)
+```
+
+## API endpoint
+
+See **GET /annotation-tasks/\{task_uuid}/evaluator-runs/\{job_uuid}** in the [API reference](/api-reference/introduction) tab.

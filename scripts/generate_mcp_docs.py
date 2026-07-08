@@ -75,6 +75,8 @@ RESOURCE_PURPOSES = {
     "agents": "Manage the agents in your workspace",
     "agent-tests": "Launch and monitor agent test runs",
     "tests": "Create and manage tests",
+    "annotation-tasks": "Create and run annotation tasks",
+    "evaluators": "Create and version evaluators",
 }
 
 # Read-before-write CRUD ordering within a resource, mirroring Coval's tool

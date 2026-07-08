@@ -1,0 +1,28 @@
+---
+title: "Run agent benchmark"
+description: "Run a multi-model benchmark on an agent's linked tests as a background job."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agent_tests.benchmark(
+    agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    models=[
+        "openai/gpt-4.1",
+        "anthropic/claude-sonnet-4"
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /agent-tests/agent/\{agent_uuid}/benchmark** in the [API reference](/api-reference/introduction) tab.

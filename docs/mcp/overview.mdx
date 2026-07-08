@@ -61,12 +61,14 @@ Ask your coding agent to:
 
 ## Available tools
 
-The Calibrate MCP server exposes 13 tools across 3 categories:
+The Calibrate MCP server exposes 33 tools across 5 categories:
 
 | Category | Tools | Purpose |
 | --- | --- | --- |
-| [Agent tests](/mcp/tools#agent-tests) | `get-agent-test-run`, `run-agent-tests`, `run-agent-tests-batch` | Launch and monitor agent test runs |
-| [Agents](/mcp/tools#agents) | `list-agents`, `get-agent`, `resolve-agent-names`, `create-agent`, `update-agent` | Manage the agents in your workspace |
+| [Agent tests](/mcp/tools#agent-tests) | `list-agent-test-runs`, `list-agent-tests`, `get-agent-benchmark`, `get-agent-test-run`, `run-agent-benchmark`, `run-agent-tests`, `run-agent-tests-batch`, `link-tests-to-agent` | Launch and monitor agent test runs |
+| [Agents](/mcp/tools#agents) | `list-agents`, `get-agent`, `resolve-agent-names`, `create-agent`, `update-agent`, `verify-agent-connection` | Manage the agents in your workspace |
+| [Annotation tasks](/mcp/tools#annotation-tasks) | `list-annotation-tasks`, `get-annotation-agreement`, `get-annotation-evaluator-run`, `get-annotation-summary`, `get-annotation-task`, `create-annotation-task`, `run-annotation-evaluators`, `update-annotation-items`, `add-annotation-items`, `link-evaluator-to-task` | Create and run annotation tasks |
+| [Evaluators](/mcp/tools#evaluators) | `list-evaluators`, `get-evaluator`, `create-evaluator`, `create-evaluator-version` | Create and version evaluators |
 | [Tests](/mcp/tools#tests) | `list-tests`, `get-test`, `create-test`, `bulk-create-tests`, `update-test` | Create and manage tests |
 
 See the [Tools reference](/mcp/tools) for each tool's parameters and the API

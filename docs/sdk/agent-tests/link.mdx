@@ -1,0 +1,27 @@
+---
+title: "Link tests to agent"
+description: "Link one or more tests to an agent. Tests that are already linked are skipped."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.agent_tests.link(
+    agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    test_uuids=[
+        "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /agent-tests** in the [API reference](/api-reference/introduction) tab.

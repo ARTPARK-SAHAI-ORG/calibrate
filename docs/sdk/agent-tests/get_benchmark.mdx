@@ -1,6 +1,6 @@
 ---
-title: "Get test run status"
-description: "Poll a test run for its status and evaluation results."
+title: "Get benchmark status"
+description: "Get the results of a benchmark run"
 ---
 
 {/* Generated from Fern reference.md — do not edit directly. */}
@@ -14,11 +14,11 @@ client = Calibrate(
     api_key="sk_your_api_key",
 )
 
-client.agent_tests.get_run(
+client.agent_tests.get_benchmark(
     task_id="a3b2c1d0-e5f4-3210-abcd-ef1234567890",
 )
 ```
 
 ## API endpoint
 
-See **GET /agent-tests/run/\{task_id}** in the [API reference](/api-reference/introduction) tab.
+See **GET /agent-tests/benchmark/\{task_id}** in the [API reference](/api-reference/introduction) tab.

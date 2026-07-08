@@ -1,0 +1,26 @@
+---
+title: "Create evaluator version"
+description: "Add a new version to an evaluator you created"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="sk_your_api_key",
+)
+
+client.evaluators.create_version(
+    evaluator_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    judge_model="judge_model",
+    system_prompt="system_prompt",
+)
+```
+
+## API endpoint
+
+See **POST /evaluators/\{evaluator_uuid}/versions** in the [API reference](/api-reference/introduction) tab.
