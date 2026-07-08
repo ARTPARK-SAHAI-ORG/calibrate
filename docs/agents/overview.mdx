@@ -1,16 +1,25 @@
 ---
 title: "Overview"
-description: "Give your AI agents the tools to evaluate voice agents on Calibrate through MCP, CLI, or API"
+description: "Give your AI coding agents the tools and knowledge to evaluate voice agents on Calibrate through skills, MCP, CLI, or API"
 ---
 
-Calibrate meets your AI agent where it already works — Claude Code,
-Cursor, Codex, and others. Connect it once and your agent can manage agents,
-build test sets, launch runs, and score outputs from Calibrate through the
-interface that fits your workflow.
+Calibrate meets your AI coding agent where it already works — Claude Code,
+Cursor, Codex, Windsurf, and others. Install the skills once and your agent
+learns how to connect an agent, build test sets, run evaluations, and calibrate
+the LLM judges against human labels — driving Calibrate through the interface
+that fits your workflow.
 
 ## Get started
 
 <CardGroup cols={2}>
+  <Card title="Agent skills" icon="graduation-cap" href="/agents/skills">
+    Install evaluation expertise with one command. Your agent learns how to
+    build test suites, design judges, and run evals on Calibrate.
+  </Card>
+  <Card title="Guided onboarding" icon="wand-magic-sparkles" href="/agents/onboarding">
+    Run `/onboard` and your agent walks you through setting up a complete
+    evaluation from scratch — connect, test, run, calibrate.
+  </Card>
   <Card title="MCP server" icon="plug" href="/mcp/overview">
     Connect the Calibrate MCP server for native tool access in Claude Code,
     Cursor, Codex, and other MCP clients.
@@ -19,37 +28,36 @@ interface that fits your workflow.
     The Calibrate CLI gives agents structured JSON output for scripting
     evaluations in any terminal.
   </Card>
-  <Card title="API" icon="code" href="/api-reference/introduction">
-    Call the Calibrate REST API directly from any language for full control
-    over agents, tests, and runs.
-  </Card>
 </CardGroup>
 
-## Access methods
+## How agents use Calibrate
 
-Every method maps to the same Calibrate evaluation API — pick the one that fits
-how your agent works.
+Skills are the knowledge layer; the MCP server, CLI, and API are the execution
+layers underneath. Combine them — skills teach your agent *what* a good
+evaluation looks like, and the CLI (which the skills drive) *runs* it.
 
 | Layer | Purpose | Installation |
 | --- | --- | --- |
-| MCP server | Gives agents native tools to manage agents, tests, and runs | `claude mcp add --transport http calibrate https://calibrate-mcp-106430091675.asia-south1.run.app/mcp --header "X-API-Key: sk_your_api_key"` |
+| Skills | Teach agents how to design and run evaluations on Calibrate | `npx skills add dalmia/calibrate-skills` |
+| MCP server | Gives agents native tools to manage agents, tests, and runs | `claude mcp add --transport http calibrate https://mcp.calibrate.artpark.ai/mcp --header "X-API-Key: sk_your_api_key"` |
 | CLI | Runs evaluations from any terminal with JSON output | `brew install dalmia/tap/calibrate` |
 | API | Direct HTTPS access for any language or runtime | REST over HTTPS — see the [API reference](/api-reference/introduction) |
 
-The [MCP server](/mcp/overview) and [CLI](/cli/calibrate/overview) both wrap the
-[public API](/api-reference/introduction), so you can mix and match — use the MCP
-server inside your editor and the CLI in CI, against the same workspace.
+The [skills](/agents/skills) drive the cloud [CLI](/cli/calibrate/overview),
+while the [MCP server](/mcp/overview) exposes the same operations as native
+tools — both wrap the [public API](/api-reference/introduction), so you can mix
+and match against the same workspace.
 
 ## Supported agents
 
-| Agent | MCP | CLI | API |
-| --- | --- | --- | --- |
-| Claude Code | ✓ | ✓ | ✓ |
-| Cursor | ✓ | ✓ | ✓ |
-| Codex | ✓ | ✓ | ✓ |
-| Claude Desktop | ✓ | — | ✓ |
-| Windsurf | ✓ | ✓ | ✓ |
-| Any agent | — | ✓ | ✓ |
+| Agent | Skills | MCP | CLI | API |
+| --- | --- | --- | --- | --- |
+| Claude Code | ✓ | ✓ | ✓ | ✓ |
+| Cursor | ✓ | ✓ | ✓ | ✓ |
+| Codex | ✓ | ✓ | ✓ | ✓ |
+| Windsurf | ✓ | ✓ | ✓ | ✓ |
+| Claude Desktop | ✓ | ✓ | — | ✓ |
+| Any agent | — | — | ✓ | ✓ |
 
 All you need is a Calibrate API key — create one under
 [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys)
@@ -58,6 +66,12 @@ All you need is a Calibrate API key — create one under
 ## Next steps
 
 <CardGroup cols={2}>
+  <Card title="Install the skills" icon="graduation-cap" href="/agents/skills">
+    One command to teach your agent the full Calibrate evaluation loop.
+  </Card>
+  <Card title="Run guided onboarding" icon="wand-magic-sparkles" href="/agents/onboarding">
+    Go from nothing to a trustworthy first evaluation with `/onboard`.
+  </Card>
   <Card title="Set up the MCP server" icon="plug" href="/mcp/installation">
     Config file locations for each client and platform.
   </Card>

@@ -1,0 +1,108 @@
+---
+title: "Agent skills"
+description: "Install evaluation expertise into your AI coding agent — one command teaches it the full Calibrate loop"
+---
+
+Agent skills are modular knowledge packages that teach your AI coding agent how
+to evaluate voice agents on Calibrate. They follow the open
+[Agent Skills](https://agentskills.io) standard, so they work with Claude Code,
+Cursor, Codex, Windsurf, and other compatible agents.
+
+Each skill drives the cloud `calibrate` CLI against Calibrate's public API and
+covers the full loop: connect an agent, build tests, run them, and — Calibrate's
+signature move — **calibrate the LLM judges against human labels** so the
+automated scores are trustworthy.
+
+## Install
+
+Install every Calibrate skill with a single command:
+
+```bash
+npx skills add dalmia/calibrate-skills
+```
+
+You also need the Calibrate CLI (which the skills drive) and an API key:
+
+```bash
+# Install the Calibrate CLI
+brew install dalmia/tap/calibrate
+
+# Authenticate (API key from Workspace settings → API keys)
+calibrate login
+```
+
+<Note>
+  Skills are the knowledge layer — they teach your agent *how* to evaluate. The
+  CLI they drive is the execution layer. See the
+  [overview](/agents/overview#how-agents-use-calibrate) for how skills, MCP, and
+  the CLI fit together.
+</Note>
+
+## Skills versus MCP and CLI
+
+| Layer | What it is | Reach for it when |
+| --- | --- | --- |
+| Skills | Knowledge — how to design and run evaluations | Your agent should decide *what* to test and *how* to judge it |
+| MCP server | Native tools inside your editor | You want the agent to call Calibrate operations as tools |
+| CLI | Terminal execution with JSON output | You're scripting evals or wiring them into CI/CD |
+
+Skills and the CLI work best together: the skills carry the methodology, and the
+CLI runs the operations they describe.
+
+## Available skills
+
+Installing the pack adds the following skills. Invoke any of them by name (e.g.
+`/connect-agent`), or start with [`/onboard`](/agents/onboarding), which
+orchestrates the whole set.
+
+| Category | Skill | What it does |
+| --- | --- | --- |
+| Overview | `calibrate-resources` | Orientation: the primitives, the CLI, auth, and which skill to reach for |
+| Onboarding | [`onboard`](/agents/onboarding) | Guided end-to-end first evaluation (orchestrator) |
+| Agents | `connect-agent` | Connect or create an agent under test and verify its connection |
+| Tests | `build-test-suite` | Author test cases (`tool_call` / `response`) and bulk-upload them |
+| Tests | `import-dataset` | Turn a CSV / JSONL / HuggingFace dataset into test cases |
+| Agent tests | `run-tests` | Link tests to an agent, run them, and read pass/fail with judge reasoning |
+| Agent tests | `benchmark-models` | Compare models on the agent's tests on a leaderboard |
+| Evaluators | `design-evaluator` | Create a versioned LLM or audio judge (binary or rating) |
+| Evaluators | `iterate-evaluator` | Add and tune an evaluator version, then pin it live |
+| Annotation | `calibrate-evaluator` | Measure human ↔ judge agreement and tune the judge until it matches humans |
+
+## The primitives
+
+Every skill maps to one of Calibrate's five public API resources — deliberately,
+there is no persona, simulation, trace, dashboard, or report resource.
+
+| Primitive | CLI group | Skills |
+| --- | --- | --- |
+| Agent | `agents` | `connect-agent` |
+| Test | `tests` | `build-test-suite`, `import-dataset` |
+| Agent test | `agent-tests` | `run-tests`, `benchmark-models` |
+| Evaluator | `evaluators` | `design-evaluator`, `iterate-evaluator` |
+| Annotation task | `annotation-tasks` | `calibrate-evaluator` |
+
+## How skills load
+
+Skills load progressively, so they stay cheap in context:
+
+- **At startup** — only each skill's name and description load (~100 tokens
+  total), enough for your agent to know one exists.
+- **On activation** — the full `SKILL.md` instructions load when a skill is
+  triggered.
+- **On demand** — reference files, assets, and scripts load only when a skill
+  needs them.
+
+Each skill lives in `skills/<category>/<skill-name>/` with a `SKILL.md`
+entrypoint and optional `references/`, `assets/`, and `scripts/` folders. The
+full source is on [GitHub](https://github.com/dalmia/calibrate-skills).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Run guided onboarding" icon="wand-magic-sparkles" href="/agents/onboarding">
+    Kick off `/onboard` to go from nothing to a trustworthy first evaluation.
+  </Card>
+  <Card title="Connect the MCP server" icon="plug" href="/mcp/overview">
+    Give your agent native Calibrate tools alongside the skills.
+  </Card>
+</CardGroup>
