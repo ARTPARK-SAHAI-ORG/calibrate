@@ -143,3 +143,6 @@ site/
 .claude/*
 !.claude/skills
 !.claude/skills/**
+
+# Generated noise assets (built locally via scripts/fetch_noise_assets.py; not committed)
+calibrate_agent/agent/assets/noise/

@@ -562,7 +562,7 @@ def save_transcript(output_dir: str | Path | None, transcript: list[dict]) -> No
 
 
 def combine_audio_files(
-    audio_dir: str, output_path: str, transcript_path: str = None
+    audio_dir: str, output_path: str, transcript_path: str = None, prefix: str = ""
 ) -> bool:
     """Combine all WAV files in a directory into a single conversation WAV file.
 
@@ -608,14 +608,14 @@ def combine_audio_files(
 
         role = msg.get("role")
         if role == "assistant":
-            file_path = os.path.join(audio_dir, f"{msg_index}_bot.wav")
+            file_path = os.path.join(audio_dir, f"{prefix}{msg_index}_bot.wav")
             if os.path.exists(file_path):
                 sorted_files.append(file_path)
             else:
                 logger.warning(f"Expected audio file not found: {file_path}")
             msg_index += 1
         elif role == "user":
-            file_path = os.path.join(audio_dir, f"{msg_index}_user.wav")
+            file_path = os.path.join(audio_dir, f"{prefix}{msg_index}_user.wav")
             if os.path.exists(file_path):
                 sorted_files.append(file_path)
             else:
