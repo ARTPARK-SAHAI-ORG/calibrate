@@ -35,7 +35,7 @@ Where each client stores its MCP config:
 ## Hosted server (recommended)
 
 Point your client at the managed endpoint
-`https://calibrate-mcp-106430091675.asia-south1.run.app/mcp` via
+`https://mcp.calibrate.artpark.ai/mcp` via
 [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), passing your API key in
 the `X-API-Key` header. Nothing to install or keep updated.
 
@@ -51,7 +51,7 @@ the `X-API-Key` header. Nothing to install or keep updated.
           "args": [
             "-y",
             "mcp-remote",
-            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
+            "https://mcp.calibrate.artpark.ai/mcp",
             "--header",
             "X-API-Key: ${CALIBRATE_API_KEY}"
           ],
@@ -74,7 +74,7 @@ the `X-API-Key` header. Nothing to install or keep updated.
           "args": [
             "-y",
             "mcp-remote",
-            "https://calibrate-mcp-106430091675.asia-south1.run.app/mcp",
+            "https://mcp.calibrate.artpark.ai/mcp",
             "--header",
             "X-API-Key: ${CALIBRATE_API_KEY}"
           ],
@@ -89,7 +89,7 @@ the `X-API-Key` header. Nothing to install or keep updated.
   <Tab title="Claude Code">
     ```bash
     claude mcp add --transport http calibrate \
-      https://calibrate-mcp-106430091675.asia-south1.run.app/mcp \
+      https://mcp.calibrate.artpark.ai/mcp \
       --header "X-API-Key: sk_your_api_key"
     ```
   </Tab>
