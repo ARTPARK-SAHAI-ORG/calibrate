@@ -7,19 +7,20 @@ description: "Expose Calibrate to coding agents over the Model Context Protocol"
 
 The Calibrate [MCP server](https://modelcontextprotocol.io) lets AI assistants
 like Claude Code, Cursor, and Codex work with Calibrate's evaluation API through
-the Model Context Protocol — so they can manage agents and tests and launch runs
-without leaving your editor. Every tool maps 1-to-1 to a
+the Model Context Protocol — so they can manage agents, tests, and evaluators,
+launch runs and benchmarks, and set up annotation tasks without leaving your
+editor. Every tool maps 1-to-1 to a
 [public API](/api-reference/introduction) operation.
 
 ## What you can do
 
 Ask your coding agent to:
 
-- List agents and resolve friendly names to UUIDs
-- Create and update agents
-- Create, bulk-upload, and update tests
-- Launch agent test runs — for one agent or every agent in your workspace
-- Poll a run for status and per-test-case results
+- Create and connect agents, and resolve friendly names to UUIDs
+- Author, bulk-upload, and update test cases
+- Create and version evaluators
+- Link tests, launch runs and benchmarks — for one agent or every agent in your workspace — and poll per-test-case results
+- Create annotation tasks, run evaluators over them, and check reviewer agreement
 
 ## Quick start
 
@@ -72,9 +73,11 @@ Once connected, you can ask your coding agent things like:
 
 - "List all my agents"
 - "Resolve the names support-bot and billing-bot to UUIDs"
+- "Create a test case for support-bot and link it"
 - "Run the tests for support-bot and give me the task id"
 - "Run tests for every agent in my workspace"
 - "What's the status and results of run abc123?"
+- "Create an annotation task from that run and check reviewer agreement"
 
 ## Requirements
 
