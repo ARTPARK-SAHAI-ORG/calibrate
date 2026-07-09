@@ -56,7 +56,7 @@ the `X-API-Key` header. Nothing to install or keep updated.
             "X-API-Key: ${CALIBRATE_API_KEY}"
           ],
           "env": {
-            "CALIBRATE_API_KEY": "sk_your_api_key"
+            "CALIBRATE_API_KEY": "your_api_key"
           }
         }
       }
@@ -79,7 +79,7 @@ the `X-API-Key` header. Nothing to install or keep updated.
             "X-API-Key: ${CALIBRATE_API_KEY}"
           ],
           "env": {
-            "CALIBRATE_API_KEY": "sk_your_api_key"
+            "CALIBRATE_API_KEY": "your_api_key"
           }
         }
       }
@@ -90,7 +90,7 @@ the `X-API-Key` header. Nothing to install or keep updated.
     ```bash
     claude mcp add --transport http calibrate \
       https://mcp.calibrate.artpark.ai/mcp \
-      --header "X-API-Key: sk_your_api_key"
+      --header "X-API-Key: your_api_key"
     ```
   </Tab>
 </Tabs>
@@ -117,7 +117,7 @@ package. It talks directly to the Calibrate API — no `mcp-remote` in between.
           "command": "npx",
           "args": ["-y", "@dalmia/calibrate-mcp", "start"],
           "env": {
-            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
+            "CALIBRATE_API_KEY_AUTH": "your_api_key"
           }
         }
       }
@@ -132,7 +132,7 @@ package. It talks directly to the Calibrate API — no `mcp-remote` in between.
           "command": "npx",
           "args": ["-y", "@dalmia/calibrate-mcp", "start"],
           "env": {
-            "CALIBRATE_API_KEY_AUTH": "sk_your_api_key"
+            "CALIBRATE_API_KEY_AUTH": "your_api_key"
           }
         }
       }
@@ -141,7 +141,7 @@ package. It talks directly to the Calibrate API — no `mcp-remote` in between.
   </Tab>
   <Tab title="Claude Code">
     ```bash
-    claude mcp add calibrate -- npx -y @dalmia/calibrate-mcp start --api-key-auth sk_your_api_key
+    claude mcp add calibrate -- npx -y @dalmia/calibrate-mcp start --api-key-auth your_api_key
     ```
   </Tab>
 </Tabs>
@@ -172,7 +172,7 @@ git clone https://github.com/dalmia/calibrate-mcp
 cd calibrate-mcp
 npm install
 npm run build
-node bin/mcp-server.js start --api-key-auth sk_your_api_key
+node bin/mcp-server.js start --api-key-auth your_api_key
 ```
 
 ### MCP Inspector

@@ -54,7 +54,7 @@ full restart. Work through the section that matches your symptom.
     auth. Paste it as plain text with no surrounding characters.
   </Accordion>
   <Accordion title="Check the header format (hosted server)">
-    For the hosted server the header must be exactly `X-API-Key: sk_your_api_key`
+    For the hosted server the header must be exactly `X-API-Key: your_api_key`
     (or `X-API-Key: ${CALIBRATE_API_KEY}` with the env var set). For the local
     server the key goes in `CALIBRATE_API_KEY_AUTH` or the `--api-key-auth` flag.
   </Accordion>
@@ -71,7 +71,7 @@ full restart. Work through the section that matches your symptom.
     Test the local server directly and watch the output:
 
     ```bash
-    CALIBRATE_API_KEY_AUTH=sk_your_api_key npx -y @dalmia/calibrate-mcp start
+    CALIBRATE_API_KEY_AUTH=your_api_key npx -y @dalmia/calibrate-mcp start
     ```
 
     Or list the tools over the hosted endpoint:

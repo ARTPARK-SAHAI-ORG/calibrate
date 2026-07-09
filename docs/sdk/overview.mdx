@@ -20,7 +20,7 @@ Create an API key under [**Workspace settings → API keys**](https://calibrate.
 ```python
 from calibrate import Calibrate
 
-client = Calibrate(api_key="sk_your_api_key")
+client = Calibrate(api_key="your_api_key")
 
 for agent in client.agents.list():
     print(agent.uuid, agent.name)
