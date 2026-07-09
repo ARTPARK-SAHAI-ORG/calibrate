@@ -167,8 +167,8 @@ def _simplify_usage_code(code: str) -> str:
             continue
         if "environment=CalibrateEnvironment" in line:
             continue
-        line = line.replace('api_key="<value>"', 'api_key="sk_your_api_key"')
-        line = line.replace('api_key="YOUR_API_KEY"', 'api_key="sk_your_api_key"')
+        line = line.replace('api_key="<value>"', 'api_key="your_api_key"')
+        line = line.replace('api_key="YOUR_API_KEY"', 'api_key="your_api_key"')
         lines.append(line)
     cleaned = "\n".join(lines).strip()
     while "\n\n\n" in cleaned:

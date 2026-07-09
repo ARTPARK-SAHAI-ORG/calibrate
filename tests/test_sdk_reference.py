@@ -171,7 +171,7 @@ def test_parse_reference_md_extracts_method() -> None:
     doc = methods[("agents", "list")]
     assert "List all agents" in doc.description
     assert "client.agents.list()" in doc.usage_code
-    assert 'api_key="sk_your_api_key"' in doc.usage_code
+    assert 'api_key="your_api_key"' in doc.usage_code
 
 
 def test_routes_with_sdk_docs_pairs_only_when_reference_exists() -> None:
