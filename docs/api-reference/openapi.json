@@ -138,21 +138,6 @@
             "title": "Updated At",
             "description": "When the run was last updated (ISO 8601 UTC)"
           },
-          "evaluators": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/TestRunEvaluator"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Evaluators",
-            "description": "The evaluators used in this run. Each verdict in `judge_results` links to one of these by `evaluator_uuid`"
-          },
           "total_tests": {
             "anyOf": [
               {
@@ -193,7 +178,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/TestCaseResult"
+                  "$ref": "#/components/schemas/TestRunCaseSummary"
                 },
                 "type": "array"
               },
@@ -202,7 +187,7 @@
               }
             ],
             "title": "Results",
-            "description": "Results for each test case"
+            "description": "Flat pass/fail summary for each test case (fetch the run detail for full results)"
           },
           "latency_ms": {
             "anyOf": [
@@ -244,7 +229,7 @@
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/ModelResult"
+                  "$ref": "#/components/schemas/ModelRunSummary"
                 },
                 "type": "array"
               },
@@ -253,44 +238,7 @@
               }
             ],
             "title": "Model Results",
-            "description": "Results for each model in a benchmark run"
-          },
-          "leaderboard_summary": {
-            "anyOf": [
-              {
-                "items": {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Leaderboard comparing the models, one row per model. Columns vary by benchmark: a `model` column plus pass/fail counts, latency, cost, and one score column per evaluator, keyed by evaluator name",
-            "examples": [
-              [
-                {
-                  "cost": 0.0021,
-                  "failed": 2,
-                  "helpfulness": 0.92,
-                  "latency_p50": 480,
-                  "model": "openai/gpt-4.1",
-                  "passed": 8,
-                  "safety": 1.0
-                },
-                {
-                  "cost": 0.0034,
-                  "failed": 1,
-                  "helpfulness": 0.95,
-                  "latency_p50": 520,
-                  "model": "anthropic/claude-sonnet-4",
-                  "passed": 9,
-                  "safety": 1.0
-                }
-              ]
-            ]
+            "description": "Flat summary for each model in a benchmark run (fetch the benchmark detail for full results)"
           },
           "error": {
             "type": "boolean",
@@ -472,7 +420,46 @@
         "properties": {
           "payload": {
             "title": "Payload",
-            "description": "The item's payload. Its shape depends on the task `type`. `payload['name']` is **required** for every type and must be unique within the task"
+            "description": "The item's payload. `name` is required and unique within the task for every type. The other fields depend on the task `type`:\n\n- `stt`: `name`, `reference_transcript`, `predicted_transcript`\n- `llm`: `name`, `chat_history` (list of `{role, content}` turns ending at the user turn), `agent_response` (the reply to judge), optional `evaluator_variables`\n- `llm-general`: `name`, `input`, `output`, optional `evaluator_variables`\n- `conversation`: `name`, `transcript` (list of `{role, content}` turns), optional `evaluator_variables`\n\n`evaluator_variables` maps an evaluator ID to that evaluator's `{{variable}}` values for this item",
+            "examples": [
+              {
+                "name": "clip-001",
+                "predicted_transcript": "the quick brown fax",
+                "reference_transcript": "the quick brown fox"
+              },
+              {
+                "agent_response": "Your balance is $42.00.",
+                "chat_history": [
+                  {
+                    "content": "What is my account balance?",
+                    "role": "user"
+                  }
+                ],
+                "name": "case-001"
+              },
+              {
+                "input": "Summarize: the meeting is moved to 3pm.",
+                "name": "pair-001",
+                "output": "The meeting is now at 3pm."
+              },
+              {
+                "name": "convo-001",
+                "transcript": [
+                  {
+                    "content": "Hi, how can I help?",
+                    "role": "assistant"
+                  },
+                  {
+                    "content": "I lost my card.",
+                    "role": "user"
+                  },
+                  {
+                    "content": "I can block it now. Can you confirm the last 4 digits?",
+                    "role": "assistant"
+                  }
+                ]
+              }
+            ]
           },
           "annotations": {
             "anyOf": [
@@ -512,13 +499,12 @@
             "type": "string",
             "enum": [
               "stt",
-              "tts",
               "llm",
               "llm-general",
               "conversation"
             ],
             "title": "Type",
-            "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `tts`: judge synthesized speech output\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
+            "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
           },
           "description": {
             "anyOf": [
@@ -606,13 +592,12 @@
             "type": "string",
             "enum": [
               "stt",
-              "tts",
               "llm",
               "llm-general",
               "conversation"
             ],
             "title": "Type",
-            "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `tts`: judge synthesized speech output\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
+            "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
           },
           "description": {
             "anyOf": [
@@ -2339,6 +2324,78 @@
         ],
         "title": "ModelResult"
       },
+      "ModelRunSummary": {
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "Model name these results are for",
+            "examples": [
+              "openai/gpt-4.1"
+            ]
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success",
+            "description": "Whether this model's run succeeded"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Status or result message for this model",
+            "default": ""
+          },
+          "total_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tests",
+            "description": "Total test cases for this model"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed",
+            "description": "Number of test cases that passed for this model"
+          },
+          "failed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed",
+            "description": "Number of test cases that failed for this model"
+          }
+        },
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "title": "ModelRunSummary",
+        "description": "Flat summary for one model in a benchmark run-LIST item. The full results\nfor each case of a model live on the benchmark detail endpoint\n(`GET /agent-tests/benchmark/{task_id}`), not here."
+      },
       "OutputConfig": {
         "properties": {
           "scale": {
@@ -2573,7 +2630,6 @@
             "type": "string",
             "enum": [
               "stt",
-              "tts",
               "llm",
               "llm-general",
               "conversation"
@@ -2869,6 +2925,37 @@
         },
         "type": "object",
         "title": "TestOutput"
+      },
+      "TestRunCaseSummary": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Name of the test case"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed",
+            "description": "Whether the case passed (null if it errored or is still running)"
+          }
+        },
+        "type": "object",
+        "title": "TestRunCaseSummary",
+        "description": "Flat summary for one test case in the run-LIST endpoints. Carries only\nenough to render a run's pass/fail breakdown and a case name. The full detail\nfor each case (agent output, judge verdicts, reasoning, latency, cost, the\ntest-case definition) lives on the run-DETAIL endpoint\n(`GET /agent-tests/run/{task_id}`)."
       },
       "TestRunEvaluator": {
         "properties": {
