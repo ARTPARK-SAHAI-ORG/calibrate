@@ -154,6 +154,56 @@ class TestPrepareSttJudgeInputs(unittest.TestCase):
         )
 
 
+class TestConfigWithoutTools(unittest.IsolatedAsyncioTestCase):
+    """A sim config that omits ``tools`` must default to an empty list.
+
+    Regression: ``_run_single_simulation_inner`` used ``config["tools"]``, so a
+    config without the key crashed with ``KeyError: 'tools'`` before the bot was
+    ever spawned. It now uses ``config.get("tools", [])`` like the sim-task call
+    two lines below.
+    """
+
+    async def test_missing_tools_key_defaults_to_empty_list(self):
+        import tempfile
+        from calibrate_agent.agent import run_simulation as RS
+
+        config = {
+            "system_prompt": "You are a helpful agent.",
+            # no "tools" key on purpose
+            "stt": {"provider": "google"},
+            "tts": {"provider": "google"},
+            "llm": {"provider": "openrouter", "model": "some/model"},
+            "settings": {"agent_speaks_first": True, "max_turns": 1},
+        }
+        persona = {
+            "characteristics": "polite",
+            "gender": "neutral",
+            "language": "english",
+            "interruption_sensitivity": "none",
+        }
+        scenario = {"name": "s", "description": "d"}
+
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            RS, "start_bot", AsyncMock()
+        ) as mock_start_bot, patch.object(
+            RS, "run_simulation", AsyncMock(return_value={})
+        ), patch.object(
+            RS, "find_available_port", return_value=54321
+        ):
+            # The mocked bot task completes immediately, so the inner routine
+            # raises "Bot task completed unexpectedly" — but only *after* it has
+            # already passed the tools access and spawned the bot, which is all
+            # this regression cares about.
+            with self.assertRaises(RuntimeError):
+                await RS._run_single_simulation_inner(
+                    config, 0, persona, 0, scenario, tmp, {"none": 0.0}
+                )
+
+        mock_start_bot.assert_called_once()
+        # tools is the second positional argument to start_bot.
+        self.assertEqual(mock_start_bot.call_args.args[1], [])
+
+
 class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
     async def test_process_frame(self):
         from collections import defaultdict

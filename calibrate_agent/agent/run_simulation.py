@@ -2180,7 +2180,7 @@ async def _run_single_simulation_inner(
                     start_bot(
                         config["system_prompt"]
                         + f"\n\nYou must always speak in {language}.",
-                        config["tools"],
+                        config.get("tools", []),
                         language,
                         port=port,
                         stt_config=stt_config,
