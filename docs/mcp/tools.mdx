@@ -20,6 +20,11 @@ List an agent's test and benchmark runs, most recently created first, with their
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `agent_uuid` | string | Yes | Agent whose test runs to list |
+| `type` | string | No | Filter by run type. Omit to return both: |
+| `status` | TaskStatus | No | Filter by run status. Omit for all statuses |
+| `has_failures` | boolean | No | Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both |
+| `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
+| `offset` | integer | No | Number of items to skip before returning results |
 
 See **GET /agent-tests/agent/&#123;agent_uuid&#125;/runs** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -34,6 +39,9 @@ List the tests linked to an agent.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `agent_uuid` | string | Yes | Agent whose linked tests to list |
+| `q` | string | No | Case-insensitive substring search on `name`. Blank is a no-op |
+| `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
+| `offset` | integer | No | Number of items to skip before returning results |
 
 See **GET /agent-tests/agent/&#123;agent_uuid&#125;/tests** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -148,6 +156,14 @@ API key (CALIBRATE_API_KEY).
 
 **Scope:** `read` · **Access:** Read-only
 
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `q` | string | No | Case-insensitive substring search on `name`. Blank is a no-op |
+| `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
+| `offset` | integer | No | Number of items to skip before returning results |
+
 See **GET /agents** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ### get-agent
@@ -242,6 +258,14 @@ See **POST /agents/&#123;agent_uuid&#125;/verify-connection** in the [API refere
 List your annotation tasks with their linked evaluators.
 
 **Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `q` | string | No | Case-insensitive substring search on `name`. Blank is a no-op |
+| `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
+| `offset` | integer | No | Number of items to skip before returning results |
 
 See **GET /annotation-tasks** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -407,6 +431,9 @@ List your evaluators. Optionally filter by what they judge or their modality, an
 | `evaluator_type` | string | No | Filter by what the evaluator judges. Omit for all types |
 | `data_type` | string | No | Filter by modality. Omit for all |
 | `include_defaults` | boolean | No | When `true`, include the built-in default evaluators alongside the ones you created |
+| `q` | string | No | Case-insensitive substring search on `name`. Blank is a no-op |
+| `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
+| `offset` | integer | No | Number of items to skip before returning results |
 
 See **GET /evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -471,6 +498,14 @@ UUID, name, type, and config. Use this to discover which tests exist
 before creating runs.
 
 **Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `q` | string | No | Case-insensitive substring search on `name`. Blank is a no-op |
+| `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
+| `offset` | integer | No | Number of items to skip before returning results |
 
 See **GET /tests** in the [API reference](/api-reference/introduction) tab for the full schema.
 

@@ -74,6 +74,59 @@
         ],
         "title": "AgentCreateResponse"
       },
+      "AgentSummary": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the agent",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the agent"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "connection"
+            ],
+            "title": "Type",
+            "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the agent was last updated (ISO 8601 UTC)"
+          },
+          "connection_verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Verified",
+            "description": "Whether the agent's connection has been verified, for a `type=connection` agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "updated_at"
+        ],
+        "title": "AgentSummary"
+      },
       "AgentTestRunCreateResponse": {
         "properties": {
           "task_id": {
@@ -274,23 +327,6 @@
           "updated_at"
         ],
         "title": "AgentTestRunListItem"
-      },
-      "AgentTestRunsResponse": {
-        "properties": {
-          "runs": {
-            "items": {
-              "$ref": "#/components/schemas/AgentTestRunListItem"
-            },
-            "type": "array",
-            "title": "Runs",
-            "description": "Test runs for the agent, most recently created first"
-          }
-        },
-        "type": "object",
-        "required": [
-          "runs"
-        ],
-        "title": "AgentTestRunsResponse"
       },
       "AgentTestsCreate": {
         "properties": {
@@ -627,7 +663,7 @@
               "type": "object"
             },
             "type": "array",
-            "description": "The evaluators linked to this task, in display order, each with its live version's rubric",
+            "description": "The evaluators linked to this task, in display order. Fetching one task by ID enriches each with its live version's rubric. Listing tasks returns lightweight metadata (uuid, name, type, position) only",
             "default": []
           },
           "item_count": {
@@ -1587,6 +1623,53 @@
         ],
         "title": "EvaluatorLinkResponse"
       },
+      "EvaluatorLiveVersionSummary": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Version ID",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number",
+            "description": "The version's number. The first version is 1, and it goes up by one for each new version of the evaluator"
+          },
+          "judge_model": {
+            "type": "string",
+            "title": "Judge Model",
+            "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VariableSpec"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Declared prompt variables"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "version_number",
+          "judge_model"
+        ],
+        "title": "EvaluatorLiveVersionSummary",
+        "description": "Slim view of the live version for list results, carrying only what the list needs."
+      },
       "EvaluatorRunLaunchResponse": {
         "properties": {
           "job_uuid": {
@@ -2461,6 +2544,211 @@
         "title": "OutputScaleEntry",
         "description": "One entry in an evaluator's output_config.scale. `value` is bool|number|string\ndepending on output_type."
       },
+      "PaginatedResponse_AgentSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentSummary"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items matching the query, before pagination"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "The applied `limit` (null when unbounded)"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "The applied `offset`",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PaginatedResponse[AgentSummary]"
+      },
+      "PaginatedResponse_AgentTestRunListItem_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentTestRunListItem"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items matching the query, before pagination"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "The applied `limit` (null when unbounded)"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "The applied `offset`",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PaginatedResponse[AgentTestRunListItem]"
+      },
+      "PaginatedResponse_AnnotationTaskResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnnotationTaskResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items matching the query, before pagination"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "The applied `limit` (null when unbounded)"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "The applied `offset`",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PaginatedResponse[AnnotationTaskResponse]"
+      },
+      "PaginatedResponse_EvaluatorResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/routers__evaluators__EvaluatorResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items matching the query, before pagination"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "The applied `limit` (null when unbounded)"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "The applied `offset`",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PaginatedResponse[EvaluatorResponse]"
+      },
+      "PaginatedResponse_TestListResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TestListResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items matching the query, before pagination"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "The applied `limit` (null when unbounded)"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "The applied `offset`",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PaginatedResponse[TestListResponse]"
+      },
       "PaginationMeta": {
         "properties": {
           "total": {
@@ -2893,6 +3181,84 @@
         ],
         "title": "TestCreateResponse"
       },
+      "TestListConfig": {
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Short description of the test, shown in list views and searched on"
+          }
+        },
+        "type": "object",
+        "title": "TestListConfig"
+      },
+      "TestListResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Unique ID for the test",
+            "examples": [
+              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the test"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "response",
+              "tool_call",
+              "conversation"
+            ],
+            "title": "Type",
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TestListConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Trimmed config carrying only the test's description. Fetch the test by ID for the full config and evaluators"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the test was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the test was last updated (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TestListResponse",
+        "description": "Trimmed test shape for list/index endpoints. The full config and hydrated\nevaluators live on the detail endpoint (`GET /tests/{uuid}`); the list keeps\nonly what list and attach-dropdown views render."
+      },
       "TestOutput": {
         "properties": {
           "response": {
@@ -2925,6 +3291,75 @@
         },
         "type": "object",
         "title": "TestOutput"
+      },
+      "TestResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Unique ID for the test",
+            "examples": [
+              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the test"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "response",
+              "tool_call",
+              "conversation"
+            ],
+            "title": "Type",
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stored config: `history`, `evaluation`, and an optional `settings`"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the test was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the test was last updated (ISO 8601 UTC)"
+          },
+          "evaluators": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "description": "Linked evaluators, resolved to their current live version at read time",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "TestResponse"
       },
       "TestRunCaseSummary": {
         "properties": {
@@ -3482,66 +3917,6 @@
         ],
         "title": "VersionCreateResponse"
       },
-      "routers__agent_tests__TestResponse": {
-        "properties": {
-          "uuid": {
-            "type": "string",
-            "maxLength": 36,
-            "minLength": 36,
-            "title": "Uuid",
-            "description": "Test ID",
-            "examples": [
-              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Name of the test"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "response",
-              "tool_call",
-              "conversation"
-            ],
-            "title": "Type",
-            "description": "What the test checks:\n- `response`: judges the reply the agent generates\n- `tool_call`: checks the tool calls the agent makes\n- `conversation`: judges the full conversation after the agent replies"
-          },
-          "config": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Test configuration"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At",
-            "description": "When the test was created (ISO 8601 UTC)"
-          },
-          "updated_at": {
-            "type": "string",
-            "title": "Updated At",
-            "description": "When the test was last updated (ISO 8601 UTC)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "uuid",
-          "name",
-          "type",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "TestResponse"
-      },
       "routers__agents__AgentResponse": {
         "properties": {
           "uuid": {
@@ -3707,7 +4082,7 @@
           "live_version": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/EvaluatorVersionResponse"
+                "$ref": "#/components/schemas/EvaluatorLiveVersionSummary"
               },
               {
                 "type": "null"
@@ -3765,75 +4140,6 @@
           "evaluator_uuid"
         ],
         "title": "EvaluatorRef"
-      },
-      "routers__tests__TestResponse": {
-        "properties": {
-          "uuid": {
-            "type": "string",
-            "maxLength": 36,
-            "minLength": 36,
-            "title": "Uuid",
-            "description": "Unique ID for the test",
-            "examples": [
-              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Name of the test"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "response",
-              "tool_call",
-              "conversation"
-            ],
-            "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
-          },
-          "config": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The stored config: `history`, `evaluation`, and an optional `settings`"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At",
-            "description": "When the test was created (ISO 8601 UTC)"
-          },
-          "updated_at": {
-            "type": "string",
-            "title": "Updated At",
-            "description": "When the test was last updated (ISO 8601 UTC)"
-          },
-          "evaluators": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "description": "Linked evaluators, resolved to their current live version at read time",
-            "default": []
-          }
-        },
-        "type": "object",
-        "required": [
-          "uuid",
-          "name",
-          "type",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "TestResponse"
       }
     },
     "securitySchemes": {
@@ -4014,17 +4320,66 @@
             "ApiKeyAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring search on `name`. Blank is a no-op",
+              "title": "Q"
+            },
+            "description": "Case-insensitive substring search on `name`. Blank is a no-op"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of items to return. Omit for no limit (all items)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return. Omit for no limit (all items)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/routers__agents__AgentResponse"
-                  },
-                  "title": "Response List Agents Agents Get"
+                  "$ref": "#/components/schemas/PaginatedResponse_AgentSummary_"
                 }
               }
             }
@@ -4261,17 +4616,66 @@
             "ApiKeyAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring search on `name`. Blank is a no-op",
+              "title": "Q"
+            },
+            "description": "Case-insensitive substring search on `name`. Blank is a no-op"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of items to return. Omit for no limit (all items)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return. Omit for no limit (all items)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/routers__tests__TestResponse"
-                  },
-                  "title": "Response List Tests Tests Get"
+                  "$ref": "#/components/schemas/PaginatedResponse_TestListResponse_"
                 }
               }
             }
@@ -4324,7 +4728,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/routers__tests__TestResponse"
+                  "$ref": "#/components/schemas/TestResponse"
                 }
               }
             }
@@ -4385,7 +4789,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/routers__tests__TestResponse"
+                  "$ref": "#/components/schemas/TestResponse"
                 }
               }
             }
@@ -4477,6 +4881,57 @@
               "title": "Agent Uuid"
             },
             "description": "Agent whose linked tests to list"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring search on `name`. Blank is a no-op",
+              "title": "Q"
+            },
+            "description": "Case-insensitive substring search on `name`. Blank is a no-op"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of items to return. Omit for no limit (all items)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return. Omit for no limit (all items)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
           }
         ],
         "responses": {
@@ -4485,11 +4940,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/routers__agent_tests__TestResponse"
-                  },
-                  "title": "Response Get Agent Tests Endpoint Agent Tests Agent  Agent Uuid  Tests Get"
+                  "$ref": "#/components/schemas/PaginatedResponse_TestListResponse_"
                 }
               }
             }
@@ -4534,6 +4985,97 @@
               "title": "Agent Uuid"
             },
             "description": "Agent whose test runs to list"
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "llm-unit-test",
+                    "llm-benchmark"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by run type. Omit to return both:\n- `llm-unit-test`: single runs of an agent's tests\n- `llm-benchmark`: multi-model comparisons",
+              "title": "Type"
+            },
+            "description": "Filter by run type. Omit to return both:\n- `llm-unit-test`: single runs of an agent's tests\n- `llm-benchmark`: multi-model comparisons"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/TaskStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by run status. Omit for all statuses",
+              "title": "Status"
+            },
+            "description": "Filter by run status. Omit for all statuses"
+          },
+          {
+            "name": "has_failures",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both",
+              "title": "Has Failures"
+            },
+            "description": "Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of items to return. Omit for no limit (all items)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return. Omit for no limit (all items)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
           }
         ],
         "responses": {
@@ -4542,7 +5084,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AgentTestRunsResponse"
+                  "$ref": "#/components/schemas/PaginatedResponse_AgentTestRunListItem_"
                 }
               }
             }
@@ -4963,6 +5505,57 @@
               "title": "Include Defaults"
             },
             "description": "When `true`, include the built-in default evaluators alongside the ones you created"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring search on `name`. Blank is a no-op",
+              "title": "Q"
+            },
+            "description": "Case-insensitive substring search on `name`. Blank is a no-op"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of items to return. Omit for no limit (all items)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return. Omit for no limit (all items)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
           }
         ],
         "responses": {
@@ -4971,11 +5564,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/routers__evaluators__EvaluatorResponse"
-                  },
-                  "title": "Response List Evaluators Evaluators Get"
+                  "$ref": "#/components/schemas/PaginatedResponse_EvaluatorResponse_"
                 }
               }
             }
@@ -5167,17 +5756,66 @@
             "ApiKeyAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring search on `name`. Blank is a no-op",
+              "title": "Q"
+            },
+            "description": "Case-insensitive substring search on `name`. Blank is a no-op"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of items to return. Omit for no limit (all items)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return. Omit for no limit (all items)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/AnnotationTaskResponse"
-                  },
-                  "title": "Response List Annotation Tasks Annotation Tasks Get"
+                  "$ref": "#/components/schemas/PaginatedResponse_AnnotationTaskResponse_"
                 }
               }
             }
