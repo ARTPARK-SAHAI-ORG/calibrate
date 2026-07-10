@@ -33,19 +33,12 @@ own provider keys (STT/TTS/LLM). **If you don't know what to put in it, ask Aman
 The agent is now running on **http://localhost:7860**.
 
 ### 2. Create the `swasth-kadam-v5` agent
-The experiments talk to a specific agent — a 12-question Hindi child-enrollment
-survey (name, district, anganwadi, pregnancy status, child name + DOB,
-phone/WhatsApp linkage, last-4-Aadhaar). A fresh clone won't have it, so create
-its folder and save the config below as `config.json`:
+Create the agent folder and save the config below as its `config.json`:
 
 ```bash
 mkdir -p server/db/agents/swasth-kadam-v5
 # then create server/db/agents/swasth-kadam-v5/config.json with the JSON below
 ```
-
-The agent is loaded purely from `server/db/agents/<agent-id>/config.json`
-(`ROOT_DB_DIR`, see `server/src/agent_store.py`), so this single file is all the
-server needs to serve `ws://localhost:7860/ws-client/swasth-kadam-v5`.
 
 <details>
 <summary><code>server/db/agents/swasth-kadam-v5/config.json</code></summary>
@@ -360,9 +353,6 @@ server needs to serve `ws://localhost:7860/ws-client/swasth-kadam-v5`.
 ```
 
 </details>
-
-<sub>An `access.json` (owner/workspace metadata) sits beside `config.json` for
-the hosted dashboard, but the local WebSocket run does **not** require it.</sub>
 
 ### 3. The agent URL Calibrate connects to
 Calibrate uses the pipecat non-telephony WebSocket endpoint:
