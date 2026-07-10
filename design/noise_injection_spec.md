@@ -30,80 +30,72 @@ Two external inputs shaped the design:
   beats abstract noise (white/pink), and it belongs to the *caller persona*.
 
 - **Vistaar / "Kathbath-Hard"** (arXiv [2305.15386](https://arxiv.org/abs/2305.15386)) —
-  builds a "hard" ASR benchmark by adding **ESC-50** background clips at a **random SNR
-  in [3, 30] dB**. Takeaway we adopted: **SNR-based additive mixing over a bounded
-  random range** is the principled difficulty knob.
+  builds a "hard" ASR benchmark by mixing **ESC-50** background clips in at a **randomly
+  chosen loudness within a set range** (the paper uses a voice-to-background ratio of
+  3–30 dB). Takeaway we adopted: **add the background at a controlled loudness relative to
+  the speech, varied within a bounded range** — a simple, principled difficulty knob.
 
-**Synthesis:** Coval gives the *what* (named, realistic ambience, persona-attached);
-Vistaar gives the *how* (SNR-bounded mixing). We combine them, and localize to India
+**Synthesis:** Coval gives the *what* (named, realistic ambience, attached to the caller);
+Vistaar gives the *how* (mixing the background in at a controlled, varied loudness). We combine them, and localize to India
 (the whole framework targets Indian voice agents — Kathbath/Svarah/Sarvam/Vaani).
 
 ---
 
-## 3. Terminology (plain names we settled on)
+## 3. Terminology
 
-Jargon was actively removed during design. Canonical terms:
+Terms used throughout this doc.
+
+**The feature's own terms**
 
 - **Environmental sounds** — non-speech background: rain, wind, engine, siren, dog,
-  train, etc. (Language-neutral.)
-- **Speaker sounds** — background *people talking*.
-  Language-specific (english / hindi / kannada).
+  train, etc. (language-neutral).
+- **Speaker sounds** — background *people talking*, in the caller's language
+  (english / hindi / kannada), processed to sound distant (see *backgroundify*).
 - **Density** — how many background speakers overlap: **single / light / medium / heavy**.
-- **Loudness** — how loud the background is vs the caller (user-facing name for SNR;
-  see §12): **faint / moderate / loud / harsh**.
-- **Situation / scene** — a realistic named combination (e.g. `busy_street`), defined
-  as a *recipe* of ingredients, generated live.
-- **Background noise loop** — the single looping background track mixed under one call.
-- **Atom** — one fully-specified condition (environment + people + loudness).
-- **Distribution** — how atoms are assigned across a batch of simulations.
+- **Loudness** — how loud the background is relative to the caller: **faint / moderate /
+  loud / harsh** (louder = harder). Under the hood this is a voice-to-background ratio; see §12.
+- **Situation / scene** — a realistic named place (e.g. `busy_street`), defined as a
+  *recipe* of ingredients and built fresh for each call.
+- **Background noise loop** — the single looping background track mixed under one call;
+  it plays continuously for the whole call, under both speakers and during every pause.
+- **Atom** — one complete condition for a single call: which environment, how many people,
+  how loud.
+- **Distribution** — how those conditions are handed out across a batch of calls (all the
+  same, weighted, or randomly varied).
 
-### 3.1 Plain-English glossary
+**Audio terms**
 
-One-sentence, no-jargon definitions for the technical terms used throughout this doc:
-
-- **SNR** — how loud the caller's voice is compared to the background; higher SNR means a
-  quieter background and an easier call.
-- **loudness** — this doc's user-facing knob for the same idea as SNR, but flipped so that
-  turning it up makes the call harder (louder background).
-- **dBFS** — a way of measuring audio loudness on a scale where 0 is the loudest a digital
-  file can go and everything else is a negative number (quieter).
-- **RMS / RMS-normalize** — RMS is a track's average loudness; to RMS-normalize is to set
-  every track to that same average loudness so none is accidentally louder than another.
-- **crossfade** — smoothly fading one clip out while fading the next one in, so the join
-  between them has no audible click or jump.
-- **seamless loop** — a clip whose end blends into its beginning so it can repeat forever
-  without a noticeable "restart" click.
-- **low-pass filter** — removes the high frequencies, leaving a muffled sound (like hearing
+- **Backgroundify** — the processing that takes crisp close-up speech and makes it sound
+  like distant, muffled room chatter.
+- **Low-pass filter** — removes the high frequencies, leaving a muffled sound (like hearing
   a party through a wall).
-- **high-pass filter** — removes the low frequencies, cutting the boomy, close-up "rumble"
-  of a voice recorded right on the microphone.
-- **reverb / impulse response (RIR)** — reverb is the echoey "in a room" quality of sound;
-  an impulse response (RIR) is a recorded (or synthetic) fingerprint of a room's echo that
-  can be stamped onto a dry recording to make it sound like it was in that room.
-- **VAD (voice activity detection)** — the agent's "is someone talking right now?" detector,
-  which decides when the caller has started and stopped speaking.
-- **mixer (SoundfileMixer)** — pipecat's component that plays a background sound file on
-  loop and blends it into the outgoing audio; here it's what actually adds the noise during
-  the live call.
-- **continuous loop** — a background sound that plays non-stop for the whole call, under
-  both speakers and during every pause (in this doc, the "background noise loop").
-- **background noise loop** — the single looping background track mixed under one call;
-  this is the canonical term this doc uses for that looping track.
-- **atom** — one complete recipe for a single call's background: which environment, how many
-  people, and how loud.
-- **distribution** — the strategy for handing out those recipes across a whole batch of
-  calls (e.g. all the same, or randomly varied).
-- **scatter (event sounds)** — placing one-off sounds like a dog bark or car horn at random
-  times and volumes, so a repeated clip doesn't sound like a robotic metronome.
-- **"mud" / muddy** — what you get when too many equally-loud sounds pile up and smear
-  together into a formless wash, like mixing all the paint colors into brown.
-- **resampling** — converting audio from one sample rate to another (e.g. 44.1 kHz down to
-  16 kHz) so it matches what the rest of the pipeline expects.
-- **mono** — single-channel audio (one speaker's worth), as opposed to stereo (left/right).
-- **seed / deterministic** — a starting number that anchors all the "random" choices;
-  deterministic means the same seed always reproduces the exact same result.
-- **backgroundify** — the processing chain that takes crisp close-up speech and makes it
-  sound like distant, muffled background chatter.
+- **High-pass filter** — removes the low frequencies, cutting the boomy close-up rumble of
+  a voice recorded right on the microphone.
+- **Reverb / impulse response (RIR)** — reverb is the echoey "in a room" quality of sound;
+  an RIR is a fingerprint of a room's echo stamped onto a dry recording to place it in that
+  room.
+- **Crossfade** — fading one clip out while fading the next in, so the join has no audible
+  click.
+- **Seamless loop** — a clip whose end blends into its start so it can repeat forever with
+  no restart click.
+- **Scatter (event sounds)** — placing one-off sounds like a dog bark or car horn at random
+  times and volumes, so a repeated clip doesn't sound like a metronome.
+- **Mud / muddy** — what you get when too many equally-loud sounds pile up and smear into a
+  formless wash (like mixing every paint colour into brown).
+- **RMS-normalize** — set every track to the same average loudness so none is accidentally
+  louder than another.
+- **Resampling** — converting audio from one sample rate to another (e.g. 44.1 kHz → 16 kHz)
+  to match the rest of the pipeline.
+- **Mono** — single-channel audio, as opposed to stereo.
+- **Mixer (`SoundfileMixer`)** — pipecat's component that plays a sound file on loop and
+  blends it into the outgoing audio; what actually adds the noise during the live call.
+- **VAD (voice activity detection)** — the agent's "is someone talking right now?" detector;
+  decides when the caller starts and stops speaking.
+- **Seed** — a starting number that anchors every "random" choice, so the same seed always
+  reproduces the exact same result.
+- **SNR / dBFS** — the underlying measures behind *loudness*: SNR is the voice-to-background
+  ratio (higher = quieter background); dBFS measures level on a scale where 0 is the digital
+  maximum and lower (more negative) is quieter.
 
 ---
 
@@ -411,20 +403,30 @@ CLI can override per-run.
   → faint OR loud, no moderate). `"any"` = all four. Default: `moderate` in `fixed`;
   `any` in variety modes.
 
-### 11.2 Distribution (assignment across the batch)
+### 11.2 Distribution (assignment across *that persona's* runs)
+Because `noise` lives on a **persona**, `mode` is resolved **per simulation** — once for
+each `(persona × scenario)` pair, using that persona's noise block. So a persona's
+distribution spans **that persona's own runs (one per scenario)**, not the whole config;
+each persona has its own independent distribution. The seed is
+`run_index = persona_index × (#scenarios) + scenario_index`.
+
 `noise.mode` ∈ `off | fixed | random | mixture`:
-- **off** — clean everywhere.
-- **fixed** — one atom for every run (controlled A/B).
-- **random** — each simulation independently samples environment + people + loudness;
-  `clean_fraction` reserves some clean controls; seeded by run index.
-- **mixture** — weighted proportions of atoms (`{weight, spec}` list).
+- **off** — clean for all of this persona's runs.
+- **fixed** — the same atom for every one of this persona's runs (controlled A/B).
+- **random** — each of this persona's runs independently samples environment + people +
+  loudness; `clean_fraction` makes some of them clean; seeded by `run_index`.
+- **mixture** — each run weighted-picks one condition from the `{weight, spec}` list.
 
 *In plain terms: an "atom" is one complete recipe for a single call's background — which
-environment, how many people, how loud. A "distribution" is how you hand those recipes out
-across a whole batch of calls. The modes are the strategies: `off` = no noise anywhere;
-`fixed` = give every call the exact same recipe (good for a clean A/B comparison);
-`random` = let each call roll its own recipe for variety; `mixture` = specify proportions,
-e.g. "20% quiet, 30% busy street, …".*
+environment, how many people, how loud. A "distribution" is how a **persona** hands those
+recipes out across its own runs (it gets one run per scenario). `off` = no noise on this
+caller; `fixed` = the exact same recipe on every one of this caller's runs (clean A/B);
+`random` = each of this caller's runs rolls its own recipe; `mixture` = proportions, e.g.
+"20% quiet, 30% busy street, …". Consequence: `random`/`mixture` only show variety when a
+persona runs across **several scenarios** — a persona with one scenario just gets one
+seeded draw. Want each condition as its own labelled case → many personas on `fixed` (see
+`examples/agent/simulation/sample_voice_noise_matrix.json`); want one caller hit with a
+spread → one persona on `random`/`mixture` with several scenarios.*
 
 **`sweep` was dropped for v1** (§18 #8): the batch size is fixed at `|personas| ×
 |scenarios|`, so a `repeat: K` run-count knob doesn't fit. `random` gives variety within
