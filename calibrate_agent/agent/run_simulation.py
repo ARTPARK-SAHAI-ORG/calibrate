@@ -299,6 +299,34 @@ def is_external_ws_agent(config: dict) -> bool:
     return agent_url.startswith("ws://") or agent_url.startswith("wss://")
 
 
+def prepare_stt_judge_inputs(
+    references: list[str],
+    predictions: list[str],
+    agent_uri: Optional[str],
+) -> Optional[tuple[list[str], list[str]]]:
+    """Pair persona references with agent STT predictions for STT judging.
+
+    Returns ``(references, predictions)`` truncated to equal length and paired
+    positionally, or ``None`` when STT accuracy should not be scored.
+
+    Scoring is gated to the **internal** calibrate agent (``agent_uri is None``).
+    For that agent we own the STT pipeline and the persona's turn boundaries stay
+    aligned with the transcription turns, so the positional pairing is reliable
+    and deterministic. For an **external** WS agent (``agent_uri`` set) the
+    pairing is not trustworthy — noise-driven VAD merges shift turn boundaries
+    and the agent may transcribe in a different script than the persona spoke —
+    so we return ``None`` and skip scoring rather than report a deflated number.
+    """
+    if agent_uri is not None:
+        return None
+    if not references or not predictions:
+        return None
+    min_len = min(len(references), len(predictions))
+    if min_len == 0:
+        return None
+    return references[:min_len], predictions[:min_len]
+
+
 def select_transport_uri(agent_uri: Optional[str], port: int) -> str:
     """Pick the simulator client transport URI.
 
@@ -1814,15 +1842,37 @@ async def _run_simulation_inner(
     # Filter out empty STT outputs
     filtered_stt_outputs = [s for s in stt_outputs if s.strip()]
 
-    # # Compare STT outputs with user messages using STT LLM judge
+    # Compare STT outputs with user messages using the STT LLM judge.
+    #
+    # This pairs each persona reference turn with the agent's transcription
+    # positionally. That pairing is only trustworthy for the internal calibrate
+    # agent, whose STT we own and whose turn boundaries stay aligned with the
+    # persona's turns. For an external WS agent we only observe its RTVI
+    # transcriptions: noise-driven VAD merges shift the turn boundaries, and the
+    # agent may transcribe in a different script than the persona spoke (e.g.
+    # romanized Hindi vs Devanagari), so a positional pairing scores otherwise
+    # correct transcriptions against the wrong reference and deflates the score.
+    # Skip STT judging entirely for external agents rather than report a
+    # misleading number (``prepare_stt_judge_inputs`` returns ``None``).
     stt_llm_judge_result = None
-    if filtered_stt_outputs and user_messages_in_transcript:
+    stt_eval_references: list[str] = []
+    stt_eval_predictions: list[str] = []
+    stt_judge_inputs = prepare_stt_judge_inputs(
+        user_messages_in_transcript, filtered_stt_outputs, agent_uri
+    )
+    if stt_judge_inputs is None and agent_uri is not None and (
+        filtered_stt_outputs and user_messages_in_transcript
+    ):
+        log_and_print(
+            f"{GENERAL_LOG_COLOR}Skipping STT accuracy scoring for the external "
+            "WS agent — reference/transcription turn pairing is unreliable for "
+            f"external agents.{RESET_COLOR}"
+        )
+    if stt_judge_inputs is not None:
+        stt_eval_references, stt_eval_predictions = stt_judge_inputs
+        min_len = len(stt_eval_references)
         # Align lengths - take minimum length
         log_and_print(f"Evaluating the STT outputs with user messages")
-        min_len = min(len(filtered_stt_outputs), len(user_messages_in_transcript))
-
-        stt_eval_references = user_messages_in_transcript[:min_len]
-        stt_eval_predictions = filtered_stt_outputs[:min_len]
 
         if min_len > 0:
             stt_llm_judge_result = await stt_llm_judge_score(
