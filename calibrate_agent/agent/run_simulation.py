@@ -191,6 +191,13 @@ from pipecat.utils.time import time_now_iso8601
 
 PIPELINE_IDLE_TIMEOUT_SECS = 120  # 2 minutes
 EVAL_TIMEOUT_SECS = 3000
+# After max_turns queues a graceful EndFrame, force-cancel the pipeline if it hasn't
+# ended within this grace period. If something keeps producing outgoing audio (e.g. a
+# continuous background-audio mixer), the EndFrame can stall behind an endless output
+# stream and never drain — the call then hangs until the agent's own idle-timeout. The
+# grace lets a normal call flush its final frames first; the fallback guarantees a
+# prompt end regardless.
+MAX_TURNS_FORCE_CANCEL_SECS = 2.0
 # Punctuation that should attach to the preceding word when joining TTS text
 # fragments into a persona turn (covers Latin plus the Devanagari danda).
 _PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
@@ -1738,6 +1745,21 @@ async def _run_simulation_inner(
                     f"{INTERRUPTION_COLOR}Max turns ({max_turns}) reached, ending conversation{RESET_COLOR}"
                 )
                 await task.queue_frame(EndFrame())
+
+                # A graceful EndFrame can stall behind a continuous outgoing-audio
+                # stream (e.g. a background-audio mixer) and never terminate; force-cancel
+                # after a short grace so the call always ends promptly instead of waiting
+                # on the agent's idle-timeout. No-op if the EndFrame already ended the task.
+                async def _force_end_after_grace():
+                    await asyncio.sleep(MAX_TURNS_FORCE_CANCEL_SECS)
+                    try:
+                        await task.cancel()
+                    except Exception as exc:
+                        eval_logger.debug(f"max_turns force-cancel no-op: {exc}")
+
+                rtvi_message_adapter._force_end_task = asyncio.create_task(
+                    _force_end_after_grace()
+                )
 
     @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message):
