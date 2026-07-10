@@ -86,6 +86,124 @@ class TestFindAvailablePort(unittest.TestCase):
                 RS.find_available_port()
 
 
+class TestPrepareSttJudgeInputs(unittest.TestCase):
+    """STT judging is scored only for the internal calibrate agent."""
+
+    def test_external_agent_returns_none(self):
+        from calibrate_agent.agent.run_simulation import prepare_stt_judge_inputs
+
+        refs = ["hi there", "my name is priya"]
+        preds = ["hi there", "my name is priya"]
+        self.assertIsNone(
+            prepare_stt_judge_inputs(refs, preds, agent_uri="ws://agent.example")
+        )
+        self.assertIsNone(
+            prepare_stt_judge_inputs(refs, preds, agent_uri="wss://agent.example")
+        )
+
+    def test_internal_agent_pairs_positionally(self):
+        from calibrate_agent.agent.run_simulation import prepare_stt_judge_inputs
+
+        refs = ["hi there", "my name is priya"]
+        preds = ["hi there", "my name is priya"]
+        result = prepare_stt_judge_inputs(refs, preds, agent_uri=None)
+        self.assertEqual(result, (refs, preds))
+
+    def test_internal_agent_truncates_to_min_len(self):
+        from calibrate_agent.agent.run_simulation import prepare_stt_judge_inputs
+
+        refs = ["a", "b", "c"]
+        preds = ["a", "b"]
+        result = prepare_stt_judge_inputs(refs, preds, agent_uri=None)
+        self.assertEqual(result, (["a", "b"], ["a", "b"]))
+
+    def test_empty_inputs_return_none(self):
+        from calibrate_agent.agent.run_simulation import prepare_stt_judge_inputs
+
+        self.assertIsNone(prepare_stt_judge_inputs([], ["a"], agent_uri=None))
+        self.assertIsNone(prepare_stt_judge_inputs(["a"], [], agent_uri=None))
+        self.assertIsNone(prepare_stt_judge_inputs([], [], agent_uri=None))
+
+    def test_regression_shifted_turns_skipped_for_external(self):
+        """Persona-2/5 shifted-turn case: an external run must not score STT.
+
+        On a noisy external call, the agent's VAD merges a turn boundary and
+        every subsequent transcription is paired with the *next* reference. A
+        positional pairing would score correct transcriptions against the wrong
+        reference and deflate the score (0.67 / 0.44 in the real runs). Because
+        the agent is external, we skip STT scoring entirely instead.
+        """
+        from calibrate_agent.agent.run_simulation import prepare_stt_judge_inputs
+
+        # SAID (persona reference, Devanagari) shifted against HEARD (agent STT,
+        # romanized): reference[i] truly corresponds to prediction[i-1].
+        references = [
+            "उसकी जन्म तारीख बाईस जुलाई दो हजार तेईस है",
+            "हाँ, यह नंबर आंगनवाड़ी से जुड़ा हुआ है",
+            "यही नंबर WhatsApp से भी जुड़ा हुआ है",
+        ]
+        predictions = [
+            "Haan, yah number Anganwadi se juda hua hai.",
+            "Haan, yahi number. WhatsApp se bhi juda hua hai.",
+            "4 8 2 7 hai.",
+        ]
+        self.assertIsNone(
+            prepare_stt_judge_inputs(
+                references, predictions, agent_uri="wss://swasth-kadam.example"
+            )
+        )
+
+
+class TestConfigWithoutTools(unittest.IsolatedAsyncioTestCase):
+    """A sim config that omits ``tools`` must default to an empty list.
+
+    Regression: ``_run_single_simulation_inner`` used ``config["tools"]``, so a
+    config without the key crashed with ``KeyError: 'tools'`` before the bot was
+    ever spawned. It now uses ``config.get("tools", [])`` like the sim-task call
+    two lines below.
+    """
+
+    async def test_missing_tools_key_defaults_to_empty_list(self):
+        import tempfile
+        from calibrate_agent.agent import run_simulation as RS
+
+        config = {
+            "system_prompt": "You are a helpful agent.",
+            # no "tools" key on purpose
+            "stt": {"provider": "google"},
+            "tts": {"provider": "google"},
+            "llm": {"provider": "openrouter", "model": "some/model"},
+            "settings": {"agent_speaks_first": True, "max_turns": 1},
+        }
+        persona = {
+            "characteristics": "polite",
+            "gender": "neutral",
+            "language": "english",
+            "interruption_sensitivity": "none",
+        }
+        scenario = {"name": "s", "description": "d"}
+
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            RS, "start_bot", AsyncMock()
+        ) as mock_start_bot, patch.object(
+            RS, "run_simulation", AsyncMock(return_value={})
+        ), patch.object(
+            RS, "find_available_port", return_value=54321
+        ):
+            # The mocked bot task completes immediately, so the inner routine
+            # raises "Bot task completed unexpectedly" — but only *after* it has
+            # already passed the tools access and spawned the bot, which is all
+            # this regression cares about.
+            with self.assertRaises(RuntimeError):
+                await RS._run_single_simulation_inner(
+                    config, 0, persona, 0, scenario, tmp, {"none": 0.0}
+                )
+
+        mock_start_bot.assert_called_once()
+        # tools is the second positional argument to start_bot.
+        self.assertEqual(mock_start_bot.call_args.args[1], [])
+
+
 class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
     async def test_process_frame(self):
         from collections import defaultdict
