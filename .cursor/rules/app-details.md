@@ -202,7 +202,7 @@ Evaluates TTS providers by synthesizing speech and measuring quality.
 
 **Metrics:**
 
-- **LLM Judge:** AI evaluation of pronunciation accuracy using an audio-capable model (`gpt-audio`). Directly compares raw audio against input text — does NOT convert speech to text first.
+- **LLM Judge:** AI evaluation of pronunciation accuracy using an audio-capable model (`gpt-audio-1.5`). Directly compares raw audio against input text — does NOT convert speech to text first.
 - **TTFB (Time to First Byte):** Latency measurement (time to receive first audio chunk)
 
 **Input:** CSV file with `id,text` columns
@@ -1417,7 +1417,7 @@ cleanup_print_logger(simulation_run_id)
 - **Streaming TTFB:** Most TTS providers use streaming APIs and measure true TTFB (time to first audio chunk): OpenAI, ElevenLabs, Cartesia, Google, Sarvam, Smallest
 - **Non-streaming:** Groq does not support streaming and does not return TTFB
 - **Pipecat usage:** Only voice agent simulations use pipecat for the full STT→LLM→TTS pipeline
-- **TTS LLM Judge accuracy:** The audio-capable model (`gpt-audio`) may have reduced accuracy for low-resource languages like Sindhi due to limited training data
+- **TTS LLM Judge accuracy:** The audio-capable model (`gpt-audio-1.5`) may have reduced accuracy for low-resource languages like Sindhi due to limited training data
 - **Language validation:** `validate_stt_language()` and `validate_tts_language()` in `calibrate_agent/utils.py` check if a language is supported by a provider before evaluation starts. Each function uses the appropriate STT or TTS language dictionaries. If invalid, the run stops with an error listing all supported languages for that provider.
 - **TTS audio saving patterns:** All TTS synthesize functions accept `audio_path` and save audio:
   - Streaming providers (OpenAI, Cartesia) write chunks directly to file as they arrive
