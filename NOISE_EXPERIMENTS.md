@@ -28,8 +28,7 @@ cp env.example .env          # then fill in the agent's provider keys (STT/TTS/L
 uv run uvicorn main:app --host 0.0.0.0 --port 7860 --reload
 ```
 The env file **must** live at `form-bharo/server/src/.env`. Fill in the agent's
-own provider keys (STT/TTS/LLM). **If you don't know what to put in it, ask Aman
-(aman.dalmia@artpark.in).**
+own provider keys (STT/TTS/LLM). **If you don't know what to put in it, ask Aman.**
 
 The agent is now running on **http://localhost:7860**.
 
@@ -106,7 +105,7 @@ Create a `.env` file at the **root of the calibrate repo** (`calibrate/.env`). T
 | `GOOGLE_APPLICATION_CREDENTIALS` | simulated-caller voice (Kannada, Google Chirp3-HD) |
 | `HF_TOKEN` (or `huggingface-cli login`) | pulling Vaani speaker clips (Part B.3) |
 
-**If you don't know what to put in this file, ask Aman (aman.dalmia@artpark.in).**
+**If you don't know what to put in this file, ask Aman.**
 
 ### 3. Build the noise assets  ⚠️ required, not in git
 The audio assets are **gitignored** (licensing), so you must build them once. They
