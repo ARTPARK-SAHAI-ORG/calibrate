@@ -164,8 +164,18 @@ is `moderate`; in the variety modes (`random`, `mixture`) the default is `any`.
 
 ## Modes
 
-`noise.mode` controls how conditions are assigned across the batch of
-simulations. The batch size is fixed at `personas × scenarios`.
+Because `noise` lives on a **persona**, `noise.mode` is applied **per persona** —
+it decides how conditions are assigned across *that persona's own runs* (a persona
+gets one run per scenario). Each persona has its own independent distribution; the
+draw is seeded per `(persona, scenario)` so it's reproducible.
+
+<Note>
+  `random` and `mixture` only show variety when a persona runs across **several
+  scenarios** — a persona with a single scenario just gets one seeded draw. For one
+  labelled condition per caller, use many personas on `fixed` (see
+  `examples/agent/simulation/sample_voice_noise_matrix.json`); to spray one caller
+  with varied noise, use one persona on `random`/`mixture` with several scenarios.
+</Note>
 
 <Tabs>
   <Tab title="off">
@@ -181,8 +191,8 @@ simulations. The batch size is fixed at `personas × scenarios`.
     ```
   </Tab>
   <Tab title="fixed">
-    One condition applied to every run — a controlled A/B against a clean
-    baseline.
+    One condition applied to every one of this persona's runs — a controlled A/B
+    against a clean baseline.
 
     ```json
     {
@@ -197,8 +207,9 @@ simulations. The batch size is fixed at `personas × scenarios`.
     ```
   </Tab>
   <Tab title="random">
-    Each simulation independently samples an environment, people density, and
-    loudness. `clean_fraction` reserves a portion of runs as clean controls.
+    Each of this persona's runs independently samples an environment, people
+    density, and loudness. `clean_fraction` makes some of those runs clean
+    controls. (Varies across the persona's scenarios — one scenario yields one draw.)
 
     ```json
     {
@@ -211,8 +222,8 @@ simulations. The batch size is fixed at `personas × scenarios`.
     ```
   </Tab>
   <Tab title="mixture">
-    Weighted proportions of conditions. Each entry has a `weight` and a `spec`
-    (an atom, or `"off"` for a clean slice).
+    Each of this persona's runs weighted-picks one condition from the list. Each
+    entry has a `weight` and a `spec` (an atom, or `"off"` for a clean slice).
 
     ```json
     {
