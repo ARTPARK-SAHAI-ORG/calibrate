@@ -101,6 +101,9 @@ calibrate agent-tests list-for-agent [flags]
 | Option | Type | Description |
 | --- | --- | --- |
 | `-a, --agent-uuid` | string | **Required.** Agent whose linked tests to list |
+| `-l, --limit` | string | Maximum number of items to return. Omit for no limit (all items) |
+| `--offset` | int | Number of items to skip before returning results |
+| `--q` | name | Case-insensitive substring search on name. Blank is a no-op |
 
 **Examples**
 
@@ -121,6 +124,11 @@ calibrate agent-tests list-runs-for-agent [flags]
 | Option | Type | Description |
 | --- | --- | --- |
 | `-a, --agent-uuid` | string | **Required.** Agent whose test runs to list |
+| `--has-failures` | true | Filter by whether the run has any failing test case or model. true returns only runs with failures (or errors), `false` only clean runs. Omit for both |
+| `-l, --limit` | string | Maximum number of items to return. Omit for no limit (all items) |
+| `--offset` | int | Number of items to skip before returning results |
+| `-s, --status` | string | Filter by run status. Omit for all statuses (options: queued, in_progress, cancelled, done, failed) |
+| `-t, --type` | llm-unit-test | Filter by run type. Omit to return both: |
 
 **Examples**
 
