@@ -404,28 +404,19 @@ Create a `.env` file at the **root of the calibrate repo** (`calibrate/.env`). T
 **If you don't know what to put in this file, ask Aman.**
 
 ### 3. Build the noise assets  ⚠️ required, not in git
-The audio assets are **gitignored** (licensing), so you must build them once. They
-live under `calibrate_agent/agent/assets/noise/` and are generated from raw clips in
-`data/`:
+The audio assets aren't in git — build them once with a single script. It downloads
+the raw clips (ESC-50 environmental sounds + Vaani speaker clips), places them under
+`data/`, and bundles them into `calibrate_agent/agent/assets/noise/` (resampled to
+16 kHz mono):
 
-```
-data/env_raw/                      # environmental sounds (ESC-50, 16-bit)
-├── rain.wav wind.wav engine.wav vacuum_cleaner.wav train.wav siren.wav
-├── crying_baby.wav footsteps.wav keyboard_typing.wav laughing.wav
-├── dog/00.wav … 07.wav           # multiple samples (scattered, not looped)
-└── car_horn/00.wav … 07.wav
-data/vaani_raw/{english,hindi,kannada}/*.wav   # Vaani speaker clips, 16 kHz mono
-```
-- **Environmental clips**: the 13 ESC-50 classes above (ESC-50 is public; note it is
-  CC BY-NC, so treat as local-only until CC0-re-sourced before shipping).
-- **Speaker clips**: from the gated **ARTPARK-IISc/Vaani** HF dataset (CC BY 4.0) —
-  accept its terms + `huggingface-cli login`, then pull ~25–40 clips per language
-  (english/hindi/kannada), filtering rows by the `language` field.
-
-Then bundle them (resamples to 16 kHz mono):
 ```bash
-uv run python -c "from calibrate_agent.agent.noise.assets import prepare_assets; prepare_assets()"
+uv run python scripts/fetch_noise_assets.py
 ```
+
+The speaker clips come from the **gated ARTPARK-IISc/Vaani** HF dataset, so accept
+its terms and log in first (`huggingface-cli login`, or set `HF_TOKEN`). The ESC-50
+half needs no login. To build only the environmental half (no HF login), run
+`--skip-speakers`.
 
 **Sanity check (no keys/assets needed):**
 ```bash
