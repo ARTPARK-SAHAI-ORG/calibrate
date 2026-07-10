@@ -18,6 +18,8 @@ import uuid
 from google.cloud.speech_v2 import SpeechClient
 from google.cloud.speech_v2.types import cloud_speech as cloud_speech_types
 from google.api_core.client_options import ClientOptions
+from google import genai
+from google.genai import types as genai_types
 
 import pandas as pd
 
@@ -398,6 +400,53 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
 
     return {
         "transcript": result["transcript"].strip(),
+    }
+
+
+def _gemini_client() -> genai.Client:
+    """Build a google-genai client from GEMINI_API_KEY / GOOGLE_API_KEY."""
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "GEMINI_API_KEY (or GOOGLE_API_KEY) environment variable not set"
+        )
+    return genai.Client(api_key=api_key)
+
+
+async def transcribe_gemini(audio_path: Path, language: str) -> Dict:
+    """Transcribe audio with a Gemini multimodal model via the google-genai API.
+
+    Gemini has no dedicated STT endpoint; transcription is a multimodal
+    generate_content call over the audio. Benchmark-only — no cascaded pipecat
+    Gemini STT service exists, so this is not mirrored in create_stt_service.
+    """
+    client = _gemini_client()
+
+    lang_code = get_stt_language_code(language, "gemini")
+    audio_bytes = load_audio(audio_path)
+
+    prompt = (
+        f"Transcribe the following {language} ({lang_code}) audio to text "
+        "verbatim. Output only the exact spoken words in the original language, "
+        "with no translation, no commentary, and no surrounding quotation marks. "
+        "If the audio contains no speech, output an empty string."
+    )
+
+    response = await asyncio.wait_for(
+        client.aio.models.generate_content(
+            model=STT_PROVIDER_MODELS["gemini"],
+            contents=[
+                prompt,
+                genai_types.Part.from_bytes(
+                    data=audio_bytes, mime_type="audio/wav"
+                ),
+            ],
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+    )
+
+    return {
+        "transcript": (response.text or "").strip(),
     }
 
 
@@ -782,6 +831,7 @@ async def transcribe_audio(
         "openai": transcribe_openai_streaming,
         "groq": transcribe_groq,
         "google": transcribe_google,
+        "gemini": transcribe_gemini,
         "sarvam": transcribe_sarvam,
         "elevenlabs": transcribe_elevenlabs_streaming,
         "cartesia": transcribe_cartesia,
@@ -1017,6 +1067,7 @@ STT_PROVIDERS = [
     "smallest",
     "groq",
     "google",
+    "gemini",
     "sarvam",
     "elevenlabs",
 ]

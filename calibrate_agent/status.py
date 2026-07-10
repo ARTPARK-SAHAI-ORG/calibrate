@@ -16,6 +16,8 @@ from urllib.parse import urlencode
 
 import httpx
 
+from calibrate_agent.utils import TTS_PROVIDER_MODELS, get_tts_voice
+
 
 # ─────────────────────────────────────────────────────────────────────
 # Provider definitions
@@ -41,6 +43,11 @@ PROVIDERS = [
         "name": "google",
         "types": ["stt", "tts"],
         "env_vars": ["GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_PROJECT_ID"],
+    },
+    {
+        "name": "gemini",
+        "types": ["stt", "tts"],
+        "env_vars": ["GEMINI_API_KEY"],
     },
     {
         "name": "sarvam",
@@ -400,11 +407,39 @@ async def _check_deepgram(client: httpx.AsyncClient) -> str:
     return "stt"
 
 
+async def _check_gemini(client: httpx.AsyncClient) -> str:
+    """TTS: synthesize 'hi' via the Gemini TTS model (google-genai)."""
+    from google import genai
+    from google.genai import types as genai_types
+
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    genai_client = genai.Client(api_key=api_key)
+    resp = await genai_client.aio.models.generate_content(
+        model=TTS_PROVIDER_MODELS["gemini"],
+        contents="hi",
+        config=genai_types.GenerateContentConfig(
+            response_modalities=["AUDIO"],
+            speech_config=genai_types.SpeechConfig(
+                voice_config=genai_types.VoiceConfig(
+                    prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(
+                        voice_name=get_tts_voice("gemini", "english")
+                    )
+                ),
+            ),
+        ),
+    )
+    audio = resp.candidates[0].content.parts[0].inline_data.data
+    if not audio or len(audio) < 100:
+        raise ValueError("Empty audio response")
+    return "tts"
+
+
 _CHECK_FUNCTIONS = {
     "deepgram": _check_deepgram,
     "openai": _check_openai,
     "groq": _check_groq,
     "google": _check_google,
+    "gemini": _check_gemini,
     "sarvam": _check_sarvam,
     "elevenlabs": _check_elevenlabs,
     "cartesia": _check_cartesia,

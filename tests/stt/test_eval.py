@@ -633,5 +633,62 @@ class TestTranscribeOpenAIStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(create.await_args.kwargs["language"], "hi")
 
 
+class TestTranscribeGemini(unittest.IsolatedAsyncioTestCase):
+    async def test_returns_stripped_transcript_and_uses_model(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        generate = AsyncMock(return_value=SimpleNamespace(text="  hola mundo  "))
+        fake_client = MagicMock()
+        fake_client.aio.models.generate_content = generate
+
+        patches = (
+            patch.dict("os.environ", {"GEMINI_API_KEY": "gk-fake"}),
+            patch.object(stt_eval.genai, "Client", return_value=fake_client),
+            patch.object(stt_eval, "load_audio", return_value=b"RIFFfake"),
+        )
+        for p in patches:
+            p.start()
+        try:
+            result = await stt_eval.transcribe_gemini(Path("/tmp/x.wav"), "hindi")
+        finally:
+            for p in patches:
+                p.stop()
+
+        self.assertEqual(result["transcript"], "hola mundo")
+        self.assertEqual(
+            generate.await_args.kwargs["model"],
+            stt_eval.STT_PROVIDER_MODELS["gemini"],
+        )
+
+    async def test_none_text_yields_empty_transcript(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        generate = AsyncMock(return_value=SimpleNamespace(text=None))
+        fake_client = MagicMock()
+        fake_client.aio.models.generate_content = generate
+
+        patches = (
+            patch.dict("os.environ", {"GOOGLE_API_KEY": "gk-fake"}),
+            patch.object(stt_eval.genai, "Client", return_value=fake_client),
+            patch.object(stt_eval, "load_audio", return_value=b"RIFFfake"),
+        )
+        for p in patches:
+            p.start()
+        try:
+            result = await stt_eval.transcribe_gemini(Path("/tmp/x.wav"), "english")
+        finally:
+            for p in patches:
+                p.stop()
+
+        self.assertEqual(result["transcript"], "")
+
+    async def test_missing_key_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(ValueError):
+                await stt_eval.transcribe_gemini(Path("/tmp/x.wav"), "english")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -289,5 +289,61 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(df.iloc[0]["ttfb"], 0.5)
 
 
+class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
+    def _fake_response(self, pcm: bytes):
+        from types import SimpleNamespace
+
+        part = SimpleNamespace(inline_data=SimpleNamespace(data=pcm))
+        content = SimpleNamespace(parts=[part])
+        return SimpleNamespace(candidates=[SimpleNamespace(content=content)])
+
+    async def test_saves_pcm_and_uses_model_and_voice(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        pcm = b"\x01\x02" * 100
+        generate = AsyncMock(return_value=self._fake_response(pcm))
+        client_obj = AsyncMock()
+        client_obj.aio.models.generate_content = generate
+        saved = {}
+
+        def fake_save(audio_bytes, output_path, sample_rate=24000):
+            saved["bytes"] = audio_bytes
+            saved["sample_rate"] = sample_rate
+
+        patches = (
+            patch.dict("os.environ", {"GEMINI_API_KEY": "gk-fake"}),
+            patch.object(tts_eval.genai, "Client", return_value=client_obj),
+            patch.object(tts_eval, "save_audio", side_effect=fake_save),
+        )
+        for p in patches:
+            p.start()
+        try:
+            result = await tts_eval.synthesize_gemini(
+                "hello", "kannada", "/tmp/out.wav"
+            )
+        finally:
+            for p in patches:
+                p.stop()
+
+        self.assertIn("ttfb", result)
+        self.assertIsInstance(result["ttfb"], float)
+        self.assertEqual(saved["bytes"], pcm)
+        self.assertEqual(saved["sample_rate"], 24000)
+
+        kwargs = generate.await_args.kwargs
+        self.assertEqual(kwargs["model"], tts_eval.TTS_PROVIDER_MODELS["gemini"])
+        voice = (
+            kwargs["config"].speech_config.voice_config.prebuilt_voice_config.voice_name
+        )
+        self.assertEqual(voice, tts_eval.get_tts_voice("gemini", "kannada"))
+
+    async def test_missing_key_raises(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(ValueError):
+                await tts_eval.synthesize_gemini("hi", "english", "/tmp/out.wav")
+
+
 if __name__ == "__main__":
     unittest.main()

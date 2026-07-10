@@ -17,6 +17,8 @@ from groq import AsyncGroq
 from cartesia import AsyncCartesia
 from sarvamai import AsyncSarvamAI, AudioOutput, EventResponse
 from google.cloud import texttospeech
+from google import genai
+from google.genai import types as genai_types
 
 import numpy as np
 import pandas as pd
@@ -443,6 +445,51 @@ async def synthesize_smallest(text: str, language: str, audio_path: str) -> Dict
     return {"ttfb": ttfb}
 
 
+async def synthesize_gemini(text: str, language: str, audio_path: str) -> Dict:
+    """Synthesize speech with a Gemini TTS model via the google-genai API.
+
+    Gemini TTS returns raw 24 kHz, 16-bit mono PCM in a single (non-streaming)
+    response, so ttfb equals the full request latency. Benchmark-only — no
+    cascaded pipecat Gemini TTS service is wired into create_tts_service.
+    """
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "GEMINI_API_KEY (or GOOGLE_API_KEY) environment variable not set"
+        )
+
+    client = genai.Client(api_key=api_key)
+
+    voice = get_tts_voice("gemini", language)
+    lang_code = get_tts_language_code(language, "gemini")
+
+    config = genai_types.GenerateContentConfig(
+        response_modalities=["AUDIO"],
+        speech_config=genai_types.SpeechConfig(
+            language_code=lang_code,
+            voice_config=genai_types.VoiceConfig(
+                prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(
+                    voice_name=voice
+                )
+            ),
+        ),
+    )
+
+    start_time = time.time()
+    response = await client.aio.models.generate_content(
+        model=TTS_PROVIDER_MODELS["gemini"],
+        contents=text,
+        config=config,
+    )
+    ttfb = time.time() - start_time
+
+    audio_bytes = response.candidates[0].content.parts[0].inline_data.data
+
+    save_audio(audio_bytes, audio_path, sample_rate=24000)
+
+    return {"ttfb": ttfb}
+
+
 # =============================================================================
 # Main Synthesis Router
 # =============================================================================
@@ -460,6 +507,7 @@ async def synthesize_speech(
     provider_methods = {
         "openai": synthesize_openai,
         "google": synthesize_google,
+        "gemini": synthesize_gemini,
         "elevenlabs": synthesize_elevenlabs,
         "cartesia": synthesize_cartesia,
         "groq": synthesize_groq,
@@ -686,6 +734,7 @@ TTS_PROVIDERS = [
     "openai",
     "groq",
     "google",
+    "gemini",
     "elevenlabs",
     "sarvam",
     "smallest",

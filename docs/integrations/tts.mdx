@@ -9,6 +9,7 @@ description: "Supported TTS providers in Calibrate"
 | **OpenAI**      | gpt-4o-mini-tts        | coral         | [openai.com](https://openai.com)                            |
 | **Groq**        | orpheus                | troy          | [groq.com](https://groq.com)                                |
 | **Google**      | chirp_3                | Charon        | [cloud.google.com](https://cloud.google.com/text-to-speech) |
+| **Gemini**      | gemini-3.1-flash-tts   | Kore          | [ai.google.dev](https://ai.google.dev/gemini-api)           |
 | **ElevenLabs**  | eleven_multilingual_v2 | Krishna       | [elevenlabs.io](https://elevenlabs.io)                      |
 | **Sarvam**      | bulbul:v3-beta         | aditya        | [sarvam.ai](https://sarvam.ai)                              |
 | **Smallest AI** | lightning              | aditi         | [smallest.ai](https://smallest.ai)                          |
@@ -30,6 +31,9 @@ export CARTESIA_API_KEY=your_key
 
 # Google
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/credentials.json
+
+# Gemini (benchmarks only; STT + TTS via the Gemini API)
+export GEMINI_API_KEY=your_key
 
 # OpenAI
 export OPENAI_API_KEY=your_key
