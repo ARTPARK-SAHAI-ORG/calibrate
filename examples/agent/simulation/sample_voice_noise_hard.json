@@ -1,0 +1,114 @@
+{
+  "agent_url": "ws://localhost:7860/ws-client/swasth-kadam-v5",
+  "personas": [
+    {
+      "label": "hard L1 · env · vehicle · loud",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. on a moving bus, engine loud.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "vehicle",
+        "people": "none",
+        "loudness": "loud"
+      }
+    },
+    {
+      "label": "hard L2 · people · medium · loud",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. in a cafe with several people talking.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": null,
+        "people": "medium",
+        "loudness": "loud"
+      }
+    },
+    {
+      "label": "hard L3 · mixed · station+medium · loud",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. at a crowded, loud railway station.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "railway_station",
+        "people": "medium",
+        "loudness": "loud"
+      }
+    },
+    {
+      "label": "hard L4 · env · vacuum · harsh",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. at home with a vacuum running right nearby.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "vacuum",
+        "people": "none",
+        "loudness": "harsh"
+      }
+    },
+    {
+      "label": "hard L5 · people · heavy · harsh",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. in a packed, very noisy crowd.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": null,
+        "people": "heavy",
+        "loudness": "harsh"
+      }
+    },
+    {
+      "label": "hard L6 · mixed · rainy+heavy · harsh",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. on a rainy street in a heavy crowd.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "rainy_street",
+        "people": "heavy",
+        "loudness": "harsh"
+      }
+    },
+    {
+      "label": "hard · baseline · clean",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. you are at home in a quiet room.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "straightforward enrollment",
+      "description": "Complete the Swasth Kadham signup for your child. Answer clearly right away. Facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; not pregnant; child Aarav Mehta, born 22 July 2023; this number is linked to your Anganwadi; WhatsApp on this number; last 4 Aadhaar digits 4827."
+    }
+  ],
+  "evaluators": [
+    {
+      "id": "form-complete-id",
+      "name": "form_completed",
+      "system_prompt": "Mark True if the agent collected the key enrollment fields (name, district, pregnancy status, child name+DOB, phone/WhatsApp linkage, last 4 Aadhaar digits) and gave a closing acknowledgment.",
+      "judge_model": "openai/gpt-4.1"
+    },
+    {
+      "id": "patient-guidance-id",
+      "name": "patient_guidance",
+      "system_prompt": "Mark True if the agent was polite, asked questions one at a time, and patiently drew out information under noise.",
+      "judge_model": "openai/gpt-4.1"
+    }
+  ],
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 50
+  }
+}
