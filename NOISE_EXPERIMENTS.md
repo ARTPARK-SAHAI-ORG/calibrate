@@ -40,8 +40,7 @@ mkdir -p server/db/agents/swasth-kadam-v5
 # then create server/db/agents/swasth-kadam-v5/config.json with the JSON below
 ```
 
-<details>
-<summary><code>server/db/agents/swasth-kadam-v5/config.json</code></summary>
+`server/db/agents/swasth-kadam-v5/config.json`:
 
 ```json
 {
@@ -351,8 +350,6 @@ mkdir -p server/db/agents/swasth-kadam-v5
     }
 }
 ```
-
-</details>
 
 ### 3. The agent URL Calibrate connects to
 Calibrate uses the pipecat non-telephony WebSocket endpoint:
