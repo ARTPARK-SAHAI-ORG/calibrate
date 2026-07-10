@@ -564,19 +564,3 @@ afplay out/easy/simulation_persona_5_scenario_1/conversation.wav        # agent-
 afplay out/easy/simulation_persona_5_scenario_1/clean_conversation.wav  # clean
 afplay out/easy/simulation_persona_5_scenario_1/noise_track.wav         # the noise loop alone
 ```
-
-### The real ground truth — the agent's filled form
-The judge scores (`form_completed`) are LLM-based and can misfire; the STT score can
-be deflated by turn-alignment under noise. The **authoritative** check is the agent's
-`data.json` (Part A.3): compare its `form_data` against the scenario facts
-(Priya Mehta / Pune / Lakshmi Nagar Kendra / not pregnant / Aarav Mehta / 22-07-2023 /
-phone✓ / WhatsApp✓ / 4827). Match a call to its conversation by running
-`--parallel 1` and taking the Nth conversation (by creation time) for persona N, or by
-fingerprinting the sim's `stt_results.csv` predictions against each conversation's
-`transcript.json`.
-
-### Interpreting across a run
-- **`conversation.wav` louder (higher RMS) than `clean_conversation.wav`** confirms noise was mixed in; harsher loudness = bigger gap.
-- **`form_completed` / `patient_guidance`** = task success / politeness (binary 1.0/0.0), but treat single results with caution — one call + one judge is noisy; run each condition several times.
-- **`data.json` diffs** show the real damage: dropped name parts, a wrong digit in a date, a bystander word pulled into a field, or (worst case) a collapsed call.
-- Expect a gradient: light/moderate noise → occasional single-field slips; loud → mostly fine; harsh crowds → corrupted fields and, at the extreme, a call that falls apart.
