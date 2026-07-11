@@ -11,6 +11,7 @@ description: "Supported STT providers in Calibrate"
 | **ElevenLabs**  | scribe-v2              | [elevenlabs.io](https://elevenlabs.io)                      |
 | **Groq**        | whisper-large-v3-turbo | [groq.com](https://groq.com)                                |
 | **Google**      | chirp-3                | [cloud.google.com](https://cloud.google.com/speech-to-text) |
+| **Gemini**      | gemini-3.5-flash       | [ai.google.dev](https://ai.google.dev/gemini-api)           |
 | **Sarvam**      | saarika-v2.5           | [sarvam.ai](https://sarvam.ai)                              |
 | **Smallest AI** | pulse                  | [smallest.ai](https://smallest.ai)                          |
 
@@ -23,4 +24,9 @@ Some providers use different models for specific languages:
 <Note>
   Google STT uses `chirp-2` model for Sindhi, instead of the default `chirp-3`.
   This is handled automatically by Calibrate.
+</Note>
+
+<Note>
+  Gemini has no dedicated STT endpoint. Transcription runs through the Gemini
+  multimodal model (`gemini-3.5-flash`) using the Gemini API.
 </Note>

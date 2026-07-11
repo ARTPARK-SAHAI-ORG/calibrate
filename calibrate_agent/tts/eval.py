@@ -17,6 +17,8 @@ from groq import AsyncGroq
 from cartesia import AsyncCartesia
 from sarvamai import AsyncSarvamAI, AudioOutput, EventResponse
 from google.cloud import texttospeech
+from google import genai
+from google.genai import types as genai_types
 
 import numpy as np
 import pandas as pd
@@ -30,6 +32,7 @@ from calibrate_agent.utils import (
     provider_log_file as _current_log_file,
     TTS_PROVIDER_MODELS,
     get_tts_voice,
+    get_gemini_api_key,
 )
 from calibrate_agent.tts.metrics import get_tts_llm_judge_score
 from calibrate_agent.llm._metrics_utils import _latency_percentiles
@@ -443,6 +446,71 @@ async def synthesize_smallest(text: str, language: str, audio_path: str) -> Dict
     return {"ttfb": ttfb}
 
 
+def _gemini_audio_chunk(chunk) -> bytes | None:
+    """Extract inline PCM audio bytes from a streamed Gemini response chunk."""
+    candidates = getattr(chunk, "candidates", None)
+    if not candidates:
+        return None
+    content = getattr(candidates[0], "content", None)
+    parts = getattr(content, "parts", None) if content else None
+    if not parts:
+        return None
+    inline = getattr(parts[0], "inline_data", None)
+    return getattr(inline, "data", None) if inline else None
+
+
+async def synthesize_gemini(text: str, language: str, audio_path: str) -> Dict:
+    """Synthesize speech with a Gemini TTS model via the google-genai API.
+
+    Streamed so ttfb reflects the first audio chunk (comparable to the other
+    streaming providers), not the full synthesis time. Gemini TTS returns raw
+    24 kHz, 16-bit mono PCM. Benchmark-only — no cascaded pipecat Gemini TTS
+    service is wired into create_tts_service.
+    """
+    client = genai.Client(api_key=get_gemini_api_key())
+
+    voice = get_tts_voice("gemini", language)
+    lang_code = get_tts_language_code(language, "gemini")
+
+    config = genai_types.GenerateContentConfig(
+        response_modalities=["AUDIO"],
+        speech_config=genai_types.SpeechConfig(
+            language_code=lang_code,
+            voice_config=genai_types.VoiceConfig(
+                prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(
+                    voice_name=voice
+                )
+            ),
+        ),
+    )
+
+    start_time = time.time()
+    ttfb = None
+    audio_chunks = []
+
+    stream = await client.aio.models.generate_content_stream(
+        model=TTS_PROVIDER_MODELS["gemini"],
+        contents=text,
+        config=config,
+    )
+    async for chunk in stream:
+        data = _gemini_audio_chunk(chunk)
+        if data:
+            if ttfb is None:
+                ttfb = time.time() - start_time
+            audio_chunks.append(data)
+
+    # A blocked or text-only response yields no audio parts. Fail cleanly (the
+    # router's @backoff retries transient blocks, then the row is marked failed)
+    # rather than writing an empty WAV.
+    if not audio_chunks:
+        raise ValueError("Gemini TTS returned no audio")
+
+    save_audio(b"".join(audio_chunks), audio_path, sample_rate=24000)
+
+    return {"ttfb": ttfb}
+
+
 # =============================================================================
 # Main Synthesis Router
 # =============================================================================
@@ -460,6 +528,7 @@ async def synthesize_speech(
     provider_methods = {
         "openai": synthesize_openai,
         "google": synthesize_google,
+        "gemini": synthesize_gemini,
         "elevenlabs": synthesize_elevenlabs,
         "cartesia": synthesize_cartesia,
         "groq": synthesize_groq,
@@ -686,6 +755,7 @@ TTS_PROVIDERS = [
     "openai",
     "groq",
     "google",
+    "gemini",
     "elevenlabs",
     "sarvam",
     "smallest",

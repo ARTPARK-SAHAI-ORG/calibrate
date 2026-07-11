@@ -1452,6 +1452,13 @@ GOOGLE_LANGUAGE_CODES = GOOGLE_STT_LANGUAGE_CODES
 ELEVENLABS_LANGUAGE_CODES = ELEVENLABS_STT_LANGUAGE_CODES
 SMALLEST_LANGUAGE_CODES = SMALLEST_STT_LANGUAGE_CODES
 
+# Gemini is a Google model and uses the same BCP-47 language codes, so it reuses
+# Google's maps. Benchmark-only (calibrate_agent/{stt,tts}/eval.py via
+# google-genai) — there is no cascaded pipecat Gemini STT/TTS service, so it is
+# not wired into create_stt_service / create_tts_service.
+GEMINI_STT_LANGUAGE_CODES = GOOGLE_STT_LANGUAGE_CODES
+GEMINI_TTS_LANGUAGE_CODES = GOOGLE_TTS_LANGUAGE_CODES
+
 
 def get_stt_language_code(language: str, provider: str) -> str:
     """Get the appropriate language code string for an STT provider.
@@ -1477,6 +1484,8 @@ def get_stt_language_code(language: str, provider: str) -> str:
         return SARVAM_STT_LANGUAGE_CODES.get(language, "en-IN")
     elif provider == "google":
         return GOOGLE_STT_LANGUAGE_CODES.get(language, "en-US")
+    elif provider == "gemini":
+        return GEMINI_STT_LANGUAGE_CODES.get(language, "en-US")
     elif provider == "smallest":
         return SMALLEST_STT_LANGUAGE_CODES.get(language, "multi")
     elif provider == "cartesia":
@@ -1518,6 +1527,8 @@ def get_tts_language_code(language: str, provider: str) -> str:
         return SARVAM_TTS_LANGUAGE_CODES.get(language, "en-IN")
     elif provider == "google":
         return GOOGLE_TTS_LANGUAGE_CODES.get(language, "en-US")
+    elif provider == "gemini":
+        return GEMINI_TTS_LANGUAGE_CODES.get(language, "en-US")
     elif provider == "smallest":
         return SMALLEST_TTS_LANGUAGE_CODES.get(language, "en")
     elif provider == "cartesia":
@@ -1565,6 +1576,7 @@ def validate_stt_language(language: str, provider: str) -> None:
     provider_languages = {
         "sarvam": SARVAM_STT_LANGUAGE_CODES,
         "google": GOOGLE_STT_LANGUAGE_CODES,
+        "gemini": GEMINI_STT_LANGUAGE_CODES,
         "smallest": SMALLEST_STT_LANGUAGE_CODES,
         "cartesia": CARTESIA_STT_LANGUAGE_CODES,
         "elevenlabs": ELEVENLABS_STT_LANGUAGE_CODES,
@@ -1602,6 +1614,7 @@ def validate_tts_language(language: str, provider: str) -> None:
     provider_languages = {
         "sarvam": SARVAM_TTS_LANGUAGE_CODES,
         "google": GOOGLE_TTS_LANGUAGE_CODES,
+        "gemini": GEMINI_TTS_LANGUAGE_CODES,
         "cartesia": CARTESIA_TTS_LANGUAGE_CODES,
         "elevenlabs": ELEVENLABS_TTS_LANGUAGE_CODES,
         "openai": OPENAI_TTS_LANGUAGE_CODES,
@@ -1703,6 +1716,9 @@ TTS_PROVIDER_VOICES = {
     "elevenlabs": "m5qndnI7u4OAdXhH0Mr5",  # Krishna (pre-made voice)
     "sarvam": "aditya",
     "smallest": "aditi",
+    # Gemini prebuilt voice; language-agnostic (one voice speaks all languages),
+    # so no TTS_PROVIDER_VOICES_BY_LANGUAGE entry is needed.
+    "gemini": "Kore",
 }
 
 # Google TTS voice family; the full name is "{lang_code}-{family}" (e.g.
@@ -1751,6 +1767,21 @@ def get_tts_voice(provider: str, language: str) -> str:
     return TTS_PROVIDER_VOICES[provider]
 
 
+def get_gemini_api_key(required: bool = True) -> Optional[str]:
+    """Return the Gemini API key from GOOGLE_API_KEY.
+
+    GOOGLE_API_KEY is google-genai's canonical variable. Single source for the
+    benchmark Gemini STT/TTS paths (calibrate_agent/{stt,tts}/eval.py) and the
+    `status` check.
+
+    Raises ValueError when ``required`` and the variable is not set.
+    """
+    key = os.getenv("GOOGLE_API_KEY")
+    if required and not key:
+        raise ValueError("GOOGLE_API_KEY environment variable not set")
+    return key
+
+
 # Single source of truth for per-provider default model names. The live agent
 # (create_stt_service / create_tts_service below) AND the benchmarks
 # (calibrate_agent/stt/eval.py, calibrate_agent/tts/eval.py) both read these, so a change in
@@ -1769,6 +1800,7 @@ STT_PROVIDER_MODELS = {
     "openai": "gpt-4o-transcribe",
     "groq": "whisper-large-v3-turbo",
     "google": "chirp_3",
+    "gemini": "gemini-3.5-flash",
     "cartesia": "ink-whisper",
     "elevenlabs": "scribe_v2_realtime",
     "smallest": "pulse",
@@ -1776,6 +1808,7 @@ STT_PROVIDER_MODELS = {
 }
 
 TTS_PROVIDER_MODELS = {
+    "gemini": "gemini-3.1-flash-tts-preview",
     "cartesia": "sonic-3.5",
     "openai": "gpt-4o-mini-tts",
     "groq": "canopylabs/orpheus-v1-english",

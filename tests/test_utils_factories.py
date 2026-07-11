@@ -31,6 +31,12 @@ TTS_SERVICE_TARGETS = {
     "smallest": "pipecat.services.smallest.tts.SmallestTTSService",
 }
 
+# Providers that exist only in the benchmarks (calibrate_agent/{stt,tts}/eval.py),
+# not in the live-agent factories — pipecat 1.0.0 has no cascaded service for them.
+# Gemini STT/TTS run through google-genai in the eval path only, so they carry
+# shared model/voice constants but have no create_*_service branch to keep in sync.
+BENCHMARK_ONLY_PROVIDERS = {"gemini"}
+
 ALL_KEYS = {
     "DEEPGRAM_API_KEY": "k",
     "SARVAM_API_KEY": "k",
@@ -59,6 +65,8 @@ class TestCreateSTTService(unittest.TestCase):
         from calibrate_agent.utils import create_stt_service, STT_PROVIDER_MODELS
 
         for prov, expected in STT_PROVIDER_MODELS.items():
+            if prov in BENCHMARK_ONLY_PROVIDERS:
+                continue
             with patch.dict(os.environ, ALL_KEYS), \
                     patch(STT_SERVICE_TARGETS[prov]) as svc:
                 create_stt_service(prov, "english")
@@ -68,9 +76,9 @@ class TestCreateSTTService(unittest.TestCase):
                 )
 
         # Guard against a new provider entering the constant without matching
-        # parity coverage here.
+        # parity coverage here (benchmark-only providers excepted).
         self.assertEqual(
-            set(STT_PROVIDER_MODELS),
+            set(STT_PROVIDER_MODELS) - BENCHMARK_ONLY_PROVIDERS,
             {"deepgram", "openai", "groq", "google", "cartesia",
              "elevenlabs", "smallest", "sarvam"},
         )
@@ -126,10 +134,13 @@ class TestCreateTTSService(unittest.TestCase):
         # below. Adding one to a constant without covering it here fails the test.
         self.assertEqual(
             benchmarked,
-            set(TTS_PROVIDER_MODELS)
-            | set(TTS_PROVIDER_VOICES)
-            | set(TTS_PROVIDER_VOICES_BY_LANGUAGE)
-            | {"google"},
+            (
+                set(TTS_PROVIDER_MODELS)
+                | set(TTS_PROVIDER_VOICES)
+                | set(TTS_PROVIDER_VOICES_BY_LANGUAGE)
+                | {"google"}
+            )
+            - BENCHMARK_ONLY_PROVIDERS,
         )
 
         for prov in benchmarked:

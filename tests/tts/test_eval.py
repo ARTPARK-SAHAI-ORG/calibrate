@@ -10,7 +10,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 import pandas as pd
 
@@ -287,6 +287,100 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
             df = pd.read_csv(results_csv)
             self.assertEqual(df.iloc[0]["text"], "new")
             self.assertEqual(df.iloc[0]["ttfb"], 0.5)
+
+
+class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
+    def _chunk(self, pcm: bytes):
+        from types import SimpleNamespace
+
+        part = SimpleNamespace(inline_data=SimpleNamespace(data=pcm))
+        content = SimpleNamespace(parts=[part])
+        return SimpleNamespace(candidates=[SimpleNamespace(content=content)])
+
+    async def test_streams_chunks_and_uses_model_and_voice(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        chunks = [self._chunk(b"\x01\x02" * 50), self._chunk(b"\x03\x04" * 50)]
+
+        async def _stream(*args, **kwargs):
+            for c in chunks:
+                yield c
+
+        stream_fn = AsyncMock(return_value=_stream())
+        client_obj = AsyncMock()
+        client_obj.aio.models.generate_content_stream = stream_fn
+        saved = {}
+
+        def fake_save(audio_bytes, output_path, sample_rate=24000):
+            saved["bytes"] = audio_bytes
+            saved["sample_rate"] = sample_rate
+
+        patches = (
+            patch.dict("os.environ", {"GOOGLE_API_KEY": "gk-fake"}),
+            patch.object(tts_eval.genai, "Client", return_value=client_obj),
+            patch.object(tts_eval, "save_audio", side_effect=fake_save),
+        )
+        for p in patches:
+            p.start()
+        try:
+            result = await tts_eval.synthesize_gemini(
+                "hello", "kannada", "/tmp/out.wav"
+            )
+        finally:
+            for p in patches:
+                p.stop()
+
+        self.assertIsInstance(result["ttfb"], float)
+        # ttfb reflects the FIRST audio chunk; all chunks are concatenated.
+        self.assertEqual(saved["bytes"], b"\x01\x02" * 50 + b"\x03\x04" * 50)
+        self.assertEqual(saved["sample_rate"], 24000)
+
+        kwargs = stream_fn.await_args.kwargs
+        self.assertEqual(kwargs["model"], tts_eval.TTS_PROVIDER_MODELS["gemini"])
+        voice = (
+            kwargs["config"].speech_config.voice_config.prebuilt_voice_config.voice_name
+        )
+        self.assertEqual(voice, tts_eval.get_tts_voice("gemini", "kannada"))
+
+    async def test_no_audio_raises_without_writing(self):
+        from types import SimpleNamespace
+        from calibrate_agent.tts import eval as tts_eval
+
+        # A text-only / blocked response: chunk carries no inline audio.
+        empty_chunk = SimpleNamespace(
+            candidates=[SimpleNamespace(content=SimpleNamespace(parts=None))]
+        )
+
+        async def _stream(*args, **kwargs):
+            yield empty_chunk
+
+        client_obj = AsyncMock()
+        client_obj.aio.models.generate_content_stream = AsyncMock(
+            return_value=_stream()
+        )
+        save = MagicMock()
+
+        patches = (
+            patch.dict("os.environ", {"GOOGLE_API_KEY": "gk-fake"}),
+            patch.object(tts_eval.genai, "Client", return_value=client_obj),
+            patch.object(tts_eval, "save_audio", save),
+        )
+        for p in patches:
+            p.start()
+        try:
+            with self.assertRaises(ValueError):
+                await tts_eval.synthesize_gemini("hi", "english", "/tmp/out.wav")
+        finally:
+            for p in patches:
+                p.stop()
+        save.assert_not_called()
+
+    async def test_missing_key_raises(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaises(ValueError):
+                await tts_eval.synthesize_gemini("hi", "english", "/tmp/out.wav")
 
 
 if __name__ == "__main__":
