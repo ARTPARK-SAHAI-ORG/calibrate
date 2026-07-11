@@ -1768,19 +1768,17 @@ def get_tts_voice(provider: str, language: str) -> str:
 
 
 def get_gemini_api_key(required: bool = True) -> Optional[str]:
-    """Return the Gemini API key from GOOGLE_API_KEY (preferred) or GEMINI_API_KEY.
+    """Return the Gemini API key from GOOGLE_API_KEY.
 
-    GOOGLE_API_KEY is google-genai's canonical variable; GEMINI_API_KEY is
-    accepted as an alternative. Single source for the benchmark Gemini STT/TTS
-    paths (calibrate_agent/{stt,tts}/eval.py) and the `status` check.
+    GOOGLE_API_KEY is google-genai's canonical variable. Single source for the
+    benchmark Gemini STT/TTS paths (calibrate_agent/{stt,tts}/eval.py) and the
+    `status` check.
 
-    Raises ValueError when ``required`` and neither variable is set.
+    Raises ValueError when ``required`` and the variable is not set.
     """
-    key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    key = os.getenv("GOOGLE_API_KEY")
     if required and not key:
-        raise ValueError(
-            "GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable not set"
-        )
+        raise ValueError("GOOGLE_API_KEY environment variable not set")
     return key
 
 

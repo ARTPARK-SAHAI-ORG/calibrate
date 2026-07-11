@@ -10,7 +10,7 @@ import tempfile
 import unittest
 import wave
 from pathlib import Path
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 
 import pandas as pd
 
@@ -316,7 +316,7 @@ class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
             saved["sample_rate"] = sample_rate
 
         patches = (
-            patch.dict("os.environ", {"GEMINI_API_KEY": "gk-fake"}),
+            patch.dict("os.environ", {"GOOGLE_API_KEY": "gk-fake"}),
             patch.object(tts_eval.genai, "Client", return_value=client_obj),
             patch.object(tts_eval, "save_audio", side_effect=fake_save),
         )
@@ -341,6 +341,39 @@ class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
             kwargs["config"].speech_config.voice_config.prebuilt_voice_config.voice_name
         )
         self.assertEqual(voice, tts_eval.get_tts_voice("gemini", "kannada"))
+
+    async def test_no_audio_raises_without_writing(self):
+        from types import SimpleNamespace
+        from calibrate_agent.tts import eval as tts_eval
+
+        # A text-only / blocked response: chunk carries no inline audio.
+        empty_chunk = SimpleNamespace(
+            candidates=[SimpleNamespace(content=SimpleNamespace(parts=None))]
+        )
+
+        async def _stream(*args, **kwargs):
+            yield empty_chunk
+
+        client_obj = AsyncMock()
+        client_obj.aio.models.generate_content_stream = AsyncMock(
+            return_value=_stream()
+        )
+        save = MagicMock()
+
+        patches = (
+            patch.dict("os.environ", {"GOOGLE_API_KEY": "gk-fake"}),
+            patch.object(tts_eval.genai, "Client", return_value=client_obj),
+            patch.object(tts_eval, "save_audio", save),
+        )
+        for p in patches:
+            p.start()
+        try:
+            with self.assertRaises(ValueError):
+                await tts_eval.synthesize_gemini("hi", "english", "/tmp/out.wav")
+        finally:
+            for p in patches:
+                p.stop()
+        save.assert_not_called()
 
     async def test_missing_key_raises(self):
         from calibrate_agent.tts import eval as tts_eval

@@ -308,34 +308,6 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "skipped")
         self.assertEqual(result["missing_vars"], ["OPENAI_API_KEY"])
 
-    async def test_alternative_env_vars_skips_when_none_set(self):
-        from calibrate_agent.status import _check_single_provider
-
-        provider = {
-            "name": "gemini",
-            "types": ["stt", "tts"],
-            "env_vars": [("GOOGLE_API_KEY", "GEMINI_API_KEY")],
-        }
-        with patch.dict(os.environ, {}, clear=True):
-            result = await _check_single_provider(provider, MagicMock())
-        self.assertEqual(result["status"], "skipped")
-        self.assertEqual(result["missing_vars"], ["GOOGLE_API_KEY or GEMINI_API_KEY"])
-
-    async def test_alternative_env_vars_ok_when_either_set(self):
-        from calibrate_agent import status as S
-
-        provider = {
-            "name": "gemini",
-            "types": ["stt", "tts"],
-            "env_vars": [("GOOGLE_API_KEY", "GEMINI_API_KEY")],
-        }
-        # Only the alternative (GEMINI_API_KEY) is set — must still run the check.
-        with patch.dict(os.environ, {"GEMINI_API_KEY": "k"}, clear=True), \
-             patch.dict(S._CHECK_FUNCTIONS, {"gemini": AsyncMock(return_value="tts")}):
-            result = await S._check_single_provider(provider, MagicMock())
-        self.assertEqual(result["status"], "ok")
-        self.assertEqual(result["check_type"], "tts")
-
     async def test_ok_path(self):
         from calibrate_agent import status as S
 

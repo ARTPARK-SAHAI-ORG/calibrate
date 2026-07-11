@@ -405,7 +405,7 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
 
 
 def _gemini_client() -> genai.Client:
-    """Build a google-genai client (key from GOOGLE_API_KEY / GEMINI_API_KEY)."""
+    """Build a google-genai client (key from GOOGLE_API_KEY)."""
     return genai.Client(api_key=get_gemini_api_key())
 
 

@@ -642,7 +642,7 @@ class TestTranscribeGemini(unittest.IsolatedAsyncioTestCase):
         fake_client.aio.models.generate_content = generate
 
         patches = (
-            patch.dict("os.environ", {"GEMINI_API_KEY": "gk-fake"}),
+            patch.dict("os.environ", {"GOOGLE_API_KEY": "gk-fake"}),
             patch.object(stt_eval.genai, "Client", return_value=fake_client),
             patch.object(stt_eval, "load_audio", return_value=b"RIFFfake"),
         )

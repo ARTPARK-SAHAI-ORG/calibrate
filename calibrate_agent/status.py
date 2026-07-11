@@ -51,7 +51,7 @@ PROVIDERS = [
     {
         "name": "gemini",
         "types": ["stt", "tts"],
-        "env_vars": [("GOOGLE_API_KEY", "GEMINI_API_KEY")],
+        "env_vars": ["GOOGLE_API_KEY"],
     },
     {
         "name": "sarvam",
@@ -482,18 +482,8 @@ async def _check_single_provider(
     name = provider["name"]
     env_vars = provider["env_vars"]
 
-    # Check if required env vars are set. An entry may be a tuple/list of
-    # alternatives ("any one of these is enough", e.g. GOOGLE_API_KEY OR
-    # GEMINI_API_KEY); a bare string is required outright.
-    def _present(entry):
-        if isinstance(entry, (tuple, list)):
-            return any(os.getenv(v) for v in entry)
-        return bool(os.getenv(entry))
-
-    def _label(entry):
-        return " or ".join(entry) if isinstance(entry, (tuple, list)) else entry
-
-    missing = [_label(e) for e in env_vars if not _present(e)]
+    # Check if required env vars are set
+    missing = [v for v in env_vars if not os.getenv(v)]
     if missing:
         result = {
             "name": name,

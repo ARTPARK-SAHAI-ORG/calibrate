@@ -500,6 +500,12 @@ async def synthesize_gemini(text: str, language: str, audio_path: str) -> Dict:
                 ttfb = time.time() - start_time
             audio_chunks.append(data)
 
+    # A blocked or text-only response yields no audio parts. Fail cleanly (the
+    # router's @backoff retries transient blocks, then the row is marked failed)
+    # rather than writing an empty WAV.
+    if not audio_chunks:
+        raise ValueError("Gemini TTS returned no audio")
+
     save_audio(b"".join(audio_chunks), audio_path, sample_rate=24000)
 
     return {"ttfb": ttfb}
