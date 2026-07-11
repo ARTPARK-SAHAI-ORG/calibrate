@@ -3,7 +3,7 @@ title: "Introduction"
 description: "Learn about Calibrate and how to get started."
 ---
 
-[Calibrate](https://calibrate.artpark.ai) is an open-source evaluation framework for voice agents.
+[Calibrate](https://calibrate.artpark.ai) is an open-source evaluation platform for AI agents — text or voice.
 
 <iframe
   className="w-full aspect-video rounded-xl"
@@ -13,34 +13,28 @@ description: "Learn about Calibrate and how to get started."
   allowFullScreen
 ></iframe>
 
-Testing voice agents manually is slow, inconsistent, and doesn't scale. Voice agents require multiple components to work well together:
+Testing AI agents manually is slow, inconsistent, and doesn't scale. An agent has to reason about the user's intent against the context and purpose of the conversation, call the right tools with the right arguments in the right order, and generate the right next-turn response — turn after turn. Voice agents add more moving parts on top: transcribing speech accurately, producing natural-sounding replies, detecting turn ends, handling interruptions, keeping latency low, and coping with multiple languages, accents, and code-switching.
 
-- Transcribing the user's speech accurately and efficiently
-- Reasoning about the user's response against the context and purpose of the conversation
-- Calling the right tools with the right arguments in the right order
-- Generating the right next turn response
-- Producing natural-sounding speech back to the user
-- Detecting if the user has completed speaking or has taken a pause before speaking again
-- Handling interruptions by the user while the agent is speaking
-- Keeping the turnaround time low
-- Handling multiple languages, accents, dialects and code-switching
+There is no simple way to evaluate each of these across every provider on your own dataset. Even when individual pieces work well, it is hard to tell whether the agent as a whole will behave in production. This leads to many teams deploying with a lot of uncertainty and risk, and their users having to deal with poor experiences.
 
-and a lot more.
+Calibrate solves this by letting you evaluate the whole agent, whichever pieces it uses:
 
-There is no simple way to evaluate each component across all the providers on your own dataset. Even if individual components work well, it is hard to tell if the agent as a whole will work as expected when you deploy it to production. This leads to many teams deploying their agents with a lot of uncertainty and risk with their users having to deal with poor experiences.
+- `Text agents (LLMs)`: Evaluate the response quality and tool calling of your LLMs for multi-turn conversations, define custom evaluators, and find the best LLM for your agent
+- `Voice agents (STT & TTS)`: Benchmark speech-to-text and text-to-speech providers (Google, Sarvam, ElevenLabs and more) on your dataset across 10+ indic languages, using metrics optimised for agentic use cases
+- `Simulations`: Simulate realistic conversations using user personas and scenarios to surface failure modes — including interruptions — before you deploy
+- `Human alignment`: Collect human labels and iteratively align your LLM judges to them, so you can automate monitoring reliably
 
-Calibrate solves this problem by letting you evaluate your entire voice agent stack:
-
-- `Speech to Text (STT)`: Benchmark multiple providers (Google, Sarvam, ElevenLabs and more) on your dataset across 10+ indic languages using metrics optimised for agentic use cases
-- `Text to Speech (TTS)`: Benchmark generated speech by multiple providers automatically using an Audio LLM Judge across 10+ indic languages
-- `Text to Text (LLMs)`: Evaluate the response quality and tool calling of your LLMs for multi-turn conversations and find the best LLM for your agent
-- `Simulations`: Simulate realistic conversations using realistic user personas and scenarios to test failure modes for your agent including interruptions
-
-Calibrate helps you continuously improve your agent, ensure a bug never repeats itself and deploy your agent with confidence.
+Calibrate helps you continuously improve your agent, ensure a bug never repeats itself, and deploy with confidence.
 
 ## Get started
 
 <CardGroup cols={2}>
+  <Card title="LLM tests" icon="brain" href="/quickstart/text-to-text">
+    Create test suites that verify model responses and tool calling behavior
+  </Card>
+  <Card title="Simulations" icon="comments" href="/quickstart/simulations">
+    Simulate agent conversations with customizable personas and scenarios
+  </Card>
   <Card
     title="Speech to Text"
     icon="microphone"
@@ -48,18 +42,12 @@ Calibrate helps you continuously improve your agent, ensure a bug never repeats 
   >
     Compare transcription accuracy across multiple providers on your dataset
   </Card>
-  <Card title="LLM tests" icon="brain" href="/quickstart/text-to-text">
-    Create test suites that verify model responses and tool calling behavior
-  </Card>
   <Card
     title="Text to Speech"
     icon="volume-high"
     href="/quickstart/text-to-speech"
   >
     Benchmark generated audio quality across multiple providers
-  </Card>
-  <Card title="Simulations" icon="comments" href="/quickstart/simulations">
-    Simulate agent conversations with customizable personas and scenarios
   </Card>
 </CardGroup>
 
