@@ -10,6 +10,114 @@ If you already have a deployed agent, you can connect it to Calibrate and run ev
   Calibrate, see [Core Concepts: Agents](/core-concepts/agents) instead.
 </Tip>
 
+## How the connection works
+
+Calibrate does not need to understand your whole agent. It only needs a single
+HTTP endpoint that speaks a simple **text-in / text-out** contract:
+
+- **In** — a `messages` array (the conversation so far).
+- **Out** — a JSON object with a `response` text field (and optionally
+  `tool_calls`).
+
+That's the entire contract. Your agent does **not** have to be
+OpenAI-compatible, and you do **not** have to expose your production pipeline —
+all the custom preprocessing, routing, retrieval, and output formatting your
+agent does can stay exactly as it is.
+
+The insight is that however custom your agent's API looks on the outside, it
+almost always ends in an LLM call over a `messages` list. That LLM call is what
+Calibrate evaluates. So the job is just to expose *that inner call* as a thin
+endpoint Calibrate can reach:
+
+```mermaid
+flowchart LR
+    subgraph prod["Your production agent — any custom shape"]
+        direction TB
+        IN["Custom inputs<br/>(x1, x2, x3)"] --> PRE["Preprocess"]
+        PRE --> MSG["Build messages"]
+        MSG --> CORE["llm_inference(messages)"]
+        CORE --> POST["Transform output"]
+        POST --> OUT["Your agent's response"]
+    end
+
+    subgraph hook["Calibrate hook — thin wrapper"]
+        direction TB
+        REQ["messages<br/>(from Calibrate)"] --> CORE2["llm_inference(messages)"]
+        CORE2 --> RESP["{ response }"]
+    end
+
+    CORE -.->|"chat.completions"| LLM[("LLM / OpenAI-compatible API")]
+    CORE2 -.->|"chat.completions"| LLM
+    Cal["Calibrate"] ==>|"POST { messages }"| REQ
+    RESP ==>|"{ response }"| Cal
+```
+
+Both paths call the **same** `llm_inference(messages)` function, so the endpoint
+Calibrate tests is exactly the model logic your agent ships — nothing is
+re-implemented or mocked.
+
+### Wrap your existing LLM call
+
+Concretely, pull the model call out of your agent handler into a reusable
+function, then expose a second route that calls it directly.
+
+**Before** — the LLM call is buried inside your request handler:
+
+```python
+def inference(x1, x2, x3):
+    y1 = preprocess(x1)
+    y2 = preprocess(x2)
+    y3 = preprocess(x3)
+
+    messages = [
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "..."},
+        {"role": "user", "content": "..."},
+    ]
+
+    response = client.chat.completions.create(messages=messages)  # buried here
+    return transform(response)
+
+@app.get("/agent")
+def agent():
+    return inference(x1, x2, x3)
+```
+
+**After** — the LLM call is modularized and re-used by a thin Calibrate route:
+
+```python
+def llm_inference(messages):
+    """The core model call — reused by both your agent and Calibrate."""
+    response = client.chat.completions.create(messages=messages)
+    return response.choices[0].message.content
+
+def inference(x1, x2, x3):
+    y1 = preprocess(x1)
+    y2 = preprocess(x2)
+    y3 = preprocess(x3)
+
+    messages = [
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "..."},
+        {"role": "user", "content": "..."},
+    ]
+
+    response = llm_inference(messages)   # same call, now shared
+    return transform(response)
+
+@app.get("/agent")
+def agent():
+    return inference(x1, x2, x3)
+
+@app.post("/calibrate/test")           # the endpoint you connect to Calibrate
+def calibrate_test(body):
+    return {"response": llm_inference(body["messages"])}
+```
+
+You then point Calibrate at `POST /calibrate/test`. The sections below cover the
+exact request and response formats, how to add authentication, and how to verify
+the connection.
+
 ## Create an agent connection
 
 From the sidebar, click **Agents** → **New agent**. Select **Connect your existing agent**, give it a name, and click **Create**.
