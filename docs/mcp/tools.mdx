@@ -56,6 +56,8 @@ Get the results of a benchmark run, including per-model scores and the leaderboa
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_id` | string | Yes | Benchmark run to poll for status and results |
+| `only_failed` | boolean | No | Return only failing test cases for each model. Omit to return every case |
+| `compact` | boolean | No | Return a compact response that omits heavy detail fields (`model_results.test_results`, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail |
 
 See **GET /agent-tests/benchmark/&#123;task_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -74,6 +76,8 @@ run-agent-tests-batch.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_id` | string | Yes | Test run to poll for status and results |
+| `only_failed` | boolean | No | Return only failing test cases. Omit to return every case |
+| `compact` | boolean | No | Return a compact response that omits heavy detail fields (`results.output`, `results.test_case`, `results.judge_results`, `results.reasoning`, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail |
 
 See **GET /agent-tests/run/&#123;task_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -313,11 +317,13 @@ Get a paginated summary table for a task, with each item's evaluator values and 
 | `task_uuid` | string | Yes | Annotation task to act on |
 | `item_id` | string | No | Filter rows to a single item. The full task-wide annotator union is still returned in `annotators` |
 | `live_only` | boolean | No | When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded |
+| `disagreement_only` | boolean | No | When true, keep only rows where the evaluator disagreed with at least one annotator |
 | `q` | string | No | Case-insensitive substring search on `payload.name`. Blank is a no-op |
 | `sort_by` | string | No | Sort key for the results |
 | `order` | string | No | Sort direction |
 | `limit` | integer | No | Maximum number of items to return |
 | `offset` | integer | No | Number of items to skip before returning results |
+| `compact` | boolean | No | Return a compact response that omits heavy detail fields (`rows.payload`, `rows.evaluator_reasoning`, `rows.annotations.reasoning`, `evaluators.versions.system_prompt`, `evaluators.versions.output_config`, `evaluators.versions.variables`, `item_comments`), keeping only the lightweight decision fields. Omit for full detail |
 
 See **GET /annotation-tasks/&#123;task_uuid&#125;/summary** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -448,6 +454,7 @@ Get one evaluator with its full version history.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `evaluator_uuid` | string | Yes | Evaluator to retrieve |
+| `compact` | boolean | No | Return a compact response that omits heavy detail fields (`versions.system_prompt`, `versions.output_config`, `versions.variables`), keeping only the lightweight decision fields. Omit for full detail |
 
 See **GET /evaluators/&#123;evaluator_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 

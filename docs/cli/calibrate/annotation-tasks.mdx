@@ -149,6 +149,8 @@ calibrate annotation-tasks get-summary [flags]
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
+| `-c, --compact` | rows.payload | — | Return a compact response that omits heavy detail fields (rows.payload, `rows.evaluator_reasoning`, `rows.annotations.reasoning`, `evaluators.versions.system_prompt`, `evaluators.versions.output_config`, `evaluators.versions.variables`, `item_comments`), keeping only the lightweight decision fields. Omit for full detail |
+| `--disagreement-only` | — | — | When true, keep only rows where the evaluator disagreed with at least one annotator |
 | `-i, --item-id` | annotators | — | Filter rows to a single item. The full task-wide annotator union is still returned in annotators |
 | `--limit` | int | `50` | Maximum number of items to return |
 | `--live-only` | — | — | When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded |
