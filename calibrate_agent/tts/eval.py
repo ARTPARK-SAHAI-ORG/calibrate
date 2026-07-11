@@ -32,6 +32,7 @@ from calibrate_agent.utils import (
     provider_log_file as _current_log_file,
     TTS_PROVIDER_MODELS,
     get_tts_voice,
+    get_gemini_api_key,
 )
 from calibrate_agent.tts.metrics import get_tts_llm_judge_score
 from calibrate_agent.llm._metrics_utils import _latency_percentiles
@@ -445,20 +446,28 @@ async def synthesize_smallest(text: str, language: str, audio_path: str) -> Dict
     return {"ttfb": ttfb}
 
 
+def _gemini_audio_chunk(chunk) -> bytes | None:
+    """Extract inline PCM audio bytes from a streamed Gemini response chunk."""
+    candidates = getattr(chunk, "candidates", None)
+    if not candidates:
+        return None
+    content = getattr(candidates[0], "content", None)
+    parts = getattr(content, "parts", None) if content else None
+    if not parts:
+        return None
+    inline = getattr(parts[0], "inline_data", None)
+    return getattr(inline, "data", None) if inline else None
+
+
 async def synthesize_gemini(text: str, language: str, audio_path: str) -> Dict:
     """Synthesize speech with a Gemini TTS model via the google-genai API.
 
-    Gemini TTS returns raw 24 kHz, 16-bit mono PCM in a single (non-streaming)
-    response, so ttfb equals the full request latency. Benchmark-only — no
-    cascaded pipecat Gemini TTS service is wired into create_tts_service.
+    Streamed so ttfb reflects the first audio chunk (comparable to the other
+    streaming providers), not the full synthesis time. Gemini TTS returns raw
+    24 kHz, 16-bit mono PCM. Benchmark-only — no cascaded pipecat Gemini TTS
+    service is wired into create_tts_service.
     """
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError(
-            "GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable not set"
-        )
-
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=get_gemini_api_key())
 
     voice = get_tts_voice("gemini", language)
     lang_code = get_tts_language_code(language, "gemini")
@@ -476,16 +485,22 @@ async def synthesize_gemini(text: str, language: str, audio_path: str) -> Dict:
     )
 
     start_time = time.time()
-    response = await client.aio.models.generate_content(
+    ttfb = None
+    audio_chunks = []
+
+    stream = await client.aio.models.generate_content_stream(
         model=TTS_PROVIDER_MODELS["gemini"],
         contents=text,
         config=config,
     )
-    ttfb = time.time() - start_time
+    async for chunk in stream:
+        data = _gemini_audio_chunk(chunk)
+        if data:
+            if ttfb is None:
+                ttfb = time.time() - start_time
+            audio_chunks.append(data)
 
-    audio_bytes = response.candidates[0].content.parts[0].inline_data.data
-
-    save_audio(audio_bytes, audio_path, sample_rate=24000)
+    save_audio(b"".join(audio_chunks), audio_path, sample_rate=24000)
 
     return {"ttfb": ttfb}
 

@@ -1767,6 +1767,23 @@ def get_tts_voice(provider: str, language: str) -> str:
     return TTS_PROVIDER_VOICES[provider]
 
 
+def get_gemini_api_key(required: bool = True) -> Optional[str]:
+    """Return the Gemini API key from GOOGLE_API_KEY (preferred) or GEMINI_API_KEY.
+
+    GOOGLE_API_KEY is google-genai's canonical variable; GEMINI_API_KEY is
+    accepted as an alternative. Single source for the benchmark Gemini STT/TTS
+    paths (calibrate_agent/{stt,tts}/eval.py) and the `status` check.
+
+    Raises ValueError when ``required`` and neither variable is set.
+    """
+    key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if required and not key:
+        raise ValueError(
+            "GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable not set"
+        )
+    return key
+
+
 # Single source of truth for per-provider default model names. The live agent
 # (create_stt_service / create_tts_service below) AND the benchmarks
 # (calibrate_agent/stt/eval.py, calibrate_agent/tts/eval.py) both read these, so a change in

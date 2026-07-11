@@ -27,6 +27,7 @@ from calibrate_agent.utils import (
     get_stt_language_code,
     validate_stt_language,
     STT_PROVIDER_MODELS,
+    get_gemini_api_key,
     provider_log as _log,
     provider_log_file as _current_log_file,
 )
@@ -404,13 +405,8 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
 
 
 def _gemini_client() -> genai.Client:
-    """Build a google-genai client from GOOGLE_API_KEY / GEMINI_API_KEY."""
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise ValueError(
-            "GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable not set"
-        )
-    return genai.Client(api_key=api_key)
+    """Build a google-genai client (key from GOOGLE_API_KEY / GEMINI_API_KEY)."""
+    return genai.Client(api_key=get_gemini_api_key())
 
 
 async def transcribe_gemini(audio_path: Path, language: str) -> Dict:

@@ -290,20 +290,25 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
 
 
 class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
-    def _fake_response(self, pcm: bytes):
+    def _chunk(self, pcm: bytes):
         from types import SimpleNamespace
 
         part = SimpleNamespace(inline_data=SimpleNamespace(data=pcm))
         content = SimpleNamespace(parts=[part])
         return SimpleNamespace(candidates=[SimpleNamespace(content=content)])
 
-    async def test_saves_pcm_and_uses_model_and_voice(self):
+    async def test_streams_chunks_and_uses_model_and_voice(self):
         from calibrate_agent.tts import eval as tts_eval
 
-        pcm = b"\x01\x02" * 100
-        generate = AsyncMock(return_value=self._fake_response(pcm))
+        chunks = [self._chunk(b"\x01\x02" * 50), self._chunk(b"\x03\x04" * 50)]
+
+        async def _stream(*args, **kwargs):
+            for c in chunks:
+                yield c
+
+        stream_fn = AsyncMock(return_value=_stream())
         client_obj = AsyncMock()
-        client_obj.aio.models.generate_content = generate
+        client_obj.aio.models.generate_content_stream = stream_fn
         saved = {}
 
         def fake_save(audio_bytes, output_path, sample_rate=24000):
@@ -325,12 +330,12 @@ class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
             for p in patches:
                 p.stop()
 
-        self.assertIn("ttfb", result)
         self.assertIsInstance(result["ttfb"], float)
-        self.assertEqual(saved["bytes"], pcm)
+        # ttfb reflects the FIRST audio chunk; all chunks are concatenated.
+        self.assertEqual(saved["bytes"], b"\x01\x02" * 50 + b"\x03\x04" * 50)
         self.assertEqual(saved["sample_rate"], 24000)
 
-        kwargs = generate.await_args.kwargs
+        kwargs = stream_fn.await_args.kwargs
         self.assertEqual(kwargs["model"], tts_eval.TTS_PROVIDER_MODELS["gemini"])
         voice = (
             kwargs["config"].speech_config.voice_config.prebuilt_voice_config.voice_name

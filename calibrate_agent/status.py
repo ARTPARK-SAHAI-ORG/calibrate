@@ -16,7 +16,11 @@ from urllib.parse import urlencode
 
 import httpx
 
-from calibrate_agent.utils import TTS_PROVIDER_MODELS, get_tts_voice
+from calibrate_agent.utils import (
+    TTS_PROVIDER_MODELS,
+    get_tts_voice,
+    get_gemini_api_key,
+)
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -412,8 +416,7 @@ async def _check_gemini(client: httpx.AsyncClient) -> str:
     from google import genai
     from google.genai import types as genai_types
 
-    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-    genai_client = genai.Client(api_key=api_key)
+    genai_client = genai.Client(api_key=get_gemini_api_key())
     resp = await genai_client.aio.models.generate_content(
         model=TTS_PROVIDER_MODELS["gemini"],
         contents="hi",
