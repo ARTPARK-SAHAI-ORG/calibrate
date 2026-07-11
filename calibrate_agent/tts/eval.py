@@ -452,10 +452,10 @@ async def synthesize_gemini(text: str, language: str, audio_path: str) -> Dict:
     response, so ttfb equals the full request latency. Benchmark-only — no
     cascaded pipecat Gemini TTS service is wired into create_tts_service.
     """
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError(
-            "GEMINI_API_KEY (or GOOGLE_API_KEY) environment variable not set"
+            "GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable not set"
         )
 
     client = genai.Client(api_key=api_key)

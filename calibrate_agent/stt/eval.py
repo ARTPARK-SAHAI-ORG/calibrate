@@ -404,11 +404,11 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
 
 
 def _gemini_client() -> genai.Client:
-    """Build a google-genai client from GEMINI_API_KEY / GOOGLE_API_KEY."""
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    """Build a google-genai client from GOOGLE_API_KEY / GEMINI_API_KEY."""
+    api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError(
-            "GEMINI_API_KEY (or GOOGLE_API_KEY) environment variable not set"
+            "GOOGLE_API_KEY (or GEMINI_API_KEY) environment variable not set"
         )
     return genai.Client(api_key=api_key)
 
