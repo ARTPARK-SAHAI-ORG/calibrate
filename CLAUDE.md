@@ -2,6 +2,12 @@
 
 Guidance for Claude Code when working in this repository.
 
+> **⚠️ Start every new task in a new worktree when you're on `main`.** Before
+> beginning any new piece of work, check the current branch. If HEAD is on
+> `main`, create a dedicated worktree (and branch) for the task and do the work
+> there — never work or commit directly on `main`. If you're already on a
+> non-`main` branch/worktree scoped to the task, continue there.
+
 ## What this project is
 
 **Calibrate** (`calibrate-agent` on PyPI) is an open-source evaluation framework
