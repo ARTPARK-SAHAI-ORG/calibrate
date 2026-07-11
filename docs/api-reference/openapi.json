@@ -1461,7 +1461,7 @@
         ],
         "title": "EvaluatorCreateResponse"
       },
-      "EvaluatorDetailResponse": {
+      "EvaluatorDetailResponseCompact": {
         "properties": {
           "uuid": {
             "type": "string",
@@ -1566,7 +1566,7 @@
           },
           "versions": {
             "items": {
-              "$ref": "#/components/schemas/EvaluatorVersionResponse"
+              "$ref": "#/components/schemas/EvaluatorVersionCompact"
             },
             "type": "array",
             "title": "Versions",
@@ -1585,7 +1585,7 @@
           "updated_at",
           "versions"
         ],
-        "title": "EvaluatorDetailResponse"
+        "title": "EvaluatorDetailResponseCompact"
       },
       "EvaluatorLinkRequest": {
         "properties": {
@@ -1910,6 +1910,81 @@
         ],
         "title": "EvaluatorRunStartRequest"
       },
+      "EvaluatorVersionCompact": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Version ID",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "version_number": {
+            "type": "integer",
+            "title": "Version Number",
+            "description": "The version's number. The first version is 1, and it goes up by one for each new version of the evaluator"
+          },
+          "judge_model": {
+            "type": "string",
+            "title": "Judge Model",
+            "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
+          },
+          "system_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "System Prompt",
+            "description": "Judge system prompt, with `{{variable}}` placeholders unrendered"
+          },
+          "output_config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OutputConfig"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+          },
+          "variables": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VariableSpec"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Variables",
+            "description": "Declared prompt variables"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the version was created (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "version_number",
+          "judge_model",
+          "created_at"
+        ],
+        "title": "EvaluatorVersionCompact"
+      },
       "EvaluatorVersionCreate": {
         "properties": {
           "judge_model": {
@@ -2009,75 +2084,6 @@
         ],
         "title": "EvaluatorVersionCreateRequest",
         "description": "Request body for adding a version to an existing evaluator."
-      },
-      "EvaluatorVersionResponse": {
-        "properties": {
-          "uuid": {
-            "type": "string",
-            "maxLength": 36,
-            "minLength": 36,
-            "title": "Uuid",
-            "description": "Version ID",
-            "examples": [
-              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
-            ]
-          },
-          "version_number": {
-            "type": "integer",
-            "title": "Version Number",
-            "description": "The version's number. The first version is 1, and it goes up by one for each new version of the evaluator"
-          },
-          "judge_model": {
-            "type": "string",
-            "title": "Judge Model",
-            "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
-          },
-          "system_prompt": {
-            "type": "string",
-            "title": "System Prompt",
-            "description": "Judge system prompt, with `{{variable}}` placeholders unrendered"
-          },
-          "output_config": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OutputConfig"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
-          },
-          "variables": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/VariableSpec"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Variables",
-            "description": "Declared prompt variables"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At",
-            "description": "When the version was created (ISO 8601 UTC)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "uuid",
-          "version_number",
-          "judge_model",
-          "system_prompt",
-          "created_at"
-        ],
-        "title": "EvaluatorVersionResponse"
       },
       "ExpectedToolCall": {
         "properties": {
@@ -2950,8 +2956,15 @@
             "description": "One row per item, evaluator, and version on this page, with the evaluator's value and each annotator's label"
           },
           "item_comments": {
-            "additionalProperties": true,
-            "type": "object",
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "Annotator comments, keyed by item ID"
           },
           "pagination": {
@@ -2967,7 +2980,6 @@
           "evaluators",
           "annotators",
           "rows",
-          "item_comments",
           "pagination"
         ],
         "title": "TaskSummaryResponse"
@@ -5246,6 +5258,30 @@
               "title": "Task Id"
             },
             "description": "Test run to poll for status and results"
+          },
+          {
+            "name": "only_failed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return only failing test cases. Omit to return every case",
+              "default": false,
+              "title": "Only Failed"
+            },
+            "description": "Return only failing test cases. Omit to return every case"
+          },
+          {
+            "name": "compact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return a compact response that omits heavy detail fields (`results.output`, `results.test_case`, `results.judge_results`, `results.reasoning`, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail",
+              "default": false,
+              "title": "Compact"
+            },
+            "description": "Return a compact response that omits heavy detail fields (`results.output`, `results.test_case`, `results.judge_results`, `results.reasoning`, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail"
           }
         ],
         "responses": {
@@ -5362,6 +5398,30 @@
               "title": "Task Id"
             },
             "description": "Benchmark run to poll for status and results"
+          },
+          {
+            "name": "only_failed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return only failing test cases for each model. Omit to return every case",
+              "default": false,
+              "title": "Only Failed"
+            },
+            "description": "Return only failing test cases for each model. Omit to return every case"
+          },
+          {
+            "name": "compact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return a compact response that omits heavy detail fields (`model_results.test_results`, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail",
+              "default": false,
+              "title": "Compact"
+            },
+            "description": "Return a compact response that omits heavy detail fields (`model_results.test_results`, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail"
           }
         ],
         "responses": {
@@ -5609,6 +5669,18 @@
               "title": "Evaluator Uuid"
             },
             "description": "Evaluator to retrieve"
+          },
+          {
+            "name": "compact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return a compact response that omits heavy detail fields (`versions.system_prompt`, `versions.output_config`, `versions.variables`), keeping only the lightweight decision fields. Omit for full detail",
+              "default": false,
+              "title": "Compact"
+            },
+            "description": "Return a compact response that omits heavy detail fields (`versions.system_prompt`, `versions.output_config`, `versions.variables`), keeping only the lightweight decision fields. Omit for full detail"
           }
         ],
         "responses": {
@@ -5617,7 +5689,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluatorDetailResponse"
+                  "$ref": "#/components/schemas/EvaluatorDetailResponseCompact"
                 }
               }
             }
@@ -6346,6 +6418,18 @@
             "description": "When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded"
           },
           {
+            "name": "disagreement_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, keep only rows where the evaluator disagreed with at least one annotator",
+              "default": false,
+              "title": "Disagreement Only"
+            },
+            "description": "When true, keep only rows where the evaluator disagreed with at least one annotator"
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -6417,6 +6501,18 @@
               "title": "Offset"
             },
             "description": "Number of items to skip before returning results"
+          },
+          {
+            "name": "compact",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Return a compact response that omits heavy detail fields (`rows.payload`, `rows.evaluator_reasoning`, `rows.annotations.reasoning`, `evaluators.versions.system_prompt`, `evaluators.versions.output_config`, `evaluators.versions.variables`, `item_comments`), keeping only the lightweight decision fields. Omit for full detail",
+              "default": false,
+              "title": "Compact"
+            },
+            "description": "Return a compact response that omits heavy detail fields (`rows.payload`, `rows.evaluator_reasoning`, `rows.annotations.reasoning`, `evaluators.versions.system_prompt`, `evaluators.versions.output_config`, `evaluators.versions.variables`, `item_comments`), keeping only the lightweight decision fields. Omit for full detail"
           }
         ],
         "responses": {

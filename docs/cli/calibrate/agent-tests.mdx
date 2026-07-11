@@ -39,6 +39,8 @@ calibrate agent-tests get-benchmark [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
+| `-c, --compact` | model_results.test_results | Return a compact response that omits heavy detail fields (model_results.test_results, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail |
+| `--only-failed` | — | Return only failing test cases for each model. Omit to return every case |
 | `-t, --task-id` | string | **Required.** Benchmark run to poll for status and results |
 
 **Examples**
@@ -59,6 +61,8 @@ calibrate agent-tests get-run [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
+| `-c, --compact` | results.output | Return a compact response that omits heavy detail fields (results.output, `results.test_case`, `results.judge_results`, `results.reasoning`, `evaluators.output_config`), keeping only the lightweight decision fields. Omit for full detail |
+| `--only-failed` | — | Return only failing test cases. Omit to return every case |
 | `-t, --task-id` | string | **Required.** Test run to poll for status and results |
 
 **Examples**
