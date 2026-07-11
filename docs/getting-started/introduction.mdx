@@ -17,7 +17,10 @@ Testing AI agents manually is slow, inconsistent, and doesn't scale. Every agent
 
 - Reasoning about the user's intent against the context and purpose of the conversation
 - Calling the right tools with the right arguments in the right order
-- Generating the right next-turn response
+- Generating the right response
+- Handling multiple languages and code-switching
+
+It can be hard to even define what "the right response" means.
 
 If you're building a **voice agent**, there are further challenges on top:
 
@@ -26,7 +29,7 @@ If you're building a **voice agent**, there are further challenges on top:
 - Detecting when the user has finished speaking or has only paused
 - Handling interruptions while the agent is speaking
 - Keeping the turnaround time low
-- Handling multiple languages, accents, dialects and code-switching
+- Handling varying accents and dialects
 
 and a lot more.
 
@@ -72,8 +75,17 @@ Calibrate helps you continuously improve your agent, ensure a bug never repeats 
   <Card title="Core Concepts" icon="book" href="/core-concepts/speech-to-text">
     Understand how Calibrate helps you evaluate effectively
   </Card>
-  <Card title="CLI" icon="terminal" href="/cli/overview">
-    Run evaluations from the command line
+  <Card title="Agents" icon="robot" href="/agents/overview">
+    Give your AI coding agent the skills to evaluate on Calibrate
+  </Card>
+  <Card title="CLI" icon="terminal" href="/cli/calibrate/overview">
+    Drive the full evaluation loop from your terminal
+  </Card>
+  <Card title="Python SDK" icon="python" href="/sdk/overview">
+    Script agents, tests, runs, and benchmarks from Python
+  </Card>
+  <Card title="MCP" icon="server" href="/mcp/overview">
+    Give your coding agent native Calibrate tools over MCP
   </Card>
   <Card title="Integrations" icon="plug" href="/integrations/stt">
     See all supported providers for different components
