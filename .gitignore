@@ -140,4 +140,6 @@ data
 site/
 
 .specstory
-.claude
+.claude/*
+!.claude/skills
+!.claude/skills/**
