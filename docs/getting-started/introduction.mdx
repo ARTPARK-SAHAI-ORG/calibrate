@@ -13,7 +13,22 @@ description: "Learn about Calibrate and how to get started."
   allowFullScreen
 ></iframe>
 
-Testing AI agents manually is slow, inconsistent, and doesn't scale. An agent has to reason about the user's intent against the context and purpose of the conversation, call the right tools with the right arguments in the right order, and generate the right next-turn response — turn after turn. Voice agents add more moving parts on top: transcribing speech accurately, producing natural-sounding replies, detecting turn ends, handling interruptions, keeping latency low, and coping with multiple languages, accents, and code-switching.
+Testing AI agents manually is slow, inconsistent, and doesn't scale. Every agent has to get several things right, turn after turn:
+
+- Reasoning about the user's intent against the context and purpose of the conversation
+- Calling the right tools with the right arguments in the right order
+- Generating the right next-turn response
+
+If you're building a **voice agent**, there are further challenges on top:
+
+- Transcribing the user's speech accurately and efficiently
+- Producing natural-sounding speech back to the user
+- Detecting when the user has finished speaking or has only paused
+- Handling interruptions while the agent is speaking
+- Keeping the turnaround time low
+- Handling multiple languages, accents, dialects and code-switching
+
+and a lot more.
 
 There is no simple way to evaluate each of these across every provider on your own dataset. Even when individual pieces work well, it is hard to tell whether the agent as a whole will behave in production. This leads to many teams deploying with a lot of uncertainty and risk, and their users having to deal with poor experiences.
 
