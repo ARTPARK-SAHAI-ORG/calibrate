@@ -1,0 +1,27 @@
+---
+title: "Link evaluators to agent"
+description: "Link one or more existing evaluators to an agent, skipping any already linked"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.agents.link_evaluators(
+    agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    evaluator_ids=[
+        "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /agents/\{agent_uuid}/evaluators** in the [API reference](/api-reference/introduction) tab.

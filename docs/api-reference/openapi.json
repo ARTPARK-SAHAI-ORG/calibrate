@@ -1587,42 +1587,6 @@
         ],
         "title": "EvaluatorDetailResponseCompact"
       },
-      "EvaluatorLinkRequest": {
-        "properties": {
-          "evaluator_id": {
-            "type": "string",
-            "maxLength": 36,
-            "minLength": 36,
-            "title": "Evaluator Id",
-            "description": "The evaluator to link. Must be one you created or a built-in default",
-            "examples": [
-              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "evaluator_id"
-        ],
-        "title": "EvaluatorLinkRequest"
-      },
-      "EvaluatorLinkResponse": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "description": "Confirmation that the evaluator was linked",
-            "examples": [
-              "Evaluator linked to annotation task"
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "message"
-        ],
-        "title": "EvaluatorLinkResponse"
-      },
       "EvaluatorLiveVersionSummary": {
         "properties": {
           "uuid": {
@@ -1909,6 +1873,72 @@
           "evaluators"
         ],
         "title": "EvaluatorRunStartRequest"
+      },
+      "EvaluatorSetRequest": {
+        "properties": {
+          "evaluator_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluator Ids",
+            "description": "The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. Each must be one you created or a built-in default",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_ids"
+        ],
+        "title": "EvaluatorSetRequest"
+      },
+      "EvaluatorSetResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation that the task's evaluators were updated",
+            "examples": [
+              "Task evaluators updated"
+            ]
+          },
+          "evaluator_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluator Ids",
+            "description": "The task's evaluator IDs after the update, in display order"
+          },
+          "linked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Linked",
+            "description": "Evaluator IDs newly linked by this request"
+          },
+          "unlinked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Unlinked",
+            "description": "Evaluator IDs unlinked by this request"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "evaluator_ids",
+          "linked",
+          "unlinked"
+        ],
+        "title": "EvaluatorSetResponse"
       },
       "EvaluatorVersionCompact": {
         "properties": {
@@ -3988,6 +4018,65 @@
         ],
         "title": "AgentResponse"
       },
+      "routers__agents__EvaluatorLinkRequest": {
+        "properties": {
+          "evaluator_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 36,
+              "minLength": 36
+            },
+            "type": "array",
+            "title": "Evaluator Ids",
+            "description": "The evaluators to link to the agent. Ones that are already linked are skipped. Each must be one you created or a built-in default",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_ids"
+        ],
+        "title": "EvaluatorLinkRequest"
+      },
+      "routers__agents__EvaluatorLinkResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation that the evaluators were linked",
+            "examples": [
+              "Evaluators linked to agent"
+            ]
+          },
+          "linked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Linked",
+            "description": "Evaluator IDs newly linked by this request"
+          },
+          "already_linked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Already Linked",
+            "description": "Evaluator IDs skipped because they were already linked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "linked",
+          "already_linked"
+        ],
+        "title": "EvaluatorLinkResponse"
+      },
       "routers__evaluators__EvaluatorResponse": {
         "properties": {
           "uuid": {
@@ -4293,6 +4382,47 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/AgentCreate"
+              },
+              "examples": {
+                "agent_within_calibrate": {
+                  "summary": "Agent within Calibrate",
+                  "description": "Build a voice/chat agent inside Calibrate. This config is the managed defaults spelled out. Override only the keys you want to change; omitted keys still inherit the defaults.",
+                  "value": {
+                    "name": "Support Agent",
+                    "type": "agent",
+                    "config": {
+                      "system_prompt": "You are a helpful assistant.",
+                      "llm": {
+                        "model": "google/gemini-2.5-flash"
+                      },
+                      "stt": {
+                        "provider": "google"
+                      },
+                      "tts": {
+                        "provider": "google"
+                      },
+                      "settings": {
+                        "agent_speaks_first": false,
+                        "max_assistant_turns": 10
+                      }
+                    }
+                  }
+                },
+                "openai_compatible_connection": {
+                  "summary": "Connect OpenAI-compatible agent",
+                  "description": "Connect your own agent over an OpenAI-compatible HTTP endpoint. `config.agent_url` is required; `agent_headers` carries the auth token the endpoint expects.",
+                  "value": {
+                    "name": "My Hosted Agent",
+                    "type": "connection",
+                    "config": {
+                      "agent_url": "https://api.example.com/v1/chat/completions",
+                      "agent_headers": {
+                        "Authorization": "Bearer <token>"
+                      },
+                      "benchmark_provider": "openrouter"
+                    }
+                  }
+                }
               }
             }
           }
@@ -4506,6 +4636,171 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/routers__agents__AgentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/{agent_uuid}/evaluators": {
+      "get": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "List agent evaluators",
+        "description": "List evaluators linked to an agent",
+        "operationId": "list_agent_evaluators_agents__agent_uuid__evaluators_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The agent whose evaluators to list",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "The agent whose evaluators to list"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Case-insensitive substring search on `name`. Blank is a no-op",
+              "title": "Q"
+            },
+            "description": "Case-insensitive substring search on `name`. Blank is a no-op"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "maximum": 1000000,
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Maximum number of items to return. Omit for no limit (all items)",
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return. Omit for no limit (all items)"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginatedResponse_EvaluatorResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Link evaluators to agent",
+        "description": "Link one or more existing evaluators to an agent, skipping any already linked",
+        "operationId": "link_evaluators_to_agent_agents__agent_uuid__evaluators_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The agent to link the evaluators to",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "The agent to link the evaluators to"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/routers__agents__EvaluatorLinkRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/routers__agents__EvaluatorLinkResponse"
                 }
               }
             }
@@ -5959,13 +6254,13 @@
       }
     },
     "/annotation-tasks/{task_uuid}/evaluators": {
-      "post": {
+      "put": {
         "tags": [
           "annotation-tasks"
         ],
-        "summary": "Link evaluator to task",
-        "description": "Link an evaluator to a task, appending it to the display order",
-        "operationId": "link_evaluator_to_task_annotation_tasks__task_uuid__evaluators_post",
+        "summary": "Update task evaluators",
+        "description": "Replace a task's linked evaluators with the given ordered set, linking, unlinking, and reordering as needed",
+        "operationId": "set_task_evaluators_annotation_tasks__task_uuid__evaluators_put",
         "security": [
           {
             "ApiKeyAuth": []
@@ -5992,7 +6287,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/EvaluatorLinkRequest"
+                "$ref": "#/components/schemas/EvaluatorSetRequest"
               }
             }
           }
@@ -6003,7 +6298,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/EvaluatorLinkResponse"
+                  "$ref": "#/components/schemas/EvaluatorSetResponse"
                 }
               }
             }

@@ -95,6 +95,8 @@
               "POST /agents/resolve",
               "GET /agents/{agent_uuid}",
               "PUT /agents/{agent_uuid}",
+              "GET /agents/{agent_uuid}/evaluators",
+              "POST /agents/{agent_uuid}/evaluators",
               "POST /agents/{agent_uuid}/verify-connection"
             ]
           },
@@ -108,7 +110,7 @@
               "GET /annotation-tasks/{task_uuid}/agreement",
               "POST /annotation-tasks/{task_uuid}/evaluator-runs",
               "GET /annotation-tasks/{task_uuid}/evaluator-runs/{job_uuid}",
-              "POST /annotation-tasks/{task_uuid}/evaluators",
+              "PUT /annotation-tasks/{task_uuid}/evaluators",
               "POST /annotation-tasks/{task_uuid}/items",
               "PUT /annotation-tasks/{task_uuid}/items",
               "GET /annotation-tasks/{task_uuid}/summary"
@@ -189,6 +191,8 @@
               "sdk/agents/resolve",
               "sdk/agents/get",
               "sdk/agents/update",
+              "sdk/agents/list_evaluators",
+              "sdk/agents/link_evaluators",
               "sdk/agents/verify_connection"
             ]
           },
@@ -201,7 +205,7 @@
               "sdk/annotation-tasks/get_agreement",
               "sdk/annotation-tasks/create_evaluator_run",
               "sdk/annotation-tasks/get_evaluator_run",
-              "sdk/annotation-tasks/link_evaluator",
+              "sdk/annotation-tasks/set_evaluators",
               "sdk/annotation-tasks/add_items",
               "sdk/annotation-tasks/update_items",
               "sdk/annotation-tasks/get_summary"

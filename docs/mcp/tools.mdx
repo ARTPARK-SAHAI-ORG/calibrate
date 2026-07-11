@@ -151,6 +151,24 @@ See **POST /agent-tests** in the [API reference](/api-reference/introduction) ta
 
 ## Agents
 
+### list-agent-evaluators
+
+List the evaluators linked to an agent, most recently linked first.
+Returns each evaluator's UUID, name, type, and live version summary.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent whose evaluators to list |
+| `q` | string | No | Case-insensitive substring search on `name`. Blank is a no-op |
+| `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
+| `offset` | integer | No | Number of items to skip before returning results |
+
+See **GET /agents/&#123;agent_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ### list-agents
 
 List every agent in the caller's organization. Returns each agent's
@@ -238,6 +256,23 @@ Fails with 404 if the agent does not exist or belongs to another org.
 | `config` | object | No | Agent behavioral config. The keys depend on `type`. |
 
 See **PUT /agents/&#123;agent_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### link-evaluators-to-agent
+
+Link one or more evaluators to an agent, skipping any already linked.
+Each evaluator must be one you created or a built-in default, and the
+agent must be in your workspace.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent to link the evaluators to |
+| `evaluator_ids` | array of string | Yes | The evaluators to link to the agent. Ones that are already linked are skipped. Each must be one you created or a built-in default |
+
+See **POST /agents/&#123;agent_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ### verify-agent-connection
 
@@ -407,9 +442,13 @@ Bulk-create items in an annotation task, optionally seeding human annotations.
 
 See **POST /annotation-tasks/&#123;task_uuid&#125;/items** in the [API reference](/api-reference/introduction) tab for the full schema.
 
-### link-evaluator-to-task
+### set-task-evaluators
 
-Link an evaluator to an annotation task, appending it to the display order.
+Replace the task's linked evaluators with exactly the given ordered
+set: new ids are linked, omitted ids are unlinked, and the list order
+sets their display position. Send an empty list to unlink all. Each
+evaluator must be one you created or a built-in default, and the task
+must be in your workspace.
 
 **Scope:** `write` · **Access:** Write
 
@@ -418,9 +457,9 @@ Link an evaluator to an annotation task, appending it to the display order.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_uuid` | string | Yes | Annotation task to act on |
-| `evaluator_id` | string | Yes | The evaluator to link. Must be one you created or a built-in default |
+| `evaluator_ids` | array of string | Yes | The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. Each must be one you created or a built-in default |
 
-See **POST /annotation-tasks/&#123;task_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
+See **PUT /annotation-tasks/&#123;task_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ## Evaluators
 

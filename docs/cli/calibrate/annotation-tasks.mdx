@@ -166,27 +166,6 @@ calibrate annotation-tasks get-summary [flags]
 calibrate annotation-tasks get-summary --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
-## Link evaluator to task
-
-Link an evaluator to a task, appending it to the display order
-
-```bash
-calibrate annotation-tasks link-evaluator [flags]
-```
-
-**Options**
-
-| Option | Type | Description |
-| --- | --- | --- |
-| `-e, --evaluator-id` | string | **Required.** The evaluator to link. Must be one you created or a built-in default |
-| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
-
-**Examples**
-
-```bash
-calibrate annotation-tasks link-evaluator --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --evaluator-id f47ac10b-58cc-4372-a567-0e02b2c3d479
-```
-
 ## List annotation tasks
 
 List annotation tasks with linked evaluators
@@ -207,6 +186,27 @@ calibrate annotation-tasks list [flags]
 
 ```bash
 calibrate annotation-tasks list
+```
+
+## Update task evaluators
+
+Replace a task's linked evaluators with the given ordered set, linking, unlinking, and reordering as needed
+
+```bash
+calibrate annotation-tasks set-evaluators [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-e, --evaluator-ids` | stringArray | **Required.** The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. Each must be one you created or a built-in default |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks set-evaluators --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --evaluator-ids '["f47ac10b-58cc-4372-a567-0e02b2c3d479"]'
 ```
 
 ## Bulk update items

@@ -15,7 +15,15 @@ client = Calibrate(
 )
 
 client.agents.create(
-    name="name",
+    name="Support Agent",
+    type="agent",
+    config={
+        "system_prompt": "You are a helpful assistant.",
+        "llm": {"model": "google/gemini-2.5-flash"},
+        "stt": {"provider": "google"},
+        "tts": {"provider": "google"},
+        "settings": {"agent_speaks_first": True, "max_assistant_turns": 50}
+    },
 )
 ```
 

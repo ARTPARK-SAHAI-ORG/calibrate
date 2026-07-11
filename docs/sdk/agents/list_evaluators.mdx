@@ -1,0 +1,24 @@
+---
+title: "List agent evaluators"
+description: "List evaluators linked to an agent"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.agents.list_evaluators(
+    agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+)
+```
+
+## API endpoint
+
+See **GET /agents/\{agent_uuid}/evaluators** in the [API reference](/api-reference/introduction) tab.

@@ -22,7 +22,7 @@ calibrate agents create [flags]
 **Examples**
 
 ```bash
-calibrate agents create --name <value>
+calibrate agents create --name Support Agent
 ```
 
 ## Get agent
@@ -45,6 +45,27 @@ calibrate agents get [flags]
 calibrate agents get --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
+## Link evaluators to agent
+
+Link one or more existing evaluators to an agent, skipping any already linked
+
+```bash
+calibrate agents link-evaluators [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** The agent to link the evaluators to |
+| `-e, --evaluator-ids` | stringArray | **Required.** The evaluators to link to the agent. Ones that are already linked are skipped. Each must be one you created or a built-in default |
+
+**Examples**
+
+```bash
+calibrate agents link-evaluators --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --evaluator-ids '["f47ac10b-58cc-4372-a567-0e02b2c3d479"]'
+```
+
 ## List agents
 
 Get the list of all your agents
@@ -65,6 +86,29 @@ calibrate agents list [flags]
 
 ```bash
 calibrate agents list
+```
+
+## List agent evaluators
+
+List evaluators linked to an agent
+
+```bash
+calibrate agents list-evaluators [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** The agent whose evaluators to list |
+| `-l, --limit` | string | Maximum number of items to return. Omit for no limit (all items) |
+| `--offset` | int | Number of items to skip before returning results |
+| `--q` | name | Case-insensitive substring search on name. Blank is a no-op |
+
+**Examples**
+
+```bash
+calibrate agents list-evaluators --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
 ```
 
 ## Resolve agent names to IDs
