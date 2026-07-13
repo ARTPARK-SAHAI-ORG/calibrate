@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from request_examples import (  # noqa: E402
     learn_more_markdown,
     named_request_examples,
     render_cli_snippet,
+    render_mcp_snippet,
     render_python_snippet,
 )
 
@@ -82,6 +84,18 @@ def test_render_python_snippet_kwargs_and_literals() -> None:
 def test_render_python_snippet_non_object_is_positional() -> None:
     assert render_python_snippet("a", "b", "hi") == 'client.a.b("hi")'
     assert render_python_snippet("a", "b", {}) == "client.a.b()"
+
+
+def test_render_mcp_snippet_wraps_body_as_tools_call_arguments() -> None:
+    value = {"name": "Support Agent", "config": {"agent_url": "https://x.example.com/v1"}}
+    snippet = render_mcp_snippet("create-agent", value)
+    assert json.loads(snippet) == {"name": "create-agent", "arguments": value}
+    # indented (pretty) JSON, not a compact one-liner
+    assert "\n" in snippet
+
+
+def test_render_mcp_snippet_non_object_yields_empty_arguments() -> None:
+    assert json.loads(render_mcp_snippet("t", "hi")) == {"name": "t", "arguments": {}}
 
 
 def test_render_cli_snippet_maps_fields_to_flags() -> None:
