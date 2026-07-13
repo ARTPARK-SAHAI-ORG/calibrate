@@ -12,17 +12,16 @@ If you already have a deployed agent, you can connect it to Calibrate and run ev
 
 ## How the connection works
 
-Calibrate does not need to understand your whole agent. It only needs a single
-HTTP endpoint that speaks a simple **text-in / text-out** contract:
+Calibrate does not need to understand your whole agent. It needs a single HTTP
+endpoint that follows one contract:
 
-- **In** — a `messages` array (the conversation so far).
-- **Out** — a JSON object with a `response` text field (and optionally
-  `tool_calls`).
+- **Request** — Calibrate `POST`s the conversation so far as a `messages` array.
+- **Response** — your endpoint returns a JSON object with the agent's reply: a
+  `response` string, and optionally `tool_calls`.
 
-That's the entire contract. Your agent does **not** have to be
-OpenAI-compatible, and you do **not** have to expose your production pipeline —
-all the custom preprocessing, routing, retrieval, and output formatting your
-agent does can stay exactly as it is.
+Your agent does **not** have to be OpenAI-compatible, and you do **not** have to
+expose your production pipeline — all the custom preprocessing, routing,
+retrieval, and output formatting your agent does can stay exactly as it is.
 
 The insight is that however custom your agent's API looks on the outside, it
 almost always ends in an LLM call over a `messages` list. That LLM call is what
@@ -55,6 +54,67 @@ flowchart LR
 Both paths call the **same** `llm_inference(messages)` function, so the endpoint
 Calibrate tests is exactly the model logic your agent ships — nothing is
 re-implemented or mocked.
+
+### Request format
+
+Calibrate `POST`s to your endpoint with the full conversation history in
+chronological order:
+
+```json
+{
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "Namaste! Main aapki kaise madad kar sakti hoon?"
+    },
+    { "role": "user", "content": "Meri beti ka vaccination schedule kya hai?" }
+  ]
+}
+```
+
+### Response format
+
+By default, your endpoint returns a `response` field containing the agent's text
+reply:
+
+```json
+{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
+}
+```
+
+If your agent also returns tool calls, expand the body to include a `tool_calls`
+array — each item has a `tool` name and an `arguments` object:
+
+```json
+{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
+  "tool_calls": [
+    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
+  ]
+}
+```
+
+Each tool call may also include an optional `output` field — the result the tool
+returned when your agent ran it. It can be any JSON value, is shown in the
+results view for review only, and never affects whether a test passes or fails:
+
+```json
+{
+  "tool_calls": [
+    {
+      "tool": "get_schedule",
+      "arguments": { "child_age_weeks": 14 },
+      "output": { "next_visit_weeks": 14, "vaccines": ["OPV", "DPT"] }
+    }
+  ]
+}
+```
+
+<Warning>
+  Your endpoint's output **must** include either a `response` field or a
+  `tool_calls` field.
+</Warning>
 
 ### Wrap your existing LLM call
 
@@ -114,9 +174,8 @@ def calibrate_test(body):
     return {"response": llm_inference(body["messages"])}
 ```
 
-You then point Calibrate at `POST /calibrate/test`. The sections below cover the
-exact request and response formats, how to add authentication, and how to verify
-the connection.
+You then point Calibrate at `POST /calibrate/test`, add any authentication
+headers your agent requires, and verify the connection — both covered below.
 
 ## Create an agent connection
 
@@ -145,70 +204,8 @@ Fill in the following:
 
 2. **Headers** (optional) — Add any headers your agent needs for authentication or custom metadata (e.g. `Authorization: Bearer YOUR_API_KEY`). Click **+ Add header** to add multiple headers.
 
-## Expected request format
-
-Calibrate will `POST` to your agent URL with this body:
-
-```json
-{
-  "messages": [
-    {
-      "role": "assistant",
-      "content": "Namaste! Main aapki kaise madad kar sakti hoon?"
-    },
-    { "role": "user", "content": "Meri beti ka vaccination schedule kya hai?" }
-  ]
-}
-```
-
-The `messages` array contains the full conversation history in chronological order.
-
-## Expected response format
-
-By default, your agent must respond with a `response` field containing its text reply:
-
-```json
-{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
-}
-```
-
-If your agent also returns tool calls, the expected output format expands to include `tool_calls`:
-
-```json
-{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
-  "tool_calls": [
-    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
-  ]
-}
-```
-
-- `response` — The agent's text reply
-- `tool_calls` — An array of tool invocations, each with a `tool` name and `arguments` object
-
-Each tool call may also include an optional `output` field — the result the
-tool returned when your agent ran it. It can be any JSON value:
-
-```json
-{
-  "tool_calls": [
-    {
-      "tool": "get_schedule",
-      "arguments": { "child_age_weeks": 14 },
-      "output": { "next_visit_weeks": 14, "vaccines": ["OPV", "DPT"] }
-    }
-  ]
-}
-```
-
-`output` is optional and shown in the results view for review only — it never
-affects whether a test passes or fails.
-
-<Warning>
-  Your agent's output **must** include either a `response` field or a
-  `tool_calls` field
-</Warning>
+The request and response formats your endpoint must follow are described in
+[How the connection works](#how-the-connection-works) above.
 
 ## Verify your connection
 
