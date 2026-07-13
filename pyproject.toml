@@ -42,8 +42,10 @@ dependencies = [
     "pipecat-ai[cartesia,deepgram,google,groq,local-smart-turn-v3,openrouter,smallest,tracing,webrtc,websocket]==1.0.0",
     "python-dotenv>=1.2.1",
     "sarvamai>=0.1.21",
+    "scipy>=1.11",
     "simpleaudio>=1.0.4",
     "sounddevice>=0.5.3",
+    "soundfile>=0.12.1",
     "uvicorn>=0.38.0",
     "whisper-normalizer>=0.1.12",
 ]
@@ -72,6 +74,8 @@ exclude = ["ui*", "examples*", "docs*", "images*"]
 "calibrate_agent" = [
     "ui/cli.bundle.mjs",
     "stt/sarvam_intent_entity/prompt_template.txt",
+    "agent/assets/noise/**/*.wav",
+    "agent/assets/noise/**/*.ogg",
 ]
 
 [tool.setuptools_scm]

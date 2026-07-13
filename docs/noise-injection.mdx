@@ -1,0 +1,266 @@
+---
+title: "Background Noise"
+description: "Simulate a caller in a noisy place to stress-test your agent's speech recognition"
+---
+
+Background noise makes the **simulated caller** in a [voice
+simulation](/quickstart/simulations) sound like a real person calling from a
+real, noisy place — a busy street, a cafe, a home with a crying baby. Noise is
+mixed continuously into the simulated user's outgoing audio for the whole call,
+so your agent's speech-to-text hears `caller speech + background`, exactly as it
+would in production.
+
+This is an **evaluation-realism** feature: it measures how well your agent's STT
+and turn-taking hold up under realistic background conditions. It only affects
+the voice-agent simulation path — not standalone STT evaluation.
+
+<Note>
+  Noise is **off by default**. Existing simulation runs are unchanged unless you
+  add a `noise` block to your config.
+</Note>
+
+## How it works
+
+For each simulation, Calibrate assembles one looping background track (a "bed")
+and mixes it under the simulated caller's voice. The bed is **constant for the
+whole call** — a caller is in one place — while variety happens *across* the
+batch of simulations.
+
+When noise is on, each run saves **both** the noisy audio the agent actually
+heard (the default `conversation.wav`) and a clean reference (`clean_`-prefixed
+files), so you can compare the two.
+
+## Why noisy speech is a good stress test
+
+Steady sounds like rain or an engine sit in a different frequency band than
+speech, so recognizers can often still "hear" the words underneath. Background
+**people talking** is the hard case — it is speech masking speech, in the same
+frequency band, so the recognizer can mistake background words for the caller's
+words. For Indian voice agents this matters specifically: an STT tuned for Indian
+languages exposed to background Hindi can hallucinate Hindi words — the exact
+production failure this feature helps you catch. Background speaker voices are
+therefore drawn from Indian-language speech and **matched to the simulation's
+language** automatically.
+
+## The `noise` block
+
+Noise is a **per-persona** setting — a caller's environment belongs to that
+caller. Add a `noise` block **inside a persona** in the `personas` array (the
+same config JSON you pass with `-c`). Different personas can have different
+noise; omit the block for a clean caller.
+
+```json
+{
+  "personas": [
+    {
+      "label": "customer calling from a market",
+      "characteristics": "...",
+      "language": "hindi",
+      "noise": {
+        "mode": "random",
+        "clean_fraction": 0.15,
+        "seed": 123
+      }
+    }
+  ]
+}
+```
+
+<Note>
+  A top-level `noise` block is also accepted as a default applied to all
+  personas, but the recommended, per-caller place is inside each persona.
+</Note>
+
+A single condition (an "atom") is described by three knobs plus an optional
+seed (this is the shape of the `noise` block you place inside a persona):
+
+```json
+{
+  "environment": "busy_street",
+  "people": "light",
+  "loudness": "moderate",
+  "seed": 42
+}
+```
+
+| Field         | Meaning                                                                 |
+| ------------- | ----------------------------------------------------------------------- |
+| `environment` | The non-speech ambience: a single sound, a named scene, an explicit list of ingredients, or `"none"`. |
+| `people`      | How many background people are talking: `"none"`, `"single"`, `"light"`, `"medium"`, or `"heavy"`. |
+| `loudness`    | How loud the background is versus the caller: `"faint"`, `"moderate"`, `"loud"`, `"harsh"`, a list to sample from, or `"any"`. |
+| `seed`        | Optional integer for reproducibility (see [Reproducibility](#reproducibility)). |
+
+`environment` and `people` are selected **independently** and merged into one
+bed. Set both for a mixed scene, one for environment-only or people-only, or
+neither for a clean call. You never set a language here — background people are
+matched to the simulation's language automatically.
+
+## Environment options
+
+`environment` accepts a single sound, a named scene, an explicit list of
+ingredients to merge (e.g. `["rain", "car_horn", "engine"]`), or `"none"`.
+Scenes are generated live from a recipe — every `busy_street` call is a
+different busy street.
+
+### Single sounds (12)
+
+| | | | |
+| ---------------- | --------------- | ---------------- | ---------------- |
+| `rain`           | `wind`          | `engine`         | `vacuum`         |
+| `train`          | `siren`         | `crying_baby`    | `footsteps`      |
+| `keyboard_typing`| `laughing`      | `dog`            | `car_horn`       |
+
+### Scenes (8)
+
+Each scene is a recipe of ingredients (and carries a default people density
+where it makes sense):
+
+| Scene             | Ingredients                     |
+| ----------------- | ------------------------------- |
+| `busy_street`     | car horn + engine + siren       |
+| `vehicle`         | engine + wind + horn            |
+| `railway_station` | train + footsteps               |
+| `office`          | keyboard typing                 |
+| `home_with_baby`  | crying baby                     |
+| `housework`       | vacuum                          |
+| `rainy_street`    | rain + wind + horn              |
+| `quiet_home`      | dog                             |
+
+## People densities
+
+`people` controls how many background voices overlap. Each crowd is assembled
+fresh per simulation from the simulation-language speaker pool, then processed to
+sound like distant room chatter — muffled and reverberant, not crisp
+foreground speech — so it reads as real background speakers.
+
+| Level    | Voices | Feels like                                        |
+| -------- | ------ | ------------------------------------------------- |
+| `single` | 1      | one person nearby on another call / a family member |
+| `light`  | 2–3    | a couple of people, a quiet office                |
+| `medium` | 4–6    | a normal cafe                                     |
+| `heavy`  | 8–12   | a packed cafe, market, or crowded station         |
+
+<Note>
+  `single` is its own hard case, not just "less crowd" — one clearly audible
+  voice gives the recognizer real words to grab onto.
+</Note>
+
+## Loudness
+
+`loudness` sets how loud the background is relative to the caller. Louder is
+harder. Higher loudness levels leave less of the caller's voice standing clear of
+the noise.
+
+| Level      | Background                                    |
+| ---------- | --------------------------------------------- |
+| `faint`    | just noticeable, easiest for the agent        |
+| `moderate` | clearly present                               |
+| `loud`     | competing with the caller                     |
+| `harsh`    | dominating, hardest for the agent             |
+
+You can also pass a **list** to sample from (`["faint", "loud"]` picks faint or
+loud, never moderate) or `"any"` for all four levels. In `fixed` mode the default
+is `moderate`; in the variety modes (`random`, `mixture`) the default is `any`.
+
+## Modes
+
+Because `noise` lives on a **persona**, `noise.mode` is applied **per persona** —
+it decides how conditions are assigned across *that persona's own runs* (a persona
+gets one run per scenario). Each persona has its own independent distribution; the
+draw is seeded per `(persona, scenario)` so it's reproducible.
+
+<Note>
+  `random` and `mixture` only show variety when a persona runs across **several
+  scenarios** — a persona with a single scenario just gets one seeded draw. For one
+  labelled condition per caller, use many personas on `fixed` (see
+  `examples/agent/simulation/sample_voice_noise_matrix.json`); to spray one caller
+  with varied noise, use one persona on `random`/`mixture` with several scenarios.
+</Note>
+
+<Tabs>
+  <Tab title="off">
+    Clean everywhere. Equivalent to omitting the `noise` block. Existing runs
+    are unchanged.
+
+    ```json
+    {
+      "noise": {
+        "mode": "off"
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="fixed">
+    One condition applied to every one of this persona's runs — a controlled A/B
+    against a clean baseline.
+
+    ```json
+    {
+      "noise": {
+        "mode": "fixed",
+        "environment": "busy_street",
+        "people": "light",
+        "loudness": "moderate",
+        "seed": 42
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="random">
+    Each of this persona's runs independently samples an environment, people
+    density, and loudness. `clean_fraction` makes some of those runs clean
+    controls. (Varies across the persona's scenarios — one scenario yields one draw.)
+
+    ```json
+    {
+      "noise": {
+        "mode": "random",
+        "clean_fraction": 0.15,
+        "seed": 123
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="mixture">
+    Each of this persona's runs weighted-picks one condition from the list. Each
+    entry has a `weight` and a `spec` (an atom, or `"off"` for a clean slice).
+
+    ```json
+    {
+      "noise": {
+        "mode": "mixture",
+        "conditions": [
+          { "weight": 0.2, "spec": "off" },
+          { "weight": 0.3, "spec": { "environment": "busy_street", "people": "light" } },
+          { "weight": 0.3, "spec": { "people": "medium" } },
+          { "weight": 0.2, "spec": { "environment": "rain" } }
+        ]
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  A `sweep` mode is **not** supported. The batch size is fixed at `personas ×
+  scenarios`, so there is no run-count knob to sweep over — use `random` for
+  variety within the fixed run count.
+</Note>
+
+## Reproducibility
+
+A single `seed` makes the whole batch deterministic: both the per-run condition
+draw and the live crowd assembly are seeded from it, so run *i* always gets the
+same condition and the same background audio. Re-running with the same seed
+reproduces identical audio, which is useful for debugging a specific failure.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Run Simulations" icon="comments" href="/quickstart/simulations">
+    Test your agent with combinations of personas and scenarios
+  </Card>
+  <Card title="Personas" icon="user" href="/core-concepts/personas">
+    Define who the simulated caller is and how they behave
+  </Card>
+</CardGroup>

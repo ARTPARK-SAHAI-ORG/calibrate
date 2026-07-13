@@ -1,0 +1,179 @@
+{
+  "agent_url": "ws://localhost:7860/ws-client/swasth-kadam-v5",
+  "personas": [
+    {
+      "label": "L1 · env-only · faint",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. A little soft rain outside.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "rain",
+        "people": "none",
+        "loudness": "faint"
+      }
+    },
+    {
+      "label": "L2 · env-only · faint",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. A soft breeze/wind outside.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "wind",
+        "people": "none",
+        "loudness": "faint"
+      }
+    },
+    {
+      "label": "L3 · people-only · faint · single",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. One person talking quietly nearby.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": null,
+        "people": "single",
+        "loudness": "faint"
+      }
+    },
+    {
+      "label": "L4 · env-only · moderate",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. Standing near a moderately busy street.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "busy_street",
+        "people": "none",
+        "loudness": "moderate"
+      }
+    },
+    {
+      "label": "L5 · people-only · moderate · light",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. A couple of people chatting nearby.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": null,
+        "people": "light",
+        "loudness": "moderate"
+      }
+    },
+    {
+      "label": "L6 · mixed · moderate · light",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. A busy street with a few people around.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "busy_street",
+        "people": "light",
+        "loudness": "moderate"
+      }
+    },
+    {
+      "label": "L7 · env-only · loud",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. On a moving bus, engine loud.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "vehicle",
+        "people": "none",
+        "loudness": "loud"
+      }
+    },
+    {
+      "label": "L8 · people-only · loud · medium",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. In a cafe with several people talking.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": null,
+        "people": "medium",
+        "loudness": "loud"
+      }
+    },
+    {
+      "label": "L9 · mixed · loud · medium",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. At a crowded, loud railway station.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "railway_station",
+        "people": "medium",
+        "loudness": "loud"
+      }
+    },
+    {
+      "label": "L10 · people-only · harsh · heavy",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. In a packed, very noisy crowd.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": null,
+        "people": "heavy",
+        "loudness": "harsh"
+      }
+    },
+    {
+      "label": "L11 · mixed · harsh · heavy",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. On a rainy street in a heavy crowd.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none",
+      "noise": {
+        "mode": "fixed",
+        "environment": "rainy_street",
+        "people": "heavy",
+        "loudness": "harsh"
+      }
+    },
+    {
+      "label": "baseline · clean (no noise)",
+      "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. You are at home in a quiet room.",
+      "gender": "female",
+      "language": "hindi",
+      "interruption_sensitivity": "none"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "straightforward enrollment",
+      "description": "Complete the Swasth Kadham signup for your child. Answer clearly right away. Facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; not pregnant; child Aarav Mehta, born 22 July 2023; this number is linked to your Anganwadi; WhatsApp on this number; last 4 Aadhaar digits 4827."
+    }
+  ],
+  "evaluators": [
+    {
+      "id": "form-complete-id",
+      "name": "form_completed",
+      "system_prompt": "Mark True if the agent collected the key enrollment fields (name, district, pregnancy status, child name+DOB, phone/WhatsApp linkage, last 4 Aadhaar digits) and gave a closing acknowledgment.",
+      "judge_model": "openai/gpt-4.1"
+    },
+    {
+      "id": "patient-guidance-id",
+      "name": "patient_guidance",
+      "system_prompt": "Mark True if the agent was polite, asked questions one at a time, and patiently drew out information under noise.",
+      "judge_model": "openai/gpt-4.1"
+    }
+  ],
+  "settings": {
+    "agent_speaks_first": true,
+    "max_turns": 3
+  }
+}
