@@ -47,6 +47,7 @@ from docs_mdx import table_cell as _table_cell  # noqa: E402
 from docs_nav import insert_tab  # noqa: E402
 from request_examples import (  # noqa: E402
     NamedExample,
+    learn_more_markdown,
     named_request_examples,
     render_cli_snippet,
 )
@@ -193,6 +194,9 @@ def _spec_examples_block(cmd: CliCommand, examples: list[NamedExample]) -> list[
             "```",
             "",
         ]
+    note = learn_more_markdown(_command_key(cmd.command))
+    if note:
+        lines += [note, ""]
     return lines
 
 

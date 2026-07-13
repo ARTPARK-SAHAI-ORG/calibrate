@@ -157,6 +157,33 @@ def _flag_for(field: str, options: list[Any]) -> str:
     return exact
 
 
+# Optional "learn more" pointer rendered under an operation's Examples section,
+# keyed by the normalized ``<group> <method>`` command (see ``command_key``).
+# Kept per-operation so a link only shows where it's relevant — the Examples
+# section itself is generic across any multi-example endpoint.
+LEARN_MORE_LINKS: dict[str, tuple[str, str]] = {
+    "agents create": ("Agent connections", "/core-concepts/agent-connections"),
+}
+
+
+def command_key(group: str, method: str) -> str:
+    """Normalize an SDK/CLI ``group``/``method`` pair to a lookup key.
+
+    Hyphens and underscores are unified and the result lowercased so the Fern
+    (``agent_tests``) and Cobra (``agent-tests``) naming conventions collide.
+    """
+    return f"{group} {method}".replace("_", "-").lower()
+
+
+def learn_more_markdown(key: str) -> str | None:
+    """Return a one-line Markdown "learn more" pointer for ``key``, or None."""
+    link = LEARN_MORE_LINKS.get(key)
+    if not link:
+        return None
+    label, url = link
+    return f"For more details, see [{label}]({url})."
+
+
 def render_cli_snippet(command: str, options: list[Any], value: Any) -> str:
     """Render one example body as a ``calibrate …`` invocation.
 

@@ -10,6 +10,8 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from cli_reference import Option  # noqa: E402
 from request_examples import (  # noqa: E402
+    command_key,
+    learn_more_markdown,
     named_request_examples,
     render_cli_snippet,
     render_python_snippet,
@@ -105,3 +107,17 @@ def test_render_cli_snippet_falls_back_to_field_flag() -> None:
     # No matching option → `--<field>` fallback rather than dropping the field.
     snippet = render_cli_snippet("calibrate x y", [], {"foo": "bar"})
     assert snippet == 'calibrate x y \\\n  --foo "bar"'
+
+
+def test_command_key_normalizes() -> None:
+    assert command_key("agents", "create") == "agents create"
+    assert command_key("agent_tests", "run") == "agent-tests run"
+
+
+def test_learn_more_markdown() -> None:
+    note = learn_more_markdown("agents create")
+    assert note == (
+        "For more details, see [Agent connections](/core-concepts/agent-connections)."
+    )
+    # No pointer for operations without a configured link.
+    assert learn_more_markdown("tests create") is None

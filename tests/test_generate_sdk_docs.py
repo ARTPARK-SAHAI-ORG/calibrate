@@ -74,3 +74,14 @@ def test_examples_for_route_reads_op() -> None:
     # Unknown route → no examples, no crash.
     missing = SdkRoute("GET", "/nope", "x", "y", "X", "T")
     assert _examples_for_route(missing, spec) == []
+
+
+def test_examples_section_includes_learn_more_link() -> None:
+    from request_examples import NamedExample
+
+    examples = [
+        NamedExample(key="build", summary="Build", description="", value={"name": "a"}),
+        NamedExample(key="connect", summary="Connect", description="", value={"name": "b"}),
+    ]
+    page = render_method_page(_ROUTE, _DOC, examples)
+    assert "[Agent connections](/core-concepts/agent-connections)" in page

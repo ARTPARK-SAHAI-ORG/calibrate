@@ -10,6 +10,8 @@ from typing import Any
 from docs_nav import insert_tab
 from request_examples import (
     NamedExample,
+    command_key,
+    learn_more_markdown,
     named_request_examples,
     render_python_snippet,
 )
@@ -70,6 +72,9 @@ def _render_examples_section(
             route.sdk_group, route.sdk_method, example.value
         )
         parts.append(f"```python\n{snippet}\n```\n\n")
+    note = learn_more_markdown(command_key(route.sdk_group, route.sdk_method))
+    if note:
+        parts.append(f"{note}\n\n")
     return parts
 
 

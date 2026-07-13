@@ -535,3 +535,18 @@ def test_subcommand_section_without_spec_examples_uses_cobra() -> None:
     )
     section = "\n".join(_subcommand_section(cmd, {}))
     assert "calibrate agents create --name X" in section
+
+
+def test_subcommand_section_includes_learn_more_link() -> None:
+    from cli_reference import CliCommand
+    from generate_cli_docs import _subcommand_section
+    from request_examples import named_request_examples
+
+    cmd = CliCommand(
+        command="calibrate agents create",
+        short="Create agent",
+        options="  --name string\n  -c, --config-param type",
+    )
+    examples = named_request_examples(_spec_two_examples()["paths"]["/agents"]["post"])
+    section = "\n".join(_subcommand_section(cmd, {"agents create": examples}))
+    assert "[Agent connections](/core-concepts/agent-connections)" in section
