@@ -82,7 +82,7 @@ results view for review only, and never affects whether a test passes or fails:
   `tool_calls` field.
 </Warning>
 
-### Add a Calibrate endpoint to your agent
+### Add a Calibrate endpoint
 
 Pull the model call out of your agent handler into a reusable function, then add
 a route that calls it directly. Your existing agent logic stays untouched:
@@ -102,8 +102,7 @@ def calibrate_test(body):
     return {"response": llm_inference(body["messages"])}
 ```
 
-Point Calibrate at `POST /calibrate/test`, add any auth headers your agent needs,
-and verify the connection — covered below.
+Point Calibrate at the new endpoint `POST /calibrate/test`, add any auth headers your agent needs, and verify the connection as shown below.
 
 ## Create an agent connection
 
