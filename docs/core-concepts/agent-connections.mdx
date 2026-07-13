@@ -38,6 +38,8 @@ format:
 }
 ```
 
+The request may also carry an optional `model` field. Calibrate adds it only when you [benchmark across models](#enable-benchmarking-across-models), so your endpoint knows which model to run for that request. Handle it only if your agent is set up to switch models from that input; otherwise ignore it.
+
 ### Response format
 
 By default, your endpoint returns a `response` field containing the agent's text
@@ -169,6 +171,8 @@ Fill in the following:
 
 2. **Headers** (optional) — Add any headers your agent needs for authentication or custom metadata (e.g. `Authorization: Bearer YOUR_API_KEY`). Click **+ Add header** to add multiple headers.
 
+3. **Support benchmarking different models** (optional) — Turn this on if your agent can switch LLMs from the request `model` field, then pick your **Model provider**. The provider sets the format Calibrate sends in `model`: for OpenRouter it's provider-prefixed (e.g. `openai/gpt-4.1`), for OpenAI it's bare (e.g. `gpt-4.1`). In the API/SDK this is the `benchmark_provider` field on the agent config. See [Enable benchmarking across models](#enable-benchmarking-across-models) for the full flow.
+
 The request and response formats your endpoint must follow are described in
 [How the connection works](#how-the-connection-works) above.
 
@@ -229,7 +233,7 @@ When enabled:
 }
 ```
 
-Depending on the provider you have selected, the format of the `model` field will be different. For example, if you have selected `OpenRouter`, the `model` field will be `openrouter/gpt-4.1`. If you have selected OpenAI, the `model` field will just be `gpt-4.1`.
+Depending on the provider you have selected, the format of the `model` field will be different. For example, if you have selected `OpenRouter`, the `model` field is provider-prefixed (e.g. `openai/gpt-4.1`). If you have selected OpenAI, the `model` field will just be `gpt-4.1`.
 
 3. When running a benchmark via **Compare models**, Calibrate will verify the connection for each selected model before starting the evaluation. See [this](/quickstart/text-to-text#verifying-agent-connection) for details.
 
