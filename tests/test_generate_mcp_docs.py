@@ -166,9 +166,17 @@ def test_examples_block_renders_labelled_tools_call_payloads() -> None:
     assert "For more details" not in text
 
 
-def test_examples_block_omitted_for_single_variant() -> None:
+def test_examples_block_renders_single_variant() -> None:
+    # No Usage block on the MCP page, so even one example gets a payload.
     op = _op_with_examples("widgets", [NamedExample("only", "Only", "", {"name": "s"})])
-    assert _examples_block(_tool("create-widget"), op) == []
+    text = "\n".join(_examples_block(_tool("create-widget"), op))
+    assert "**Examples**" in text
+    assert '"name": "create-widget"' in text
+    assert text.count("```json") == 1
+
+
+def test_examples_block_omitted_when_no_examples() -> None:
+    assert _examples_block(_tool("create-widget"), _op_with_examples("widgets", [])) == []
 
 
 def test_examples_block_adds_agent_connection_learn_more() -> None:

@@ -283,12 +283,13 @@ def _params_table(args: list[Arg]) -> str:
 def _examples_block(tool: McpTool, op: Operation) -> list[str]:
     """Render an **Examples** block, one labelled ``tools/call`` payload per variant.
 
-    Only emitted when the operation has ≥2 named request examples — a single
-    example matches the Parameters table above and adds nothing. Keeps every
-    distinct request shape (e.g. build-in-Calibrate vs. connect-external agent)
-    visible on the Tools page, from the OpenAPI spec as the single source.
+    Emitted for any operation with ≥1 named request example. Unlike the SDK/CLI
+    pages (which skip a single example because it duplicates their Usage block),
+    the MCP Tools page has no Usage block, so even one example adds a concrete
+    ``tools/call`` payload. Keeps every distinct request shape (e.g.
+    build-in-Calibrate vs. connect-external agent) visible from the OpenAPI spec.
     """
-    if len(op.examples) < 2:
+    if not op.examples:
         return []
     lines = ["**Examples**", ""]
     for ex in op.examples:
