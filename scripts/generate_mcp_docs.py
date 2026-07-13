@@ -29,7 +29,7 @@ import json
 import re
 import sys
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -38,6 +38,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from docs_mdx import escape_mdx_prose, frontmatter_value, table_cell  # noqa: E402
 from docs_nav import insert_tab  # noqa: E402
 from mcp_reference import McpTool, operation_key, parse_tools_dir  # noqa: E402
+from request_examples import (  # noqa: E402
+    NamedExample,
+    command_key,
+    learn_more_markdown,
+    named_request_examples,
+    render_mcp_snippet,
+)
 from sdk_reference import api_group_from_tag  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -100,6 +107,7 @@ class Operation:
     summary: str
     tag: str
     args: list["Arg"]
+    examples: list[NamedExample] = field(default_factory=list)
 
     @property
     def api_page(self) -> str:
@@ -220,6 +228,7 @@ def build_operation_map(openapi: dict[str, Any]) -> dict[str, Operation]:
                 summary=(op.get("summary") or "").strip(),
                 tag=tags[0] if tags else "",
                 args=args,
+                examples=named_request_examples(op),
             )
     return ops
 
@@ -271,6 +280,29 @@ def _params_table(args: list[Arg]) -> str:
     return "\n".join(lines)
 
 
+def _examples_block(tool: McpTool, op: Operation) -> list[str]:
+    """Render an **Examples** block, one labelled ``tools/call`` payload per variant.
+
+    Only emitted when the operation has ≥2 named request examples — a single
+    example matches the Parameters table above and adds nothing. Keeps every
+    distinct request shape (e.g. build-in-Calibrate vs. connect-external agent)
+    visible on the Tools page, from the OpenAPI spec as the single source.
+    """
+    if len(op.examples) < 2:
+        return []
+    lines = ["**Examples**", ""]
+    for ex in op.examples:
+        lines += [f"**{escape_mdx_prose(ex.summary)}**", ""]
+        if ex.description:
+            lines += [escape_mdx_prose(ex.description), ""]
+        lines += ["```json", render_mcp_snippet(tool.name, ex.value), "```", ""]
+    verb = tool.name.split("-", 1)[0]
+    note = learn_more_markdown(command_key(op.tag, verb))
+    if note:
+        lines += [note, ""]
+    return lines
+
+
 def _tool_section(tool: McpTool, op: Operation) -> list[str]:
     lines = [f"### {tool.name}", ""]
     if tool.description:
@@ -285,6 +317,8 @@ def _tool_section(tool: McpTool, op: Operation) -> list[str]:
     table = _params_table(op.args)
     if table:
         lines += ["**Parameters**", "", table, ""]
+
+    lines += _examples_block(tool, op)
 
     api_page = escape_mdx_prose(op.api_page)
     lines += [

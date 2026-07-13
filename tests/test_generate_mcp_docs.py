@@ -14,7 +14,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from generate_mcp_docs import (  # noqa: E402
     Arg,
+    Operation,
     _anchor,
+    _examples_block,
     _params_table,
     _schema_type,
     _summary_line,
@@ -24,7 +26,8 @@ from generate_mcp_docs import (  # noqa: E402
     build_tab,
     generate_mcp_docs,
 )
-from mcp_reference import parse_tool_ts  # noqa: E402
+from mcp_reference import McpTool, parse_tool_ts  # noqa: E402
+from request_examples import NamedExample  # noqa: E402
 from mcp_tool_samples import (  # noqa: E402
     CREATE_WIDGET_TS,
     GET_WIDGET_TS,
@@ -118,6 +121,67 @@ def test_operation_map_unwraps_optional_body_anyof() -> None:
     assert [a.name for a in run.args] == ["gadget_names"]
     assert run.args[0].required is False
     assert run.args[0].type == "array of string"
+
+
+def test_operation_map_extracts_named_examples() -> None:
+    create = build_operation_map(OPENAPI)["createwidgetwidgetspostop"]
+    # value-less "no_value" entry is dropped; only the two real variants survive
+    assert [e.key for e in create.examples] == ["basic_widget", "colored_widget"]
+    assert create.examples[0].summary == "Basic widget"
+    assert create.examples[0].value == {"name": "sprocket"}
+
+
+# --------------------------------------------------------------------------- #
+# _examples_block
+# --------------------------------------------------------------------------- #
+def _op_with_examples(tag: str, examples: list[NamedExample]) -> Operation:
+    return Operation(
+        path="/widgets", method="post", summary="", tag=tag, args=[], examples=examples
+    )
+
+
+def _tool(name: str) -> McpTool:
+    return McpTool(name=name, scopes=["write"])
+
+
+def test_examples_block_renders_labelled_tools_call_payloads() -> None:
+    op = _op_with_examples(
+        "widgets",
+        [
+            NamedExample("basic", "Basic widget", "A minimal widget.", {"name": "s"}),
+            NamedExample("colored", "Colored widget", "", {"name": "s", "color": "red"}),
+        ],
+    )
+    text = "\n".join(_examples_block(_tool("create-widget"), op))
+    assert "**Examples**" in text
+    assert "**Basic widget**" in text
+    assert "A minimal widget." in text  # description rendered
+    assert "**Colored widget**" in text
+    # each variant is a JSON tools/call payload naming the tool + its arguments
+    assert '"name": "create-widget"' in text
+    assert '"arguments": {' in text
+    assert '"color": "red"' in text
+    assert text.count("```json") == 2
+    # no production learn-more link for the synthetic "widgets create" key
+    assert "For more details" not in text
+
+
+def test_examples_block_omitted_for_single_variant() -> None:
+    op = _op_with_examples("widgets", [NamedExample("only", "Only", "", {"name": "s"})])
+    assert _examples_block(_tool("create-widget"), op) == []
+
+
+def test_examples_block_adds_agent_connection_learn_more() -> None:
+    # create-agent (tag "agents", verb "create") -> the production learn-more link
+    op = _op_with_examples(
+        "agents",
+        [
+            NamedExample("build", "Build in Calibrate", "", {"name": "a"}),
+            NamedExample("connect", "Connect external", "", {"name": "a", "config": {}}),
+        ],
+    )
+    text = "\n".join(_examples_block(_tool("create-agent"), op))
+    assert "[Agent connections](/core-concepts/agent-connections)" in text
 
 
 # --------------------------------------------------------------------------- #
@@ -252,6 +316,12 @@ def test_tools_page_content(tmp_path: Path) -> None:
     # no-arg tool omits the Parameters block
     list_section = tools[tools.index("### list-widgets"):tools.index("### get-widget")]
     assert "**Parameters**" not in list_section
+    # multi-variant create-widget grows an Examples block of tools/call payloads
+    create_section = tools[tools.index("### create-widget"):]
+    assert "**Examples**" in create_section
+    assert "**Basic widget**" in create_section
+    assert '"name": "create-widget"' in create_section
+    assert create_section.count("```json") == 2
 
 
 def test_generate_inserts_tab_after_python_sdk(tmp_path: Path) -> None:

@@ -186,7 +186,19 @@ OPENAPI: dict = {
                 "requestBody": {
                     "content": {
                         "application/json": {
-                            "schema": {"$ref": "#/components/schemas/WidgetCreate"}
+                            "schema": {"$ref": "#/components/schemas/WidgetCreate"},
+                            "examples": {
+                                "basic_widget": {
+                                    "summary": "Basic widget",
+                                    "description": "A minimal widget.",
+                                    "value": {"name": "sprocket"},
+                                },
+                                "colored_widget": {
+                                    "summary": "Colored widget",
+                                    "value": {"name": "sprocket", "color": "red"},
+                                },
+                                "no_value": {"summary": "ignored — no value"},
+                            },
                         }
                     }
                 },

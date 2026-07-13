@@ -111,6 +111,19 @@ def render_python_snippet(sdk_group: str, sdk_method: str, value: Any) -> str:
     return "\n".join(lines)
 
 
+def render_mcp_snippet(tool_name: str, value: Any) -> str:
+    """Render one example body as an MCP ``tools/call`` argument payload.
+
+    The request-body object becomes the tool's ``arguments`` map — the shape a
+    coding agent passes when it invokes the tool. Mirrors the JSON-RPC
+    ``tools/call`` params documented in the MCP troubleshooting page, so the
+    Tools reference shows exactly what the agent sends.
+    """
+    arguments = value if isinstance(value, dict) else {}
+    payload = {"name": tool_name, "arguments": arguments}
+    return json.dumps(payload, indent=2)
+
+
 def _cli_value(value: Any) -> str:
     """Format one flag value for a shell command.
 
