@@ -15,47 +15,10 @@ If you already have a deployed agent, you can connect it to Calibrate and run ev
 Calibrate does not need to understand your whole agent. It needs a single HTTP
 endpoint that follows one contract:
 
-- **Request** — Calibrate sends a `POST` request whose body has a `messages`
-  array: the conversation so far, in OpenAI chat message format (each message is
-  a `{ "role", "content" }` object).
-- **Response** — your endpoint returns a JSON object with the agent's reply: a
-  `response` string, and optionally `tool_calls`.
-
-Your agent does **not** have to be OpenAI-compatible, and you do **not** have to
-expose your production pipeline — all the custom preprocessing, routing,
-retrieval, and output formatting your agent does can stay exactly as it is.
-
-The insight is that however custom your agent's API looks on the outside, it
-almost always ends in an LLM call over a `messages` list. That LLM call is what
-Calibrate evaluates. So the job is just to expose *that inner call* as a thin
-endpoint Calibrate can reach:
-
-```mermaid
-flowchart LR
-    subgraph prod["Your production agent — any custom shape"]
-        direction TB
-        IN["Custom inputs<br/>(x1, x2, x3)"] --> PRE["Preprocess"]
-        PRE --> MSG["Build messages"]
-        MSG --> CORE["llm_inference(messages)"]
-        CORE --> POST["Transform output"]
-        POST --> OUT["Your agent's response"]
-    end
-
-    subgraph hook["Calibrate hook — thin wrapper"]
-        direction TB
-        REQ["messages<br/>(from Calibrate)"] --> CORE2["llm_inference(messages)"]
-        CORE2 --> RESP["{ response }"]
-    end
-
-    CORE -.->|"chat.completions"| LLM[("LLM / OpenAI-compatible API")]
-    CORE2 -.->|"chat.completions"| LLM
-    Cal["Calibrate"] ==>|"POST { messages }"| REQ
-    RESP ==>|"{ response }"| Cal
-```
-
-Both paths call the **same** `llm_inference(messages)` function, so the endpoint
-Calibrate tests is exactly the model logic your agent ships — nothing is
-re-implemented or mocked.
+- **Request** — Calibrate sends a `POST` request with the conversation history as a `messages`
+  array in the OpenAI chat message format.
+- **Response** — your endpoint returns a JSON object with the agent's reply as a
+  `response` string, and/or its tool calls as a `tool_calls` array.
 
 ### Request format
 
@@ -119,10 +82,10 @@ results view for review only, and never affects whether a test passes or fails:
   `tool_calls` field.
 </Warning>
 
-### Wrap your existing LLM call
+### Add a Calibrate endpoint to your agent
 
-Concretely, pull the model call out of your agent handler into a reusable
-function, then expose a second route that calls it directly.
+The change to your codebase: pull the model call out of your agent handler into a
+reusable function, then expose a new route that calls it directly.
 
 **Before** — the LLM call is buried inside your request handler:
 
