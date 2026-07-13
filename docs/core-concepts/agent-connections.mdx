@@ -15,7 +15,9 @@ If you already have a deployed agent, you can connect it to Calibrate and run ev
 Calibrate does not need to understand your whole agent. It needs a single HTTP
 endpoint that follows one contract:
 
-- **Request** — Calibrate `POST`s the conversation so far as a `messages` array.
+- **Request** — Calibrate sends a `POST` request whose body has a `messages`
+  array: the conversation so far, in OpenAI chat message format (each message is
+  a `{ "role", "content" }` object).
 - **Response** — your endpoint returns a JSON object with the agent's reply: a
   `response` string, and optionally `tool_calls`.
 
@@ -57,8 +59,9 @@ re-implemented or mocked.
 
 ### Request format
 
-Calibrate `POST`s to your endpoint with the full conversation history in
-chronological order:
+Calibrate sends a `POST` request to your endpoint. The body carries the full
+conversation history in chronological order, using the OpenAI chat message
+format:
 
 ```json
 {
