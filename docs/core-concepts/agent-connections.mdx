@@ -84,20 +84,58 @@ results view for review only, and never affects whether a test passes or fails:
 
 ### Add a Calibrate endpoint
 
-Pull the model call out of your agent handler into a reusable function, then add
-a route that calls it directly. Your existing agent logic stays untouched:
+The change to your codebase: pull the model call out of your agent handler into a
+reusable function, then expose a new route that calls it directly.
+
+**Before** — the LLM call is buried inside your request handler:
 
 ```python
-def llm_inference(messages):               # extract your existing model call
+def inference(x1, x2, x3):
+    y1 = preprocess(x1)
+    y2 = preprocess(x2)
+    y3 = preprocess(x3)
+
+    messages = [
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "..."},
+        {"role": "user", "content": "..."},
+    ]
+
+    response = client.chat.completions.create(messages=messages)  # buried here
+    return transform(response)
+
+@app.get("/agent")
+def agent():
+    return inference(x1, x2, x3)
+```
+
+**After** — the LLM call is modularized and re-used by a thin Calibrate route:
+
+```python
+def llm_inference(messages):
+    """The core model call — reused by both your agent and Calibrate."""
     response = client.chat.completions.create(messages=messages)
     return response.choices[0].message.content
 
-@app.get("/agent")                         # your agent — unchanged behavior
-def agent(x1, x2, x3):
-    messages = build_messages(preprocess(x1, x2, x3))
-    return transform(llm_inference(messages))
+def inference(x1, x2, x3):
+    y1 = preprocess(x1)
+    y2 = preprocess(x2)
+    y3 = preprocess(x3)
 
-@app.post("/calibrate/test")               # new: the endpoint Calibrate calls
+    messages = [
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "..."},
+        {"role": "user", "content": "..."},
+    ]
+
+    response = llm_inference(messages)   # same call, now shared
+    return transform(response)
+
+@app.get("/agent")
+def agent():
+    return inference(x1, x2, x3)
+
+@app.post("/calibrate/test")           # the endpoint you connect to Calibrate
 def calibrate_test(body):
     return {"response": llm_inference(body["messages"])}
 ```
