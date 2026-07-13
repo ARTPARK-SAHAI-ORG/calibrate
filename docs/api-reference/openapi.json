@@ -4448,7 +4448,19 @@
               }
             }
           }
-        }
+        },
+        "x-codeSamples": [
+          {
+            "lang": "curl",
+            "label": "Agent within Calibrate",
+            "source": "curl --request POST \\\n  --url https://api.calibrate.artpark.ai/agents \\\n  --header 'Content-Type: application/json' \\\n  --header 'X-API-Key: <api-key>' \\\n  --data '{\n  \"name\": \"Support Agent\",\n  \"type\": \"agent\",\n  \"config\": {\n    \"system_prompt\": \"You are a helpful assistant.\",\n    \"llm\": {\n      \"model\": \"google/gemini-2.5-flash\"\n    },\n    \"stt\": {\n      \"provider\": \"google\"\n    },\n    \"tts\": {\n      \"provider\": \"google\"\n    },\n    \"settings\": {\n      \"agent_speaks_first\": false,\n      \"max_assistant_turns\": 10\n    }\n  }\n}'"
+          },
+          {
+            "lang": "curl",
+            "label": "Connect OpenAI-compatible agent",
+            "source": "curl --request POST \\\n  --url https://api.calibrate.artpark.ai/agents \\\n  --header 'Content-Type: application/json' \\\n  --header 'X-API-Key: <api-key>' \\\n  --data '{\n  \"name\": \"My Hosted Agent\",\n  \"type\": \"connection\",\n  \"config\": {\n    \"agent_url\": \"https://api.example.com/v1/chat/completions\",\n    \"agent_headers\": {\n      \"Authorization\": \"Bearer <token>\"\n    },\n    \"benchmark_provider\": \"openrouter\"\n  }\n}'"
+          }
+        ]
       },
       "get": {
         "tags": [

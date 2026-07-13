@@ -27,6 +27,55 @@ client.agents.create(
 )
 ```
 
+## Examples
+
+**Agent within Calibrate**
+
+Build a voice/chat agent inside Calibrate. This config is the managed defaults spelled out. Override only the keys you want to change; omitted keys still inherit the defaults.
+
+```python
+client.agents.create(
+    name="Support Agent",
+    type="agent",
+    config={
+        "system_prompt": "You are a helpful assistant.",
+        "llm": {
+            "model": "google/gemini-2.5-flash"
+        },
+        "stt": {
+            "provider": "google"
+        },
+        "tts": {
+            "provider": "google"
+        },
+        "settings": {
+            "agent_speaks_first": False,
+            "max_assistant_turns": 10
+        }
+    },
+)
+```
+
+**Connect OpenAI-compatible agent**
+
+Connect your own agent over an OpenAI-compatible HTTP endpoint. `config.agent_url` is required; `agent_headers` carries the auth token the endpoint expects.
+
+```python
+client.agents.create(
+    name="My Hosted Agent",
+    type="connection",
+    config={
+        "agent_url": "https://api.example.com/v1/chat/completions",
+        "agent_headers": {
+            "Authorization": "Bearer <token>"
+        },
+        "benchmark_provider": "openrouter"
+    },
+)
+```
+
+For more details, see [Agent connections](/core-concepts/agent-connections).
+
 ## API endpoint
 
 See **POST /agents** in the [API reference](/api-reference/introduction) tab.

@@ -21,9 +21,25 @@ calibrate agents create [flags]
 
 **Examples**
 
+_Agent within Calibrate_
+
 ```bash
-calibrate agents create --name Support Agent
+calibrate agents create \
+  --name "Support Agent" \
+  --type "agent" \
+  --config-param '{"system_prompt":"You are a helpful assistant.","llm":{"model":"google/gemini-2.5-flash"},"stt":{"provider":"google"},"tts":{"provider":"google"},"settings":{"agent_speaks_first":false,"max_assistant_turns":10}}'
 ```
+
+_Connect OpenAI-compatible agent_
+
+```bash
+calibrate agents create \
+  --name "My Hosted Agent" \
+  --type "connection" \
+  --config-param '{"agent_url":"https://api.example.com/v1/chat/completions","agent_headers":{"Authorization":"Bearer <token>"},"benchmark_provider":"openrouter"}'
+```
+
+For more details, see [Agent connections](/core-concepts/agent-connections).
 
 ## Get agent
 
