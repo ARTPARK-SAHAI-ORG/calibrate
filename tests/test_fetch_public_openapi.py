@@ -130,12 +130,13 @@ def test_render_method_page_escapes_quotes_in_frontmatter() -> None:
     assert 'description: "Rename the agent to \\"production\\"."' in page
 
 
-def test_normalize_strips_x_code_samples(minimal_spec: dict) -> None:
-    minimal_spec["paths"]["/agents"]["get"]["x-codeSamples"] = [
-        {"lang": "python", "source": "from calibrate import Calibrate\n"}
-    ]
+def test_normalize_preserves_x_code_samples(minimal_spec: dict) -> None:
+    # Mintlify renders x-codeSamples as the request code panel, so the backend's
+    # per-operation samples must survive normalization into the docs spec.
+    samples = [{"lang": "python", "source": "from calibrate import Calibrate\n"}]
+    minimal_spec["paths"]["/agents"]["get"]["x-codeSamples"] = samples
     out = _normalize_for_docs(minimal_spec, TEST_BASE_URL)
-    assert "x-codeSamples" not in out["paths"]["/agents"]["get"]
+    assert out["paths"]["/agents"]["get"]["x-codeSamples"] == samples
 
 
 def test_render_templates_substitutes_base_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

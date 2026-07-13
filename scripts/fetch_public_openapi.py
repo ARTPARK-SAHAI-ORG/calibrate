@@ -103,7 +103,6 @@ def _normalize_for_docs(spec: dict[str, Any], base_url: str) -> dict[str, Any]:
             if not isinstance(op, dict):
                 continue
             op["security"] = [{API_KEY_SCHEME: []}]
-            op.pop("x-codeSamples", None)
             params = op.get("parameters")
             if params:
                 op["parameters"] = [
