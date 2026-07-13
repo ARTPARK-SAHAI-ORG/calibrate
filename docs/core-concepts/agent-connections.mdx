@@ -10,6 +10,138 @@ If you already have a deployed agent, you can connect it to Calibrate and run ev
   Calibrate, see [Core Concepts: Agents](/core-concepts/agents) instead.
 </Tip>
 
+## How the connection works
+
+Calibrate does not need to understand your whole agent. It needs a single HTTP
+endpoint that follows one contract:
+
+- **Request** — Calibrate sends a `POST` request with the conversation history as a `messages`
+  array in the OpenAI chat message format.
+- **Response** — your endpoint returns a JSON object with the agent's reply as a
+  `response` string, and/or its tool calls as a `tool_calls` array.
+
+### Request format
+
+Calibrate sends a `POST` request to your endpoint. The body carries the full
+conversation history in chronological order, using the OpenAI chat message
+format:
+
+```json
+{
+  "messages": [
+    {
+      "role": "assistant",
+      "content": "Namaste! Main aapki kaise madad kar sakti hoon?"
+    },
+    { "role": "user", "content": "Meri beti ka vaccination schedule kya hai?" }
+  ]
+}
+```
+
+### Response format
+
+By default, your endpoint returns a `response` field containing the agent's text
+reply:
+
+```json
+{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
+}
+```
+
+If your agent also returns tool calls, expand the body to include a `tool_calls`
+array — each item has a `tool` name and an `arguments` object:
+
+```json
+{
+  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
+  "tool_calls": [
+    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
+  ]
+}
+```
+
+Each tool call may also include an optional `output` field — the result the tool
+returned when your agent ran it. It can be any JSON value, is shown in the
+results view for review only, and never affects whether a test passes or fails:
+
+```json
+{
+  "tool_calls": [
+    {
+      "tool": "get_schedule",
+      "arguments": { "child_age_weeks": 14 },
+      "output": { "next_visit_weeks": 14, "vaccines": ["OPV", "DPT"] }
+    }
+  ]
+}
+```
+
+<Warning>
+  Your endpoint's output **must** include either a `response` field or a
+  `tool_calls` field.
+</Warning>
+
+### Add a Calibrate endpoint
+
+The change to your codebase: pull the model call out of your agent handler into a
+reusable function, then expose a new route that calls it directly.
+
+**Before** — the LLM call is buried inside your request handler:
+
+```python
+def inference(x1, x2, x3):
+    y1 = preprocess(x1)
+    y2 = preprocess(x2)
+    y3 = preprocess(x3)
+
+    messages = [
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "..."},
+        {"role": "user", "content": "..."},
+    ]
+
+    response = client.chat.completions.create(messages=messages)  # buried here
+    return transform(response)
+
+@app.get("/agent")
+def agent():
+    return inference(x1, x2, x3)
+```
+
+**After** — the LLM call is modularized and re-used by a thin Calibrate route:
+
+```python
+def llm_inference(messages):
+    """The core model call — reused by both your agent and Calibrate."""
+    response = client.chat.completions.create(messages=messages)
+    return response.choices[0].message.content
+
+def inference(x1, x2, x3):
+    y1 = preprocess(x1)
+    y2 = preprocess(x2)
+    y3 = preprocess(x3)
+
+    messages = [
+        {"role": "user", "content": "..."},
+        {"role": "assistant", "content": "..."},
+        {"role": "user", "content": "..."},
+    ]
+
+    response = llm_inference(messages)   # same call, now shared
+    return transform(response)
+
+@app.get("/agent")
+def agent():
+    return inference(x1, x2, x3)
+
+@app.post("/calibrate/test")           # the endpoint you connect to Calibrate
+def calibrate_test(body):
+    return {"response": llm_inference(body["messages"])}
+```
+
+Point Calibrate at the new endpoint `POST /calibrate/test`, add any auth headers your agent needs, and verify the connection as shown below.
+
 ## Create an agent connection
 
 From the sidebar, click **Agents** → **New agent**. Select **Connect your existing agent**, give it a name, and click **Create**.
@@ -37,70 +169,8 @@ Fill in the following:
 
 2. **Headers** (optional) — Add any headers your agent needs for authentication or custom metadata (e.g. `Authorization: Bearer YOUR_API_KEY`). Click **+ Add header** to add multiple headers.
 
-## Expected request format
-
-Calibrate will `POST` to your agent URL with this body:
-
-```json
-{
-  "messages": [
-    {
-      "role": "assistant",
-      "content": "Namaste! Main aapki kaise madad kar sakti hoon?"
-    },
-    { "role": "user", "content": "Meri beti ka vaccination schedule kya hai?" }
-  ]
-}
-```
-
-The `messages` array contains the full conversation history in chronological order.
-
-## Expected response format
-
-By default, your agent must respond with a `response` field containing its text reply:
-
-```json
-{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
-}
-```
-
-If your agent also returns tool calls, the expected output format expands to include `tool_calls`:
-
-```json
-{
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
-  "tool_calls": [
-    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
-  ]
-}
-```
-
-- `response` — The agent's text reply
-- `tool_calls` — An array of tool invocations, each with a `tool` name and `arguments` object
-
-Each tool call may also include an optional `output` field — the result the
-tool returned when your agent ran it. It can be any JSON value:
-
-```json
-{
-  "tool_calls": [
-    {
-      "tool": "get_schedule",
-      "arguments": { "child_age_weeks": 14 },
-      "output": { "next_visit_weeks": 14, "vaccines": ["OPV", "DPT"] }
-    }
-  ]
-}
-```
-
-`output` is optional and shown in the results view for review only — it never
-affects whether a test passes or fails.
-
-<Warning>
-  Your agent's output **must** include either a `response` field or a
-  `tool_calls` field
-</Warning>
+The request and response formats your endpoint must follow are described in
+[How the connection works](#how-the-connection-works) above.
 
 ## Verify your connection
 
