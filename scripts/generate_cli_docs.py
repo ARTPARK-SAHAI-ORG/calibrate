@@ -45,7 +45,12 @@ from docs_mdx import escape_mdx_prose as _escape_mdx_prose  # noqa: E402
 from docs_mdx import frontmatter_value as _frontmatter_value  # noqa: E402
 from docs_mdx import table_cell as _table_cell  # noqa: E402
 from docs_nav import insert_tab  # noqa: E402
-from sdk_reference import api_group_from_tag  # noqa: E402
+from request_examples import (  # noqa: E402
+    NamedExample,
+    named_request_examples,
+    render_cli_snippet,
+)
+from sdk_reference import api_group_from_tag, load_route_map  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = REPO_ROOT / "docs"
@@ -140,22 +145,92 @@ def _synopsis_lines(cmd: CliCommand) -> list[str]:
     return []
 
 
-def _command_body(cmd: CliCommand) -> list[str]:
-    """Usage block + options table + examples for a single command."""
+def _command_key(command: str) -> str:
+    """Normalize a command path for matching a CLI command to an SDK route.
+
+    ``calibrate agents create`` -> ``agents create``; hyphens and underscores are
+    unified (Fern uses ``agent_tests``, Cobra ``agent-tests``) so the two naming
+    conventions — kept in lockstep by the backend overlays — compare equal.
+    """
+    parts = command.split()
+    tail = parts[1:] if parts and parts[0] == "calibrate" else parts
+    return " ".join(tail).replace("_", "-").lower()
+
+
+def _examples_by_command(openapi: dict) -> dict[str, list[NamedExample]]:
+    """Map each CLI command to its operation's ≥2 named request examples.
+
+    Reuses the Fern route map (path + SDK group/method) to bridge a CLI command
+    to its spec operation, since the SDK and CLI naming overlays are kept 1:1.
+    Best-effort: if the Fern overrides aren't available (they live in the backend
+    repo, present during the sync workflow), returns ``{}`` and the CLI pages
+    fall back to Cobra's own Examples block.
+    """
+    try:
+        routes = load_route_map(openapi=openapi)
+    except SystemExit:
+        return {}
+    result: dict[str, list[NamedExample]] = {}
+    for route in routes:
+        op = openapi.get("paths", {}).get(route.path, {}).get(route.http.lower(), {})
+        examples = named_request_examples(op) if isinstance(op, dict) else []
+        if len(examples) >= 2:
+            key = f"{route.sdk_group} {route.sdk_method}".replace("_", "-").lower()
+            result[key] = examples
+    return result
+
+
+def _spec_examples_block(cmd: CliCommand, examples: list[NamedExample]) -> list[str]:
+    """Render one labelled `bash` invocation per named request variant."""
+    options = parse_options(cmd.options)
+    lines = ["**Examples**", ""]
+    for example in examples:
+        lines += [
+            f"_{example.summary}_",
+            "",
+            "```bash",
+            render_cli_snippet(cmd.command, options, example.value),
+            "```",
+            "",
+        ]
+    return lines
+
+
+def _command_body(
+    cmd: CliCommand,
+    spec_examples: list[NamedExample] | None = None,
+) -> list[str]:
+    """Usage block + options table + examples for a single command.
+
+    When the spec supplies ≥2 named request examples for this command they
+    replace Cobra's single (often empty) Examples block, so distinct request
+    shapes stay visible on the CLI page.
+    """
     lines: list[str] = []
     if cmd.usage:
         lines += ["```bash", cmd.usage.strip(), "```", ""]
     table = _options_table(parse_options(cmd.options))
     if table:
         lines += ["**Options**", "", table, ""]
-    if cmd.examples:
+    if spec_examples:
+        lines += _spec_examples_block(cmd, spec_examples)
+    elif cmd.examples:
         lines += ["**Examples**", "", "```bash", cmd.examples.strip(), "```", ""]
     return lines
 
 
-def _subcommand_section(cmd: CliCommand) -> list[str]:
+def _subcommand_section(
+    cmd: CliCommand,
+    examples_by_command: dict[str, list[NamedExample]] | None = None,
+) -> list[str]:
     heading = cmd.short.strip() or cmd.subcommand
-    return [f"## {heading}", "", *_synopsis_lines(cmd), *_command_body(cmd)]
+    spec_examples = (examples_by_command or {}).get(_command_key(cmd.command))
+    return [
+        f"## {heading}",
+        "",
+        *_synopsis_lines(cmd),
+        *_command_body(cmd, spec_examples),
+    ]
 
 
 def _frontmatter(title: str, description: str) -> list[str]:
@@ -171,18 +246,30 @@ def _frontmatter(title: str, description: str) -> list[str]:
 
 
 def render_resource_page(
-    title: str, parent: CliCommand | None, subcommands: list[CliCommand]
+    title: str,
+    parent: CliCommand | None,
+    subcommands: list[CliCommand],
+    examples_by_command: dict[str, list[NamedExample]] | None = None,
 ) -> str:
     """A resource page — straight into one ## section per subcommand (no preamble)."""
     lines = _frontmatter(title, parent.short if parent else "")
     for cmd in subcommands:
-        lines += _subcommand_section(cmd)
+        lines += _subcommand_section(cmd, examples_by_command)
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
-def render_leaf_page(title: str, cmd: CliCommand) -> str:
+def render_leaf_page(
+    title: str,
+    cmd: CliCommand,
+    examples_by_command: dict[str, list[NamedExample]] | None = None,
+) -> str:
     """A standalone command (no subcommands) rendered as a single page."""
-    lines = _frontmatter(title, cmd.short) + _synopsis_lines(cmd) + _command_body(cmd)
+    spec_examples = (examples_by_command or {}).get(_command_key(cmd.command))
+    lines = (
+        _frontmatter(title, cmd.short)
+        + _synopsis_lines(cmd)
+        + _command_body(cmd, spec_examples)
+    )
     return "\n".join(lines).rstrip("\n") + "\n"
 
 
@@ -385,6 +472,15 @@ def generate_cli_docs(
     tags = include_tags if include_tags is not None else api_tags(openapi_path)
     tag_by_key = {_match_key(t): t for t in tags} if tags is not None else None
 
+    # Spec-derived request examples, keyed by CLI command. Best-effort: a missing
+    # or unreadable spec just means Cobra's own Examples blocks are used.
+    examples_by_command: dict[str, list[NamedExample]] = {}
+    try:
+        spec = json.loads(Path(openapi_path).read_text(encoding="utf-8"))
+        examples_by_command = _examples_by_command(spec)
+    except (OSError, ValueError):
+        pass
+
     # Decide what to document first, WITHOUT writing anything.
     selected: list[str] = []
     matched_tags: set[str] = set()
@@ -412,9 +508,13 @@ def generate_cli_docs(
         title = resource_title(res)
         subs = _ordered_subs(entry["subs"], subcommand_order(entry["parent"]))
         if subs:
-            content = render_resource_page(title, entry["parent"], subs)
+            content = render_resource_page(
+                title, entry["parent"], subs, examples_by_command
+            )
         elif entry["parent"] is not None:
-            content = render_leaf_page(title, entry["parent"])
+            content = render_leaf_page(
+                title, entry["parent"], examples_by_command
+            )
         else:
             continue
         slug = resource_slug(res)

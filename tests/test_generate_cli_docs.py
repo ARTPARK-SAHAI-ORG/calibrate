@@ -436,3 +436,102 @@ def test_generate_fails_hard_on_unmatched_tag(tmp_path: Path, capsys) -> None:
     # nothing is written on failure — the docs are left untouched
     assert not (output_root / "widgets.mdx").exists()
     assert not (output_root / "overview.mdx").exists()
+
+
+# --------------------------------------------------------------------------- #
+# spec-derived request examples (connect-vs-create)
+# --------------------------------------------------------------------------- #
+def _spec_two_examples() -> dict:
+    return {
+        "paths": {
+            "/agents": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "examples": {
+                                    "build": {
+                                        "summary": "Agent within Calibrate",
+                                        "value": {"name": "Support Agent", "type": "agent"},
+                                    },
+                                    "connect": {
+                                        "summary": "Connect external agent",
+                                        "value": {
+                                            "name": "My Hosted Agent",
+                                            "type": "connection",
+                                            "config": {"agent_url": "https://x.example.com/v1"},
+                                        },
+                                    },
+                                }
+                            }
+                        }
+                    },
+                }
+            }
+        }
+    }
+
+
+def test_examples_by_command_maps_via_route_map() -> None:
+    overrides = {
+        "paths": {"/agents": {"post": {
+            "x-fern-sdk-group-name": "agents",
+            "x-fern-sdk-method-name": "create",
+        }}}
+    }
+    from sdk_reference import build_route_map
+
+    spec = _spec_two_examples()
+    spec["paths"]["/agents"]["post"]["tags"] = ["agents"]
+    # Route map bridges the CLI command to the op; key is the normalized command.
+    routes = build_route_map(overrides, spec)
+    assert routes  # sanity: the override resolves
+
+    # _examples_by_command loads overrides from disk; exercise the pure mapping
+    # by monkeypatching load_route_map to the in-memory route map.
+    import generate_cli_docs as gcd
+
+    orig = gcd.load_route_map
+    gcd.load_route_map = lambda openapi=None: routes
+    try:
+        mapping = gcd._examples_by_command(spec)
+    finally:
+        gcd.load_route_map = orig
+    assert set(mapping) == {"agents create"}
+    assert [e.summary for e in mapping["agents create"]] == [
+        "Agent within Calibrate",
+        "Connect external agent",
+    ]
+
+
+def test_subcommand_section_injects_spec_examples() -> None:
+    from cli_reference import CliCommand
+    from generate_cli_docs import _subcommand_section
+    from request_examples import named_request_examples
+
+    cmd = CliCommand(
+        command="calibrate agents create",
+        short="Create agent",
+        options="  --name string\n  --type type\n  -c, --config-param type",
+        examples="calibrate agents create",  # Cobra's minimal block
+    )
+    examples = named_request_examples(_spec_two_examples()["paths"]["/agents"]["post"])
+    section = "\n".join(_subcommand_section(cmd, {"agents create": examples}))
+    assert "_Agent within Calibrate_" in section
+    assert "_Connect external agent_" in section
+    assert "--config-param '{\"agent_url\":\"https://x.example.com/v1\"}'" in section
+    # Spec examples REPLACE Cobra's minimal block, not append to it.
+    assert section.count("**Examples**") == 1
+
+
+def test_subcommand_section_without_spec_examples_uses_cobra() -> None:
+    from cli_reference import CliCommand
+    from generate_cli_docs import _subcommand_section
+
+    cmd = CliCommand(
+        command="calibrate agents create",
+        short="Create agent",
+        examples="calibrate agents create --name X",
+    )
+    section = "\n".join(_subcommand_section(cmd, {}))
+    assert "calibrate agents create --name X" in section

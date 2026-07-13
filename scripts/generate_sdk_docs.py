@@ -8,6 +8,11 @@ from pathlib import Path
 from typing import Any
 
 from docs_nav import insert_tab
+from request_examples import (
+    NamedExample,
+    named_request_examples,
+    render_python_snippet,
+)
 from sdk_reference import (
     SdkMethodDoc,
     SdkRoute,
@@ -44,7 +49,35 @@ def _split_description(description: str) -> tuple[str, str]:
     return summary, body
 
 
-def render_method_page(route: SdkRoute, doc: SdkMethodDoc) -> str:
+def _render_examples_section(
+    route: SdkRoute, examples: list[NamedExample]
+) -> list[str]:
+    """Render an `## Examples` block, one labelled snippet per named variant.
+
+    Only emitted when the operation has ≥2 named request examples — a single
+    example is already the Usage block, so repeating it adds nothing. Keeps every
+    distinct request shape (build-in-Calibrate vs. connect-external) visible on
+    the SDK page instead of only Fern's first-example Usage snippet.
+    """
+    if len(examples) < 2:
+        return []
+    parts = ["## Examples\n\n"]
+    for example in examples:
+        parts.append(f"**{_mdx_escape(example.summary)}**\n\n")
+        if example.description:
+            parts.append(f"{_mdx_escape(example.description)}\n\n")
+        snippet = render_python_snippet(
+            route.sdk_group, route.sdk_method, example.value
+        )
+        parts.append(f"```python\n{snippet}\n```\n\n")
+    return parts
+
+
+def render_method_page(
+    route: SdkRoute,
+    doc: SdkMethodDoc,
+    examples: list[NamedExample] | None = None,
+) -> str:
     api_page = _mdx_escape(route.mintlify_api_page)
     api_callout = (
         f"See **{api_page}** in the "
@@ -70,6 +103,11 @@ def render_method_page(route: SdkRoute, doc: SdkMethodDoc) -> str:
         [
             "## Usage\n\n",
             f"```python\n{doc.usage_code.rstrip()}\n```\n\n",
+        ]
+    )
+    parts.extend(_render_examples_section(route, examples or []))
+    parts.extend(
+        [
             "## API endpoint\n\n",
             f"{api_callout}\n",
         ]
@@ -77,14 +115,25 @@ def render_method_page(route: SdkRoute, doc: SdkMethodDoc) -> str:
     return "".join(parts)
 
 
+def _examples_for_route(
+    route: SdkRoute, openapi: dict[str, Any]
+) -> list[NamedExample]:
+    op = openapi.get("paths", {}).get(route.path, {}).get(route.http.lower(), {})
+    return named_request_examples(op) if isinstance(op, dict) else []
+
+
 def write_sdk_pages(
     paired: list[tuple[SdkRoute, SdkMethodDoc]],
+    openapi: dict[str, Any],
 ) -> list[str]:
     written: list[str] = []
     for route, doc in paired:
         out = SDK_ROOT / route.sdk_group.replace("_", "-") / f"{route.sdk_method}.mdx"
         out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(render_method_page(route, doc), encoding="utf-8")
+        examples = _examples_for_route(route, openapi)
+        out.write_text(
+            render_method_page(route, doc, examples), encoding="utf-8"
+        )
         written.append(route.doc_slug)
     return written
 
@@ -166,7 +215,7 @@ def generate_sdk_docs(reference_path: Path, openapi: dict[str, Any]) -> list[str
     methods = parse_reference_file(reference_path)
     paired = routes_with_sdk_docs(routes, methods)
     copy_overview()
-    written = write_sdk_pages(paired)
+    written = write_sdk_pages(paired, openapi)
     update_docs_json(routes, paired)
     return ["sdk/overview", *written]
 
