@@ -15,11 +15,30 @@ automated scores are trustworthy.
 
 ## Install
 
-Install every Calibrate skill with a single command:
+Install every Calibrate skill with one command. Pass `--agent` to target your
+specific coding agent — without it, the command defaults to whichever agent it
+detects, which may not be the one you want:
 
-```bash
-npx skills add dalmia/calibrate-skills
+<CodeGroup>
+```bash Claude Code
+npx skills add dalmia/calibrate-skills --agent claude-code -g
 ```
+
+```bash Cursor
+npx skills add dalmia/calibrate-skills --agent cursor -g
+```
+
+```bash Windsurf
+npx skills add dalmia/calibrate-skills --agent windsurf -g
+```
+
+```bash Codex
+npx skills add dalmia/calibrate-skills --agent codex -g
+```
+</CodeGroup>
+
+The `-g` flag installs globally (available in all projects). After installing,
+**restart your coding agent session** for the new skills to appear.
 
 You also need the Calibrate CLI (which the skills drive) and an API key:
 
