@@ -72,7 +72,7 @@ DEFAULT_TEXT_JUDGE_MODEL = "openai/gpt-5.4-mini"
 # Simulation uses a stronger model by default for grading multi-turn conversations
 DEFAULT_SIMULATION_JUDGE_MODEL = "openai/gpt-5.4-mini"
 # OpenRouter's audio-capable OpenAI model. Override per-evaluator when needed.
-DEFAULT_AUDIO_JUDGE_MODEL = "openai/gpt-audio-1.5"
+DEFAULT_AUDIO_JUDGE_MODEL = "openai/gpt-audio"
 
 
 # ── Evaluator type tags ─────────────────────────────────────────────────────
@@ -202,7 +202,9 @@ def attach_evaluator_id(evaluator: dict, result: dict) -> dict:
     return result
 
 
-def evaluator_config_payload(evaluators: list[dict], extra: Optional[dict] = None) -> dict:
+def evaluator_config_payload(
+    evaluators: list[dict], extra: Optional[dict] = None
+) -> dict:
     """Build the evaluator config artifact written alongside run outputs."""
     payload = dict(extra or {})
     raw_evaluators = [dict(ev) for ev in evaluators or [] if isinstance(ev, dict)]
@@ -588,8 +590,7 @@ async def text_judge(
     coros = [_judge_one_text(ev, user_prompt, fallback_model) for ev in evaluators]
     results = await asyncio.gather(*coros)
     return {
-        ev["name"]: attach_evaluator_id(ev, r)
-        for ev, r in zip(evaluators, results)
+        ev["name"]: attach_evaluator_id(ev, r) for ev, r in zip(evaluators, results)
     }
 
 
@@ -628,8 +629,7 @@ async def audio_judge(
     ]
     results = await asyncio.gather(*coros)
     return {
-        ev["name"]: attach_evaluator_id(ev, r)
-        for ev, r in zip(evaluators, results)
+        ev["name"]: attach_evaluator_id(ev, r) for ev, r in zip(evaluators, results)
     }
 
 
