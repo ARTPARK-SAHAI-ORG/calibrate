@@ -1043,6 +1043,17 @@ async def run_eval_only(
     Returns:
         dict with status, metrics, and output_dir.
     """
+    # Refuse to write results back into the run dir being judged — that would
+    # overwrite its results.csv/metrics.json (losing the run's ttfb column).
+    if os.path.abspath(output_dir) == os.path.abspath(dataset_path):
+        return {
+            "status": "error",
+            "error": (
+                f"--output-dir must differ from the run dir being judged: {dataset_path}. "
+                "Choose a different -o so the run's results.csv/metrics.json aren't overwritten."
+            ),
+        }
+
     os.makedirs(output_dir, exist_ok=True)
 
     log_save_path = join(output_dir, "logs")

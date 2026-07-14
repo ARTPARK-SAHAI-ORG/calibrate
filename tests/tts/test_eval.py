@@ -537,6 +537,22 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["status"], "error")
         self.assertIn("does not exist", result["error"])
 
+    async def test_output_dir_same_as_run_dir_rejected(self):
+        """Judging a run into its own dir would clobber its results.csv."""
+        from calibrate_agent.tts import eval as tts_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_run_dir(tmp, extra_cols={"ttfb": 1.0})
+            result = await tts_eval.run_eval_only(
+                dataset_path=run_dir,
+                output_dir=os.path.join(run_dir, ""),  # same dir, trailing slash
+            )
+            self.assertEqual(result["status"], "error")
+            self.assertIn("must differ", result["error"])
+            # The original run's results.csv is untouched (ttfb column intact).
+            df = pd.read_csv(os.path.join(run_dir, "results.csv"))
+            self.assertIn("ttfb", df.columns)
+
 
 if __name__ == "__main__":
     unittest.main()
