@@ -537,7 +537,8 @@
               "stt",
               "llm",
               "llm-general",
-              "conversation"
+              "conversation",
+              "tts"
             ],
             "title": "Type",
             "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
@@ -630,7 +631,8 @@
               "stt",
               "llm",
               "llm-general",
-              "conversation"
+              "conversation",
+              "tts"
             ],
             "title": "Type",
             "description": "Task type. Determines the shape of each item's payload.\n- `stt`: judge a transcript on its own\n- `llm`: judge one response with its conversation history\n- `llm-general`: judge a standalone `input -> output` pair\n- `conversation`: judge a full conversation"
@@ -2956,7 +2958,8 @@
               "stt",
               "llm",
               "llm-general",
-              "conversation"
+              "conversation",
+              "tts"
             ],
             "title": "Task Type",
             "description": "Type of the task"
