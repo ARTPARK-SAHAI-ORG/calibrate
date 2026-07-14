@@ -626,26 +626,32 @@ async def get_llm_wer_cer_score(
     row_keys = [_row_cache_key(i) for i in range(len(row_segments))]
 
     async def _judge_row_segments(row_i: int) -> list:
-        row_verdicts: list = []
-        for seg in row_segments[row_i]:
-            if (
-                seg["tag"] == "equal"
-                or not seg["reference"].strip()
-                or not seg["prediction"].strip()
-            ):
-                continue
-            res = await sarvam_llm_wer.equivalence_judge(
-                seg["reference"], seg["prediction"], model=model
+        differing = [
+            seg
+            for seg in row_segments[row_i]
+            if seg["tag"] != "equal"
+            and seg["reference"].strip()
+            and seg["prediction"].strip()
+        ]
+        # Judge a row's differing segments concurrently; order is preserved so
+        # the cached per-row verdict list is deterministic.
+        results = await asyncio.gather(
+            *(
+                sarvam_llm_wer.equivalence_judge(
+                    seg["reference"], seg["prediction"], model=model
+                )
+                for seg in differing
             )
-            row_verdicts.append(
-                {
-                    "reference": seg["reference"],
-                    "prediction": seg["prediction"],
-                    "equivalent": bool(res["equivalent"]),
-                    "reasoning": res["reasoning"],
-                }
-            )
-        return row_verdicts
+        )
+        return [
+            {
+                "reference": seg["reference"],
+                "prediction": seg["prediction"],
+                "equivalent": bool(res["equivalent"]),
+                "reasoning": res["reasoning"],
+            }
+            for seg, res in zip(differing, results)
+        ]
 
     def _make(i: int):
         return _judge_row_segments(i)

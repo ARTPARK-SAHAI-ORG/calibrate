@@ -12,11 +12,37 @@ Run with:
     python -m unittest tests.stt.test_llm_wer -v
 """
 
+import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
 
 class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
+    async def test_row_segments_judged_concurrently(self):
+        from calibrate_agent.stt import sarvam_llm_wer as slw
+        from calibrate_agent.stt import metrics
+
+        started = 0
+        both_started = asyncio.Event()
+
+        async def judge(reference, prediction, model=None):
+            nonlocal started
+            started += 1
+            if started >= 2:
+                both_started.set()
+            # Judged serially, the first call would block here forever waiting
+            # for the second to begin — the timeout would then trip.
+            await asyncio.wait_for(both_started.wait(), timeout=2)
+            return {"index": 0, "equivalent": True, "reasoning": "r"}
+
+        with patch.object(slw, "equivalence_judge", AsyncMock(side_effect=judge)):
+            # One row, two differing segments: ("a","x") and ("b","y").
+            await metrics.get_llm_wer_cer_score(
+                references=["a k b"], predictions=["x k y"]
+            )
+
+        self.assertTrue(both_started.is_set())
+
     async def test_forgiveness_lowers_wer(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics
