@@ -96,6 +96,22 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(seen.count(("a", "b")), 2)
 
+    async def test_case_and_punctuation_only_diff_not_judged(self):
+        from calibrate_agent.stt import sarvam_llm_wer as slw
+        from calibrate_agent.stt import metrics
+
+        judge = AsyncMock()
+        # "Hello," vs "hello" differ only in case + punctuation. The cleanup
+        # applied before alignment collapses both to "hello", so the segment is
+        # equal and never reaches the equivalence judge.
+        with patch.object(slw, "equivalence_judge", judge):
+            result = await metrics.get_llm_wer_cer_score(
+                references=["Hello, world"], predictions=["hello world"]
+            )
+
+        judge.assert_not_called()
+        self.assertEqual(result["llm_wer"], 0.0)
+
     async def test_insertions_and_deletions_not_judged(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics

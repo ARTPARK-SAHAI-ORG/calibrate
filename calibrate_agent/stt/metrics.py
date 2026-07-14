@@ -44,6 +44,12 @@ _EDIT_CLEANUP = [
 ]
 _WER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfWords()])
 _CER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfChars()])
+# Same case-fold/punctuation/whitespace cleanup as above, but kept as a
+# string->string transform (no tokenization). Used by LLM-WER to clean text
+# *before* word alignment, so segments differing only in case or punctuation
+# don't reach the equivalence judge (the WER/CER scorers apply this at scoring
+# time via the transforms above; the LLM-WER alignment step runs earlier).
+_EDIT_CLEANUP_TEXT = jiwer.Compose(_EDIT_CLEANUP)
 
 # calibrate_agent language name / ISO code -> indic-nlp-library normalizer code.
 # Languages absent here (english, urdu, …) get NFC-only normalization: Vistaar
@@ -617,6 +623,12 @@ async def get_llm_wer_cer_score(
     norm_references, norm_predictions = await asyncio.to_thread(
         _normalize_refs_preds, references, predictions, language
     )
+
+    # Apply the same case-fold/punctuation/whitespace cleanup the WER/CER scorer
+    # uses, but *before* alignment — otherwise a segment differing only in case
+    # or punctuation would be sent to the equivalence judge as a real mismatch.
+    norm_references = [_EDIT_CLEANUP_TEXT(str(r)) for r in norm_references]
+    norm_predictions = [_EDIT_CLEANUP_TEXT(str(p)) for p in norm_predictions]
 
     # Word-align every row; segment equivalence is judged (and cached) per row.
     row_segments: List[List[dict]] = []
