@@ -280,16 +280,15 @@ Examples:
     tts_parser.add_argument(
         "--eval-only",
         action="store_true",
-        help="Skip synthesis and run the audio judge directly on a dataset of (text, audio_path) pairs",
+        help="Skip synthesis and run the audio judge on a prior run's audio (see --dataset)",
     )
     tts_parser.add_argument(
         "--dataset",
         type=str,
         default=None,
         help=(
-            "Source for --eval-only: a prior run dir (its results.csv is read), "
-            "a CSV with id/text/audio_path columns, or a JSON list of "
-            "{id, text, audio_path}. Required with --eval-only."
+            "Prior TTS run directory (e.g. ./out/run/openai) whose results.csv "
+            "is read directly. Required with --eval-only."
         ),
     )
 
@@ -586,7 +585,6 @@ Examples:
                 sys.exit(1)
 
             argv = ["calibrate-agent", "--eval-only", "--dataset", args.dataset]
-            argv.extend(["-l", args.language])
             argv.extend(["-o", args.output_dir])
             if args.config:
                 argv.extend(["--config", args.config])

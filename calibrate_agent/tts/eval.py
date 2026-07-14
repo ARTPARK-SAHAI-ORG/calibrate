@@ -943,113 +943,58 @@ async def run_single_provider_eval(
         _current_log_file.reset(token)
 
 
-def _resolve_eval_only_audio_path(audio_path: str, source_dir: str) -> str | None:
-    """Resolve a dataset row's ``audio_path`` to an existing file, or None.
+def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]:
+    """Validate a TTS run directory for eval-only and resolve its audio paths.
 
-    A TTS run's ``results.csv`` stores ``audio_path`` relative to the CWD at
-    run time (e.g. ``./out/run/openai/audios/row_1.wav``), while a hand-written
-    JSON dataset typically stores paths relative to the dataset file. To make
-    both "just work" — and to survive being pointed at from a different CWD —
-    each path is tried against several candidates and the first that exists
-    wins. The final ``{source_dir}/audios/{basename}`` candidate matches the
-    fixed run layout (``results.csv`` sits next to an ``audios/`` folder), so a
-    run directory resolves regardless of CWD.
-    """
-    candidates = [audio_path]
-    if not os.path.isabs(audio_path):
-        candidates.append(join(source_dir, audio_path))
-        candidates.append(join(source_dir, "audios", os.path.basename(audio_path)))
-    for candidate in candidates:
-        if exists(candidate):
-            return os.path.abspath(candidate)
-    return None
-
-
-def validate_tts_eval_only_dataset(dataset_path: str) -> tuple[bool, str, list[dict]]:
-    """Validate a TTS eval-only dataset and resolve its audio paths.
-
-    ``dataset_path`` may be any of:
-
-    - a **directory** from a prior TTS run (e.g. ``./out/run/openai``) — its
-      ``results.csv`` is read directly, no transformation needed;
-    - a **CSV** file with ``id``, ``text`` and ``audio_path`` columns (a run's
-      ``results.csv`` qualifies; extra columns like ``ttfb`` are ignored);
-    - a **JSON** file: a list of objects with ``id``, ``text`` and
-      ``audio_path`` fields.
-
-    Each ``audio_path`` is resolved to an existing absolute path (see
-    :func:`_resolve_eval_only_audio_path`) and written back into the returned
-    rows.
+    ``run_dir`` is a prior TTS run's output directory (e.g. ``./out/run/openai``)
+    containing a ``results.csv`` with ``id``, ``text`` and ``audio_path``
+    columns — no transformation needed. Extra columns (e.g. ``ttfb``) are
+    ignored. Each ``audio_path`` is resolved to an existing absolute path,
+    tried as given (relative to the CWD) and, as a fallback, under
+    ``{run_dir}/audios/{basename}`` (the fixed run layout) so it resolves
+    regardless of the CWD.
 
     Returns:
         tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
     """
-    if not exists(dataset_path):
-        return False, f"Dataset path does not exist: {dataset_path}", []
+    if not exists(run_dir):
+        return False, f"Dataset directory does not exist: {run_dir}", []
+    if not os.path.isdir(run_dir):
+        return False, f"--dataset must be a run directory, got a file: {run_dir}", []
 
-    required = {"id", "text", "audio_path"}
+    csv_path = join(run_dir, "results.csv")
+    if not exists(csv_path):
+        return False, f"No results.csv found in directory: {run_dir}", []
 
-    # A directory is treated as a run output dir: read its results.csv.
-    if os.path.isdir(dataset_path):
-        csv_path = join(dataset_path, "results.csv")
-        if not exists(csv_path):
-            return (
-                False,
-                f"No results.csv found in directory: {dataset_path}. "
-                "Point --dataset at a provider run dir, its results.csv, or a JSON dataset.",
-                [],
-            )
-        dataset_path = csv_path
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        return False, f"Failed to read results.csv: {e}", []
 
-    source_dir = os.path.dirname(os.path.abspath(dataset_path))
+    missing = {"id", "text", "audio_path"} - set(df.columns)
+    if missing:
+        return (
+            False,
+            f"results.csv missing required columns: {sorted(missing)}. "
+            f"Found columns: {list(df.columns)}.",
+            [],
+        )
 
-    if dataset_path.lower().endswith(".csv"):
-        try:
-            df = pd.read_csv(dataset_path)
-        except Exception as e:
-            return False, f"Failed to read dataset CSV: {e}", []
-        missing = required - set(df.columns)
-        if missing:
-            return (
-                False,
-                f"CSV missing required columns: {sorted(missing)}. "
-                f"Found columns: {list(df.columns)}.",
-                [],
-            )
-        data = [
-            {"id": r["id"], "text": r["text"], "audio_path": r["audio_path"]}
-            for _, r in df[["id", "text", "audio_path"]].iterrows()
-        ]
-    else:
-        try:
-            with open(dataset_path) as f:
-                data = json.load(f)
-        except Exception as e:
-            return False, f"Failed to parse dataset JSON: {e}", []
-        if not isinstance(data, list):
-            return False, "Dataset must be a JSON list of objects", []
-        for i, row in enumerate(data):
-            if not isinstance(row, dict):
-                return False, f"Row {i} is not an object", []
-            row_missing = required - row.keys()
-            if row_missing:
-                return (
-                    False,
-                    f"Row {i} missing required fields: {sorted(row_missing)}. "
-                    "Each row needs 'id', 'text', 'audio_path'.",
-                    [],
-                )
+    if len(df) == 0:
+        return False, f"results.csv is empty: {csv_path}", []
 
-    if not data:
-        return False, f"Dataset is empty: {dataset_path}", []
-
-    for i, row in enumerate(data):
-        resolved = _resolve_eval_only_audio_path(str(row["audio_path"]), source_dir)
+    rows = []
+    for i, r in df[["id", "text", "audio_path"]].iterrows():
+        audio_path = str(r["audio_path"])
+        candidates = [audio_path]
+        if not os.path.isabs(audio_path):
+            candidates.append(join(run_dir, "audios", os.path.basename(audio_path)))
+        resolved = next((os.path.abspath(c) for c in candidates if exists(c)), None)
         if resolved is None:
-            return False, f"Row {i} audio file does not exist: {row['audio_path']}", []
-        row["audio_path"] = resolved
+            return False, f"Row {i} audio file does not exist: {audio_path}", []
+        rows.append({"id": r["id"], "text": r["text"], "audio_path": resolved})
 
-    return True, "", data
+    return True, "", rows
 
 
 async def run_eval_only(
@@ -1062,9 +1007,8 @@ async def run_eval_only(
     ``results.csv`` directly under ``output_dir``.
 
     Args:
-        dataset_path: A prior TTS run directory (its ``results.csv`` is read),
-            a CSV with ``id``/``text``/``audio_path`` columns, or a JSON file
-            with a list of {"id", "text", "audio_path"} rows. See
+        dataset_path: A prior TTS run directory (e.g. ``./out/run/openai``)
+            whose ``results.csv`` is read directly. See
             :func:`validate_tts_eval_only_dataset`.
         output_dir: Directory to write results and metrics.
         judge_evaluators: Optional list of evaluator dicts. Defaults to the
