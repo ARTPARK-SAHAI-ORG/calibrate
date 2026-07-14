@@ -51,6 +51,11 @@ from calibrate_agent.langfuse import (
 from calibrate_agent.rate_limit import SARVAM_TTS_STREAMING_LIMITER
 
 
+# Subdirectory (under a run's output dir) where synthesized audio is written.
+# Single-sourced: the synthesis path writes here and eval-only reads from here.
+TTS_AUDIO_SUBDIR = "audios"
+
+
 # =============================================================================
 # TTS Provider API Methods
 # =============================================================================
@@ -595,7 +600,7 @@ async def run_tts_eval(
     else:
         processed_ids = set()
 
-    audio_output_dir = join(output_dir, "audios")
+    audio_output_dir = join(output_dir, TTS_AUDIO_SUBDIR)
     os.makedirs(audio_output_dir, exist_ok=True)
 
     success_count = 0
@@ -1014,7 +1019,9 @@ def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]
         audio_path = str(r["audio_path"])
         candidates = [audio_path]
         if not os.path.isabs(audio_path):
-            candidates.append(join(run_dir, "audios", os.path.basename(audio_path)))
+            candidates.append(
+            join(run_dir, TTS_AUDIO_SUBDIR, os.path.basename(audio_path))
+        )
         resolved = next((os.path.abspath(c) for c in candidates if exists(c)), None)
         if resolved is None:
             return False, f"Row {i} audio file does not exist: {audio_path}", []
