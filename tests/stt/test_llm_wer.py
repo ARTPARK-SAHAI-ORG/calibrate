@@ -51,7 +51,7 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["per_row"][0]["segments"][0]["equivalent"])
         self.assertFalse(result["per_row"][1]["segments"][0]["equivalent"])
 
-    async def test_unique_segments_judged_once(self):
+    async def test_each_row_judged_separately(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics
 
@@ -61,14 +61,14 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
             seen.append((reference, prediction))
             return {"index": 0, "equivalent": True, "reasoning": "r"}
 
-        # The same differing segment ("a","b") appears in both rows -> judged once.
+        # The same differing segment ("a","b") appears in both rows -> judged per row.
         with patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
             await metrics.get_llm_wer_cer_score(
                 references=["a x", "a y"],
                 predictions=["b x", "b y"],
             )
 
-        self.assertEqual(seen.count(("a", "b")), 1)
+        self.assertEqual(seen.count(("a", "b")), 2)
 
     async def test_insertions_and_deletions_not_judged(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw

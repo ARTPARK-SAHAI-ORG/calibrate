@@ -3,7 +3,6 @@ STT evaluation metrics.
 """
 
 import asyncio
-import hashlib
 import json
 import os
 import unicodedata
@@ -181,22 +180,15 @@ def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
 
 # --- Per-row judge checkpointing ------------------------------------------
 #
-# LLM judge calls (the plain STT judge, Sarvam intent/entity, and LLM-WER
-# segment equivalence) are the expensive, re-billable part of scoring. To make a
-# crashed or interrupted run resumable, each root can persist its per-unit
-# results to a JSONL cache and, on rerun, skip units already computed. Keys are
-# content-addressed (a hash of the exact judge input — model, config, and the
-# text pair), so an edited dataset or changed evaluator config re-judges only the
-# affected units instead of returning a stale verdict.
+# LLM judge calls are the expensive, re-billable part of scoring. Each root
+# persists its per-row results to a JSONL cache so an interrupted run resumes
+# without re-billing completed calls. Keys are plain row indices ("0", "1", …)
+# in dataset order — same assumption as transcription resume on results.csv.
 
 
-def _cache_key(*parts: object) -> str:
-    """Stable content hash for a judge input, used as the JSONL cache key."""
-    h = hashlib.sha256()
-    for part in parts:
-        h.update(repr(part).encode("utf-8"))
-        h.update(b"\x00")
-    return h.hexdigest()
+def _row_cache_key(index: int) -> str:
+    """JSONL cache key for the ``index``-th row in the current dataset."""
+    return str(index)
 
 
 def _load_judge_cache(cache_path: Optional[str]) -> dict:
@@ -452,11 +444,7 @@ async def get_llm_judge_score(
 
     refs = [str(r) for r in references]
     preds = [str(p) for p in predictions]
-    ev_fingerprint = json.dumps(evaluators, sort_keys=True, ensure_ascii=False)
-    keys = [
-        _cache_key("stt_llm_judge", fallback_model, ev_fingerprint, r, p)
-        for r, p in zip(refs, preds)
-    ]
+    keys = [_row_cache_key(i) for i in range(len(refs))]
 
     def _make(i: int):
         return stt_llm_judge(
@@ -546,10 +534,7 @@ async def get_intent_entity_score(
 
     norm_references = [str(r) for r in norm_references]
     norm_predictions = [str(p) for p in norm_predictions]
-    keys = [
-        _cache_key("intent_entity", model, r, p)
-        for r, p in zip(norm_references, norm_predictions)
-    ]
+    keys = [_row_cache_key(i) for i in range(len(norm_references))]
 
     def _make(i: int):
         return sarvam_intent_entity.intent_entity_judge(
@@ -633,39 +618,46 @@ async def get_llm_wer_cer_score(
         _normalize_refs_preds, references, predictions, language
     )
 
-    # Word-align every row and collect the unique differing segment pairs to
-    # judge (dedup — the same (ref, pred) segment is scored once).
+    # Word-align every row; segment equivalence is judged (and cached) per row.
     row_segments: List[List[dict]] = []
-    unique_pairs: dict = {}
     for i, (ref, pred) in enumerate(zip(norm_references, norm_predictions)):
-        segments = get_segments(str(ref), str(pred), key=i)
-        row_segments.append(segments)
-        for seg in segments:
-            if (
-                seg["tag"] != "equal"
-                and seg["reference"].strip()
-                and seg["prediction"].strip()
-            ):
-                unique_pairs.setdefault((seg["reference"], seg["prediction"]), None)
+        row_segments.append(get_segments(str(ref), str(pred), key=i))
 
-    pair_list = list(unique_pairs.keys())
-    seg_keys = [_cache_key("llm_wer", model, ref, pred) for ref, pred in pair_list]
+    row_keys = [_row_cache_key(i) for i in range(len(row_segments))]
+
+    async def _judge_row_segments(row_i: int) -> list:
+        row_verdicts: list = []
+        for seg in row_segments[row_i]:
+            if (
+                seg["tag"] == "equal"
+                or not seg["reference"].strip()
+                or not seg["prediction"].strip()
+            ):
+                continue
+            res = await sarvam_llm_wer.equivalence_judge(
+                seg["reference"], seg["prediction"], model=model
+            )
+            row_verdicts.append(
+                {
+                    "reference": seg["reference"],
+                    "prediction": seg["prediction"],
+                    "equivalent": bool(res["equivalent"]),
+                    "reasoning": res["reasoning"],
+                }
+            )
+        return row_verdicts
 
     def _make(i: int):
-        ref, pred = pair_list[i]
-        return sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
+        return _judge_row_segments(i)
 
-    judge_results = await _gather_cached(
-        cache_path, seg_keys, _make, desc="Running LLM-WER equivalence judge"
+    row_verdicts_list = await _gather_cached(
+        cache_path, row_keys, _make, desc="Running LLM-WER equivalence judge"
     )
 
-    verdicts = {
-        pair: {
-            "equivalent": bool(res["equivalent"]),
-            "reasoning": res["reasoning"],
-        }
-        for pair, res in zip(pair_list, judge_results)
-    }
+    verdicts: dict = {}
+    for row_verdicts in row_verdicts_list:
+        for item in row_verdicts:
+            verdicts[(item["reference"], item["prediction"])] = item
 
     # Reconstruct corrected reference/prediction per row: forgive equivalent
     # segments by rewriting the prediction side to the reference.

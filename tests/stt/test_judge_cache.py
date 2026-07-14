@@ -1,11 +1,10 @@
 """
 Tests for per-row judge checkpointing / resume.
 
-The cache helpers live in ``calibrate_agent/stt/metrics.py``: ``_cache_key``,
+The cache helpers live in ``calibrate_agent/stt/metrics.py``: ``_row_cache_key``,
 ``_load_judge_cache``, and ``_gather_cached`` persist each LLM judge result to a
 JSONL file so an interrupted run resumes without re-billing completed calls.
-``_score_and_write_results`` wires a per-judge cache file under
-``output_dir/judge_cache/``.
+Keys are plain row indices (``"0"``, ``"1"``, …) in dataset order.
 
 Run with:
     python -m unittest tests.stt.test_judge_cache -v
@@ -19,14 +18,13 @@ from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
 
-class TestCacheKey(unittest.TestCase):
-    def test_stable_and_distinct(self):
-        from calibrate_agent.stt.metrics import _cache_key
+class TestRowCacheKey(unittest.TestCase):
+    def test_row_index_as_string(self):
+        from calibrate_agent.stt.metrics import _row_cache_key
 
-        self.assertEqual(_cache_key("a", "b"), _cache_key("a", "b"))
-        self.assertNotEqual(_cache_key("a", "b"), _cache_key("a", "c"))
-        # Field boundaries matter: ("ab","c") must not collide with ("a","bc").
-        self.assertNotEqual(_cache_key("ab", "c"), _cache_key("a", "bc"))
+        self.assertEqual(_row_cache_key(0), "0")
+        self.assertEqual(_row_cache_key(12), "12")
+        self.assertNotEqual(_row_cache_key(1), _row_cache_key(2))
 
 
 class TestLoadJudgeCache(unittest.TestCase):
