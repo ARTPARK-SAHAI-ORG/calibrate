@@ -154,7 +154,11 @@ async def main():
         "--dataset",
         type=str,
         default=None,
-        help="Path to dataset JSON (list of {id, text, audio_path}). Required with --eval-only.",
+        help=(
+            "Source for --eval-only: a prior run dir (its results.csv is read), "
+            "a CSV with id/text/audio_path columns, or a JSON list of "
+            "{id, text, audio_path}. Required with --eval-only."
+        ),
     )
     parser.add_argument(
         "-l",

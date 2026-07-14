@@ -465,6 +465,68 @@ class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn("audio file does not exist", err)
 
+    def test_reads_run_results_csv(self):
+        """A run's results.csv is accepted directly (columns id/text/audio_path,
+        extra ttfb ignored; audio_path resolved via the {dir}/audios/ layout)."""
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audios = os.path.join(tmp, "audios")
+            os.makedirs(audios)
+            _write_wav(os.path.join(audios, "row_1.wav"))
+            csv_path = os.path.join(tmp, "results.csv")
+            pd.DataFrame(
+                [
+                    {
+                        "id": "row_1",
+                        "text": "hello world",
+                        # Stored relative to a *different* cwd — must still resolve
+                        # via the {csv_dir}/audios/{basename} fallback.
+                        "audio_path": "./out/run/openai/audios/row_1.wav",
+                        "ttfb": 1.23,
+                    }
+                ]
+            ).to_csv(csv_path, index=False)
+
+            ok, err, rows = validate_tts_eval_only_dataset(csv_path)
+            self.assertTrue(ok, err)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["audio_path"], os.path.join(audios, "row_1.wav"))
+
+    def test_reads_run_directory(self):
+        """Pointing at a run directory reads its results.csv with no transform."""
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audios = os.path.join(tmp, "audios")
+            os.makedirs(audios)
+            _write_wav(os.path.join(audios, "row_1.wav"))
+            pd.DataFrame(
+                [{"id": "row_1", "text": "hi", "audio_path": "audios/row_1.wav"}]
+            ).to_csv(os.path.join(tmp, "results.csv"), index=False)
+
+            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            self.assertTrue(ok, err)
+            self.assertEqual(rows[0]["audio_path"], os.path.join(audios, "row_1.wav"))
+
+    def test_directory_without_results_csv(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            self.assertFalse(ok)
+            self.assertIn("No results.csv", err)
+
+    def test_csv_missing_columns(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = os.path.join(tmp, "results.csv")
+            pd.DataFrame([{"id": "1", "text": "hi"}]).to_csv(csv_path, index=False)
+            ok, err, rows = validate_tts_eval_only_dataset(csv_path)
+            self.assertFalse(ok)
+            self.assertIn("missing required columns", err)
+
 
 class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_runs_judge_on_dataset(self):
@@ -519,6 +581,52 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("ttfb", df.columns)
             self.assertIn("quality", df.columns)
             self.assertIn("quality_reasoning", df.columns)
+
+    async def test_runs_on_run_directory(self):
+        """End-to-end: point run_eval_only at a run dir, no dataset transform."""
+        from calibrate_agent.tts import eval as tts_eval
+
+        async def fake_judge(audio_paths, texts, evaluators=None, fallback_model=None):
+            return {
+                "scores": {"quality": {"type": "binary", "mean": 1.0}},
+                "score": 1.0,
+                "per_row": [{"quality": {"match": True, "reasoning": "ok"}}],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = os.path.join(tmp, "openai")
+            os.makedirs(os.path.join(run_dir, "audios"))
+            _write_wav(os.path.join(run_dir, "audios", "row_1.wav"))
+            pd.DataFrame(
+                [
+                    {
+                        "id": "row_1",
+                        "text": "hello world",
+                        "audio_path": "audios/row_1.wav",
+                        "ttfb": 1.0,
+                    }
+                ]
+            ).to_csv(os.path.join(run_dir, "results.csv"), index=False)
+            out = os.path.join(tmp, "eval")
+
+            with patch.object(
+                tts_eval, "get_tts_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ):
+                result = await tts_eval.run_eval_only(
+                    dataset_path=run_dir,
+                    output_dir=out,
+                    judge_evaluators=[
+                        {
+                            "name": "quality",
+                            "system_prompt": "judge quality",
+                            "judge_model": "openai/gpt-4.1",
+                            "type": "binary",
+                        }
+                    ],
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertTrue(os.path.exists(os.path.join(out, "results.csv")))
 
     async def test_invalid_dataset_returns_error(self):
         from calibrate_agent.tts import eval as tts_eval
