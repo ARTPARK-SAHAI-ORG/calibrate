@@ -485,6 +485,17 @@ class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn("audio file does not exist", err)
 
+    def test_empty_results_csv(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pd.DataFrame(columns=["id", "text", "audio_path"]).to_csv(
+                os.path.join(tmp, "results.csv"), index=False
+            )
+            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            self.assertFalse(ok)
+            self.assertIn("empty", err)
+
 
 class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_runs_on_run_directory(self):

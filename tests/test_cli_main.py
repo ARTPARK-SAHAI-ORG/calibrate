@@ -273,6 +273,40 @@ class TestMainDispatch(unittest.TestCase):
                     "-d", "--overwrite",
                 ])
 
+    def test_tts_eval_only_no_dataset_exits(self):
+        with self.assertRaises(SystemExit):
+            self._run_with_argv(["calibrate_agent", "tts", "--eval-only"])
+
+    def test_tts_eval_only_success(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("calibrate_agent.tts.benchmark.main", AsyncMock(return_value=None)):
+                self._run_with_argv([
+                    "calibrate_agent", "tts", "--eval-only", "--dataset", tmp,
+                    "-o", str(Path(tmp) / "out"),
+                ])
+
+    def test_tts_eval_only_forwards_dataset_and_config(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text("{}")
+            with patch("calibrate_agent.tts.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "tts", "--eval-only", "--dataset", tmp,
+                    "-o", str(Path(tmp) / "out"), "-c", str(cfg),
+                ])
+
+        self.assertIn("--eval-only", captured["argv"])
+        self.assertIn(tmp, captured["argv"])
+        self.assertIn("--config", captured["argv"])
+        # Language is not forwarded to the eval-only path (judge ignores it).
+        self.assertNotIn("-l", captured["argv"])
+
     def test_llm_no_config_launches_ui(self):
         from calibrate_agent import cli
         with patch.object(cli, "_launch_ink_ui") as mock:
