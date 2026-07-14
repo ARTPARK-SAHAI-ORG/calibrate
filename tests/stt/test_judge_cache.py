@@ -162,8 +162,7 @@ class TestLlmWerResume(unittest.IsolatedAsyncioTestCase):
             path = str(Path(tmp) / "llm_wer.jsonl")
 
             first = AsyncMock(side_effect=judge)
-            with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-                 patch.object(slw, "equivalence_judge", first):
+            with patch.object(slw, "equivalence_judge", first):
                 r1 = await metrics.get_llm_wer_cer_score(
                     ["doctor ne bola"], ["daktar ne bola"], cache_path=path
                 )
@@ -171,8 +170,7 @@ class TestLlmWerResume(unittest.IsolatedAsyncioTestCase):
 
             # Re-run with the same cache: the segment judge must not be called.
             second = AsyncMock(side_effect=judge)
-            with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-                 patch.object(slw, "equivalence_judge", second):
+            with patch.object(slw, "equivalence_judge", second):
                 r2 = await metrics.get_llm_wer_cer_score(
                     ["doctor ne bola"], ["daktar ne bola"], cache_path=path
                 )

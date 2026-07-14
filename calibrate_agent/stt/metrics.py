@@ -135,12 +135,31 @@ def _get_indic_normalizer():
     return IndicNormalizer()
 
 
+def _normalize_refs_preds(
+    references: List[str], predictions: List[str], language: str
+) -> tuple[List[str], List[str]]:
+    """NFC + indic-nlp normalize references/predictions (Vistaar path #1).
+
+    Shared by WER/CER and LLM-WER/CER so edit metrics compare the same
+    normalized strings; jiwer cleanup (case-fold, punctuation, whitespace)
+    is applied later at scoring time.
+    """
+    normalizer = _indic_normalizer(language)
+    norm_references = [_normalize_text(ref, normalizer) for ref in references]
+    norm_predictions = [
+        _normalize_text(pred, normalizer) if isinstance(pred, str) else ""
+        for pred in predictions
+    ]
+    return norm_references, norm_predictions
+
+
 def _normalize_pairs(
     references: List[str], predictions: List[str], language: str
 ) -> tuple[List[str], List[str]]:
-    """Normalize references/predictions with the cached normalizer.
+    """Normalize references/predictions with the vendored Sarvam normalizer.
 
-    Runs in-process (``n_jobs=1`` — no joblib subprocess fork) so it can be
+    Used only by intent/entity scoring (path #2 — Whisper + up-front
+    punctuation/case stripping). Runs in-process (``n_jobs=1``) so it can be
     offloaded to a worker thread without freezing the event loop.
     """
     normalizer = _get_indic_normalizer()
@@ -295,14 +314,7 @@ def _edit_metric(
     case is a dataset with *no* reference words at all — guarded below to
     avoid jiwer returning an unbounded count instead of a rate.
     """
-    normalizer = _indic_normalizer(language)
-
-    references = [_normalize_text(ref, normalizer) for ref in references]
-    predictions = [
-        _normalize_text(pred, normalizer) if isinstance(pred, str) else ""
-        for pred in predictions
-    ]
-
+    references, predictions = _normalize_refs_preds(references, predictions, language)
     return _score_edit_metric(metric_fn, transform, references, predictions)
 
 
@@ -317,7 +329,7 @@ def _score_edit_metric(
     The scoring half of :func:`_edit_metric` — no text normalization is applied,
     so callers must normalize (and coerce to ``str``) upstream. Shared by the
     WER/CER metrics (which normalize first) and the LLM-WER/CER root (whose
-    corrected pairs are already ``IndicNormalizer``-normalized strings).
+    corrected pairs are already Vistaar-normalized strings).
     ``score`` is the dataset-pooled rate; ``per_row`` holds the per-utterance
     rates for row-level reporting.
     """
@@ -567,16 +579,17 @@ async def get_llm_wer_cer_score(
 ) -> dict:
     """Normalize, judge segment equivalence, forgive, and re-score WER/CER.
 
-    Mirrors Sarvam's ``llm_wer`` flow: reference and prediction are first run
-    through the vendored ``IndicNormalizer``, then word-aligned with
-    ``difflib.SequenceMatcher``. Each *differing* segment (a ``replace`` opcode
-    with words on both sides) is judged by ``sarvam_llm_wer.equivalence_judge``
-    for semantic/phonetic equivalence; equivalent segments are rewritten to the
-    reference ("forgiven"). Insertions and deletions are never forgiven. The
-    corrected pairs are then scored with calibrate_agent's own jiwer WER/CER
-    (``_score_edit_metric``), so ``llm_wer``/``llm_cer`` are directly comparable
-    to the top-level ``wer``/``cer`` metrics — the delta is purely the effect of
-    equivalence forgiveness.
+    Reference and prediction are first normalized with the same Vistaar path as
+    ``get_wer_score``/``get_cer_score`` (NFC + lightweight indic-nlp for Indic
+    languages), then word-aligned with ``difflib.SequenceMatcher``. Each
+    *differing* segment (a ``replace`` opcode with words on both sides) is
+    judged by ``sarvam_llm_wer.equivalence_judge`` for semantic/phonetic
+    equivalence; equivalent segments are rewritten to the reference
+    ("forgiven"). Insertions and deletions are never forgiven. The corrected
+    pairs are then scored with calibrate_agent's own jiwer WER/CER
+    (``_score_edit_metric``), so ``llm_wer``/``llm_cer`` are directly
+    comparable to the top-level ``wer``/``cer`` metrics — the delta is purely
+    the effect of equivalence forgiveness.
 
     Unique segment pairs are judged once and reused across rows (dedup).
     ``cache_path`` (optional) additionally persists each segment verdict to a
@@ -607,7 +620,6 @@ async def get_llm_wer_cer_score(
     if not references:
         return {"llm_wer": 0.0, "llm_cer": 0.0, "per_row": []}
 
-    # Deferred so the transformers/indic-nlp stack only loads when scoring runs.
     from calibrate_agent.stt import sarvam_llm_wer
     from calibrate_agent.stt.sarvam_llm_wer import (
         DEFAULT_LLM_WER_MODEL,
@@ -618,7 +630,7 @@ async def get_llm_wer_cer_score(
         model = DEFAULT_LLM_WER_MODEL
 
     norm_references, norm_predictions = await asyncio.to_thread(
-        _normalize_pairs, references, predictions, language
+        _normalize_refs_preds, references, predictions, language
     )
 
     # Word-align every row and collect the unique differing segment pairs to

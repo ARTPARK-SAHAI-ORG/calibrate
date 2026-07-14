@@ -2,8 +2,8 @@
 Tests for the LLM-WER/CER judge aggregation.
 
 ``get_llm_wer_cer_score`` lives in ``calibrate_agent/stt/metrics.py`` (the metric
-root). It normalizes reference/prediction via the vendored ``IndicNormalizer``
-(mocked here to avoid downloading a model), word-aligns each pair with
+root). It normalizes reference/prediction with the same Vistaar path as WER/CER
+(NFC + lightweight indic-nlp), word-aligns each pair with
 ``difflib.SequenceMatcher``, judges each *differing* segment for equivalence via
 ``calibrate_agent/stt/sarvam_llm_wer/judge.py`` (mocked), forgives equivalent
 segments, and re-scores WER/CER with calibrate_agent's own jiwer scorer.
@@ -14,13 +14,6 @@ Run with:
 
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
-
-
-def _identity_normalizer():
-    """Mock normalizer whose normalize_texts returns inputs unchanged."""
-    inst = MagicMock()
-    inst.normalize_texts.side_effect = lambda texts, langs, n_jobs=1: list(texts)
-    return inst
 
 
 class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
@@ -42,8 +35,7 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
                 "reasoning": "because",
             }
 
-        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-             patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
+        with patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
             result = await metrics.get_llm_wer_cer_score(
                 references=["doctor ne bola", "hello world"],
                 predictions=["daktar ne bola", "hello word"],
@@ -70,8 +62,7 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
             return {"index": 0, "equivalent": True, "reasoning": "r"}
 
         # The same differing segment ("a","b") appears in both rows -> judged once.
-        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-             patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
+        with patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
             await metrics.get_llm_wer_cer_score(
                 references=["a x", "a y"],
                 predictions=["b x", "b y"],
@@ -86,8 +77,7 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         judge = AsyncMock()
         # Pure deletion (pred shorter) and pure insertion (pred longer) — no
         # ``replace`` segment with both sides non-empty, so nothing to judge.
-        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-             patch.object(slw, "equivalence_judge", judge):
+        with patch.object(slw, "equivalence_judge", judge):
             result = await metrics.get_llm_wer_cer_score(
                 references=["one two three", "one"],
                 predictions=["one two", "one two"],
@@ -102,8 +92,7 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics
 
-        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-             patch.object(slw, "equivalence_judge", AsyncMock()):
+        with patch.object(slw, "equivalence_judge", AsyncMock()):
             result = await metrics.get_llm_wer_cer_score(references=[], predictions=[])
 
         self.assertEqual(result["llm_wer"], 0.0)
@@ -114,18 +103,18 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics
 
-        norm_inst = MagicMock()
-        norm_inst.normalize_texts.side_effect = lambda texts, langs, n_jobs=1: [
-            t.lower() for t in texts
-        ]
-
         seen = []
 
         async def fake_judge(reference, prediction, model=None):
             seen.append((reference, prediction))
             return {"index": 0, "equivalent": False, "reasoning": "r"}
 
-        with patch.object(metrics, "_get_indic_normalizer", return_value=norm_inst), \
+        real_normalize = metrics._normalize_text
+
+        def fake_normalize(text, normalizer):
+            return real_normalize(text, normalizer).lower()
+
+        with patch.object(metrics, "_normalize_text", side_effect=fake_normalize), \
              patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
             await metrics.get_llm_wer_cer_score(
                 references=["HELLO WORLD"],
@@ -133,6 +122,22 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(seen, [("world", "word")])
+
+    async def test_uses_same_normalization_as_wer(self):
+        from calibrate_agent.stt import sarvam_llm_wer as slw
+        from calibrate_agent.stt import metrics
+
+        refs = ["doctor ne bola"]
+        preds = ["daktar ne bola"]
+
+        with patch.object(slw, "equivalence_judge", AsyncMock(
+            return_value={"index": 0, "equivalent": False, "reasoning": "r"}
+        )):
+            wer = metrics.get_wer_score(refs, preds)
+            llm = await metrics.get_llm_wer_cer_score(refs, preds)
+
+        # No forgiveness -> LLM-WER should match plain WER on the same inputs.
+        self.assertAlmostEqual(llm["llm_wer"], wer["score"], places=6)
 
 
 class TestGetSegments(unittest.TestCase):
