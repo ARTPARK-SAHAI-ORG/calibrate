@@ -1028,9 +1028,9 @@ async def run_eval_only(
     output_dir: str,
     judge_evaluators: list[dict] = None,
 ) -> dict:
-    """Run the TTS audio judge only, on a pre-existing dataset of
-    (text, audio_path) pairs. Skips synthesis. Writes ``metrics.json`` and
-    ``results.csv`` directly under ``output_dir``.
+    """Run the TTS audio judge only, on a prior run's audio. Skips synthesis
+    and reads the run directory's ``results.csv`` directly. Writes
+    ``metrics.json`` and ``results.csv`` under ``output_dir``.
 
     Args:
         dataset_path: A prior TTS run directory (e.g. ``./out/run/openai``)
