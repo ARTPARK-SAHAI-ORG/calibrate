@@ -51,6 +51,11 @@ from calibrate_agent.langfuse import (
 from calibrate_agent.rate_limit import SARVAM_TTS_STREAMING_LIMITER
 
 
+# Subdirectory (under a run's output dir) where synthesized audio is written.
+# Single-sourced: the synthesis path writes here and eval-only reads from here.
+TTS_AUDIO_SUBDIR = "audios"
+
+
 # =============================================================================
 # TTS Provider API Methods
 # =============================================================================
@@ -595,7 +600,7 @@ async def run_tts_eval(
     else:
         processed_ids = set()
 
-    audio_output_dir = join(output_dir, "audios")
+    audio_output_dir = join(output_dir, TTS_AUDIO_SUBDIR)
     os.makedirs(audio_output_dir, exist_ok=True)
 
     success_count = 0
@@ -777,6 +782,94 @@ TTS_LANGUAGES = [
 ]
 
 
+async def _score_and_write_results(
+    ids: list,
+    texts: list[str],
+    audio_paths: list[str],
+    output_dir: str,
+    evaluator_config_dir: str,
+    judge_evaluators: list[dict] = None,
+    ttfb_values: list = None,
+) -> dict:
+    """Run the TTS audio judge over (audio_path, text) pairs and write outputs.
+
+    Writes ``metrics.json`` and ``results.csv`` under ``output_dir`` and the
+    resolved evaluator config under ``evaluator_config_dir``. Returns the
+    metrics_data dict.
+
+    When ``ttfb_values`` (aligned with ``ids``) is provided, a ``ttfb`` column
+    and TTFB percentile metrics are included; when None (eval-only, where
+    nothing is synthesized) both are omitted.
+    """
+    _log("Running evaluators...")
+    _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
+    require_unique_evaluator_names(_evaluators)
+    write_evaluator_config(evaluator_config_dir, _evaluators)
+    llm_judge_results = await get_tts_llm_judge_score(
+        audio_paths,
+        texts,
+        evaluators=_evaluators,
+    )
+    for name, score_dict in llm_judge_results["scores"].items():
+        _log(f"  {name}: {score_dict['mean']:.4f}")
+
+    # Map evaluator name → evaluator dict (for per-row value extraction).
+    _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
+
+    # Each evaluator gets one entry keyed by its name. The value is the full
+    # per-criterion dict (``type``, ``mean``, plus ``scale_min``/``scale_max``
+    # for ratings). Downstream consumers (leaderboard, summary print, UI)
+    # detect evaluators as dict values that carry a ``type`` field.
+    metrics_data = {}
+    for name, score_dict in llm_judge_results["scores"].items():
+        metrics_data[name] = score_dict
+
+    # TTFB percentile metrics (filter out None/NaN values). Only for the
+    # synthesis path — eval-only passes ttfb_values=None.
+    if ttfb_values is not None:
+        valid_ttfb = [
+            t
+            for t in ttfb_values
+            if t is not None and not (isinstance(t, float) and np.isnan(t))
+        ]
+        ttfb_pct = _latency_percentiles(valid_ttfb)
+        if ttfb_pct is not None:
+            metrics_data["ttfb"] = {
+                "p50": float(ttfb_pct["p50"]),
+                "p95": float(ttfb_pct["p95"]),
+                "p99": float(ttfb_pct["p99"]),
+                "count": ttfb_pct["count"],
+            }
+
+    metrics_save_path = join(output_dir, "metrics.json")
+    with open(metrics_save_path, "w") as f:
+        json.dump(metrics_data, f, indent=4)
+    _log(f"Metrics saved to: {metrics_save_path}")
+
+    ttfb_iter = ttfb_values if ttfb_values is not None else [None] * len(ids)
+    data = []
+    for _id, text, audio_path, ttfb, llm_row in zip(
+        ids, texts, audio_paths, ttfb_iter, llm_judge_results["per_row"]
+    ):
+        row = {"id": _id, "text": text, "audio_path": audio_path}
+        if ttfb_values is not None:
+            row["ttfb"] = ttfb
+        for name, ev in _evaluators_by_name.items():
+            ev_result = llm_row[name]
+            if is_rating(ev):
+                row[name] = ev_result["score"]
+            else:
+                row[name] = bool(ev_result["match"])
+            row[f"{name}_reasoning"] = ev_result["reasoning"]
+        data.append(row)
+
+    results_csv_path = join(output_dir, "results.csv")
+    pd.DataFrame(data).to_csv(results_csv_path, index=False)
+    _log(f"Results saved to: {results_csv_path}")
+
+    return metrics_data
+
+
 async def run_single_provider_eval(
     provider: str,
     language: str,
@@ -859,85 +952,153 @@ async def run_single_provider_eval(
                 "error": "No results found",
             }
 
-        # Run evaluators
-        _log("Running evaluators...")
-        _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
-        require_unique_evaluator_names(_evaluators)
-        write_evaluator_config(output_dir, _evaluators)
-        llm_judge_results = await get_tts_llm_judge_score(
-            all_audio_paths,
-            all_texts,
-            evaluators=_evaluators,
+        # Run evaluators, write metrics.json + results.csv (evaluator config
+        # goes to the parent output_dir, shared across providers).
+        metrics_data = await _score_and_write_results(
+            ids=all_ids,
+            texts=all_texts,
+            audio_paths=all_audio_paths,
+            output_dir=provider_output_dir,
+            evaluator_config_dir=output_dir,
+            judge_evaluators=judge_evaluators,
+            ttfb_values=all_ttfb,
         )
-        for name, score_dict in llm_judge_results["scores"].items():
-            _log(f"  {name}: {score_dict['mean']:.4f}")
-
-        # Map evaluator name → evaluator dict (for per-row value extraction)
-        _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
-
-        # Each evaluator gets one entry keyed by its name. The value is the
-        # full per-criterion dict (``type``, ``mean``, plus ``scale_min``/
-        # ``scale_max`` for ratings). Downstream consumers (leaderboard,
-        # summary print, UI) detect evaluators as dict values that carry a
-        # ``type`` field.
-        metrics_data = {}
-        for name, score_dict in llm_judge_results["scores"].items():
-            metrics_data[name] = score_dict
-
-        # Add ttfb percentile metrics (filter out None/NaN values)
-        valid_ttfb = [
-            t
-            for t in all_ttfb
-            if t is not None and not (isinstance(t, float) and np.isnan(t))
-        ]
-        ttfb_pct = _latency_percentiles(valid_ttfb)
-        if ttfb_pct is not None:
-            metrics_data["ttfb"] = {
-                "p50": float(ttfb_pct["p50"]),
-                "p95": float(ttfb_pct["p95"]),
-                "p99": float(ttfb_pct["p99"]),
-                "count": ttfb_pct["count"],
-            }
-
-        # Save metrics
-        metrics_save_path = join(provider_output_dir, "metrics.json")
-        with open(metrics_save_path, "w") as f:
-            json.dump(metrics_data, f, indent=4)
-
-        _log(f"Metrics saved to: {metrics_save_path}")
-
-        # Update results CSV with evaluator scores
-        data = []
-        for _id, text, audio_path, ttfb, llm_row in zip(
-            all_ids,
-            all_texts,
-            all_audio_paths,
-            all_ttfb,
-            llm_judge_results["per_row"],
-        ):
-            row = {
-                "id": _id,
-                "text": text,
-                "audio_path": audio_path,
-                "ttfb": ttfb,
-            }
-            for name, ev in _evaluators_by_name.items():
-                ev_result = llm_row[name]
-                if is_rating(ev):
-                    row[name] = ev_result["score"]
-                else:
-                    row[name] = bool(ev_result["match"])
-                row[f"{name}_reasoning"] = ev_result["reasoning"]
-            data.append(row)
-
-        pd.DataFrame(data).to_csv(results_csv_path, index=False)
-        _log(f"Results saved to: {results_csv_path}")
 
         return {
             "provider": provider,
             "status": "completed",
             "metrics": metrics_data,
             "output_dir": provider_output_dir,
+        }
+    finally:
+        _current_log_file.reset(token)
+
+
+def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]:
+    """Validate a TTS run directory for eval-only and resolve its audio paths.
+
+    ``run_dir`` is a prior TTS run's output directory (e.g. ``./out/run/openai``)
+    containing a ``results.csv`` with ``id``, ``text`` and ``audio_path``
+    columns — no transformation needed. Extra columns (e.g. ``ttfb``) are
+    ignored. Each ``audio_path`` is resolved to an existing absolute path,
+    tried as given (relative to the CWD) and, as a fallback, under
+    ``{run_dir}/audios/{basename}`` (the fixed run layout) so it resolves
+    regardless of the CWD.
+
+    Returns:
+        tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
+    """
+    if not exists(run_dir):
+        return False, f"Dataset directory does not exist: {run_dir}", []
+    if not os.path.isdir(run_dir):
+        return False, f"--dataset must be a run directory, got a file: {run_dir}", []
+
+    csv_path = join(run_dir, "results.csv")
+    if not exists(csv_path):
+        return False, f"No results.csv found in directory: {run_dir}", []
+
+    try:
+        df = pd.read_csv(csv_path)
+    except Exception as e:
+        return False, f"Failed to read results.csv: {e}", []
+
+    missing = {"id", "text", "audio_path"} - set(df.columns)
+    if missing:
+        return (
+            False,
+            f"results.csv missing required columns: {sorted(missing)}. "
+            f"Found columns: {list(df.columns)}.",
+            [],
+        )
+
+    if len(df) == 0:
+        return False, f"results.csv is empty: {csv_path}", []
+
+    rows = []
+    for i, r in df[["id", "text", "audio_path"]].iterrows():
+        audio_path = str(r["audio_path"])
+        candidates = [audio_path]
+        if not os.path.isabs(audio_path):
+            candidates.append(
+                join(run_dir, TTS_AUDIO_SUBDIR, os.path.basename(audio_path))
+            )
+        resolved = next((os.path.abspath(c) for c in candidates if exists(c)), None)
+        if resolved is None:
+            return False, f"Row {i} audio file does not exist: {audio_path}", []
+        rows.append({"id": r["id"], "text": r["text"], "audio_path": resolved})
+
+    return True, "", rows
+
+
+async def run_eval_only(
+    dataset_path: str,
+    output_dir: str,
+    judge_evaluators: list[dict] = None,
+) -> dict:
+    """Run the TTS audio judge only, on a prior run's audio. Skips synthesis
+    and reads the run directory's ``results.csv`` directly. Writes
+    ``metrics.json`` and ``results.csv`` under ``output_dir``.
+
+    Args:
+        dataset_path: A prior TTS run directory (e.g. ``./out/run/openai``)
+            whose ``results.csv`` is read directly. See
+            :func:`validate_tts_eval_only_dataset`.
+        output_dir: Directory to write results and metrics.
+        judge_evaluators: Optional list of evaluator dicts. Defaults to the
+            built-in TTS evaluator (``DEFAULT_TTS_EVALUATOR``) when omitted.
+
+    Returns:
+        dict with status, metrics, and output_dir.
+    """
+    # Refuse to write results back into the run dir being judged — that would
+    # overwrite its results.csv/metrics.json (losing the run's ttfb column).
+    if os.path.abspath(output_dir) == os.path.abspath(dataset_path):
+        return {
+            "status": "error",
+            "error": (
+                f"--output-dir must differ from the run dir being judged: {dataset_path}. "
+                "Choose a different -o so the run's results.csv/metrics.json aren't overwritten."
+            ),
+        }
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    log_save_path = join(output_dir, "logs")
+    if exists(log_save_path):
+        os.remove(log_save_path)
+
+    token = _current_log_file.set(log_save_path)
+    try:
+        _log("--------------------------------")
+        _log("\033[33mRunning TTS eval-only on dataset\033[0m")
+        _log(f"Dataset: {dataset_path}")
+
+        is_valid, error_msg, rows = validate_tts_eval_only_dataset(dataset_path)
+        if not is_valid:
+            _log(f"\033[31mError: {error_msg}\033[0m")
+            return {"status": "error", "error": error_msg}
+
+        ids = [r["id"] for r in rows]
+        texts = [str(r["text"]) for r in rows]
+        audio_paths = [r["audio_path"] for r in rows]
+
+        # No synthesis here, so no TTFB: ttfb_values=None omits the column and
+        # the percentile metrics. Metrics + results + evaluator config all land
+        # in ``output_dir``.
+        metrics_data = await _score_and_write_results(
+            ids=ids,
+            texts=texts,
+            audio_paths=audio_paths,
+            output_dir=output_dir,
+            evaluator_config_dir=output_dir,
+            judge_evaluators=judge_evaluators,
+            ttfb_values=None,
+        )
+
+        return {
+            "status": "completed",
+            "metrics": metrics_data,
+            "output_dir": output_dir,
         }
     finally:
         _current_log_file.reset(token)

@@ -32,10 +32,19 @@ from calibrate_agent.tts.benchmark import run
 # Single provider evaluation
 from calibrate_agent.tts.eval import run_single_provider_eval as run_single
 
+# Eval-only (skip synthesis, judge pre-generated audio)
+from calibrate_agent.tts.eval import run_eval_only
+
 # Leaderboard generation
 from calibrate_agent.tts.leaderboard import generate_leaderboard
 
 # Validation utilities
 from calibrate_agent.tts.eval import validate_tts_input_file
 
-__all__ = ["run", "run_single", "generate_leaderboard", "validate_tts_input_file"]
+__all__ = [
+    "run",
+    "run_single",
+    "run_eval_only",
+    "generate_leaderboard",
+    "validate_tts_input_file",
+]

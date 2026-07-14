@@ -383,5 +383,187 @@ class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
                 await tts_eval.synthesize_gemini("hi", "english", "/tmp/out.wav")
 
 
+def _write_wav(path: str) -> None:
+    """Write a tiny valid WAV file so eval-only validation's existence check passes."""
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes(b"\x00\x00" * 100)
+
+
+def _make_run_dir(tmp: str, audio_path: str = "audios/row_1.wav", extra_cols: dict = None) -> str:
+    """Create a minimal TTS run dir (results.csv + audios/row_1.wav) under ``tmp``."""
+    run_dir = os.path.join(tmp, "openai")
+    os.makedirs(os.path.join(run_dir, "audios"))
+    _write_wav(os.path.join(run_dir, "audios", "row_1.wav"))
+    row = {"id": "row_1", "text": "hello world", "audio_path": audio_path}
+    if extra_cols:
+        row.update(extra_cols)
+    pd.DataFrame([row]).to_csv(os.path.join(run_dir, "results.csv"), index=False)
+    return run_dir
+
+
+class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
+    def test_reads_run_directory(self):
+        """Pointing at a run directory reads its results.csv with no transform."""
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_run_dir(tmp)
+            ok, err, rows = validate_tts_eval_only_dataset(run_dir)
+            self.assertTrue(ok, err)
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(
+                rows[0]["audio_path"], os.path.join(run_dir, "audios", "row_1.wav")
+            )
+
+    def test_extra_columns_ignored_and_cwd_independent(self):
+        """A ttfb column is ignored; an audio_path stored relative to a different
+        cwd still resolves via the {run_dir}/audios/{basename} fallback."""
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_run_dir(
+                tmp,
+                audio_path="./out/run/openai/audios/row_1.wav",
+                extra_cols={"ttfb": 1.23},
+            )
+            ok, err, rows = validate_tts_eval_only_dataset(run_dir)
+            self.assertTrue(ok, err)
+            self.assertEqual(
+                rows[0]["audio_path"], os.path.join(run_dir, "audios", "row_1.wav")
+            )
+
+    def test_path_does_not_exist(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        ok, err, rows = validate_tts_eval_only_dataset("/nope")
+        self.assertFalse(ok)
+        self.assertEqual(rows, [])
+        self.assertIn("does not exist", err)
+
+    def test_rejects_a_file(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
+            path = f.name
+        try:
+            ok, err, rows = validate_tts_eval_only_dataset(path)
+            self.assertFalse(ok)
+            self.assertIn("must be a run directory", err)
+        finally:
+            os.remove(path)
+
+    def test_directory_without_results_csv(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            self.assertFalse(ok)
+            self.assertIn("No results.csv", err)
+
+    def test_results_csv_missing_columns(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pd.DataFrame([{"id": "1", "text": "hi"}]).to_csv(
+                os.path.join(tmp, "results.csv"), index=False
+            )
+            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            self.assertFalse(ok)
+            self.assertIn("missing required columns", err)
+
+    def test_audio_file_absent(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pd.DataFrame(
+                [{"id": "1", "text": "hi", "audio_path": "audios/missing.wav"}]
+            ).to_csv(os.path.join(tmp, "results.csv"), index=False)
+            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            self.assertFalse(ok)
+            self.assertIn("audio file does not exist", err)
+
+    def test_empty_results_csv(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            pd.DataFrame(columns=["id", "text", "audio_path"]).to_csv(
+                os.path.join(tmp, "results.csv"), index=False
+            )
+            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            self.assertFalse(ok)
+            self.assertIn("empty", err)
+
+
+class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
+    async def test_runs_on_run_directory(self):
+        """End-to-end: point run_eval_only at a run dir, no dataset transform."""
+        from calibrate_agent.tts import eval as tts_eval
+
+        async def fake_judge(audio_paths, texts, evaluators=None, fallback_model=None):
+            return {
+                "scores": {"quality": {"type": "binary", "mean": 1.0}},
+                "score": 1.0,
+                "per_row": [{"quality": {"match": True, "reasoning": "ok"}}],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_run_dir(tmp, extra_cols={"ttfb": 1.0})
+            out = os.path.join(tmp, "eval")
+
+            with patch.object(
+                tts_eval, "get_tts_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ):
+                result = await tts_eval.run_eval_only(
+                    dataset_path=run_dir,
+                    output_dir=out,
+                    judge_evaluators=[
+                        {
+                            "name": "quality",
+                            "system_prompt": "judge quality",
+                            "judge_model": "openai/gpt-4.1",
+                            "type": "binary",
+                        }
+                    ],
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertIn("quality", result["metrics"])
+            self.assertTrue(os.path.exists(os.path.join(out, "metrics.json")))
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            # No ttfb column in eval-only results; evaluator columns present.
+            self.assertNotIn("ttfb", df.columns)
+            self.assertIn("quality", df.columns)
+            self.assertIn("quality_reasoning", df.columns)
+
+    async def test_invalid_dataset_returns_error(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        result = await tts_eval.run_eval_only(
+            dataset_path="/nonexistent",
+            output_dir=tempfile.mkdtemp(),
+        )
+        self.assertEqual(result["status"], "error")
+        self.assertIn("does not exist", result["error"])
+
+    async def test_output_dir_same_as_run_dir_rejected(self):
+        """Judging a run into its own dir would clobber its results.csv."""
+        from calibrate_agent.tts import eval as tts_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_run_dir(tmp, extra_cols={"ttfb": 1.0})
+            result = await tts_eval.run_eval_only(
+                dataset_path=run_dir,
+                output_dir=os.path.join(run_dir, ""),  # same dir, trailing slash
+            )
+            self.assertEqual(result["status"], "error")
+            self.assertIn("must differ", result["error"])
+            # The original run's results.csv is untouched (ttfb column intact).
+            df = pd.read_csv(os.path.join(run_dir, "results.csv"))
+            self.assertIn("ttfb", df.columns)
+
+
 if __name__ == "__main__":
     unittest.main()
