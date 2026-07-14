@@ -3,9 +3,12 @@ STT evaluation metrics.
 """
 
 import asyncio
+import hashlib
+import json
+import os
 import unicodedata
 from functools import lru_cache
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import jiwer
@@ -157,6 +160,114 @@ def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
     return list(evaluators) if evaluators else [DEFAULT_STT_EVALUATOR]
 
 
+# --- Per-row judge checkpointing ------------------------------------------
+#
+# LLM judge calls (the plain STT judge, Sarvam intent/entity, and LLM-WER
+# segment equivalence) are the expensive, re-billable part of scoring. To make a
+# crashed or interrupted run resumable, each root can persist its per-unit
+# results to a JSONL cache and, on rerun, skip units already computed. Keys are
+# content-addressed (a hash of the exact judge input — model, config, and the
+# text pair), so an edited dataset or changed evaluator config re-judges only the
+# affected units instead of returning a stale verdict.
+
+
+def _cache_key(*parts: object) -> str:
+    """Stable content hash for a judge input, used as the JSONL cache key."""
+    h = hashlib.sha256()
+    for part in parts:
+        h.update(repr(part).encode("utf-8"))
+        h.update(b"\x00")
+    return h.hexdigest()
+
+
+def _load_judge_cache(cache_path: Optional[str]) -> dict:
+    """Load a JSONL judge cache into ``{key: value}``.
+
+    Missing file → empty cache. A partially written trailing line (from a crash
+    mid-append) is skipped rather than raising, so a resumed run still recovers
+    every fully written entry.
+    """
+    cache: dict = {}
+    if not cache_path or not os.path.exists(cache_path):
+        return cache
+    with open(cache_path, "r", encoding="utf-8") as fp:
+        for line in fp:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if "key" in entry:
+                cache[entry["key"]] = entry["value"]
+    return cache
+
+
+async def _gather_cached(
+    cache_path: Optional[str],
+    keys: List[str],
+    make_coro: Callable[[int], "asyncio.Future"],
+    desc: str,
+) -> list:
+    """Run ``make_coro(i)`` for each item whose ``keys[i]`` isn't already cached.
+
+    Results are returned aligned to ``keys`` order (cached + newly computed).
+    Each new result is appended to ``cache_path`` (JSONL) as soon as it completes
+    so an interrupted run preserves finished work; ``cache_path=None`` disables
+    persistence (every item is computed, nothing is written). Identical keys are
+    computed once and shared. If a coroutine raises (after its own retries), the
+    successes that completed are still persisted before the first exception is
+    re-raised.
+    """
+    cache = _load_judge_cache(cache_path)
+
+    # One representative index per not-yet-cached unique key.
+    todo: List[int] = []
+    scheduled: set = set(cache.keys())
+    for i, key in enumerate(keys):
+        if key not in scheduled:
+            scheduled.add(key)
+            todo.append(i)
+
+    if todo:
+
+        async def _wrapped(idx: int):
+            return idx, await make_coro(idx)
+
+        writer = None
+        first_exc: Optional[BaseException] = None
+        try:
+            if cache_path:
+                os.makedirs(os.path.dirname(cache_path) or ".", exist_ok=True)
+                writer = open(cache_path, "a", encoding="utf-8")
+            for coro in tqdm_asyncio.as_completed(
+                [_wrapped(i) for i in todo], desc=desc
+            ):
+                try:
+                    idx, result = await coro
+                except Exception as exc:  # noqa: BLE001 — preserve partial work
+                    if first_exc is None:
+                        first_exc = exc
+                    continue
+                cache[keys[idx]] = result
+                if writer:
+                    writer.write(
+                        json.dumps(
+                            {"key": keys[idx], "value": result}, ensure_ascii=False
+                        )
+                        + "\n"
+                    )
+                    writer.flush()
+        finally:
+            if writer:
+                writer.close()
+        if first_exc is not None:
+            raise first_exc
+
+    return [cache[key] for key in keys]
+
+
 def _edit_metric(
     metric_fn,
     transform,
@@ -301,6 +412,7 @@ async def get_llm_judge_score(
     predictions: List[str],
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_STT_JUDGE_MODEL,
+    cache_path: Optional[str] = None,
 ) -> dict:
     """Run STT judge across all rows and aggregate per-evaluator scores.
 
@@ -319,23 +431,31 @@ async def get_llm_judge_score(
 
     Iteration order of ``scores`` and each ``per_row`` entry matches the
     order of the ``evaluators`` argument (Python dicts preserve insertion
-    order; ``asyncio.gather`` preserves coroutine order).
+    order; results are returned in input order).
+
+    ``cache_path`` (optional) enables per-row checkpointing: completed rows are
+    persisted to a JSONL file and skipped on a resumed run.
     """
     evaluators = _resolve_evaluators(evaluators)
 
-    coroutines = [
-        stt_llm_judge(
-            str(reference),
-            str(prediction),
+    refs = [str(r) for r in references]
+    preds = [str(p) for p in predictions]
+    ev_fingerprint = json.dumps(evaluators, sort_keys=True, ensure_ascii=False)
+    keys = [
+        _cache_key("stt_llm_judge", fallback_model, ev_fingerprint, r, p)
+        for r, p in zip(refs, preds)
+    ]
+
+    def _make(i: int):
+        return stt_llm_judge(
+            refs[i],
+            preds[i],
             evaluators=evaluators,
             fallback_model=fallback_model,
         )
-        for reference, prediction in zip(references, predictions)
-    ]
 
-    results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running STT evaluators",
+    results = await _gather_cached(
+        cache_path, keys, _make, desc="Running STT evaluators"
     )
 
     # Aggregate per-evaluator scores — mean of 0/1 for binary, mean of scores for rating.
@@ -371,6 +491,7 @@ async def get_intent_entity_score(
     predictions: List[str],
     language: str = "english",
     model: Optional[str] = None,
+    cache_path: Optional[str] = None,
 ) -> dict:
     """Normalize, judge, and aggregate intent/entity preservation.
 
@@ -389,8 +510,9 @@ async def get_intent_entity_score(
         }
 
     ``model`` defaults to ``DEFAULT_INTENT_ENTITY_MODEL`` when omitted.
-    ``per_row`` order matches the input order (``asyncio.gather`` preserves
-    coroutine order).
+    ``per_row`` order matches the input order. ``cache_path`` (optional) enables
+    per-row checkpointing: judged rows are persisted to a JSONL file and skipped
+    on a resumed run.
     """
     if not references:
         return {"intent": 0.0, "entity": 0.0, "per_row": []}
@@ -410,18 +532,20 @@ async def get_intent_entity_score(
         _normalize_pairs, references, predictions, language
     )
 
-    coroutines = [
-        sarvam_intent_entity.intent_entity_judge(
-            str(reference), str(prediction), model=model, index=i
-        )
-        for i, (reference, prediction) in enumerate(
-            zip(norm_references, norm_predictions)
-        )
+    norm_references = [str(r) for r in norm_references]
+    norm_predictions = [str(p) for p in norm_predictions]
+    keys = [
+        _cache_key("intent_entity", model, r, p)
+        for r, p in zip(norm_references, norm_predictions)
     ]
 
-    results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running intent/entity judge",
+    def _make(i: int):
+        return sarvam_intent_entity.intent_entity_judge(
+            norm_references[i], norm_predictions[i], model=model, index=i
+        )
+
+    results = await _gather_cached(
+        cache_path, keys, _make, desc="Running intent/entity judge"
     )
 
     intent_scores = [int(row["intent_score"]) for row in results]
@@ -439,6 +563,7 @@ async def get_llm_wer_cer_score(
     predictions: List[str],
     language: str = "english",
     model: Optional[str] = None,
+    cache_path: Optional[str] = None,
 ) -> dict:
     """Normalize, judge segment equivalence, forgive, and re-score WER/CER.
 
@@ -453,8 +578,10 @@ async def get_llm_wer_cer_score(
     to the top-level ``wer``/``cer`` metrics — the delta is purely the effect of
     equivalence forgiveness.
 
-    Unique segment pairs are judged once and reused across rows (dedup), matching
-    upstream's caching intent without persisting a cache to disk.
+    Unique segment pairs are judged once and reused across rows (dedup).
+    ``cache_path`` (optional) additionally persists each segment verdict to a
+    JSONL file and skips already-judged segments on a resumed run — restoring
+    upstream's on-disk segment cache.
 
     Returns:
         {
@@ -510,13 +637,14 @@ async def get_llm_wer_cer_score(
                 unique_pairs.setdefault((seg["reference"], seg["prediction"]), None)
 
     pair_list = list(unique_pairs.keys())
-    coroutines = [
-        sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
-        for ref, pred in pair_list
-    ]
-    judge_results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running LLM-WER equivalence judge",
+    seg_keys = [_cache_key("llm_wer", model, ref, pred) for ref, pred in pair_list]
+
+    def _make(i: int):
+        ref, pred = pair_list[i]
+        return sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
+
+    judge_results = await _gather_cached(
+        cache_path, seg_keys, _make, desc="Running LLM-WER equivalence judge"
     )
 
     verdicts = {

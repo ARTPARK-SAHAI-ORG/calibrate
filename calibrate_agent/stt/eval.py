@@ -4,6 +4,7 @@ import sys
 import os
 import json
 import base64
+import shutil
 from os.path import join, exists
 from datetime import datetime
 from pathlib import Path
@@ -1140,6 +1141,13 @@ async def run_single_provider_eval(
             os.remove(results_csv_path)
             _log("Overwrite enabled - deleted existing results.csv")
 
+        # A fresh run must not resume from a prior run's judge checkpoints.
+        if overwrite:
+            judge_cache_dir = Path(provider_output_dir) / "judge_cache"
+            if judge_cache_dir.exists():
+                shutil.rmtree(judge_cache_dir)
+                _log("Overwrite enabled - cleared judge_cache")
+
         gt = pd.read_csv(gt_file)
 
         if debug:
@@ -1297,7 +1305,13 @@ async def _score_and_write_results(
     When ``run_sarvam_judges`` is False (the default) the Sarvam intent/entity
     judge is skipped entirely — no normalizer model is loaded, no judge calls
     are made, and the ``sarvam_*`` columns/metrics are omitted.
+
+    Every LLM judge call (intent/entity, LLM-WER segments, and the STT
+    evaluators) is checkpointed to ``output_dir/judge_cache/`` so an interrupted
+    run resumes without re-billing the calls it already completed.
     """
+    cache_dir = join(output_dir, "judge_cache")
+
     wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
 
@@ -1311,14 +1325,20 @@ async def _score_and_write_results(
     llm_wer_results = None
     if run_sarvam_judges:
         intent_entity_results = await get_intent_entity_score(
-            gt_transcripts, pred_transcripts, language=language
+            gt_transcripts,
+            pred_transcripts,
+            language=language,
+            cache_path=join(cache_dir, "intent_entity.jsonl"),
         )
         _log(
             f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
             to_terminal=False,
         )
         llm_wer_results = await get_llm_wer_cer_score(
-            gt_transcripts, pred_transcripts, language=language
+            gt_transcripts,
+            pred_transcripts,
+            language=language,
+            cache_path=join(cache_dir, "llm_wer.jsonl"),
         )
         _log(
             f"Sarvam LLM WER: {llm_wer_results['llm_wer']:.4f}  Sarvam LLM CER: {llm_wer_results['llm_cer']:.4f}",
@@ -1332,6 +1352,7 @@ async def _score_and_write_results(
         gt_transcripts,
         pred_transcripts,
         evaluators=_evaluators,
+        cache_path=join(cache_dir, "llm_judge.jsonl"),
     )
     for name, score_dict in llm_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
