@@ -43,5 +43,50 @@
         "price_per_minute_usd": 0.008
       }
     }
+  },
+  "tts": {
+    "cartesia": {
+      "sonic-3.5": {
+        "price_per_million_chars_usd": 50.0
+      }
+    },
+    "openai": {
+      "gpt-4o-mini-tts": {
+        "price_per_million_chars_usd": 15.0
+      }
+    },
+    "groq": {
+      "canopylabs/orpheus-v1-english": {
+        "price_per_million_chars_usd": 22.0
+      }
+    },
+    "google": {
+      "chirp3-hd": {
+        "price_per_million_chars_usd": 30.0
+      },
+      "gemini-2.5-flash-tts": {
+        "price_per_million_chars_usd": 30.0
+      }
+    },
+    "gemini": {
+      "gemini-3.1-flash-tts-preview": {
+        "price_per_million_chars_usd": 36.3636364
+      }
+    },
+    "elevenlabs": {
+      "eleven_multilingual_v2": {
+        "price_per_million_chars_usd": 100.0
+      }
+    },
+    "sarvam": {
+      "bulbul:v3": {
+        "price_per_million_chars_usd": 17.4418605
+      }
+    },
+    "smallest": {
+      "lightning-v3.1": {
+        "price_per_million_chars_usd": 19.5
+      }
+    }
   }
 }

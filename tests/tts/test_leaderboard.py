@@ -60,6 +60,27 @@ class TestTTSLeaderboard(unittest.TestCase):
             self.assertIn("ttfb_p95", summary.columns)
             self.assertIn("ttfb_p99", summary.columns)
 
+    def test_cost_metrics_surface_as_scalar_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_provider(base, "openai", {
+                "pronunciation": {"type": "binary", "mean": 0.9},
+                "cost": {
+                    "total_characters": 2000,
+                    "cost_per_million_chars_usd": 15.0,
+                    "cost_usd": 0.03,
+                },
+            })
+
+            save_dir = base / "leaderboard"
+            generate_tts_leaderboard(str(base), str(save_dir))
+
+            summary = pd.read_excel(save_dir / "tts_leaderboard.xlsx", sheet_name="summary")
+            self.assertIn("total_characters", summary.columns)
+            self.assertIn("cost_per_million_chars_usd", summary.columns)
+            self.assertIn("cost_usd", summary.columns)
+            self.assertEqual(float(summary.iloc[0]["cost_usd"]), 0.03)
+
     def test_multi_criterion_metrics_surface_dynamically(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)

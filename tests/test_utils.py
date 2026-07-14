@@ -36,6 +36,66 @@ class TestAudioDurationSeconds(unittest.TestCase):
             self.assertIsNone(get_audio_duration_seconds(path))
 
 
+class TestReadLeaderboardCostMetrics(unittest.TestCase):
+    def _write(self, tmp, metrics):
+        path = Path(tmp) / "metrics.json"
+        path.write_text(json.dumps(metrics))
+        return path
+
+    def test_tts_cost_fans_out_to_scalar_columns(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "pronunciation": {"type": "binary", "mean": 0.9},
+                "cost": {
+                    "total_characters": 2000,
+                    "cost_per_million_chars_usd": 15.0,
+                    "cost_usd": 0.03,
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertEqual(metrics["total_characters"], 2000.0)
+            self.assertEqual(metrics["cost_per_million_chars_usd"], 15.0)
+            self.assertEqual(metrics["cost_usd"], 0.03)
+            self.assertNotIn("cost", metrics)
+
+    def test_stt_cost_fans_out_to_minute_columns(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "wer": 0.1,
+                "cost": {
+                    "audio_minutes": 2.0,
+                    "cost_per_minute_usd": 0.006,
+                    "cost_usd": 0.012,
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertEqual(metrics["audio_minutes"], 2.0)
+            self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
+            self.assertEqual(metrics["cost_usd"], 0.012)
+
+    def test_cost_only_surfaces_numeric_scalars(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "cost": {
+                    "total_characters": 500,
+                    "pricing_model": "gpt-4o-mini-tts",
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertEqual(metrics["total_characters"], 500.0)
+            self.assertNotIn("pricing_model", metrics)
+            self.assertNotIn("cost_usd", metrics)
+
+
 class TestLanguageCodes(unittest.TestCase):
     def test_get_stt_language_codes_per_provider(self):
         from calibrate_agent.utils import get_stt_language_code

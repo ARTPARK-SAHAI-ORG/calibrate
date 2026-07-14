@@ -2338,7 +2338,16 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
             if key == "cost" and isinstance(value, dict):
-                for cost_key in ("audio_minutes", "cost_per_minute_usd", "cost_usd"):
+                # STT cost keys are per-minute; TTS cost keys are per-character.
+                # Both share ``cost_usd``. Only keys present in the object
+                # surface, so a run only emits its own component's columns.
+                for cost_key in (
+                    "audio_minutes",
+                    "cost_per_minute_usd",
+                    "total_characters",
+                    "cost_per_million_chars_usd",
+                    "cost_usd",
+                ):
                     scalar = value.get(cost_key)
                     if isinstance(scalar, (int, float)):
                         metrics[cost_key] = float(scalar)

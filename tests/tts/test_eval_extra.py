@@ -458,5 +458,76 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
                 await E.main()
 
 
+class TestTTSCostMetrics(unittest.TestCase):
+    def test_builds_cost_metrics_from_default_pricing(self):
+        from calibrate_agent.tts import eval as E
+
+        metrics = E._build_tts_cost_metrics(
+            provider="openai",
+            texts=["a" * 1_000_000],
+            model="gpt-4o-mini-tts",
+        )
+
+        self.assertEqual(metrics["billing_unit"], "character")
+        self.assertEqual(metrics["pricing_model"], "gpt-4o-mini-tts")
+        self.assertEqual(metrics["total_characters"], 1_000_000)
+        self.assertEqual(metrics["cost_per_million_chars_usd"], 15.0)
+        self.assertEqual(metrics["cost_usd"], 15.0)
+
+    def test_sums_characters_across_rows_and_ignores_missing(self):
+        from calibrate_agent.tts import eval as E
+
+        metrics = E._build_tts_cost_metrics(
+            provider="groq",
+            texts=["hello", "world!", None, float("nan")],
+            model="canopylabs/orpheus-v1-english",
+        )
+
+        self.assertEqual(metrics["total_characters"], 11)
+        self.assertEqual(metrics["cost_per_million_chars_usd"], 22.0)
+        self.assertAlmostEqual(metrics["cost_usd"], 11 / 1_000_000 * 22.0)
+
+    def test_empty_texts_returns_none(self):
+        from calibrate_agent.tts import eval as E
+
+        self.assertIsNone(E._build_tts_cost_metrics("openai", texts=[]))
+        self.assertIsNone(E._build_tts_cost_metrics("openai", texts=[None, ""]))
+
+    def test_unknown_provider_returns_none(self):
+        from calibrate_agent.tts import eval as E
+
+        self.assertIsNone(E._build_tts_cost_metrics("madeup", texts=["abcd"]))
+
+    def test_google_sindhi_uses_gemini_pricing_model(self):
+        from calibrate_agent.tts import eval as E
+
+        self.assertEqual(
+            E._default_tts_model("google", "sindhi"), "gemini-2.5-flash-tts"
+        )
+        self.assertEqual(E._default_tts_model("google", "english"), "chirp3-hd")
+
+        metrics = E._build_tts_cost_metrics(
+            provider="google",
+            texts=["a" * 1_000_000],
+            model=E._default_tts_model("google", "sindhi"),
+        )
+        self.assertEqual(metrics["pricing_model"], "gemini-2.5-flash-tts")
+        self.assertEqual(metrics["cost_usd"], 30.0)
+
+    def test_all_supported_providers_have_cost_pricing(self):
+        from calibrate_agent.tts import eval as E
+        from calibrate_agent.tts.eval import TTS_PROVIDERS
+
+        for provider in TTS_PROVIDERS:
+            with self.subTest(provider=provider):
+                metrics = E._build_tts_cost_metrics(
+                    provider=provider,
+                    texts=["a" * 1000],
+                    model=E._default_tts_model(provider, "english"),
+                )
+                self.assertIsNotNone(metrics)
+                self.assertIn("cost_usd", metrics)
+
+
 if __name__ == "__main__":
     unittest.main()
