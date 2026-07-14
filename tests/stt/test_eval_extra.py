@@ -45,11 +45,9 @@ def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
                 {
                     "llm_wer": float(llm_wer),
                     "llm_cer": float(llm_cer),
-                    "corrected_reference": str(r),
-                    "corrected_prediction": str(p),
                     "segments": [],
                 }
-                for r, p in zip(refs, preds)
+                for _ in refs
             ],
         }
 

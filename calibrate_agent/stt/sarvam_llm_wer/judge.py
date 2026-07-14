@@ -30,7 +30,6 @@ async def equivalence_judge(
     reference: str,
     prediction: str,
     model: str = DEFAULT_LLM_WER_MODEL,
-    index: int = 0,
 ) -> dict:
     """Judge whether a reference/prediction word segment is equivalent.
 
@@ -38,7 +37,6 @@ async def equivalence_judge(
         reference: Reference-side words of a differing segment (normalized).
         prediction: Prediction-side words of the same segment (normalized).
         model: OpenRouter model id used for grading.
-        index: Row index echoed into the input/output JSON.
 
     Returns:
         Dict matching :class:`LLMEquivalenceResponse` fields

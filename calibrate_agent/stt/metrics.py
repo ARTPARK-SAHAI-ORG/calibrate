@@ -204,13 +204,12 @@ def _score_edit_metric(
     """Score already-normalized (reference, prediction) pairs with jiwer.
 
     The scoring half of :func:`_edit_metric` — no text normalization is applied,
-    so callers must normalize upstream. Shared by the WER/CER metrics (which
-    normalize first) and the LLM-WER/CER root (whose corrected pairs are already
-    ``IndicNormalizer``-normalized). ``score`` is the dataset-pooled rate;
-    ``per_row`` holds the per-utterance rates for row-level reporting.
+    so callers must normalize (and coerce to ``str``) upstream. Shared by the
+    WER/CER metrics (which normalize first) and the LLM-WER/CER root (whose
+    corrected pairs are already ``IndicNormalizer``-normalized strings).
+    ``score`` is the dataset-pooled rate; ``per_row`` holds the per-utterance
+    rates for row-level reporting.
     """
-    predictions = [p if isinstance(p, str) else "" for p in predictions]
-
     # Per-clip rates — for results.csv only, never averaged into `score`.
     per_row = [
         metric_fn(
@@ -465,9 +464,7 @@ async def get_llm_wer_cer_score(
                 {
                     "llm_wer": float,          # per-utterance corrected WER
                     "llm_cer": float,          # per-utterance corrected CER
-                    "corrected_reference": str,
-                    "corrected_prediction": str,
-                    "segments": [
+                    "segments": [              # judged differing segments
                         {"reference": str, "prediction": str,
                          "equivalent": bool, "reasoning": str},
                         ...
@@ -514,8 +511,8 @@ async def get_llm_wer_cer_score(
 
     pair_list = list(unique_pairs.keys())
     coroutines = [
-        sarvam_llm_wer.equivalence_judge(ref, pred, model=model, index=i)
-        for i, (ref, pred) in enumerate(pair_list)
+        sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
+        for ref, pred in pair_list
     ]
     judge_results = await tqdm_asyncio.gather(
         *coroutines,
@@ -571,15 +568,11 @@ async def get_llm_wer_cer_score(
         {
             "llm_wer": float(row_wer),
             "llm_cer": float(row_cer),
-            "corrected_reference": corr_ref,
-            "corrected_prediction": corr_pred,
             "segments": seg_log,
         }
-        for row_wer, row_cer, corr_ref, corr_pred, seg_log in zip(
+        for row_wer, row_cer, seg_log in zip(
             wer_scored["per_row"],
             cer_scored["per_row"],
-            corrected_references,
-            corrected_predictions,
             per_row_segments,
         )
     ]

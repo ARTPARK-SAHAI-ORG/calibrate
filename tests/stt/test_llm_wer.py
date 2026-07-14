@@ -35,9 +35,9 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
             ("world", "word"): False,
         }
 
-        async def fake_judge(reference, prediction, model=None, index=0):
+        async def fake_judge(reference, prediction, model=None):
             return {
-                "index": index,
+                "index": 0,
                 "equivalent": verdicts[(reference, prediction)],
                 "reasoning": "because",
             }
@@ -55,8 +55,9 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result["per_row"]), 2)
         self.assertAlmostEqual(result["per_row"][0]["llm_wer"], 0.0, places=6)
         self.assertAlmostEqual(result["per_row"][1]["llm_wer"], 0.5, places=6)
-        self.assertEqual(result["per_row"][0]["corrected_prediction"], "doctor ne bola")
-        self.assertEqual(result["per_row"][1]["corrected_prediction"], "hello word")
+        # Row 0's differing segment was forgiven; row 1's was kept as an error.
+        self.assertTrue(result["per_row"][0]["segments"][0]["equivalent"])
+        self.assertFalse(result["per_row"][1]["segments"][0]["equivalent"])
 
     async def test_unique_segments_judged_once(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
@@ -64,9 +65,9 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
 
         seen = []
 
-        async def fake_judge(reference, prediction, model=None, index=0):
+        async def fake_judge(reference, prediction, model=None):
             seen.append((reference, prediction))
-            return {"index": index, "equivalent": True, "reasoning": "r"}
+            return {"index": 0, "equivalent": True, "reasoning": "r"}
 
         # The same differing segment ("a","b") appears in both rows -> judged once.
         with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
@@ -120,9 +121,9 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
 
         seen = []
 
-        async def fake_judge(reference, prediction, model=None, index=0):
+        async def fake_judge(reference, prediction, model=None):
             seen.append((reference, prediction))
-            return {"index": index, "equivalent": False, "reasoning": "r"}
+            return {"index": 0, "equivalent": False, "reasoning": "r"}
 
         with patch.object(metrics, "_get_indic_normalizer", return_value=norm_inst), \
              patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
@@ -187,7 +188,7 @@ class TestEquivalenceJudge(unittest.IsolatedAsyncioTestCase):
 
         with patch.object(jw, "_build_openrouter_client", return_value=MagicMock()), \
              patch.object(jw.instructor, "apatch", return_value=fake_client):
-            result = await inner("doctor", "daktar", model="m", index=2)
+            result = await inner("doctor", "daktar", model="m")
 
         self.assertEqual(result, fake_result)
         _, kwargs = fake_client.chat.completions.create.call_args
