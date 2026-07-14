@@ -777,6 +777,94 @@ TTS_LANGUAGES = [
 ]
 
 
+async def _score_and_write_results(
+    ids: list,
+    texts: list[str],
+    audio_paths: list[str],
+    output_dir: str,
+    evaluator_config_dir: str,
+    judge_evaluators: list[dict] = None,
+    ttfb_values: list = None,
+) -> dict:
+    """Run the TTS audio judge over (audio_path, text) pairs and write outputs.
+
+    Writes ``metrics.json`` and ``results.csv`` under ``output_dir`` and the
+    resolved evaluator config under ``evaluator_config_dir``. Returns the
+    metrics_data dict.
+
+    When ``ttfb_values`` (aligned with ``ids``) is provided, a ``ttfb`` column
+    and TTFB percentile metrics are included; when None (eval-only, where
+    nothing is synthesized) both are omitted.
+    """
+    _log("Running evaluators...")
+    _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
+    require_unique_evaluator_names(_evaluators)
+    write_evaluator_config(evaluator_config_dir, _evaluators)
+    llm_judge_results = await get_tts_llm_judge_score(
+        audio_paths,
+        texts,
+        evaluators=_evaluators,
+    )
+    for name, score_dict in llm_judge_results["scores"].items():
+        _log(f"  {name}: {score_dict['mean']:.4f}")
+
+    # Map evaluator name → evaluator dict (for per-row value extraction).
+    _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
+
+    # Each evaluator gets one entry keyed by its name. The value is the full
+    # per-criterion dict (``type``, ``mean``, plus ``scale_min``/``scale_max``
+    # for ratings). Downstream consumers (leaderboard, summary print, UI)
+    # detect evaluators as dict values that carry a ``type`` field.
+    metrics_data = {}
+    for name, score_dict in llm_judge_results["scores"].items():
+        metrics_data[name] = score_dict
+
+    # TTFB percentile metrics (filter out None/NaN values). Only for the
+    # synthesis path — eval-only passes ttfb_values=None.
+    if ttfb_values is not None:
+        valid_ttfb = [
+            t
+            for t in ttfb_values
+            if t is not None and not (isinstance(t, float) and np.isnan(t))
+        ]
+        ttfb_pct = _latency_percentiles(valid_ttfb)
+        if ttfb_pct is not None:
+            metrics_data["ttfb"] = {
+                "p50": float(ttfb_pct["p50"]),
+                "p95": float(ttfb_pct["p95"]),
+                "p99": float(ttfb_pct["p99"]),
+                "count": ttfb_pct["count"],
+            }
+
+    metrics_save_path = join(output_dir, "metrics.json")
+    with open(metrics_save_path, "w") as f:
+        json.dump(metrics_data, f, indent=4)
+    _log(f"Metrics saved to: {metrics_save_path}")
+
+    ttfb_iter = ttfb_values if ttfb_values is not None else [None] * len(ids)
+    data = []
+    for _id, text, audio_path, ttfb, llm_row in zip(
+        ids, texts, audio_paths, ttfb_iter, llm_judge_results["per_row"]
+    ):
+        row = {"id": _id, "text": text, "audio_path": audio_path}
+        if ttfb_values is not None:
+            row["ttfb"] = ttfb
+        for name, ev in _evaluators_by_name.items():
+            ev_result = llm_row[name]
+            if is_rating(ev):
+                row[name] = ev_result["score"]
+            else:
+                row[name] = bool(ev_result["match"])
+            row[f"{name}_reasoning"] = ev_result["reasoning"]
+        data.append(row)
+
+    results_csv_path = join(output_dir, "results.csv")
+    pd.DataFrame(data).to_csv(results_csv_path, index=False)
+    _log(f"Results saved to: {results_csv_path}")
+
+    return metrics_data
+
+
 async def run_single_provider_eval(
     provider: str,
     language: str,
@@ -859,79 +947,17 @@ async def run_single_provider_eval(
                 "error": "No results found",
             }
 
-        # Run evaluators
-        _log("Running evaluators...")
-        _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
-        require_unique_evaluator_names(_evaluators)
-        write_evaluator_config(output_dir, _evaluators)
-        llm_judge_results = await get_tts_llm_judge_score(
-            all_audio_paths,
-            all_texts,
-            evaluators=_evaluators,
+        # Run evaluators, write metrics.json + results.csv (evaluator config
+        # goes to the parent output_dir, shared across providers).
+        metrics_data = await _score_and_write_results(
+            ids=all_ids,
+            texts=all_texts,
+            audio_paths=all_audio_paths,
+            output_dir=provider_output_dir,
+            evaluator_config_dir=output_dir,
+            judge_evaluators=judge_evaluators,
+            ttfb_values=all_ttfb,
         )
-        for name, score_dict in llm_judge_results["scores"].items():
-            _log(f"  {name}: {score_dict['mean']:.4f}")
-
-        # Map evaluator name → evaluator dict (for per-row value extraction)
-        _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
-
-        # Each evaluator gets one entry keyed by its name. The value is the
-        # full per-criterion dict (``type``, ``mean``, plus ``scale_min``/
-        # ``scale_max`` for ratings). Downstream consumers (leaderboard,
-        # summary print, UI) detect evaluators as dict values that carry a
-        # ``type`` field.
-        metrics_data = {}
-        for name, score_dict in llm_judge_results["scores"].items():
-            metrics_data[name] = score_dict
-
-        # Add ttfb percentile metrics (filter out None/NaN values)
-        valid_ttfb = [
-            t
-            for t in all_ttfb
-            if t is not None and not (isinstance(t, float) and np.isnan(t))
-        ]
-        ttfb_pct = _latency_percentiles(valid_ttfb)
-        if ttfb_pct is not None:
-            metrics_data["ttfb"] = {
-                "p50": float(ttfb_pct["p50"]),
-                "p95": float(ttfb_pct["p95"]),
-                "p99": float(ttfb_pct["p99"]),
-                "count": ttfb_pct["count"],
-            }
-
-        # Save metrics
-        metrics_save_path = join(provider_output_dir, "metrics.json")
-        with open(metrics_save_path, "w") as f:
-            json.dump(metrics_data, f, indent=4)
-
-        _log(f"Metrics saved to: {metrics_save_path}")
-
-        # Update results CSV with evaluator scores
-        data = []
-        for _id, text, audio_path, ttfb, llm_row in zip(
-            all_ids,
-            all_texts,
-            all_audio_paths,
-            all_ttfb,
-            llm_judge_results["per_row"],
-        ):
-            row = {
-                "id": _id,
-                "text": text,
-                "audio_path": audio_path,
-                "ttfb": ttfb,
-            }
-            for name, ev in _evaluators_by_name.items():
-                ev_result = llm_row[name]
-                if is_rating(ev):
-                    row[name] = ev_result["score"]
-                else:
-                    row[name] = bool(ev_result["match"])
-                row[f"{name}_reasoning"] = ev_result["reasoning"]
-            data.append(row)
-
-        pd.DataFrame(data).to_csv(results_csv_path, index=False)
-        _log(f"Results saved to: {results_csv_path}")
 
         return {
             "provider": provider,
@@ -1038,49 +1064,18 @@ async def run_eval_only(
         texts = [str(r["text"]) for r in rows]
         audio_paths = [r["audio_path"] for r in rows]
 
-        _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
-        require_unique_evaluator_names(_evaluators)
-        write_evaluator_config(output_dir, _evaluators)
-
-        llm_judge_results = await get_tts_llm_judge_score(
-            audio_paths,
-            texts,
-            evaluators=_evaluators,
+        # No synthesis here, so no TTFB: ttfb_values=None omits the column and
+        # the percentile metrics. Metrics + results + evaluator config all land
+        # in ``output_dir``.
+        metrics_data = await _score_and_write_results(
+            ids=ids,
+            texts=texts,
+            audio_paths=audio_paths,
+            output_dir=output_dir,
+            evaluator_config_dir=output_dir,
+            judge_evaluators=judge_evaluators,
+            ttfb_values=None,
         )
-        for name, score_dict in llm_judge_results["scores"].items():
-            _log(f"  {name}: {score_dict['mean']:.4f}")
-
-        _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
-
-        metrics_data = {}
-        for name, score_dict in llm_judge_results["scores"].items():
-            metrics_data[name] = score_dict
-
-        with open(join(output_dir, "metrics.json"), "w") as f:
-            json.dump(metrics_data, f, indent=4)
-
-        data = []
-        for _id, text, audio_path, llm_row in zip(
-            ids,
-            texts,
-            audio_paths,
-            llm_judge_results["per_row"],
-        ):
-            row = {
-                "id": _id,
-                "text": text,
-                "audio_path": audio_path,
-            }
-            for name, ev in _evaluators_by_name.items():
-                ev_result = llm_row[name]
-                if is_rating(ev):
-                    row[name] = ev_result["score"]
-                else:
-                    row[name] = bool(ev_result["match"])
-                row[f"{name}_reasoning"] = ev_result["reasoning"]
-            data.append(row)
-
-        pd.DataFrame(data).to_csv(join(output_dir, "results.csv"), index=False)
 
         return {
             "status": "completed",
