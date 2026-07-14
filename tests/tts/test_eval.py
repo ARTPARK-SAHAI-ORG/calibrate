@@ -383,5 +383,153 @@ class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
                 await tts_eval.synthesize_gemini("hi", "english", "/tmp/out.wav")
 
 
+import json
+
+
+def _write_wav(path: str) -> None:
+    """Write a tiny valid WAV file so eval-only validation's existence check passes."""
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(16000)
+        wf.writeframes(b"\x00\x00" * 100)
+
+
+class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
+    def test_valid_relative_paths_resolved(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_wav(os.path.join(tmp, "a.wav"))
+            _write_wav(os.path.join(tmp, "b.wav"))
+            ds = os.path.join(tmp, "ds.json")
+            with open(ds, "w") as f:
+                json.dump(
+                    [
+                        {"id": "1", "text": "hello", "audio_path": "a.wav"},
+                        {"id": "2", "text": "world", "audio_path": "b.wav"},
+                    ],
+                    f,
+                )
+            ok, err, rows = validate_tts_eval_only_dataset(ds)
+            self.assertTrue(ok, err)
+            self.assertEqual(len(rows), 2)
+            # Relative paths resolved to absolute against the dataset dir.
+            self.assertTrue(os.path.isabs(rows[0]["audio_path"]))
+            self.assertEqual(rows[0]["audio_path"], os.path.join(tmp, "a.wav"))
+
+    def test_missing_file(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        ok, err, rows = validate_tts_eval_only_dataset("/nope.json")
+        self.assertFalse(ok)
+        self.assertEqual(rows, [])
+        self.assertIn("does not exist", err)
+
+    def test_not_a_list(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump({"id": "1", "text": "hi", "audio_path": "a.wav"}, f)
+            path = f.name
+        try:
+            ok, err, rows = validate_tts_eval_only_dataset(path)
+            self.assertFalse(ok)
+            self.assertIn("list", err)
+        finally:
+            os.remove(path)
+
+    def test_missing_fields(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump([{"id": "1", "text": "hi"}], f)
+            path = f.name
+        try:
+            ok, err, rows = validate_tts_eval_only_dataset(path)
+            self.assertFalse(ok)
+            self.assertIn("missing required fields", err)
+        finally:
+            os.remove(path)
+
+    def test_audio_file_absent(self):
+        from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ds = os.path.join(tmp, "ds.json")
+            with open(ds, "w") as f:
+                json.dump(
+                    [{"id": "1", "text": "hi", "audio_path": "missing.wav"}], f
+                )
+            ok, err, rows = validate_tts_eval_only_dataset(ds)
+            self.assertFalse(ok)
+            self.assertIn("audio file does not exist", err)
+
+
+class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
+    async def test_runs_judge_on_dataset(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        async def fake_judge(audio_paths, texts, evaluators=None, fallback_model=None):
+            return {
+                "scores": {"quality": {"type": "binary", "mean": 0.5}},
+                "score": 0.5,
+                "per_row": [
+                    {"quality": {"match": True, "reasoning": "ok"}},
+                    {"quality": {"match": False, "reasoning": "no"}},
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_wav(os.path.join(tmp, "a.wav"))
+            _write_wav(os.path.join(tmp, "b.wav"))
+            ds = os.path.join(tmp, "ds.json")
+            with open(ds, "w") as f:
+                json.dump(
+                    [
+                        {"id": "1", "text": "hello", "audio_path": "a.wav"},
+                        {"id": "2", "text": "world", "audio_path": "b.wav"},
+                    ],
+                    f,
+                )
+            out = os.path.join(tmp, "out")
+
+            with patch.object(
+                tts_eval, "get_tts_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ):
+                result = await tts_eval.run_eval_only(
+                    dataset_path=ds,
+                    output_dir=out,
+                    judge_evaluators=[
+                        {
+                            "name": "quality",
+                            "system_prompt": "judge quality",
+                            "judge_model": "openai/gpt-4.1",
+                            "type": "binary",
+                        }
+                    ],
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertIn("quality", result["metrics"])
+            self.assertTrue(os.path.exists(os.path.join(out, "metrics.json")))
+            self.assertTrue(os.path.exists(os.path.join(out, "results.csv")))
+            # No ttfb column in eval-only results.
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertNotIn("ttfb", df.columns)
+            self.assertIn("quality", df.columns)
+            self.assertIn("quality_reasoning", df.columns)
+
+    async def test_invalid_dataset_returns_error(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        result = await tts_eval.run_eval_only(
+            dataset_path="/nonexistent.json",
+            output_dir=tempfile.mkdtemp(),
+        )
+        self.assertEqual(result["status"], "error")
+        self.assertIn("does not exist", result["error"])
+
+
 if __name__ == "__main__":
     unittest.main()

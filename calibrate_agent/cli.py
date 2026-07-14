@@ -277,6 +277,17 @@ Examples:
         default=None,
         help="Path to optional JSON config file with judge settings (model, prompt)",
     )
+    tts_parser.add_argument(
+        "--eval-only",
+        action="store_true",
+        help="Skip synthesis and run the audio judge directly on a dataset of (text, audio_path) pairs",
+    )
+    tts_parser.add_argument(
+        "--dataset",
+        type=str,
+        default=None,
+        help="Path to dataset JSON (list of {id, text, audio_path}). Required with --eval-only.",
+    )
 
     # ── LLM tests ───────────────────────────────────────────────
     # `calibrate-agent llm` with no args → interactive UI
@@ -560,8 +571,25 @@ Examples:
             _launch_ink_ui("stt")
 
     elif args.component == "tts":
-        # If provider is given, run evaluation directly; otherwise launch interactive UI
-        if args.provider is not None:
+        # eval-only: skip synthesis and run the audio judge on a dataset.
+        # provider given → run synthesis + evaluators.
+        # neither: launch interactive UI.
+        if args.eval_only:
+            from calibrate_agent.tts.benchmark import main as tts_benchmark_main
+
+            if not args.dataset:
+                print("\033[31mError: --dataset is required with --eval-only\033[0m")
+                sys.exit(1)
+
+            argv = ["calibrate-agent", "--eval-only", "--dataset", args.dataset]
+            argv.extend(["-l", args.language])
+            argv.extend(["-o", args.output_dir])
+            if args.config:
+                argv.extend(["--config", args.config])
+
+            sys.argv = argv
+            asyncio.run(tts_benchmark_main())
+        elif args.provider is not None:
             from calibrate_agent.tts.benchmark import main as tts_benchmark_main
 
             providers = args.provider

@@ -943,6 +943,144 @@ async def run_single_provider_eval(
         _current_log_file.reset(token)
 
 
+def validate_tts_eval_only_dataset(dataset_path: str) -> tuple[bool, str, list[dict]]:
+    """Validate a TTS eval-only dataset JSON file.
+
+    Expected format: a JSON list of objects with ``id``, ``text`` and
+    ``audio_path`` fields. ``audio_path`` may be absolute or relative to the
+    dataset file's directory; each is resolved to an absolute path and checked
+    to exist. The resolved path is written back into the returned rows.
+
+    Returns:
+        tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
+    """
+    if not exists(dataset_path):
+        return False, f"Dataset file does not exist: {dataset_path}", []
+
+    try:
+        with open(dataset_path) as f:
+            data = json.load(f)
+    except Exception as e:
+        return False, f"Failed to parse dataset JSON: {e}", []
+
+    if not isinstance(data, list):
+        return False, "Dataset must be a JSON list of objects", []
+
+    required = {"id", "text", "audio_path"}
+    dataset_dir = os.path.dirname(os.path.abspath(dataset_path))
+    for i, row in enumerate(data):
+        if not isinstance(row, dict):
+            return False, f"Row {i} is not an object", []
+        missing = required - row.keys()
+        if missing:
+            return (
+                False,
+                f"Row {i} missing required fields: {sorted(missing)}. Each row needs 'id', 'text', 'audio_path'.",
+                [],
+            )
+        audio_path = row["audio_path"]
+        if not os.path.isabs(audio_path):
+            audio_path = join(dataset_dir, audio_path)
+        if not exists(audio_path):
+            return False, f"Row {i} audio file does not exist: {audio_path}", []
+        row["audio_path"] = audio_path
+
+    return True, "", data
+
+
+async def run_eval_only(
+    dataset_path: str,
+    output_dir: str,
+    judge_evaluators: list[dict] = None,
+) -> dict:
+    """Run the TTS audio judge only, on a pre-existing dataset of
+    (text, audio_path) pairs. Skips synthesis. Writes ``metrics.json`` and
+    ``results.csv`` directly under ``output_dir``.
+
+    Args:
+        dataset_path: Path to a JSON file with a list of {"id", "text",
+            "audio_path"} rows.
+        output_dir: Directory to write results and metrics.
+        judge_evaluators: Optional list of evaluator dicts. Defaults to the
+            built-in TTS evaluator (``DEFAULT_TTS_EVALUATOR``) when omitted.
+
+    Returns:
+        dict with status, metrics, and output_dir.
+    """
+    os.makedirs(output_dir, exist_ok=True)
+
+    log_save_path = join(output_dir, "logs")
+    if exists(log_save_path):
+        os.remove(log_save_path)
+
+    token = _current_log_file.set(log_save_path)
+    try:
+        _log("--------------------------------")
+        _log("\033[33mRunning TTS eval-only on dataset\033[0m")
+        _log(f"Dataset: {dataset_path}")
+
+        is_valid, error_msg, rows = validate_tts_eval_only_dataset(dataset_path)
+        if not is_valid:
+            _log(f"\033[31mError: {error_msg}\033[0m")
+            return {"status": "error", "error": error_msg}
+
+        ids = [r["id"] for r in rows]
+        texts = [str(r["text"]) for r in rows]
+        audio_paths = [r["audio_path"] for r in rows]
+
+        _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
+        require_unique_evaluator_names(_evaluators)
+        write_evaluator_config(output_dir, _evaluators)
+
+        llm_judge_results = await get_tts_llm_judge_score(
+            audio_paths,
+            texts,
+            evaluators=_evaluators,
+        )
+        for name, score_dict in llm_judge_results["scores"].items():
+            _log(f"  {name}: {score_dict['mean']:.4f}")
+
+        _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
+
+        metrics_data = {}
+        for name, score_dict in llm_judge_results["scores"].items():
+            metrics_data[name] = score_dict
+
+        with open(join(output_dir, "metrics.json"), "w") as f:
+            json.dump(metrics_data, f, indent=4)
+
+        data = []
+        for _id, text, audio_path, llm_row in zip(
+            ids,
+            texts,
+            audio_paths,
+            llm_judge_results["per_row"],
+        ):
+            row = {
+                "id": _id,
+                "text": text,
+                "audio_path": audio_path,
+            }
+            for name, ev in _evaluators_by_name.items():
+                ev_result = llm_row[name]
+                if is_rating(ev):
+                    row[name] = ev_result["score"]
+                else:
+                    row[name] = bool(ev_result["match"])
+                row[f"{name}_reasoning"] = ev_result["reasoning"]
+            data.append(row)
+
+        pd.DataFrame(data).to_csv(join(output_dir, "results.csv"), index=False)
+
+        return {
+            "status": "completed",
+            "metrics": metrics_data,
+            "output_dir": output_dir,
+        }
+    finally:
+        _current_log_file.reset(token)
+
+
 async def main():
     """CLI entry point for single-provider TTS evaluation.
 

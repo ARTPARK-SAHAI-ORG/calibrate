@@ -23,6 +23,7 @@ from typing import Literal
 from calibrate_agent.tts.eval import (
     TTS_LANGUAGES,
     TTS_PROVIDERS,
+    run_eval_only,
     run_single_provider_eval,
     validate_tts_input_file,
 )
@@ -142,8 +143,18 @@ async def main():
         "--provider",
         type=str,
         nargs="+",
-        required=True,
-        help="TTS provider(s) to use for evaluation (space-separated for multiple)",
+        help="TTS provider(s) to use for evaluation (space-separated for multiple). Not required with --eval-only.",
+    )
+    parser.add_argument(
+        "--eval-only",
+        action="store_true",
+        help="Skip synthesis and run the audio judge directly on a dataset of (text, audio_path) pairs",
+    )
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        default=None,
+        help="Path to dataset JSON (list of {id, text, audio_path}). Required with --eval-only.",
     )
     parser.add_argument(
         "-l",
@@ -157,8 +168,7 @@ async def main():
         "-i",
         "--input",
         type=str,
-        required=True,
-        help="Path to the input CSV file containing the texts to synthesize",
+        help="Path to the input CSV file containing the texts to synthesize. Not required with --eval-only.",
     )
     parser.add_argument(
         "-o",
@@ -197,6 +207,63 @@ async def main():
 
     providers = args.provider
 
+    # Load evaluators from optional config file (shared by both flows)
+    judge_evaluators = None
+    if args.config:
+        import json as _json
+
+        with open(args.config) as _f:
+            _cfg = _json.load(_f)
+        judge_evaluators = _cfg.get("evaluators")
+
+    # Eval-only mode owns ``output_dir/logs`` itself via the provider_log
+    # contextvar, so we don't set up a benchmark-level StreamTee here —
+    # otherwise both writers would target the same path (and the eval-only
+    # ``os.remove`` of that path would unlink the active handle on POSIX or
+    # raise PermissionError on Windows).
+    if args.eval_only:
+        if not args.dataset:
+            print("\033[31mError: --dataset is required with --eval-only\033[0m")
+            sys.exit(1)
+
+        os.makedirs(args.output_dir, exist_ok=True)
+
+        print("\n\033[91mTTS Eval-Only\033[0m\n")
+        print(f"Dataset: {args.dataset}")
+        print(f"Output: {args.output_dir}")
+        print("")
+
+        result = await run_eval_only(
+            dataset_path=args.dataset,
+            output_dir=args.output_dir,
+            judge_evaluators=judge_evaluators,
+        )
+
+        print(f"\n\033[92m{'='*60}\033[0m")
+        print(f"\033[92mSummary\033[0m")
+        print(f"\033[92m{'='*60}\033[0m\n")
+
+        if result.get("status") == "error":
+            print(f"  \033[31mError - {result.get('error')}\033[0m")
+            sys.exit(1)
+
+        metrics = result.get("metrics", {})
+        # Evaluator entries are dicts carrying a ``type`` field.
+        judge_str = ", ".join(
+            f"{k}={v['mean']:.2f}"
+            for k, v in metrics.items()
+            if isinstance(v, dict) and "type" in v
+        )
+        print(f"  {judge_str}")
+        return
+
+    if not providers:
+        print("\033[31mError: --provider is required (omit only with --eval-only)\033[0m")
+        sys.exit(1)
+    if not args.input:
+        print("\033[31mError: --input is required (omit only with --eval-only)\033[0m")
+        sys.exit(1)
+
     # Validate all providers
     for provider in providers:
         if provider not in TTS_PROVIDERS:
@@ -234,14 +301,6 @@ async def main():
         print(f"Input: {args.input}")
         print(f"Output: {args.output_dir}")
         print("")
-
-        # Load evaluators from optional config file
-        judge_evaluators = None
-        if args.config:
-            import json as _json
-            with open(args.config) as _f:
-                _cfg = _json.load(_f)
-            judge_evaluators = _cfg.get("evaluators")
 
         result = await run(
             input=args.input,
