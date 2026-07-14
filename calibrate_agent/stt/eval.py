@@ -36,6 +36,7 @@ from calibrate_agent.stt.metrics import (
     get_cer_score,
     get_llm_judge_score,
     get_intent_entity_score,
+    get_llm_wer_cer_score,
 )
 from calibrate_agent.judges import (
     is_rating,
@@ -1303,15 +1304,24 @@ async def _score_and_write_results(
     cer_results = get_cer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
-    # Intent + entity preservation are opt-in via ``run_sarvam_judges``;
-    # skipping avoids loading the normalizer model and the per-row judge calls.
+    # Intent + entity preservation and LLM-WER/CER are opt-in via
+    # ``run_sarvam_judges``; skipping avoids loading the normalizer model and the
+    # per-row judge calls.
     intent_entity_results = None
+    llm_wer_results = None
     if run_sarvam_judges:
         intent_entity_results = await get_intent_entity_score(
             gt_transcripts, pred_transcripts, language=language
         )
         _log(
             f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
+            to_terminal=False,
+        )
+        llm_wer_results = await get_llm_wer_cer_score(
+            gt_transcripts, pred_transcripts, language=language
+        )
+        _log(
+            f"Sarvam LLM WER: {llm_wer_results['llm_wer']:.4f}  Sarvam LLM CER: {llm_wer_results['llm_cer']:.4f}",
             to_terminal=False,
         )
 
@@ -1335,6 +1345,9 @@ async def _score_and_write_results(
     if intent_entity_results is not None:
         metrics_data["sarvam_intent_score"] = intent_entity_results["intent"]
         metrics_data["sarvam_entity_score"] = intent_entity_results["entity"]
+    if llm_wer_results is not None:
+        metrics_data["sarvam_llm_wer"] = llm_wer_results["llm_wer"]
+        metrics_data["sarvam_llm_cer"] = llm_wer_results["llm_cer"]
     for name, score_dict in llm_results["scores"].items():
         metrics_data[name] = score_dict
 
@@ -1343,15 +1356,21 @@ async def _score_and_write_results(
         if intent_entity_results is not None
         else [None] * len(ids)
     )
+    llm_wer_per_row = (
+        llm_wer_results["per_row"]
+        if llm_wer_results is not None
+        else [None] * len(ids)
+    )
 
     data = []
-    for _id, gt_text, pred_text, wer, cer, ie_row, llm_row in zip(
+    for _id, gt_text, pred_text, wer, cer, ie_row, llm_wer_row, llm_row in zip(
         ids,
         gt_transcripts,
         pred_transcripts,
         wer_results["per_row"],
         cer_results["per_row"],
         ie_per_row,
+        llm_wer_per_row,
         llm_results["per_row"],
     ):
         row = {
@@ -1366,6 +1385,12 @@ async def _score_and_write_results(
             row["sarvam_intent_reasoning"] = ie_row["intent_explanation"]
             row["sarvam_entity_score"] = float(ie_row["entity_score"])
             row["sarvam_entity_reasoning"] = ie_row["entity_explanation"]
+        if llm_wer_row is not None:
+            row["sarvam_llm_wer"] = float(llm_wer_row["llm_wer"])
+            row["sarvam_llm_cer"] = float(llm_wer_row["llm_cer"])
+            row["sarvam_llm_wer_reasoning"] = json.dumps(
+                llm_wer_row["segments"], ensure_ascii=False
+            )
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
             if is_rating(ev):
@@ -1465,6 +1490,10 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
         parts.append(f"Sarvam Intent Score={metrics['sarvam_intent_score']:.4f}")
     if "sarvam_entity_score" in metrics:
         parts.append(f"Sarvam Entity Score={metrics['sarvam_entity_score']:.4f}")
+    if "sarvam_llm_wer" in metrics:
+        parts.append(f"Sarvam LLM WER={metrics['sarvam_llm_wer']:.4f}")
+    if "sarvam_llm_cer" in metrics:
+        parts.append(f"Sarvam LLM CER={metrics['sarvam_llm_cer']:.4f}")
     # Evaluator entries are dicts carrying a ``type`` field; that's the marker
     # we use to pick them out from other top-level metrics.
     parts.extend(
@@ -1547,9 +1576,9 @@ async def main():
         "--sarvam-judges",
         action="store_true",
         help=(
-            "Also compute Sarvam intent & entity preservation scores. Off by "
-            "default; enabling it loads a text-normalizer model and runs an "
-            "extra per-row LLM judge."
+            "Also compute Sarvam LLM judges: intent & entity preservation "
+            "and LLM-WER/CER. Off by default; enabling it loads a "
+            "text-normalizer model and runs extra per-row LLM judges."
         ),
     )
 

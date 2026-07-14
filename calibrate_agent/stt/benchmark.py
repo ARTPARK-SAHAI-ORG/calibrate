@@ -249,9 +249,9 @@ async def main():
         "--sarvam-judges",
         action="store_true",
         help=(
-            "Also compute Sarvam intent & entity preservation scores. Off by "
-            "default; enabling it loads a text-normalizer model and runs an "
-            "extra per-row LLM judge."
+            "Also compute Sarvam LLM judges: intent & entity preservation "
+            "and LLM-WER/CER. Off by default; enabling it loads a "
+            "text-normalizer model and runs extra per-row LLM judges."
         ),
     )
 

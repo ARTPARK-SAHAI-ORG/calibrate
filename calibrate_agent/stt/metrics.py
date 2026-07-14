@@ -192,6 +192,25 @@ def _edit_metric(
         for pred in predictions
     ]
 
+    return _score_edit_metric(metric_fn, transform, references, predictions)
+
+
+def _score_edit_metric(
+    metric_fn,
+    transform,
+    references: List[str],
+    predictions: List[str],
+) -> dict:
+    """Score already-normalized (reference, prediction) pairs with jiwer.
+
+    The scoring half of :func:`_edit_metric` — no text normalization is applied,
+    so callers must normalize upstream. Shared by the WER/CER metrics (which
+    normalize first) and the LLM-WER/CER root (whose corrected pairs are already
+    ``IndicNormalizer``-normalized). ``score`` is the dataset-pooled rate;
+    ``per_row`` holds the per-utterance rates for row-level reporting.
+    """
+    predictions = [p if isinstance(p, str) else "" for p in predictions]
+
     # Per-clip rates — for results.csv only, never averaged into `score`.
     per_row = [
         metric_fn(
@@ -413,4 +432,160 @@ async def get_intent_entity_score(
         "intent": float(calculate_intent_accuracy(intent_scores)),
         "entity": float(calculate_entity_metrics(entity_scores)["mean"]),
         "per_row": results,
+    }
+
+
+async def get_llm_wer_cer_score(
+    references: List[str],
+    predictions: List[str],
+    language: str = "english",
+    model: Optional[str] = None,
+) -> dict:
+    """Normalize, judge segment equivalence, forgive, and re-score WER/CER.
+
+    Mirrors Sarvam's ``llm_wer`` flow: reference and prediction are first run
+    through the vendored ``IndicNormalizer``, then word-aligned with
+    ``difflib.SequenceMatcher``. Each *differing* segment (a ``replace`` opcode
+    with words on both sides) is judged by ``sarvam_llm_wer.equivalence_judge``
+    for semantic/phonetic equivalence; equivalent segments are rewritten to the
+    reference ("forgiven"). Insertions and deletions are never forgiven. The
+    corrected pairs are then scored with calibrate_agent's own jiwer WER/CER
+    (``_score_edit_metric``), so ``llm_wer``/``llm_cer`` are directly comparable
+    to the top-level ``wer``/``cer`` metrics — the delta is purely the effect of
+    equivalence forgiveness.
+
+    Unique segment pairs are judged once and reused across rows (dedup), matching
+    upstream's caching intent without persisting a cache to disk.
+
+    Returns:
+        {
+            "llm_wer": float,     # dataset-pooled WER after forgiveness
+            "llm_cer": float,     # dataset-pooled CER after forgiveness
+            "per_row": [
+                {
+                    "llm_wer": float,          # per-utterance corrected WER
+                    "llm_cer": float,          # per-utterance corrected CER
+                    "corrected_reference": str,
+                    "corrected_prediction": str,
+                    "segments": [
+                        {"reference": str, "prediction": str,
+                         "equivalent": bool, "reasoning": str},
+                        ...
+                    ],
+                },
+                ...
+            ],
+        }
+
+    ``model`` defaults to ``DEFAULT_LLM_WER_MODEL`` when omitted. ``per_row``
+    order matches the input order.
+    """
+    if not references:
+        return {"llm_wer": 0.0, "llm_cer": 0.0, "per_row": []}
+
+    # Deferred so the transformers/indic-nlp stack only loads when scoring runs.
+    from calibrate_agent.stt import sarvam_llm_wer
+    from calibrate_agent.stt.sarvam_llm_wer import (
+        DEFAULT_LLM_WER_MODEL,
+        get_segments,
+    )
+
+    if model is None:
+        model = DEFAULT_LLM_WER_MODEL
+
+    norm_references, norm_predictions = await asyncio.to_thread(
+        _normalize_pairs, references, predictions, language
+    )
+
+    # Word-align every row and collect the unique differing segment pairs to
+    # judge (dedup — the same (ref, pred) segment is scored once).
+    row_segments: List[List[dict]] = []
+    unique_pairs: dict = {}
+    for i, (ref, pred) in enumerate(zip(norm_references, norm_predictions)):
+        segments = get_segments(str(ref), str(pred), key=i)
+        row_segments.append(segments)
+        for seg in segments:
+            if (
+                seg["tag"] != "equal"
+                and seg["reference"].strip()
+                and seg["prediction"].strip()
+            ):
+                unique_pairs.setdefault((seg["reference"], seg["prediction"]), None)
+
+    pair_list = list(unique_pairs.keys())
+    coroutines = [
+        sarvam_llm_wer.equivalence_judge(ref, pred, model=model, index=i)
+        for i, (ref, pred) in enumerate(pair_list)
+    ]
+    judge_results = await tqdm_asyncio.gather(
+        *coroutines,
+        desc="Running LLM-WER equivalence judge",
+    )
+
+    verdicts = {
+        pair: {
+            "equivalent": bool(res["equivalent"]),
+            "reasoning": res["reasoning"],
+        }
+        for pair, res in zip(pair_list, judge_results)
+    }
+
+    # Reconstruct corrected reference/prediction per row: forgive equivalent
+    # segments by rewriting the prediction side to the reference.
+    corrected_references: List[str] = []
+    corrected_predictions: List[str] = []
+    per_row_segments: List[List[dict]] = []
+    for segments in row_segments:
+        ref_parts: List[str] = []
+        pred_parts: List[str] = []
+        seg_log: List[dict] = []
+        for seg in segments:
+            pair = (seg["reference"], seg["prediction"])
+            verdict = verdicts.get(pair)
+            forgiven = seg["tag"] == "equal" or (
+                verdict is not None and verdict["equivalent"]
+            )
+            ref_parts.append(seg["reference"])
+            pred_parts.append(seg["reference"] if forgiven else seg["prediction"])
+            if verdict is not None:
+                seg_log.append(
+                    {
+                        "reference": seg["reference"],
+                        "prediction": seg["prediction"],
+                        "equivalent": verdict["equivalent"],
+                        "reasoning": verdict["reasoning"],
+                    }
+                )
+        corrected_references.append(" ".join(ref_parts).strip())
+        corrected_predictions.append(" ".join(pred_parts).strip())
+        per_row_segments.append(seg_log)
+
+    wer_scored = _score_edit_metric(
+        jiwer.wer, _WER_TRANSFORM, corrected_references, corrected_predictions
+    )
+    cer_scored = _score_edit_metric(
+        jiwer.cer, _CER_TRANSFORM, corrected_references, corrected_predictions
+    )
+
+    per_row = [
+        {
+            "llm_wer": float(row_wer),
+            "llm_cer": float(row_cer),
+            "corrected_reference": corr_ref,
+            "corrected_prediction": corr_pred,
+            "segments": seg_log,
+        }
+        for row_wer, row_cer, corr_ref, corr_pred, seg_log in zip(
+            wer_scored["per_row"],
+            cer_scored["per_row"],
+            corrected_references,
+            corrected_predictions,
+            per_row_segments,
+        )
+    ]
+
+    return {
+        "llm_wer": wer_scored["score"],
+        "llm_cer": cer_scored["score"],
+        "per_row": per_row,
     }

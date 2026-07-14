@@ -253,6 +253,28 @@ def _fake_intent_entity(intent=1, entity=1.0):
     return AsyncMock(side_effect=_fn)
 
 
+def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
+    """Build a fake ``get_llm_wer_cer_score`` returning fixed scores per row."""
+
+    async def _fn(refs, preds, language="english", model=None):
+        return {
+            "llm_wer": float(llm_wer),
+            "llm_cer": float(llm_cer),
+            "per_row": [
+                {
+                    "llm_wer": float(llm_wer),
+                    "llm_cer": float(llm_cer),
+                    "corrected_reference": str(r),
+                    "corrected_prediction": str(p),
+                    "segments": [],
+                }
+                for r, p in zip(refs, preds)
+            ],
+        }
+
+    return AsyncMock(side_effect=_fn)
+
+
 class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_writes_metrics_and_results(self):
         from calibrate_agent.stt import eval as stt_eval
@@ -275,6 +297,8 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                 stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
             ), patch.object(
                 stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
+            ), patch.object(
+                stt_eval, "get_llm_wer_cer_score", _fake_llm_wer(0.05, 0.03)
             ):
                 metrics = await stt_eval._score_and_write_results(
                     ids=["1", "2"],
@@ -290,6 +314,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             # Intent + entity are reported as top-level floats when enabled.
             self.assertEqual(metrics["sarvam_intent_score"], 1.0)
             self.assertEqual(metrics["sarvam_entity_score"], 1.0)
+            # LLM-WER/CER likewise.
+            self.assertEqual(metrics["sarvam_llm_wer"], 0.05)
+            self.assertEqual(metrics["sarvam_llm_cer"], 0.03)
             self.assertTrue((out / "metrics.json").exists())
             self.assertTrue((out / "results.csv").exists())
             df = pd.read_csv(out / "results.csv")
@@ -304,6 +331,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     "sarvam_intent_reasoning",
                     "sarvam_entity_score",
                     "sarvam_entity_reasoning",
+                    "sarvam_llm_wer",
+                    "sarvam_llm_cer",
+                    "sarvam_llm_wer_reasoning",
                     "semantic_match",
                     "semantic_match_reasoning",
                 }
@@ -336,6 +366,8 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                 stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
             ), patch.object(
                 stt_eval, "get_intent_entity_score", _fake_intent_entity(0, 0.25)
+            ), patch.object(
+                stt_eval, "get_llm_wer_cer_score", _fake_llm_wer(0.4, 0.3)
             ):
                 metrics = await stt_eval._score_and_write_results(
                     ids=["a"],
@@ -350,10 +382,13 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             # With the flag on, intent/entity report alongside a custom evaluator.
             self.assertEqual(metrics["sarvam_intent_score"], 0.0)
             self.assertEqual(metrics["sarvam_entity_score"], 0.25)
+            self.assertEqual(metrics["sarvam_llm_wer"], 0.4)
+            self.assertEqual(metrics["sarvam_llm_cer"], 0.3)
             self.assertIn("completeness", metrics)
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["sarvam_intent_score"], 0)
             self.assertEqual(df.iloc[0]["sarvam_entity_score"], 0.25)
+            self.assertEqual(df.iloc[0]["sarvam_llm_wer"], 0.4)
 
     async def test_intent_entity_skipped_by_default(self):
         from calibrate_agent.stt import eval as stt_eval
