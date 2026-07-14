@@ -1020,8 +1020,8 @@ def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]
         candidates = [audio_path]
         if not os.path.isabs(audio_path):
             candidates.append(
-            join(run_dir, TTS_AUDIO_SUBDIR, os.path.basename(audio_path))
-        )
+                join(run_dir, TTS_AUDIO_SUBDIR, os.path.basename(audio_path))
+            )
         resolved = next((os.path.abspath(c) for c in candidates if exists(c)), None)
         if resolved is None:
             return False, f"Row {i} audio file does not exist: {audio_path}", []
