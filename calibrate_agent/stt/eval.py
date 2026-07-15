@@ -1303,6 +1303,10 @@ async def _score_and_write_results(
     ``run_sarvam_judges`` is False it is skipped entirely — no normalizer model
     is loaded, no judge calls are made, and the ``sarvam_*`` columns/metrics are
     omitted.
+
+    Each judge is isolated: if any judge raises, the failure is logged and that
+    judge's columns/metrics are dropped, but WER/CER and any judges that
+    succeeded are still written.
     """
     wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
@@ -1310,26 +1314,39 @@ async def _score_and_write_results(
     cer_results = get_cer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
+    # Each judge below runs independently and is isolated: a failure in one
+    # (Sarvam intent/entity, Sarvam LLM-WER/CER, or the LLM judge) is logged and
+    # that judge's columns/metrics are omitted, but WER/CER and any judges that
+    # succeeded are still written.
+
     # Intent + entity preservation and LLM-WER/CER run by default; setting
     # ``run_sarvam_judges`` to False skips loading the normalizer model and the
     # per-row judge calls.
     intent_entity_results = None
     llm_wer_results = None
     if run_sarvam_judges:
-        intent_entity_results = await get_intent_entity_score(
-            gt_transcripts, pred_transcripts, language=language
-        )
-        _log(
-            f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
-            to_terminal=False,
-        )
-        llm_wer_results = await get_llm_wer_cer_score(
-            gt_transcripts, pred_transcripts, language=language
-        )
-        _log(
-            f"Sarvam LLM WER: {llm_wer_results['llm_wer']:.4f}  Sarvam LLM CER: {llm_wer_results['llm_cer']:.4f}",
-            to_terminal=False,
-        )
+        try:
+            intent_entity_results = await get_intent_entity_score(
+                gt_transcripts, pred_transcripts, language=language
+            )
+            _log(
+                f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
+                to_terminal=False,
+            )
+        except Exception as e:
+            intent_entity_results = None
+            _log(f"Sarvam intent/entity judge failed, skipping: {e}")
+        try:
+            llm_wer_results = await get_llm_wer_cer_score(
+                gt_transcripts, pred_transcripts, language=language
+            )
+            _log(
+                f"Sarvam LLM WER: {llm_wer_results['llm_wer']:.4f}  Sarvam LLM CER: {llm_wer_results['llm_cer']:.4f}",
+                to_terminal=False,
+            )
+        except Exception as e:
+            llm_wer_results = None
+            _log(f"Sarvam LLM-WER/CER judge failed, skipping: {e}")
 
     # The LLM judge is opt-in for STT: when no evaluators are passed we report
     # WER/CER only and skip the judge entirely (no evaluator config, no judge
@@ -1339,15 +1356,22 @@ async def _score_and_write_results(
     if _evaluators:
         require_unique_evaluator_names(_evaluators)
         write_evaluator_config(evaluator_config_dir, _evaluators)
-        llm_results = await get_llm_judge_score(
-            gt_transcripts,
-            pred_transcripts,
-            evaluators=_evaluators,
-        )
-        for name, score_dict in llm_results["scores"].items():
-            _log(f"  {name}: {score_dict['mean']:.4f}")
+        try:
+            llm_results = await get_llm_judge_score(
+                gt_transcripts,
+                pred_transcripts,
+                evaluators=_evaluators,
+            )
+            for name, score_dict in llm_results["scores"].items():
+                _log(f"  {name}: {score_dict['mean']:.4f}")
+        except Exception as e:
+            llm_results = None
+            _log(f"LLM judge failed, skipping evaluator columns: {e}")
 
-    _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
+    # Only surface evaluator columns for judges that actually produced results.
+    _evaluators_by_name = (
+        {ev["name"]: ev for ev in _evaluators} if llm_results is not None else {}
+    )
 
     metrics_data = {
         "wer": wer_results["score"],
