@@ -33,6 +33,7 @@ from calibrate_agent.stt.eval import (
     STT_LANGUAGES,
 )
 from calibrate_agent.stt.leaderboard import generate_leaderboard
+from calibrate_agent._env import env_int
 from calibrate_agent.utils import StreamTee
 
 
@@ -254,6 +255,15 @@ async def main():
             "per-row LLM judges."
         ),
     )
+    parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=env_int("CALIBRATE_STT_MAX_PARALLEL", MAX_PARALLEL_PROVIDERS),
+        help=(
+            "Number of providers to evaluate in parallel (default: 2, or "
+            "$CALIBRATE_STT_MAX_PARALLEL)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -363,6 +373,7 @@ async def main():
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
             run_sarvam_judges=not args.skip_sarvam,
+            max_parallel=args.max_parallel,
         )
 
         # Print summary
