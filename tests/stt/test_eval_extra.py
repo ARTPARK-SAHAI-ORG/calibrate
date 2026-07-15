@@ -727,6 +727,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
+                    run_sarvam_judges=False,
                 )
             self.assertEqual(result["wer"], 0.1)
             self.assertEqual(result["cer"], 0.2)
@@ -770,7 +771,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
             self.assertIn("sarvam_llm_cer", df.columns)
             self.assertIn("sarvam_llm_wer_reasoning", df.columns)
 
-    async def test_sarvam_llm_wer_absent_by_default(self):
+    async def test_sarvam_llm_wer_absent_when_disabled(self):
         from calibrate_agent.stt import eval as E
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -787,6 +788,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["x"],
                     output_dir=tmp,
                     evaluator_config_dir=tmp,
+                    run_sarvam_judges=False,
                 )
             llm_wer_mock.assert_not_called()
             self.assertNotIn("sarvam_llm_wer", result)
@@ -816,6 +818,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                 output_dir=tmp,
                 evaluator_config_dir=tmp,
                 judge_evaluators=[rating_ev],
+                run_sarvam_judges=False,
             )
 
 
@@ -849,7 +852,9 @@ class TestRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                          {"semantic_match": {"match": True, "reasoning": "ok"}},
                      ],
                  })):
-                result = await E.run_eval_only(str(ds), str(out))
+                result = await E.run_eval_only(
+                    str(ds), str(out), run_sarvam_judges=False
+                )
         self.assertEqual(result["status"], "completed")
 
 
@@ -928,6 +933,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                     debug_count=5,
                     ignore_retry=False,
                     overwrite=True,
+                    run_sarvam_judges=False,
                 )
             self.assertEqual(result["status"], "completed")
 
@@ -990,6 +996,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                     debug_count=1,
                     ignore_retry=True,
                     overwrite=False,
+                    run_sarvam_judges=False,
                 )
             self.assertEqual(result["status"], "completed")
 

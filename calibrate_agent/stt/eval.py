@@ -1101,7 +1101,7 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
-    run_sarvam_judges: bool = False,
+    run_sarvam_judges: bool = True,
 ) -> dict:
     """Run STT evaluation for a single provider."""
     provider_output_dir = join(output_dir, provider)
@@ -1290,7 +1290,7 @@ async def _score_and_write_results(
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_sarvam_judges: bool = False,
+    run_sarvam_judges: bool = True,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1299,9 +1299,10 @@ async def _score_and_write_results(
     is empty/omitted, no judge runs, no evaluator config is written, and the
     evaluator columns/metrics are omitted. Returns the metrics_data dict.
 
-    When ``run_sarvam_judges`` is False (the default) the Sarvam intent/entity
-    judge is skipped entirely — no normalizer model is loaded, no judge calls
-    are made, and the ``sarvam_*`` columns/metrics are omitted.
+    The Sarvam intent/entity judge runs by default. When
+    ``run_sarvam_judges`` is False it is skipped entirely — no normalizer model
+    is loaded, no judge calls are made, and the ``sarvam_*`` columns/metrics are
+    omitted.
     """
     wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
@@ -1309,8 +1310,8 @@ async def _score_and_write_results(
     cer_results = get_cer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
-    # Intent + entity preservation and LLM-WER/CER are opt-in via
-    # ``run_sarvam_judges``; skipping avoids loading the normalizer model and the
+    # Intent + entity preservation and LLM-WER/CER run by default; setting
+    # ``run_sarvam_judges`` to False skips loading the normalizer model and the
     # per-row judge calls.
     intent_entity_results = None
     llm_wer_results = None
@@ -1427,7 +1428,7 @@ async def run_eval_only(
     output_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_sarvam_judges: bool = False,
+    run_sarvam_judges: bool = True,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
@@ -1441,9 +1442,9 @@ async def run_eval_only(
             LLM judge runs and only WER/CER are reported.
         language: Language of the dataset, used to normalize text before the
             intent/entity judge. Defaults to ``english``.
-        run_sarvam_judges: When True, also run the Sarvam intent/entity judge.
-            Off by default — leaving it off skips the normalizer model load and
-            the judge calls entirely.
+        run_sarvam_judges: Run the Sarvam intent/entity judge (default True).
+            Setting it to False skips the normalizer model load and the judge
+            calls entirely.
 
     Returns:
         dict with status, metrics, and output_dir.
@@ -1494,7 +1495,7 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
     shared by the single-provider, multi-provider, and eval-only paths.
 
     The Sarvam judge fields are only included when present in ``metrics``
-    (i.e. when ``--sarvam-judges`` was enabled for the run).
+    (i.e. unless ``--skip-sarvam`` was passed for the run).
     """
     parts = [
         f"WER={metrics.get('wer', 0):.4f}",
@@ -1587,11 +1588,11 @@ async def main():
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
     parser.add_argument(
-        "--sarvam-judges",
+        "--skip-sarvam",
         action="store_true",
         help=(
-            "Also compute Sarvam LLM judges: intent & entity preservation "
-            "and LLM-WER/CER. Off by default; enabling it runs extra "
+            "Skip the Sarvam LLM judges (intent & entity preservation and "
+            "LLM-WER/CER). They run by default; passing this skips the extra "
             "per-row LLM judges."
         ),
     )
@@ -1636,7 +1637,7 @@ async def main():
         debug_count=args.debug_count,
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
-        run_sarvam_judges=args.sarvam_judges,
+        run_sarvam_judges=not args.skip_sarvam,
     )
 
     # Print summary

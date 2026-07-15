@@ -243,7 +243,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
             self.assertEqual(mock_eval.call_args.kwargs["language"], "hindi")
 
-    async def test_main_eval_only_intent_entity_off_by_default(self):
+    async def test_main_eval_only_intent_entity_on_by_default(self):
         from calibrate_agent.stt import benchmark as B
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -259,9 +259,9 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                  patch.object(B, "run_eval_only", mock_eval):
                 await B.main()
 
-            self.assertFalse(mock_eval.call_args.kwargs["run_sarvam_judges"])
+            self.assertTrue(mock_eval.call_args.kwargs["run_sarvam_judges"])
 
-    async def test_main_eval_only_forwards_intent_entity_flag(self):
+    async def test_main_eval_only_skip_sarvam_flag(self):
         from calibrate_agent.stt import benchmark as B
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -273,12 +273,12 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
             mock_eval = AsyncMock(return_value=fake_result)
             argv = ["b.py", "--eval-only", "--dataset", str(ds),
-                    "-o", str(out), "--sarvam-judges"]
+                    "-o", str(out), "--skip-sarvam"]
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run_eval_only", mock_eval):
                 await B.main()
 
-            self.assertTrue(mock_eval.call_args.kwargs["run_sarvam_judges"])
+            self.assertFalse(mock_eval.call_args.kwargs["run_sarvam_judges"])
 
     async def test_main_eval_only_error(self):
         from calibrate_agent.stt import benchmark as B
@@ -355,17 +355,17 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             }
             mock_run = AsyncMock(return_value=fake_run_result)
 
-            # Default off.
+            # Default on.
             argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
-            self.assertFalse(mock_run.call_args.kwargs["run_sarvam_judges"])
+            self.assertTrue(mock_run.call_args.kwargs["run_sarvam_judges"])
 
-            # Flag on.
-            argv.append("--sarvam-judges")
+            # Skip flag.
+            argv.append("--skip-sarvam")
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
-            self.assertTrue(mock_run.call_args.kwargs["run_sarvam_judges"])
+            self.assertFalse(mock_run.call_args.kwargs["run_sarvam_judges"])
 
     async def test_main_error_provider_exits(self):
         from calibrate_agent.stt import benchmark as B
