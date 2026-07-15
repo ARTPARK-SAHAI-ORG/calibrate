@@ -250,8 +250,8 @@ async def main():
         action="store_true",
         help=(
             "Also compute Sarvam LLM judges: intent & entity preservation "
-            "and LLM-WER/CER. Off by default; enabling it loads a "
-            "text-normalizer model and runs extra per-row LLM judges."
+            "and LLM-WER/CER. Off by default; enabling it runs extra "
+            "per-row LLM judges."
         ),
     )
 
