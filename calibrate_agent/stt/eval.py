@@ -1351,7 +1351,7 @@ async def _score_and_write_results(
     # The LLM judge is opt-in for STT: when no evaluators are passed we report
     # WER/CER only and skip the judge entirely (no evaluator config, no judge
     # calls, no evaluator columns/metrics).
-    _evaluators = list(judge_evaluators) if judge_evaluators else []
+    _evaluators = judge_evaluators or []
     llm_results = None
     if _evaluators:
         require_unique_evaluator_names(_evaluators)
