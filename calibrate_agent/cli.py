@@ -234,11 +234,11 @@ Examples:
         help="Path to dataset JSON (list of {id, gt, pred}). Required with --eval-only.",
     )
     stt_parser.add_argument(
-        "--sarvam-judges",
+        "--skip-sarvam",
         action="store_true",
         help=(
-            "Also compute Sarvam LLM judges: intent & entity preservation "
-            "and LLM-WER/CER. Off by default; enabling it runs extra "
+            "Skip the Sarvam LLM judges (intent & entity preservation and "
+            "LLM-WER/CER). They run by default; passing this skips the extra "
             "per-row LLM judges."
         ),
     )
@@ -540,8 +540,8 @@ Examples:
             argv.extend(["-o", args.output_dir])
             if args.config:
                 argv.extend(["--config", args.config])
-            if args.sarvam_judges:
-                argv.append("--sarvam-judges")
+            if args.skip_sarvam:
+                argv.append("--skip-sarvam")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -565,8 +565,8 @@ Examples:
                 argv.extend(["-s", args.save_dir])
             if args.config:
                 argv.extend(["--config", args.config])
-            if args.sarvam_judges:
-                argv.append("--sarvam-judges")
+            if args.skip_sarvam:
+                argv.append("--skip-sarvam")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())

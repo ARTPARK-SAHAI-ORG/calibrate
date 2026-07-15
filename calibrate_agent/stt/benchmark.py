@@ -77,7 +77,7 @@ async def run(
     overwrite: bool = False,
     max_parallel: int = MAX_PARALLEL_PROVIDERS,
     judge_evaluators: list[dict] = None,
-    run_sarvam_judges: bool = False,
+    run_sarvam_judges: bool = True,
 ) -> dict:
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
@@ -96,11 +96,11 @@ async def run(
         overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
         max_parallel: Maximum number of providers to run in parallel (default: 2)
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
-            ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
-            the implicit default STT evaluator runs.
-        run_sarvam_judges: When True, also run the Sarvam intent/entity judge
-            (loads a normalizer model + makes per-row judge calls). Off by
-            default.
+            ``system_prompt``, ``judge_model``, ``type``, ...). When omitted no
+            LLM judge runs and only WER/CER are reported.
+        run_sarvam_judges: Run the Sarvam intent/entity judge (default True;
+            loads a normalizer model + makes per-row judge calls). Set to False
+            to skip it.
 
     Returns:
         dict: Results summary with status and output paths
@@ -246,11 +246,11 @@ async def main():
         help="Path to optional JSON config file with an `evaluators` list",
     )
     parser.add_argument(
-        "--sarvam-judges",
+        "--skip-sarvam",
         action="store_true",
         help=(
-            "Also compute Sarvam LLM judges: intent & entity preservation "
-            "and LLM-WER/CER. Off by default; enabling it runs extra "
+            "Skip the Sarvam LLM judges (intent & entity preservation and "
+            "LLM-WER/CER). They run by default; passing this skips the extra "
             "per-row LLM judges."
         ),
     )
@@ -316,7 +316,7 @@ async def main():
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
             language=args.language,
-            run_sarvam_judges=args.sarvam_judges,
+            run_sarvam_judges=not args.skip_sarvam,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
@@ -362,7 +362,7 @@ async def main():
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
-            run_sarvam_judges=args.sarvam_judges,
+            run_sarvam_judges=not args.skip_sarvam,
         )
 
         # Print summary

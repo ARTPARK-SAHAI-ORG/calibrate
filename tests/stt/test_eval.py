@@ -304,6 +304,13 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "world"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
                     run_sarvam_judges=True,
                 )
 
@@ -388,7 +395,54 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(df.iloc[0]["sarvam_entity_score"], 0.25)
             self.assertEqual(df.iloc[0]["sarvam_llm_wer"], 0.4)
 
-    async def test_intent_entity_skipped_by_default(self):
+    async def test_sarvam_judges_run_by_default(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+            return {
+                "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                "score": 1.0,
+                "per_row": [
+                    {"semantic_match": {"match": True, "reasoning": "ok"}}
+                    for _ in refs
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(
+                stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
+            ), patch.object(
+                stt_eval, "get_llm_wer_cer_score", _fake_llm_wer(0.05, 0.03)
+            ):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
+                )
+
+            # Default: the Sarvam judges run and their metrics/columns appear.
+            self.assertIn("sarvam_intent_score", metrics)
+            self.assertIn("sarvam_entity_score", metrics)
+            self.assertIn("sarvam_llm_wer", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertIn("sarvam_intent_score", df.columns)
+            self.assertIn("sarvam_entity_score", df.columns)
+            self.assertIn("wer", metrics)
+            self.assertIn("semantic_match", metrics)
+
+    async def test_sarvam_judges_skipped_when_disabled(self):
         from calibrate_agent.stt import eval as stt_eval
 
         async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
@@ -413,9 +467,17 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "world"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
+                    run_sarvam_judges=False,
                 )
 
-            # Default: the judge is never invoked and no sarvam_* keys appear.
+            # Disabled: the Sarvam judge is never invoked and no sarvam_* keys appear.
             ie_mock.assert_not_awaited()
             self.assertNotIn("sarvam_intent_score", metrics)
             self.assertNotIn("sarvam_entity_score", metrics)
@@ -425,6 +487,124 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             # WER/CER and the judge column are still written.
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
+
+    async def test_llm_judge_failure_still_writes_wer_cer_and_sarvam(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(
+                stt_eval,
+                "get_llm_judge_score",
+                AsyncMock(side_effect=RuntimeError("judge boom")),
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
+            ), patch.object(
+                stt_eval, "get_llm_wer_cer_score", _fake_llm_wer(0.05, 0.03)
+            ):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
+                )
+
+            # LLM judge failed: WER/CER and the Sarvam judges survive; the
+            # evaluator columns/metrics are dropped and nothing crashes.
+            self.assertIn("wer", metrics)
+            self.assertIn("cer", metrics)
+            self.assertIn("sarvam_intent_score", metrics)
+            self.assertIn("sarvam_llm_wer", metrics)
+            self.assertNotIn("semantic_match", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertNotIn("semantic_match", df.columns)
+            self.assertIn("sarvam_intent_score", df.columns)
+            self.assertEqual(len(df), 2)
+
+    async def test_sarvam_failure_still_writes_wer_cer_and_evaluator(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+            return {
+                "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                "score": 1.0,
+                "per_row": [
+                    {"semantic_match": {"match": True, "reasoning": "ok"}}
+                    for _ in refs
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(
+                stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ), patch.object(
+                stt_eval,
+                "get_intent_entity_score",
+                AsyncMock(side_effect=RuntimeError("intent boom")),
+            ), patch.object(
+                stt_eval, "get_llm_wer_cer_score", _fake_llm_wer(0.05, 0.03)
+            ):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
+                )
+
+            # One Sarvam judge failed: WER/CER, the evaluator, and the other
+            # Sarvam judge (LLM-WER/CER) all survive; only intent/entity drops.
+            self.assertIn("wer", metrics)
+            self.assertIn("semantic_match", metrics)
+            self.assertIn("sarvam_llm_wer", metrics)
+            self.assertNotIn("sarvam_intent_score", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertIn("semantic_match", df.columns)
+            self.assertNotIn("sarvam_intent_score", df.columns)
+            self.assertIn("sarvam_llm_wer", df.columns)
+
+    async def test_no_llm_judge_when_no_evaluators(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        judge_mock = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_llm_judge_score", judge_mock):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "goodbye"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    run_sarvam_judges=False,
+                )
+
+            # No evaluators passed: the LLM judge is never invoked, no evaluator
+            # config is written, and only WER/CER are reported.
+            judge_mock.assert_not_awaited()
+            self.assertIn("wer", metrics)
+            self.assertIn("cer", metrics)
+            self.assertNotIn("semantic_match", metrics)
+            self.assertFalse((out / "config.json").exists())
+            df = pd.read_csv(out / "results.csv")
+            self.assertEqual(set(df.columns), {"id", "gt", "pred", "wer", "cer"})
+            self.assertEqual(len(df), 2)
 
     async def test_rating_evaluator_writes_numeric_score(self):
         from calibrate_agent.stt import eval as stt_eval
@@ -468,6 +648,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=[rating],
+                    run_sarvam_judges=False,
                 )
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["accuracy"], 4)
@@ -507,6 +688,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                 result = await stt_eval.run_eval_only(
                     dataset_path=str(ds_path),
                     output_dir=str(out),
+                    run_sarvam_judges=False,
                 )
 
             self.assertEqual(result["status"], "completed")
