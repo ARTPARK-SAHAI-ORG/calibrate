@@ -48,10 +48,21 @@ class SemanticWERResponse(BaseModel):
 
 
 def build_prompt(reference: str, prediction: str) -> str:
-    """Build the semantic-WER prompt for a single (reference, hypothesis) pair."""
+    """Build the semantic-WER prompt for a single (reference, hypothesis) pair.
+
+    ``PROMPT_TEMPLATE`` is pipecat's ``SEMANTIC_WER_SYSTEM_PROMPT`` verbatim; the
+    trailing block is pipecat's per-pair user message verbatim (from
+    ``SemanticWEREvaluator.evaluate``). We send both as one message because the
+    judge is a single ``instructor`` call rather than pipecat's system/user
+    split — the text the model sees is identical.
+    """
     return (
         f"{PROMPT_TEMPLATE}\n\n"
-        "=== EVALUATE ===\n"
-        f'REFERENCE: "{reference}"\n'
-        f'HYPOTHESIS: "{prediction}"\n'
+        "Please calculate the Word Error Rate (WER) for this ASR transcription.\n\n"
+        "**Reference (ground truth):**\n"
+        f"{reference}\n\n"
+        "**Hypothesis (ASR transcription):**\n"
+        f"{prediction}\n\n"
+        "Follow the process: NORMALIZE → ALIGN → COUNT → VERIFY → CALCULATE\n\n"
+        "Show your work clearly, then call calculate_wer with your verified counts."
     )

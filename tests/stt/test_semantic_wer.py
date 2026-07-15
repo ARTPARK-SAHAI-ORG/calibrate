@@ -26,6 +26,12 @@ class TestBuildPrompt(unittest.TestCase):
         # Carries the pipecat-style methodology.
         self.assertIn("NORMALIZE", p)
         self.assertIn("SEMANTIC CHECK", p)
+        # Prompt is pipecat's verbatim: the rules our paraphrase had dropped
+        # and the full few-shot set must be present.
+        self.assertIn("Compound words count as ONE error", p)
+        self.assertIn("TRUNCATED/INCOMPLETE TEXT", p)
+        self.assertIn("TRAILING FUNCTION WORDS AT TRUNCATION", p)
+        self.assertEqual(p.count("### Example"), 8)
 
 
 class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
