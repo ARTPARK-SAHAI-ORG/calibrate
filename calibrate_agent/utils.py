@@ -1807,6 +1807,33 @@ STT_PROVIDER_MODELS = {
     "sarvam": "saaras:v3",
 }
 
+# Per-language STT model OVERRIDES, mirroring TTS_PROVIDER_VOICES_BY_LANGUAGE. A
+# (provider, language) entry here wins over the provider's STT_PROVIDER_MODELS
+# default; languages without an entry fall back to it. Both the live agent
+# (create_stt_service) and the benchmark (calibrate_agent/stt/eval.py) resolve
+# through get_stt_model() so they can't drift. Cartesia's ink-2 is its fastest,
+# most accurate streaming model but is English-only, so only english overrides to
+# it; hindi/kannada stay on the multilingual ink-whisper default.
+STT_PROVIDER_MODELS_BY_LANGUAGE = {
+    "cartesia": {
+        "english": "ink-2",
+    },
+}
+
+
+def get_stt_model(provider: str, language: str) -> str:
+    """Return the default STT model for a provider + language.
+
+    A per-language override in STT_PROVIDER_MODELS_BY_LANGUAGE wins; otherwise the
+    provider's language-agnostic default in STT_PROVIDER_MODELS. Shared by
+    create_stt_service and calibrate_agent/stt/eval.py so the live agent and
+    benchmark pick the same model.
+    """
+    override = STT_PROVIDER_MODELS_BY_LANGUAGE.get(provider, {}).get(language)
+    if override is not None:
+        return override
+    return STT_PROVIDER_MODELS[provider]
+
 TTS_PROVIDER_MODELS = {
     "gemini": "gemini-3.1-flash-tts-preview",
     "cartesia": "sonic-3.5",
@@ -1885,7 +1912,7 @@ def create_stt_service(
             api_key=os.getenv("CARTESIA_API_KEY"),
             settings=CartesiaSTTService.Settings(
                 language=stt_language,
-                model=STT_PROVIDER_MODELS[provider],
+                model=get_stt_model(provider, language),
             ),
         )
     elif provider == "smallest":
