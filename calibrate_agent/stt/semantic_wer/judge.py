@@ -1,25 +1,49 @@
-"""Holistic semantic-WER judge — one LLM call per (reference, hypothesis) pair.
+"""Semantic-WER judge — pipecat's reason-then-tool loop over OpenRouter.
 
-Mirrors pipecat's stt-benchmark semantic WER: the model normalizes, aligns,
-applies the semantic error check, and returns S/D/I + reference word counts,
-which ``get_semantic_wer_score`` turns into a WER. Routes through calibrate's
-OpenRouter + ``instructor`` client (same plumbing as the Sarvam LLM-WER and text
-judges).
+Mirrors pipecat's stt-benchmark ``SemanticWEREvaluator.evaluate``: a multi-turn
+tool-use loop where the model writes its free-form semantic reasoning and then
+commits the counts via a ``calculate_wer`` tool call, with the rules in a
+**system** message and the (reference, hypothesis) pair in a **user** message.
+The prompt and tool schema are pipecat's verbatim (``main.py``).
+
+The one transport difference from pipecat: calibrate stays on its OpenRouter
+(OpenAI-compatible) client rather than the native Anthropic SDK, so the
+Anthropic ``tool_use`` loop is expressed as OpenAI function-calling (same
+reason→commit shape, same tool contract). Seams: ``@backoff`` / ``@observe`` /
+``log_judge_io`` and a Unicode NFC pre-normalization of the inputs (for Indic
+scripts; pipecat targets English and normalizes nothing upstream).
 """
 
+import json
 import unicodedata
 
 import backoff
-import instructor
 
 from calibrate_agent.judges import _build_openrouter_client
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 from calibrate_agent.utils import log_judge_io
-from calibrate_agent.stt.semantic_wer.main import SemanticWERResponse, build_prompt
+from calibrate_agent.stt.semantic_wer.main import (
+    SYSTEM_PROMPT,
+    CALCULATE_WER_TOOL,
+    build_user_prompt,
+)
 
 # pipecat's stt-benchmark judges with Claude; reached here via OpenRouter.
 # Overridable per call / via get_semantic_wer_score(model=...).
 DEFAULT_SEMANTIC_WER_MODEL = "anthropic/claude-sonnet-4.5"
+
+_MAX_TURNS = 10  # pipecat's safety limit
+
+# pipecat's Anthropic tool → OpenAI function-calling shape. The Anthropic
+# ``input_schema`` doubles as the OpenAI ``parameters`` object unchanged.
+_OPENAI_TOOL = {
+    "type": "function",
+    "function": {
+        "name": CALCULATE_WER_TOOL["name"],
+        "description": CALCULATE_WER_TOOL["description"],
+        "parameters": CALCULATE_WER_TOOL["input_schema"],
+    },
+}
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
@@ -29,40 +53,78 @@ async def semantic_wer_judge(
     prediction: str,
     model: str = DEFAULT_SEMANTIC_WER_MODEL,
 ) -> dict:
-    """Score one (reference, hypothesis) pair with the semantic-WER rubric.
+    """Score one (reference, hypothesis) pair with pipecat's tool-use loop.
 
-    Returns a dict matching :class:`SemanticWERResponse`
-    (``substitutions``, ``deletions``, ``insertions``, ``reference_words``,
-    ``normalized_reference``, ``normalized_hypothesis``, ``reasoning``).
+    Returns the ``calculate_wer`` counts plus reasoning:
+    ``substitutions``, ``deletions``, ``insertions``, ``reference_words``,
+    ``normalized_reference``, ``normalized_hypothesis``, ``reasoning``.
     """
-    # Canonicalize Unicode (NFC) before the judge sees the text. pipecat targets
-    # English and applies no upstream normalization, but this repo runs Indic
-    # scripts where visually identical strings can differ at the codepoint level
-    # (NFC vs NFD, nukta composition) — without this the LLM may count those as
-    # spurious substitutions. NFC only: lossless canonicalization, no case /
-    # punctuation stripping (the judge's inline STEP 1 handles the rest).
+    # Seam: NFC pre-normalization (see module docstring). Applied before the
+    # judge sees the text so Indic codepoint variants aren't counted as errors.
     reference = unicodedata.normalize("NFC", reference)
     prediction = unicodedata.normalize("NFC", prediction)
 
-    client = instructor.apatch(_build_openrouter_client())
+    client = _build_openrouter_client()
 
-    prompt = build_prompt(reference, prediction)
+    # System = pipecat's rules; user = pipecat's per-pair message.
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": build_user_prompt(reference, prediction)},
+    ]
 
-    response = await client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        response_model=SemanticWERResponse,
-        temperature=0,
-        max_completion_tokens=8192,
-    )
+    tool_input = None
+    reasoning = ""
 
-    result = response.model_dump()
+    for _ in range(_MAX_TURNS):
+        response = await client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=[_OPENAI_TOOL],
+            tool_choice="auto",
+            temperature=0,
+            max_tokens=4096,
+        )
+        message = response.choices[0].message
+        tool_calls = message.tool_calls or []
+
+        wer_call = next(
+            (tc for tc in tool_calls if tc.function.name == "calculate_wer"), None
+        )
+        if wer_call is not None:
+            # The assistant's free-form reasoning precedes the committed counts.
+            reasoning = message.content or ""
+            tool_input = json.loads(wer_call.function.arguments)
+            break
+
+        # Model reasoned without committing yet — feed its turn back and ask it
+        # to finish with the tool call (pipecat's loop likewise keeps going).
+        messages.append({"role": "assistant", "content": message.content or ""})
+        messages.append(
+            {"role": "user", "content": "Now call calculate_wer with your counts."}
+        )
+
+    if tool_input is None:
+        raise ValueError(
+            "semantic_wer_judge: model did not call calculate_wer within "
+            f"{_MAX_TURNS} turns"
+        )
+
+    result = {
+        "substitutions": int(tool_input.get("substitutions", 0)),
+        "deletions": int(tool_input.get("deletions", 0)),
+        "insertions": int(tool_input.get("insertions", 0)),
+        # pipecat defaults a missing reference_words to 1 at its call site.
+        "reference_words": int(tool_input.get("reference_words", 1)),
+        "normalized_reference": tool_input.get("normalized_reference") or "",
+        "normalized_hypothesis": tool_input.get("normalized_hypothesis") or "",
+        "reasoning": reasoning,
+    }
 
     log_judge_io(
         evaluator="semantic_wer",
         model=model,
-        system_prompt="",
-        user_input=prompt,
+        system_prompt=SYSTEM_PROMPT,
+        user_input=build_user_prompt(reference, prediction),
         output=result,
     )
 
@@ -70,11 +132,7 @@ async def semantic_wer_judge(
         langfuse.update_current_trace(
             input={"reference": reference, "prediction": prediction},
             output=result,
-            metadata={
-                "reference": reference,
-                "prediction": prediction,
-                "model": model,
-            },
+            metadata={"reference": reference, "prediction": prediction, "model": model},
         )
 
     return result
