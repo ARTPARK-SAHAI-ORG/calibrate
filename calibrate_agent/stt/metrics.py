@@ -261,10 +261,11 @@ async def get_semantic_wer_score(
 ) -> dict:
     """Compute pipecat-style semantic WER over (reference, prediction) pairs.
 
-    One holistic LLM call per row (see ``stt/semantic_wer``): the model
-    normalizes, aligns, applies the semantic error check, and returns
-    substitution/deletion/insertion counts + the reference word count. WER is
-    computed here from those counts, exactly as pipecat's ``_calculate_wer``:
+    One judge call per row via pipecat's reason-then-tool loop (see
+    ``stt/semantic_wer``): the model normalizes, aligns, applies the semantic
+    error check, and commits substitution/deletion/insertion counts + the
+    reference word count through a ``calculate_wer`` tool call. WER is computed
+    here from those counts, exactly as pipecat's ``_calculate_wer``:
     per row ``(S + D + I) / reference_words`` and, at the dataset level, the
     length-weighted **pooled** WER ``ΣSDI / Σreference_words`` over the
     finite-WER rows only (``ref_words==0`` rows are ``inf`` and excluded from
