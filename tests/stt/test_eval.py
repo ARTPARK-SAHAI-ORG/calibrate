@@ -911,5 +911,65 @@ class TestTranscribeGemini(unittest.IsolatedAsyncioTestCase):
                 await stt_eval.transcribe_gemini(Path("/tmp/x.wav"), "english")
 
 
+class TestTranscribeCartesia(unittest.IsolatedAsyncioTestCase):
+    """The Cartesia model is per-language (ink-2 for english, ink-whisper for
+    hindi/kannada) and the ink-whisper-only tuning params must not leak to ink-2."""
+
+    def _patch(self, stt_eval, ws_kwargs_sink):
+        async def fake_receive():
+            yield {"type": "transcript", "text": "hello", "is_final": True}
+            yield {"type": "done"}
+
+        ws = MagicMock()
+        ws.send = AsyncMock()
+        ws.receive = MagicMock(side_effect=lambda: fake_receive())
+        ws.close = AsyncMock()
+
+        async def fake_websocket(**kwargs):
+            ws_kwargs_sink.update(kwargs)
+            return ws
+
+        client = MagicMock()
+        client.stt.websocket = AsyncMock(side_effect=fake_websocket)
+        client.close = AsyncMock()
+
+        return (
+            patch.dict("os.environ", {"CARTESIA_API_KEY": "sk-fake"}),
+            patch.object(stt_eval, "AsyncCartesia", return_value=client),
+            patch.object(stt_eval, "load_audio", return_value=b"\x00\x00" * 1600),
+        )
+
+    async def test_english_uses_ink2_without_whisper_params(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        sink = {}
+        for p in self._patch(stt_eval, sink):
+            p.start()
+        try:
+            result = await stt_eval.transcribe_cartesia(Path("/tmp/x.wav"), "english")
+        finally:
+            patch.stopall()
+
+        self.assertEqual(result["transcript"], "hello")
+        self.assertEqual(sink["model"], "ink-2")
+        self.assertNotIn("min_volume", sink)
+        self.assertNotIn("max_silence_duration_secs", sink)
+
+    async def test_hindi_uses_ink_whisper_with_params(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        sink = {}
+        for p in self._patch(stt_eval, sink):
+            p.start()
+        try:
+            await stt_eval.transcribe_cartesia(Path("/tmp/x.wav"), "hindi")
+        finally:
+            patch.stopall()
+
+        self.assertEqual(sink["model"], "ink-whisper")
+        self.assertEqual(sink["min_volume"], 0.15)
+        self.assertEqual(sink["max_silence_duration_secs"], 0.3)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -27,6 +27,7 @@ from calibrate_agent.utils import (
     get_stt_language_code,
     validate_stt_language,
     STT_PROVIDER_MODELS,
+    get_stt_model,
     get_gemini_api_key,
     provider_log as _log,
     provider_log_file as _current_log_file,
@@ -524,19 +525,24 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
         raise ValueError("CARTESIA_API_KEY environment variable not set")
 
     lang_code = get_stt_language_code(language, "cartesia")
+    model = get_stt_model("cartesia", language)
 
     client = AsyncCartesia(api_key=api_key)
 
     try:
+        ws_kwargs = {
+            "model": model,  # Model (required)
+            "language": lang_code,  # Language of your audio (required)
+            "encoding": "pcm_s16le",  # Audio encoding format (required)
+            "sample_rate": 16000,  # Audio sample rate (required)
+        }
+        # min_volume / max_silence_duration_secs are ink-whisper-only; ink-2 rejects them.
+        if model == "ink-whisper":
+            ws_kwargs["min_volume"] = 0.15
+            ws_kwargs["max_silence_duration_secs"] = 0.3
+
         # Create websocket connection with voice activity detection
-        ws = await client.stt.websocket(
-            model=STT_PROVIDER_MODELS["cartesia"],  # Model (required)
-            language=lang_code,  # Language of your audio (required)
-            encoding="pcm_s16le",  # Audio encoding format (required)
-            sample_rate=16000,  # Audio sample rate (required)
-            min_volume=0.15,  # Volume threshold for voice activity detection
-            max_silence_duration_secs=0.3,  # Maximum silence duration before endpointing
-        )
+        ws = await client.stt.websocket(**ws_kwargs)
 
         # Simulate streaming audio data (replace with your audio source)
         async def audio_stream():

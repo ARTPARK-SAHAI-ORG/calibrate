@@ -59,21 +59,29 @@ class TestCreateSTTService(unittest.TestCase):
                 create_stt_service(prov, "english")
 
     def test_stt_models_come_from_shared_constant(self):
-        """Every provider's model in create_stt_service must come from
-        utils.STT_PROVIDER_MODELS — the SAME dict calibrate_agent/stt/eval.py reads —
-        so the live agent and the benchmark can't drift apart."""
-        from calibrate_agent.utils import create_stt_service, STT_PROVIDER_MODELS
+        """Every provider's model in create_stt_service must come from the same
+        resolver (get_stt_model over STT_PROVIDER_MODELS[_BY_LANGUAGE]) that
+        calibrate_agent/stt/eval.py reads — for every language — so the live agent
+        and the benchmark can't drift apart. Models are per-language: an override
+        in STT_PROVIDER_MODELS_BY_LANGUAGE wins, else the default."""
+        from calibrate_agent.utils import (
+            create_stt_service,
+            STT_PROVIDER_MODELS,
+            get_stt_model,
+        )
 
-        for prov, expected in STT_PROVIDER_MODELS.items():
+        for prov in STT_PROVIDER_MODELS:
             if prov in BENCHMARK_ONLY_PROVIDERS:
                 continue
-            with patch.dict(os.environ, ALL_KEYS), \
-                    patch(STT_SERVICE_TARGETS[prov]) as svc:
-                create_stt_service(prov, "english")
-                self.assertEqual(
-                    svc.Settings.call_args.kwargs["model"], expected,
-                    f"{prov}: STT model default drifted from STT_PROVIDER_MODELS",
-                )
+            for language in ("english", "hindi", "kannada"):
+                with patch.dict(os.environ, ALL_KEYS), \
+                        patch(STT_SERVICE_TARGETS[prov]) as svc:
+                    create_stt_service(prov, language)
+                    self.assertEqual(
+                        svc.Settings.call_args.kwargs["model"],
+                        get_stt_model(prov, language),
+                        f"{prov}/{language}: STT model drifted from get_stt_model",
+                    )
 
         # Guard against a new provider entering the constant without matching
         # parity coverage here (benchmark-only providers excepted).
@@ -82,6 +90,17 @@ class TestCreateSTTService(unittest.TestCase):
             {"deepgram", "openai", "groq", "google", "cartesia",
              "elevenlabs", "smallest", "sarvam"},
         )
+
+    def test_cartesia_stt_model_is_per_language(self):
+        """Cartesia uses English-only ink-2 for english but stays on the
+        multilingual ink-whisper for hindi/kannada."""
+        from calibrate_agent.utils import get_stt_model
+
+        self.assertEqual(get_stt_model("cartesia", "english"), "ink-2")
+        self.assertEqual(get_stt_model("cartesia", "hindi"), "ink-whisper")
+        self.assertEqual(get_stt_model("cartesia", "kannada"), "ink-whisper")
+        # A provider with no override falls back to its flat default.
+        self.assertEqual(get_stt_model("deepgram", "english"), "nova-3")
 
     def test_sarvam_stt_transcribes(self):
         """Sarvam STT must use saaras:v3 with mode="transcribe" so pipecat routes

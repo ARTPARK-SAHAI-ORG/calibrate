@@ -1807,6 +1807,23 @@ STT_PROVIDER_MODELS = {
     "sarvam": "saaras:v3",
 }
 
+# Per-language STT model overrides, resolved through get_stt_model() (mirrors
+# TTS_PROVIDER_VOICES_BY_LANGUAGE / get_tts_voice). Cartesia's ink-2 is English-only.
+STT_PROVIDER_MODELS_BY_LANGUAGE = {
+    "cartesia": {
+        "english": "ink-2",
+    },
+}
+
+
+def get_stt_model(provider: str, language: str) -> str:
+    """Return the STT model for a provider + language: a per-language override in
+    STT_PROVIDER_MODELS_BY_LANGUAGE if present, else STT_PROVIDER_MODELS."""
+    override = STT_PROVIDER_MODELS_BY_LANGUAGE.get(provider, {}).get(language)
+    if override is not None:
+        return override
+    return STT_PROVIDER_MODELS[provider]
+
 TTS_PROVIDER_MODELS = {
     "gemini": "gemini-3.1-flash-tts-preview",
     "cartesia": "sonic-3.5",
@@ -1885,7 +1902,7 @@ def create_stt_service(
             api_key=os.getenv("CARTESIA_API_KEY"),
             settings=CartesiaSTTService.Settings(
                 language=stt_language,
-                model=STT_PROVIDER_MODELS[provider],
+                model=get_stt_model(provider, language),
             ),
         )
     elif provider == "smallest":
