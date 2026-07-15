@@ -382,6 +382,17 @@ For any function block you add or modify:
 This is not optional — every PR is gated by the test suite in CI and by the
 pre-commit hook on `main`.
 
+### When the user asks "how do I test this?"
+
+Answer with the **single specific command they should run locally** for the
+change at hand — the exact `uv run …` / `calibrate-agent …` invocation, with the
+real flags, dataset path, and provider filled in (use `examples/` datasets when
+one fits). Do **not** give a tiered "here are the options" answer or a menu of
+fast-vs-thorough choices. One concrete, copy-pasteable command (a second line
+only if a follow-up command is genuinely needed, e.g. inspecting the output
+file). If a real run needs API keys or a dataset the user must supply, say so in
+one line, but still give the exact command.
+
 ## Things to keep in mind
 
 - **Default branch is `main`**, not `master`. Some early conversations used
