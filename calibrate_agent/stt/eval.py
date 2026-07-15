@@ -27,6 +27,7 @@ from calibrate_agent.utils import (
     get_stt_language_code,
     validate_stt_language,
     STT_PROVIDER_MODELS,
+    google_stt_model_and_location,
     get_gemini_api_key,
     provider_log as _log,
     provider_log_file as _current_log_file,
@@ -385,13 +386,7 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
 
     lang_code = get_stt_language_code(language, "google")
 
-    # Use chirp_2 model and asia-southeast1 region for Sindhi
-    if language.lower() == "sindhi":
-        model = "chirp_2"
-        region = "asia-southeast1"
-    else:
-        model = STT_PROVIDER_MODELS["google"]
-        region = "us"
+    model, region = google_stt_model_and_location(language)
 
     result = await asyncio.wait_for(
         asyncio.to_thread(
