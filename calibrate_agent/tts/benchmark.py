@@ -28,7 +28,8 @@ from calibrate_agent.tts.eval import (
     validate_tts_input_file,
 )
 from calibrate_agent.tts.leaderboard import generate_leaderboard
-from calibrate_agent.utils import StreamTee, env_int
+from calibrate_agent._env import env_int
+from calibrate_agent.utils import StreamTee
 
 # Maximum number of providers to run in parallel
 MAX_PARALLEL_PROVIDERS = 2

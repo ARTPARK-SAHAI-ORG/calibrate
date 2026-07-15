@@ -33,7 +33,8 @@ from calibrate_agent.stt.eval import (
     STT_LANGUAGES,
 )
 from calibrate_agent.stt.leaderboard import generate_leaderboard
-from calibrate_agent.utils import StreamTee, env_int
+from calibrate_agent._env import env_int
+from calibrate_agent.utils import StreamTee
 
 
 # Maximum number of providers to run in parallel

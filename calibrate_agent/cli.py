@@ -25,22 +25,11 @@ import json
 from importlib.metadata import version as get_version
 from dotenv import find_dotenv, load_dotenv
 
-
-def _env_int(name: str, default: int) -> int:
-    """Read an int from env var ``name``, falling back to ``default``.
-
-    Local to the CLI (uses only ``os``) so building the argument parser doesn't
-    import the heavy ``calibrate_agent.utils`` module — importing it here shifts
-    scipy/numpy init order and trips a scipy ``_CopyMode`` incompatibility in the
-    voice path. ``calibrate_agent.utils.env_int`` is the same helper for library code.
-    """
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        return int(raw)
-    except ValueError:
-        return default
+# ``calibrate_agent._env`` is stdlib-only (imports just ``os``), so this import is
+# safe at parser-build time — unlike ``calibrate_agent.utils``, which pulls in
+# scipy/numpy/pipecat and trips a scipy ``_CopyMode`` incompatibility in the
+# voice path if imported here.
+from calibrate_agent._env import env_int
 
 
 def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
@@ -262,7 +251,7 @@ Examples:
     stt_parser.add_argument(
         "--max-parallel",
         type=int,
-        default=_env_int("CALIBRATE_STT_MAX_PARALLEL", 2),
+        default=env_int("CALIBRATE_STT_MAX_PARALLEL", 2),
         help=(
             "Number of providers to evaluate in parallel (default: 2, or "
             "$CALIBRATE_STT_MAX_PARALLEL)."
@@ -293,7 +282,7 @@ Examples:
     tts_parser.add_argument(
         "--max-parallel",
         type=int,
-        default=_env_int("CALIBRATE_TTS_MAX_PARALLEL", 2),
+        default=env_int("CALIBRATE_TTS_MAX_PARALLEL", 2),
         help=(
             "Number of providers to evaluate in parallel (default: 2, or "
             "$CALIBRATE_TTS_MAX_PARALLEL)."
@@ -367,7 +356,7 @@ Examples:
     llm_parser.add_argument(
         "--max-parallel",
         type=int,
-        default=_env_int("CALIBRATE_LLM_MAX_PARALLEL", 2),
+        default=env_int("CALIBRATE_LLM_MAX_PARALLEL", 2),
         help=(
             "Number of models to evaluate in parallel (default: 2, or "
             "$CALIBRATE_LLM_MAX_PARALLEL)."
