@@ -700,6 +700,27 @@ class TestValidateSTTEvalOnlyDataset(unittest.TestCase):
 # --- _score_and_write_results --------------------------------------------
 
 class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        from calibrate_agent.stt import eval as E
+
+        async def _sem(references, predictions, model=None):
+            return {
+                "semantic_wer": 0.0,
+                "per_row": [
+                    {
+                        "semantic_wer": 0.0, "substitutions": 0, "deletions": 0,
+                        "insertions": 0, "reference_words": 1,
+                        "normalized_reference": "", "normalized_hypothesis": "",
+                        "reasoning": "",
+                    }
+                    for _ in references
+                ],
+            }
+
+        p = patch.object(E, "get_semantic_wer_score", AsyncMock(side_effect=_sem))
+        p.start()
+        self.addCleanup(p.stop)
+
     async def test_writes_files(self):
         from calibrate_agent.stt import eval as E
 
@@ -727,7 +748,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
             self.assertEqual(result["wer"], 0.1)
             self.assertEqual(result["cer"], 0.2)
@@ -760,7 +781,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["x", "y"],
                     output_dir=tmp,
                     evaluator_config_dir=tmp,
-                    run_sarvam_judges=True,
+                    run_llm_judges=True,
                 )
             self.assertEqual(result["sarvam_llm_wer"], 0.05)
             self.assertEqual(result["sarvam_llm_cer"], 0.03)
@@ -788,7 +809,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["x"],
                     output_dir=tmp,
                     evaluator_config_dir=tmp,
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
             llm_wer_mock.assert_not_called()
             self.assertNotIn("sarvam_llm_wer", result)
@@ -818,7 +839,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                 output_dir=tmp,
                 evaluator_config_dir=tmp,
                 judge_evaluators=[rating_ev],
-                run_sarvam_judges=False,
+                run_llm_judges=False,
             )
 
 
@@ -853,7 +874,7 @@ class TestRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                      ],
                  })):
                 result = await E.run_eval_only(
-                    str(ds), str(out), run_sarvam_judges=False
+                    str(ds), str(out), run_llm_judges=False
                 )
         self.assertEqual(result["status"], "completed")
 
@@ -933,7 +954,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                     debug_count=5,
                     ignore_retry=False,
                     overwrite=True,
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
             self.assertEqual(result["status"], "completed")
 
@@ -996,7 +1017,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                     debug_count=1,
                     ignore_retry=True,
                     overwrite=False,
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
             self.assertEqual(result["status"], "completed")
 

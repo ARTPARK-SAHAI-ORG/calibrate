@@ -38,6 +38,7 @@ from calibrate_agent.stt.metrics import (
     get_llm_judge_score,
     get_intent_entity_score,
     get_llm_wer_cer_score,
+    get_semantic_wer_score,
 )
 from calibrate_agent.judges import (
     is_rating,
@@ -1096,7 +1097,7 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
-    run_sarvam_judges: bool = True,
+    run_llm_judges: bool = True,
 ) -> dict:
     """Run STT evaluation for a single provider."""
     provider_output_dir = join(output_dir, provider)
@@ -1229,7 +1230,7 @@ async def run_single_provider_eval(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            run_sarvam_judges=run_sarvam_judges,
+            run_llm_judges=run_llm_judges,
         )
 
         return {
@@ -1285,7 +1286,7 @@ async def _score_and_write_results(
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_sarvam_judges: bool = True,
+    run_llm_judges: bool = True,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1295,7 +1296,7 @@ async def _score_and_write_results(
     evaluator columns/metrics are omitted. Returns the metrics_data dict.
 
     The Sarvam intent/entity judge runs by default. When
-    ``run_sarvam_judges`` is False it is skipped entirely — no normalizer model
+    ``run_llm_judges`` is False it is skipped entirely — no normalizer model
     is loaded, no judge calls are made, and the ``sarvam_*`` columns/metrics are
     omitted.
 
@@ -1315,11 +1316,11 @@ async def _score_and_write_results(
     # succeeded are still written.
 
     # Intent + entity preservation and LLM-WER/CER run by default; setting
-    # ``run_sarvam_judges`` to False skips loading the normalizer model and the
+    # ``run_llm_judges`` to False skips loading the normalizer model and the
     # per-row judge calls.
     intent_entity_results = None
     llm_wer_results = None
-    if run_sarvam_judges:
+    if run_llm_judges:
         try:
             intent_entity_results = await get_intent_entity_score(
                 gt_transcripts, pred_transcripts, language=language
@@ -1342,6 +1343,21 @@ async def _score_and_write_results(
         except Exception as e:
             llm_wer_results = None
             _log(f"Sarvam LLM-WER/CER judge failed, skipping: {e}")
+
+    # Semantic WER (pipecat methodology) runs as part of the LLM judges group.
+    semantic_wer_results = None
+    if run_llm_judges:
+        try:
+            semantic_wer_results = await get_semantic_wer_score(
+                gt_transcripts, pred_transcripts
+            )
+            _log(
+                f"Semantic WER: {semantic_wer_results['semantic_wer']:.4f}",
+                to_terminal=False,
+            )
+        except Exception as e:
+            semantic_wer_results = None
+            _log(f"Semantic WER judge failed, skipping: {e}")
 
     # The LLM judge is opt-in for STT: when no evaluators are passed we report
     # WER/CER only and skip the judge entirely (no evaluator config, no judge
@@ -1378,6 +1394,8 @@ async def _score_and_write_results(
     if llm_wer_results is not None:
         metrics_data["sarvam_llm_wer"] = llm_wer_results["llm_wer"]
         metrics_data["sarvam_llm_cer"] = llm_wer_results["llm_cer"]
+    if semantic_wer_results is not None:
+        metrics_data["semantic_wer"] = semantic_wer_results["semantic_wer"]
     if llm_results is not None:
         for name, score_dict in llm_results["scores"].items():
             metrics_data[name] = score_dict
@@ -1395,9 +1413,24 @@ async def _score_and_write_results(
     llm_per_row = (
         llm_results["per_row"] if llm_results is not None else [None] * len(ids)
     )
+    semantic_wer_per_row = (
+        semantic_wer_results["per_row"]
+        if semantic_wer_results is not None
+        else [None] * len(ids)
+    )
 
     data = []
-    for _id, gt_text, pred_text, wer, cer, ie_row, llm_wer_row, llm_row in zip(
+    for (
+        _id,
+        gt_text,
+        pred_text,
+        wer,
+        cer,
+        ie_row,
+        llm_wer_row,
+        semantic_wer_row,
+        llm_row,
+    ) in zip(
         ids,
         gt_transcripts,
         pred_transcripts,
@@ -1405,6 +1438,7 @@ async def _score_and_write_results(
         cer_results["per_row"],
         ie_per_row,
         llm_wer_per_row,
+        semantic_wer_per_row,
         llm_per_row,
     ):
         row = {
@@ -1425,6 +1459,13 @@ async def _score_and_write_results(
             row["sarvam_llm_wer_reasoning"] = json.dumps(
                 llm_wer_row["segments"], ensure_ascii=False
             )
+        if semantic_wer_row is not None:
+            row["semantic_wer"] = float(semantic_wer_row["semantic_wer"])
+            row["semantic_wer_substitutions"] = semantic_wer_row["substitutions"]
+            row["semantic_wer_deletions"] = semantic_wer_row["deletions"]
+            row["semantic_wer_insertions"] = semantic_wer_row["insertions"]
+            row["semantic_wer_reference_words"] = semantic_wer_row["reference_words"]
+            row["semantic_wer_reasoning"] = semantic_wer_row["reasoning"]
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
             if is_rating(ev):
@@ -1447,7 +1488,7 @@ async def run_eval_only(
     output_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_sarvam_judges: bool = True,
+    run_llm_judges: bool = True,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
@@ -1461,7 +1502,7 @@ async def run_eval_only(
             LLM judge runs and only WER/CER are reported.
         language: Language of the dataset, used to normalize text before the
             intent/entity judge. Defaults to ``english``.
-        run_sarvam_judges: Run the Sarvam intent/entity judge (default True).
+        run_llm_judges: Run the Sarvam intent/entity judge (default True).
             Setting it to False skips the normalizer model load and the judge
             calls entirely.
 
@@ -1497,7 +1538,7 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            run_sarvam_judges=run_sarvam_judges,
+            run_llm_judges=run_llm_judges,
         )
 
         return {
@@ -1514,13 +1555,14 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
     shared by the single-provider, multi-provider, and eval-only paths.
 
     The Sarvam judge fields are only included when present in ``metrics``
-    (i.e. unless ``--skip-sarvam`` was passed for the run).
+    (i.e. unless ``--skip-llm-judges`` was passed for the run).
     """
     parts = [
         f"WER={metrics.get('wer', 0):.4f}",
         f"CER={metrics.get('cer', 0):.4f}",
     ]
     for key, label in (
+        ("semantic_wer", "Semantic WER"),
         ("sarvam_intent_score", "Sarvam Intent Score"),
         ("sarvam_entity_score", "Sarvam Entity Score"),
         ("sarvam_llm_wer", "Sarvam LLM WER"),
@@ -1607,12 +1649,12 @@ async def main():
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
     parser.add_argument(
-        "--skip-sarvam",
+        "--skip-llm-judges",
         action="store_true",
         help=(
-            "Skip the Sarvam LLM judges (intent & entity preservation and "
-            "LLM-WER/CER). They run by default; passing this skips the extra "
-            "per-row LLM judges."
+            "Skip the extra LLM-based judges (Sarvam intent & entity "
+            "preservation, Sarvam LLM-WER/CER, and pipecat-style semantic WER). "
+            "They all run by default; passing this reports WER/CER only."
         ),
     )
 
@@ -1656,7 +1698,7 @@ async def main():
         debug_count=args.debug_count,
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
-        run_sarvam_judges=not args.skip_sarvam,
+        run_llm_judges=not args.skip_llm_judges,
     )
 
     # Print summary
