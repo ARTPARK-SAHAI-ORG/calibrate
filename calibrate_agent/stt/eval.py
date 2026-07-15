@@ -1486,8 +1486,6 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
         f"WER={metrics.get('wer', 0):.4f}",
         f"CER={metrics.get('cer', 0):.4f}",
     ]
-    # Optional Sarvam judge metrics — included only when present in ``metrics``
-    # (i.e. when ``--sarvam-judges`` was enabled for the run).
     for key, label in (
         ("sarvam_intent_score", "Sarvam Intent Score"),
         ("sarvam_entity_score", "Sarvam Entity Score"),
