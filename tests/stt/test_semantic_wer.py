@@ -8,9 +8,10 @@ results.csv when the LLM-judge group is enabled (``run_llm_judges``).
 
 import json
 import tempfile
+import unicodedata
 import unittest
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
 
@@ -84,6 +85,39 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
             out = await M.get_semantic_wer_score([""], ["x y"])
 
         self.assertEqual(out["per_row"][0]["semantic_wer"], float("inf"))
+
+
+class TestJudgeNFCNormalization(unittest.IsolatedAsyncioTestCase):
+    async def test_reference_and_prediction_are_nfc_normalized(self):
+        from calibrate_agent.stt.semantic_wer import judge as J
+        from calibrate_agent.stt.semantic_wer.main import SemanticWERResponse
+
+        # Decomposed (NFD) input whose NFC form differs — combining marks that
+        # recompose to precomposed codepoints. The judge must normalize to NFC.
+        nfd_ref = unicodedata.normalize("NFD", "café résumé")
+        nfd_hyp = unicodedata.normalize("NFD", "café résumé")
+        self.assertNotEqual(nfd_ref, unicodedata.normalize("NFC", nfd_ref))
+
+        captured = {}
+
+        async def fake_create(*args, **kwargs):
+            captured["content"] = kwargs["messages"][0]["content"]
+            return SemanticWERResponse(
+                substitutions=0, deletions=0, insertions=0, reference_words=3
+            )
+
+        fake_client = MagicMock()
+        fake_client.chat.completions.create = fake_create
+
+        with patch.object(J, "_build_openrouter_client", return_value=object()), patch.object(
+            J.instructor, "apatch", return_value=fake_client
+        ):
+            await J.semantic_wer_judge(nfd_ref, nfd_hyp)
+
+        # The prompt the judge sent must carry the NFC (composed) form, not the
+        # decomposed input it received.
+        self.assertIn(unicodedata.normalize("NFC", nfd_ref), captured["content"])
+        self.assertNotIn(nfd_ref, captured["content"])
 
 
 def _fake_judge():

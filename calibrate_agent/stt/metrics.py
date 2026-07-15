@@ -269,9 +269,12 @@ async def get_semantic_wer_score(
     length-weighted **pooled** WER ``ΣSDI / Σreference_words``.
 
     Unlike ``get_llm_wer_cer_score`` (Sarvam: deterministic difflib alignment +
-    per-segment equivalence forgiveness), the LLM does the entire count here.
-    No text normalization is applied upstream — the judge normalizes inline,
-    matching pipecat (which targets English).
+    per-segment equivalence forgiveness), the LLM does the entire count here and
+    normalizes inline (case, punctuation, contractions, numbers, …). The only
+    upstream step is Unicode NFC canonicalization in ``semantic_wer_judge`` — a
+    deviation from pipecat (English-only, no normalization) so Indic codepoint
+    variants don't count as spurious errors. No case/punctuation/Indic pass is
+    applied; that stays the judge's job.
 
     Returns:
         {

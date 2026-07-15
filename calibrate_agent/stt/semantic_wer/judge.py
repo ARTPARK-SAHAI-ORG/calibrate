@@ -7,6 +7,8 @@ OpenRouter + ``instructor`` client (same plumbing as the Sarvam LLM-WER and text
 judges).
 """
 
+import unicodedata
+
 import backoff
 import instructor
 
@@ -33,6 +35,15 @@ async def semantic_wer_judge(
     (``substitutions``, ``deletions``, ``insertions``, ``reference_words``,
     ``normalized_reference``, ``normalized_hypothesis``, ``reasoning``).
     """
+    # Canonicalize Unicode (NFC) before the judge sees the text. pipecat targets
+    # English and applies no upstream normalization, but this repo runs Indic
+    # scripts where visually identical strings can differ at the codepoint level
+    # (NFC vs NFD, nukta composition) — without this the LLM may count those as
+    # spurious substitutions. NFC only: lossless canonicalization, no case /
+    # punctuation stripping (the judge's inline STEP 1 handles the rest).
+    reference = unicodedata.normalize("NFC", reference)
+    prediction = unicodedata.normalize("NFC", prediction)
+
     client = instructor.apatch(_build_openrouter_client())
 
     prompt = build_prompt(reference, prediction)
