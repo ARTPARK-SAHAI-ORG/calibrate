@@ -34,6 +34,25 @@ DEFAULT_SEMANTIC_WER_MODEL = "anthropic/claude-sonnet-4.5"
 
 _MAX_TURNS = 10  # pipecat's safety limit
 
+
+def _short_circuit(
+    substitutions: int,
+    deletions: int,
+    insertions: int,
+    reference_words: int,
+    reasoning: str,
+) -> dict:
+    """Deterministic empty-input result (no LLM call), pipecat's shape."""
+    return {
+        "substitutions": substitutions,
+        "deletions": deletions,
+        "insertions": insertions,
+        "reference_words": reference_words,
+        "normalized_reference": "",
+        "normalized_hypothesis": "",
+        "reasoning": reasoning,
+    }
+
 # pipecat's Anthropic tool → OpenAI function-calling shape. The Anthropic
 # ``input_schema`` doubles as the OpenAI ``parameters`` object unchanged.
 _OPENAI_TOOL = {
@@ -63,6 +82,20 @@ async def semantic_wer_judge(
     # judge sees the text so Indic codepoint variants aren't counted as errors.
     reference = unicodedata.normalize("NFC", reference)
     prediction = unicodedata.normalize("NFC", prediction)
+
+    # pipecat evaluate(): empty-input short-circuits, ported verbatim. These are
+    # deterministic — no LLM call — matching _empty_result / _no_reference_result
+    # / _no_hypothesis_result. get_semantic_wer_score turns these counts into the
+    # same per-row WER pipecat reports (0.0 / inf / 1.0 respectively).
+    if not reference.strip() and not prediction.strip():
+        return _short_circuit(0, 0, 0, 0, reasoning="empty reference and hypothesis")
+    if not reference.strip():
+        return _short_circuit(
+            0, 0, len(prediction.split()), 0, reasoning="empty reference"
+        )
+    if not prediction.strip():
+        words = len(reference.split())
+        return _short_circuit(0, words, 0, words, reasoning="empty hypothesis")
 
     client = _build_openrouter_client()
 

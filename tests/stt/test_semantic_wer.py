@@ -191,6 +191,63 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(nfd_ref, user_msg)
 
 
+class TestJudgeEmptyShortCircuit(unittest.IsolatedAsyncioTestCase):
+    async def _run_no_llm(self, ref, hyp):
+        """Run the judge asserting the model is never called."""
+        from calibrate_agent.stt.semantic_wer import judge as J
+
+        def _boom(*a, **kw):
+            raise AssertionError("LLM must not be called for empty inputs")
+
+        with patch.object(J, "_build_openrouter_client", side_effect=_boom):
+            return await J.semantic_wer_judge(ref, hyp)
+
+    async def test_both_empty(self):
+        r = await self._run_no_llm("   ", "")
+        self.assertEqual(
+            (r["substitutions"], r["deletions"], r["insertions"], r["reference_words"]),
+            (0, 0, 0, 0),
+        )
+
+    async def test_empty_reference_is_inf(self):
+        # pipecat _no_reference_result: insertions = len(hyp words), ref_words 0.
+        r = await self._run_no_llm("", "two extra words here")
+        self.assertEqual(r["insertions"], 4)
+        self.assertEqual(r["reference_words"], 0)
+        # Downstream this row is inf (errors>0, ref_words==0).
+
+    async def test_empty_hypothesis_is_wer_one(self):
+        # pipecat _no_hypothesis_result: deletions = ref_words = len(ref words).
+        r = await self._run_no_llm("three word reference", "  ")
+        self.assertEqual(r["deletions"], 3)
+        self.assertEqual(r["reference_words"], 3)  # -> per-row WER 3/3 = 1.0
+
+    async def test_empty_rows_pool_like_pipecat(self):
+        from calibrate_agent.stt import metrics as M
+
+        by_ref = {
+            "": {"substitutions": 0, "deletions": 0, "insertions": 2,
+                 "reference_words": 0, "normalized_reference": "",
+                 "normalized_hypothesis": "", "reasoning": "empty reference"},
+            "hi there": {"substitutions": 1, "deletions": 0, "insertions": 0,
+                         "reference_words": 2, "normalized_reference": "",
+                         "normalized_hypothesis": "", "reasoning": "one sub"},
+        }
+
+        async def fake_judge(reference, prediction, model=None):
+            return by_ref[reference]
+
+        with patch(
+            "calibrate_agent.stt.semantic_wer.semantic_wer_judge",
+            AsyncMock(side_effect=fake_judge),
+        ):
+            out = await M.get_semantic_wer_score(["", "hi there"], ["x y", "hi bye"])
+
+        # Empty-reference row is inf and excluded from pooling; pooled = 1/2.
+        self.assertEqual(out["per_row"][0]["semantic_wer"], float("inf"))
+        self.assertAlmostEqual(out["semantic_wer"], 0.5)
+
+
 def _fake_judge():
     async def judge(refs, preds, evaluators=None, fallback_model=None):
         return {
