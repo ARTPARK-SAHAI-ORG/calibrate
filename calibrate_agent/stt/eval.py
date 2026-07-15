@@ -234,11 +234,16 @@ async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
     audio_file = load_audio(audio_path, as_file=True)
 
     # Supplying the input language (ISO-639-1) improves accuracy and latency
-    # per the OpenAI transcription docs.
+    # per the OpenAI transcription docs. For the gpt-4o transcribe models the
+    # `language` param is only a soft hint, so we also steer the output language
+    # via `prompt` — OpenAI's own recommended workaround for the model emitting
+    # the wrong script (e.g. Urdu for English/Hindi audio).
+    # https://developers.openai.com/api/docs/guides/speech-to-text
     stream = await client.audio.transcriptions.create(
         model=STT_PROVIDER_MODELS["openai"],
         file=audio_file,
         language=lang_code,
+        prompt=f"Transcribe the audio in {language.capitalize()}.",
         response_format="text",
         stream=True,
     )
