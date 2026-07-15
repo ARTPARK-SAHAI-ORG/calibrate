@@ -664,6 +664,12 @@ class TestTranscribeOpenAIStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["transcript"], "hello world")
         # OpenAI STT expects an ISO-639-1 code — "hi" for hindi.
         self.assertEqual(create.await_args.kwargs["language"], "hi")
+        # The gpt-4o models treat `language` as a soft hint, so we also steer
+        # the output language via `prompt` to stop it emitting the wrong script.
+        self.assertEqual(
+            create.await_args.kwargs["prompt"],
+            "Transcribe the audio in Hindi.",
+        )
 
 
 class TestTranscribeGemini(unittest.IsolatedAsyncioTestCase):
