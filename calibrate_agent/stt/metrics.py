@@ -182,8 +182,6 @@ def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
     return list(evaluators) if evaluators else [DEFAULT_STT_EVALUATOR]
 
 
-
-
 def _edit_metric(
     metric_fn,
     transform,
@@ -517,8 +515,10 @@ async def get_llm_wer_cer_score(
     # Apply the same case-fold/punctuation/whitespace cleanup the WER/CER scorer
     # uses, but *before* alignment — otherwise a segment differing only in case
     # or punctuation would be sent to the equivalence judge as a real mismatch.
-    norm_references = [_EDIT_CLEANUP_TEXT(str(r)) for r in norm_references]
-    norm_predictions = [_EDIT_CLEANUP_TEXT(str(p)) for p in norm_predictions]
+    # ``_normalize_refs_preds`` already returns strings (NFC-coerced), so the
+    # cleanup and alignment below operate on strings without extra coercion.
+    norm_references = [_EDIT_CLEANUP_TEXT(r) for r in norm_references]
+    norm_predictions = [_EDIT_CLEANUP_TEXT(p) for p in norm_predictions]
 
     # Word-align every row and collect the unique differing segment pairs to
     # judge (dedup — the same (ref, pred) segment is judged once across the whole
@@ -526,7 +526,7 @@ async def get_llm_wer_cer_score(
     row_segments: List[List[dict]] = []
     unique_pairs: dict = {}
     for i, (ref, pred) in enumerate(zip(norm_references, norm_predictions)):
-        segments = get_segments(str(ref), str(pred), key=i)
+        segments = get_segments(ref, pred, key=i)
         row_segments.append(segments)
         for seg in segments:
             if (
