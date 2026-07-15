@@ -24,6 +24,18 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
+def get_wav_duration_seconds(audio_path: str | Path) -> float | None:
+    """Return WAV duration in seconds, or None when it cannot be read."""
+    try:
+        with wave.open(str(audio_path), "rb") as wav_file:
+            frame_rate = wav_file.getframerate()
+            if frame_rate <= 0:
+                return None
+            return wav_file.getnframes() / float(frame_rate)
+    except Exception:
+        return None
+
+
 def patch_langfuse_trace(trace_name: str):
     from pipecat.utils.tracing import service_decorators
 
@@ -2277,7 +2289,12 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
     metrics: dict = {}
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
-            if isinstance(value, dict) and "mean" in value:
+            if key == "cost" and isinstance(value, dict):
+                for cost_key in ("audio_minutes", "cost_per_minute_usd", "cost_usd"):
+                    scalar = value.get(cost_key)
+                    if isinstance(scalar, (int, float)):
+                        metrics[cost_key] = float(scalar)
+            elif isinstance(value, dict) and "mean" in value:
                 metrics[key] = value["mean"]
             elif isinstance(value, dict) and "p50" in value:
                 for pct in ("p50", "p95", "p99"):

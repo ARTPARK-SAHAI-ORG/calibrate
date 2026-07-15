@@ -25,6 +25,7 @@ import pandas as pd
 
 from calibrate_agent.utils import (
     get_stt_language_code,
+    get_wav_duration_seconds,
     validate_stt_language,
     STT_PROVIDER_MODELS,
     get_gemini_api_key,
@@ -49,6 +50,7 @@ from calibrate_agent.langfuse import (
     langfuse,
     langfuse_enabled,
 )
+from calibrate_agent.pricing import resolve_pricing
 from calibrate_agent.rate_limit import (
     STT_PROVIDER_TIMEOUT_SECONDS,
     STT_STREAMING_IDLE_TIMEOUT_SECONDS,
@@ -59,6 +61,71 @@ from calibrate_agent.rate_limit import (
 # =============================================================================
 # STT Provider API Methods
 # =============================================================================
+
+
+def _default_stt_model(provider: str, language: str | None = None) -> str | None:
+    if provider == "google":
+        model, _region = _google_stt_model_and_region(language)
+        return model
+    return STT_PROVIDER_MODELS.get(provider)
+
+
+def _google_stt_model_and_region(language: str | None) -> tuple[str, str]:
+    if language and language.lower() == "sindhi":
+        return "chirp_2", "asia-southeast1"
+    return STT_PROVIDER_MODELS["google"], "us"
+
+
+def _stt_result_row(
+    row_id: object,
+    gt_text: object,
+    pred_text: str,
+    audio_dir: Path,
+) -> dict:
+    return {
+        "id": row_id,
+        "gt": gt_text,
+        "pred": pred_text,
+        "audio_duration_seconds": get_wav_duration_seconds(audio_dir / f"{row_id}.wav"),
+    }
+
+
+def _build_stt_cost_metrics(
+    provider: str,
+    audio_duration_seconds: list[float | None] | None,
+    model: str | None = None,
+) -> dict | None:
+    """Build STT cost metrics from audio duration and provider price config."""
+    durations = [
+        float(duration)
+        for duration in (audio_duration_seconds or [])
+        if duration is not None and not pd.isna(duration)
+    ]
+    if not durations:
+        return None
+
+    total_seconds = float(sum(durations))
+    audio_minutes = round(total_seconds / 60.0, 4)
+    metrics = {
+        "provider": provider,
+        "pricing_model": model,
+        "currency": "USD",
+        "billing_unit": "minute",
+        "total_seconds": total_seconds,
+        "audio_minutes": audio_minutes,
+        "pricing_source": "unavailable",
+    }
+
+    pricing = resolve_pricing("stt", provider, model=model)
+    if not pricing:
+        return metrics
+
+    price_per_minute = pricing["price_per_minute_usd"]
+    metrics["pricing_source"] = pricing["pricing_source"]
+    metrics["pricing_model"] = pricing["model"]
+    metrics["cost_per_minute_usd"] = price_per_minute
+    metrics["cost_usd"] = audio_minutes * price_per_minute
+    return metrics
 
 
 def load_audio(audio_path: Path, as_file: bool = False, raw_pcm: bool = False):
@@ -385,13 +452,7 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
 
     lang_code = get_stt_language_code(language, "google")
 
-    # Use chirp_2 model and asia-southeast1 region for Sindhi
-    if language.lower() == "sindhi":
-        model = "chirp_2"
-        region = "asia-southeast1"
-    else:
-        model = STT_PROVIDER_MODELS["google"]
-        region = "us"
+    model, region = _google_stt_model_and_region(language)
 
     result = await asyncio.wait_for(
         asyncio.to_thread(
@@ -932,11 +993,13 @@ async def run_stt_eval(
             raise
 
         # Save immediately after each file
+        audio_duration_seconds = _get_wav_duration_seconds(audio_path)
         results.append(
             {
                 "id": gt_info["id"],
                 "gt": gt_info["gt"],
                 "pred": transcript,
+                "audio_duration_seconds": audio_duration_seconds,
             }
         )
         pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -1190,11 +1253,12 @@ async def run_single_provider_eval(
                 for gt_info in gt_data:
                     if gt_info["id"] not in processed_ids:
                         results.append(
-                            {
-                                "id": gt_info["id"],
-                                "gt": gt_info["gt"],
-                                "pred": "",
-                            }
+                            _stt_result_row(
+                                gt_info["id"],
+                                gt_info["gt"],
+                                "",
+                                audio_dir,
+                            )
                         )
 
                 pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -1219,6 +1283,19 @@ async def run_single_provider_eval(
         all_ids = results_df["id"].tolist()
         all_gt_transcripts = results_df["gt"].astype(str).tolist()
         all_pred_transcripts = results_df["pred"].fillna("").astype(str).tolist()
+        audio_durations = []
+        for row_index, row_id in enumerate(all_ids):
+            duration = None
+            if "audio_duration_seconds" in results_df.columns:
+                duration = results_df.iloc[row_index]["audio_duration_seconds"]
+            if duration is None or pd.isna(duration):
+                duration = get_wav_duration_seconds(audio_dir / f"{row_id}.wav")
+            audio_durations.append(duration)
+        cost_metrics = _build_stt_cost_metrics(
+            provider=provider,
+            audio_duration_seconds=audio_durations,
+            model=_default_stt_model(provider, language),
+        )
 
         _log(f"gt_transcripts: {all_gt_transcripts}", to_terminal=False)
         _log(f"pred_transcripts: {all_pred_transcripts}", to_terminal=False)
@@ -1235,6 +1312,8 @@ async def run_single_provider_eval(
             judge_evaluators=judge_evaluators,
             language=language,
             run_sarvam_judges=run_sarvam_judges,
+            audio_durations=audio_durations,
+            cost_metrics=cost_metrics,
         )
 
         return {
@@ -1291,6 +1370,8 @@ async def _score_and_write_results(
     judge_evaluators: list[dict] = None,
     language: str = "english",
     run_sarvam_judges: bool = True,
+    cost_metrics: dict | None = None,
+    audio_durations: list[float | None] | None = None,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1386,6 +1467,8 @@ async def _score_and_write_results(
     if llm_results is not None:
         for name, score_dict in llm_results["scores"].items():
             metrics_data[name] = score_dict
+    if cost_metrics:
+        metrics_data["cost"] = cost_metrics
 
     ie_per_row = (
         intent_entity_results["per_row"]
@@ -1401,8 +1484,14 @@ async def _score_and_write_results(
         llm_results["per_row"] if llm_results is not None else [None] * len(ids)
     )
 
+    audio_durations = list(audio_durations or [])
+    if len(audio_durations) < len(ids):
+        audio_durations.extend([None] * (len(ids) - len(audio_durations)))
+    elif len(audio_durations) > len(ids):
+        audio_durations = audio_durations[: len(ids)]
+
     data = []
-    for _id, gt_text, pred_text, wer, cer, ie_row, llm_wer_row, llm_row in zip(
+    for _id, gt_text, pred_text, wer, cer, ie_row, llm_wer_row, llm_row, duration in zip(
         ids,
         gt_transcripts,
         pred_transcripts,
@@ -1411,6 +1500,7 @@ async def _score_and_write_results(
         ie_per_row,
         llm_wer_per_row,
         llm_per_row,
+        audio_durations,
     ):
         row = {
             "id": _id,
@@ -1419,6 +1509,8 @@ async def _score_and_write_results(
             "wer": wer,
             "cer": cer,
         }
+        if duration is not None and not pd.isna(duration):
+            row["audio_duration_seconds"] = duration
         if ie_row is not None:
             row["sarvam_intent_score"] = int(ie_row["intent_score"])
             row["sarvam_intent_reasoning"] = ie_row["intent_explanation"]
@@ -1430,13 +1522,14 @@ async def _score_and_write_results(
             row["sarvam_llm_wer_reasoning"] = json.dumps(
                 llm_wer_row["segments"], ensure_ascii=False
             )
-        for name, ev in _evaluators_by_name.items():
-            ev_result = llm_row[name]
-            if is_rating(ev):
-                row[name] = ev_result["score"]
-            else:
-                row[name] = bool(ev_result["match"])
-            row[f"{name}_reasoning"] = ev_result["reasoning"]
+        if llm_row is not None:
+            for name, ev in _evaluators_by_name.items():
+                ev_result = llm_row[name]
+                if is_rating(ev):
+                    row[name] = ev_result["score"]
+                else:
+                    row[name] = bool(ev_result["match"])
+                row[f"{name}_reasoning"] = ev_result["reasoning"]
         data.append(row)
 
     with open(join(output_dir, "metrics.json"), "w") as f:
@@ -1540,6 +1633,9 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
         for k, v in metrics.items()
         if isinstance(v, dict) and "type" in v
     )
+    cost = metrics.get("cost")
+    if isinstance(cost, dict) and cost.get("cost_usd") is not None:
+        parts.append(f"cost=${cost['cost_usd']:.6f}")
     return f"  {prefix}" + ", ".join(parts)
 
 

@@ -85,6 +85,28 @@ class TestSTTLeaderboard(unittest.TestCase):
             self.assertIn("semantic_match", summary.columns)
             self.assertIn("completeness", summary.columns)
 
+    def test_cost_metrics_surface_as_scalar_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_provider(base, "openai", {
+                "wer": 0.1,
+                "semantic_match": {"type": "binary", "mean": 0.9},
+                "cost": {
+                    "audio_minutes": 2.0,
+                    "cost_per_minute_usd": 0.006,
+                    "cost_usd": 0.012,
+                },
+            })
+
+            save_dir = base / "leaderboard"
+            generate_stt_leaderboard(str(base), str(save_dir))
+
+            summary = pd.read_excel(save_dir / "stt_leaderboard.xlsx", sheet_name="summary")
+            self.assertIn("audio_minutes", summary.columns)
+            self.assertIn("cost_per_minute_usd", summary.columns)
+            self.assertIn("cost_usd", summary.columns)
+            self.assertEqual(float(summary.iloc[0]["cost_usd"]), 0.012)
+
     def test_skips_existing_leaderboard_folder(self):
         """A pre-existing `leaderboard` subdir under output_dir must not be
         treated as a provider (hardcoded skip in the leaderboard code)."""
