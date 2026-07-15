@@ -48,6 +48,24 @@ class TestGetSTTLanguage(unittest.TestCase):
         self.assertEqual(get_stt_language("klingon", "sarvam"), Language.EN_IN)
 
 
+class TestGoogleModelAndLocation(unittest.TestCase):
+    def test_sindhi_vs_default(self):
+        from calibrate_agent.utils import (
+            google_stt_model_and_location,
+            STT_PROVIDER_MODELS,
+        )
+
+        self.assertEqual(
+            google_stt_model_and_location("sindhi"), ("chirp_2", "asia-southeast1")
+        )
+        self.assertEqual(
+            google_stt_model_and_location("hindi"),
+            (STT_PROVIDER_MODELS["google"], "us"),
+        )
+        # Explicit model override wins for non-Sindhi.
+        self.assertEqual(google_stt_model_and_location("hindi", "chirp_3"), ("chirp_3", "us"))
+
+
 class TestGoogleSindhiRouting(unittest.TestCase):
     ALL_KEYS = {"GOOGLE_APPLICATION_CREDENTIALS": "/creds.json"}
 

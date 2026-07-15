@@ -1834,6 +1834,22 @@ STT_PROVIDER_MODELS = {
     "sarvam": "saaras:v3",
 }
 
+
+def google_stt_model_and_location(
+    language: str, model: str | None = None
+) -> tuple[str, str]:
+    """Return the Google STT (model, location) for a language.
+
+    Sindhi is only served by ``chirp_2`` in ``asia-southeast1``; every other
+    language uses the default model in ``us``. Single source of truth shared by
+    the live-agent factory (``create_stt_service``) and the direct-path
+    benchmark (``stt/eval.py`` ``transcribe_google``) so the two can't drift.
+    """
+    if str(language).lower() == "sindhi":
+        return model or "chirp_2", "asia-southeast1"
+    return model or STT_PROVIDER_MODELS["google"], "us"
+
+
 TTS_PROVIDER_MODELS = {
     "gemini": "gemini-3.1-flash-tts-preview",
     "cartesia": "sonic-3.5",
@@ -1931,14 +1947,7 @@ def create_stt_service(
             ),
         )
     elif provider == "google":
-        # Sindhi is only served by chirp_2 in asia-southeast1 (mirrors the
-        # direct-path transcribe_google special-case in stt/eval.py).
-        if str(language).lower() == "sindhi":
-            google_model = model or "chirp_2"
-            google_location = "asia-southeast1"
-        else:
-            google_model = model or STT_PROVIDER_MODELS[provider]
-            google_location = "us"
+        google_model, google_location = google_stt_model_and_location(language, model)
         return GoogleSTTService(
             sample_rate=16000,
             location=google_location,
