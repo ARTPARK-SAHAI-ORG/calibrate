@@ -530,7 +530,7 @@ List your evaluators. Optionally filter by what they judge or their modality, an
 | --- | --- | --- | --- |
 | `evaluator_type` | string | No | Filter by what the evaluator judges. Omit for all types |
 | `data_type` | string | No | Filter by modality. Omit for all |
-| `include_defaults` | boolean | No | When `true`, include the built-in default evaluators alongside the ones you created |
+| `include_defaults` | boolean | No | Retained for backward compatibility and no longer filters. Your evaluators, including your editable copies of the defaults, are always returned |
 | `q` | string | No | Case-insensitive substring search on `name`. Blank is a no-op |
 | `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
 | `offset` | integer | No | Number of items to skip before returning results |

@@ -1525,7 +1525,7 @@
           "is_default": {
             "type": "boolean",
             "title": "Is Default",
-            "description": "True for a built-in default evaluator, which you can't edit. False for an evaluator you created, which you can edit and add versions to"
+            "description": "True when the evaluator is a built-in default or your workspace's editable copy of one. False for an evaluator you created yourself"
           },
           "slug": {
             "anyOf": [
@@ -1538,6 +1538,18 @@
             ],
             "title": "Slug",
             "description": "Stable slug for a built-in default evaluator"
+          },
+          "source_default_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Default Slug",
+            "description": "Stable slug of the built-in default this evaluator is your editable copy of. Set on your default forks so you can identify a specific default by it"
           },
           "live_version_id": {
             "anyOf": [
@@ -4142,7 +4154,7 @@
           "is_default": {
             "type": "boolean",
             "title": "Is Default",
-            "description": "True for a built-in default evaluator, which you can't edit. False for an evaluator you created, which you can edit and add versions to"
+            "description": "True when the evaluator is a built-in default or your workspace's editable copy of one. False for an evaluator you created yourself"
           },
           "slug": {
             "anyOf": [
@@ -4155,6 +4167,18 @@
             ],
             "title": "Slug",
             "description": "Stable slug for a built-in default evaluator"
+          },
+          "source_default_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Default Slug",
+            "description": "Stable slug of the built-in default this evaluator is your editable copy of. Set on your default forks so you can identify a specific default by it"
           },
           "live_version_id": {
             "anyOf": [
@@ -5870,11 +5894,11 @@
             "required": false,
             "schema": {
               "type": "boolean",
-              "description": "When `true`, include the built-in default evaluators alongside the ones you created",
+              "description": "Retained for backward compatibility and no longer filters. Your evaluators, including your editable copies of the defaults, are always returned",
               "default": true,
               "title": "Include Defaults"
             },
-            "description": "When `true`, include the built-in default evaluators alongside the ones you created"
+            "description": "Retained for backward compatibility and no longer filters. Your evaluators, including your editable copies of the defaults, are always returned"
           },
           {
             "name": "q",
