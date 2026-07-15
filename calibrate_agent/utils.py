@@ -24,6 +24,22 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
+def env_int(name: str, default: int) -> int:
+    """Read an int from env var ``name``, falling back to ``default``.
+
+    Used for benchmark concurrency knobs so they can be tuned via the
+    environment (e.g. in CI / .env) without a code change; the hardcoded
+    ``default`` is the fallback when the var is unset or not a valid int.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 def patch_langfuse_trace(trace_name: str):
     from pipecat.utils.tracing import service_decorators
 

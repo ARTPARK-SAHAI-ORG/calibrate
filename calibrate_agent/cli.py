@@ -26,6 +26,23 @@ from importlib.metadata import version as get_version
 from dotenv import find_dotenv, load_dotenv
 
 
+def _env_int(name: str, default: int) -> int:
+    """Read an int from env var ``name``, falling back to ``default``.
+
+    Local to the CLI (uses only ``os``) so building the argument parser doesn't
+    import the heavy ``calibrate_agent.utils`` module — importing it here shifts
+    scipy/numpy init order and trips a scipy ``_CopyMode`` incompatibility in the
+    voice path. ``calibrate_agent.utils.env_int`` is the same helper for library code.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
     """Convert argparse namespace to sys.argv format.
 
@@ -242,6 +259,15 @@ Examples:
             "per-row LLM judges."
         ),
     )
+    stt_parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=_env_int("CALIBRATE_STT_MAX_PARALLEL", 2),
+        help=(
+            "Number of providers to evaluate in parallel (default: 2, or "
+            "$CALIBRATE_STT_MAX_PARALLEL)."
+        ),
+    )
 
     # ── TTS ───────────────────────────────────────────────────────
     # `calibrate-agent tts` with no args → interactive UI
@@ -264,6 +290,15 @@ Examples:
     tts_parser.add_argument("-d", "--debug", action="store_true")
     tts_parser.add_argument("-dc", "--debug_count", type=int, default=5)
     tts_parser.add_argument("--overwrite", action="store_true")
+    tts_parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=_env_int("CALIBRATE_TTS_MAX_PARALLEL", 2),
+        help=(
+            "Number of providers to evaluate in parallel (default: 2, or "
+            "$CALIBRATE_TTS_MAX_PARALLEL)."
+        ),
+    )
     tts_parser.add_argument(
         "--leaderboard",
         action="store_true",
@@ -328,6 +363,15 @@ Examples:
         type=int,
         default=None,
         help="Number of test cases to evaluate in parallel per model",
+    )
+    llm_parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=_env_int("CALIBRATE_LLM_MAX_PARALLEL", 2),
+        help=(
+            "Number of models to evaluate in parallel (default: 2, or "
+            "$CALIBRATE_LLM_MAX_PARALLEL)."
+        ),
     )
     llm_parser.add_argument(
         "-d",
@@ -567,6 +611,7 @@ Examples:
                 argv.extend(["--config", args.config])
             if args.skip_sarvam:
                 argv.append("--skip-sarvam")
+            argv.extend(["--max-parallel", str(args.max_parallel)])
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -606,6 +651,7 @@ Examples:
                 argv.append("--overwrite")
             if args.config:
                 argv.extend(["--config", args.config])
+            argv.extend(["--max-parallel", str(args.max_parallel)])
 
             sys.argv = argv
             asyncio.run(tts_benchmark_main())
@@ -706,6 +752,7 @@ Examples:
                             output_dir=args.output_dir,
                             models=_models,
                             evaluators=_config.get("evaluators"),
+                            max_parallel=args.max_parallel,
                             test_parallel=args.parallel,
                             overwrite=args.overwrite,
                         )
@@ -745,6 +792,7 @@ Examples:
                 argv.extend(["-p", args.provider])
                 if getattr(args, "parallel", None) is not None:
                     argv.extend(["-n", str(args.parallel)])
+                argv.extend(["--max-parallel", str(args.max_parallel)])
                 if getattr(args, "overwrite", False):
                     argv.append("--overwrite")
                 if getattr(args, "debug", False):
