@@ -34,6 +34,26 @@ def _fake_intent_entity(intent=1, entity=1.0):
     return AsyncMock(side_effect=_fn)
 
 
+def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
+    """Adaptive ``get_llm_wer_cer_score`` mock — one row per input pair."""
+
+    async def _fn(refs, preds, language="english", model=None):
+        return {
+            "llm_wer": float(llm_wer),
+            "llm_cer": float(llm_cer),
+            "per_row": [
+                {
+                    "llm_wer": float(llm_wer),
+                    "llm_cer": float(llm_cer),
+                    "segments": [],
+                }
+                for _ in refs
+            ],
+        }
+
+    return AsyncMock(side_effect=_fn)
+
+
 # --- format_metrics_summary ----------------------------------------------
 
 class TestFormatMetricsSummary(unittest.TestCase):
@@ -46,6 +66,8 @@ class TestFormatMetricsSummary(unittest.TestCase):
                 "cer": 0.2,
                 "sarvam_intent_score": 0.9,
                 "sarvam_entity_score": 0.8,
+                "sarvam_llm_wer": 0.05,
+                "sarvam_llm_cer": 0.03,
                 "semantic": {"type": "binary", "mean": 0.75},
             },
             prefix="deepgram: ",
@@ -53,7 +75,8 @@ class TestFormatMetricsSummary(unittest.TestCase):
         self.assertEqual(
             line,
             "  deepgram: WER=0.1000, CER=0.2000, Sarvam Intent Score=0.9000, "
-            "Sarvam Entity Score=0.8000, semantic=0.7500",
+            "Sarvam Entity Score=0.8000, Sarvam LLM WER=0.0500, "
+            "Sarvam LLM CER=0.0300, semantic=0.7500",
         )
 
     def test_omits_sarvam_when_absent(self):
@@ -707,6 +730,63 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
             df = _pd.read_csv(Path(tmp) / "results.csv")
             self.assertIn("cer", df.columns)
             self.assertEqual(list(df["cer"]), [0.2, 0.2])
+
+    async def test_sarvam_judges_emit_llm_wer_columns(self):
+        from calibrate_agent.stt import eval as E
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "per_row": [0.1, 0.1]}), \
+                 patch.object(E, "get_cer_score", return_value={"score": 0.2, "per_row": [0.2, 0.2]}), \
+                 patch.object(E, "get_intent_entity_score", _fake_intent_entity()), \
+                 patch.object(E, "get_llm_wer_cer_score", _fake_llm_wer(0.05, 0.03)), \
+                 patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
+                     "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                     "per_row": [
+                         {"semantic_match": {"match": True, "reasoning": "ok"}},
+                         {"semantic_match": {"match": True, "reasoning": "ok"}},
+                     ],
+                 })):
+                result = await E._score_and_write_results(
+                    ids=["a", "b"],
+                    gt_transcripts=["x", "y"],
+                    pred_transcripts=["x", "y"],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                    run_sarvam_judges=True,
+                )
+            self.assertEqual(result["sarvam_llm_wer"], 0.05)
+            self.assertEqual(result["sarvam_llm_cer"], 0.03)
+
+            import pandas as _pd
+            df = _pd.read_csv(Path(tmp) / "results.csv")
+            self.assertIn("sarvam_llm_wer", df.columns)
+            self.assertIn("sarvam_llm_cer", df.columns)
+            self.assertIn("sarvam_llm_wer_reasoning", df.columns)
+
+    async def test_sarvam_llm_wer_absent_by_default(self):
+        from calibrate_agent.stt import eval as E
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "per_row": [0.1]}), \
+                 patch.object(E, "get_cer_score", return_value={"score": 0.2, "per_row": [0.2]}), \
+                 patch.object(E, "get_llm_wer_cer_score", _fake_llm_wer()) as llm_wer_mock, \
+                 patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
+                     "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                     "per_row": [{"semantic_match": {"match": True, "reasoning": "ok"}}],
+                 })):
+                result = await E._score_and_write_results(
+                    ids=["a"],
+                    gt_transcripts=["x"],
+                    pred_transcripts=["x"],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                )
+            llm_wer_mock.assert_not_called()
+            self.assertNotIn("sarvam_llm_wer", result)
+
+            import pandas as _pd
+            df = _pd.read_csv(Path(tmp) / "results.csv")
+            self.assertNotIn("sarvam_llm_wer", df.columns)
 
     async def test_rating_evaluator(self):
         from calibrate_agent.stt import eval as E

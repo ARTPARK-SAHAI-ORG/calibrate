@@ -42,6 +42,12 @@ _EDIT_CLEANUP = [
 ]
 _WER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfWords()])
 _CER_TRANSFORM = jiwer.Compose(_EDIT_CLEANUP + [jiwer.ReduceToListOfListOfChars()])
+# Same case-fold/punctuation/whitespace cleanup as above, but kept as a
+# string->string transform (no tokenization). Used by LLM-WER to clean text
+# *before* word alignment, so segments differing only in case or punctuation
+# don't reach the equivalence judge (the WER/CER scorers apply this at scoring
+# time via the transforms above; the LLM-WER alignment step runs earlier).
+_EDIT_CLEANUP_TEXT = jiwer.Compose(_EDIT_CLEANUP)
 
 # calibrate_agent language name / ISO code -> indic-nlp-library normalizer code.
 # Languages absent here (english, urdu, …) get NFC-only normalization: Vistaar
@@ -132,12 +138,31 @@ def _get_indic_normalizer():
     return IndicNormalizer()
 
 
+def _normalize_refs_preds(
+    references: List[str], predictions: List[str], language: str
+) -> tuple[List[str], List[str]]:
+    """NFC + indic-nlp normalize references/predictions (Vistaar path #1).
+
+    Shared by WER/CER and LLM-WER/CER so edit metrics compare the same
+    normalized strings; jiwer cleanup (case-fold, punctuation, whitespace)
+    is applied later at scoring time.
+    """
+    normalizer = _indic_normalizer(language)
+    norm_references = [_normalize_text(ref, normalizer) for ref in references]
+    norm_predictions = [
+        _normalize_text(pred, normalizer) if isinstance(pred, str) else ""
+        for pred in predictions
+    ]
+    return norm_references, norm_predictions
+
+
 def _normalize_pairs(
     references: List[str], predictions: List[str], language: str
 ) -> tuple[List[str], List[str]]:
-    """Normalize references/predictions with the cached normalizer.
+    """Normalize references/predictions with the vendored Sarvam normalizer.
 
-    Runs in-process (``n_jobs=1`` — no joblib subprocess fork) so it can be
+    Used only by intent/entity scoring (path #2 — Whisper + up-front
+    punctuation/case stripping). Runs in-process (``n_jobs=1``) so it can be
     offloaded to a worker thread without freezing the event loop.
     """
     normalizer = _get_indic_normalizer()
@@ -184,14 +209,25 @@ def _edit_metric(
     case is a dataset with *no* reference words at all — guarded below to
     avoid jiwer returning an unbounded count instead of a rate.
     """
-    normalizer = _indic_normalizer(language)
+    references, predictions = _normalize_refs_preds(references, predictions, language)
+    return _score_edit_metric(metric_fn, transform, references, predictions)
 
-    references = [_normalize_text(ref, normalizer) for ref in references]
-    predictions = [
-        _normalize_text(pred, normalizer) if isinstance(pred, str) else ""
-        for pred in predictions
-    ]
 
+def _score_edit_metric(
+    metric_fn,
+    transform,
+    references: List[str],
+    predictions: List[str],
+) -> dict:
+    """Score already-normalized (reference, prediction) pairs with jiwer.
+
+    The scoring half of :func:`_edit_metric` — no text normalization is applied,
+    so callers must normalize (and coerce to ``str``) upstream. Shared by the
+    WER/CER metrics (which normalize first) and the LLM-WER/CER root (whose
+    corrected pairs are already Vistaar-normalized strings).
+    ``score`` is the dataset-pooled rate; ``per_row`` holds the per-utterance
+    rates for row-level reporting.
+    """
     # Per-clip rates — for results.csv only, never averaged into `score`.
     per_row = [
         metric_fn(
@@ -413,4 +449,163 @@ async def get_intent_entity_score(
         "intent": float(calculate_intent_accuracy(intent_scores)),
         "entity": float(calculate_entity_metrics(entity_scores)["mean"]),
         "per_row": results,
+    }
+
+
+async def get_llm_wer_cer_score(
+    references: List[str],
+    predictions: List[str],
+    language: str = "english",
+    model: Optional[str] = None,
+) -> dict:
+    """Normalize, judge segment equivalence, forgive, and re-score WER/CER.
+
+    Reference and prediction are first normalized with the same Vistaar path as
+    ``get_wer_score``/``get_cer_score`` (NFC + lightweight indic-nlp for Indic
+    languages), then word-aligned with ``difflib.SequenceMatcher``. Each
+    *differing* segment (a ``replace`` opcode with words on both sides) is
+    judged by ``sarvam_llm_wer.equivalence_judge`` for semantic/phonetic
+    equivalence; equivalent segments are rewritten to the reference
+    ("forgiven"). Insertions and deletions are never forgiven. The corrected
+    pairs are then scored with calibrate_agent's own jiwer WER/CER
+    (``_score_edit_metric``), so ``llm_wer``/``llm_cer`` are directly
+    comparable to the top-level ``wer``/``cer`` metrics — the delta is purely
+    the effect of equivalence forgiveness.
+
+    Unique segment pairs are judged once and reused across rows (dedup),
+    matching upstream Sarvam's behavior.
+
+    Returns:
+        {
+            "llm_wer": float,     # dataset-pooled WER after forgiveness
+            "llm_cer": float,     # dataset-pooled CER after forgiveness
+            "per_row": [
+                {
+                    "llm_wer": float,          # per-utterance corrected WER
+                    "llm_cer": float,          # per-utterance corrected CER
+                    "segments": [              # judged differing segments
+                        {"reference": str, "prediction": str,
+                         "equivalent": bool, "reasoning": str},
+                        ...
+                    ],
+                },
+                ...
+            ],
+        }
+
+    ``model`` defaults to ``DEFAULT_LLM_WER_MODEL`` when omitted. ``per_row``
+    order matches the input order.
+    """
+    if not references:
+        return {"llm_wer": 0.0, "llm_cer": 0.0, "per_row": []}
+
+    from calibrate_agent.stt import sarvam_llm_wer
+    from calibrate_agent.stt.sarvam_llm_wer import (
+        DEFAULT_LLM_WER_MODEL,
+        get_segments,
+    )
+
+    if model is None:
+        model = DEFAULT_LLM_WER_MODEL
+
+    norm_references, norm_predictions = await asyncio.to_thread(
+        _normalize_refs_preds, references, predictions, language
+    )
+
+    # Apply the same case-fold/punctuation/whitespace cleanup the WER/CER scorer
+    # uses, but *before* alignment — otherwise a segment differing only in case
+    # or punctuation would be sent to the equivalence judge as a real mismatch.
+    # ``_normalize_refs_preds`` already returns strings (NFC-coerced), so the
+    # cleanup and alignment below operate on strings without extra coercion.
+    norm_references = [_EDIT_CLEANUP_TEXT(r) for r in norm_references]
+    norm_predictions = [_EDIT_CLEANUP_TEXT(p) for p in norm_predictions]
+
+    # Word-align every row and collect the unique differing segment pairs to
+    # judge (dedup — the same (ref, pred) segment is judged once across the whole
+    # dataset and reused everywhere it appears).
+    row_segments: List[List[dict]] = []
+    unique_pairs: dict = {}
+    for ref, pred in zip(norm_references, norm_predictions):
+        segments = get_segments(ref, pred)
+        row_segments.append(segments)
+        for seg in segments:
+            if (
+                seg["tag"] != "equal"
+                and seg["reference"].strip()
+                and seg["prediction"].strip()
+            ):
+                unique_pairs.setdefault((seg["reference"], seg["prediction"]), None)
+
+    pair_list = list(unique_pairs.keys())
+    coroutines = [
+        sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
+        for ref, pred in pair_list
+    ]
+    judge_results = await tqdm_asyncio.gather(
+        *coroutines,
+        desc="Running LLM-WER equivalence judge",
+    )
+
+    verdicts = {
+        pair: {
+            "equivalent": bool(res["equivalent"]),
+            "reasoning": res["reasoning"],
+        }
+        for pair, res in zip(pair_list, judge_results)
+    }
+
+    # Reconstruct corrected reference/prediction per row: forgive equivalent
+    # segments by rewriting the prediction side to the reference.
+    corrected_references: List[str] = []
+    corrected_predictions: List[str] = []
+    per_row_segments: List[List[dict]] = []
+    for segments in row_segments:
+        ref_parts: List[str] = []
+        pred_parts: List[str] = []
+        seg_log: List[dict] = []
+        for seg in segments:
+            pair = (seg["reference"], seg["prediction"])
+            verdict = verdicts.get(pair)
+            forgiven = seg["tag"] == "equal" or (
+                verdict is not None and verdict["equivalent"]
+            )
+            ref_parts.append(seg["reference"])
+            pred_parts.append(seg["reference"] if forgiven else seg["prediction"])
+            if verdict is not None:
+                seg_log.append(
+                    {
+                        "reference": seg["reference"],
+                        "prediction": seg["prediction"],
+                        "equivalent": verdict["equivalent"],
+                        "reasoning": verdict["reasoning"],
+                    }
+                )
+        corrected_references.append(" ".join(ref_parts).strip())
+        corrected_predictions.append(" ".join(pred_parts).strip())
+        per_row_segments.append(seg_log)
+
+    wer_scored = _score_edit_metric(
+        jiwer.wer, _WER_TRANSFORM, corrected_references, corrected_predictions
+    )
+    cer_scored = _score_edit_metric(
+        jiwer.cer, _CER_TRANSFORM, corrected_references, corrected_predictions
+    )
+
+    per_row = [
+        {
+            "llm_wer": float(row_wer),
+            "llm_cer": float(row_cer),
+            "segments": seg_log,
+        }
+        for row_wer, row_cer, seg_log in zip(
+            wer_scored["per_row"],
+            cer_scored["per_row"],
+            per_row_segments,
+        )
+    ]
+
+    return {
+        "llm_wer": wer_scored["score"],
+        "llm_cer": cer_scored["score"],
+        "per_row": per_row,
     }
