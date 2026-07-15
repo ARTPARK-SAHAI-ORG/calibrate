@@ -1461,10 +1461,17 @@ async def _score_and_write_results(
             )
         if semantic_wer_row is not None:
             row["semantic_wer"] = float(semantic_wer_row["semantic_wer"])
-            row["semantic_wer_substitutions"] = semantic_wer_row["substitutions"]
-            row["semantic_wer_deletions"] = semantic_wer_row["deletions"]
-            row["semantic_wer_insertions"] = semantic_wer_row["insertions"]
-            row["semantic_wer_reference_words"] = semantic_wer_row["reference_words"]
+            row["semantic_wer_metadata"] = json.dumps(
+                {
+                    "substitutions": semantic_wer_row["substitutions"],
+                    "deletions": semantic_wer_row["deletions"],
+                    "insertions": semantic_wer_row["insertions"],
+                    "reference_words": semantic_wer_row["reference_words"],
+                    "normalized_reference": semantic_wer_row["normalized_reference"],
+                    "normalized_hypothesis": semantic_wer_row["normalized_hypothesis"],
+                },
+                ensure_ascii=False,
+            )
             row["semantic_wer_reasoning"] = semantic_wer_row["reasoning"]
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]

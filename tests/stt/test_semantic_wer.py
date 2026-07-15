@@ -6,6 +6,7 @@ semantic WER threads through ``_score_and_write_results`` into metrics.json +
 results.csv when the LLM-judge group is enabled (``run_llm_judges``).
 """
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -145,8 +146,13 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(metrics["semantic_wer"], 0.05)
             df = pd.read_csv(out / "results.csv")
             self.assertIn("semantic_wer", df.columns)
-            self.assertIn("semantic_wer_substitutions", df.columns)
+            self.assertIn("semantic_wer_metadata", df.columns)
             self.assertIn("semantic_wer_reasoning", df.columns)
+            meta = json.loads(df["semantic_wer_metadata"].iloc[0])
+            self.assertEqual(meta["substitutions"], 1)
+            self.assertEqual(meta["reference_words"], 20)
+            self.assertEqual(meta["normalized_reference"], "r")
+            self.assertNotIn("reasoning", meta)
 
     async def test_omitted_when_disabled(self):
         from calibrate_agent.stt import eval as stt_eval
