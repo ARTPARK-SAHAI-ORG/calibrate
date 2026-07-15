@@ -86,6 +86,37 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(out["per_row"][0]["semantic_wer"], float("inf"))
 
+    async def test_inf_rows_excluded_from_pooled(self):
+        from calibrate_agent.stt import metrics as M
+
+        # Row "ok": 1 error / 10 -> 0.1 (finite). Row "bad": 2 errors / 0 ->
+        # inf. Pooled must be 1/10 = 0.1 (the inf row contributes neither its
+        # 2 errors nor its 0 ref words), matching pipecat's compute_pooled_wer.
+        by_ref = {
+            "ok": {
+                "substitutions": 1, "deletions": 0, "insertions": 0,
+                "reference_words": 10, "normalized_reference": "r",
+                "normalized_hypothesis": "h", "reasoning": "one sub",
+            },
+            "bad": {
+                "substitutions": 0, "deletions": 0, "insertions": 2,
+                "reference_words": 0, "normalized_reference": "",
+                "normalized_hypothesis": "x y", "reasoning": "no reference",
+            },
+        }
+
+        async def fake_judge(reference, prediction, model=None):
+            return by_ref[reference]
+
+        with patch(
+            "calibrate_agent.stt.semantic_wer.semantic_wer_judge",
+            AsyncMock(side_effect=fake_judge),
+        ):
+            out = await M.get_semantic_wer_score(["ok", "bad"], ["a", "b"])
+
+        self.assertAlmostEqual(out["semantic_wer"], 0.1)
+        self.assertEqual(out["per_row"][1]["semantic_wer"], float("inf"))
+
 
 class TestJudgeNFCNormalization(unittest.IsolatedAsyncioTestCase):
     async def test_reference_and_prediction_are_nfc_normalized(self):

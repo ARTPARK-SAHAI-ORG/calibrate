@@ -266,7 +266,9 @@ async def get_semantic_wer_score(
     substitution/deletion/insertion counts + the reference word count. WER is
     computed here from those counts, exactly as pipecat's ``_calculate_wer``:
     per row ``(S + D + I) / reference_words`` and, at the dataset level, the
-    length-weighted **pooled** WER ``ΣSDI / Σreference_words``.
+    length-weighted **pooled** WER ``ΣSDI / Σreference_words`` over the
+    finite-WER rows only (``ref_words==0`` rows are ``inf`` and excluded from
+    both sums, matching pipecat's ``compute_pooled_wer``).
 
     Unlike ``get_llm_wer_cer_score`` (Sarvam: deterministic difflib alignment +
     per-segment equivalence forgiveness), the LLM does the entire count here and
@@ -334,8 +336,13 @@ async def get_semantic_wer_score(
                 "reasoning": res.get("reasoning", ""),
             }
         )
-        total_errors += errors
-        total_ref_words += ref_words
+        # Pool only finite-WER rows, matching pipecat's compute_pooled_wer
+        # (``valid = [m for m in metrics if m.wer < inf]``). A ``ref_words==0``
+        # row with errors is ``inf`` and is excluded entirely — otherwise its
+        # errors would inflate the numerator with nothing in the denominator.
+        if row_wer != float("inf"):
+            total_errors += errors
+            total_ref_words += ref_words
 
     pooled = 0.0 if total_ref_words == 0 else total_errors / total_ref_words
 
