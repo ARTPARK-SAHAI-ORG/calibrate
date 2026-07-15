@@ -1476,24 +1476,26 @@ async def run_eval_only(
 
 
 def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
-    """Build the one-line ``WER / CER / Sarvam Intent / Sarvam Entity / judge``
-    summary shared by the single-provider, multi-provider, and eval-only paths.
+    """Build the one-line ``WER / CER / Sarvam judges / evaluator`` summary
+    shared by the single-provider, multi-provider, and eval-only paths.
 
-    The Sarvam intent/entity fields are only included when present in
-    ``metrics`` (i.e. when intent/entity scoring was enabled for the run).
+    The Sarvam judge fields are only included when present in ``metrics``
+    (i.e. when ``--sarvam-judges`` was enabled for the run).
     """
     parts = [
         f"WER={metrics.get('wer', 0):.4f}",
         f"CER={metrics.get('cer', 0):.4f}",
     ]
-    if "sarvam_intent_score" in metrics:
-        parts.append(f"Sarvam Intent Score={metrics['sarvam_intent_score']:.4f}")
-    if "sarvam_entity_score" in metrics:
-        parts.append(f"Sarvam Entity Score={metrics['sarvam_entity_score']:.4f}")
-    if "sarvam_llm_wer" in metrics:
-        parts.append(f"Sarvam LLM WER={metrics['sarvam_llm_wer']:.4f}")
-    if "sarvam_llm_cer" in metrics:
-        parts.append(f"Sarvam LLM CER={metrics['sarvam_llm_cer']:.4f}")
+    # Optional Sarvam judge metrics — included only when present in ``metrics``
+    # (i.e. when ``--sarvam-judges`` was enabled for the run).
+    for key, label in (
+        ("sarvam_intent_score", "Sarvam Intent Score"),
+        ("sarvam_entity_score", "Sarvam Entity Score"),
+        ("sarvam_llm_wer", "Sarvam LLM WER"),
+        ("sarvam_llm_cer", "Sarvam LLM CER"),
+    ):
+        if key in metrics:
+            parts.append(f"{label}={metrics[key]:.4f}")
     # Evaluator entries are dicts carrying a ``type`` field; that's the marker
     # we use to pick them out from other top-level metrics.
     parts.extend(
