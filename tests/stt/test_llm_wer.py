@@ -187,7 +187,7 @@ class TestGetSegments(unittest.TestCase):
     def test_replace_segment_extracted(self):
         from calibrate_agent.stt.sarvam_llm_wer import get_segments
 
-        segs = get_segments("doctor ne bola", "daktar ne bola", key=0)
+        segs = get_segments("doctor ne bola", "daktar ne bola")
         replaces = [s for s in segs if s["tag"] == "replace"]
         self.assertEqual(len(replaces), 1)
         self.assertEqual(replaces[0]["reference"], "doctor")
@@ -196,7 +196,7 @@ class TestGetSegments(unittest.TestCase):
     def test_both_empty_returns_no_segments(self):
         from calibrate_agent.stt.sarvam_llm_wer import get_segments
 
-        self.assertEqual(get_segments("", "", key=0), [])
+        self.assertEqual(get_segments("", ""), [])
 
 
 class TestLazyImports(unittest.TestCase):

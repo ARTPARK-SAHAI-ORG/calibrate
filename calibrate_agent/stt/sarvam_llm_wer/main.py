@@ -40,7 +40,7 @@ class LLMEquivalenceResponse(BaseModel):
 
 
 def get_segments(
-    reference_string: str, predicted_string: str, key: Any
+    reference_string: str, predicted_string: str
 ) -> List[Dict[str, Any]]:
     """Word-align ``reference_string`` against ``predicted_string``.
 
@@ -48,6 +48,9 @@ def get_segments(
     ``replace``, ``insert``, ``delete``; ``reference`` / ``prediction`` hold the
     words on each side of that opcode. Only ``replace`` segments (both sides
     non-empty) are candidates for equivalence forgiveness downstream.
+
+    (Upstream also emits ``key``/``segment_idx`` bookkeeping for its on-disk
+    cache; those are dropped here since calibrate_agent doesn't cache.)
     """
     reference_words = reference_string.strip().split()
     predicted_words = predicted_string.strip().split()
@@ -60,10 +63,8 @@ def get_segments(
             "reference": " ".join(reference_words[i1:i2]),
             "prediction": " ".join(predicted_words[j1:j2]),
             "tag": tag,
-            "key": key,
-            "segment_idx": segment_idx,
         }
-        for segment_idx, (tag, i1, i2, j1, j2) in enumerate(matcher.get_opcodes())
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes()
     ]
 
 

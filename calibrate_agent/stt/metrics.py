@@ -525,8 +525,8 @@ async def get_llm_wer_cer_score(
     # dataset and reused everywhere it appears).
     row_segments: List[List[dict]] = []
     unique_pairs: dict = {}
-    for i, (ref, pred) in enumerate(zip(norm_references, norm_predictions)):
-        segments = get_segments(ref, pred, key=i)
+    for ref, pred in zip(norm_references, norm_predictions):
+        segments = get_segments(ref, pred)
         row_segments.append(segments)
         for seg in segments:
             if (
