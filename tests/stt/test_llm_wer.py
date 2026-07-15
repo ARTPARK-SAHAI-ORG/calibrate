@@ -18,7 +18,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 
 class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
-    async def test_row_segments_judged_concurrently(self):
+    async def test_segments_judged_concurrently(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics
 
@@ -77,7 +77,7 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["per_row"][0]["segments"][0]["equivalent"])
         self.assertFalse(result["per_row"][1]["segments"][0]["equivalent"])
 
-    async def test_each_row_judged_separately(self):
+    async def test_unique_segments_judged_once(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics
 
@@ -87,14 +87,15 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
             seen.append((reference, prediction))
             return {"index": 0, "equivalent": True, "reasoning": "r"}
 
-        # The same differing segment ("a","b") appears in both rows -> judged per row.
+        # The same differing segment ("a","b") appears in both rows -> judged
+        # once across the whole dataset (dedup) and reused.
         with patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
             await metrics.get_llm_wer_cer_score(
                 references=["a x", "a y"],
                 predictions=["b x", "b y"],
             )
 
-        self.assertEqual(seen.count(("a", "b")), 2)
+        self.assertEqual(seen.count(("a", "b")), 1)
 
     async def test_case_and_punctuation_only_diff_not_judged(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
