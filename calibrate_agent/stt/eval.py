@@ -536,8 +536,7 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
             "encoding": "pcm_s16le",  # Audio encoding format (required)
             "sample_rate": 16000,  # Audio sample rate (required)
         }
-        # min_volume / max_silence_duration_secs are ink-whisper-only tuning
-        # params; ink-2 does its own turn detection and rejects them.
+        # min_volume / max_silence_duration_secs are ink-whisper-only; ink-2 rejects them.
         if model == "ink-whisper":
             ws_kwargs["min_volume"] = 0.15
             ws_kwargs["max_silence_duration_secs"] = 0.3

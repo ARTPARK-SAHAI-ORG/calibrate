@@ -388,6 +388,13 @@ pre-commit hook on `main`.
   "master" but the repo and all CI configs use `main`.
 - **Don't add comments unless the why is non-obvious.** The codebase follows
   the rule from the global guidelines: comments explain *why*, not *what*.
+- **Keep comments concise and write them for a fresh reader.** One or two lines
+  is usually enough. A comment should state the fact a newcomer needs to
+  understand the code — not narrate the task, the conversation, or the reasoning
+  that led there. Don't restate what the code plainly says, don't list every
+  call site or provider, and don't recap the decision history. If the "why"
+  needs more than a couple of lines, it belongs in a docstring or this file, not
+  an inline block.
 - **Prefer editing existing files** over creating new ones — especially in
   `stt/`, `tts/`, and `llm/`, where the structure is mirrored 1-to-1 in
   `tests/`.
