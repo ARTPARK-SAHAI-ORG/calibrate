@@ -720,6 +720,13 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["x", "y"],
                     output_dir=tmp,
                     evaluator_config_dir=tmp,
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
                 )
             self.assertEqual(result["wer"], 0.1)
             self.assertEqual(result["cer"], 0.2)

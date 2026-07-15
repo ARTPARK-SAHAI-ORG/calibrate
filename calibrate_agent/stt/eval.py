@@ -40,7 +40,6 @@ from calibrate_agent.stt.metrics import (
 )
 from calibrate_agent.judges import (
     is_rating,
-    DEFAULT_STT_EVALUATOR,
     require_unique_evaluator_names,
     write_evaluator_config,
 )
@@ -1293,11 +1292,12 @@ async def _score_and_write_results(
     language: str = "english",
     run_sarvam_judges: bool = False,
 ) -> dict:
-    """Run WER + LLM-judge evaluators over (gt, pred) pairs and write outputs.
+    """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
-    Writes ``results.csv`` and ``metrics.json`` under ``output_dir`` and the
-    resolved evaluator config under ``evaluator_config_dir``. Returns the
-    metrics_data dict.
+    Writes ``results.csv`` and ``metrics.json`` under ``output_dir``. WER and
+    CER are always computed. The LLM judge is opt-in: when ``judge_evaluators``
+    is empty/omitted, no judge runs, no evaluator config is written, and the
+    evaluator columns/metrics are omitted. Returns the metrics_data dict.
 
     When ``run_sarvam_judges`` is False (the default) the Sarvam intent/entity
     judge is skipped entirely — no normalizer model is loaded, no judge calls
@@ -1330,16 +1330,21 @@ async def _score_and_write_results(
             to_terminal=False,
         )
 
-    _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_STT_EVALUATOR]
-    require_unique_evaluator_names(_evaluators)
-    write_evaluator_config(evaluator_config_dir, _evaluators)
-    llm_results = await get_llm_judge_score(
-        gt_transcripts,
-        pred_transcripts,
-        evaluators=_evaluators,
-    )
-    for name, score_dict in llm_results["scores"].items():
-        _log(f"  {name}: {score_dict['mean']:.4f}")
+    # The LLM judge is opt-in for STT: when no evaluators are passed we report
+    # WER/CER only and skip the judge entirely (no evaluator config, no judge
+    # calls, no evaluator columns/metrics).
+    _evaluators = list(judge_evaluators) if judge_evaluators else []
+    llm_results = None
+    if _evaluators:
+        require_unique_evaluator_names(_evaluators)
+        write_evaluator_config(evaluator_config_dir, _evaluators)
+        llm_results = await get_llm_judge_score(
+            gt_transcripts,
+            pred_transcripts,
+            evaluators=_evaluators,
+        )
+        for name, score_dict in llm_results["scores"].items():
+            _log(f"  {name}: {score_dict['mean']:.4f}")
 
     _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
 
@@ -1353,8 +1358,9 @@ async def _score_and_write_results(
     if llm_wer_results is not None:
         metrics_data["sarvam_llm_wer"] = llm_wer_results["llm_wer"]
         metrics_data["sarvam_llm_cer"] = llm_wer_results["llm_cer"]
-    for name, score_dict in llm_results["scores"].items():
-        metrics_data[name] = score_dict
+    if llm_results is not None:
+        for name, score_dict in llm_results["scores"].items():
+            metrics_data[name] = score_dict
 
     ie_per_row = (
         intent_entity_results["per_row"]
@@ -1366,6 +1372,9 @@ async def _score_and_write_results(
         if llm_wer_results is not None
         else [None] * len(ids)
     )
+    llm_per_row = (
+        llm_results["per_row"] if llm_results is not None else [None] * len(ids)
+    )
 
     data = []
     for _id, gt_text, pred_text, wer, cer, ie_row, llm_wer_row, llm_row in zip(
@@ -1376,7 +1385,7 @@ async def _score_and_write_results(
         cer_results["per_row"],
         ie_per_row,
         llm_wer_per_row,
-        llm_results["per_row"],
+        llm_per_row,
     ):
         row = {
             "id": _id,
@@ -1428,8 +1437,8 @@ async def run_eval_only(
     Args:
         dataset_path: Path to a JSON file with a list of {"id", "gt", "pred"} rows.
         output_dir: Directory to write results and metrics.
-        judge_evaluators: Optional list of evaluator dicts. Defaults to the
-            built-in STT evaluator when omitted.
+        judge_evaluators: Optional list of evaluator dicts. When omitted, no
+            LLM judge runs and only WER/CER are reported.
         language: Language of the dataset, used to normalize text before the
             intent/entity judge. Defaults to ``english``.
         run_sarvam_judges: When True, also run the Sarvam intent/entity judge.

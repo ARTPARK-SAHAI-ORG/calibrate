@@ -304,6 +304,13 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "world"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
                     run_sarvam_judges=True,
                 )
 
@@ -413,9 +420,16 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "world"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
                 )
 
-            # Default: the judge is never invoked and no sarvam_* keys appear.
+            # Default: the Sarvam judge is never invoked and no sarvam_* keys appear.
             ie_mock.assert_not_awaited()
             self.assertNotIn("sarvam_intent_score", metrics)
             self.assertNotIn("sarvam_entity_score", metrics)
@@ -425,6 +439,32 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             # WER/CER and the judge column are still written.
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
+
+    async def test_no_llm_judge_when_no_evaluators(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        judge_mock = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_llm_judge_score", judge_mock):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "goodbye"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                )
+
+            # No evaluators passed: the LLM judge is never invoked, no evaluator
+            # config is written, and only WER/CER are reported.
+            judge_mock.assert_not_awaited()
+            self.assertIn("wer", metrics)
+            self.assertIn("cer", metrics)
+            self.assertNotIn("semantic_match", metrics)
+            self.assertFalse((out / "config.json").exists())
+            df = pd.read_csv(out / "results.csv")
+            self.assertEqual(set(df.columns), {"id", "gt", "pred", "wer", "cer"})
+            self.assertEqual(len(df), 2)
 
     async def test_rating_evaluator_writes_numeric_score(self):
         from calibrate_agent.stt import eval as stt_eval

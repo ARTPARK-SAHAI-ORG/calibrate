@@ -96,8 +96,8 @@ async def run(
         overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
         max_parallel: Maximum number of providers to run in parallel (default: 2)
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
-            ``system_prompt``, ``judge_model``, ``type``, ...). When omitted
-            the implicit default STT evaluator runs.
+            ``system_prompt``, ``judge_model``, ``type``, ...). When omitted no
+            LLM judge runs and only WER/CER are reported.
         run_sarvam_judges: When True, also run the Sarvam intent/entity judge
             (loads a normalizer model + makes per-row judge calls). Off by
             default.
