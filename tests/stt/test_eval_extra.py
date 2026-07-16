@@ -842,6 +842,116 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                 run_llm_judges=False,
             )
 
+    async def test_short_row_extras_do_not_truncate_results(self):
+        from calibrate_agent.stt import eval as E
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(E, "get_wer_score", return_value={"score": 0.1, "per_row": [0.1, 0.2]}), \
+                 patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
+                     "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                     "per_row": [
+                         {"semantic_match": {"match": True, "reasoning": "ok"}},
+                         {"semantic_match": {"match": False, "reasoning": "no"}},
+                     ],
+                 })):
+                await E._score_and_write_results(
+                    ids=["a", "b"],
+                    gt_transcripts=["x", "y"],
+                    pred_transcripts=["x", "z"],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                    audio_durations=[1.0],
+                )
+
+            df = pd.read_csv(Path(tmp) / "results.csv")
+            self.assertEqual(len(df), 2)
+            self.assertEqual(df.iloc[0]["audio_duration_seconds"], 1.0)
+
+
+class TestSTTCostMetrics(unittest.TestCase):
+    def test_builds_cost_metrics_from_default_pricing(self):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="openai",
+            audio_duration_seconds=[60.0],
+            model="gpt-4o-transcribe",
+        )
+
+        self.assertEqual(metrics["billing_unit"], "minute")
+        self.assertEqual(metrics["pricing_model"], "gpt-4o-transcribe")
+        self.assertEqual(metrics["total_seconds"], 60.0)
+        self.assertEqual(metrics["audio_minutes"], 1.0)
+        self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
+        self.assertEqual(metrics["cost_usd"], 0.006)
+        self.assertNotIn("excluded_row_indices", metrics)
+
+    def test_builds_cost_metrics_from_multiple_durations(self):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="openai",
+            audio_duration_seconds=[30.0, 90.0, None],
+            model="gpt-4o-transcribe",
+        )
+
+        self.assertEqual(metrics["billing_unit"], "minute")
+        self.assertEqual(metrics["total_seconds"], 120.0)
+        self.assertEqual(metrics["audio_minutes"], 2.0)
+        self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
+        self.assertEqual(metrics["cost_usd"], 0.012)
+        self.assertEqual(metrics["excluded_row_indices"], [2])
+
+    def test_rounds_audio_minutes_for_cost_metrics(self):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="openai",
+            audio_duration_seconds=[100.0],
+            model="gpt-4o-transcribe",
+        )
+
+        self.assertEqual(metrics["audio_minutes"], 1.6667)
+
+    def test_uses_google_sindhi_pricing_model(self):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="google",
+            audio_duration_seconds=[60.0],
+            model=E._default_stt_model("google", "sindhi"),
+        )
+
+        self.assertEqual(metrics["pricing_model"], "chirp_2")
+        self.assertEqual(metrics["cost_usd"], 0.016)
+
+    def test_returns_none_when_no_pricing(self):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="gemini",
+            audio_duration_seconds=[60.0],
+            model=E._default_stt_model("gemini", "english"),
+        )
+
+        self.assertIsNone(metrics)
+
+    def test_all_supported_providers_with_default_pricing(self):
+        from calibrate_agent.stt import eval as E
+        from calibrate_agent.stt.eval import STT_PROVIDERS
+
+        providers_without_per_minute_pricing = {"gemini"}
+        for provider in STT_PROVIDERS:
+            if provider in providers_without_per_minute_pricing:
+                continue
+            with self.subTest(provider=provider):
+                metrics = E._build_stt_cost_metrics(
+                    provider=provider,
+                    audio_duration_seconds=[60.0],
+                    model=E._default_stt_model(provider, "english"),
+                )
+                self.assertIn("cost_usd", metrics)
+
 
 # --- run_eval_only --------------------------------------------------------
 

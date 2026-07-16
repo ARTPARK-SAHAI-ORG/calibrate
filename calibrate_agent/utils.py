@@ -24,6 +24,22 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
+def get_audio_duration_seconds(audio_path: str | Path) -> float | None:
+    """Return audio duration in seconds, or None when it cannot be read.
+
+    Uses pydub (``ffmpeg``) so any format the transcription path can decode —
+    WAV, MP3, etc. — yields a duration, keeping cost coverage in sync with the
+    files actually transcribed. Logs a warning when a file can't be read.
+    """
+    try:
+        from pydub import AudioSegment
+
+        return AudioSegment.from_file(audio_path).duration_seconds
+    except Exception as e:
+        logger.warning(f"Could not read audio duration for {audio_path}: {e}")
+        return None
+
+
 def patch_langfuse_trace(trace_name: str):
     from pipecat.utils.tracing import service_decorators
 
@@ -2321,7 +2337,12 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
     metrics: dict = {}
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
-            if isinstance(value, dict) and "mean" in value:
+            if key == "cost" and isinstance(value, dict):
+                for cost_key in ("audio_minutes", "cost_per_minute_usd", "cost_usd"):
+                    scalar = value.get(cost_key)
+                    if isinstance(scalar, (int, float)):
+                        metrics[cost_key] = float(scalar)
+            elif isinstance(value, dict) and "mean" in value:
                 metrics[key] = value["mean"]
             elif isinstance(value, dict) and "p50" in value:
                 for pct in ("p50", "p95", "p99"):

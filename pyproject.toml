@@ -74,6 +74,7 @@ exclude = ["ui*", "examples*", "docs*", "images*"]
     "stt/sarvam_intent_entity/prompt_template.txt",
     "stt/sarvam_llm_wer/prompt_template.txt",
     "stt/semantic_wer/prompt_template.txt",
+    "pricing_data.json",
 ]
 
 [tool.setuptools_scm]
