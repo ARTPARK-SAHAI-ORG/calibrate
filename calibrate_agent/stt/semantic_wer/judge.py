@@ -145,7 +145,12 @@ async def semantic_wer_judge(
         tools=[_OPENAI_TOOL],
         tool_choice=_FORCE_WER_TOOL,
         temperature=0,
-        max_tokens=1024,
+        # Headroom for the tool-call JSON: it carries normalized_reference +
+        # normalized_hypothesis (the full texts) and an errors list, which for a
+        # long utterance can exceed a tight cap. A truncated call is unparseable
+        # and, at temperature 0, fails identically on every retry — so undersize
+        # here would deterministically drop the whole run's semantic WER.
+        max_tokens=4096,
     )
     message = commit_resp.choices[0].message
     wer_call = next(
