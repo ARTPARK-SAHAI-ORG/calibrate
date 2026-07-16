@@ -364,7 +364,7 @@ def get_ttfs_stats(ttfs_values: List[Optional[float]]) -> Optional[dict]:
     simply omits TTFS from ``metrics.json``. Percentiles use linear
     interpolation (numpy's default), matching pipecat's stt-benchmark.
     """
-    values = sorted(v for v in ttfs_values if v is not None)
+    values = [v for v in ttfs_values if v is not None]
     if not values:
         return None
     arr = np.array(values, dtype=float)
