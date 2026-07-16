@@ -100,6 +100,26 @@ class TestScoreAndWriteTTFS(unittest.IsolatedAsyncioTestCase):
             df = pd.read_csv(out / "results.csv")
             self.assertIn("ttfs", df.columns)
 
+    async def test_shorter_ttfs_list_does_not_drop_rows(self):
+        """A ttfs list shorter than ids is padded, not silently truncated via zip."""
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_llm_judge_score", _fake_judge()):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["a", "b", "c"],
+                    gt_transcripts=["hi", "there", "world"],
+                    pred_transcripts=["hi", "there", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    ttfs_values=[0.3],  # shorter than the 3 ids
+                )
+
+            self.assertIn("ttfs", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertEqual(len(df), 3)  # all rows written, none dropped
+
     async def test_direct_engine_omits_ttfs(self):
         """All-None TTFS (direct engine) leaves ttfs out entirely."""
         from calibrate_agent.stt import eval as stt_eval

@@ -1603,7 +1603,11 @@ async def _score_and_write_results(
 
     # TTFS latency (pipeline engine only). Emitted as a {p50,p95,p99,mean} dict
     # so read_leaderboard_metrics fans it into ttfs_p50/ttfs_p95/ttfs_p99 columns.
-    ttfs_per_row = ttfs_values if ttfs_values is not None else [None] * len(ids)
+    ttfs_per_row = list(ttfs_values) if ttfs_values is not None else [None] * len(ids)
+    if len(ttfs_per_row) < len(ids):
+        ttfs_per_row.extend([None] * (len(ids) - len(ttfs_per_row)))
+    elif len(ttfs_per_row) > len(ids):
+        ttfs_per_row = ttfs_per_row[: len(ids)]
     has_ttfs = any(v is not None for v in ttfs_per_row)
     if has_ttfs:
         ttfs_stats = get_ttfs_stats(ttfs_per_row)
