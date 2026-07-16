@@ -472,7 +472,7 @@ class TestTTSCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["pricing_model"], "gpt-4o-mini-tts")
         self.assertEqual(metrics["total_characters"], 1_000_000)
         self.assertEqual(metrics["cost_per_million_chars_usd"], 15.0)
-        self.assertEqual(metrics["cost_usd"], 15.0)
+        self.assertNotIn("cost_usd", metrics)
 
     def test_sums_characters_across_rows_and_ignores_missing(self):
         from calibrate_agent.tts import eval as E
@@ -485,7 +485,7 @@ class TestTTSCostMetrics(unittest.TestCase):
 
         self.assertEqual(metrics["total_characters"], 11)
         self.assertEqual(metrics["cost_per_million_chars_usd"], 22.0)
-        self.assertAlmostEqual(metrics["cost_usd"], 11 / 1_000_000 * 22.0)
+        self.assertNotIn("cost_usd", metrics)
 
     def test_empty_texts_returns_none(self):
         from calibrate_agent.tts import eval as E
@@ -512,7 +512,7 @@ class TestTTSCostMetrics(unittest.TestCase):
             model=E._default_tts_model("google", "sindhi"),
         )
         self.assertEqual(metrics["pricing_model"], "gemini-2.5-flash-tts")
-        self.assertEqual(metrics["cost_usd"], 30.0)
+        self.assertEqual(metrics["cost_per_million_chars_usd"], 30.0)
 
     def test_all_supported_providers_have_cost_pricing(self):
         from calibrate_agent.tts import eval as E
@@ -526,7 +526,7 @@ class TestTTSCostMetrics(unittest.TestCase):
                     model=E._default_tts_model(provider, "english"),
                 )
                 self.assertIsNotNone(metrics)
-                self.assertIn("cost_usd", metrics)
+                self.assertIn("cost_per_million_chars_usd", metrics)
 
 
 if __name__ == "__main__":

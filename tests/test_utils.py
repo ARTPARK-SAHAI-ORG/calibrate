@@ -51,14 +51,13 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
                 "cost": {
                     "total_characters": 2000,
                     "cost_per_million_chars_usd": 15.0,
-                    "cost_usd": 0.03,
                 },
             })
             metrics = read_leaderboard_metrics(path)
 
             self.assertEqual(metrics["total_characters"], 2000.0)
             self.assertEqual(metrics["cost_per_million_chars_usd"], 15.0)
-            self.assertEqual(metrics["cost_usd"], 0.03)
+            self.assertNotIn("cost_usd", metrics)
             self.assertNotIn("cost", metrics)
 
     def test_stt_cost_fans_out_to_minute_columns(self):

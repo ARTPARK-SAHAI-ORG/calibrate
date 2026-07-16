@@ -119,8 +119,8 @@ Once all the providers have completed, it displays a leaderboard measuring key m
 Each provider output directory includes:
 
 - `results.csv` with one row per input text (`id`, `text`, `audio_path`, `ttfb`, evaluator scores, and evaluator reasoning).
-- `metrics.json` with evaluator summaries, `ttfb` percentiles, and a `cost` object. The cost object includes `provider`, `pricing_model`, `currency`, `billing_unit`, `total_characters`, `cost_per_million_chars_usd`, and `cost_usd`. TTS providers bill per input character, so cost is estimated from the total characters synthesized; models billed on audio output (OpenAI, Gemini) use an equivalent per-character rate so the metric is comparable across providers.
-- `leaderboard/tts_leaderboard.xlsx` with scalar cost columns in the summary sheet: `total_characters`, `cost_per_million_chars_usd`, and `cost_usd`.
+- `metrics.json` with evaluator summaries, `ttfb` percentiles, and a `cost` object. The cost object includes `provider`, `pricing_model`, `currency`, `billing_unit`, `total_characters`, and `cost_per_million_chars_usd`. TTS providers bill per input character, so cost is reported as the per-million-character rate; models billed on audio output (OpenAI, Gemini) use an equivalent per-character rate so the metric is comparable across providers.
+- `leaderboard/tts_leaderboard.xlsx` with cost columns in the summary sheet: `total_characters` and `cost_per_million_chars_usd`.
 
 <Frame>
   <img src="./images/tts_leaderboard.png" alt="TTS leaderboard" />
