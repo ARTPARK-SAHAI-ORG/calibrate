@@ -68,6 +68,7 @@ class TestTTSLeaderboard(unittest.TestCase):
                 "cost": {
                     "total_characters": 2000,
                     "cost_per_million_chars_usd": 15.0,
+                    "cost_usd": 0.03,
                 },
             })
 
@@ -77,8 +78,8 @@ class TestTTSLeaderboard(unittest.TestCase):
             summary = pd.read_excel(save_dir / "tts_leaderboard.xlsx", sheet_name="summary")
             self.assertIn("total_characters", summary.columns)
             self.assertIn("cost_per_million_chars_usd", summary.columns)
-            self.assertEqual(float(summary.iloc[0]["cost_per_million_chars_usd"]), 15.0)
-            self.assertNotIn("cost_usd", summary.columns)
+            self.assertIn("cost_usd", summary.columns)
+            self.assertEqual(float(summary.iloc[0]["cost_usd"]), 0.03)
 
     def test_multi_criterion_metrics_surface_dynamically(self):
         with tempfile.TemporaryDirectory() as tmp:

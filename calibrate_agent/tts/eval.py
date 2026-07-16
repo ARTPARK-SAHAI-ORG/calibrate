@@ -81,10 +81,10 @@ def _build_tts_cost_metrics(
 ) -> dict | None:
     """Build TTS cost metrics from input characters and provider price config.
 
-    TTS providers bill per input character, so cost is reported as the
-    per-million-character rate (not a computed total spend). Returns ``None``
-    when there is nothing to price or no pricing is configured for the
-    provider/model.
+    TTS providers bill per input character, so cost is estimated from the total
+    number of characters synthesized (normalized to a per-million-character
+    rate). Returns ``None`` when there is nothing to price or no pricing is
+    configured for the provider/model.
     """
     total_characters = sum(
         len(str(text))
@@ -98,13 +98,15 @@ def _build_tts_cost_metrics(
     if not pricing:
         return None
 
+    price_per_million = pricing["price_per_million_chars_usd"]
     return {
         "provider": provider,
         "pricing_model": pricing["model"],
         "currency": "USD",
         "billing_unit": "character",
         "total_characters": total_characters,
-        "cost_per_million_chars_usd": pricing["price_per_million_chars_usd"],
+        "cost_per_million_chars_usd": price_per_million,
+        "cost_usd": total_characters / 1_000_000.0 * price_per_million,
     }
 
 
