@@ -10,7 +10,6 @@ class TestPricingResolver(unittest.TestCase):
         self.assertEqual(pricing["billing_unit"], "minute")
         self.assertEqual(pricing["model"], "gpt-4o-transcribe")
         self.assertEqual(pricing["price_per_minute_usd"], 0.006)
-        self.assertEqual(pricing["pricing_source"], "calibrate_default")
 
     def test_resolves_explicit_stt_model_pricing(self):
         from calibrate_agent.pricing import resolve_pricing

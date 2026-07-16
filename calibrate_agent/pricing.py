@@ -46,7 +46,6 @@ def resolve_pricing(
         "currency": "USD",
         "billing_unit": "minute",
         "price_per_minute_usd": float(price),
-        "pricing_source": "calibrate_default",
     }
 
 

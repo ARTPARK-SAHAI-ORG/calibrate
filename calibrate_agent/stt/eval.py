@@ -119,7 +119,6 @@ def _build_stt_cost_metrics(
         "billing_unit": "minute",
         "total_seconds": total_seconds,
         "audio_minutes": round(total_minutes, 4),
-        "pricing_source": pricing["pricing_source"],
         "cost_per_minute_usd": price_per_minute,
         "cost_usd": total_minutes * price_per_minute,
     }

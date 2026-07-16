@@ -879,7 +879,6 @@ class TestSTTCostMetrics(unittest.TestCase):
         )
 
         self.assertEqual(metrics["billing_unit"], "minute")
-        self.assertEqual(metrics["pricing_source"], "calibrate_default")
         self.assertEqual(metrics["pricing_model"], "gpt-4o-transcribe")
         self.assertEqual(metrics["total_seconds"], 60.0)
         self.assertEqual(metrics["audio_minutes"], 1.0)
@@ -897,7 +896,6 @@ class TestSTTCostMetrics(unittest.TestCase):
         )
 
         self.assertEqual(metrics["billing_unit"], "minute")
-        self.assertEqual(metrics["pricing_source"], "calibrate_default")
         self.assertEqual(metrics["total_seconds"], 120.0)
         self.assertEqual(metrics["audio_minutes"], 2.0)
         self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
@@ -925,7 +923,6 @@ class TestSTTCostMetrics(unittest.TestCase):
         )
 
         self.assertEqual(metrics["pricing_model"], "chirp_2")
-        self.assertEqual(metrics["pricing_source"], "calibrate_default")
         self.assertEqual(metrics["cost_usd"], 0.016)
 
     def test_returns_none_when_no_pricing(self):
@@ -953,7 +950,6 @@ class TestSTTCostMetrics(unittest.TestCase):
                     audio_duration_seconds=[60.0],
                     model=E._default_stt_model(provider, "english"),
                 )
-                self.assertEqual(metrics["pricing_source"], "calibrate_default")
                 self.assertIn("cost_usd", metrics)
 
 
