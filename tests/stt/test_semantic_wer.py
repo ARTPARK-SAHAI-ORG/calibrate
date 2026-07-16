@@ -125,34 +125,42 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(out["per_row"][1]["semantic_wer"], float("inf"))
 
 
-def _fake_completion(args: dict, content: str = "my reasoning"):
-    """A minimal OpenAI-style chat completion with one calculate_wer tool call."""
+def _tool_completion(args: dict):
+    """OpenAI-style completion whose message carries one calculate_wer call."""
     tc = SimpleNamespace(
         function=SimpleNamespace(name="calculate_wer", arguments=json.dumps(args))
     )
-    msg = SimpleNamespace(content=content, tool_calls=[tc])
-    return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
+    return SimpleNamespace(choices=[SimpleNamespace(
+        message=SimpleNamespace(content=None, tool_calls=[tc]))])
+
+
+def _text_completion(content: str):
+    """OpenAI-style completion with plain reasoning text and no tool call."""
+    return SimpleNamespace(choices=[SimpleNamespace(
+        message=SimpleNamespace(content=content, tool_calls=None))])
 
 
 class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
-    async def _run(self, ref, hyp, args, content="my reasoning"):
+    async def _run(self, ref, hyp, args, reasoning="my reasoning"):
+        """Two-phase judge: phase 1 (no tools) -> reasoning; phase 2 -> tool call."""
         from calibrate_agent.stt.semantic_wer import judge as J
 
-        captured = {}
+        calls = []
 
         async def fake_create(*a, **kw):
-            captured["messages"] = kw["messages"]
-            captured["tools"] = kw["tools"]
-            return _fake_completion(args, content)
+            calls.append(kw)
+            if "tools" in kw:            # phase 2 — commit
+                return _tool_completion(args)
+            return _text_completion(reasoning)   # phase 1 — reason
 
         fake_client = MagicMock()
         fake_client.chat.completions.create = fake_create
         with patch.object(J, "_build_openrouter_client", return_value=fake_client):
             result = await J.semantic_wer_judge(ref, hyp)
-        return result, captured
+        return result, calls
 
-    async def test_system_user_split_and_count_extraction(self):
-        result, captured = await self._run(
+    async def test_two_phase_split_force_and_extraction(self):
+        result, calls = await self._run(
             "transfer to savings",
             "transfer to checking",
             {
@@ -163,17 +171,28 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
                 "normalized_reference": "transfer to savings",
                 "normalized_hypothesis": "transfer to checking",
             },
-            content="savings->checking changes the account",
+            reasoning="savings->checking changes the account",
         )
-        # System (rules) / user (pair) split — not one crammed message.
-        self.assertEqual(captured["messages"][0]["role"], "system")
-        self.assertEqual(captured["messages"][1]["role"], "user")
-        self.assertIn("SEMANTIC CHECK", captured["messages"][0]["content"])
-        self.assertIn("transfer to savings", captured["messages"][1]["content"])
-        self.assertNotIn("transfer to savings", captured["messages"][0]["content"])
-        # Tool schema is offered as an OpenAI function named calculate_wer.
-        self.assertEqual(captured["tools"][0]["function"]["name"], "calculate_wer")
-        # Counts parsed from the tool call; reasoning captured from the message.
+        # Exactly two calls.
+        self.assertEqual(len(calls), 2)
+        p1, p2 = calls
+
+        # Phase 1: reason only — no tool offered, system/user split.
+        self.assertNotIn("tools", p1)
+        self.assertNotIn("tool_choice", p1)
+        self.assertEqual(p1["messages"][0]["role"], "system")
+        self.assertEqual(p1["messages"][1]["role"], "user")
+        self.assertIn("SEMANTIC CHECK", p1["messages"][0]["content"])
+        self.assertIn("transfer to savings", p1["messages"][1]["content"])
+        self.assertNotIn("transfer to savings", p1["messages"][0]["content"])
+
+        # Phase 2: the calculate_wer call is forced, reasoning replayed.
+        self.assertEqual(p2["tools"][0]["function"]["name"], "calculate_wer")
+        self.assertEqual(p2["tool_choice"]["function"]["name"], "calculate_wer")
+        self.assertEqual(p2["messages"][2]["role"], "assistant")
+        self.assertEqual(p2["messages"][2]["content"], "savings->checking changes the account")
+
+        # Counts parsed from the forced call; reasoning from phase 1.
         self.assertEqual(result["substitutions"], 1)
         self.assertEqual(result["reference_words"], 3)
         self.assertEqual(result["reasoning"], "savings->checking changes the account")
@@ -182,10 +201,11 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
         # Decomposed (NFD) input whose NFC form differs — the judge must send
         # the composed form to the model, not the decomposed input it received.
         nfd_ref = unicodedata.normalize("NFD", "café résumé")
-        _, captured = await self._run(
+        _, calls = await self._run(
             nfd_ref, nfd_ref,
             {"substitutions": 0, "deletions": 0, "insertions": 0, "reference_words": 3},
         )
+        captured = {"messages": calls[0]["messages"]}
         user_msg = captured["messages"][1]["content"]
         self.assertIn(unicodedata.normalize("NFC", nfd_ref), user_msg)
         self.assertNotIn(nfd_ref, user_msg)

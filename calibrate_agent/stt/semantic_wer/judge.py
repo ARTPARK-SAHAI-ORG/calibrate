@@ -1,17 +1,24 @@
-"""Semantic-WER judge — pipecat's reason-then-tool loop over OpenRouter.
+"""Semantic-WER judge — two-phase reason-then-commit over OpenRouter.
 
-Mirrors pipecat's stt-benchmark ``SemanticWEREvaluator.evaluate``: a multi-turn
-tool-use loop where the model writes its free-form semantic reasoning and then
-commits the counts via a ``calculate_wer`` tool call, with the rules in a
-**system** message and the (reference, hypothesis) pair in a **user** message.
-The prompt and tool schema are pipecat's verbatim (``main.py``).
+Same rubric and tool contract as pipecat's stt-benchmark
+``SemanticWEREvaluator.evaluate`` (prompt + ``calculate_wer`` schema are
+pipecat's verbatim; see ``main.py``), but structured for reliability as two
+explicit calls per pair instead of pipecat's single auto tool-use loop:
 
-The one transport difference from pipecat: calibrate stays on its OpenRouter
-(OpenAI-compatible) client rather than the native Anthropic SDK, so the
-Anthropic ``tool_use`` loop is expressed as OpenAI function-calling (same
-reason→commit shape, same tool contract). Seams: ``@backoff`` / ``@observe`` /
-``log_judge_io`` and a Unicode NFC pre-normalization of the inputs (for Indic
-scripts; pipecat targets English and normalizes nothing upstream).
+  Phase 1 — with the rules in a **system** message and the (reference,
+            hypothesis) pair in a **user** message, the model reasons freely.
+            No tool is offered, so it can only produce text.
+  Phase 2 — the phase-1 reasoning is replayed and the model is *required* to
+            call ``calculate_wer`` (forced ``tool_choice``), committing the
+            counts.
+
+This guarantees termination in exactly two calls (no nudge loop, no
+runaway-retry worst case) at the cost of one extra call per row versus
+pipecat's single-call-usually loop. Transport is calibrate's OpenRouter
+(OpenAI-compatible) client, not the native Anthropic SDK. Seams: ``@backoff`` /
+``@observe`` / ``log_judge_io`` and a Unicode NFC pre-normalization of the
+inputs (for Indic scripts; pipecat targets English and normalizes nothing
+upstream).
 """
 
 import json
@@ -32,7 +39,8 @@ from calibrate_agent.stt.semantic_wer.main import (
 # Overridable per call / via get_semantic_wer_score(model=...).
 DEFAULT_SEMANTIC_WER_MODEL = "anthropic/claude-sonnet-4.5"
 
-_MAX_TURNS = 10  # pipecat's safety limit
+# Phase 2 requires the model to call calculate_wer (no free-form escape).
+_FORCE_WER_TOOL = {"type": "function", "function": {"name": "calculate_wer"}}
 
 
 def _short_circuit(
@@ -98,49 +106,44 @@ async def semantic_wer_judge(
         return _short_circuit(0, words, 0, words, reasoning="empty hypothesis")
 
     client = _build_openrouter_client()
+    user_msg = build_user_prompt(reference, prediction)
 
-    # System = pipecat's rules; user = pipecat's per-pair message.
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": build_user_prompt(reference, prediction)},
-    ]
+    # Phase 1 — reason freely. No tool is offered, so the model can only write
+    # its NORMALIZE → ALIGN → SEMANTIC CHECK working out as text.
+    reason_resp = await client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_msg},
+        ],
+        temperature=0,
+        max_tokens=4096,
+    )
+    reasoning = reason_resp.choices[0].message.content or ""
 
-    tool_input = None
-    reasoning = ""
-
-    for _ in range(_MAX_TURNS):
-        response = await client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=[_OPENAI_TOOL],
-            tool_choice="auto",
-            temperature=0,
-            max_tokens=4096,
-        )
-        message = response.choices[0].message
-        tool_calls = message.tool_calls or []
-
-        wer_call = next(
-            (tc for tc in tool_calls if tc.function.name == "calculate_wer"), None
-        )
-        if wer_call is not None:
-            # The assistant's free-form reasoning precedes the committed counts.
-            reasoning = message.content or ""
-            tool_input = json.loads(wer_call.function.arguments)
-            break
-
-        # Model reasoned without committing yet — feed its turn back and ask it
-        # to finish with the tool call (pipecat's loop likewise keeps going).
-        messages.append({"role": "assistant", "content": message.content or ""})
-        messages.append(
-            {"role": "user", "content": "Now call calculate_wer with your counts."}
-        )
-
-    if tool_input is None:
-        raise ValueError(
-            "semantic_wer_judge: model did not call calculate_wer within "
-            f"{_MAX_TURNS} turns"
-        )
+    # Phase 2 — replay the reasoning and REQUIRE the calculate_wer call, so the
+    # counts are always committed (no nudge loop, guaranteed to terminate).
+    commit_resp = await client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user_msg},
+            {"role": "assistant", "content": reasoning},
+            {"role": "user", "content": "Now call calculate_wer with your final counts."},
+        ],
+        tools=[_OPENAI_TOOL],
+        tool_choice=_FORCE_WER_TOOL,
+        temperature=0,
+        max_tokens=1024,
+    )
+    message = commit_resp.choices[0].message
+    wer_call = next(
+        (tc for tc in (message.tool_calls or []) if tc.function.name == "calculate_wer"),
+        None,
+    )
+    if wer_call is None:
+        raise ValueError("semantic_wer_judge: forced calculate_wer call was not returned")
+    tool_input = json.loads(wer_call.function.arguments)
 
     result = {
         "substitutions": int(tool_input.get("substitutions", 0)),
@@ -157,7 +160,7 @@ async def semantic_wer_judge(
         evaluator="semantic_wer",
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        user_input=build_user_prompt(reference, prediction),
+        user_input=user_msg,
         output=result,
     )
 
