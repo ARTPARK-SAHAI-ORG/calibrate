@@ -319,7 +319,9 @@ async def get_semantic_wer_score(
         s = int(res.get("substitutions", 0))
         d = int(res.get("deletions", 0))
         i = int(res.get("insertions", 0))
-        ref_words = int(res.get("reference_words", 0))
+        # The judge always sets reference_words; default to 1 (not 0) only to
+        # stay consistent with its own default and pipecat's call site.
+        ref_words = int(res.get("reference_words", 1))
         errors = s + d + i
         if ref_words == 0:
             row_wer = 0.0 if errors == 0 else float("inf")
