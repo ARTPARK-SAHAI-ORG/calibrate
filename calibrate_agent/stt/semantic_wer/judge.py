@@ -42,6 +42,17 @@ DEFAULT_SEMANTIC_WER_MODEL = "anthropic/claude-sonnet-4.5"
 # Phase 2 requires the model to call calculate_wer (no free-form escape).
 _FORCE_WER_TOOL = {"type": "function", "function": {"name": "calculate_wer"}}
 
+# Cache the long, identical-every-row system prompt. Both phases and every row
+# share this exact prefix, so within the cache window rows are billed as cache
+# reads instead of full prompt tokens. OpenRouter forwards the Anthropic-style
+# breakpoint; providers without prompt caching simply ignore it.
+_CACHED_SYSTEM_MESSAGE = {
+    "role": "system",
+    "content": [
+        {"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}
+    ],
+}
+
 
 def _short_circuit(
     substitutions: int,
@@ -113,7 +124,7 @@ async def semantic_wer_judge(
     reason_resp = await client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            _CACHED_SYSTEM_MESSAGE,
             {"role": "user", "content": user_msg},
         ],
         temperature=0,
@@ -126,7 +137,7 @@ async def semantic_wer_judge(
     commit_resp = await client.chat.completions.create(
         model=model,
         messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
+            _CACHED_SYSTEM_MESSAGE,
             {"role": "user", "content": user_msg},
             {"role": "assistant", "content": reasoning},
             {"role": "user", "content": "Now call calculate_wer with your final counts."},

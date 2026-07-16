@@ -187,9 +187,12 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("tool_choice", p1)
         self.assertEqual(p1["messages"][0]["role"], "system")
         self.assertEqual(p1["messages"][1]["role"], "user")
-        self.assertIn("SEMANTIC CHECK", p1["messages"][0]["content"])
+        # System prompt is cached (content is a list with a cache_control part).
+        sys_part = p1["messages"][0]["content"][0]
+        self.assertEqual(sys_part["cache_control"], {"type": "ephemeral"})
+        self.assertIn("SEMANTIC CHECK", sys_part["text"])
+        self.assertNotIn("transfer to savings", sys_part["text"])
         self.assertIn("transfer to savings", p1["messages"][1]["content"])
-        self.assertNotIn("transfer to savings", p1["messages"][0]["content"])
 
         # Phase 2: the calculate_wer call is forced, reasoning replayed.
         self.assertEqual(p2["tools"][0]["function"]["name"], "calculate_wer")
