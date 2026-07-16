@@ -1,6 +1,10 @@
 from pathlib import Path
 
-from calibrate_agent._env import env_int, resolve_stt_parallelism
+from calibrate_agent._env import (
+    env_int,
+    resolve_stt_max_concurrency,
+    resolve_stt_parallelism,
+)
 
 
 class TestEnvInt:
@@ -58,6 +62,32 @@ class TestResolveSTTParallelism:
         self._clear(monkeypatch)
         # Only concurrency given explicitly; parallel falls to pipeline default.
         assert resolve_stt_parallelism("pipeline", max_concurrency=5) == (1, 5)
+
+
+class TestResolveSTTMaxConcurrency:
+    def _clear(self, monkeypatch):
+        monkeypatch.delenv("CALIBRATE_STT_MAX_PARALLEL", raising=False)
+        monkeypatch.delenv("CALIBRATE_STT_MAX_CONCURRENCY", raising=False)
+
+    def test_per_engine_default(self, monkeypatch):
+        self._clear(monkeypatch)
+        assert resolve_stt_max_concurrency("pipeline") == 1
+        assert resolve_stt_max_concurrency("direct") == 4
+
+    def test_explicit_wins(self, monkeypatch):
+        monkeypatch.setenv("CALIBRATE_STT_MAX_CONCURRENCY", "9")
+        assert resolve_stt_max_concurrency("pipeline", 3) == 3
+
+    def test_env_overrides_default(self, monkeypatch):
+        self._clear(monkeypatch)
+        monkeypatch.setenv("CALIBRATE_STT_MAX_CONCURRENCY", "7")
+        assert resolve_stt_max_concurrency("pipeline") == 7
+
+    def test_ignores_the_parallel_env_var(self, monkeypatch):
+        self._clear(monkeypatch)
+        # A single-provider resolve must not be swayed by the across-providers knob.
+        monkeypatch.setenv("CALIBRATE_STT_MAX_PARALLEL", "99")
+        assert resolve_stt_max_concurrency("pipeline") == 1
 
 
 class TestEnvStdlibOnly:

@@ -44,7 +44,7 @@ from calibrate_agent.stt.metrics import (
     get_ttfs_stats,
 )
 from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
-from calibrate_agent._env import resolve_stt_parallelism
+from calibrate_agent._env import resolve_stt_max_concurrency
 from calibrate_agent.judges import (
     is_rating,
     require_unique_evaluator_names,
@@ -1095,9 +1095,7 @@ async def run_stt_eval(
     Returns:
         Number of files successfully transcribed (non-empty) in this run.
     """
-    _, max_concurrency = resolve_stt_parallelism(
-        engine, max_concurrency=max_concurrency
-    )
+    max_concurrency = resolve_stt_max_concurrency(engine, max_concurrency)
     transcribe_fn = (
         transcribe_audio_pipeline if engine == "pipeline" else transcribe_audio
     )

@@ -39,6 +39,23 @@ STT_PARALLELISM_DEFAULTS = {
 }
 
 
+def resolve_stt_max_concurrency(engine, max_concurrency=None):
+    """Resolve per-provider clip concurrency (the ``CALIBRATE_STT_MAX_CONCURRENCY``
+    knob) for an STT run.
+
+    An explicit (non-None) value wins; else the env var if set; else the
+    per-engine default in ``STT_PARALLELISM_DEFAULTS`` (unknown engines fall back
+    to ``direct``). Single-provider callers use this directly so they don't touch
+    the across-providers knob they have no use for.
+    """
+    if max_concurrency is not None:
+        return max_concurrency
+    _mp_default, mc_default = STT_PARALLELISM_DEFAULTS.get(
+        engine, STT_PARALLELISM_DEFAULTS["direct"]
+    )
+    return env_int("CALIBRATE_STT_MAX_CONCURRENCY", mc_default)
+
+
 def resolve_stt_parallelism(engine, max_parallel=None, max_concurrency=None):
     """Resolve ``(max_parallel, max_concurrency)`` for an STT benchmark run.
 
@@ -47,7 +64,7 @@ def resolve_stt_parallelism(engine, max_parallel=None, max_concurrency=None):
     if set, else the per-engine default in ``STT_PARALLELISM_DEFAULTS`` (unknown
     engines fall back to the ``direct`` defaults).
     """
-    mp_default, mc_default = STT_PARALLELISM_DEFAULTS.get(
+    mp_default, _mc_default = STT_PARALLELISM_DEFAULTS.get(
         engine, STT_PARALLELISM_DEFAULTS["direct"]
     )
     resolved_parallel = (
@@ -55,9 +72,4 @@ def resolve_stt_parallelism(engine, max_parallel=None, max_concurrency=None):
         if max_parallel is not None
         else env_int("CALIBRATE_STT_MAX_PARALLEL", mp_default)
     )
-    resolved_concurrency = (
-        max_concurrency
-        if max_concurrency is not None
-        else env_int("CALIBRATE_STT_MAX_CONCURRENCY", mc_default)
-    )
-    return resolved_parallel, resolved_concurrency
+    return resolved_parallel, resolve_stt_max_concurrency(engine, max_concurrency)
