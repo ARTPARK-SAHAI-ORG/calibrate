@@ -68,6 +68,9 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
                 "substitutions": 0, "deletions": 0, "insertions": 0,
                 "reference_words": 5, "normalized_reference": "r2",
                 "normalized_hypothesis": "h2", "reasoning": "clean",
+                # A judge dict may also carry the full CoT — it must be dropped,
+                # not echoed into per_row (which feeds the persisted outputs).
+                "chain_of_thought": "long verbose working-out",
             },
         }
 
@@ -83,6 +86,7 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(out["semantic_wer"], 1 / 15)
         self.assertAlmostEqual(out["per_row"][0]["semantic_wer"], 0.1)
         self.assertAlmostEqual(out["per_row"][1]["semantic_wer"], 0.0)
+        self.assertNotIn("chain_of_thought", out["per_row"][1])
 
     async def test_empty_input(self):
         from calibrate_agent.stt import metrics as M
@@ -222,6 +226,9 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
             result["reasoning"],
             "'savings' misheard as 'checking' — the agent would act on the wrong account.",
         )
+        # The full CoT rides along for debug surfaces but is distinct from the
+        # public reasoning.
+        self.assertEqual(result["chain_of_thought"], "savings->checking changes the account")
 
     async def test_reasoning_falls_back_to_cot_when_summary_missing(self):
         # Older models / truncated calls may omit ``summary`` — the row must still

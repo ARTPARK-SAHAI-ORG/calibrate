@@ -97,7 +97,9 @@ async def semantic_wer_judge(
 
     Returns the ``calculate_wer`` counts plus reasoning:
     ``substitutions``, ``deletions``, ``insertions``, ``reference_words``,
-    ``normalized_reference``, ``normalized_hypothesis``, ``reasoning``.
+    ``normalized_reference``, ``normalized_hypothesis``, ``reasoning`` (the
+    concise public summary), and ``chain_of_thought`` (the full phase-1 CoT,
+    kept for debug surfaces only — never persisted to the leaderboard).
     """
     # Seam: NFC pre-normalization (see module docstring). Applied before the
     # judge sees the text so Indic codepoint variants aren't counted as errors.
@@ -186,16 +188,19 @@ async def semantic_wer_judge(
         "normalized_reference": tool_input.get("normalized_reference") or "",
         "normalized_hypothesis": tool_input.get("normalized_hypothesis") or "",
         "reasoning": summary or reasoning,
+        # Full CoT rides along for the debug surfaces below (log + Langfuse). It
+        # never reaches the leaderboard: get_semantic_wer_score and eval.py both
+        # cherry-pick named keys, so this one is dropped. pipecat likewise keeps
+        # the raw reasoning trace only for offline debugging.
+        "chain_of_thought": reasoning,
     }
 
-    # Persist the full CoT to the per-provider debug log (never the leaderboard):
-    # pipecat likewise keeps the raw reasoning trace only for offline debugging.
     log_judge_io(
         evaluator="semantic_wer",
         model=model,
         system_prompt=SYSTEM_PROMPT,
         user_input=user_msg,
-        output={**result, "chain_of_thought": reasoning},
+        output=result,
     )
 
     if langfuse_enabled and langfuse:
