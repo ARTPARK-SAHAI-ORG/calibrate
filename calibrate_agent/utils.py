@@ -24,15 +24,19 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
-def get_wav_duration_seconds(audio_path: str | Path) -> float | None:
-    """Return WAV duration in seconds, or None when it cannot be read."""
+def get_audio_duration_seconds(audio_path: str | Path) -> float | None:
+    """Return audio duration in seconds, or None when it cannot be read.
+
+    Uses pydub (``ffmpeg``) so any format the transcription path can decode —
+    WAV, MP3, etc. — yields a duration, keeping cost coverage in sync with the
+    files actually transcribed. Logs a warning when a file can't be read.
+    """
     try:
-        with wave.open(str(audio_path), "rb") as wav_file:
-            frame_rate = wav_file.getframerate()
-            if frame_rate <= 0:
-                return None
-            return wav_file.getnframes() / float(frame_rate)
-    except Exception:
+        from pydub import AudioSegment
+
+        return AudioSegment.from_file(audio_path).duration_seconds
+    except Exception as e:
+        logger.warning(f"Could not read audio duration for {audio_path}: {e}")
         return None
 
 
@@ -1652,35 +1656,62 @@ def validate_tts_language(language: str, provider: str) -> None:
 # =============================================================================
 
 
+# Base pipecat ``Language`` enum per language name, used by the STT factory
+# (create_stt_service) and the pipeline benchmark engine. Mirrors the coverage of
+# the direct-path ``get_stt_language_code`` maps so both engines support the same
+# 13 languages. Sarvam takes India-regional (``*_IN``) variants; every other
+# provider takes the base enum and pipecat's per-service layer translates it.
+_STT_LANGUAGE_ENUMS = {
+    "english": Language.EN,
+    "hindi": Language.HI,
+    "kannada": Language.KN,
+    "bengali": Language.BN,
+    "malayalam": Language.ML,
+    "marathi": Language.MR,
+    "odia": Language.OR,
+    "punjabi": Language.PA,
+    "tamil": Language.TA,
+    "telugu": Language.TE,
+    "gujarati": Language.GU,
+    "sindhi": Language.SD,
+    "maithili": Language.MAI,
+}
+
+_SARVAM_STT_LANGUAGE_ENUMS = {
+    "english": Language.EN_IN,
+    "hindi": Language.HI_IN,
+    "kannada": Language.KN_IN,
+    "bengali": Language.BN_IN,
+    "malayalam": Language.ML_IN,
+    "marathi": Language.MR_IN,
+    "odia": Language.OR_IN,
+    "punjabi": Language.PA_IN,
+    "tamil": Language.TA_IN,
+    "telugu": Language.TE_IN,
+    "gujarati": Language.GU_IN,
+    "sindhi": Language.SD_IN,
+    "maithili": Language.MAI_IN,
+}
+
+
 def get_stt_language(
-    language: Literal["english", "hindi", "kannada"],
+    language: str,
     provider: str,
 ) -> Language:
     """Get the appropriate Language enum for STT based on language and provider.
 
     Args:
-        language: The language name (english, hindi, kannada)
+        language: The language name (e.g. english, hindi, tamil — any of the 13
+            supported STT languages).
         provider: The STT provider name
 
     Returns:
-        The appropriate Language enum value
+        The appropriate Language enum value (falls back to English for an
+        unknown language, matching the direct-path code maps' defaults).
     """
-    # Sarvam uses regional language codes
-    if provider == "sarvam":
-        if language == "kannada":
-            return Language.KN_IN
-        elif language == "hindi":
-            return Language.HI_IN
-        else:
-            return Language.EN_IN
-
-    # Default language codes
-    if language == "kannada":
-        return Language.KN
-    elif language == "hindi":
-        return Language.HI
-    else:
-        return Language.EN
+    language = language.lower()
+    table = _SARVAM_STT_LANGUAGE_ENUMS if provider == "sarvam" else _STT_LANGUAGE_ENUMS
+    return table.get(language, table["english"])
 
 
 def get_tts_language(
@@ -1819,6 +1850,22 @@ STT_PROVIDER_MODELS = {
     "sarvam": "saaras:v3",
 }
 
+
+def google_stt_model_and_location(
+    language: str, model: str | None = None
+) -> tuple[str, str]:
+    """Return the Google STT (model, location) for a language.
+
+    Sindhi is only served by ``chirp_2`` in ``asia-southeast1``; every other
+    language uses the default model in ``us``. Single source of truth shared by
+    the live-agent factory (``create_stt_service``) and the direct-path
+    benchmark (``stt/eval.py`` ``transcribe_google``) so the two can't drift.
+    """
+    if str(language).lower() == "sindhi":
+        return model or "chirp_2", "asia-southeast1"
+    return model or STT_PROVIDER_MODELS["google"], "us"
+
+
 TTS_PROVIDER_MODELS = {
     "gemini": "gemini-3.1-flash-tts-preview",
     "cartesia": "sonic-3.5",
@@ -1916,12 +1963,13 @@ def create_stt_service(
             ),
         )
     elif provider == "google":
+        google_model, google_location = google_stt_model_and_location(language, model)
         return GoogleSTTService(
             sample_rate=16000,
-            location="us",
+            location=google_location,
             settings=GoogleSTTService.Settings(
                 languages=[stt_language],
-                model=model or STT_PROVIDER_MODELS[provider],
+                model=google_model,
             ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
         )

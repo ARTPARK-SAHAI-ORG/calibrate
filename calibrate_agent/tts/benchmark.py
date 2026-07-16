@@ -28,6 +28,7 @@ from calibrate_agent.tts.eval import (
     validate_tts_input_file,
 )
 from calibrate_agent.tts.leaderboard import generate_leaderboard
+from calibrate_agent._env import env_int
 from calibrate_agent.utils import StreamTee
 
 # Maximum number of providers to run in parallel
@@ -205,6 +206,15 @@ async def main():
         default=None,
         help="Path to optional JSON config file with an `evaluators` list",
     )
+    parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=env_int("CALIBRATE_TTS_MAX_PARALLEL", MAX_PARALLEL_PROVIDERS),
+        help=(
+            "Number of providers to evaluate in parallel (default: 2, or "
+            "$CALIBRATE_TTS_MAX_PARALLEL)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -314,6 +324,7 @@ async def main():
             debug_count=args.debug_count,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
+            max_parallel=args.max_parallel,
         )
 
         # Print summary

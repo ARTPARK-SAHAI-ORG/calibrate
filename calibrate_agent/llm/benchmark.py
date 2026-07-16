@@ -29,6 +29,7 @@ from os.path import exists, join
 from calibrate_agent.llm.run_tests import display_label, run_model_tests
 from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
 from calibrate_agent.llm._output import print_benchmark_summary
+from calibrate_agent._env import env_int
 from calibrate_agent.utils import StreamTee, apply_debug_limit
 
 # Maximum number of models to run in parallel
@@ -156,6 +157,15 @@ async def main():
         help="Number of test cases to evaluate in parallel per model",
     )
     parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=env_int("CALIBRATE_LLM_MAX_PARALLEL", MAX_PARALLEL_MODELS),
+        help=(
+            "Number of models to evaluate in parallel (default: 2, or "
+            "$CALIBRATE_LLM_MAX_PARALLEL)."
+        ),
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Force a clean run instead of resuming completed test cases from a prior results.json",
@@ -223,6 +233,7 @@ async def main():
             models=models,
             provider=args.provider,
             output_dir=args.output_dir,
+            max_parallel=args.max_parallel,
             test_parallel=args.parallel,
             overwrite=args.overwrite,
         )

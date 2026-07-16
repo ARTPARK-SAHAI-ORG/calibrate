@@ -33,6 +33,7 @@ from calibrate_agent.stt.eval import (
     STT_LANGUAGES,
 )
 from calibrate_agent.stt.leaderboard import generate_leaderboard
+from calibrate_agent._env import env_int
 from calibrate_agent.utils import StreamTee
 
 
@@ -77,7 +78,7 @@ async def run(
     overwrite: bool = False,
     max_parallel: int = MAX_PARALLEL_PROVIDERS,
     judge_evaluators: list[dict] = None,
-    run_sarvam_judges: bool = True,
+    run_llm_judges: bool = True,
 ) -> dict:
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
@@ -98,7 +99,7 @@ async def run(
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted no
             LLM judge runs and only WER/CER are reported.
-        run_sarvam_judges: Run the Sarvam intent/entity judge (default True;
+        run_llm_judges: Run the Sarvam intent/entity judge (default True;
             loads a normalizer model + makes per-row judge calls). Set to False
             to skip it.
 
@@ -132,7 +133,7 @@ async def run(
                 ignore_retry=ignore_retry,
                 overwrite=overwrite,
                 judge_evaluators=judge_evaluators,
-                run_sarvam_judges=run_sarvam_judges,
+                run_llm_judges=run_llm_judges,
             )
             return (provider, result)
 
@@ -246,12 +247,21 @@ async def main():
         help="Path to optional JSON config file with an `evaluators` list",
     )
     parser.add_argument(
-        "--skip-sarvam",
+        "--skip-llm-judges",
         action="store_true",
         help=(
-            "Skip the Sarvam LLM judges (intent & entity preservation and "
-            "LLM-WER/CER). They run by default; passing this skips the extra "
-            "per-row LLM judges."
+            "Skip the extra LLM-based judges (Sarvam intent & entity "
+            "preservation, Sarvam LLM-WER/CER, and pipecat-style semantic WER). "
+            "They all run by default; passing this reports WER/CER only."
+        ),
+    )
+    parser.add_argument(
+        "--max-parallel",
+        type=int,
+        default=env_int("CALIBRATE_STT_MAX_PARALLEL", MAX_PARALLEL_PROVIDERS),
+        help=(
+            "Number of providers to evaluate in parallel (default: 2, or "
+            "$CALIBRATE_STT_MAX_PARALLEL)."
         ),
     )
 
@@ -316,7 +326,7 @@ async def main():
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
             language=args.language,
-            run_sarvam_judges=not args.skip_sarvam,
+            run_llm_judges=not args.skip_llm_judges,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
@@ -362,7 +372,8 @@ async def main():
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
-            run_sarvam_judges=not args.skip_sarvam,
+            run_llm_judges=not args.skip_llm_judges,
+            max_parallel=args.max_parallel,
         )
 
         # Print summary

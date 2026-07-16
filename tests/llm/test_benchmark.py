@@ -317,7 +317,14 @@ class TestBenchmarkDebugFlag(unittest.IsolatedAsyncioTestCase):
         captured = {}
 
         async def fake_run(
-            *, config, models, provider, output_dir, test_parallel=None, overwrite=False
+            *,
+            config,
+            models,
+            provider,
+            output_dir,
+            max_parallel=2,
+            test_parallel=None,
+            overwrite=False,
         ):
             captured["config"] = config
             captured["overwrite"] = overwrite
