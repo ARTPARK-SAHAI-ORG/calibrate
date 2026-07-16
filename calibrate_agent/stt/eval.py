@@ -29,6 +29,7 @@ from calibrate_agent.utils import (
     validate_stt_language,
     STT_PROVIDER_MODELS,
     google_stt_model_and_location,
+    create_stt_service,
     get_gemini_api_key,
     provider_log as _log,
     provider_log_file as _current_log_file,
@@ -40,7 +41,10 @@ from calibrate_agent.stt.metrics import (
     get_intent_entity_score,
     get_llm_wer_cer_score,
     get_semantic_wer_score,
+    get_ttfs_stats,
 )
+from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
+from calibrate_agent._env import env_int
 from calibrate_agent.judges import (
     is_rating,
     require_unique_evaluator_names,
@@ -937,12 +941,142 @@ async def transcribe_audio(
 # =============================================================================
 
 
+@backoff.on_exception(backoff.expo, Exception, max_tries=3, factor=2)
+@observe(name="stt", capture_input=False, capture_output=False)
+async def transcribe_audio_pipeline(
+    audio_path: Path,
+    reference: str,
+    provider: str,
+    language: str,
+    unique_id: str,
+) -> dict:
+    """Transcribe one clip by streaming it through a real pipecat pipeline.
+
+    The "pipeline" engine: feeds the WAV at real-time pace through the same
+    ``create_stt_service`` the live agent deploys, so the benchmark reflects the
+    shipped STT config and also captures TTFS latency (speech-stop -> final
+    transcript). Contrast with ``transcribe_audio`` (the "direct" engine), which
+    calls each provider SDK directly.
+
+    Returns ``{"transcript": str, "ttfs": float | None}``.
+    """
+    # Sarvam's streaming endpoint is rate-limited per account; honour the same
+    # limiter the direct engine uses so concurrent clips don't blow the cap.
+    if provider == "sarvam":
+        await SARVAM_STT_STREAMING_LIMITER.acquire()
+
+    pcm = load_audio(audio_path, raw_pcm=True)
+    stt_service = create_stt_service(provider, language)
+    output = await transcribe_via_pipeline(pcm, stt_service)
+
+    transcript = output["transcript"].strip()
+    ttfs = output["ttfs"]
+
+    if langfuse_enabled and langfuse:
+        input_audio_media = create_langfuse_audio_media(audio_path)
+        langfuse.update_current_trace(
+            input={
+                "audio": input_audio_media,
+                "reference": reference,
+                "language": language,
+                "provider": provider,
+            },
+            output=transcript,
+            metadata={
+                "provider": provider,
+                "language": language,
+                "reference": reference,
+                "ttfs": ttfs,
+                "engine": "pipeline",
+            },
+            session_id=unique_id,
+        )
+
+    return {"transcript": transcript, "ttfs": ttfs}
+
+
+async def _run_stt_eval_concurrent(
+    gt_data: List[Dict],
+    audio_dir: Path,
+    provider: str,
+    language: str,
+    results_csv_path: Path,
+    max_concurrency: int,
+    transcribe_fn,
+    with_ttfs: bool,
+) -> int:
+    """Transcribe clips with bounded concurrency, writing rows as they complete.
+
+    Shared by both engines: ``transcribe_fn`` is the per-clip coroutine
+    (``transcribe_audio`` for direct, ``transcribe_audio_pipeline`` for pipeline)
+    and ``with_ttfs`` adds the ``ttfs`` column (pipeline only). Up to
+    ``max_concurrency`` clips run at once (for pipeline each is a 1x real-time
+    pipeline, so concurrency keeps a large run tractable); each result is written
+    to ``results.csv`` under a lock (resumable, skip-processed). A failed clip is
+    logged and left unwritten for the outer retry loop / no-progress fill,
+    without a gather-wide cancel.
+    """
+    if exists(results_csv_path):
+        existing_df = pd.read_csv(results_csv_path)
+        results = existing_df.to_dict("records")
+        processed_ids = set(existing_df["id"].tolist())
+    else:
+        results = []
+        processed_ids = set()
+
+    pending = [g for g in gt_data if g["id"] not in processed_ids]
+    if not pending:
+        return 0
+
+    unique_id = str(uuid.uuid4())
+    semaphore = asyncio.Semaphore(max_concurrency)
+    write_lock = asyncio.Lock()
+    success_count = 0
+
+    async def worker(index: int, gt_info: Dict) -> None:
+        nonlocal success_count
+        async with semaphore:
+            audio_path = audio_dir / f"{gt_info['id']}.wav"
+            _log("--------------------------------")
+            _log(f"Processing audio [{index}/{len(pending)}]: {audio_path.name}")
+            try:
+                output = await transcribe_fn(
+                    audio_path, gt_info["gt"], provider, language, unique_id
+                )
+            except Exception as e:
+                # Don't raise: leave this id unprocessed so the retry loop can
+                # re-attempt it (and eventually fill an empty transcript) without
+                # cancelling the other in-flight clips.
+                _log(f"\033[91mFailed to transcribe {audio_path}: {e}\033[0m")
+                return
+
+            transcript = output["transcript"]
+            _log(f"\033[33mTranscript: {transcript}\033[0m")
+            async with write_lock:
+                if transcript:
+                    success_count += 1
+                row = _stt_result_row(
+                    gt_info["id"], gt_info["gt"], transcript, audio_dir
+                )
+                if with_ttfs:
+                    row["ttfs"] = output.get("ttfs")
+                results.append(row)
+                pd.DataFrame(results).to_csv(results_csv_path, index=False)
+
+    await asyncio.gather(
+        *(worker(i + 1, gt_info) for i, gt_info in enumerate(pending))
+    )
+    return success_count
+
+
 async def run_stt_eval(
     gt_data: List[Dict],
     audio_dir: Path,
     provider: str,
     language: str,
     results_csv_path: Path,
+    engine: str = "pipeline",
+    max_concurrency: int = 4,
 ) -> int:
     """Process audio files and save results immediately to CSV.
 
@@ -952,53 +1086,26 @@ async def run_stt_eval(
         provider: STT provider name
         language: Language code
         results_csv_path: Path to save results CSV
+        engine: ``"direct"`` (per-provider SDK calls) or ``"pipeline"`` (stream
+            through a real pipecat agent pipeline, capturing TTFS latency).
+        max_concurrency: Concurrent clips per provider (applies to both engines).
 
     Returns:
         Number of files successfully transcribed (non-empty) in this run.
     """
-    # Load existing results to skip already processed files
-    if exists(results_csv_path):
-        existing_df = pd.read_csv(results_csv_path)
-        results = existing_df.to_dict("records")
-        processed_ids = set(existing_df["id"].tolist())
-    else:
-        results = []
-        processed_ids = set()
-
-    success_count = 0
-
-    unique_id = str(uuid.uuid4())
-
-    for i, gt_info in enumerate(gt_data):
-        # Skip if already processed
-        if gt_info["id"] in processed_ids:
-            continue
-
-        audio_path = audio_dir / f"{gt_info['id']}.wav"
-
-        _log(f"--------------------------------")
-        _log(f"Processing audio [{i + 1}/{len(gt_data)}]: {audio_path.name}")
-
-        try:
-            output = await transcribe_audio(
-                audio_path, gt_info["gt"], provider, language, unique_id
-            )
-            transcript = output["transcript"]
-            _log(f"\033[33mTranscript: {transcript}\033[0m")
-            if transcript:
-                success_count += 1
-        except Exception as e:
-            _log(f"\033[91mFailed to transcribe {audio_path}: {e}\033[0m")
-            raise
-
-        # Save immediately after each file
-        results.append(
-            _stt_result_row(gt_info["id"], gt_info["gt"], transcript, audio_dir)
-        )
-        pd.DataFrame(results).to_csv(results_csv_path, index=False)
-
-    return success_count
-
+    transcribe_fn = (
+        transcribe_audio_pipeline if engine == "pipeline" else transcribe_audio
+    )
+    return await _run_stt_eval_concurrent(
+        gt_data,
+        audio_dir,
+        provider,
+        language,
+        results_csv_path,
+        max_concurrency,
+        transcribe_fn=transcribe_fn,
+        with_ttfs=(engine == "pipeline"),
+    )
 
 def validate_stt_input_dir(input_dir: str, input_file_name: str) -> tuple[bool, str]:
     """Validate STT input directory structure.
@@ -1158,6 +1265,8 @@ async def run_single_provider_eval(
     overwrite: bool,
     judge_evaluators: list[dict] = None,
     run_llm_judges: bool = True,
+    engine: str = "pipeline",
+    max_concurrency: int = 4,
 ) -> dict:
     """Run STT evaluation for a single provider."""
     provider_output_dir = join(output_dir, provider)
@@ -1266,6 +1375,8 @@ async def run_single_provider_eval(
                 provider=provider,
                 language=language,
                 results_csv_path=results_csv_path,
+                engine=engine,
+                max_concurrency=max_concurrency,
             )
 
             if ignore_retry:
@@ -1290,6 +1401,14 @@ async def run_single_provider_eval(
             model=_default_stt_model(provider, language),
         )
 
+        # TTFS latency is only produced by the pipeline engine; NaN/absent -> None.
+        if "ttfs" in results_df.columns:
+            all_ttfs = [
+                None if pd.isna(v) else float(v) for v in results_df["ttfs"].tolist()
+            ]
+        else:
+            all_ttfs = [None] * len(all_ids)
+
         _log(f"gt_transcripts: {all_gt_transcripts}", to_terminal=False)
         _log(f"pred_transcripts: {all_pred_transcripts}", to_terminal=False)
 
@@ -1307,6 +1426,7 @@ async def run_single_provider_eval(
             run_llm_judges=run_llm_judges,
             audio_durations=audio_durations,
             cost_metrics=cost_metrics,
+            ttfs_values=all_ttfs,
         )
 
         return {
@@ -1365,6 +1485,7 @@ async def _score_and_write_results(
     run_llm_judges: bool = True,
     cost_metrics: dict | None = None,
     audio_durations: list[float | None] | None = None,
+    ttfs_values: list = None,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1480,6 +1601,15 @@ async def _score_and_write_results(
     if cost_metrics:
         metrics_data["cost"] = cost_metrics
 
+    # TTFS latency (pipeline engine only). Emitted as a {p50,p95,p99,mean} dict
+    # so read_leaderboard_metrics fans it into ttfs_p50/ttfs_p95/ttfs_p99 columns.
+    ttfs_per_row = ttfs_values if ttfs_values is not None else [None] * len(ids)
+    has_ttfs = any(v is not None for v in ttfs_per_row)
+    if has_ttfs:
+        ttfs_stats = get_ttfs_stats(ttfs_per_row)
+        if ttfs_stats is not None:
+            metrics_data["ttfs"] = ttfs_stats
+
     ie_per_row = (
         intent_entity_results["per_row"]
         if intent_entity_results is not None
@@ -1512,6 +1642,7 @@ async def _score_and_write_results(
         pred_text,
         wer,
         cer,
+        ttfs_row,
         ie_row,
         llm_wer_row,
         semantic_wer_row,
@@ -1523,6 +1654,7 @@ async def _score_and_write_results(
         pred_transcripts,
         wer_results["per_row"],
         cer_results["per_row"],
+        ttfs_per_row,
         ie_per_row,
         llm_wer_per_row,
         semantic_wer_per_row,
@@ -1538,6 +1670,8 @@ async def _score_and_write_results(
         }
         if duration is not None and not pd.isna(duration):
             row["audio_duration_seconds"] = duration
+        if has_ttfs:
+            row["ttfs"] = ttfs_row
         if ie_row is not None:
             row["sarvam_intent_score"] = int(ie_row["intent_score"])
             row["sarvam_intent_reasoning"] = ie_row["intent_explanation"]
@@ -1667,6 +1801,10 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
     ):
         if key in metrics:
             parts.append(f"{label}={metrics[key]:.4f}")
+    # TTFS latency (pipeline engine only) — a {p50,p95,p99,mean} dict.
+    ttfs = metrics.get("ttfs")
+    if isinstance(ttfs, dict) and "p50" in ttfs:
+        parts.append(f"TTFS p50={ttfs['p50']:.2f}s p95={ttfs['p95']:.2f}s")
     # Evaluator entries are dicts carrying a ``type`` field; that's the marker
     # we use to pick them out from other top-level metrics.
     parts.extend(
@@ -1757,6 +1895,26 @@ async def main():
             "They all run by default; passing this reports WER/CER only."
         ),
     )
+    parser.add_argument(
+        "--engine",
+        type=str,
+        default="pipeline",
+        choices=["direct", "pipeline"],
+        help=(
+            "Transcription engine: 'pipeline' (default; streams through a real "
+            "pipecat agent pipeline at real-time pace, also reporting TTFS "
+            "latency) or 'direct' (faster; per-provider SDK, no latency)."
+        ),
+    )
+    parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=env_int("CALIBRATE_STT_MAX_CONCURRENCY", 4),
+        help=(
+            "Concurrent clips per provider, both engines (default: 4, or "
+            "$CALIBRATE_STT_MAX_CONCURRENCY)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -1799,6 +1957,8 @@ async def main():
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
         run_llm_judges=not args.skip_llm_judges,
+        engine=args.engine,
+        max_concurrency=args.max_concurrency,
     )
 
     # Print summary

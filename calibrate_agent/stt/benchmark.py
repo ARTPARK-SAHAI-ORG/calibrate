@@ -79,6 +79,8 @@ async def run(
     max_parallel: int = MAX_PARALLEL_PROVIDERS,
     judge_evaluators: list[dict] = None,
     run_llm_judges: bool = True,
+    engine: str = "pipeline",
+    max_concurrency: int = 4,
 ) -> dict:
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
@@ -134,6 +136,8 @@ async def run(
                 overwrite=overwrite,
                 judge_evaluators=judge_evaluators,
                 run_llm_judges=run_llm_judges,
+                engine=engine,
+                max_concurrency=max_concurrency,
             )
             return (provider, result)
 
@@ -264,6 +268,26 @@ async def main():
             "$CALIBRATE_STT_MAX_PARALLEL)."
         ),
     )
+    parser.add_argument(
+        "--engine",
+        type=str,
+        default="pipeline",
+        choices=["direct", "pipeline"],
+        help=(
+            "Transcription engine: 'pipeline' (default; streams through a real "
+            "pipecat agent pipeline at real-time pace, also reporting TTFS "
+            "latency) or 'direct' (faster; per-provider SDK, no latency)."
+        ),
+    )
+    parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=env_int("CALIBRATE_STT_MAX_CONCURRENCY", 4),
+        help=(
+            "Concurrent clips per provider, both engines (default: 4, or "
+            "$CALIBRATE_STT_MAX_CONCURRENCY)."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -374,6 +398,8 @@ async def main():
             judge_evaluators=judge_evaluators,
             run_llm_judges=not args.skip_llm_judges,
             max_parallel=args.max_parallel,
+            engine=args.engine,
+            max_concurrency=args.max_concurrency,
         )
 
         # Print summary

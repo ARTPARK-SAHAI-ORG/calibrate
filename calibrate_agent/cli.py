@@ -257,6 +257,26 @@ Examples:
             "$CALIBRATE_STT_MAX_PARALLEL)."
         ),
     )
+    stt_parser.add_argument(
+        "--engine",
+        type=str,
+        default="pipeline",
+        choices=["direct", "pipeline"],
+        help=(
+            "Transcription engine: 'pipeline' (default; streams through a real "
+            "pipecat agent pipeline at real-time pace, also reporting TTFS "
+            "latency) or 'direct' (faster; per-provider SDK, no latency)."
+        ),
+    )
+    stt_parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=env_int("CALIBRATE_STT_MAX_CONCURRENCY", 4),
+        help=(
+            "Concurrent clips per provider, both engines (default: 4, or "
+            "$CALIBRATE_STT_MAX_CONCURRENCY)."
+        ),
+    )
 
     # ── TTS ───────────────────────────────────────────────────────
     # `calibrate-agent tts` with no args → interactive UI
@@ -601,6 +621,8 @@ Examples:
             if args.skip_llm_judges:
                 argv.append("--skip-llm-judges")
             argv.extend(["--max-parallel", str(args.max_parallel)])
+            argv.extend(["--engine", args.engine])
+            argv.extend(["--max-concurrency", str(args.max_concurrency)])
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
