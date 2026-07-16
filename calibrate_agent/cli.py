@@ -240,12 +240,12 @@ Examples:
         help="Path to dataset JSON (list of {id, gt, pred}). Required with --eval-only.",
     )
     stt_parser.add_argument(
-        "--skip-sarvam",
+        "--skip-llm-judges",
         action="store_true",
         help=(
-            "Skip the Sarvam LLM judges (intent & entity preservation and "
-            "LLM-WER/CER). They run by default; passing this skips the extra "
-            "per-row LLM judges."
+            "Skip the extra LLM-based judges (Sarvam intent & entity "
+            "preservation, Sarvam LLM-WER/CER, and pipecat-style semantic WER). "
+            "They all run by default; passing this reports WER/CER only."
         ),
     )
     stt_parser.add_argument(
@@ -573,8 +573,8 @@ Examples:
             argv.extend(["-o", args.output_dir])
             if args.config:
                 argv.extend(["--config", args.config])
-            if args.skip_sarvam:
-                argv.append("--skip-sarvam")
+            if args.skip_llm_judges:
+                argv.append("--skip-llm-judges")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -598,8 +598,8 @@ Examples:
                 argv.extend(["-s", args.save_dir])
             if args.config:
                 argv.extend(["--config", args.config])
-            if args.skip_sarvam:
-                argv.append("--skip-sarvam")
+            if args.skip_llm_judges:
+                argv.append("--skip-llm-judges")
             argv.extend(["--max-parallel", str(args.max_parallel)])
 
             sys.argv = argv

@@ -186,7 +186,7 @@ class TestMainDispatch(unittest.TestCase):
                     "-o", tmp,
                 ])
 
-    def test_stt_benchmark_forwards_skip_sarvam_flag(self):
+    def test_stt_benchmark_forwards_skip_llm_judges_flag(self):
         captured = {}
 
         async def fake_main():
@@ -206,12 +206,12 @@ class TestMainDispatch(unittest.TestCase):
                 self._run_with_argv([
                     "calibrate_agent", "stt", "-p", "deepgram",
                     "-i", str(base), "-o", str(base / "out"),
-                    "--skip-sarvam",
+                    "--skip-llm-judges",
                 ])
 
-        self.assertIn("--skip-sarvam", captured["argv"])
+        self.assertIn("--skip-llm-judges", captured["argv"])
 
-    def test_stt_benchmark_omits_skip_sarvam_flag_by_default(self):
+    def test_stt_benchmark_omits_skip_llm_judges_flag_by_default(self):
         captured = {}
 
         async def fake_main():
@@ -233,9 +233,9 @@ class TestMainDispatch(unittest.TestCase):
                     "-i", str(base), "-o", str(base / "out"),
                 ])
 
-        self.assertNotIn("--skip-sarvam", captured["argv"])
+        self.assertNotIn("--skip-llm-judges", captured["argv"])
 
-    def test_stt_eval_only_forwards_skip_sarvam_flag_and_language(self):
+    def test_stt_eval_only_forwards_skip_llm_judges_flag_and_language(self):
         captured = {}
 
         async def fake_main():
@@ -248,10 +248,10 @@ class TestMainDispatch(unittest.TestCase):
                        AsyncMock(side_effect=fake_main)):
                 self._run_with_argv([
                     "calibrate_agent", "stt", "--eval-only", "--dataset", str(ds),
-                    "-o", tmp, "-l", "hindi", "--skip-sarvam",
+                    "-o", tmp, "-l", "hindi", "--skip-llm-judges",
                 ])
 
-        self.assertIn("--skip-sarvam", captured["argv"])
+        self.assertIn("--skip-llm-judges", captured["argv"])
         self.assertIn("hindi", captured["argv"])
 
     def test_tts_no_provider_launches_ui(self):

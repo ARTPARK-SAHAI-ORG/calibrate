@@ -273,7 +273,34 @@ def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
     return AsyncMock(side_effect=_fn)
 
 
+def _fake_semantic_wer():
+    """Fake ``get_semantic_wer_score`` (part of the default LLM-judge group)."""
+
+    async def _sem(references, predictions, model=None):
+        return {
+            "semantic_wer": 0.0,
+            "per_row": [
+                {
+                    "semantic_wer": 0.0, "substitutions": 0, "deletions": 0,
+                    "insertions": 0, "reference_words": 1,
+                    "normalized_reference": "", "normalized_hypothesis": "",
+                    "reasoning": "",
+                }
+                for _ in references
+            ],
+        }
+
+    return AsyncMock(side_effect=_sem)
+
+
 class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        p = patch.object(stt_eval, "get_semantic_wer_score", _fake_semantic_wer())
+        p.start()
+        self.addCleanup(p.stop)
+
     async def test_writes_metrics_and_results(self):
         from calibrate_agent.stt import eval as stt_eval
 
@@ -311,7 +338,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_sarvam_judges=True,
+                    run_llm_judges=True,
                 )
 
             self.assertIn("wer", metrics)
@@ -381,7 +408,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=custom,
-                    run_sarvam_judges=True,
+                    run_llm_judges=True,
                 )
 
             # With the flag on, intent/entity report alongside a custom evaluator.
@@ -474,7 +501,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
 
             # Disabled: the Sarvam judge is never invoked and no sarvam_* keys appear.
@@ -592,7 +619,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "goodbye"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
 
             # No evaluators passed: the LLM judge is never invoked, no evaluator
@@ -648,13 +675,20 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=[rating],
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["accuracy"], 4)
 
 
 class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        p = patch.object(stt_eval, "get_semantic_wer_score", _fake_semantic_wer())
+        p.start()
+        self.addCleanup(p.stop)
+
     async def test_runs_evaluator_on_dataset(self):
         from calibrate_agent.stt import eval as stt_eval
 
@@ -688,7 +722,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                 result = await stt_eval.run_eval_only(
                     dataset_path=str(ds_path),
                     output_dir=str(out),
-                    run_sarvam_judges=False,
+                    run_llm_judges=False,
                 )
 
             self.assertEqual(result["status"], "completed")

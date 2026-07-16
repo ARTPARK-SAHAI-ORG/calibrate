@@ -73,6 +73,7 @@ exclude = ["ui*", "examples*", "docs*", "images*"]
     "ui/cli.bundle.mjs",
     "stt/sarvam_intent_entity/prompt_template.txt",
     "stt/sarvam_llm_wer/prompt_template.txt",
+    "stt/semantic_wer/prompt_template.txt",
 ]
 
 [tool.setuptools_scm]

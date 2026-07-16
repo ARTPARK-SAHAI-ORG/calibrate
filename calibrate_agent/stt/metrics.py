@@ -24,7 +24,7 @@ from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 # NOTE: ``calibrate_agent.stt.sarvam_intent_entity`` is imported lazily inside the
 # intent/entity functions below — importing it eagerly pulls in transformers,
 # indic-nlp, and joblib, which we want to avoid unless intent/entity scoring is
-# actually requested (it runs by default unless ``--skip-sarvam`` is passed).
+# actually requested (it runs by default unless ``--skip-llm-judges`` is passed).
 
 # Re-export for existing imports
 DEFAULT_STT_JUDGE_MODEL = DEFAULT_TEXT_JUDGE_MODEL
@@ -252,6 +252,104 @@ def _score_edit_metric(
     )
 
     return {"score": float(score), "per_row": per_row}
+
+
+async def get_semantic_wer_score(
+    references: List[str],
+    predictions: List[str],
+    model: Optional[str] = None,
+) -> dict:
+    """Compute pipecat-style semantic WER over (reference, prediction) pairs.
+
+    One judge call per row via pipecat's reason-then-tool loop (see
+    ``stt/semantic_wer``): the model normalizes, aligns, applies the semantic
+    error check, and commits substitution/deletion/insertion counts + the
+    reference word count through a ``calculate_wer`` tool call. WER is computed
+    here from those counts, exactly as pipecat's ``_calculate_wer``:
+    per row ``(S + D + I) / reference_words`` and, at the dataset level, the
+    length-weighted **pooled** WER ``ΣSDI / Σreference_words`` over the
+    finite-WER rows only (``ref_words==0`` rows are ``inf`` and excluded from
+    both sums, matching pipecat's ``compute_pooled_wer``).
+
+    Unlike ``get_llm_wer_cer_score`` (Sarvam: deterministic difflib alignment +
+    per-segment equivalence forgiveness), the LLM does the entire count here and
+    normalizes inline (case, punctuation, contractions, numbers, …). The only
+    upstream step is Unicode NFC canonicalization in ``semantic_wer_judge`` — a
+    deviation from pipecat (English-only, no normalization) so Indic codepoint
+    variants don't count as spurious errors. No case/punctuation/Indic pass is
+    applied; that stays the judge's job.
+
+    Returns:
+        {
+            "semantic_wer": float,   # dataset-pooled WER
+            "per_row": [
+                {"semantic_wer": float, "substitutions": int, "deletions": int,
+                 "insertions": int, "reference_words": int,
+                 "normalized_reference": str, "normalized_hypothesis": str,
+                 "reasoning": str},
+                ...
+            ],
+        }
+
+    ``model`` defaults to ``DEFAULT_SEMANTIC_WER_MODEL`` when omitted; ``per_row``
+    order matches the input order.
+    """
+    if not references:
+        return {"semantic_wer": 0.0, "per_row": []}
+
+    from calibrate_agent.stt import semantic_wer as _semantic_wer
+    from calibrate_agent.stt.semantic_wer import DEFAULT_SEMANTIC_WER_MODEL
+
+    if model is None:
+        model = DEFAULT_SEMANTIC_WER_MODEL
+
+    coroutines = [
+        _semantic_wer.semantic_wer_judge(str(reference), str(prediction), model=model)
+        for reference, prediction in zip(references, predictions)
+    ]
+    results = await tqdm_asyncio.gather(
+        *coroutines,
+        desc="Running semantic WER judge",
+    )
+
+    total_errors = 0
+    total_ref_words = 0
+    per_row: List[dict] = []
+    for res in results:
+        s = int(res.get("substitutions", 0))
+        d = int(res.get("deletions", 0))
+        i = int(res.get("insertions", 0))
+        # The judge always sets reference_words; default to 1 (not 0) only to
+        # stay consistent with its own default and pipecat's call site.
+        ref_words = int(res.get("reference_words", 1))
+        errors = s + d + i
+        if ref_words == 0:
+            row_wer = 0.0 if errors == 0 else float("inf")
+        else:
+            row_wer = errors / ref_words
+        per_row.append(
+            {
+                "semantic_wer": float(row_wer),
+                "substitutions": s,
+                "deletions": d,
+                "insertions": i,
+                "reference_words": ref_words,
+                "normalized_reference": res.get("normalized_reference", ""),
+                "normalized_hypothesis": res.get("normalized_hypothesis", ""),
+                "reasoning": res.get("reasoning", ""),
+            }
+        )
+        # Pool only finite-WER rows, matching pipecat's compute_pooled_wer
+        # (``valid = [m for m in metrics if m.wer < inf]``). A ``ref_words==0``
+        # row with errors is ``inf`` and is excluded entirely — otherwise its
+        # errors would inflate the numerator with nothing in the denominator.
+        if row_wer != float("inf"):
+            total_errors += errors
+            total_ref_words += ref_words
+
+    pooled = 0.0 if total_ref_words == 0 else total_errors / total_ref_words
+
+    return {"semantic_wer": float(pooled), "per_row": per_row}
 
 
 def get_wer_score(
