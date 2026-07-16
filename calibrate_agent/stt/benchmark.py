@@ -33,12 +33,8 @@ from calibrate_agent.stt.eval import (
     STT_LANGUAGES,
 )
 from calibrate_agent.stt.leaderboard import generate_leaderboard
-from calibrate_agent._env import env_int
+from calibrate_agent._env import resolve_stt_parallelism
 from calibrate_agent.utils import StreamTee
-
-
-# Maximum number of providers to run in parallel
-MAX_PARALLEL_PROVIDERS = 2
 
 
 async def run(
@@ -76,11 +72,11 @@ async def run(
     debug_count: int = 5,
     ignore_retry: bool = False,
     overwrite: bool = False,
-    max_parallel: int = MAX_PARALLEL_PROVIDERS,
+    max_parallel: int = None,
     judge_evaluators: list[dict] = None,
     run_llm_judges: bool = True,
     engine: str = "pipeline",
-    max_concurrency: int = 4,
+    max_concurrency: int = None,
 ) -> dict:
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
@@ -97,7 +93,8 @@ async def run(
         debug_count: Number of audio files to run in debug mode (default: 5)
         ignore_retry: Skip retry if not all audios are processed
         overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
-        max_parallel: Maximum number of providers to run in parallel (default: 2)
+        max_parallel: Providers to run in parallel. ``None`` resolves per engine
+            (pipeline 1, direct 2) via ``resolve_stt_parallelism``.
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted no
             LLM judge runs and only WER/CER are reported.
@@ -118,6 +115,9 @@ async def run(
         ...     output_dir="./out"
         ... ))
     """
+    max_parallel, max_concurrency = resolve_stt_parallelism(
+        engine, max_parallel, max_concurrency
+    )
     results = {}
     semaphore = asyncio.Semaphore(max_parallel)
 
@@ -262,10 +262,10 @@ async def main():
     parser.add_argument(
         "--max-parallel",
         type=int,
-        default=env_int("CALIBRATE_STT_MAX_PARALLEL", MAX_PARALLEL_PROVIDERS),
+        default=None,
         help=(
-            "Number of providers to evaluate in parallel (default: 2, or "
-            "$CALIBRATE_STT_MAX_PARALLEL)."
+            "Number of providers to evaluate in parallel (default: pipeline 1, "
+            "direct 2; or $CALIBRATE_STT_MAX_PARALLEL)."
         ),
     )
     parser.add_argument(
@@ -282,10 +282,11 @@ async def main():
     parser.add_argument(
         "--max-concurrency",
         type=int,
-        default=env_int("CALIBRATE_STT_MAX_CONCURRENCY", 4),
+        default=None,
         help=(
-            "Concurrent clips per provider, both engines (default: 4, or "
-            "$CALIBRATE_STT_MAX_CONCURRENCY)."
+            "Concurrent clips per provider, both engines (default: pipeline 1, "
+            "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
+            "1 to keep TTFS latency uncontended."
         ),
     )
 

@@ -251,10 +251,10 @@ Examples:
     stt_parser.add_argument(
         "--max-parallel",
         type=int,
-        default=env_int("CALIBRATE_STT_MAX_PARALLEL", 2),
+        default=None,
         help=(
-            "Number of providers to evaluate in parallel (default: 2, or "
-            "$CALIBRATE_STT_MAX_PARALLEL)."
+            "Number of providers to evaluate in parallel (default: pipeline 1, "
+            "direct 2; or $CALIBRATE_STT_MAX_PARALLEL)."
         ),
     )
     stt_parser.add_argument(
@@ -271,10 +271,11 @@ Examples:
     stt_parser.add_argument(
         "--max-concurrency",
         type=int,
-        default=env_int("CALIBRATE_STT_MAX_CONCURRENCY", 4),
+        default=None,
         help=(
-            "Concurrent clips per provider, both engines (default: 4, or "
-            "$CALIBRATE_STT_MAX_CONCURRENCY)."
+            "Concurrent clips per provider, both engines (default: pipeline 1, "
+            "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
+            "1 to keep TTFS latency uncontended."
         ),
     )
 
@@ -620,9 +621,14 @@ Examples:
                 argv.extend(["--config", args.config])
             if args.skip_llm_judges:
                 argv.append("--skip-llm-judges")
-            argv.extend(["--max-parallel", str(args.max_parallel)])
+            # Only forward the parallelism knobs when the user set them
+            # explicitly; otherwise let the benchmark resolve the per-engine
+            # default (pipeline 1/1, direct 2/4).
+            if args.max_parallel is not None:
+                argv.extend(["--max-parallel", str(args.max_parallel)])
+            if args.max_concurrency is not None:
+                argv.extend(["--max-concurrency", str(args.max_concurrency)])
             argv.extend(["--engine", args.engine])
-            argv.extend(["--max-concurrency", str(args.max_concurrency)])
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())

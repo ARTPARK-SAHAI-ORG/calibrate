@@ -44,7 +44,7 @@ from calibrate_agent.stt.metrics import (
     get_ttfs_stats,
 )
 from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
-from calibrate_agent._env import env_int
+from calibrate_agent._env import resolve_stt_parallelism
 from calibrate_agent.judges import (
     is_rating,
     require_unique_evaluator_names,
@@ -1076,7 +1076,7 @@ async def run_stt_eval(
     language: str,
     results_csv_path: Path,
     engine: str = "pipeline",
-    max_concurrency: int = 4,
+    max_concurrency: int = None,
 ) -> int:
     """Process audio files and save results immediately to CSV.
 
@@ -1088,11 +1088,16 @@ async def run_stt_eval(
         results_csv_path: Path to save results CSV
         engine: ``"direct"`` (per-provider SDK calls) or ``"pipeline"`` (stream
             through a real pipecat agent pipeline, capturing TTFS latency).
-        max_concurrency: Concurrent clips per provider (applies to both engines).
+        max_concurrency: Concurrent clips per provider (both engines). ``None``
+            resolves per engine (pipeline 1, direct 4) via
+            ``resolve_stt_parallelism``.
 
     Returns:
         Number of files successfully transcribed (non-empty) in this run.
     """
+    _, max_concurrency = resolve_stt_parallelism(
+        engine, max_concurrency=max_concurrency
+    )
     transcribe_fn = (
         transcribe_audio_pipeline if engine == "pipeline" else transcribe_audio
     )
@@ -1266,9 +1271,13 @@ async def run_single_provider_eval(
     judge_evaluators: list[dict] = None,
     run_llm_judges: bool = True,
     engine: str = "pipeline",
-    max_concurrency: int = 4,
+    max_concurrency: int = None,
 ) -> dict:
-    """Run STT evaluation for a single provider."""
+    """Run STT evaluation for a single provider.
+
+    ``max_concurrency=None`` is forwarded to ``run_stt_eval``, which resolves the
+    per-engine default (pipeline 1, direct 4).
+    """
     provider_output_dir = join(output_dir, provider)
 
     # ``exist_ok=True`` keeps this safe when the same provider folder is
@@ -1913,10 +1922,11 @@ async def main():
     parser.add_argument(
         "--max-concurrency",
         type=int,
-        default=env_int("CALIBRATE_STT_MAX_CONCURRENCY", 4),
+        default=None,
         help=(
-            "Concurrent clips per provider, both engines (default: 4, or "
-            "$CALIBRATE_STT_MAX_CONCURRENCY)."
+            "Concurrent clips per provider, both engines (default: pipeline 1, "
+            "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
+            "1 to keep TTFS latency uncontended."
         ),
     )
 
