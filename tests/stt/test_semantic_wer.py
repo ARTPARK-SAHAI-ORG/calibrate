@@ -39,6 +39,17 @@ class TestPrompt(unittest.TestCase):
         self.assertIn("TRAILING FUNCTION WORDS AT TRUNCATION", p)
         self.assertEqual(p.count("### Example"), 8)
 
+    def test_tool_requires_concise_summary(self):
+        from calibrate_agent.stt.semantic_wer.main import CALCULATE_WER_TOOL
+
+        schema = CALCULATE_WER_TOOL["input_schema"]
+        # Calibrate adds a required ``summary`` field for the public reasoning.
+        self.assertIn("summary", schema["properties"])
+        self.assertIn("summary", schema["required"])
+        # pipecat's original counts are still required.
+        for field in ("substitutions", "deletions", "insertions", "reference_words"):
+            self.assertIn(field, schema["required"])
+
 
 class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
     async def test_pooled_and_per_row_formula(self):
@@ -57,6 +68,9 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
                 "substitutions": 0, "deletions": 0, "insertions": 0,
                 "reference_words": 5, "normalized_reference": "r2",
                 "normalized_hypothesis": "h2", "reasoning": "clean",
+                # A judge dict may also carry the full CoT — it must be dropped,
+                # not echoed into per_row (which feeds the persisted outputs).
+                "chain_of_thought": "long verbose working-out",
             },
         }
 
@@ -72,6 +86,7 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
         self.assertAlmostEqual(out["semantic_wer"], 1 / 15)
         self.assertAlmostEqual(out["per_row"][0]["semantic_wer"], 0.1)
         self.assertAlmostEqual(out["per_row"][1]["semantic_wer"], 0.0)
+        self.assertNotIn("chain_of_thought", out["per_row"][1])
 
     async def test_empty_input(self):
         from calibrate_agent.stt import metrics as M
@@ -175,6 +190,7 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
                 "reference_words": 3,
                 "normalized_reference": "transfer to savings",
                 "normalized_hypothesis": "transfer to checking",
+                "summary": "'savings' misheard as 'checking' — the agent would act on the wrong account.",
             },
             reasoning="savings->checking changes the account",
         )
@@ -199,10 +215,35 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(p2["tool_choice"]["function"]["name"], "calculate_wer")
         self.assertEqual(p2["messages"][2]["role"], "assistant")
         self.assertEqual(p2["messages"][2]["content"], "savings->checking changes the account")
+        # Phase 2 nudges for the concise, public summary.
+        self.assertIn("summary", p2["messages"][3]["content"])
 
-        # Counts parsed from the forced call; reasoning from phase 1.
+        # Counts parsed from the forced call; the public reasoning is the concise
+        # phase-2 summary, NOT the verbose phase-1 chain-of-thought.
         self.assertEqual(result["substitutions"], 1)
         self.assertEqual(result["reference_words"], 3)
+        self.assertEqual(
+            result["reasoning"],
+            "'savings' misheard as 'checking' — the agent would act on the wrong account.",
+        )
+        # The full CoT rides along for debug surfaces but is distinct from the
+        # public reasoning.
+        self.assertEqual(result["chain_of_thought"], "savings->checking changes the account")
+
+    async def test_reasoning_falls_back_to_cot_when_summary_missing(self):
+        # Older models / truncated calls may omit ``summary`` — the row must still
+        # carry reasoning rather than an empty string, so fall back to the CoT.
+        result, _ = await self._run(
+            "transfer to savings",
+            "transfer to checking",
+            {
+                "substitutions": 1,
+                "deletions": 0,
+                "insertions": 0,
+                "reference_words": 3,
+            },
+            reasoning="savings->checking changes the account",
+        )
         self.assertEqual(result["reasoning"], "savings->checking changes the account")
 
     async def test_reference_and_prediction_are_nfc_normalized(self):
