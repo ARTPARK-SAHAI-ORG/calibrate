@@ -81,7 +81,8 @@ async def run(
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
 
-    Evaluates providers in parallel (max 2 by default), then generates a comparison leaderboard.
+    Evaluates providers in parallel (per-engine default: pipeline 1, direct 2),
+    then generates a comparison leaderboard.
 
     Args:
         providers: List of STT providers to evaluate
