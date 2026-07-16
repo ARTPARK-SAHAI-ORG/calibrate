@@ -352,6 +352,30 @@ async def get_semantic_wer_score(
     return {"semantic_wer": float(pooled), "per_row": per_row}
 
 
+def get_ttfs_stats(ttfs_values: List[Optional[float]]) -> Optional[dict]:
+    """Aggregate per-clip TTFS latencies into percentile stats.
+
+    TTFS (time-to-final-segment) is the speech-stop -> final-transcript latency
+    captured by the pipeline engine (``None`` for clips that produced no
+    transcript / no TTFB metric, and for every clip under the direct engine).
+
+    Returns ``{"p50", "p95", "p99", "mean"}`` in seconds over the non-None
+    values, or ``None`` when there are none — so the direct engine (all None)
+    simply omits TTFS from ``metrics.json``. Percentiles use linear
+    interpolation (numpy's default), matching pipecat's stt-benchmark.
+    """
+    values = [v for v in ttfs_values if v is not None]
+    if not values:
+        return None
+    arr = np.array(values, dtype=float)
+    return {
+        "p50": float(np.percentile(arr, 50)),
+        "p95": float(np.percentile(arr, 95)),
+        "p99": float(np.percentile(arr, 99)),
+        "mean": float(np.mean(arr)),
+    }
+
+
 def get_wer_score(
     references: List[str], predictions: List[str], language: str = "english"
 ) -> dict:

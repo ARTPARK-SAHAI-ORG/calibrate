@@ -1019,6 +1019,7 @@ class TestRunStteval(unittest.IsolatedAsyncioTestCase):
                     provider="deepgram",
                     language="english",
                     results_csv_path=str(results_csv),
+                    engine="direct",
                 )
 
             self.assertEqual(count, 1)
@@ -1128,6 +1129,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                     ignore_retry=True,
                     overwrite=False,
                     run_llm_judges=False,
+                    engine="direct",
                 )
             self.assertEqual(result["status"], "completed")
 
