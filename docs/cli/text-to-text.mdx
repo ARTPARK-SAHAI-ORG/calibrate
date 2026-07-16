@@ -602,45 +602,10 @@ If you want thresholds different from “top-of-scale” (for example “tone at
 
 ## Get started
 
-### Interactive mode
-
-Run `calibrate-agent llm` with no arguments to launch the interactive UI:
-
-```bash
-calibrate-agent llm
-```
-
-**Calibrate agent** — the UI detects that your config defines a system prompt and tools and guides you through:
-
-1. **Config file** — path to your config file
-2. **Provider** — OpenRouter or OpenAI
-3. **Model entry** — enter model names one at a time (single or multiple)
-4. **Confirm models** — review the list and add more or proceed
-5. **Output directory** — where results will be saved (defaults to `./out`)
-6. **API keys** — enter the API keys for the selected provider
-
-The evaluation runs the selected models in parallel (max 2 at a time), showing results for each test as they complete.
-
-**Agent connection** — the UI detects `agent_url` in your config and switches to agent mode:
-
-_Single test:_
-
-1. **Config file** — path to your config file (with `agent_url` and optionally `agent_headers`)
-2. **Mode** — select "Single test"
-3. **Verify** — calibrate verifies the connection; shows success or failure with the option to go back
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — only `OPENAI_API_KEY` is required (used by the LLM judge)
-
-_Benchmark across models:_
-
-1. **Config file** — path to your config file (with `agent_url` and optionally `agent_headers`)
-2. **Mode** — select "Benchmark across models"
-3. **Model entry** — enter a model name; calibrate verifies the connection with that model before asking if you want to add another
-4. **Confirm models** — review the list and add more or proceed
-5. **Output directory** — where results will be saved (defaults to `./out`)
-6. **API keys** — only `OPENAI_API_KEY` is required (used by the LLM judge)
-
-### Non-interactive mode
+Pass your config with `-c` and the model(s) with `-m`. Set the API keys for the
+selected provider in your environment (or a `.env` file in the directory you run
+the command from). The evaluation runs the selected models in parallel (max 2 at
+a time), showing results for each test as they complete.
 
 **Calibrate agent:**
 

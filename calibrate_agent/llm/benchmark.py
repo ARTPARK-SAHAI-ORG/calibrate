@@ -196,9 +196,9 @@ async def main():
         )
 
     # ``exist_ok=True`` makes this safe when several ``calibrate-agent llm``
-    # subprocesses (e.g. one per model spawned by the interactive UI) race to
-    # create the output dir — the previous ``if not exists: makedirs(...)``
-    # pattern was non-atomic and the loser raised ``FileExistsError``.
+    # processes race to create the output dir — the previous
+    # ``if not exists: makedirs(...)`` pattern was non-atomic and the loser
+    # raised ``FileExistsError``.
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Mirror everything written to stdout/stderr into a single output-dir-level
@@ -206,11 +206,9 @@ async def main():
     # leaderboard prints, summary) is captured in one place — same pattern as
     # the STT/TTS benchmark CLIs.
     #
-    # When the interactive UI runs each model in its own ``calibrate-agent llm``
-    # subprocess, multiple processes target the same ``logs`` path concurrently;
-    # the UI sets ``CALIBRATE_LLM_LOG_APPEND=1`` so subprocesses append instead
-    # of racing to truncate each other's output. The UI itself clears the file
-    # once before kicking off the run.
+    # If several ``calibrate-agent llm`` processes target the same ``logs`` path
+    # concurrently, set ``CALIBRATE_LLM_LOG_APPEND=1`` so they append instead of
+    # racing to truncate each other's output (clear the file once beforehand).
     log_path = join(args.output_dir, "logs")
     append_mode = os.environ.get("CALIBRATE_LLM_LOG_APPEND") == "1"
     if not append_mode and exists(log_path):

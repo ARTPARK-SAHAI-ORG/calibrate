@@ -320,43 +320,13 @@ For voice simulations, specify the STT, LLM, and TTS providers:
 
 ## Get started
 
-### Interactive mode
-
-Run `calibrate-agent simulations` with no arguments to launch the interactive UI:
-
-```bash
-calibrate-agent simulations
-```
-
-**Calibrate agent (text):**
-
-1. **Simulation type** — select "Text"
-2. **Config file** — path to your config file
-3. **Provider** — OpenRouter or OpenAI
-4. **Model** — the model used for both the agent and user simulator
-5. **Parallel count** — how many simulations to run simultaneously (default: `1`)
-6. **Output directory** — where results will be saved (defaults to `./out`)
-7. **API keys** — enter the API keys for the selected provider
-
-**Calibrate agent (voice):**
-
-1. **Simulation type** — select "Voice"
-2. **Config file** — path to your config file (with `stt`, `tts`, and `llm` set)
-3. **Parallel count** — how many simulations to run simultaneously (default: `1`)
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — enter the API keys for the selected providers
-
-**Agent connection (text & voice):**
-
-1. **Simulation type** — select `Text` or `Voice`
-2. **Config file** — path to your config file
-3. **Parallel count** — how many simulations to run simultaneously (default: `1`)
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — only `OPENAI_API_KEY` is required (used by the user simulator and LLM judge)
-
-### Non-interactive mode
-
-Pass `--type text` or `--type voice` and a config file directly to skip the UI.
+Pass `--type text` or `--type voice` and a config file with `-c`. Set the API
+keys for the selected provider in your environment (or a `.env` file in the
+directory you run the command from). For text simulations against a Calibrate
+agent, `-m`/`-p` set the model and provider used for both the agent and the user
+simulator; for agent connections and voice, only `OPENAI_API_KEY` is required
+(used by the user simulator and LLM judge). Use `-n` to control parallelism
+(default: `1`).
 
 **Calibrate agent (text):**
 

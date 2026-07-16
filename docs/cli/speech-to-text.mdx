@@ -6,7 +6,7 @@ description: "Evaluate Speech to Text providers via CLI"
 ## Get started
 
 ```bash
-calibrate-agent stt
+calibrate-agent stt -p deepgram google -l english -i ./data -o ./out
 ```
 
 <iframe
@@ -17,11 +17,12 @@ calibrate-agent stt
   allowFullScreen
 ></iframe>
 
-The interactive UI guides you through the full evaluation process:
+The command takes:
 
-1. **Language selection** — pick from 10+ supported Indic languages
-2. **Provider selection** — choose providers (only those supporting your language are shown)
-3. **Input directory** — path to the directory containing your audio files and reference transcripts
+- `-p`/`--provider` — one or more providers to evaluate (space-separated). Only providers that support the chosen language are run.
+- `-l`/`--language` — one of the 10+ supported Indic languages (defaults to `english`).
+- `-i`/`--input-dir` — path to the directory containing your audio files and reference transcripts.
+- `-o`/`--output-dir` — where results are saved (defaults to `./out`).
 
 The input directory should have this structure:
 
@@ -47,10 +48,7 @@ The **stt.csv** file contains the reference transcriptions:
 
 Refer to the [sample dataset](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/sample_input) for a template.
 
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — enter the API keys for the selected providers
-
-The evaluation runs providers in parallel (max 2 at a time), showing the transcriptions as they are generated.
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time), showing the transcriptions as they are generated.
 
 ## Evaluator configuration
 

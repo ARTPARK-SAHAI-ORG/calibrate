@@ -6,7 +6,7 @@ description: "Evaluate Text to Speech providers via CLI"
 ## Get started
 
 ```bash
-calibrate-agent tts
+calibrate-agent tts -p openai google -l english -i sample.csv -o ./out
 ```
 
 <iframe
@@ -17,11 +17,12 @@ calibrate-agent tts
   allowFullScreen
 ></iframe>
 
-The interactive UI guides you through the full evaluation process:
+The command takes:
 
-1. **Language selection** — pick from 10+ supported Indic languages
-2. **Provider selection** — choose providers (only those supporting your language are shown)
-3. **Input CSV** — path to CSV file with `id` and `text` columns
+- `-p`/`--provider` — one or more providers to evaluate (space-separated). Only providers that support the chosen language are run.
+- `-l`/`--language` — one of the 10+ supported Indic languages (defaults to `english`).
+- `-i`/`--input` — path to a CSV file with `id` and `text` columns.
+- `-o`/`--output-dir` — where results are saved (defaults to `./out`).
 
 The **input CSV** should have this format:
 
@@ -33,10 +34,7 @@ The **input CSV** should have this format:
 
 Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/sample.csv) for a template.
 
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — enter the API keys for the selected providers
-
-The evaluation runs providers in parallel (max 2 at a time), showing the progress as audio files are generated.
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time), showing the progress as audio files are generated.
 
 ## Evaluator configuration
 

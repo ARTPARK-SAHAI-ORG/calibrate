@@ -18,23 +18,17 @@ pip install calibrate-agent
 
 ## Get started
 
-<Note>
-  The interactive CLI requires [Node.js](https://nodejs.org/) to be installed on
-  your system.
-</Note>
+Each command runs directly from its flags:
 
-```bash
-calibrate-agent
-```
+| Command                                                       | Description                                    |
+| ------------------------------------------------------------ | ---------------------------------------------- |
+| `calibrate-agent stt -p deepgram google -i ./data -o ./out`  | STT evaluation — benchmark providers           |
+| `calibrate-agent tts -p openai google -i sample.csv -o ./out`| TTS evaluation — benchmark providers           |
+| `calibrate-agent llm -c config.json -m openai/gpt-4.1`       | LLM evaluation — test agent responses          |
+| `calibrate-agent simulations --type text -c config.json`     | Text or voice simulations                      |
+| `calibrate-agent status`                                     | Check API key configuration and connectivity   |
 
-Launches the interactive main menu where you can select from all available options.
-
-| Command                 | Description                                       |
-| ----------------------- | ------------------------------------------------- |
-| `calibrate-agent stt`         | Interactive STT evaluation — benchmark providers  |
-| `calibrate-agent tts`         | Interactive TTS evaluation — benchmark providers  |
-| `calibrate-agent llm`         | Interactive LLM evaluation — test agent responses |
-| `calibrate-agent simulations` | Interactive text or voice simulations             |
+Run `calibrate-agent <command> -h` to see all options for a command.
 
 ## Next steps
 

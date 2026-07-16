@@ -66,11 +66,10 @@ calibrate-agent = "calibrate_agent.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["ui*", "examples*", "docs*", "images*"]
+exclude = ["examples*", "docs*", "images*"]
 
 [tool.setuptools.package-data]
 "calibrate_agent" = [
-    "ui/cli.bundle.mjs",
     "stt/sarvam_intent_entity/prompt_template.txt",
     "stt/sarvam_llm_wer/prompt_template.txt",
     "stt/semantic_wer/prompt_template.txt",

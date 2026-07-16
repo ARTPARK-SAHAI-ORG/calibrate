@@ -17,10 +17,9 @@ agent simulations — all from a single CLI / Python library.
 - Website / docs: https://calibrate.artpark.ai
 - Built on top of [pipecat](https://github.com/pipecat-ai/pipecat).
 - The CLI entry point is `calibrate-agent` (defined in `pyproject.toml:scripts` →
-  `calibrate_agent.cli:main`).
-
-The repo also ships an **Ink (React) terminal UI** in `ui/` that is bundled into
-the Python package and launched from the CLI.
+  `calibrate_agent.cli:main`). Every command runs directly from its flags — a
+  subcommand invoked without its required args prints an error and exits
+  non-zero.
 
 ## Before making any change
 
@@ -85,11 +84,6 @@ tests/                     # Test suite — mirrors the calibrate_agent/ structu
 │               test_tests_leaderboard.py
 ├── test_connections.py, test_cli.py, test_judges.py,
 │   test_sdk_judge_regressions.py
-
-ui/                        # Ink (React + TypeScript) terminal UI
-├── source/                # *.tsx entry points (app, llm-app, sim-app, etc.)
-├── tests/                 # vitest tests
-└── package.json           # Bundled into calibrate_agent/ui/cli.bundle.mjs
 
 docs/                      # Mintlify docs site (.mdx)
 examples/                  # Example datasets + scripts users can run
