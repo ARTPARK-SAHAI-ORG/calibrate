@@ -66,6 +66,9 @@ from calibrate_agent.rate_limit import (
 
 
 def _default_stt_model(provider: str, language: str | None = None) -> str | None:
+    # Mirrors the model each transcribe_* uses (table, or the Google helper for
+    # the Sindhi exception) so cost prices the model actually benchmarked. If a
+    # provider gains a language-specific model, update it here too.
     if provider == "google":
         model, _region = google_stt_model_and_location(language)
         return model
@@ -92,11 +95,13 @@ def _build_stt_cost_metrics(
     model: str | None = None,
 ) -> dict | None:
     """Build STT cost metrics from audio duration and provider price config."""
-    durations = [
-        float(duration)
-        for duration in (audio_duration_seconds or [])
-        if duration is not None and not pd.isna(duration)
-    ]
+    durations = []
+    excluded_row_indices = []
+    for index, duration in enumerate(audio_duration_seconds or []):
+        if duration is not None and not pd.isna(duration):
+            durations.append(float(duration))
+        else:
+            excluded_row_indices.append(index)
     if not durations:
         return None
 
@@ -105,19 +110,22 @@ def _build_stt_cost_metrics(
         return None
 
     total_seconds = float(sum(durations))
-    audio_minutes = round(total_seconds / 60.0, 4)
+    total_minutes = total_seconds / 60.0
     price_per_minute = pricing["price_per_minute_usd"]
-    return {
+    metrics = {
         "provider": provider,
         "pricing_model": pricing["model"],
         "currency": "USD",
         "billing_unit": "minute",
         "total_seconds": total_seconds,
-        "audio_minutes": audio_minutes,
+        "audio_minutes": round(total_minutes, 4),
         "pricing_source": pricing["pricing_source"],
         "cost_per_minute_usd": price_per_minute,
-        "cost_usd": audio_minutes * price_per_minute,
+        "cost_usd": total_minutes * price_per_minute,
     }
+    if excluded_row_indices:
+        metrics["excluded_row_indices"] = excluded_row_indices
+    return metrics
 
 
 def load_audio(audio_path: Path, as_file: bool = False, raw_pcm: bool = False):
@@ -985,14 +993,8 @@ async def run_stt_eval(
             raise
 
         # Save immediately after each file
-        audio_duration_seconds = get_audio_duration_seconds(audio_path)
         results.append(
-            {
-                "id": gt_info["id"],
-                "gt": gt_info["gt"],
-                "pred": transcript,
-                "audio_duration_seconds": audio_duration_seconds,
-            }
+            _stt_result_row(gt_info["id"], gt_info["gt"], transcript, audio_dir)
         )
         pd.DataFrame(results).to_csv(results_csv_path, index=False)
 

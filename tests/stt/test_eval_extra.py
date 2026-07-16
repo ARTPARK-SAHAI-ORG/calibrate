@@ -885,6 +885,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["audio_minutes"], 1.0)
         self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
         self.assertEqual(metrics["cost_usd"], 0.006)
+        self.assertNotIn("excluded_row_indices", metrics)
 
     def test_builds_cost_metrics_from_multiple_durations(self):
         from calibrate_agent.stt import eval as E
@@ -901,6 +902,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["audio_minutes"], 2.0)
         self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
         self.assertEqual(metrics["cost_usd"], 0.012)
+        self.assertEqual(metrics["excluded_row_indices"], [2])
 
     def test_rounds_audio_minutes_for_cost_metrics(self):
         from calibrate_agent.stt import eval as E
