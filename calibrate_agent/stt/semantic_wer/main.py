@@ -34,9 +34,6 @@ except FileNotFoundError:
         "Please ensure it exists alongside main.py."
     )
 
-# Backwards-compatible alias (older imports referenced PROMPT_TEMPLATE).
-PROMPT_TEMPLATE = SYSTEM_PROMPT
-
 # pipecat's CALCULATE_WER_TOOL, verbatim (Anthropic tool schema). The judge
 # converts this to the OpenAI function-calling shape for OpenRouter; the
 # ``input_schema`` doubles as the OpenAI ``parameters`` object unchanged.
@@ -112,13 +109,3 @@ def build_user_prompt(reference: str, prediction: str) -> str:
         "Follow the process: NORMALIZE → ALIGN → COUNT → VERIFY → CALCULATE\n\n"
         "Show your work clearly, then call calculate_wer with your verified counts."
     )
-
-
-def build_prompt(reference: str, prediction: str) -> str:
-    """System prompt + per-pair user message, concatenated.
-
-    Retained for callers/tests that want the full prompt text as one string.
-    The judge itself sends the two parts as separate system/user messages
-    (see ``judge.py``); the concatenation here is the same text.
-    """
-    return f"{SYSTEM_PROMPT}\n\n{build_user_prompt(reference, prediction)}"

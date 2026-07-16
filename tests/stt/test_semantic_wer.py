@@ -1,8 +1,8 @@
 """Tests for the pipecat-style semantic WER flow (stt/semantic_wer + wiring).
 
-The judge (one holistic LLM call per row) is mocked — no network. Covers the
-pooled/per-row WER formula, the build_prompt template, and that
-semantic WER threads through ``_score_and_write_results`` into metrics.json +
+The judge (two-phase reason-then-tool call per row) is mocked — no network.
+Covers the pooled/per-row WER formula, the prompt/tool text, and that semantic
+WER threads through ``_score_and_write_results`` into metrics.json +
 results.csv when the LLM-judge group is enabled (``run_llm_judges``).
 """
 
@@ -17,13 +17,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pandas as pd
 
 
-class TestBuildPrompt(unittest.TestCase):
-    def test_prompt_includes_pair_and_rules(self):
-        from calibrate_agent.stt.semantic_wer import build_prompt
+class TestPrompt(unittest.TestCase):
+    def test_user_prompt_carries_the_pair(self):
+        from calibrate_agent.stt.semantic_wer import build_user_prompt
 
-        p = build_prompt("transfer to savings", "transfer to checking")
-        self.assertIn("transfer to savings", p)
-        self.assertIn("transfer to checking", p)
+        u = build_user_prompt("transfer to savings", "transfer to checking")
+        self.assertIn("transfer to savings", u)
+        self.assertIn("transfer to checking", u)
+        self.assertIn("call calculate_wer", u)
+
+    def test_system_prompt_is_pipecat_verbatim(self):
+        from calibrate_agent.stt.semantic_wer import SYSTEM_PROMPT as p
+
         # Carries the pipecat-style methodology.
         self.assertIn("NORMALIZE", p)
         self.assertIn("SEMANTIC CHECK", p)

@@ -18,19 +18,15 @@ Reference: https://github.com/pipecat-ai/stt-benchmark
 
 from .main import (
     SYSTEM_PROMPT,
-    PROMPT_TEMPLATE,
     CALCULATE_WER_TOOL,
     build_user_prompt,
-    build_prompt,
 )
 from .judge import semantic_wer_judge, DEFAULT_SEMANTIC_WER_MODEL
 
 __all__ = [
     "SYSTEM_PROMPT",
-    "PROMPT_TEMPLATE",
     "CALCULATE_WER_TOOL",
     "build_user_prompt",
-    "build_prompt",
     "semantic_wer_judge",
     "DEFAULT_SEMANTIC_WER_MODEL",
 ]
