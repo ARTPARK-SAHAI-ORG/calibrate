@@ -10,7 +10,9 @@ explicit calls per pair instead of pipecat's single auto tool-use loop:
             No tool is offered, so it can only produce text.
   Phase 2 — the phase-1 reasoning is replayed and the model is *required* to
             call ``calculate_wer`` (forced ``tool_choice``), committing the
-            counts.
+            counts plus a concise ``summary`` verdict. That summary — not the
+            verbose phase-1 CoT — becomes the row's public ``reasoning``; the raw
+            CoT is kept only in the per-provider debug log.
 
 This guarantees termination in exactly two calls (no nudge loop, no
 runaway-retry worst case) at the cost of one extra call per row versus
@@ -140,7 +142,16 @@ async def semantic_wer_judge(
             _CACHED_SYSTEM_MESSAGE,
             {"role": "user", "content": user_msg},
             {"role": "assistant", "content": reasoning},
-            {"role": "user", "content": "Now call calculate_wer with your final counts."},
+            {
+                "role": "user",
+                "content": (
+                    "Now call calculate_wer with your final counts and a concise "
+                    "`summary` (1-2 sentences, plain language) explaining the "
+                    "semantic errors you counted, or that there were none. The "
+                    "summary is shown publicly — do not restate your step-by-step "
+                    "working."
+                ),
+            },
         ],
         tools=[_OPENAI_TOOL],
         tool_choice=_FORCE_WER_TOOL,
@@ -161,6 +172,11 @@ async def semantic_wer_judge(
         raise ValueError("semantic_wer_judge: forced calculate_wer call was not returned")
     tool_input = json.loads(wer_call.function.arguments)
 
+    # The publicly-shown reasoning is the model's concise phase-2 ``summary``, not
+    # the phase-1 chain-of-thought — the CoT is verbose working-out that leaks
+    # into the leaderboard UI. Fall back to the CoT only if the summary is missing
+    # (older models / truncated calls), so a row is never left without reasoning.
+    summary = (tool_input.get("summary") or "").strip()
     result = {
         "substitutions": int(tool_input.get("substitutions", 0)),
         "deletions": int(tool_input.get("deletions", 0)),
@@ -169,15 +185,17 @@ async def semantic_wer_judge(
         "reference_words": int(tool_input.get("reference_words", 1)),
         "normalized_reference": tool_input.get("normalized_reference") or "",
         "normalized_hypothesis": tool_input.get("normalized_hypothesis") or "",
-        "reasoning": reasoning,
+        "reasoning": summary or reasoning,
     }
 
+    # Persist the full CoT to the per-provider debug log (never the leaderboard):
+    # pipecat likewise keeps the raw reasoning trace only for offline debugging.
     log_judge_io(
         evaluator="semantic_wer",
         model=model,
         system_prompt=SYSTEM_PROMPT,
         user_input=user_msg,
-        output=result,
+        output={**result, "chain_of_thought": reasoning},
     )
 
     if langfuse_enabled and langfuse:

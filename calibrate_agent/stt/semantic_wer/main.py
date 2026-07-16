@@ -8,11 +8,13 @@ via a ``calculate_wer`` tool call. The WER itself is computed in Python from
 those counts (see ``get_semantic_wer_score`` in ``stt/metrics.py``), mirroring
 pipecat's ``_calculate_wer``.
 
-``SYSTEM_PROMPT`` (``prompt_template.txt``) and ``CALCULATE_WER_TOOL`` are
-pipecat's verbatim, so the judge runs the same rules + tool contract pipecat
-does. The judge (``judge.py``) drives them through a tool-calling loop with a
-system/user split, matching pipecat's shape; only the transport (OpenRouter's
-OpenAI-compatible API vs pipecat's native Anthropic SDK) differs.
+``SYSTEM_PROMPT`` (``prompt_template.txt``) is pipecat's verbatim, and
+``CALCULATE_WER_TOOL`` is pipecat's plus one required ``summary`` field (a
+concise, publicly-showable verdict — see below), so the judge runs the same
+rules + tool contract pipecat does. The judge (``judge.py``) drives them through
+a tool-calling loop with a system/user split, matching pipecat's shape; only the
+transport (OpenRouter's OpenAI-compatible API vs pipecat's native Anthropic SDK)
+and the ``summary`` capture differ.
 
 Distinct from ``stt/sarvam_llm_wer`` (Sarvam's approach), which aligns
 deterministically with difflib and only asks the LLM to forgive per-segment
@@ -34,9 +36,15 @@ except FileNotFoundError:
         "Please ensure it exists alongside main.py."
     )
 
-# pipecat's CALCULATE_WER_TOOL, verbatim (Anthropic tool schema). The judge
-# converts this to the OpenAI function-calling shape for OpenRouter; the
-# ``input_schema`` doubles as the OpenAI ``parameters`` object unchanged.
+# pipecat's CALCULATE_WER_TOOL (Anthropic tool schema). The judge converts this
+# to the OpenAI function-calling shape for OpenRouter; the ``input_schema``
+# doubles as the OpenAI ``parameters`` object unchanged.
+#
+# Calibrate addition (not in pipecat): a required ``summary`` field. pipecat
+# keeps the model's full chain-of-thought only for offline debugging and never
+# surfaces it; calibrate shows per-row judge reasoning in the leaderboard UI, so
+# we ask the model to commit a short, publicly-showable verdict alongside the
+# counts instead of leaking the raw CoT. See ``semantic_wer_judge``.
 CALCULATE_WER_TOOL = {
     "name": "calculate_wer",
     "description": "Calculate Word Error Rate from error counts. Call this ONCE after you have normalized, aligned, and verified the texts. WER = (substitutions + deletions + insertions) / reference_words",
@@ -67,6 +75,17 @@ CALCULATE_WER_TOOL = {
                 "type": "string",
                 "description": "The normalized hypothesis text (for verification)",
             },
+            "summary": {
+                "type": "string",
+                "description": (
+                    "A concise, publicly-showable explanation (1-2 sentences, "
+                    "plain language) of the semantic errors you counted, or a "
+                    "brief statement that there were none. Summarize only the "
+                    "verdict and the errors that mattered — do NOT include "
+                    "step-by-step working, normalization steps, or alignment "
+                    "tables."
+                ),
+            },
             "errors": {
                 "type": "array",
                 "description": "List of identified errors",
@@ -93,7 +112,13 @@ CALCULATE_WER_TOOL = {
                 },
             },
         },
-        "required": ["substitutions", "deletions", "insertions", "reference_words"],
+        "required": [
+            "substitutions",
+            "deletions",
+            "insertions",
+            "reference_words",
+            "summary",
+        ],
     },
 }
 
