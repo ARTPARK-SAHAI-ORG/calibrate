@@ -86,7 +86,7 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
         path.write_text(json.dumps(metrics))
         return path
 
-    def test_tts_cost_fans_out_to_scalar_columns(self):
+    def test_only_cost_usd_surfaces(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -100,19 +100,19 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["cost_per_million_chars_currency"], 15.0)
             self.assertEqual(metrics["cost_usd"], 0.03)
-            self.assertNotIn("total_characters", metrics)  # usage, not a cost
+            # Only cost_usd is comparable; everything else stays off the board.
+            self.assertNotIn("cost_per_million_chars_currency", metrics)
+            self.assertNotIn("total_characters", metrics)
             self.assertNotIn("cost", metrics)
 
-    def test_inr_cost_fans_out_native_columns_but_not_fx_rate(self):
+    def test_inr_only_cost_usd_surfaces_not_native_or_fx(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write(tmp, {
                 "cost": {
                     "currency": "INR",
-                    "total_characters": 1000,
                     "cost_per_million_chars_currency": 3000.0,
                     "cost_in_currency": 3.0,
                     "conversion_rate": 96.0,
@@ -121,13 +121,12 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["cost_per_million_chars_currency"], 3000.0)
-            self.assertEqual(metrics["cost_in_currency"], 3.0)
             self.assertEqual(metrics["cost_usd"], 0.03125)
-            # The FX rate is process context, not a per-provider cost column.
+            self.assertNotIn("cost_per_million_chars_currency", metrics)
+            self.assertNotIn("cost_in_currency", metrics)
             self.assertNotIn("conversion_rate", metrics)
 
-    def test_stt_cost_fans_out_to_minute_columns(self):
+    def test_stt_only_cost_usd_surfaces(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -141,26 +140,25 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["cost_per_minute_currency"], 0.006)
             self.assertEqual(metrics["cost_usd"], 0.012)
-            self.assertNotIn("audio_minutes", metrics)  # usage, not a cost
+            self.assertNotIn("cost_per_minute_currency", metrics)
+            self.assertNotIn("audio_minutes", metrics)
 
-    def test_only_cost_figures_surface_not_labels_or_usage(self):
+    def test_cost_without_usd_surfaces_nothing(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write(tmp, {
                 "cost": {
-                    "cost_usd": 0.02,
-                    "total_characters": 500,       # usage, excluded
-                    "pricing_model": "gpt-4o-mini-tts",  # label, excluded
+                    "currency": "INR",
+                    "cost_per_million_chars_currency": 3000.0,
+                    "cost_in_currency": 3.0,
                 },
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["cost_usd"], 0.02)
-            self.assertNotIn("total_characters", metrics)
-            self.assertNotIn("pricing_model", metrics)
+            self.assertNotIn("cost_usd", metrics)
+            self.assertNotIn("cost_in_currency", metrics)
 
 
 class TestLanguageCodes(unittest.TestCase):

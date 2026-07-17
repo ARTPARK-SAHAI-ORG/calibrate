@@ -76,8 +76,8 @@ class TestTTSLeaderboard(unittest.TestCase):
             generate_tts_leaderboard(str(base), str(save_dir))
 
             summary = pd.read_excel(save_dir / "tts_leaderboard.xlsx", sheet_name="summary")
-            self.assertIn("cost_per_million_chars_currency", summary.columns)
             self.assertIn("cost_usd", summary.columns)
+            self.assertNotIn("cost_per_million_chars_currency", summary.columns)
             self.assertNotIn("total_characters", summary.columns)
             self.assertEqual(float(summary.iloc[0]["cost_usd"]), 0.03)
 

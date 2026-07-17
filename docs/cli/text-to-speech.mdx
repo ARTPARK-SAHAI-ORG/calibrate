@@ -120,7 +120,7 @@ Each provider output directory includes:
 
 - `results.csv` with one row per input text (`id`, `text`, `audio_path`, `ttfb`, evaluator scores, and evaluator reasoning).
 - `metrics.json` with evaluator summaries, `ttfb` percentiles, and a `cost` object. Each provider is priced in its **native billing unit** — no unit conversion. Character-billed providers (most) report `billing_unit: "character"`, `total_characters`, and the per-million-character rate (`cost_per_million_chars_currency`); audio-billed providers (OpenAI, Gemini) report `billing_unit: "minute"`, `total_seconds`, `audio_minutes`, and the per-minute rate (`cost_per_minute_currency`), with the audio duration measured from the synthesized output. The rate is denominated in `currency`. Providers billed in a non-USD currency (e.g. Sarvam in INR) report the native-currency total `cost_in_currency` and, when the live exchange rate is reachable, the `conversion_rate` used (native-currency units per 1 USD) and `cost_usd`. If the exchange rate can't be fetched, the native-currency cost is still reported and `cost_usd` is omitted, so that provider is left out of the USD comparison rather than failing the run. `cost_usd` is the metric comparable across all providers.
-- `leaderboard/tts_leaderboard.xlsx` with cost columns in the summary sheet: `cost_per_million_chars_currency`, `cost_per_minute_currency`, and `cost_usd` (only the columns relevant to each provider's billing unit are populated).
+- `leaderboard/tts_leaderboard.xlsx` with a `cost_usd` column in the summary sheet (the one cost figure comparable across providers; per-unit rates and native-currency figures stay in each provider's `metrics.json`).
 
 <Frame>
   <img src="./images/tts_leaderboard.png" alt="TTS leaderboard" />

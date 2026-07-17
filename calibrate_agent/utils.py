@@ -2384,18 +2384,12 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
             if key == "cost" and isinstance(value, dict):
-                # Only cost figures belong on the leaderboard. Usage counts
-                # (characters, audio minutes) are identical across providers for
-                # a given run, so they are not comparison columns.
-                for cost_key in (
-                    "cost_per_minute_currency",
-                    "cost_per_million_chars_currency",
-                    "cost_in_currency",
-                    "cost_usd",
-                ):
-                    scalar = value.get(cost_key)
-                    if isinstance(scalar, (int, float)):
-                        metrics[cost_key] = float(scalar)
+                # Only the USD total is comparable across providers, so it is
+                # the one cost column on the leaderboard. Per-unit rates and
+                # native-currency figures live in each provider's metrics.json.
+                cost_usd = value.get("cost_usd")
+                if isinstance(cost_usd, (int, float)):
+                    metrics["cost_usd"] = float(cost_usd)
             elif isinstance(value, dict) and "mean" in value:
                 metrics[key] = value["mean"]
             elif isinstance(value, dict) and "p50" in value:
