@@ -22,12 +22,18 @@ TTS_DEFAULT_MODELS = {
     "smallest": "lightning-v3.1",
 }
 
-# Per component: (normalized billing unit, price-key stem in pricing_data.json).
-# The currency is appended to the stem (``price_per_minute_usd`` /
-# ``price_per_minute_inr``), so the stored key drives the currency.
-_COMPONENT_UNIT = {
-    "stt": ("minute", "price_per_minute"),
-    "tts": ("character", "price_per_million_chars"),
+# Per component: the billing units it can use, each a
+# (normalized billing unit, price-key stem). STT is always per-minute. TTS is
+# usually per input character, but audio-token-billed models (OpenAI, Gemini)
+# are per output minute — so a TTS model may use either. The currency is
+# appended to the stem (``price_per_minute_usd`` / ``price_per_minute_inr``),
+# so the stored key drives both the unit and the currency.
+_COMPONENT_BILLING = {
+    "stt": (("minute", "price_per_minute"),),
+    "tts": (
+        ("character", "price_per_million_chars"),
+        ("minute", "price_per_minute"),
+    ),
 }
 
 # Checked in order; first key present wins. USD is the default for providers
@@ -47,15 +53,13 @@ def resolve_pricing(
 ) -> dict | None:
     """Return normalized pricing for a provider/model of ``component``.
 
-    ``component`` is ``"stt"`` (per-minute) or ``"tts"``
-    (per-million-character). The returned dict carries the native
-    ``currency`` and the ``native_rate`` in that currency. Returns ``None``
+    ``component`` is ``"stt"`` or ``"tts"``. The returned dict carries the
+    resolved ``billing_unit`` (``"minute"`` or ``"character"``), the native
+    ``currency``, and the ``native_rate`` in that currency. Returns ``None``
     when no price is configured for the resolved provider/model.
     """
-    if component not in _COMPONENT_UNIT:
+    if component not in _COMPONENT_BILLING:
         raise ValueError(f"Unsupported pricing component: {component}")
-
-    billing_unit, price_stem = _COMPONENT_UNIT[component]
 
     provider_key = provider.lower()
     model_name = model or _COMPONENT_DEFAULT_MODELS[component].get(provider_key)
@@ -71,16 +75,17 @@ def resolve_pricing(
     if not isinstance(model_pricing, dict):
         return None
 
-    for currency in _SUPPORTED_CURRENCIES:
-        price = model_pricing.get(f"{price_stem}_{currency}")
-        if isinstance(price, (int, float)) and price >= 0:
-            return {
-                "provider": provider,
-                "model": model_name,
-                "currency": currency.upper(),
-                "billing_unit": billing_unit,
-                "native_rate": float(price),
-            }
+    for billing_unit, price_stem in _COMPONENT_BILLING[component]:
+        for currency in _SUPPORTED_CURRENCIES:
+            price = model_pricing.get(f"{price_stem}_{currency}")
+            if isinstance(price, (int, float)) and price >= 0:
+                return {
+                    "provider": provider,
+                    "model": model_name,
+                    "currency": currency.upper(),
+                    "billing_unit": billing_unit,
+                    "native_rate": float(price),
+                }
     return None
 
 

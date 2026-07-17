@@ -27,6 +27,7 @@ import backoff
 
 from calibrate_agent.utils import (
     get_tts_language_code,
+    get_audio_duration_seconds,
     validate_tts_language,
     provider_log as _log,
     provider_log_file as _current_log_file,
@@ -77,25 +78,47 @@ def _default_tts_model(provider: str, language: str | None = None) -> str | None
 def _build_tts_cost_metrics(
     provider: str,
     texts: list | None,
+    audio_paths: list | None = None,
     model: str | None = None,
 ) -> dict | None:
-    """Build TTS cost metrics from input characters and provider price config.
+    """Build TTS cost metrics from provider price config.
 
-    TTS providers bill per input character, so cost is estimated from the total
-    number of characters synthesized (normalized to a per-million-character
-    rate). Returns ``None`` when there is nothing to price or no pricing is
-    configured for the provider/model.
+    Each provider is priced in its native billing unit — no unit conversion.
+    Character-billed providers cost on the total input characters; audio-billed
+    providers (OpenAI, Gemini) cost on the measured output audio duration read
+    from ``audio_paths``. Returns ``None`` when there is nothing to price or no
+    pricing is configured for the provider/model.
     """
+    pricing = resolve_pricing("tts", provider, model=model)
+    if not pricing:
+        return None
+
+    if pricing["billing_unit"] == "minute":
+        durations = [
+            d
+            for d in (get_audio_duration_seconds(p) for p in (audio_paths or []))
+            if d is not None
+        ]
+        if not durations:
+            return None
+        total_seconds = float(sum(durations))
+        total_minutes = total_seconds / 60.0
+        metrics = {
+            "provider": provider,
+            "pricing_model": pricing["model"],
+            "billing_unit": "minute",
+            "total_seconds": total_seconds,
+            "audio_minutes": round(total_minutes, 4),
+        }
+        metrics.update(cost_breakdown(pricing, total_minutes, "cost_per_minute"))
+        return metrics
+
     total_characters = sum(
         len(str(text))
         for text in (texts or [])
         if text is not None and not (isinstance(text, float) and pd.isna(text))
     )
     if total_characters <= 0:
-        return None
-
-    pricing = resolve_pricing("tts", provider, model=model)
-    if not pricing:
         return None
 
     metrics = {
@@ -1011,6 +1034,7 @@ async def run_single_provider_eval(
         cost_metrics = _build_tts_cost_metrics(
             provider=provider,
             texts=all_texts,
+            audio_paths=all_audio_paths,
             model=_default_tts_model(provider, language),
         )
         metrics_data = await _score_and_write_results(

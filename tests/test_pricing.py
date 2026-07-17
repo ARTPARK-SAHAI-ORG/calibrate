@@ -45,24 +45,35 @@ class TestSTTPricingResolver(unittest.TestCase):
 
 
 class TestTTSPricingResolver(unittest.TestCase):
-    def test_resolves_default_tts_provider_pricing(self):
+    def test_resolves_char_billed_tts_provider(self):
+        from calibrate_agent.pricing import resolve_pricing
+
+        pricing = resolve_pricing("tts", "groq")
+
+        self.assertEqual(pricing["billing_unit"], "character")
+        self.assertEqual(pricing["currency"], "USD")
+        self.assertEqual(pricing["model"], "canopylabs/orpheus-v1-english")
+        self.assertEqual(pricing["native_rate"], 22.0)
+
+    def test_resolves_minute_billed_tts_provider(self):
         from calibrate_agent.pricing import resolve_pricing
 
         pricing = resolve_pricing("tts", "openai")
 
-        self.assertEqual(pricing["billing_unit"], "character")
+        self.assertEqual(pricing["billing_unit"], "minute")
         self.assertEqual(pricing["currency"], "USD")
         self.assertEqual(pricing["model"], "gpt-4o-mini-tts")
-        self.assertEqual(pricing["native_rate"], 15.0)
+        self.assertEqual(pricing["native_rate"], 0.015)
 
     def test_resolves_explicit_tts_model_pricing(self):
         from calibrate_agent.pricing import resolve_pricing
 
         pricing = resolve_pricing("tts", "google", model="gemini-2.5-flash-tts")
 
+        self.assertEqual(pricing["billing_unit"], "minute")
         self.assertEqual(pricing["currency"], "USD")
         self.assertEqual(pricing["model"], "gemini-2.5-flash-tts")
-        self.assertEqual(pricing["native_rate"], 30.0)
+        self.assertEqual(pricing["native_rate"], 0.015)
 
     def test_resolves_all_supported_tts_provider_defaults(self):
         from calibrate_agent.pricing import TTS_DEFAULT_MODELS, resolve_pricing
@@ -77,10 +88,10 @@ class TestTTSPricingResolver(unittest.TestCase):
     def test_provider_lookup_is_case_insensitive(self):
         from calibrate_agent.pricing import resolve_pricing
 
-        pricing = resolve_pricing("tts", "OpenAI", model="gpt-4o-mini-tts")
+        pricing = resolve_pricing("tts", "Groq", model="canopylabs/orpheus-v1-english")
 
-        self.assertEqual(pricing["model"], "gpt-4o-mini-tts")
-        self.assertEqual(pricing["native_rate"], 15.0)
+        self.assertEqual(pricing["model"], "canopylabs/orpheus-v1-english")
+        self.assertEqual(pricing["native_rate"], 22.0)
 
 
 class TestSarvamINRPricing(unittest.TestCase):

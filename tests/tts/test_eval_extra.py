@@ -459,20 +459,46 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
 
 
 class TestTTSCostMetrics(unittest.TestCase):
-    def test_builds_cost_metrics_from_default_pricing(self):
+    def test_char_billed_provider_costs_on_characters(self):
         from calibrate_agent.tts import eval as E
 
         metrics = E._build_tts_cost_metrics(
-            provider="openai",
+            provider="groq",
             texts=["a" * 1_000_000],
-            model="gpt-4o-mini-tts",
+            model="canopylabs/orpheus-v1-english",
         )
 
         self.assertEqual(metrics["billing_unit"], "character")
-        self.assertEqual(metrics["pricing_model"], "gpt-4o-mini-tts")
+        self.assertEqual(metrics["pricing_model"], "canopylabs/orpheus-v1-english")
         self.assertEqual(metrics["total_characters"], 1_000_000)
-        self.assertEqual(metrics["cost_per_million_chars_usd"], 15.0)
-        self.assertEqual(metrics["cost_usd"], 15.0)
+        self.assertEqual(metrics["cost_per_million_chars_usd"], 22.0)
+        self.assertEqual(metrics["cost_usd"], 22.0)
+
+    def test_minute_billed_provider_costs_on_audio_duration(self):
+        from calibrate_agent.tts import eval as E
+
+        with patch.object(E, "get_audio_duration_seconds", return_value=60.0):
+            metrics = E._build_tts_cost_metrics(
+                provider="openai",
+                texts=["hi", "there"],
+                audio_paths=["a.wav", "b.wav"],  # 2 x 60s = 2 min
+                model="gpt-4o-mini-tts",
+            )
+
+        self.assertEqual(metrics["billing_unit"], "minute")
+        self.assertEqual(metrics["pricing_model"], "gpt-4o-mini-tts")
+        self.assertEqual(metrics["total_seconds"], 120.0)
+        self.assertEqual(metrics["audio_minutes"], 2.0)
+        self.assertEqual(metrics["cost_per_minute_usd"], 0.015)
+        self.assertEqual(metrics["cost_usd"], 0.03)
+        self.assertNotIn("total_characters", metrics)
+
+    def test_minute_billed_without_audio_returns_none(self):
+        from calibrate_agent.tts import eval as E
+
+        self.assertIsNone(
+            E._build_tts_cost_metrics("openai", texts=["hi"], model="gpt-4o-mini-tts")
+        )
 
     def test_sums_characters_across_rows_and_ignores_missing(self):
         from calibrate_agent.tts import eval as E
@@ -490,15 +516,15 @@ class TestTTSCostMetrics(unittest.TestCase):
     def test_empty_texts_returns_none(self):
         from calibrate_agent.tts import eval as E
 
-        self.assertIsNone(E._build_tts_cost_metrics("openai", texts=[]))
-        self.assertIsNone(E._build_tts_cost_metrics("openai", texts=[None, ""]))
+        self.assertIsNone(E._build_tts_cost_metrics("groq", texts=[]))
+        self.assertIsNone(E._build_tts_cost_metrics("groq", texts=[None, ""]))
 
     def test_unknown_provider_returns_none(self):
         from calibrate_agent.tts import eval as E
 
         self.assertIsNone(E._build_tts_cost_metrics("madeup", texts=["abcd"]))
 
-    def test_google_sindhi_uses_gemini_pricing_model(self):
+    def test_google_sindhi_is_minute_billed(self):
         from calibrate_agent.tts import eval as E
 
         self.assertEqual(
@@ -506,28 +532,33 @@ class TestTTSCostMetrics(unittest.TestCase):
         )
         self.assertEqual(E._default_tts_model("google", "english"), "chirp3-hd")
 
-        metrics = E._build_tts_cost_metrics(
-            provider="google",
-            texts=["a" * 1_000_000],
-            model=E._default_tts_model("google", "sindhi"),
-        )
+        with patch.object(E, "get_audio_duration_seconds", return_value=120.0):
+            metrics = E._build_tts_cost_metrics(
+                provider="google",
+                texts=["a" * 100],
+                audio_paths=["s.wav"],  # 2 min
+                model=E._default_tts_model("google", "sindhi"),
+            )
         self.assertEqual(metrics["pricing_model"], "gemini-2.5-flash-tts")
-        self.assertEqual(metrics["cost_usd"], 30.0)
+        self.assertEqual(metrics["billing_unit"], "minute")
+        self.assertEqual(metrics["cost_usd"], 0.03)  # 2 min * $0.015
 
     @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
     def test_all_supported_providers_have_cost_pricing(self, _fx):
         from calibrate_agent.tts import eval as E
         from calibrate_agent.tts.eval import TTS_PROVIDERS
 
-        for provider in TTS_PROVIDERS:
-            with self.subTest(provider=provider):
-                metrics = E._build_tts_cost_metrics(
-                    provider=provider,
-                    texts=["a" * 1000],
-                    model=E._default_tts_model(provider, "english"),
-                )
-                self.assertIsNotNone(metrics)
-                self.assertIn("cost_usd", metrics)
+        with patch.object(E, "get_audio_duration_seconds", return_value=60.0):
+            for provider in TTS_PROVIDERS:
+                with self.subTest(provider=provider):
+                    metrics = E._build_tts_cost_metrics(
+                        provider=provider,
+                        texts=["a" * 1000],
+                        audio_paths=["x.wav"],
+                        model=E._default_tts_model(provider, "english"),
+                    )
+                    self.assertIsNotNone(metrics)
+                    self.assertIn("cost_usd", metrics)
 
     @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
     def test_sarvam_tts_cost_reported_in_inr_and_usd(self, _fx):
