@@ -40,7 +40,7 @@
     },
     "smallest": {
       "pulse": {
-        "price_per_minute_usd": 0.005
+        "price_per_minute_usd": 0.003
       }
     }
   },
