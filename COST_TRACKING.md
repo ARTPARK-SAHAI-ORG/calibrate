@@ -18,9 +18,10 @@ caveats to surface anywhere costs are displayed.
 - **Live FX:** `get_usd_to_inr_rate()` in
   [`calibrate_agent/utils.py`](calibrate_agent/utils.py) — fetched once per run
   from Frankfurter (ECB reference rates, no API key), retried with exponential
-  backoff, and cached. There is no hardcoded fallback: a reported INR→USD cost
-  always reflects a real exchange rate, and the run fails if the rate can't be
-  fetched.
+  backoff, and cached. There is no hardcoded fallback, so a reported `cost_usd`
+  always reflects a real exchange rate. If the rate can't be fetched,
+  `cost_breakdown` reports the native-currency cost only and omits `cost_usd`
+  (the provider is left out of the USD comparison; the run continues).
 - **Cost builders:** `_build_stt_cost_metrics` in `stt/eval.py`,
   `_build_tts_cost_metrics` in `tts/eval.py`.
 
@@ -36,19 +37,21 @@ conversion**:
   **minute**, measured from the synthesized `.wav` duration.
 
 Providers billed in a non-USD currency (Sarvam, in INR) report their native
-rate and total, plus the FX `conversion_rate` used; `cost_usd` is always
-present.
+rate and total. When the live FX rate is reachable they also get the
+`conversion_rate` used and `cost_usd`; if it isn't, `cost_usd` is omitted and
+the provider is left out of the USD comparison.
 
 ## Cost object fields
 
 Every `cost` object has: `provider`, `pricing_model`, `billing_unit`,
-`currency`, `cost_usd`.
+`currency`. USD providers always have `cost_usd`; non-USD providers have it only
+when the FX rate was fetched.
 
 | Added when… | Fields |
 | --- | --- |
 | `billing_unit == "minute"` | `total_seconds`, `audio_minutes`, `cost_per_minute_currency` |
 | `billing_unit == "character"` | `total_characters`, `cost_per_million_chars_currency` |
-| `currency != "USD"` | `cost_in_currency` (total in the native currency), `conversion_rate` (native-currency units per 1 USD) |
+| `currency != "USD"` | `cost_in_currency` (total in the native currency); plus `conversion_rate` and `cost_usd` when the live FX rate is available |
 | STT, some rows unreadable | `excluded_row_indices` |
 
 The per-unit rate field is `cost_per_minute_currency` /

@@ -10,6 +10,7 @@ from calibrate_agent.utils import (
     STT_PROVIDER_MODELS,
     TTS_PROVIDER_MODELS,
     get_usd_to_inr_rate,
+    provider_log,
 )
 
 # TTS pricing model labels, single-sourced from utils.TTS_PROVIDER_MODELS.
@@ -100,8 +101,11 @@ def cost_breakdown(
     STT, millions of characters for TTS). The native per-unit rate is reported
     under ``<rate_field_stem>_currency`` (denominated in ``currency``). Non-USD
     providers additionally get the native-currency total (``cost_in_currency``)
-    and the ``conversion_rate`` used (units of the native currency per 1 USD).
-    ``cost_usd`` is always present.
+    and, when the live FX rate is available, the ``conversion_rate`` used (units
+    of the native currency per 1 USD) and ``cost_usd``. For USD providers
+    ``cost_usd`` is always present; for a non-USD provider it is omitted when the
+    FX lookup fails, so that provider is left out of the USD comparison rather
+    than failing the whole run.
     """
     currency = pricing["currency"]
     native_rate = pricing["native_rate"]
@@ -113,12 +117,22 @@ def cost_breakdown(
     }
     if currency == "USD":
         fields["cost_usd"] = cost_native
-    else:
-        # Only INR is supported today; extend here for other currencies.
+        return fields
+
+    # Non-USD (only INR today). Always report the native-currency cost; add the
+    # USD conversion when the live rate is reachable, else report native only.
+    fields["cost_in_currency"] = cost_native
+    try:
         conversion_rate = get_usd_to_inr_rate()  # native units per 1 USD
-        fields["cost_in_currency"] = cost_native
-        fields["conversion_rate"] = conversion_rate
-        fields["cost_usd"] = cost_native / conversion_rate
+    except Exception:
+        provider_log(
+            f"USD->{currency} FX rate unavailable; reporting {currency} cost "
+            f"only for {pricing.get('provider')}, skipping cost_usd.",
+            to_terminal=True,
+        )
+        return fields
+    fields["conversion_rate"] = conversion_rate
+    fields["cost_usd"] = cost_native / conversion_rate
     return fields
 
 

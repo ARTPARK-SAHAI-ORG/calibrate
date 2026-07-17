@@ -140,6 +140,20 @@ class TestCostBreakdown(unittest.TestCase):
         self.assertEqual(fields["conversion_rate"], 100.0)
         self.assertEqual(fields["cost_usd"], 60.0)
 
+    def test_inr_breakdown_omits_usd_when_fx_unavailable(self):
+        from calibrate_agent import pricing as P
+
+        entry = {"currency": "INR", "native_rate": 3000.0, "provider": "sarvam"}
+        with patch.object(P, "get_usd_to_inr_rate", side_effect=RuntimeError("no FX")):
+            fields = P.cost_breakdown(entry, 2.0, "cost_per_million_chars")
+
+        # Native-currency cost is still reported; USD is skipped, not raised.
+        self.assertEqual(fields["currency"], "INR")
+        self.assertEqual(fields["cost_per_million_chars_currency"], 3000.0)
+        self.assertEqual(fields["cost_in_currency"], 6000.0)
+        self.assertNotIn("cost_usd", fields)
+        self.assertNotIn("conversion_rate", fields)
+
 
 class TestPricingResolverGuards(unittest.TestCase):
     def test_unknown_provider_returns_none(self):
