@@ -13,6 +13,7 @@ from typing import Literal, Optional, Any
 
 import aiofiles
 import aiohttp
+import backoff
 import numpy as np
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
@@ -22,6 +23,51 @@ from pipecat.transcriptions.language import Language
 
 # Context variable to track current execution context (BOT or EVAL)
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
+
+
+_usd_to_inr_cache: float | None = None
+
+# Live USD-base FX sources (no API key). Both return {"rates": {"INR": <rate>}}.
+# Tried in order each attempt; a second source guards against one being down or
+# rate-limiting a given IP.
+_FX_ENDPOINTS = (
+    "https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR",
+    "https://open.er-api.com/v6/latest/USD",
+)
+
+
+@backoff.on_exception(backoff.expo, Exception, max_tries=4)
+def _fetch_usd_to_inr() -> float:
+    import urllib.request
+
+    last_error: Exception | None = None
+    for url in _FX_ENDPOINTS:
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": "calibrate-agent"})
+            with urllib.request.urlopen(request, timeout=5) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            rate = float(data["rates"]["INR"])
+            if rate > 0:
+                return rate
+            last_error = ValueError(f"Non-positive USD→INR rate from FX API: {rate}")
+        except Exception as error:  # try the next source before retrying
+            last_error = error
+    raise last_error or RuntimeError("No FX source returned a USD→INR rate")
+
+
+def get_usd_to_inr_rate() -> float:
+    """Return the USD→INR rate (INR per 1 USD), fetched live and cached.
+
+    Fetched once per process from Frankfurter (ECB reference rates, no API key)
+    with exponential-backoff retries, and cached. Raises if the live rate cannot
+    be fetched — there is no hardcoded fallback, so a reported INR→USD cost
+    always reflects a real exchange rate. Used to convert INR-billed provider
+    prices (e.g. Sarvam) to USD for cost reporting.
+    """
+    global _usd_to_inr_cache
+    if _usd_to_inr_cache is None:
+        _usd_to_inr_cache = _fetch_usd_to_inr()
+    return _usd_to_inr_cache
 
 
 def get_audio_duration_seconds(audio_path: str | Path) -> float | None:
@@ -2338,10 +2384,12 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
             if key == "cost" and isinstance(value, dict):
-                for cost_key in ("audio_minutes", "cost_per_minute_usd", "cost_usd"):
-                    scalar = value.get(cost_key)
-                    if isinstance(scalar, (int, float)):
-                        metrics[cost_key] = float(scalar)
+                # Only the USD total is comparable across providers, so it is
+                # the one cost column on the leaderboard. Per-unit rates and
+                # native-currency figures live in each provider's metrics.json.
+                cost_usd = value.get("cost_usd")
+                if isinstance(cost_usd, (int, float)):
+                    metrics["cost_usd"] = float(cost_usd)
             elif isinstance(value, dict) and "mean" in value:
                 metrics[key] = value["mean"]
             elif isinstance(value, dict) and "p50" in value:

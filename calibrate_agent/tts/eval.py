@@ -27,6 +27,7 @@ import backoff
 
 from calibrate_agent.utils import (
     get_tts_language_code,
+    get_audio_duration_seconds,
     validate_tts_language,
     provider_log as _log,
     provider_log_file as _current_log_file,
@@ -34,6 +35,7 @@ from calibrate_agent.utils import (
     get_tts_voice,
     get_gemini_api_key,
 )
+from calibrate_agent.pricing import TTS_DEFAULT_MODELS, cost_breakdown, resolve_pricing
 from calibrate_agent.tts.metrics import get_tts_llm_judge_score
 from calibrate_agent.llm._metrics_utils import _latency_percentiles
 from calibrate_agent.judges import (
@@ -59,6 +61,80 @@ TTS_AUDIO_SUBDIR = "audios"
 # =============================================================================
 # TTS Provider API Methods
 # =============================================================================
+
+
+def _default_tts_model(provider: str, language: str | None = None) -> str | None:
+    """Resolve the pricing model name for a provider/language.
+
+    Sindhi uses a different model for some providers than their default: Google
+    synthesizes it with the synchronous Gemini-TTS model instead of the
+    streaming Chirp3-HD voices, and ElevenLabs uses ``eleven_v3`` instead of
+    ``eleven_multilingual_v2`` (see ``synthesize_google`` / ``synthesize_elevenlabs``).
+    """
+    is_sindhi = bool(language) and language.lower() == "sindhi"
+    if is_sindhi and provider == "google":
+        return "gemini-2.5-flash-tts"
+    if is_sindhi and provider == "elevenlabs":
+        return "eleven_v3"
+    return TTS_DEFAULT_MODELS.get(provider)
+
+
+def _build_tts_cost_metrics(
+    provider: str,
+    texts: list | None,
+    audio_paths: list | None = None,
+    model: str | None = None,
+) -> dict | None:
+    """Build TTS cost metrics from provider price config.
+
+    Each provider is priced in its native billing unit — no unit conversion.
+    Character-billed providers cost on the total input characters; audio-billed
+    providers (OpenAI, Gemini) cost on the measured output audio duration read
+    from ``audio_paths``. Returns ``None`` when there is nothing to price or no
+    pricing is configured for the provider/model.
+    """
+    pricing = resolve_pricing("tts", provider, model=model)
+    if not pricing:
+        return None
+
+    if pricing["billing_unit"] == "minute":
+        durations = [
+            d
+            for d in (get_audio_duration_seconds(p) for p in (audio_paths or []))
+            if d is not None
+        ]
+        if not durations:
+            return None
+        total_seconds = float(sum(durations))
+        total_minutes = total_seconds / 60.0
+        metrics = {
+            "provider": provider,
+            "pricing_model": pricing["model"],
+            "billing_unit": "minute",
+            "total_seconds": total_seconds,
+            "audio_minutes": round(total_minutes, 4),
+        }
+        metrics.update(cost_breakdown(pricing, total_minutes, "cost_per_minute"))
+        return metrics
+
+    total_characters = sum(
+        len(str(text))
+        for text in (texts or [])
+        if text is not None and not (isinstance(text, float) and pd.isna(text))
+    )
+    if total_characters <= 0:
+        return None
+
+    metrics = {
+        "provider": provider,
+        "pricing_model": pricing["model"],
+        "billing_unit": "character",
+        "total_characters": total_characters,
+    }
+    metrics.update(
+        cost_breakdown(pricing, total_characters / 1_000_000.0, "cost_per_million_chars")
+    )
+    return metrics
 
 
 def save_audio(audio_bytes: bytes, output_path: str, sample_rate: int = 24000):
@@ -790,6 +866,7 @@ async def _score_and_write_results(
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
     ttfb_values: list = None,
+    cost_metrics: dict = None,
 ) -> dict:
     """Run the TTS audio judge over (audio_path, text) pairs and write outputs.
 
@@ -799,7 +876,8 @@ async def _score_and_write_results(
 
     When ``ttfb_values`` (aligned with ``ids``) is provided, a ``ttfb`` column
     and TTFB percentile metrics are included; when None (eval-only, where
-    nothing is synthesized) both are omitted.
+    nothing is synthesized) both are omitted. When ``cost_metrics`` is provided
+    it is attached under the ``cost`` key.
     """
     _log("Running evaluators...")
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
@@ -823,6 +901,9 @@ async def _score_and_write_results(
     metrics_data = {}
     for name, score_dict in llm_judge_results["scores"].items():
         metrics_data[name] = score_dict
+
+    if cost_metrics:
+        metrics_data["cost"] = cost_metrics
 
     # TTFB percentile metrics (filter out None/NaN values). Only for the
     # synthesis path — eval-only passes ttfb_values=None.
@@ -954,6 +1035,12 @@ async def run_single_provider_eval(
 
         # Run evaluators, write metrics.json + results.csv (evaluator config
         # goes to the parent output_dir, shared across providers).
+        cost_metrics = _build_tts_cost_metrics(
+            provider=provider,
+            texts=all_texts,
+            audio_paths=all_audio_paths,
+            model=_default_tts_model(provider, language),
+        )
         metrics_data = await _score_and_write_results(
             ids=all_ids,
             texts=all_texts,
@@ -962,6 +1049,7 @@ async def run_single_provider_eval(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             ttfb_values=all_ttfb,
+            cost_metrics=cost_metrics,
         )
 
         return {
