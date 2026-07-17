@@ -97,11 +97,11 @@ def cost_breakdown(
     """Build the cost fields for a metrics ``cost`` object.
 
     ``usage_in_units`` is total usage measured in the billing unit (minutes for
-    STT, millions of characters for TTS). USD-billed providers get the native
-    per-unit rate (``<rate_field_stem>_usd``) and ``cost_usd``. Non-USD
+    STT, millions of characters for TTS). The native per-unit rate is reported
+    under ``<rate_field_stem>_currency`` (denominated in ``currency``). Non-USD
     providers additionally get the native-currency total (``cost_in_currency``)
-    and the live FX rate used (``cost_per_usd`` = units of the native currency
-    per 1 USD). ``cost_usd`` is always present.
+    and the ``conversion_rate`` used (units of the native currency per 1 USD).
+    ``cost_usd`` is always present.
     """
     currency = pricing["currency"]
     native_rate = pricing["native_rate"]
@@ -109,16 +109,16 @@ def cost_breakdown(
 
     fields = {
         "currency": currency,
-        f"{rate_field_stem}_{currency.lower()}": native_rate,
+        f"{rate_field_stem}_currency": native_rate,
     }
     if currency == "USD":
         fields["cost_usd"] = cost_native
     else:
         # Only INR is supported today; extend here for other currencies.
-        fx_per_usd = get_usd_to_inr_rate()
+        conversion_rate = get_usd_to_inr_rate()  # native units per 1 USD
         fields["cost_in_currency"] = cost_native
-        fields["cost_per_usd"] = fx_per_usd
-        fields["cost_usd"] = cost_native / fx_per_usd
+        fields["conversion_rate"] = conversion_rate
+        fields["cost_usd"] = cost_native / conversion_rate
     return fields
 
 

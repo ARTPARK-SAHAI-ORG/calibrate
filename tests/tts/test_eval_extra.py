@@ -471,7 +471,7 @@ class TestTTSCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["billing_unit"], "character")
         self.assertEqual(metrics["pricing_model"], "canopylabs/orpheus-v1-english")
         self.assertEqual(metrics["total_characters"], 1_000_000)
-        self.assertEqual(metrics["cost_per_million_chars_usd"], 22.0)
+        self.assertEqual(metrics["cost_per_million_chars_currency"], 22.0)
         self.assertEqual(metrics["cost_usd"], 22.0)
 
     def test_minute_billed_provider_costs_on_audio_duration(self):
@@ -489,7 +489,7 @@ class TestTTSCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["pricing_model"], "gpt-4o-mini-tts")
         self.assertEqual(metrics["total_seconds"], 120.0)
         self.assertEqual(metrics["audio_minutes"], 2.0)
-        self.assertEqual(metrics["cost_per_minute_usd"], 0.015)
+        self.assertEqual(metrics["cost_per_minute_currency"], 0.015)
         self.assertEqual(metrics["cost_usd"], 0.03)
         self.assertNotIn("total_characters", metrics)
 
@@ -510,7 +510,7 @@ class TestTTSCostMetrics(unittest.TestCase):
         )
 
         self.assertEqual(metrics["total_characters"], 11)
-        self.assertEqual(metrics["cost_per_million_chars_usd"], 22.0)
+        self.assertEqual(metrics["cost_per_million_chars_currency"], 22.0)
         self.assertAlmostEqual(metrics["cost_usd"], 11 / 1_000_000 * 22.0)
 
     def test_empty_texts_returns_none(self):
@@ -571,9 +571,9 @@ class TestTTSCostMetrics(unittest.TestCase):
         )
 
         self.assertEqual(metrics["currency"], "INR")
-        self.assertEqual(metrics["cost_per_million_chars_inr"], 3000.0)
+        self.assertEqual(metrics["cost_per_million_chars_currency"], 3000.0)
         self.assertEqual(metrics["cost_in_currency"], 3000.0)  # 1M chars * ₹3000/1M
-        self.assertEqual(metrics["cost_per_usd"], 96.0)
+        self.assertEqual(metrics["conversion_rate"], 96.0)
         self.assertAlmostEqual(metrics["cost_usd"], 3000.0 / 96.0)
         self.assertNotIn("cost_per_million_chars_usd", metrics)
 

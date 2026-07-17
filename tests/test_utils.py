@@ -90,18 +90,18 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
                 "pronunciation": {"type": "binary", "mean": 0.9},
                 "cost": {
                     "total_characters": 2000,
-                    "cost_per_million_chars_usd": 15.0,
+                    "cost_per_million_chars_currency": 15.0,
                     "cost_usd": 0.03,
                 },
             })
             metrics = read_leaderboard_metrics(path)
 
             self.assertEqual(metrics["total_characters"], 2000.0)
-            self.assertEqual(metrics["cost_per_million_chars_usd"], 15.0)
+            self.assertEqual(metrics["cost_per_million_chars_currency"], 15.0)
             self.assertEqual(metrics["cost_usd"], 0.03)
             self.assertNotIn("cost", metrics)
 
-    def test_inr_cost_fans_out_native_and_fx_columns(self):
+    def test_inr_cost_fans_out_native_and_conversion_columns(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -109,17 +109,17 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
                 "cost": {
                     "currency": "INR",
                     "total_characters": 1000,
-                    "cost_per_million_chars_inr": 3000.0,
+                    "cost_per_million_chars_currency": 3000.0,
                     "cost_in_currency": 3.0,
-                    "cost_per_usd": 96.0,
+                    "conversion_rate": 96.0,
                     "cost_usd": 0.03125,
                 },
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["cost_per_million_chars_inr"], 3000.0)
+            self.assertEqual(metrics["cost_per_million_chars_currency"], 3000.0)
             self.assertEqual(metrics["cost_in_currency"], 3.0)
-            self.assertEqual(metrics["cost_per_usd"], 96.0)
+            self.assertEqual(metrics["conversion_rate"], 96.0)
             self.assertEqual(metrics["cost_usd"], 0.03125)
 
     def test_stt_cost_fans_out_to_minute_columns(self):
@@ -130,14 +130,14 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
                 "wer": 0.1,
                 "cost": {
                     "audio_minutes": 2.0,
-                    "cost_per_minute_usd": 0.006,
+                    "cost_per_minute_currency": 0.006,
                     "cost_usd": 0.012,
                 },
             })
             metrics = read_leaderboard_metrics(path)
 
             self.assertEqual(metrics["audio_minutes"], 2.0)
-            self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
+            self.assertEqual(metrics["cost_per_minute_currency"], 0.006)
             self.assertEqual(metrics["cost_usd"], 0.012)
 
     def test_cost_only_surfaces_numeric_scalars(self):

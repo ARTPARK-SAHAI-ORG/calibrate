@@ -882,7 +882,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["pricing_model"], "gpt-4o-transcribe")
         self.assertEqual(metrics["total_seconds"], 60.0)
         self.assertEqual(metrics["audio_minutes"], 1.0)
-        self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
+        self.assertEqual(metrics["cost_per_minute_currency"], 0.006)
         self.assertEqual(metrics["cost_usd"], 0.006)
         self.assertNotIn("excluded_row_indices", metrics)
 
@@ -898,7 +898,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["billing_unit"], "minute")
         self.assertEqual(metrics["total_seconds"], 120.0)
         self.assertEqual(metrics["audio_minutes"], 2.0)
-        self.assertEqual(metrics["cost_per_minute_usd"], 0.006)
+        self.assertEqual(metrics["cost_per_minute_currency"], 0.006)
         self.assertEqual(metrics["cost_usd"], 0.012)
         self.assertEqual(metrics["excluded_row_indices"], [2])
 
@@ -964,9 +964,9 @@ class TestSTTCostMetrics(unittest.TestCase):
         )
 
         self.assertEqual(metrics["currency"], "INR")
-        self.assertEqual(metrics["cost_per_minute_inr"], 0.5)
+        self.assertEqual(metrics["cost_per_minute_currency"], 0.5)
         self.assertEqual(metrics["cost_in_currency"], 1.0)  # 2 min * ₹0.5
-        self.assertEqual(metrics["cost_per_usd"], 96.0)
+        self.assertEqual(metrics["conversion_rate"], 96.0)
         self.assertAlmostEqual(metrics["cost_usd"], 1.0 / 96.0)
         self.assertNotIn("cost_per_minute_usd", metrics)
 

@@ -122,12 +122,12 @@ class TestCostBreakdown(unittest.TestCase):
         fields = cost_breakdown(pricing, 2.0, "cost_per_minute")
 
         self.assertEqual(fields["currency"], "USD")
-        self.assertEqual(fields["cost_per_minute_usd"], 0.006)
+        self.assertEqual(fields["cost_per_minute_currency"], 0.006)
         self.assertEqual(fields["cost_usd"], 0.012)
         self.assertNotIn("cost_in_currency", fields)
-        self.assertNotIn("cost_per_usd", fields)
+        self.assertNotIn("conversion_rate", fields)
 
-    def test_inr_breakdown_includes_native_and_fx(self):
+    def test_inr_breakdown_includes_native_and_conversion(self):
         from calibrate_agent import pricing as P
 
         entry = {"currency": "INR", "native_rate": 3000.0}
@@ -135,9 +135,9 @@ class TestCostBreakdown(unittest.TestCase):
             fields = P.cost_breakdown(entry, 2.0, "cost_per_million_chars")
 
         self.assertEqual(fields["currency"], "INR")
-        self.assertEqual(fields["cost_per_million_chars_inr"], 3000.0)
+        self.assertEqual(fields["cost_per_million_chars_currency"], 3000.0)
         self.assertEqual(fields["cost_in_currency"], 6000.0)
-        self.assertEqual(fields["cost_per_usd"], 100.0)
+        self.assertEqual(fields["conversion_rate"], 100.0)
         self.assertEqual(fields["cost_usd"], 60.0)
 
 

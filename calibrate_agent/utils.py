@@ -2378,13 +2378,11 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
                 # surface, so a run only emits its own component's columns.
                 for cost_key in (
                     "audio_minutes",
-                    "cost_per_minute_usd",
-                    "cost_per_minute_inr",
+                    "cost_per_minute_currency",
                     "total_characters",
-                    "cost_per_million_chars_usd",
-                    "cost_per_million_chars_inr",
+                    "cost_per_million_chars_currency",
                     "cost_in_currency",
-                    "cost_per_usd",
+                    "conversion_rate",
                     "cost_usd",
                 ):
                     scalar = value.get(cost_key)
