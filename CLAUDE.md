@@ -108,6 +108,11 @@ are acronyms (API, LLM, STT, TTS, WER, TTFB, PR, HTML, URL) and proper nouns
 (Calibrate, GitHub, Mintlify, Markdown). Match this when adding or editing any
 `.mdx` page.
 
+Write docs standalone — a reader never saw the change history or our chat. State
+what the feature *is*, never what it changed from, what it's "not", or what was
+requested (see "Never leak the conversation into long-lived text" under Things
+to keep in mind).
+
 Some pages are **generated** from templates in `docs/templates/` by
 `scripts/fetch_public_openapi.py` (which single-sources the backend host from
 `PUBLIC_API_BASE_URL` — never hardcode it). Edit the template, not the generated
@@ -399,6 +404,15 @@ one line, but still give the exact command.
   "master" but the repo and all CI configs use `main`.
 - **Don't add comments unless the why is non-obvious.** The codebase follows
   the rule from the global guidelines: comments explain *why*, not *what*.
+- **Never leak the conversation into long-lived text.** Code comments, docs,
+  commit-persisted files, and CLAUDE.md are read cold by someone who never saw
+  our chat. Write them as if authored fresh: state what *is*, not what changed,
+  what it's "not", what was "removed", or what someone asked for. Ban words like
+  "now", "previously", "still", "no longer", "as requested", "instead of X",
+  "note that we don't…" — anything that only makes sense relative to a prior
+  version or a request. If a distinction matters on its own (a real limitation,
+  a gotcha), state it plainly without the reactive framing. This applies to
+  every file you write, not just docs.
 - **Prefer editing existing files** over creating new ones — especially in
   `stt/`, `tts/`, and `llm/`, where the structure is mirrored 1-to-1 in
   `tests/`.
