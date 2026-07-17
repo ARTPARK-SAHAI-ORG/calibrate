@@ -22,9 +22,9 @@ Calibrate provides the following commands:
 
 | Command                                                       | Description                                    |
 | ------------------------------------------------------------ | ---------------------------------------------- |
-| `calibrate-agent stt -p deepgram google -i ./data -o ./out`  | STT evaluation — benchmark providers           |
-| `calibrate-agent tts -p openai google -i sample.csv -o ./out`| TTS evaluation — benchmark providers           |
-| `calibrate-agent llm -c config.json -m openai/gpt-4.1`       | LLM evaluation — test agent responses          |
+| `calibrate-agent stt -p deepgram google -i ./data -o ./out`  | Benchmark STT providers                        |
+| `calibrate-agent tts -p openai google -i sample.csv -o ./out`| Benchmark TTS providers                        |
+| `calibrate-agent llm -c config.json -m openai/gpt-4.1`       | Test agent responses and tool calls            |
 | `calibrate-agent simulations --type text -c config.json`     | Text or voice simulations                      |
 | `calibrate-agent general --dataset data.json -c config.json` | Score arbitrary `{id, input, output}` pairs with an LLM judge |
 | `calibrate-agent status`                                     | Check API key configuration and connectivity   |

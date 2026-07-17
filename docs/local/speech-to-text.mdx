@@ -68,7 +68,7 @@ When the run finishes, it prints a summary leaderboard to your terminal and writ
 
 Each provider can be run through one of two engines, chosen with `--engine`:
 
-- **`pipeline`** (the default) feeds each clip through a real pipecat pipeline at real-time pace, using the same STT setup your live voice agent runs, following the methodology of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark). The accuracy scores then match what your agent gets in production, and the run also measures latency: the gap between the speaker stopping and the final transcript arriving (TTFS). Running in real time makes it slower.
+- **`pipeline`** (the default) feeds each clip through a real pipecat pipeline at real-time pace, using the same STT setup your live voice agent runs, following the methodology of [pipecat's STT benchmark](https://github.com/pipecat-ai/stt-benchmark). The accuracy scores then match what your agent gets in production, and the run also measures latency: the gap between the speaker stopping and the final transcript arriving (TTFS). Running in real time makes it slower.
 - **`direct`** sends each clip straight to the provider's transcription SDK. It is faster and fine for a quick accuracy-only comparison, but it reports no latency.
 
 ```bash
@@ -164,7 +164,7 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 Alongside classic WER/CER, every run also computes a set of LLM-based judges tuned for Indian-language ASR. They all run by default; pass `--skip-llm-judges` to report WER/CER only.
 
 - **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER**: adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which makes the case that raw WER is a poor accuracy signal for Indic speech.
-- **Semantic WER**: a meaning-aware word error rate in the style of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
+- **Semantic WER**: a meaning-aware word error rate in the style of [pipecat's STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
 
 These appear as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, alongside the `semantic_match` evaluator above.
 
