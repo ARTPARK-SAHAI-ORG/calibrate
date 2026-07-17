@@ -2,7 +2,7 @@
   "stt": {
     "deepgram": {
       "nova-3": {
-        "price_per_minute_usd": 0.0043
+        "price_per_minute_usd": 0.0048
       }
     },
     "openai": {
@@ -30,7 +30,7 @@
     },
     "elevenlabs": {
       "scribe_v2_realtime": {
-        "price_per_minute_usd": 0.0036666667
+        "price_per_minute_usd": 0.0065
       }
     },
     "cartesia": {
@@ -40,7 +40,7 @@
     },
     "smallest": {
       "pulse": {
-        "price_per_minute_usd": 0.008
+        "price_per_minute_usd": 0.005
       }
     }
   },
