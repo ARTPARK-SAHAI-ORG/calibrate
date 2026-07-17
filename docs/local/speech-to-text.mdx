@@ -62,7 +62,7 @@ Set the API keys for the selected providers in your environment (or a `.env` fil
 
 ## Evaluator configuration
 
-By default, a text LLM judge — routed through [OpenRouter](https://openrouter.ai/) (set `OPENROUTER_API_KEY` in your environment) — evaluates whether each transcription matches the reference text semantically using the built-in **`semantic_match`** evaluator; expand **Default evaluator: semantic_match** below for the exact `system_prompt` from the codebase. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
+By default, a built-in **`semantic_match`** evaluator uses a text LLM judge to check whether each transcription matches the reference text semantically. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
 
 ```bash
 calibrate-agent stt -p deepgram google -i ./data -o ./out --config config.json
@@ -109,7 +109,9 @@ Each evaluator also accepts:
 
 Binary evaluators produce per-row pass/fail and a mean pass-rate. Rating evaluators produce an integer score on your scale and a mean score in the leaderboard.
 
-When multiple evaluators are defined, each is scored independently — one LLM call per evaluator per row, all run in parallel — and appears as a separate column in the results and leaderboard.
+When multiple evaluators are defined, each is scored independently (one LLM call per evaluator per row, all run in parallel) and appears as a separate column in the results and leaderboard.
+
+Every judge call routes through [OpenRouter](https://openrouter.ai/), so set `OPENROUTER_API_KEY` in your environment before running.
 
 Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/config.json) for a template.
 

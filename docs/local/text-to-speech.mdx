@@ -38,7 +38,7 @@ Set the API keys for the selected providers in your environment (or a `.env` fil
 
 ## Evaluator configuration
 
-By default, an audio LLM judge — routed through [OpenRouter](https://openrouter.ai/) (set `OPENROUTER_API_KEY` in your environment) — evaluates whether the reference text is pronounced correctly in the synthesized audio using the built-in **`pronunciation`** evaluator; expand **Default evaluator: pronunciation** below for the exact `system_prompt` from the codebase. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
+By default, a built-in **`pronunciation`** evaluator uses an audio LLM judge to check whether the reference text is pronounced correctly in the synthesized audio. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
 
 ```bash
 calibrate-agent tts -p openai google -i sample.csv -o ./out --config config.json
@@ -73,7 +73,7 @@ The config file supports:
 | `evaluators[].id`            | string | Optional unique id. Output `config.json` includes the raw `evaluators` list and an `evaluators_map` from id to name.                                                                                                                                                                                                                                                                |
 | `evaluators[].name`          | string | Unique evaluator name. Becomes the column name in the leaderboard.                                                                                                                                                                                                                                                                                                                  |
 | `evaluators[].system_prompt` | string | Full system prompt used for this evaluator's audio LLM judge call.                                                                                                                                                                                                                                                                                                                  |
-| `evaluators[].judge_model`   | string | OpenRouter model id for this evaluator (default: `openai/gpt-audio`). Must be an audio-capable model in the [OpenRouter catalog](https://openrouter.ai/models) — for example OpenAI’s audio models or Google’s Gemini audio-capable entries; the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) uses `google/gemini-2.5-flash`. |
+| `evaluators[].judge_model`   | string | OpenRouter model id for this evaluator (default: `openai/gpt-audio`). Must be an audio-capable model in the [OpenRouter catalog](https://openrouter.ai/models), for example OpenAI’s audio models or Google’s Gemini audio-capable entries; the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) uses `google/gemini-2.5-flash`. |
 
 Each evaluator also accepts:
 
@@ -85,7 +85,9 @@ Each evaluator also accepts:
 
 Binary evaluators produce per-row pass/fail and a mean pass-rate. Rating evaluators produce an integer score on your scale and a mean score in the leaderboard.
 
-When multiple evaluators are defined, each is scored independently — one audio LLM call per evaluator per row, all run in parallel — and appears as a separate column in the results and leaderboard.
+When multiple evaluators are defined, each is scored independently (one audio LLM call per evaluator per row, all run in parallel) and appears as a separate column in the results and leaderboard.
+
+Every judge call routes through [OpenRouter](https://openrouter.ai/), so set `OPENROUTER_API_KEY` in your environment before running.
 
 Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) for a template.
 
