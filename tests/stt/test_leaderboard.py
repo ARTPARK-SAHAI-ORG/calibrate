@@ -102,9 +102,9 @@ class TestSTTLeaderboard(unittest.TestCase):
             generate_stt_leaderboard(str(base), str(save_dir))
 
             summary = pd.read_excel(save_dir / "stt_leaderboard.xlsx", sheet_name="summary")
-            self.assertIn("audio_minutes", summary.columns)
             self.assertIn("cost_per_minute_currency", summary.columns)
             self.assertIn("cost_usd", summary.columns)
+            self.assertNotIn("audio_minutes", summary.columns)
             self.assertEqual(float(summary.iloc[0]["cost_usd"]), 0.012)
 
     def test_skips_existing_leaderboard_folder(self):

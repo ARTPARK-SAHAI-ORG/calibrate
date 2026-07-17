@@ -2384,13 +2384,11 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
     if isinstance(data, dict) and "metric_name" not in data:
         for key, value in data.items():
             if key == "cost" and isinstance(value, dict):
-                # STT cost keys are per-minute; TTS cost keys are per-character.
-                # Both share ``cost_usd``. Only keys present in the object
-                # surface, so a run only emits its own component's columns.
+                # Only cost figures belong on the leaderboard. Usage counts
+                # (characters, audio minutes) are identical across providers for
+                # a given run, so they are not comparison columns.
                 for cost_key in (
-                    "audio_minutes",
                     "cost_per_minute_currency",
-                    "total_characters",
                     "cost_per_million_chars_currency",
                     "cost_in_currency",
                     "cost_usd",

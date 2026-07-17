@@ -100,9 +100,9 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["total_characters"], 2000.0)
             self.assertEqual(metrics["cost_per_million_chars_currency"], 15.0)
             self.assertEqual(metrics["cost_usd"], 0.03)
+            self.assertNotIn("total_characters", metrics)  # usage, not a cost
             self.assertNotIn("cost", metrics)
 
     def test_inr_cost_fans_out_native_columns_but_not_fx_rate(self):
@@ -141,25 +141,26 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["audio_minutes"], 2.0)
             self.assertEqual(metrics["cost_per_minute_currency"], 0.006)
             self.assertEqual(metrics["cost_usd"], 0.012)
+            self.assertNotIn("audio_minutes", metrics)  # usage, not a cost
 
-    def test_cost_only_surfaces_numeric_scalars(self):
+    def test_only_cost_figures_surface_not_labels_or_usage(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             path = self._write(tmp, {
                 "cost": {
-                    "total_characters": 500,
-                    "pricing_model": "gpt-4o-mini-tts",
+                    "cost_usd": 0.02,
+                    "total_characters": 500,       # usage, excluded
+                    "pricing_model": "gpt-4o-mini-tts",  # label, excluded
                 },
             })
             metrics = read_leaderboard_metrics(path)
 
-            self.assertEqual(metrics["total_characters"], 500.0)
+            self.assertEqual(metrics["cost_usd"], 0.02)
+            self.assertNotIn("total_characters", metrics)
             self.assertNotIn("pricing_model", metrics)
-            self.assertNotIn("cost_usd", metrics)
 
 
 class TestLanguageCodes(unittest.TestCase):
