@@ -34,7 +34,27 @@ The **input CSV** should have this format:
 
 Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/sample.csv) for a template.
 
-Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time), showing the progress as audio files are generated.
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (2 at a time by default; tune with `--max-parallel`), showing progress as audio files are generated.
+
+When the run finishes, it prints a summary leaderboard to your terminal and writes the following under each provider's output directory:
+
+```
+<output-dir>/<provider>/
+├── audios/
+│   └── <id>.wav          # one synthesized clip per input row
+├── results.csv           # per row: id, text, audio_path, ttfb, evaluator scores + reasoning
+├── metrics.json          # aggregate evaluator scores and TTFB latency
+└── leaderboard/
+    └── tts_leaderboard.xlsx
+```
+
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/core-concepts/text-to-speech#metrics"
+>
+  Detailed explanation of all metrics and how an LLM judge works
+</Card>
 
 ## Evaluator configuration
 
@@ -99,7 +119,7 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 
 <AccordionGroup>
   <Accordion title="pronunciation (default evaluator system prompt)">
-    Matches [`DEFAULT_TTS_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate/judges.py) in `calibrate/judges.py` when no `--config` is passed.
+    Matches [`DEFAULT_TTS_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate_agent/judges.py) in `calibrate_agent/judges.py` when no `--config` is passed.
 
     ```text
     You are a highly accurate evaluator evaluating the audio output of a TTS model.
@@ -111,28 +131,6 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 
   </Accordion>
 </AccordionGroup>
-
-## Output
-
-Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.
-
-<Frame>
-  <img src="./images/tts_leaderboard.png" alt="TTS leaderboard" />
-</Frame>
-
-You can also view the generated audio and metrics for each row of your dataset including the LLM judge score and reasoning. Use the arrow keys to navigate rows and press **Enter** or **p** to play the generated audio.
-
-<Frame>
-  <img src="./images/tts_output_provider.png" alt="TTS provider outputs" />
-</Frame>
-
-<Card
-  title="Learn more about metrics"
-  icon="chart-bar"
-  href="/core-concepts/text-to-speech#metrics"
->
-  Detailed explanation of all metrics and how LLM Judge works
-</Card>
 
 ## Evaluate an existing dataset
 
