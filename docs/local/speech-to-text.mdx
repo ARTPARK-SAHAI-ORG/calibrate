@@ -68,7 +68,7 @@ When the run finishes, it prints a summary leaderboard to your terminal and writ
 
 Each provider can be run through one of two engines, chosen with `--engine`:
 
-- **`pipeline`** (the default) streams every clip through a real pipecat agent pipeline at real-time pace, using the same STT configuration your live voice agent deploys. It reflects the accuracy and behavior an agent actually sees in production, and it also measures time-to-final-transcript (TTFS) latency. Because it runs in real time, it is slower.
+- **`pipeline`** (the default) streams every clip through a real pipecat agent pipeline at real-time pace, using the same STT configuration your live voice agent deploys, following the methodology of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark). It reflects the accuracy and behavior an agent actually sees in production, and it also measures time-to-final-transcript (TTFS) latency. Because it runs in real time, it is slower.
 - **`direct`** sends each clip straight to the provider's transcription SDK. It is much faster and is good for a quick accuracy-only comparison, but it does not measure latency.
 
 ```bash
@@ -76,8 +76,6 @@ calibrate-agent stt -p deepgram google -i ./data -o ./out --engine direct
 ```
 
 Both engines evaluate multiple providers at once and multiple clips per provider at once. `--max-parallel` controls how many providers run together and `--max-concurrency` how many clips per provider. The `pipeline` engine defaults both to `1` so the latency numbers stay uncontended; `direct` defaults higher since it has no latency to protect.
-
-This methodology follows the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
 
 ## Evaluator configuration
 
