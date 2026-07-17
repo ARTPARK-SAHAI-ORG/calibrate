@@ -60,21 +60,45 @@ class TestSimulationLeaderboard(unittest.TestCase):
             csv = base / "lb" / "simulation_leaderboard.csv"
             self.assertTrue(csv.exists())
 
-    def test_latency_metric_shown_as_seconds_and_excluded_from_overall(self):
+    def test_latency_percentiles_fanned_out_and_excluded_from_overall(self):
         from calibrate_agent.llm.simulation_leaderboard import _read_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             _write(base, "m1", {
                 "accuracy": {"type": "binary", "mean": 0.8},
+                "e2e_latency": {
+                    "type": "latency",
+                    "p50": 1.0,
+                    "p95": 2.5,
+                    "p99": 3.2,
+                    "count": 12,
+                },
+            })
+            display, normalized, info = _read_metrics(base / "m1" / "metrics.json")
+
+        # Latency fans into raw-second percentile columns; binary is scaled to %.
+        self.assertEqual(display["e2e_latency_p50"], 1.0)
+        self.assertEqual(display["e2e_latency_p95"], 2.5)
+        self.assertEqual(display["e2e_latency_p99"], 3.2)
+        self.assertEqual(display["accuracy"], 80.0)
+        # Latency columns are kept out of the normalized set → out of `overall`.
+        self.assertNotIn("e2e_latency_p50", normalized)
+        self.assertNotIn("e2e_latency_p95", normalized)
+        self.assertNotIn("e2e_latency_p99", normalized)
+        self.assertEqual(info["e2e_latency_p50"], {"type": "latency"})
+
+    def test_legacy_latency_mean_still_shown_as_seconds(self):
+        from calibrate_agent.llm.simulation_leaderboard import _read_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write(base, "m1", {
                 "e2e_latency": {"type": "latency", "mean": 2.5},
             })
             display, normalized, info = _read_metrics(base / "m1" / "metrics.json")
 
-        # Latency shows raw seconds, binary is scaled to %.
         self.assertEqual(display["e2e_latency"], 2.5)
-        self.assertEqual(display["accuracy"], 80.0)
-        # Latency is kept out of the normalized set → excluded from `overall`.
         self.assertNotIn("e2e_latency", normalized)
         self.assertEqual(info["e2e_latency"], {"type": "latency"})
 

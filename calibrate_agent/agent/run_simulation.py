@@ -37,6 +37,7 @@ from calibrate_agent.utils import (
     TRANSCRIPT_FILE_NAME,
 )
 from calibrate_agent.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
+from calibrate_agent.llm._metrics_utils import _latency_percentiles
 from calibrate_agent.stt.metrics import (
     get_llm_judge_score as stt_llm_judge_score,
     DEFAULT_STT_JUDGE_MODEL,
@@ -1942,6 +1943,7 @@ async def _run_simulation_inner(
         "ttft": ttft_dict,
         "processing_time": processing_time_dict,
         "e2e_latency": e2e_latency_mean,
+        "e2e_latency_samples": list(latency_tracker.deltas),
         "evaluation_results": evaluation_results,
         "stt_llm_judge": stt_llm_judge_result,
     }
@@ -2323,6 +2325,13 @@ async def _run_single_simulation_inner(
         e2e_latency = simulation_result.get("metrics", {}).get("e2e_latency")
         if e2e_latency is not None:
             sim_metrics_row["e2e_latency"] = e2e_latency
+        # Raw per-turn deltas ride along so the aggregate can pool them into
+        # p50/p95/p99. Dropped before results.csv is written (see aggregation).
+        e2e_latency_samples = simulation_result.get("metrics", {}).get(
+            "e2e_latency_samples"
+        )
+        if e2e_latency_samples:
+            sim_metrics_row["e2e_latency_samples"] = e2e_latency_samples
 
         return (
             sim_metrics_row,
@@ -2412,7 +2421,7 @@ async def main():
     all_simulation_metrics = []
     metrics_by_criterion = defaultdict(list)
     stt_llm_judge_scores = []
-    e2e_latencies = []
+    e2e_latency_samples: list = []
 
     # Collect metrics from results
     failed_simulations = []
@@ -2426,10 +2435,13 @@ async def main():
         if sim_metrics_row is None:
             continue
 
-        all_simulation_metrics.append(sim_metrics_row)
+        # Pop the raw per-turn deltas before the row becomes a results.csv line
+        # (a list column would serialize badly); pool them for the percentiles.
+        samples = sim_metrics_row.pop("e2e_latency_samples", None)
+        if samples:
+            e2e_latency_samples.extend(float(s) for s in samples)
 
-        if sim_metrics_row.get("e2e_latency") is not None:
-            e2e_latencies.append(float(sim_metrics_row["e2e_latency"]))
+        all_simulation_metrics.append(sim_metrics_row)
 
         # Evaluation criteria metrics (value works for both binary 0/1 and rating score)
         for eval_result in evaluation_results:
@@ -2483,12 +2495,18 @@ async def main():
             stt_llm_judge_scores
         )
 
-    # Aggregate sim-side end-to-end latency (seconds). Typed "latency" so the
-    # leaderboard shows raw seconds and keeps it out of the pass-rate `overall`.
-    if e2e_latencies:
+    # Aggregate sim-side end-to-end latency (seconds) into p50/p95/p99 over every
+    # per-turn response delay pooled across all conversations. Typed "latency" so
+    # the leaderboard shows raw seconds and keeps it out of the pass-rate
+    # `overall`.
+    latency_pct = _latency_percentiles(e2e_latency_samples)
+    if latency_pct is not None:
         metrics_summary["e2e_latency"] = {
             "type": "latency",
-            "mean": float(np.mean(e2e_latencies)),
+            "p50": latency_pct["p50"],
+            "p95": latency_pct["p95"],
+            "p99": latency_pct["p99"],
+            "count": latency_pct["count"],
         }
 
     # Save overall results.csv

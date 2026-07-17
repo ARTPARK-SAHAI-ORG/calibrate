@@ -494,6 +494,29 @@ class TestEndToEndLatencyTracker(unittest.TestCase):
         self.assertEqual(len(tracker.deltas), 1)
         self.assertGreater(tracker.mean(), 0)
 
+    def test_accumulates_one_delta_per_turn_for_pooling(self):
+        from calibrate_agent.agent.run_simulation import EndToEndLatencyTracker
+
+        loop = asyncio.new_event_loop()
+
+        async def scenario():
+            tracker = EndToEndLatencyTracker()
+            for _ in range(3):
+                tracker.mark_user_turn_end()
+                await asyncio.sleep(0.01)
+                tracker.mark_agent_audio()
+            return tracker
+
+        try:
+            tracker = loop.run_until_complete(scenario())
+        finally:
+            loop.close()
+
+        # One delta recorded per turn — these raw samples are what the aggregate
+        # pools across conversations to compute p50/p95/p99.
+        self.assertEqual(len(tracker.deltas), 3)
+        self.assertTrue(all(d > 0 for d in tracker.deltas))
+
 
 class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
     """A new bot utterance must clear stale interrupt flags.

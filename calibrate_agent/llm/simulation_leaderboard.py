@@ -80,14 +80,21 @@ def _read_metrics(
     info: Dict[str, dict] = {}
 
     for metric_name, metric_data in data.items():
+        if isinstance(metric_data, dict) and metric_data.get("type") == "latency":
+            # Latency is seconds, not a pass-rate — fan p50/p95/p99 into their own
+            # display columns and keep them out of ``normalized`` so they never
+            # skew the ``overall`` score. Older runs carry a single ``mean``.
+            pct_cols = [p for p in ("p50", "p95", "p99") if p in metric_data]
+            if pct_cols:
+                for pct in pct_cols:
+                    display[f"{metric_name}_{pct}"] = float(metric_data[pct])
+                    info[f"{metric_name}_{pct}"] = {"type": "latency"}
+            elif "mean" in metric_data:
+                display[metric_name] = float(metric_data["mean"])
+                info[metric_name] = {"type": "latency"}
+            continue
         if isinstance(metric_data, dict) and "mean" in metric_data:
             mean = float(metric_data["mean"])
-            if metric_data.get("type") == "latency":
-                # Latency is seconds, not a pass-rate — show it as-is and keep it
-                # out of ``normalized`` so it never skews the ``overall`` score.
-                display[metric_name] = mean
-                info[metric_name] = {"type": "latency"}
-                continue
             is_rating_metric = metric_data.get("type") == "rating"
             if is_rating_metric:
                 display[metric_name] = mean
