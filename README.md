@@ -28,7 +28,7 @@ calibrate-agent llm -c config.json -m openai/gpt-4.1         # LLM evaluation
 calibrate-agent simulations --type text -c config.json      # Text or voice simulations
 ```
 
-- [CLI Documentation](https://calibrate.artpark.ai/docs/cli/overview)
+- [CLI Documentation](https://calibrate.artpark.ai/docs/local/overview)
 
 ## Contributing
 

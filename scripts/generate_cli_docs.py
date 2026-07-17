@@ -57,8 +57,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = REPO_ROOT / "docs"
 DOCS_JSON = DOCS_ROOT / "docs.json"
 DEFAULT_OPENAPI = DOCS_ROOT / "api-reference" / "openapi.json"
-OUTPUT_ROOT = DOCS_ROOT / "cli" / "calibrate"
-TEMPLATE_DIR = REPO_ROOT / "docs" / "templates" / "cli" / "calibrate"
+OUTPUT_ROOT = DOCS_ROOT / "cli"
+TEMPLATE_DIR = REPO_ROOT / "docs" / "templates" / "cli"
 
 TAB_NAME = "CLI"
 INSERT_AFTER_TAB = ("API reference", "Home")
@@ -382,7 +382,7 @@ def _copy_getting_started(
         for token, value in substitutions.items():
             text = text.replace(token, value)
         (output_root / f"{name}.mdx").write_text(text, encoding="utf-8")
-        page_ids.append(f"cli/calibrate/{name}")
+        page_ids.append(f"cli/{name}")
     return page_ids
 
 
@@ -398,7 +398,7 @@ def global_flags_table(root_cmd: CliCommand | None) -> str:
 
 
 def _prune_stale(output_root: Path, keep_page_ids: set[str]) -> list[Path]:
-    docs_root = output_root.parents[1]
+    docs_root = output_root.parent
     removed: list[Path] = []
     for mdx in output_root.rglob("*.mdx"):
         page_id = str(mdx.relative_to(docs_root).with_suffix("")).replace("\\", "/")
@@ -465,7 +465,7 @@ def generate_cli_docs(
     if not src_dir.is_dir():
         raise SystemExit(f"CLI docs source directory not found: {src_dir}")
 
-    docs_root = output_root.parents[1]
+    docs_root = output_root.parent
     root_cmd, resources = _discover(src_dir)
 
     # Only document API-backed command groups. ``include_tags`` overrides the

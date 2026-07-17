@@ -48,9 +48,8 @@ import re
 from dataclasses import dataclass, field
 
 # Page-path prefix every generated cloud-CLI page lives under, e.g.
-# ``cli/calibrate/agents/list``. The root command maps to the hand-written
-# overview page.
-SLUG_PREFIX = "cli/calibrate"
+# ``cli/agents/list``. The root command maps to the hand-written overview page.
+SLUG_PREFIX = "cli"
 OVERVIEW_SLUG = f"{SLUG_PREFIX}/overview"
 ROOT_FILENAME = "calibrate.md"
 
@@ -102,7 +101,7 @@ def command_from_filename(filename: str) -> str:
 
 
 def filename_to_slug(filename: str) -> str:
-    """``calibrate_agents_list.md`` -> ``cli/calibrate/agents/list``.
+    """``calibrate_agents_list.md`` -> ``cli/agents/list``.
 
     The root command (``calibrate.md``) maps to the overview page.
     """

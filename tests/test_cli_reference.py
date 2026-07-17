@@ -43,16 +43,16 @@ def test_command_from_filename_simple() -> None:
 
 
 def test_filename_to_slug_leaf() -> None:
-    assert filename_to_slug("calibrate_agents_list.md") == "cli/calibrate/agents/list"
+    assert filename_to_slug("calibrate_agents_list.md") == "cli/agents/list"
 
 
 def test_filename_to_slug_hyphenated_segment() -> None:
-    assert filename_to_slug("calibrate_agent-tests_run.md") == "cli/calibrate/agent-tests/run"
+    assert filename_to_slug("calibrate_agent-tests_run.md") == "cli/agent-tests/run"
 
 
 def test_filename_to_slug_root_is_overview() -> None:
     assert filename_to_slug("calibrate.md") == OVERVIEW_SLUG
-    assert OVERVIEW_SLUG == "cli/calibrate/overview"
+    assert OVERVIEW_SLUG == "cli/overview"
 
 
 def test_resource_of() -> None:
@@ -69,7 +69,7 @@ def test_last_segment() -> None:
 
 
 def test_resource_slug() -> None:
-    assert resource_slug("agents") == "cli/calibrate/agents"
+    assert resource_slug("agents") == "cli/agents"
 
 
 # --------------------------------------------------------------------------- #

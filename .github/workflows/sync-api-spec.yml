@@ -95,7 +95,7 @@ jobs:
             docs/reference/api-keys.mdx \
             docs/reference/github-actions.mdx \
             docs/sdk \
-            docs/cli/calibrate \
+            docs/cli \
             docs/mcp \
             docs/docs.json
           if git diff --cached --quiet; then
