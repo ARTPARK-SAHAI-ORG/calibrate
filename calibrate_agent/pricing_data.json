@@ -25,6 +25,7 @@
     },
     "sarvam": {
       "saaras:v3": {
+        "currency": "INR",
         "price_per_minute_inr": 0.5
       }
     },
@@ -80,6 +81,7 @@
     },
     "sarvam": {
       "bulbul:v3": {
+        "currency": "INR",
         "price_per_million_chars_inr": 3000
       }
     },

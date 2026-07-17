@@ -402,6 +402,13 @@ one line, but still give the exact command.
 
 - **Default branch is `main`**, not `master`. Some early conversations used
   "master" but the repo and all CI configs use `main`.
+- **A question is not a change request.** When the user asks "why…", "what is
+  …", "isn't this…", "where is…", answer it and stop. Do not edit, commit, or
+  push code off a question — answer, *offer* the change ("want me to…?"), and
+  wait for an explicit yes. This holds even when the change looks obviously
+  correct (dead-data cleanup, a rename, a fix): making it unasked removes the
+  user's decision and creates churn. Especially during review/Q&A, the user is
+  deciding what to do, not delegating it.
 - **Don't add comments unless the why is non-obvious.** The codebase follows
   the rule from the global guidelines: comments explain *why*, not *what*.
 - **Never leak the conversation into long-lived text.** Code comments, docs,
