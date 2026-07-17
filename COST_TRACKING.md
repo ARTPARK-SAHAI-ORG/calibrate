@@ -131,47 +131,26 @@ shape 5 plus `cost_in_currency` and `conversion_rate` (as in shape 2).
 
 ## Caveats (surface these wherever cost is displayed)
 
-### General — every provider
-- **Estimates, not invoices.** Proportional estimates from published rates.
-  Real bills differ due to per-request minimums, rounding, volume/committed-use
-  discounts, free tiers, and taxes (e.g. GST).
-- **Point-in-time rates.** Captured ~July 2026; providers change pricing and
-  model versions — bundled rates can go stale.
-- **Pay-as-you-go / entry tier assumed.** Where a provider only sells
-  subscription tiers, the entry/standard rate is used; high-volume tiers are
-  cheaper.
-- **Free tiers are not deducted** (e.g. Google's 60 min/month, 1M chars/month).
+These are the assumptions and limitations **Calibrate's cost tracking**
+introduces — not the providers' own billing nuances (per-request minimums,
+increments, free tiers, taxes, etc.), which we do not model.
 
-### Currency / FX (INR providers — Sarvam)
-- `cost_usd` uses a **live mid-market FX rate** (USD→INR, ECB via Frankfurter,
-  daily). The real card charge includes an **FX margin + GST**, so actual USD
-  differs.
-- **FX fallback:** if the live lookup fails, a hardcoded rate (₹96.35, as of
-  2026-07-16) is used and may be stale.
-- **Sarvam `bulbul:v3` is beta pricing** (₹30/10K), subject to change.
-
-### Audio-billed TTS (OpenAI, Gemini, Google-Sindhi)
-- Billed by audio-output tokens; approximated as
-  `measured audio minutes × per-minute rate`. Actual token count varies with
-  content, and the per-minute figures ($0.015 / $0.03) are provider estimates.
-- Cost depends on the synthesized **speech rate** — the same text can cost
-  differently across these providers because their audio durations differ.
-- **Gemini 3.1 Flash TTS is preview pricing** (pre-GA); batch mode (½ price) is
-  not used.
-
-### Per-provider
-- **Cartesia (STT + TTS):** no flat rate — credit/subscription based. Priced at
-  the entry **Pro** tier ($0.00005/credit); effective cost drops to ~$37/1M
-  (TTS) and lower (STT) at the **Scale** tier.
-- **ElevenLabs TTS ($100/1M):** `eleven_multilingual_v2` flat $0.10/1K; cheaper
-  Flash/Turbo models exist. Sindhi uses `eleven_v3` (same price).
-- **ElevenLabs STT ($0.0065/min):** `scribe_v2_realtime`; add-ons (diarization,
-  entity detection) are extra.
-- **Deepgram STT ($0.0048/min):** nova-3 streaming PAYG; multilingual is higher
-  ($0.0058), committed (Growth) tier lower ($0.0042).
-- **Google STT ($0.016/min):** billed in 15-second increments (rounded up);
-  async Dynamic Batch is cheaper ($0.004/min).
-- **Groq:** 10-second minimum per request — short clips cost more than the flat
-  per-minute rate implies.
-- **Smallest:** uses the standard (not Pro) Lightning TTS model and the
-  standalone (not agent-bundle) Pulse STT rate.
+- **Bundled, point-in-time rates.** Costs are estimated from a rate table
+  captured ~July 2026, not live provider pricing — they drift as providers
+  change prices.
+- **Entry tier assumed.** We use the standard pay-as-you-go / entry tier;
+  volume or committed-use discounts and free tiers are not modeled.
+- **Provider billing quirks not modeled.** Per-request minimums, billing
+  increments/rounding, and taxes (GST) are ignored, so estimates run low for
+  many short requests.
+- **One variant per provider.** Each provider is priced at a single model/tier
+  we selected — Cartesia entry (Pro) tier, ElevenLabs `eleven_multilingual_v2`,
+  Deepgram nova-3 streaming, Smallest standard Lightning / standalone Pulse —
+  not the provider's other variants or tiers.
+- **Audio-billed TTS is approximated.** OpenAI, Gemini, and Google-Sindhi are
+  billed by audio-output tokens; we estimate cost as
+  `measured audio minutes × per-minute rate`, so the figure scales with the
+  synthesized audio length and the same text can differ across providers.
+- **INR converted via live mid-market FX.** For INR-billed providers, `cost_usd`
+  uses a live mid-market USD→INR rate (excludes FX margin and GST) and falls
+  back to a fixed rate if the live lookup fails.
