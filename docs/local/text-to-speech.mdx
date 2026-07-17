@@ -43,10 +43,12 @@ When the run finishes, it prints a summary leaderboard to your terminal and writ
 ├── audios/
 │   └── <id>.wav          # one synthesized clip per input row
 ├── results.csv           # per row: id, text, audio_path, ttfb, evaluator scores + reasoning
-├── metrics.json          # aggregate evaluator scores and TTFB latency
+├── metrics.json          # evaluator scores, TTFB latency, and a cost estimate
 └── leaderboard/
     └── tts_leaderboard.xlsx
 ```
+
+`metrics.json` includes a `cost` object priced in each provider's native billing unit: character-billed providers (most) report `total_characters` and a per-million-character rate, while audio-billed providers (OpenAI, Gemini) report `audio_minutes` and a per-minute rate. A provider billed in a non-USD currency (e.g. Sarvam in INR) reports the native-currency cost plus `cost_usd` when the exchange rate is reachable. `cost_usd` is the figure comparable across providers, and the leaderboard ranks on it.
 
 <Card
   title="Learn more about metrics"
