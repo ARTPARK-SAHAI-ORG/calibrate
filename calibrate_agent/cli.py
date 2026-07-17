@@ -156,7 +156,7 @@ Examples:
         help="Component to run",
         metavar="{stt,tts,llm,simulations,general,status}",
     )
-    subparsers.required = False  # Allow `calibrate-agent` alone for main menu
+    subparsers.required = False  # Allow bare `calibrate-agent` to print help
 
     # ── STT ───────────────────────────────────────────────────────
     # `calibrate-agent stt -p provider1 provider2 ... -i input-dir ...` → run benchmark (multi) or eval (single)
