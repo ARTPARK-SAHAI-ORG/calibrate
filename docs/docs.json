@@ -272,7 +272,8 @@
                   "local/agent-connections/chat",
                   "local/agent-connections/outbound-voice"
                 ]
-              }
+              },
+              "local/general"
             ]
           }
         ]

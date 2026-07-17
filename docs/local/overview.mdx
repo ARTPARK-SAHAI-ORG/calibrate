@@ -31,20 +31,6 @@ Calibrate provides the following commands:
 
 Run `calibrate-agent <command> -h` to see all options for a command. Pass `calibrate-agent status --table` to print connectivity as a table instead of JSON.
 
-### General task evaluation
-
-`calibrate-agent general` scores arbitrary input/output pairs with an LLM judge — useful for evaluating any task that isn't STT, TTS, or a conversation.
-
-```bash
-calibrate-agent general --dataset data.json -c config.json -o ./out
-```
-
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `--dataset` | string | — | JSON list of `{id, input, output}` rows to score. |
-| `-c, --config` | string | — | JSON config defining the `evaluators` list (same evaluator shape as the other commands). |
-| `-o, --output-dir` | string | `./out` | Where results are written. |
-
 ## Next steps
 
 <CardGroup cols={2}>
@@ -59,5 +45,8 @@ calibrate-agent general --dataset data.json -c config.json -o ./out
   </Card>
   <Card title="Simulations" icon="comments" href="/local/simulations">
     Run text or voice simulations
+  </Card>
+  <Card title="General task evaluation" icon="scale-balanced" href="/local/general">
+    Score arbitrary input/output pairs with an LLM judge
   </Card>
 </CardGroup>
