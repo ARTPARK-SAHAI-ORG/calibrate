@@ -25,11 +25,12 @@ import json
 from importlib.metadata import version as get_version
 from dotenv import find_dotenv, load_dotenv
 
-# ``calibrate_agent._env`` is stdlib-only (imports just ``os``), so this import is
-# safe at parser-build time — unlike ``calibrate_agent.utils``, which pulls in
-# scipy/numpy/pipecat and trips a scipy ``_CopyMode`` incompatibility in the
-# voice path if imported here.
+# ``calibrate_agent._env`` and ``calibrate_agent._cli_args`` are stdlib-only, so
+# these imports are safe at parser-build time — unlike ``calibrate_agent.utils``,
+# which pulls in scipy/numpy/pipecat and trips a scipy ``_CopyMode``
+# incompatibility in the voice path if imported here.
 from calibrate_agent._env import env_int
+from calibrate_agent._cli_args import add_stt_eval_args
 
 
 def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
@@ -239,45 +240,7 @@ Examples:
         default=None,
         help="Path to dataset JSON (list of {id, gt, pred}). Required with --eval-only.",
     )
-    stt_parser.add_argument(
-        "--skip-llm-judges",
-        action="store_true",
-        help=(
-            "Skip the extra LLM-based judges (Sarvam intent & entity "
-            "preservation, Sarvam LLM-WER/CER, and pipecat-style semantic WER). "
-            "They all run by default; passing this reports WER/CER only."
-        ),
-    )
-    stt_parser.add_argument(
-        "--max-parallel",
-        type=int,
-        default=None,
-        help=(
-            "Number of providers to evaluate in parallel (default: pipeline 1, "
-            "direct 2; or $CALIBRATE_STT_MAX_PARALLEL)."
-        ),
-    )
-    stt_parser.add_argument(
-        "--engine",
-        type=str,
-        default="pipeline",
-        choices=["direct", "pipeline"],
-        help=(
-            "Transcription engine: 'pipeline' (default; streams through a real "
-            "pipecat agent pipeline at real-time pace, also reporting TTFS "
-            "latency) or 'direct' (faster; per-provider SDK, no latency)."
-        ),
-    )
-    stt_parser.add_argument(
-        "--max-concurrency",
-        type=int,
-        default=None,
-        help=(
-            "Concurrent clips per provider, both engines (default: pipeline 1, "
-            "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
-            "1 to keep TTFS latency uncontended."
-        ),
-    )
+    add_stt_eval_args(stt_parser, include_max_parallel=True)
 
     # ── TTS ───────────────────────────────────────────────────────
     # `calibrate-agent tts` with no args → interactive UI

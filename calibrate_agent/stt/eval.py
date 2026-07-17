@@ -45,6 +45,7 @@ from calibrate_agent.stt.metrics import (
 )
 from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
 from calibrate_agent._env import resolve_stt_max_concurrency
+from calibrate_agent._cli_args import add_stt_eval_args
 from calibrate_agent.judges import (
     is_rating,
     require_unique_evaluator_names,
@@ -1897,36 +1898,7 @@ async def main():
         action="store_true",
         help="Overwrite existing results instead of resuming from last checkpoint",
     )
-    parser.add_argument(
-        "--skip-llm-judges",
-        action="store_true",
-        help=(
-            "Skip the extra LLM-based judges (Sarvam intent & entity "
-            "preservation, Sarvam LLM-WER/CER, and pipecat-style semantic WER). "
-            "They all run by default; passing this reports WER/CER only."
-        ),
-    )
-    parser.add_argument(
-        "--engine",
-        type=str,
-        default="pipeline",
-        choices=["direct", "pipeline"],
-        help=(
-            "Transcription engine: 'pipeline' (default; streams through a real "
-            "pipecat agent pipeline at real-time pace, also reporting TTFS "
-            "latency) or 'direct' (faster; per-provider SDK, no latency)."
-        ),
-    )
-    parser.add_argument(
-        "--max-concurrency",
-        type=int,
-        default=None,
-        help=(
-            "Concurrent clips per provider, both engines (default: pipeline 1, "
-            "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
-            "1 to keep TTFS latency uncontended."
-        ),
-    )
+    add_stt_eval_args(parser, include_max_parallel=False)
 
     args = parser.parse_args()
 
