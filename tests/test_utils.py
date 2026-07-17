@@ -101,7 +101,7 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
             self.assertEqual(metrics["cost_usd"], 0.03)
             self.assertNotIn("cost", metrics)
 
-    def test_inr_cost_fans_out_native_and_conversion_columns(self):
+    def test_inr_cost_fans_out_native_columns_but_not_fx_rate(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -119,8 +119,9 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
 
             self.assertEqual(metrics["cost_per_million_chars_currency"], 3000.0)
             self.assertEqual(metrics["cost_in_currency"], 3.0)
-            self.assertEqual(metrics["conversion_rate"], 96.0)
             self.assertEqual(metrics["cost_usd"], 0.03125)
+            # The FX rate is process context, not a per-provider cost column.
+            self.assertNotIn("conversion_rate", metrics)
 
     def test_stt_cost_fans_out_to_minute_columns(self):
         from calibrate_agent.utils import read_leaderboard_metrics

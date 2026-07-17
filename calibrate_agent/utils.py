@@ -2382,7 +2382,6 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
                     "total_characters",
                     "cost_per_million_chars_currency",
                     "cost_in_currency",
-                    "conversion_rate",
                     "cost_usd",
                 ):
                     scalar = value.get(cost_key)
