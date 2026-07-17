@@ -6,19 +6,19 @@ import json
 from functools import lru_cache
 from importlib import resources
 
-from calibrate_agent.utils import STT_PROVIDER_MODELS, get_usd_to_inr_rate
+from calibrate_agent.utils import (
+    STT_PROVIDER_MODELS,
+    TTS_PROVIDER_MODELS,
+    get_usd_to_inr_rate,
+)
 
-# TTS pricing model labels. utils.TTS_PROVIDER_MODELS omits google/smallest
-# (their synth functions don't read a shared model constant), so pricing keeps
-# its own complete map of the model each provider is billed as.
+# TTS pricing model labels, single-sourced from utils.TTS_PROVIDER_MODELS.
+# That map omits google and smallest (their synth functions resolve the model
+# elsewhere — Google from its voice family, Smallest from a hardcoded
+# endpoint), so their pricing labels are the only ones added here.
 TTS_DEFAULT_MODELS = {
-    "cartesia": "sonic-3.5",
-    "openai": "gpt-4o-mini-tts",
-    "groq": "canopylabs/orpheus-v1-english",
+    **TTS_PROVIDER_MODELS,
     "google": "chirp3-hd",
-    "gemini": "gemini-3.1-flash-tts-preview",
-    "elevenlabs": "eleven_multilingual_v2",
-    "sarvam": "bulbul:v3",
     "smallest": "lightning-v3.1",
 }
 

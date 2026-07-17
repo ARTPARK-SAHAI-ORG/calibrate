@@ -69,11 +69,15 @@ class TestUsdToInrRate(unittest.TestCase):
             self.assertEqual(U.get_usd_to_inr_rate(), 96.5)
             self.assertEqual(m.call_count, 1)
 
-    def test_falls_back_when_fetch_fails(self):
+    def test_raises_when_fetch_fails(self):
         import calibrate_agent.utils as U
 
-        with patch("urllib.request.urlopen", side_effect=OSError("no network")):
-            self.assertEqual(U.get_usd_to_inr_rate(), U._USD_TO_INR_FALLBACK)
+        with patch("urllib.request.urlopen", side_effect=OSError("no network")), \
+             patch("time.sleep"):  # skip backoff waits
+            with self.assertRaises(Exception):
+                U.get_usd_to_inr_rate()
+
+        self.assertIsNone(U._usd_to_inr_cache)  # failure is not cached
 
 
 class TestReadLeaderboardCostMetrics(unittest.TestCase):

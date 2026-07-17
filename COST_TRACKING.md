@@ -17,8 +17,10 @@ caveats to surface anywhere costs are displayed.
   the cost fields.
 - **Live FX:** `get_usd_to_inr_rate()` in
   [`calibrate_agent/utils.py`](calibrate_agent/utils.py) — fetched once per run
-  from Frankfurter (ECB reference rates, no API key), cached, with a hardcoded
-  fallback so runs never break on a network hiccup.
+  from Frankfurter (ECB reference rates, no API key), retried with exponential
+  backoff, and cached. There is no hardcoded fallback: a reported INR→USD cost
+  always reflects a real exchange rate, and the run fails if the rate can't be
+  fetched.
 - **Cost builders:** `_build_stt_cost_metrics` in `stt/eval.py`,
   `_build_tts_cost_metrics` in `tts/eval.py`.
 
@@ -148,5 +150,5 @@ shape 5 plus `cost_in_currency` and `conversion_rate` (as in shape 2).
   `measured audio minutes × per-minute rate`, so the figure scales with the
   synthesized audio length and the same text can differ across providers.
 - **INR converted via live mid-market FX.** For INR-billed providers, `cost_usd`
-  uses a live mid-market USD→INR rate (excludes FX margin and GST) and falls
-  back to a fixed rate if the live lookup fails.
+  uses a live mid-market USD→INR rate, which excludes the FX margin and GST a
+  real payment would incur.
