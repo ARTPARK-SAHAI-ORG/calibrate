@@ -2,6 +2,14 @@
 
 Guidance for Claude Code when working in this repository.
 
+> **⚠️ Explain in plain, consistent words.** When answering the user, pick one
+> term per concept and keep it for the whole explanation — never swap synonyms
+> for the same thing (e.g. don't call one thing a "model name", then an
+> "engine", then an "instruction"). Avoid jargon and vague filler verbs
+> ("carry", "hold", "surface", "spread", "wire up") — say plainly what actually
+> happens. Before sending an explanation, re-read it and make sure a
+> non-engineer would follow it and that no term shifts meaning midway.
+
 > **⚠️ Start every new task in a new worktree when you're on `main`.** Before
 > beginning any new piece of work, check the current branch. If HEAD is on
 > `main`, create a dedicated worktree (and branch) for the task and do the work
