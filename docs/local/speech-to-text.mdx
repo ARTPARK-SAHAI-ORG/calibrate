@@ -19,10 +19,10 @@ calibrate-agent stt -p deepgram google -l english -i ./data -o ./out
 
 The command takes:
 
-- `-p`/`--provider` — one or more providers to evaluate (space-separated). Only providers that support the chosen language are run.
-- `-l`/`--language` — one of the 10+ supported Indic languages (defaults to `english`).
-- `-i`/`--input-dir` — path to the directory containing your audio files and reference transcripts.
-- `-o`/`--output-dir` — where results are saved (defaults to `./out`).
+- `-p`/`--provider`: one or more providers to evaluate (space-separated). Only providers that support the chosen language are run.
+- `-l`/`--language`: one of the 10+ supported Indic languages (defaults to `english`).
+- `-i`/`--input-dir`: path to the directory containing your audio files and reference transcripts.
+- `-o`/`--output-dir`: where results are saved (defaults to `./out`).
 
 The input directory should have this structure:
 
@@ -48,17 +48,37 @@ The **stt.csv** file contains the reference transcriptions:
 
 Refer to the [sample dataset](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/sample_input) for a template.
 
-Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time — tune with `--max-parallel`), showing the transcriptions as they are generated.
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time, tunable with `--max-parallel`), showing the transcriptions as they are generated.
 
-<Note>
-  **How providers are transcribed — streaming pipeline vs direct.** Where a
-  provider offers a real-time streaming API, Calibrate streams your audio
-  through it — the same *pipeline* path a live voice agent uses — rather than
-  only calling a batch whole-file endpoint. That reflects the accuracy an agent
-  actually sees in production. Providers without a streaming API fall back to
-  their direct (batch) transcription endpoint. This mirrors the methodology of
-  the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
-</Note>
+Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.
+
+<Frame>
+  <img src="./images/stt_leaderboard.png" alt="STT leaderboard" />
+</Frame>
+
+Each provider output directory includes:
+
+- `results.csv` with one row per input audio. In addition to `id`, `gt`, `pred`, WER, evaluator scores, and evaluator reasoning, STT runs include `audio_duration_seconds`.
+- `metrics.json` with aggregate `wer`, evaluator summaries, and a `cost` object. The cost object includes `provider`, `pricing_model`, `currency`, `billing_unit`, `total_seconds`, `audio_minutes`, `cost_per_minute_usd`, and `cost_usd`. Cost is a proportional estimate from bundled rates; provider invoices may differ because of per-file rounding, minimums, tiers, or regional pricing.
+- `leaderboard/stt_leaderboard.xlsx` with scalar cost columns in the summary sheet: `audio_minutes`, `cost_per_minute_usd`, and `cost_usd`.
+
+You can also view the generated transcript and metrics for each row of your dataset including the LLM judge score and reasoning.
+
+<Frame>
+  <img src="./images/stt_output_provider.png" alt="STT provider outputs" />
+</Frame>
+
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/core-concepts/speech-to-text#metrics"
+>
+  Detailed explanation of all metrics and why using an LLM Judge is necessary
+</Card>
+
+## How it works
+
+Where a provider offers a real-time streaming API, Calibrate streams your audio through it (the same *pipeline* path a live voice agent uses) rather than only calling a batch whole-file endpoint. That reflects the accuracy an agent actually sees in production. Providers without a streaming API fall back to their direct (batch) transcription endpoint. This mirrors the methodology of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
 
 ## Evaluator configuration
 
@@ -146,8 +166,8 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 
 Alongside classic WER/CER, every run also computes a set of LLM-based judges tuned for Indian-language ASR. They all run by default; pass `--skip-llm-judges` to report WER/CER only.
 
-- **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER** — adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which argues that raw WER understates real agent quality for Indic speech.
-- **Semantic WER** — a meaning-aware word error rate in the style of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
+- **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER**: adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which argues that raw WER understates real agent quality for Indic speech.
+- **Semantic WER**: a meaning-aware word error rate in the style of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
 
 These surface as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, on top of the `semantic_match` evaluator above.
 
@@ -181,34 +201,6 @@ calibrate-agent stt --eval-only --dataset gt_pred.json -o ./out
 | `--ignore_retry` | flag | off | Don't retry failed transcriptions. |
 | `--eval-only` | flag | off | Skip transcription; judge a `{id, gt, pred}` dataset (needs `--dataset`). |
 | `--dataset` | string | — | Path to the `--eval-only` dataset JSON. |
-
-## Output
-
-Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.
-
-Each provider output directory includes:
-
-- `results.csv` with one row per input audio. In addition to `id`, `gt`, `pred`, WER, evaluator scores, and evaluator reasoning, STT runs include `audio_duration_seconds`.
-- `metrics.json` with aggregate `wer`, evaluator summaries, and a `cost` object. The cost object includes `provider`, `pricing_model`, `currency`, `billing_unit`, `total_seconds`, `audio_minutes`, `cost_per_minute_usd`, and `cost_usd`. Cost is a proportional estimate from bundled rates; provider invoices may differ because of per-file rounding, minimums, tiers, or regional pricing.
-- `leaderboard/stt_leaderboard.xlsx` with scalar cost columns in the summary sheet: `audio_minutes`, `cost_per_minute_usd`, and `cost_usd`.
-
-<Frame>
-  <img src="./images/stt_leaderboard.png" alt="STT leaderboard" />
-</Frame>
-
-You can also view the generated transcript and metrics for each row of your dataset including the LLM judge score and reasoning.
-
-<Frame>
-  <img src="./images/stt_output_provider.png" alt="STT provider outputs" />
-</Frame>
-
-<Card
-  title="Learn more about metrics"
-  icon="chart-bar"
-  href="/core-concepts/speech-to-text#metrics"
->
-  Detailed explanation of all metrics and why using an LLM Judge is necessary
-</Card>
 
 ## Resources
 
