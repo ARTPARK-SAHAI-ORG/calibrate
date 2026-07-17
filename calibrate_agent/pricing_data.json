@@ -2,7 +2,7 @@
   "stt": {
     "deepgram": {
       "nova-3": {
-        "price_per_minute_usd": 0.0043
+        "price_per_minute_usd": 0.0048
       }
     },
     "openai": {
@@ -25,22 +25,72 @@
     },
     "sarvam": {
       "saaras:v3": {
-        "price_per_minute_usd": 0.006
+        "currency": "INR",
+        "price_per_minute_inr": 0.5
       }
     },
     "elevenlabs": {
       "scribe_v2_realtime": {
-        "price_per_minute_usd": 0.0036666667
+        "price_per_minute_usd": 0.0065
       }
     },
     "cartesia": {
       "ink-whisper": {
-        "price_per_minute_usd": 0.0021666667
+        "price_per_minute_usd": 0.003
       }
     },
     "smallest": {
       "pulse": {
-        "price_per_minute_usd": 0.008
+        "price_per_minute_usd": 0.003
+      }
+    }
+  },
+  "tts": {
+    "cartesia": {
+      "sonic-3.5": {
+        "price_per_million_chars_usd": 50.0
+      }
+    },
+    "openai": {
+      "gpt-4o-mini-tts": {
+        "price_per_minute_usd": 0.015
+      }
+    },
+    "groq": {
+      "canopylabs/orpheus-v1-english": {
+        "price_per_million_chars_usd": 22.0
+      }
+    },
+    "google": {
+      "chirp3-hd": {
+        "price_per_million_chars_usd": 30.0
+      },
+      "gemini-2.5-flash-tts": {
+        "price_per_minute_usd": 0.015
+      }
+    },
+    "gemini": {
+      "gemini-3.1-flash-tts-preview": {
+        "price_per_minute_usd": 0.03
+      }
+    },
+    "elevenlabs": {
+      "eleven_multilingual_v2": {
+        "price_per_million_chars_usd": 100.0
+      },
+      "eleven_v3": {
+        "price_per_million_chars_usd": 100.0
+      }
+    },
+    "sarvam": {
+      "bulbul:v3": {
+        "currency": "INR",
+        "price_per_million_chars_inr": 3000
+      }
+    },
+    "smallest": {
+      "lightning-v3.1": {
+        "price_per_million_chars_usd": 17.5
       }
     }
   }

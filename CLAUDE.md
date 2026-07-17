@@ -2,6 +2,14 @@
 
 Guidance for Claude Code when working in this repository.
 
+> **⚠️ Explain in plain, consistent words.** When answering the user, pick one
+> term per concept and keep it for the whole explanation — never swap synonyms
+> for the same thing (e.g. don't call one thing a "model name", then an
+> "engine", then an "instruction"). Avoid jargon and vague filler verbs
+> ("carry", "hold", "surface", "spread", "wire up") — say plainly what actually
+> happens. Before sending an explanation, re-read it and make sure a
+> non-engineer would follow it and that no term shifts meaning midway.
+
 > **⚠️ Start every new task in a new worktree when you're on `main`.** Before
 > beginning any new piece of work, check the current branch. If HEAD is on
 > `main`, create a dedicated worktree (and branch) for the task and do the work
@@ -107,6 +115,11 @@ Title Case (`## Next Steps`). The only words that stay capitalized mid-heading
 are acronyms (API, LLM, STT, TTS, WER, TTFB, PR, HTML, URL) and proper nouns
 (Calibrate, GitHub, Mintlify, Markdown). Match this when adding or editing any
 `.mdx` page.
+
+Write docs standalone — a reader never saw the change history or our chat. State
+what the feature *is*, never what it changed from, what it's "not", or what was
+requested (see "Never leak the conversation into long-lived text" under Things
+to keep in mind).
 
 Some pages are **generated** from templates in `docs/templates/` by
 `scripts/fetch_public_openapi.py` (which single-sources the backend host from
@@ -397,8 +410,24 @@ one line, but still give the exact command.
 
 - **Default branch is `main`**, not `master`. Some early conversations used
   "master" but the repo and all CI configs use `main`.
+- **A question is not a change request.** When the user asks "why…", "what is
+  …", "isn't this…", "where is…", answer it and stop. Do not edit, commit, or
+  push code off a question — answer, *offer* the change ("want me to…?"), and
+  wait for an explicit yes. This holds even when the change looks obviously
+  correct (dead-data cleanup, a rename, a fix): making it unasked removes the
+  user's decision and creates churn. Especially during review/Q&A, the user is
+  deciding what to do, not delegating it.
 - **Don't add comments unless the why is non-obvious.** The codebase follows
   the rule from the global guidelines: comments explain *why*, not *what*.
+- **Never leak the conversation into long-lived text.** Code comments, docs,
+  commit-persisted files, and CLAUDE.md are read cold by someone who never saw
+  our chat. Write them as if authored fresh: state what *is*, not what changed,
+  what it's "not", what was "removed", or what someone asked for. Ban words like
+  "now", "previously", "still", "no longer", "as requested", "instead of X",
+  "note that we don't…" — anything that only makes sense relative to a prior
+  version or a request. If a distinction matters on its own (a real limitation,
+  a gotcha), state it plainly without the reactive framing. This applies to
+  every file you write, not just docs.
 - **Prefer editing existing files** over creating new ones — especially in
   `stt/`, `tts/`, and `llm/`, where the structure is mirrored 1-to-1 in
   `tests/`.

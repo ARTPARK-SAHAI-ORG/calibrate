@@ -36,6 +36,131 @@ class TestAudioDurationSeconds(unittest.TestCase):
             self.assertIsNone(get_audio_duration_seconds(path))
 
 
+class TestUsdToInrRate(unittest.TestCase):
+    def setUp(self):
+        import calibrate_agent.utils as U
+
+        self._orig_cache = U._usd_to_inr_cache
+        U._usd_to_inr_cache = None
+
+    def tearDown(self):
+        import calibrate_agent.utils as U
+
+        U._usd_to_inr_cache = self._orig_cache
+
+    def test_fetches_and_caches_live_rate(self):
+        import calibrate_agent.utils as U
+
+        payload = json.dumps({"base": "USD", "rates": {"INR": 96.5}}).encode()
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self):
+                return payload
+
+        with patch("urllib.request.urlopen", return_value=_Resp()) as m:
+            self.assertEqual(U.get_usd_to_inr_rate(), 96.5)
+            # cached: second call does not hit the network again
+            self.assertEqual(U.get_usd_to_inr_rate(), 96.5)
+            self.assertEqual(m.call_count, 1)
+
+    def test_raises_when_fetch_fails(self):
+        import calibrate_agent.utils as U
+
+        with patch("urllib.request.urlopen", side_effect=OSError("no network")), \
+             patch("time.sleep"):  # skip backoff waits
+            with self.assertRaises(Exception):
+                U.get_usd_to_inr_rate()
+
+        self.assertIsNone(U._usd_to_inr_cache)  # failure is not cached
+
+
+class TestReadLeaderboardCostMetrics(unittest.TestCase):
+    def _write(self, tmp, metrics):
+        path = Path(tmp) / "metrics.json"
+        path.write_text(json.dumps(metrics))
+        return path
+
+    def test_only_cost_usd_surfaces(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "pronunciation": {"type": "binary", "mean": 0.9},
+                "cost": {
+                    "total_characters": 2000,
+                    "cost_per_million_chars_currency": 15.0,
+                    "cost_usd": 0.03,
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertEqual(metrics["cost_usd"], 0.03)
+            # Only cost_usd is comparable; everything else stays off the board.
+            self.assertNotIn("cost_per_million_chars_currency", metrics)
+            self.assertNotIn("total_characters", metrics)
+            self.assertNotIn("cost", metrics)
+
+    def test_inr_only_cost_usd_surfaces_not_native_or_fx(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "cost": {
+                    "currency": "INR",
+                    "cost_per_million_chars_currency": 3000.0,
+                    "cost_in_currency": 3.0,
+                    "conversion_rate": 96.0,
+                    "cost_usd": 0.03125,
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertEqual(metrics["cost_usd"], 0.03125)
+            self.assertNotIn("cost_per_million_chars_currency", metrics)
+            self.assertNotIn("cost_in_currency", metrics)
+            self.assertNotIn("conversion_rate", metrics)
+
+    def test_stt_only_cost_usd_surfaces(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "wer": 0.1,
+                "cost": {
+                    "audio_minutes": 2.0,
+                    "cost_per_minute_currency": 0.006,
+                    "cost_usd": 0.012,
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertEqual(metrics["cost_usd"], 0.012)
+            self.assertNotIn("cost_per_minute_currency", metrics)
+            self.assertNotIn("audio_minutes", metrics)
+
+    def test_cost_without_usd_surfaces_nothing(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "cost": {
+                    "currency": "INR",
+                    "cost_per_million_chars_currency": 3000.0,
+                    "cost_in_currency": 3.0,
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertNotIn("cost_usd", metrics)
+            self.assertNotIn("cost_in_currency", metrics)
+
+
 class TestLanguageCodes(unittest.TestCase):
     def test_get_stt_language_codes_per_provider(self):
         from calibrate_agent.utils import get_stt_language_code
