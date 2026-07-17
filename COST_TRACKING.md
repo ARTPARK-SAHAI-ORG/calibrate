@@ -173,5 +173,5 @@ shape 5 plus `cost_in_currency` and `conversion_rate` (as in shape 2).
   async Dynamic Batch is cheaper ($0.004/min).
 - **Groq:** 10-second minimum per request — short clips cost more than the flat
   per-minute rate implies.
-- **Smallest:** pricing page is JS-rendered/approximate; uses the standard (not
-  Pro) TTS model and the standalone (not agent-bundle) STT rate.
+- **Smallest:** uses the standard (not Pro) Lightning TTS model and the
+  standalone (not agent-bundle) Pulse STT rate.
