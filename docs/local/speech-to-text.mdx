@@ -61,21 +61,21 @@ When the run finishes, it prints a summary leaderboard to your terminal and writ
   icon="chart-bar"
   href="/core-concepts/speech-to-text#metrics"
 >
-  Detailed explanation of all metrics and why using an LLM Judge is necessary
+  Detailed explanation of all metrics and why an LLM judge is necessary
 </Card>
 
 ## How it works
 
 Each provider can be run through one of two engines, chosen with `--engine`:
 
-- **`pipeline`** (the default) streams every clip through a real pipecat agent pipeline at real-time pace, using the same STT configuration your live voice agent deploys, following the methodology of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark). It reflects the accuracy and behavior an agent actually sees in production, and it also measures time-to-final-transcript (TTFS) latency. Because it runs in real time, it is slower.
-- **`direct`** sends each clip straight to the provider's transcription SDK. It is much faster and is good for a quick accuracy-only comparison, but it does not measure latency.
+- **`pipeline`** (the default) feeds each clip through a real pipecat pipeline at real-time pace, using the same STT setup your live voice agent runs, following the methodology of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark). The accuracy scores then match what your agent gets in production, and the run also measures latency: the gap between the speaker stopping and the final transcript arriving (TTFS). Running in real time makes it slower.
+- **`direct`** sends each clip straight to the provider's transcription SDK. It is faster and fine for a quick accuracy-only comparison, but it reports no latency.
 
 ```bash
 calibrate-agent stt -p deepgram google -i ./data -o ./out --engine direct
 ```
 
-Both engines evaluate multiple providers at once and multiple clips per provider at once. `--max-parallel` controls how many providers run together and `--max-concurrency` how many clips per provider. The `pipeline` engine defaults both to `1` so the latency numbers stay uncontended; `direct` defaults higher since it has no latency to protect.
+Both engines evaluate several providers at once, and several clips per provider at once. `--max-parallel` sets how many providers run together; `--max-concurrency` sets how many clips per provider. The `pipeline` engine defaults both to `1` so that running things in parallel doesn't distort the latency measurements; `direct` defaults higher because it isn't measuring latency.
 
 ## Evaluator configuration
 
@@ -140,7 +140,7 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 
 <AccordionGroup>
   <Accordion title="semantic_match (default evaluator system prompt)">
-    Matches [`DEFAULT_STT_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate/judges.py) in `calibrate/judges.py` when no `--config` is passed.
+    Matches [`DEFAULT_STT_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate_agent/judges.py) in `calibrate_agent/judges.py` when no `--config` is passed.
 
     ```text
     You are a highly accurate evaluator evaluating the transcription output of an STT model.
@@ -163,14 +163,14 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 
 Alongside classic WER/CER, every run also computes a set of LLM-based judges tuned for Indian-language ASR. They all run by default; pass `--skip-llm-judges` to report WER/CER only.
 
-- **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER**: adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which argues that raw WER understates real agent quality for Indic speech.
+- **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER**: adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which makes the case that raw WER is a poor accuracy signal for Indic speech.
 - **Semantic WER**: a meaning-aware word error rate in the style of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
 
-These surface as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, on top of the `semantic_match` evaluator above.
+These appear as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, alongside the `semantic_match` evaluator above.
 
 ## Evaluate an existing dataset
 
-Already have transcriptions from a prior run or another tool? Skip inference and run only the judges on a dataset of `{id, gt, pred}` pairs with `--eval-only`:
+Already have transcriptions from a prior run or another tool? Skip transcription and run only the judges on a dataset of `{id, gt, pred}` pairs with `--eval-only`:
 
 ```bash
 calibrate-agent stt --eval-only --dataset gt_pred.json -o ./out
@@ -191,7 +191,7 @@ calibrate-agent stt --eval-only --dataset gt_pred.json -o ./out
 | `--skip-llm-judges` | flag | off | Skip the extra LLM judges (Sarvam intent/entity, Sarvam LLM-WER/CER, semantic WER); report WER/CER only. |
 | `--leaderboard` | flag | off | Generate a leaderboard after a single-provider run (multi-provider runs always do). |
 | `-s, --save-dir` | string | — | Directory to write the leaderboard workbook. |
-| `--engine` | `pipeline` \| `direct` | `pipeline` | Transcription engine. `pipeline` streams each clip through a real pipecat agent pipeline (agent-faithful, measures TTFS latency); `direct` calls the provider SDK directly (faster, no latency). |
+| `--engine` | `pipeline` \| `direct` | `pipeline` | Transcription engine. `pipeline` feeds each clip through a real pipecat pipeline, using the same STT setup your live agent runs and reporting TTFS latency; `direct` calls the provider SDK directly (faster, but reports no latency). |
 | `--max-parallel` | integer | pipeline `1`, direct `2` | Providers to evaluate concurrently (env `CALIBRATE_STT_MAX_PARALLEL`). |
 | `--max-concurrency` | integer | pipeline `1`, direct `4` | Clips per provider to transcribe concurrently (env `CALIBRATE_STT_MAX_CONCURRENCY`). |
 | `--overwrite` | flag | off | Ignore a prior `results.csv` and start a clean run instead of resuming. |
