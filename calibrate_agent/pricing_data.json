@@ -77,6 +77,9 @@
     "elevenlabs": {
       "eleven_multilingual_v2": {
         "price_per_million_chars_usd": 100.0
+      },
+      "eleven_v3": {
+        "price_per_million_chars_usd": 100.0
       }
     },
     "sarvam": {

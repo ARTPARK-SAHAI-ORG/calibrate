@@ -543,6 +543,23 @@ class TestTTSCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["billing_unit"], "minute")
         self.assertEqual(metrics["cost_usd"], 0.03)  # 2 min * $0.015
 
+    def test_elevenlabs_sindhi_uses_v3_pricing_model(self):
+        from calibrate_agent.tts import eval as E
+
+        self.assertEqual(E._default_tts_model("elevenlabs", "sindhi"), "eleven_v3")
+        self.assertEqual(
+            E._default_tts_model("elevenlabs", "hindi"), "eleven_multilingual_v2"
+        )
+
+        metrics = E._build_tts_cost_metrics(
+            provider="elevenlabs",
+            texts=["a" * 1_000_000],
+            model=E._default_tts_model("elevenlabs", "sindhi"),
+        )
+        self.assertEqual(metrics["pricing_model"], "eleven_v3")
+        self.assertEqual(metrics["cost_per_million_chars_currency"], 100.0)
+        self.assertEqual(metrics["cost_usd"], 100.0)
+
     @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
     def test_all_supported_providers_have_cost_pricing(self, _fx):
         from calibrate_agent.tts import eval as E

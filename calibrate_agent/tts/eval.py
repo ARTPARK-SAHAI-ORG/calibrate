@@ -66,12 +66,16 @@ TTS_AUDIO_SUBDIR = "audios"
 def _default_tts_model(provider: str, language: str | None = None) -> str | None:
     """Resolve the pricing model name for a provider/language.
 
-    Google synthesizes Sindhi through the synchronous Gemini-TTS model instead
-    of the streaming Chirp3-HD voices (see ``synthesize_google``), so it prices
-    on a different model.
+    Sindhi uses a different model for some providers than their default: Google
+    synthesizes it with the synchronous Gemini-TTS model instead of the
+    streaming Chirp3-HD voices, and ElevenLabs uses ``eleven_v3`` instead of
+    ``eleven_multilingual_v2`` (see ``synthesize_google`` / ``synthesize_elevenlabs``).
     """
-    if provider == "google" and language and language.lower() == "sindhi":
+    is_sindhi = bool(language) and language.lower() == "sindhi"
+    if is_sindhi and provider == "google":
         return "gemini-2.5-flash-tts"
+    if is_sindhi and provider == "elevenlabs":
+        return "eleven_v3"
     return TTS_DEFAULT_MODELS.get(provider)
 
 
