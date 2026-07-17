@@ -34,6 +34,7 @@ from calibrate_agent.stt.eval import (
 )
 from calibrate_agent.stt.leaderboard import generate_leaderboard
 from calibrate_agent._env import resolve_stt_parallelism
+from calibrate_agent._cli_args import add_stt_eval_args
 from calibrate_agent.utils import StreamTee
 
 
@@ -251,45 +252,7 @@ async def main():
         default=None,
         help="Path to optional JSON config file with an `evaluators` list",
     )
-    parser.add_argument(
-        "--skip-llm-judges",
-        action="store_true",
-        help=(
-            "Skip the extra LLM-based judges (Sarvam intent & entity "
-            "preservation, Sarvam LLM-WER/CER, and pipecat-style semantic WER). "
-            "They all run by default; passing this reports WER/CER only."
-        ),
-    )
-    parser.add_argument(
-        "--max-parallel",
-        type=int,
-        default=None,
-        help=(
-            "Number of providers to evaluate in parallel (default: pipeline 1, "
-            "direct 2; or $CALIBRATE_STT_MAX_PARALLEL)."
-        ),
-    )
-    parser.add_argument(
-        "--engine",
-        type=str,
-        default="pipeline",
-        choices=["direct", "pipeline"],
-        help=(
-            "Transcription engine: 'pipeline' (default; streams through a real "
-            "pipecat agent pipeline at real-time pace, also reporting TTFS "
-            "latency) or 'direct' (faster; per-provider SDK, no latency)."
-        ),
-    )
-    parser.add_argument(
-        "--max-concurrency",
-        type=int,
-        default=None,
-        help=(
-            "Concurrent clips per provider, both engines (default: pipeline 1, "
-            "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
-            "1 to keep TTFS latency uncontended."
-        ),
-    )
+    add_stt_eval_args(parser, include_max_parallel=True)
 
     args = parser.parse_args()
 
