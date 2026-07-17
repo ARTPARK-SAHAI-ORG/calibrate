@@ -48,7 +48,7 @@ The **stt.csv** file contains the reference transcriptions:
 
 Refer to the [sample dataset](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/sample_input) for a template.
 
-Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time, tunable with `--max-parallel`), showing the transcriptions as they are generated.
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel, showing the transcriptions as they are generated.
 
 Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.
 
@@ -58,7 +58,7 @@ Once all the providers have completed, it displays a leaderboard measuring key m
 
 Each provider output directory includes:
 
-- `results.csv` with one row per input audio. In addition to `id`, `gt`, `pred`, WER, evaluator scores, and evaluator reasoning, STT runs include `audio_duration_seconds`.
+- `results.csv` with one row per input audio. In addition to `id`, `gt`, `pred`, WER, evaluator scores, and evaluator reasoning, STT runs include `audio_duration_seconds`, plus a `ttfs` latency column when the `pipeline` engine is used.
 - `metrics.json` with aggregate `wer`, evaluator summaries, and a `cost` object. The cost object includes `provider`, `pricing_model`, `currency`, `billing_unit`, `total_seconds`, `audio_minutes`, `cost_per_minute_usd`, and `cost_usd`. Cost is a proportional estimate from bundled rates; provider invoices may differ because of per-file rounding, minimums, tiers, or regional pricing.
 - `leaderboard/stt_leaderboard.xlsx` with scalar cost columns in the summary sheet: `audio_minutes`, `cost_per_minute_usd`, and `cost_usd`.
 
@@ -78,7 +78,18 @@ You can also view the generated transcript and metrics for each row of your data
 
 ## How it works
 
-Where a provider offers a real-time streaming API, Calibrate streams your audio through it (the same *pipeline* path a live voice agent uses) rather than only calling a batch whole-file endpoint. That reflects the accuracy an agent actually sees in production. Providers without a streaming API fall back to their direct (batch) transcription endpoint. This mirrors the methodology of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
+Each provider can be run through one of two engines, chosen with `--engine`:
+
+- **`pipeline`** (the default) streams every clip through a real pipecat agent pipeline at real-time pace, using the same STT configuration your live voice agent deploys. It reflects the accuracy and behavior an agent actually sees in production, and it also measures time-to-final-transcript (TTFS) latency. Because it runs in real time, it is slower.
+- **`direct`** sends each clip straight to the provider's transcription SDK. It is much faster and is good for a quick accuracy-only comparison, but it does not measure latency.
+
+```bash
+calibrate-agent stt -p deepgram google -i ./data -o ./out --engine direct
+```
+
+Both engines evaluate multiple providers at once and multiple clips per provider at once. `--max-parallel` controls how many providers run together and `--max-concurrency` how many clips per provider. The `pipeline` engine defaults both to `1` so the latency numbers stay uncontended; `direct` defaults higher since it has no latency to protect.
+
+This methodology follows the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
 
 ## Evaluator configuration
 
@@ -194,7 +205,9 @@ calibrate-agent stt --eval-only --dataset gt_pred.json -o ./out
 | `--skip-llm-judges` | flag | off | Skip the extra LLM judges (Sarvam intent/entity, Sarvam LLM-WER/CER, semantic WER); report WER/CER only. |
 | `--leaderboard` | flag | off | Generate a leaderboard after a single-provider run (multi-provider runs always do). |
 | `-s, --save-dir` | string | — | Directory to write the leaderboard workbook. |
-| `--max-parallel` | integer | `2` | Providers to evaluate concurrently (env `CALIBRATE_STT_MAX_PARALLEL`). |
+| `--engine` | `pipeline` \| `direct` | `pipeline` | Transcription engine. `pipeline` streams each clip through a real pipecat agent pipeline (agent-faithful, measures TTFS latency); `direct` calls the provider SDK directly (faster, no latency). |
+| `--max-parallel` | integer | pipeline `1`, direct `2` | Providers to evaluate concurrently (env `CALIBRATE_STT_MAX_PARALLEL`). |
+| `--max-concurrency` | integer | pipeline `1`, direct `4` | Clips per provider to transcribe concurrently (env `CALIBRATE_STT_MAX_CONCURRENCY`). |
 | `--overwrite` | flag | off | Ignore a prior `results.csv` and start a clean run instead of resuming. |
 | `-d, --debug` | flag | off | Evaluate only the first N rows. |
 | `-dc, --debug_count` | integer | `5` | Number of rows in debug mode. |
