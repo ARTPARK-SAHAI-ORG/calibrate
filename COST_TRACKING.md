@@ -131,10 +131,6 @@ shape 5 plus `cost_in_currency` and `conversion_rate` (as in shape 2).
 
 ## Caveats (surface these wherever cost is displayed)
 
-These are the assumptions and limitations **Calibrate's cost tracking**
-introduces — not the providers' own billing nuances (per-request minimums,
-increments, free tiers, taxes, etc.), which we do not model.
-
 - **Bundled, point-in-time rates.** Costs are estimated from a rate table
   captured ~July 2026, not live provider pricing — they drift as providers
   change prices.
