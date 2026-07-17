@@ -6,7 +6,7 @@ import json
 from functools import lru_cache
 from importlib import resources
 
-from calibrate_agent.utils import STT_PROVIDER_MODELS
+from calibrate_agent.utils import STT_PROVIDER_MODELS, get_usd_to_inr_rate
 
 # TTS pricing model labels. utils.TTS_PROVIDER_MODELS omits google/smallest
 # (their synth functions don't read a shared model constant), so pricing keeps
@@ -22,13 +22,17 @@ TTS_DEFAULT_MODELS = {
     "smallest": "lightning-v3.1",
 }
 
-# Per component: (price key in pricing_data.json, normalized billing unit).
-# STT bills per minute of audio; TTS bills per input character (stored as a
-# per-million-character rate for readable numbers).
-_COMPONENT_PRICE = {
-    "stt": ("price_per_minute_usd", "minute"),
-    "tts": ("price_per_million_chars_usd", "character"),
+# Per component: (normalized billing unit, price-key stem in pricing_data.json).
+# The currency is appended to the stem (``price_per_minute_usd`` /
+# ``price_per_minute_inr``), so the stored key drives the currency.
+_COMPONENT_UNIT = {
+    "stt": ("minute", "price_per_minute"),
+    "tts": ("character", "price_per_million_chars"),
 }
+
+# Checked in order; first key present wins. USD is the default for providers
+# that publish in USD; INR covers providers billed in rupees (e.g. Sarvam).
+_SUPPORTED_CURRENCIES = ("usd", "inr")
 
 _COMPONENT_DEFAULT_MODELS = {
     "stt": STT_PROVIDER_MODELS,
@@ -43,14 +47,15 @@ def resolve_pricing(
 ) -> dict | None:
     """Return normalized pricing for a provider/model of ``component``.
 
-    ``component`` is ``"stt"`` (per-minute pricing) or ``"tts"``
-    (per-million-character pricing). Returns ``None`` when no price is
-    configured for the resolved provider/model.
+    ``component`` is ``"stt"`` (per-minute) or ``"tts"``
+    (per-million-character). The returned dict carries the native
+    ``currency`` and the ``native_rate`` in that currency. Returns ``None``
+    when no price is configured for the resolved provider/model.
     """
-    if component not in _COMPONENT_PRICE:
+    if component not in _COMPONENT_UNIT:
         raise ValueError(f"Unsupported pricing component: {component}")
 
-    price_key, billing_unit = _COMPONENT_PRICE[component]
+    billing_unit, price_stem = _COMPONENT_UNIT[component]
 
     provider_key = provider.lower()
     model_name = model or _COMPONENT_DEFAULT_MODELS[component].get(provider_key)
@@ -66,17 +71,50 @@ def resolve_pricing(
     if not isinstance(model_pricing, dict):
         return None
 
-    price = model_pricing.get(price_key)
-    if not isinstance(price, (int, float)) or price < 0:
-        return None
+    for currency in _SUPPORTED_CURRENCIES:
+        price = model_pricing.get(f"{price_stem}_{currency}")
+        if isinstance(price, (int, float)) and price >= 0:
+            return {
+                "provider": provider,
+                "model": model_name,
+                "currency": currency.upper(),
+                "billing_unit": billing_unit,
+                "native_rate": float(price),
+            }
+    return None
 
-    return {
-        "provider": provider,
-        "model": model_name,
-        "currency": "USD",
-        "billing_unit": billing_unit,
-        price_key: float(price),
+
+def cost_breakdown(
+    pricing: dict,
+    usage_in_units: float,
+    rate_field_stem: str,
+) -> dict:
+    """Build the cost fields for a metrics ``cost`` object.
+
+    ``usage_in_units`` is total usage measured in the billing unit (minutes for
+    STT, millions of characters for TTS). USD-billed providers get the native
+    per-unit rate (``<rate_field_stem>_usd``) and ``cost_usd``. Non-USD
+    providers additionally get the native-currency total (``cost_in_currency``)
+    and the live FX rate used (``cost_per_usd`` = units of the native currency
+    per 1 USD). ``cost_usd`` is always present.
+    """
+    currency = pricing["currency"]
+    native_rate = pricing["native_rate"]
+    cost_native = usage_in_units * native_rate
+
+    fields = {
+        "currency": currency,
+        f"{rate_field_stem}_{currency.lower()}": native_rate,
     }
+    if currency == "USD":
+        fields["cost_usd"] = cost_native
+    else:
+        # Only INR is supported today; extend here for other currencies.
+        fx_per_usd = get_usd_to_inr_rate()
+        fields["cost_in_currency"] = cost_native
+        fields["cost_per_usd"] = fx_per_usd
+        fields["cost_usd"] = cost_native / fx_per_usd
+    return fields
 
 
 @lru_cache(maxsize=1)

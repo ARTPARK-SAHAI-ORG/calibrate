@@ -25,7 +25,8 @@
     },
     "sarvam": {
       "saaras:v3": {
-        "price_per_minute_usd": 0.006
+        "currency": "INR",
+        "price_per_minute_inr": 0.5
       }
     },
     "elevenlabs": {
@@ -80,7 +81,8 @@
     },
     "sarvam": {
       "bulbul:v3": {
-        "price_per_million_chars_usd": 34.8837209
+        "currency": "INR",
+        "price_per_million_chars_inr": 3000
       }
     },
     "smallest": {

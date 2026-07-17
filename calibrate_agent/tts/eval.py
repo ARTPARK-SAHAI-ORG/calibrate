@@ -34,7 +34,7 @@ from calibrate_agent.utils import (
     get_tts_voice,
     get_gemini_api_key,
 )
-from calibrate_agent.pricing import TTS_DEFAULT_MODELS, resolve_pricing
+from calibrate_agent.pricing import TTS_DEFAULT_MODELS, cost_breakdown, resolve_pricing
 from calibrate_agent.tts.metrics import get_tts_llm_judge_score
 from calibrate_agent.llm._metrics_utils import _latency_percentiles
 from calibrate_agent.judges import (
@@ -98,16 +98,16 @@ def _build_tts_cost_metrics(
     if not pricing:
         return None
 
-    price_per_million = pricing["price_per_million_chars_usd"]
-    return {
+    metrics = {
         "provider": provider,
         "pricing_model": pricing["model"],
-        "currency": "USD",
         "billing_unit": "character",
         "total_characters": total_characters,
-        "cost_per_million_chars_usd": price_per_million,
-        "cost_usd": total_characters / 1_000_000.0 * price_per_million,
     }
+    metrics.update(
+        cost_breakdown(pricing, total_characters / 1_000_000.0, "cost_per_million_chars")
+    )
+    return metrics
 
 
 def save_audio(audio_bytes: bytes, output_path: str, sample_rate: int = 24000):

@@ -119,7 +119,7 @@ Once all the providers have completed, it displays a leaderboard measuring key m
 Each provider output directory includes:
 
 - `results.csv` with one row per input text (`id`, `text`, `audio_path`, `ttfb`, evaluator scores, and evaluator reasoning).
-- `metrics.json` with evaluator summaries, `ttfb` percentiles, and a `cost` object. The cost object includes `provider`, `pricing_model`, `currency`, `billing_unit`, `total_characters`, `cost_per_million_chars_usd`, and `cost_usd`. TTS providers bill per input character, so cost is estimated from the total characters synthesized; models billed on audio output (OpenAI, Gemini) use an equivalent per-character rate so the metric is comparable across providers.
+- `metrics.json` with evaluator summaries, `ttfb` percentiles, and a `cost` object. The cost object includes `provider`, `pricing_model`, `currency`, `billing_unit`, `total_characters`, the native per-million-character rate (`cost_per_million_chars_usd`), and `cost_usd`. Providers billed in another currency (e.g. Sarvam in INR) instead report `cost_per_million_chars_inr`, the native-currency total `cost_in_currency`, and the live USD→currency rate used `cost_per_usd`; `cost_usd` is always present, converted at the current exchange rate (fetched live, with a fallback). TTS providers bill per input character, so cost is estimated from the total characters synthesized; models billed on audio output (OpenAI, Gemini) use an equivalent per-character rate so the metric is comparable across providers.
 - `leaderboard/tts_leaderboard.xlsx` with scalar cost columns in the summary sheet: `total_characters`, `cost_per_million_chars_usd`, and `cost_usd`.
 
 <Frame>

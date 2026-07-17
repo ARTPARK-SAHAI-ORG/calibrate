@@ -514,7 +514,8 @@ class TestTTSCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["pricing_model"], "gemini-2.5-flash-tts")
         self.assertEqual(metrics["cost_usd"], 30.0)
 
-    def test_all_supported_providers_have_cost_pricing(self):
+    @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
+    def test_all_supported_providers_have_cost_pricing(self, _fx):
         from calibrate_agent.tts import eval as E
         from calibrate_agent.tts.eval import TTS_PROVIDERS
 
@@ -527,6 +528,23 @@ class TestTTSCostMetrics(unittest.TestCase):
                 )
                 self.assertIsNotNone(metrics)
                 self.assertIn("cost_usd", metrics)
+
+    @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
+    def test_sarvam_tts_cost_reported_in_inr_and_usd(self, _fx):
+        from calibrate_agent.tts import eval as E
+
+        metrics = E._build_tts_cost_metrics(
+            provider="sarvam",
+            texts=["a" * 1_000_000],  # 1M characters
+            model=E._default_tts_model("sarvam", "hindi"),
+        )
+
+        self.assertEqual(metrics["currency"], "INR")
+        self.assertEqual(metrics["cost_per_million_chars_inr"], 3000.0)
+        self.assertEqual(metrics["cost_in_currency"], 3000.0)  # 1M chars * ₹3000/1M
+        self.assertEqual(metrics["cost_per_usd"], 96.0)
+        self.assertAlmostEqual(metrics["cost_usd"], 3000.0 / 96.0)
+        self.assertNotIn("cost_per_million_chars_usd", metrics)
 
 
 if __name__ == "__main__":

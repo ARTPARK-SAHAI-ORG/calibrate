@@ -56,7 +56,7 @@ from calibrate_agent.langfuse import (
     langfuse,
     langfuse_enabled,
 )
-from calibrate_agent.pricing import resolve_pricing
+from calibrate_agent.pricing import cost_breakdown, resolve_pricing
 from calibrate_agent.rate_limit import (
     STT_PROVIDER_TIMEOUT_SECONDS,
     STT_STREAMING_IDLE_TIMEOUT_SECONDS,
@@ -115,17 +115,14 @@ def _build_stt_cost_metrics(
 
     total_seconds = float(sum(durations))
     total_minutes = total_seconds / 60.0
-    price_per_minute = pricing["price_per_minute_usd"]
     metrics = {
         "provider": provider,
         "pricing_model": pricing["model"],
-        "currency": "USD",
         "billing_unit": "minute",
         "total_seconds": total_seconds,
         "audio_minutes": round(total_minutes, 4),
-        "cost_per_minute_usd": price_per_minute,
-        "cost_usd": total_minutes * price_per_minute,
     }
+    metrics.update(cost_breakdown(pricing, total_minutes, "cost_per_minute"))
     if excluded_row_indices:
         metrics["excluded_row_indices"] = excluded_row_indices
     return metrics

@@ -24,6 +24,41 @@ from pipecat.transcriptions.language import Language
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
 
 
+# Fallback USD→INR rate (INR per 1 USD) used when the live lookup fails, so cost
+# reporting never breaks on a network hiccup. ECB reference rate, 2026-07-16.
+_USD_TO_INR_FALLBACK = 96.35
+_usd_to_inr_cache: float | None = None
+
+
+def get_usd_to_inr_rate() -> float:
+    """Return the USD→INR rate (INR per 1 USD).
+
+    Fetched live once per process from Frankfurter (ECB reference rates, no API
+    key required) and cached; falls back to ``_USD_TO_INR_FALLBACK`` if the
+    fetch fails. Used to convert INR-billed provider prices (e.g. Sarvam) to USD
+    for cost reporting.
+    """
+    global _usd_to_inr_cache
+    if _usd_to_inr_cache is not None:
+        return _usd_to_inr_cache
+
+    try:
+        import urllib.request
+
+        url = "https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR"
+        with urllib.request.urlopen(url, timeout=5) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        rate = float(data["rates"]["INR"])
+        if rate > 0:
+            _usd_to_inr_cache = rate
+            return rate
+    except Exception:
+        pass
+
+    _usd_to_inr_cache = _USD_TO_INR_FALLBACK
+    return _USD_TO_INR_FALLBACK
+
+
 def get_audio_duration_seconds(audio_path: str | Path) -> float | None:
     """Return audio duration in seconds, or None when it cannot be read.
 
@@ -2344,8 +2379,12 @@ def read_leaderboard_metrics(metrics_path: Path) -> dict:
                 for cost_key in (
                     "audio_minutes",
                     "cost_per_minute_usd",
+                    "cost_per_minute_inr",
                     "total_characters",
                     "cost_per_million_chars_usd",
+                    "cost_per_million_chars_inr",
+                    "cost_in_currency",
+                    "cost_per_usd",
                     "cost_usd",
                 ):
                     scalar = value.get(cost_key)

@@ -36,6 +36,46 @@ class TestAudioDurationSeconds(unittest.TestCase):
             self.assertIsNone(get_audio_duration_seconds(path))
 
 
+class TestUsdToInrRate(unittest.TestCase):
+    def setUp(self):
+        import calibrate_agent.utils as U
+
+        self._orig_cache = U._usd_to_inr_cache
+        U._usd_to_inr_cache = None
+
+    def tearDown(self):
+        import calibrate_agent.utils as U
+
+        U._usd_to_inr_cache = self._orig_cache
+
+    def test_fetches_and_caches_live_rate(self):
+        import calibrate_agent.utils as U
+
+        payload = json.dumps({"base": "USD", "rates": {"INR": 96.5}}).encode()
+
+        class _Resp:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self):
+                return payload
+
+        with patch("urllib.request.urlopen", return_value=_Resp()) as m:
+            self.assertEqual(U.get_usd_to_inr_rate(), 96.5)
+            # cached: second call does not hit the network again
+            self.assertEqual(U.get_usd_to_inr_rate(), 96.5)
+            self.assertEqual(m.call_count, 1)
+
+    def test_falls_back_when_fetch_fails(self):
+        import calibrate_agent.utils as U
+
+        with patch("urllib.request.urlopen", side_effect=OSError("no network")):
+            self.assertEqual(U.get_usd_to_inr_rate(), U._USD_TO_INR_FALLBACK)
+
+
 class TestReadLeaderboardCostMetrics(unittest.TestCase):
     def _write(self, tmp, metrics):
         path = Path(tmp) / "metrics.json"
@@ -60,6 +100,27 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
             self.assertEqual(metrics["cost_per_million_chars_usd"], 15.0)
             self.assertEqual(metrics["cost_usd"], 0.03)
             self.assertNotIn("cost", metrics)
+
+    def test_inr_cost_fans_out_native_and_fx_columns(self):
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, {
+                "cost": {
+                    "currency": "INR",
+                    "total_characters": 1000,
+                    "cost_per_million_chars_inr": 3000.0,
+                    "cost_in_currency": 3.0,
+                    "cost_per_usd": 96.0,
+                    "cost_usd": 0.03125,
+                },
+            })
+            metrics = read_leaderboard_metrics(path)
+
+            self.assertEqual(metrics["cost_per_million_chars_inr"], 3000.0)
+            self.assertEqual(metrics["cost_in_currency"], 3.0)
+            self.assertEqual(metrics["cost_per_usd"], 96.0)
+            self.assertEqual(metrics["cost_usd"], 0.03125)
 
     def test_stt_cost_fans_out_to_minute_columns(self):
         from calibrate_agent.utils import read_leaderboard_metrics

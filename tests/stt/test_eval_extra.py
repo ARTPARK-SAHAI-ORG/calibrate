@@ -936,7 +936,8 @@ class TestSTTCostMetrics(unittest.TestCase):
 
         self.assertIsNone(metrics)
 
-    def test_all_supported_providers_with_default_pricing(self):
+    @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
+    def test_all_supported_providers_with_default_pricing(self, _fx):
         from calibrate_agent.stt import eval as E
         from calibrate_agent.stt.eval import STT_PROVIDERS
 
@@ -951,6 +952,23 @@ class TestSTTCostMetrics(unittest.TestCase):
                     model=E._default_stt_model(provider, "english"),
                 )
                 self.assertIn("cost_usd", metrics)
+
+    @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
+    def test_sarvam_stt_cost_reported_in_inr_and_usd(self, _fx):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="sarvam",
+            audio_duration_seconds=[120.0],  # 2 minutes
+            model=E._default_stt_model("sarvam", "hindi"),
+        )
+
+        self.assertEqual(metrics["currency"], "INR")
+        self.assertEqual(metrics["cost_per_minute_inr"], 0.5)
+        self.assertEqual(metrics["cost_in_currency"], 1.0)  # 2 min * ₹0.5
+        self.assertEqual(metrics["cost_per_usd"], 96.0)
+        self.assertAlmostEqual(metrics["cost_usd"], 1.0 / 96.0)
+        self.assertNotIn("cost_per_minute_usd", metrics)
 
 
 # --- run_eval_only --------------------------------------------------------
