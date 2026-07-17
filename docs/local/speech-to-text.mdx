@@ -60,15 +60,15 @@ When the run finishes, it prints a summary leaderboard to your terminal and writ
     └── stt_leaderboard.xlsx
 ```
 
-**`results.csv`** has one row per clip:
+**`results.csv`** has one row per clip. By default it carries WER/CER and the built-in LLM judges (Sarvam intent/entity, Sarvam LLM WER/CER, and semantic WER):
 
 ```csv
-id,gt,pred,wer,cer,audio_duration_seconds,ttfs,semantic_match,semantic_match_reasoning
-audio_1,Hi,Hi,0.0,0.0,1.2,0.41,True,"Values match exactly."
-audio_2,Madam my name is Geeta Shankar,madam my name is geetha shankar,0.14,0.06,3.4,0.55,True,"Spelling differs but the value is the same."
+id,gt,pred,wer,cer,audio_duration_seconds,ttfs,sarvam_intent_score,sarvam_entity_score,sarvam_llm_wer,semantic_wer
+audio_1,Hi,Hi,0.0,0.0,1.2,0.41,1,1.0,0.0,0.0
+audio_2,Madam my name is Geeta Shankar,madam my name is geetha shankar,0.14,0.06,3.4,0.55,1,0.5,0.08,0.05
 ```
 
-`ttfs` appears only on the `pipeline` engine. The Sarvam and semantic-WER judges add `sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, and `semantic_wer` columns, each with a matching `_reasoning` column.
+`ttfs` appears only on the `pipeline` engine. Each LLM judge also writes a matching `_reasoning` column (and `semantic_wer` a `_metadata` column). Any evaluators you add with `--config` get their own score and `_reasoning` columns too.
 
 **`metrics.json`** is one aggregate object for the run:
 
@@ -81,7 +81,6 @@ audio_2,Madam my name is Geeta Shankar,madam my name is geetha shankar,0.14,0.06
   "sarvam_llm_wer": 0.04,
   "sarvam_llm_cer": 0.02,
   "semantic_wer": 0.03,
-  "semantic_match": { "type": "binary", "mean": 0.9 },
   "cost": {
     "provider": "deepgram",
     "pricing_model": "nova-3",
@@ -96,14 +95,14 @@ audio_2,Madam my name is Geeta Shankar,madam my name is geetha shankar,0.14,0.06
 }
 ```
 
-Each configured evaluator (like `semantic_match`) appears as its own `{ "type", "mean" }` block, and `ttfs` only on the `pipeline` engine. Cost is a proportional estimate from bundled rates, so provider invoices may differ because of per-file rounding, minimums, tiers, or regional pricing.
+`ttfs` appears only on the `pipeline` engine. Any evaluators you add with `--config` appear as their own `{ "type", "mean" }` block (e.g. `"semantic_match": { "type": "binary", "mean": 0.9 }`). Cost is a proportional estimate from bundled rates, so provider invoices may differ because of per-file rounding, minimums, tiers, or regional pricing.
 
 **`leaderboard/stt_leaderboard.xlsx`** ranks every provider side by side (the same table printed to your terminal), one row per provider with WER/CER, each judge's mean, and the cost columns:
 
-| provider | wer | cer | semantic_match | semantic_wer | audio_minutes | cost_usd | count |
+| provider | wer | cer | sarvam_entity_score | semantic_wer | audio_minutes | cost_usd | count |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | openai | 0.00 | 0.00 | 1.00 | 0.00 | 2.14 | 0.013 | 3 |
-| sarvam | 0.06 | 0.03 | 1.00 | 0.02 | 2.14 | 0.013 | 3 |
+| sarvam | 0.06 | 0.03 | 0.95 | 0.02 | 2.14 | 0.013 | 3 |
 
 <Card
   title="Learn more about metrics"
@@ -128,7 +127,7 @@ Both engines evaluate several providers at once, and several clips per provider 
 
 ## Evaluator configuration
 
-By default, a built-in **`semantic_match`** evaluator uses a text LLM judge to check whether each transcription matches the reference text semantically. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
+By default STT reports WER/CER and the built-in [LLM judges](#llm-judges-for-reliable-accuracy) only. To add your own text LLM judges on top, pass a config file with `--config`. For example, a `semantic_match` check that marks each transcription against the reference text:
 
 ```bash
 calibrate-agent stt -p deepgram google -i ./data -o ./out --config config.json
@@ -182,14 +181,14 @@ Every judge call routes through [OpenRouter](https://openrouter.ai/), so set `OP
 Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/config.json) for a template.
 
 <Note>
-  The `--config` flag is optional. When omitted, a single built-in
-  `semantic_match` evaluator scores semantic match between source and
-  transcription.
+  The `--config` flag is optional. When omitted, STT reports WER/CER and the
+  built-in LLM judges only; custom evaluators like `semantic_match` run only
+  when you define them here.
 </Note>
 
 <AccordionGroup>
-  <Accordion title="semantic_match (default evaluator system prompt)">
-    Matches [`DEFAULT_STT_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate_agent/judges.py) in `calibrate_agent/judges.py` when no `--config` is passed.
+  <Accordion title="semantic_match (built-in evaluator system prompt)">
+The prompt template for the built-in `semantic_match` evaluator ([`DEFAULT_STT_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate_agent/judges.py) in `calibrate_agent/judges.py`), handy as a starting point for your own `--config`.
 
     ```text
     You are a highly accurate evaluator evaluating the transcription output of an STT model.
@@ -215,7 +214,7 @@ Alongside classic WER/CER, every run also computes a set of LLM-based judges tun
 - **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER**: adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which makes the case that raw WER is a poor accuracy signal for Indic speech.
 - **Semantic WER**: a meaning-aware word error rate in the style of [pipecat's STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
 
-These appear as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, alongside the `semantic_match` evaluator above.
+These appear as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, next to WER and CER. Any custom evaluators you add with `--config` show up alongside them.
 
 ## Evaluate an existing dataset
 
