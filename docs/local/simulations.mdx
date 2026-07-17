@@ -394,6 +394,33 @@ and review the reasoning for each evaluation criterion:
   <img src="./images/simulation_eval.png" alt="Simulation evaluation" />
 </Frame>
 
+## Evaluate existing transcripts
+
+Already have conversation transcripts? Skip running the simulation and score them directly with `--eval-only` (text simulations only):
+
+```bash
+calibrate-agent simulations --type text -c config.json --eval-only --dataset transcripts.json -o ./out
+```
+
+`--dataset` is a JSON list of `{conversation_history, name?}` items. To only check that an external agent endpoint is reachable, use `--verify --agent-url <url>`.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-t, --type` | string | — | Simulation type: `text` or `voice`. |
+| `-c, --config` | string | — | Simulation config JSON. |
+| `-o, --output-dir` | string | `./out` | Where results are written. |
+| `-m, --model` | string | — | Model for text simulations (drives both the agent and the user simulator). |
+| `-p, --provider` | string | `openrouter` | LLM provider for text simulations: `openrouter` or `openai`. |
+| `-n, --parallel` | integer | `1` | Simulations to run concurrently (env `CALIBRATE_SIMULATION_PARALLEL`). |
+| `--verify` | flag | off | Verify an external agent connection and exit (needs `--agent-url`). |
+| `--agent-url` | string | — | External agent endpoint URL (with `--verify`). |
+| `--agent-headers` | string | — | HTTP headers for the agent as a JSON string. |
+| `--skip-verify` | flag | off | Skip the agent connection check before running. |
+| `--eval-only` | flag | off | Skip the simulation; judge pre-existing transcripts (text only; needs `--dataset`). |
+| `--dataset` | string | — | Path to the `--eval-only` transcripts JSON. |
+
 ## Resources
 
 <CardGroup cols={2}>

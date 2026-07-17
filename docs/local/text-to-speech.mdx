@@ -132,6 +132,34 @@ You can also view the generated audio and metrics for each row of your dataset i
   Detailed explanation of all metrics and how LLM Judge works
 </Card>
 
+## Evaluate an existing dataset
+
+Already synthesized audio in a prior run? Skip synthesis and re-run only the audio judge on that run's output with `--eval-only`:
+
+```bash
+calibrate-agent tts --eval-only --dataset ./out/run/openai -o ./out
+```
+
+`--dataset` points at a prior TTS run directory (e.g. `./out/<run>/<provider>`) whose `results.csv` is read directly. Add `--config` to customize the audio evaluators.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-p, --provider` | string(s) | — | TTS provider(s) to evaluate, space-separated. Only providers supporting the language run. |
+| `-l, --language` | string | `english` | Synthesis language (one of the supported Indic languages). |
+| `-i, --input` | string | — | CSV file with `id` and `text` columns. |
+| `-o, --output-dir` | string | `./out` | Where results and generated audio are written. |
+| `-c, --config` | string | — | JSON config defining custom audio evaluators. |
+| `--leaderboard` | flag | off | Generate a leaderboard after a single-provider run (multi-provider runs always do). |
+| `-s, --save-dir` | string | — | Directory to write the leaderboard workbook. |
+| `--max-parallel` | integer | `2` | Providers to synthesize concurrently (env `CALIBRATE_TTS_MAX_PARALLEL`). |
+| `--overwrite` | flag | off | Ignore a prior `results.csv` and start a clean run instead of resuming. |
+| `-d, --debug` | flag | off | Synthesize only the first N rows. |
+| `-dc, --debug_count` | integer | `5` | Number of rows in debug mode. |
+| `--eval-only` | flag | off | Skip synthesis; run the audio judge on a prior run's audio (needs `--dataset`). |
+| `--dataset` | string | — | Prior TTS run directory whose `results.csv` is re-judged (with `--eval-only`). |
+
 ## Resources
 
 <Card title="Integrations" icon="volume-high" href="/integrations/tts">

@@ -48,7 +48,17 @@ The **stt.csv** file contains the reference transcriptions:
 
 Refer to the [sample dataset](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/sample_input) for a template.
 
-Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time), showing the transcriptions as they are generated.
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (max 2 at a time — tune with `--max-parallel`), showing the transcriptions as they are generated.
+
+<Note>
+  **How providers are transcribed — streaming pipeline vs direct.** Where a
+  provider offers a real-time streaming API, Calibrate streams your audio
+  through it — the same *pipeline* path a live voice agent uses — rather than
+  only calling a batch whole-file endpoint. That reflects the accuracy an agent
+  actually sees in production. Providers without a streaming API fall back to
+  their direct (batch) transcription endpoint. This mirrors the methodology of
+  the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
+</Note>
 
 ## Evaluator configuration
 
@@ -129,6 +139,46 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 
   </Accordion>
 </AccordionGroup>
+
+## Additional accuracy judges
+
+Alongside classic WER/CER, every run also computes a set of LLM-based judges tuned for Indian-language ASR. They all run by default; pass `--skip-llm-judges` to report WER/CER only.
+
+- **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER** — adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which argues that raw WER understates real agent quality for Indic speech.
+- **Semantic WER** — a meaning-aware word error rate in the style of the [pipecat STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
+
+These surface as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, on top of the `semantic_match` evaluator above.
+
+## Evaluate an existing dataset
+
+Already have transcriptions from a prior run or another tool? Skip inference and run only the judges on a dataset of `{id, gt, pred}` pairs with `--eval-only`:
+
+```bash
+calibrate-agent stt --eval-only --dataset gt_pred.json -o ./out
+```
+
+`--dataset` points at a JSON list of `{"id", "gt", "pred"}` items. Add `--config` to customize the evaluators, or `--skip-llm-judges` to report WER/CER only.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-p, --provider` | string(s) | — | STT provider(s) to evaluate, space-separated. Only providers supporting the language run. |
+| `-l, --language` | string | `english` | Evaluation language (one of the supported Indic languages). |
+| `-i, --input-dir` | string | — | Directory containing `stt.csv` and an `audios/` folder. |
+| `-o, --output-dir` | string | `./out` | Where results are written. |
+| `-f, --input-file-name` | string | `stt.csv` | Reference-transcript CSV filename inside the input directory. |
+| `-c, --config` | string | — | JSON config defining custom evaluators. |
+| `--skip-llm-judges` | flag | off | Skip the extra LLM judges (Sarvam intent/entity, Sarvam LLM-WER/CER, semantic WER); report WER/CER only. |
+| `--leaderboard` | flag | off | Generate a leaderboard after a single-provider run (multi-provider runs always do). |
+| `-s, --save-dir` | string | — | Directory to write the leaderboard workbook. |
+| `--max-parallel` | integer | `2` | Providers to evaluate concurrently (env `CALIBRATE_STT_MAX_PARALLEL`). |
+| `--overwrite` | flag | off | Ignore a prior `results.csv` and start a clean run instead of resuming. |
+| `-d, --debug` | flag | off | Evaluate only the first N rows. |
+| `-dc, --debug_count` | integer | `5` | Number of rows in debug mode. |
+| `--ignore_retry` | flag | off | Don't retry failed transcriptions. |
+| `--eval-only` | flag | off | Skip transcription; judge a `{id, gt, pred}` dataset (needs `--dataset`). |
+| `--dataset` | string | — | Path to the `--eval-only` dataset JSON. |
 
 ## Output
 

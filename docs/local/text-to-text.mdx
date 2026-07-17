@@ -679,6 +679,42 @@ You can drill into each model to view the results for each test with the reasoni
   />
 </Frame>
 
+## Verify and evaluate existing outputs
+
+Check that an external agent endpoint is reachable and returns the expected shape before running a full suite, with `--verify`:
+
+```bash
+calibrate-agent llm --verify --agent-url https://your-agent/chat
+```
+
+Or skip inference entirely and run the evaluators on outputs you already have, with `--eval-only`:
+
+```bash
+calibrate-agent llm --eval-only -c config.json --dataset outputs.json -o ./out
+```
+
+`--dataset` is a JSON list of `{test_case, output}` items. For agent-connection configs, `--skip-verify` runs without the pre-flight connection check.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-c, --config` | string | — | Test config JSON (system prompt + tools + test cases, or an `agent_url`). |
+| `-m, --model` | string(s) | `gpt-4.1` | Model(s) to evaluate, space-separated. Multiple models produce a benchmark leaderboard. |
+| `-p, --provider` | string | `openrouter` | LLM provider: `openrouter` or `openai`. |
+| `-o, --output-dir` | string | `./out` | Where results are written. |
+| `-n, --parallel` | integer | — | Test cases to evaluate concurrently per model. |
+| `--max-parallel` | integer | `2` | Models to evaluate concurrently (env `CALIBRATE_LLM_MAX_PARALLEL`). |
+| `--overwrite` | flag | off | Ignore a prior `results.json` and start a clean run instead of resuming. |
+| `-d, --debug` | flag | off | Evaluate only the first N test cases. |
+| `-dc, --debug_count` | integer | `5` | Number of test cases in debug mode. |
+| `--verify` | flag | off | Verify an external agent connection and exit (needs `--agent-url`). |
+| `--agent-url` | string | — | External agent endpoint URL (with `--verify`). |
+| `--agent-headers` | string | — | HTTP headers for the agent as a JSON string. |
+| `--skip-verify` | flag | off | Skip the agent connection check before running (agent-connection configs). |
+| `--eval-only` | flag | off | Skip inference; judge a `{test_case, output}` dataset (needs `--config` and `--dataset`). |
+| `--dataset` | string | — | Path to the `--eval-only` dataset JSON. |
+
 ## Resources
 
 <Card title="Integrations" icon="volume-high" href="/integrations/llm">
