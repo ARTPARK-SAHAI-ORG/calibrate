@@ -1,6 +1,5 @@
 """Tests for calibrate_agent/cli.py — entry point and subcommand dispatching."""
 
-import asyncio
 import json
 import sys
 import tempfile
@@ -155,7 +154,6 @@ class TestMainDispatch(unittest.TestCase):
                 self._run_with_argv(["calibrate_agent", "stt"])
 
     def test_stt_with_provider_runs_benchmark(self):
-        from calibrate_agent import cli
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             (base / "audios").mkdir()

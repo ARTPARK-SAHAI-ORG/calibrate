@@ -25,7 +25,6 @@ Mirrors pipecat's stt-benchmark methodology on our pinned pipecat 1.0.0:
 
 import asyncio
 import time
-from pathlib import Path
 from typing import Optional
 
 from pipecat.frames.frames import (

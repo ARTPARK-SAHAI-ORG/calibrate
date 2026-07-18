@@ -168,7 +168,7 @@ async def run_bot(
     runner_args: RunnerArguments,
     output_dir,
 ):
-    logger.info(f"Starting bot")
+    logger.info("Starting bot")
 
     # --- STT Setup ---
     stt = create_stt_service(
@@ -321,7 +321,7 @@ async def run_bot(
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        logger.info(f"Client connected")
+        logger.info("Client connected")
         await audio_buffer.start_recording()
         # Kick off the conversation.
         messages.append(
@@ -331,7 +331,7 @@ async def run_bot(
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        logger.info(f"Client disconnected")
+        logger.info("Client disconnected")
         await task.cancel()
 
     @context_aggregator.user().event_handler("on_user_turn_stopped")

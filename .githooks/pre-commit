@@ -1,8 +1,27 @@
 #!/usr/bin/env bash
-# Run the full test suite before committing to main.
-# On other branches, do nothing.
+# Lint staged Python files on every branch.
+# Additionally run the full test suite when committing to main.
 
 branch=$(git symbolic-ref --short HEAD 2>/dev/null)
+
+staged_py=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.py$')
+
+if [ -n "$staged_py" ]; then
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "✗ uv not found on PATH — install uv or run 'ruff check' manually." >&2
+        exit 1
+    fi
+
+    echo "→ pre-commit: linting staged Python files..."
+    if ! echo "$staged_py" | xargs uv run --extra dev ruff check --force-exclude; then
+        echo ""
+        echo "✗ Lint failed. Commit aborted."
+        echo "  Run 'uv run --extra dev ruff check --fix .' to fix what is auto-fixable."
+        exit 1
+    fi
+    echo "✓ Lint passed."
+fi
+
 if [ "$branch" != "main" ]; then
     exit 0
 fi

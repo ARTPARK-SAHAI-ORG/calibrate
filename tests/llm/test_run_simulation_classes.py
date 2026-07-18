@@ -1,12 +1,10 @@
 """Tests for ConversationState and Processor classes in llm/run_simulation.py."""
 
-import asyncio
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 
 class TestConversationState(unittest.IsolatedAsyncioTestCase):
@@ -102,7 +100,7 @@ class TestProcessor(unittest.IsolatedAsyncioTestCase):
         partner.queue_frames.assert_called_once()
 
     async def test_handle_completed_response_continues(self):
-        proc, state = self._make_processor()
+        proc, _state = self._make_processor()
         task = MagicMock()
         task.queue_frames = AsyncMock()
         proc.set_task(task)
@@ -130,7 +128,7 @@ class TestProcessor(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(state.finished)
 
     async def test_end_conversation(self):
-        proc, state = self._make_processor()
+        proc, _state = self._make_processor()
         task = MagicMock()
         task.queue_frames = AsyncMock()
         proc.set_task(task)

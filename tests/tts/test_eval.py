@@ -130,7 +130,7 @@ class TestTTSValidateExistingResultsCSV(unittest.TestCase):
     def test_nonexistent_is_valid(self):
         from calibrate_agent.tts.eval import validate_existing_results_csv
 
-        ok, err = validate_existing_results_csv("/nonexistent.csv")
+        ok, _err = validate_existing_results_csv("/nonexistent.csv")
         self.assertTrue(ok)
 
     def test_valid_columns(self):
@@ -449,7 +449,7 @@ class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as f:
             path = f.name
         try:
-            ok, err, rows = validate_tts_eval_only_dataset(path)
+            ok, err, _rows = validate_tts_eval_only_dataset(path)
             self.assertFalse(ok)
             self.assertIn("must be a run directory", err)
         finally:
@@ -459,7 +459,7 @@ class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
         from calibrate_agent.tts.eval import validate_tts_eval_only_dataset
 
         with tempfile.TemporaryDirectory() as tmp:
-            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            ok, err, _rows = validate_tts_eval_only_dataset(tmp)
             self.assertFalse(ok)
             self.assertIn("No results.csv", err)
 
@@ -470,7 +470,7 @@ class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
             pd.DataFrame([{"id": "1", "text": "hi"}]).to_csv(
                 os.path.join(tmp, "results.csv"), index=False
             )
-            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            ok, err, _rows = validate_tts_eval_only_dataset(tmp)
             self.assertFalse(ok)
             self.assertIn("missing required columns", err)
 
@@ -481,7 +481,7 @@ class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
             pd.DataFrame(
                 [{"id": "1", "text": "hi", "audio_path": "audios/missing.wav"}]
             ).to_csv(os.path.join(tmp, "results.csv"), index=False)
-            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            ok, err, _rows = validate_tts_eval_only_dataset(tmp)
             self.assertFalse(ok)
             self.assertIn("audio file does not exist", err)
 
@@ -492,7 +492,7 @@ class TestTTSValidateEvalOnlyDataset(unittest.TestCase):
             pd.DataFrame(columns=["id", "text", "audio_path"]).to_csv(
                 os.path.join(tmp, "results.csv"), index=False
             )
-            ok, err, rows = validate_tts_eval_only_dataset(tmp)
+            ok, err, _rows = validate_tts_eval_only_dataset(tmp)
             self.assertFalse(ok)
             self.assertIn("empty", err)
 

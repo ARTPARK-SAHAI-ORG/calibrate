@@ -312,6 +312,27 @@ runs rely on them.
 
 ## Workflows
 
+### Linting
+
+Ruff is the linter. It is configured in `pyproject.toml` under `[tool.ruff]`
+and catches unused imports, unused variables, unused function arguments that
+are unpacked, unreachable or useless expressions, undefined names, and a few
+duplicated-branch patterns.
+
+```bash
+uv run --extra dev ruff check .          # check
+uv run --extra dev ruff check --fix .    # auto-fix what is fixable
+```
+
+Run this before committing. The `lint` job in `.github/workflows/tests.yml`
+fails the PR on any finding, and `.githooks/pre-commit` lints staged `.py`
+files on every branch.
+
+Some imports exist only to be re-exported (e.g. `AsyncOpenAI` in
+`calibrate_agent/langfuse.py`). Mark those with `# noqa: F401` rather than
+deleting them, and check for module-attribute access in tests
+(`patch.object(module, "Name")`) before removing an import that looks unused.
+
 ### Running the test suite
 
 ```bash

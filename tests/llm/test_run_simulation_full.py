@@ -1,10 +1,7 @@
 """Test the run_simulation full function flow with heavy mocking."""
 
-import asyncio
-import os
 import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
 

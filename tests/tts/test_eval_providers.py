@@ -1,6 +1,5 @@
 """Happy path tests for TTS provider synthesize methods (heavy SDK mocking)."""
 
-import asyncio
 import os
 import tempfile
 import unittest
@@ -263,7 +262,7 @@ class TestSynthesizeGoogle(unittest.IsolatedAsyncioTestCase):
                    return_value=fake_client), \
              patch("calibrate_agent.tts.eval.save_audio"):
             path = Path(tmp) / "x.wav"
-            result = await E.synthesize_google("hi", "sindhi", str(path))
+            await E.synthesize_google("hi", "sindhi", str(path))
 
 
 if __name__ == "__main__":

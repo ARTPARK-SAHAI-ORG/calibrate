@@ -1,15 +1,12 @@
 """Extra coverage for tts/eval.py — provider routers, run/eval flow."""
 
-import asyncio
-import io
-import json
 import os
 import sys
 import tempfile
 import unittest
 import wave
 from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock, mock_open
+from unittest.mock import patch, AsyncMock, MagicMock
 
 import pandas as pd
 
@@ -186,7 +183,7 @@ class TestValidateTTSInputFile(unittest.TestCase):
             f.write('"unclosed\n')
             path = f.name
         try:
-            ok, _ = validate_tts_input_file(path)
+            _ok, _ = validate_tts_input_file(path)
             # might pass or fail depending on pandas tolerance — just check no crash
         finally:
             os.unlink(path)

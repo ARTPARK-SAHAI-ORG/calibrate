@@ -319,7 +319,7 @@ async def main():
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
-        print(f"\033[92mSummary\033[0m")
+        print("\033[92mSummary\033[0m")
         print(f"\033[92m{'='*60}\033[0m\n")
 
         if result.get("status") == "error":
@@ -369,7 +369,7 @@ async def main():
 
         # Print summary
         print(f"\n\033[92m{'='*60}\033[0m")
-        print(f"\033[92mSummary\033[0m")
+        print("\033[92mSummary\033[0m")
         print(f"\033[92m{'='*60}\033[0m\n")
 
         has_errors = False

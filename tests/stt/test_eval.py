@@ -164,7 +164,7 @@ class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
     def test_missing_file(self):
         from calibrate_agent.stt.eval import validate_stt_eval_only_dataset
 
-        ok, err, rows = validate_stt_eval_only_dataset("/nope.json")
+        ok, _err, rows = validate_stt_eval_only_dataset("/nope.json")
         self.assertFalse(ok)
         self.assertEqual(rows, [])
 
@@ -175,7 +175,7 @@ class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
             json.dump({"id": "1", "gt": "hi", "pred": "hi"}, f)
             path = f.name
         try:
-            ok, err, rows = validate_stt_eval_only_dataset(path)
+            ok, err, _rows = validate_stt_eval_only_dataset(path)
             self.assertFalse(ok)
             self.assertIn("list", err)
         finally:
@@ -188,7 +188,7 @@ class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
             json.dump([{"id": "1", "gt": "hi"}], f)
             path = f.name
         try:
-            ok, err, rows = validate_stt_eval_only_dataset(path)
+            ok, err, _rows = validate_stt_eval_only_dataset(path)
             self.assertFalse(ok)
             self.assertIn("missing required fields", err)
         finally:

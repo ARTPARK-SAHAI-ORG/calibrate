@@ -1,7 +1,5 @@
 """Extra coverage for stt/eval.py — provider routers and main pathway."""
 
-import asyncio
-import io
 import json
 import os
 import sys
@@ -647,7 +645,7 @@ class TestValidateSTTEvalOnlyDataset(unittest.TestCase):
     def test_nonexistent(self):
         from calibrate_agent.stt.eval import validate_stt_eval_only_dataset
 
-        ok, err, _ = validate_stt_eval_only_dataset("/nonexistent.json")
+        ok, _err, _ = validate_stt_eval_only_dataset("/nonexistent.json")
         self.assertFalse(ok)
 
     def test_invalid_json(self):
@@ -656,7 +654,7 @@ class TestValidateSTTEvalOnlyDataset(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "data.json"
             p.write_text("{bad")
-            ok, err, _ = validate_stt_eval_only_dataset(str(p))
+            ok, _err, _ = validate_stt_eval_only_dataset(str(p))
             self.assertFalse(ok)
 
     def test_not_a_list(self):
@@ -692,7 +690,7 @@ class TestValidateSTTEvalOnlyDataset(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp) / "data.json"
             p.write_text(json.dumps([{"id": "a", "gt": "x", "pred": "x"}]))
-            ok, err, rows = validate_stt_eval_only_dataset(str(p))
+            ok, _err, rows = validate_stt_eval_only_dataset(str(p))
             self.assertTrue(ok)
             self.assertEqual(len(rows), 1)
 

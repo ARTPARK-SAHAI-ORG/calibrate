@@ -9,8 +9,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from cli_reference import Option  # noqa: E402
-from request_examples import (  # noqa: E402
+from cli_reference import Option
+from request_examples import (
     command_key,
     learn_more_markdown,
     named_request_examples,

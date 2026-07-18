@@ -7,8 +7,6 @@ or:
     python tests/test_agent_connection.py
 """
 
-import asyncio
-import json
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -77,7 +75,7 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {"response": "Hello there!", "tool_calls": []}
 
-        ctx, mock_client = _patch_httpx(fake_body)
+        ctx, _mock_client = _patch_httpx(fake_body)
         with ctx:
             result = await agent.call([{"role": "user", "content": "Hi"}])
 

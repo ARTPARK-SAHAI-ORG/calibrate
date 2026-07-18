@@ -1,9 +1,6 @@
 """Test agent/bot.py run_bot function with heavy mocking."""
 
-import asyncio
-import tempfile
 import unittest
-from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
 

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from cli_reference import (  # noqa: E402
+from cli_reference import (
     OVERVIEW_SLUG,
     CliCommand,
     Option,
@@ -28,7 +28,7 @@ from cli_reference import (  # noqa: E402
     resource_of,
     resource_slug,
 )
-from cli_doc_samples import ROOT_CMD, WIDGETS, WIDGETS_CREATE, WIDGETS_LIST  # noqa: E402
+from cli_doc_samples import ROOT_CMD, WIDGETS, WIDGETS_CREATE
 
 
 # --------------------------------------------------------------------------- #

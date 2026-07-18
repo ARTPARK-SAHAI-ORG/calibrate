@@ -1,11 +1,9 @@
 """Cover remaining branches in stt/eval.py."""
 
-import asyncio
-import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 
 import pandas as pd
 

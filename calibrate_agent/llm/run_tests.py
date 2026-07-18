@@ -13,21 +13,15 @@ if TYPE_CHECKING:
 import os
 from os.path import join, exists
 import json
-from pathlib import Path
 from calibrate_agent.utils import (
-    configure_print_logger,
     log_and_print,
     build_tools_schema,
     provider_log_file,
     apply_debug_limit,
 )
 from pipecat.frames.frames import (
-    TranscriptionFrame,
-    LLMRunFrame,
     EndFrame,
-    EndTaskFrame,
     LLMFullResponseEndFrame,
-    CancelFrame,
     FunctionCallResultProperties,
     LLMMessagesAppendFrame,
     TextFrame,
@@ -41,7 +35,7 @@ from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
+from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -277,7 +271,6 @@ class CostTrackingOpenRouterLLMService(OpenRouterLLMService):
 class LLMInferenceError(Exception):
     """Raised when LLM inference fails due to system error (API error, invalid model, etc.)"""
 
-    pass
 
 
 # Lock to protect logger add/remove operations from race conditions when running in parallel
@@ -2321,7 +2314,7 @@ async def main():
         total = result["total"]
         pct = (passed / total * 100) if total else 0.0
         print(f"\n\033[92m{'='*60}\033[0m")
-        print(f"\033[92mSummary\033[0m")
+        print("\033[92mSummary\033[0m")
         print(f"\033[92m{'='*60}\033[0m\n")
         print(f"  eval-only: {passed}/{total} ({pct:.1f}%)")
         return
@@ -2354,7 +2347,7 @@ async def main():
 
     # Print summary
     print(f"\n\033[92m{'='*60}\033[0m")
-    print(f"\033[92mSummary\033[0m")
+    print("\033[92mSummary\033[0m")
     print(f"\033[92m{'='*60}\033[0m\n")
 
     passed = result["metrics"]["passed"]

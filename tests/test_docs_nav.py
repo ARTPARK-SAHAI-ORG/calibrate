@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from docs_nav import insert_tab  # noqa: E402
+from docs_nav import insert_tab
 
 
 def _names(tabs):

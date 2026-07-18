@@ -9,13 +9,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from mcp_reference import (  # noqa: E402
+from mcp_reference import (
     McpTool,
     operation_key,
     parse_tool_ts,
     parse_tools_dir,
 )
-from mcp_tool_samples import (  # noqa: E402
+from mcp_tool_samples import (
     CREATE_WIDGET_TS,
     GET_WIDGET_TS,
     HELPER_TS,

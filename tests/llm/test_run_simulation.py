@@ -5,7 +5,6 @@ All tests are pure async — no mocks or external dependencies needed.
 """
 
 import asyncio
-import pytest
 
 from calibrate_agent.llm.run_simulation import ConversationState
 

@@ -5,7 +5,6 @@ Run with:
     python -m pytest tests/test_output.py -v
 """
 
-import io
 import unittest
 from unittest.mock import patch
 

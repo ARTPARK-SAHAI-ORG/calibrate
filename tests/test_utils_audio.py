@@ -1,7 +1,6 @@
 """Tests for utils.py audio combining functions."""
 
 import json
-import os
 import tempfile
 import unittest
 import wave

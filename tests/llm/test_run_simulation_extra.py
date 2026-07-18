@@ -136,7 +136,7 @@ class TestRunEvalOnlySimulationTask(unittest.IsolatedAsyncioTestCase):
                 evaluators=[_bin_ev("x")],
                 output_dir=tmp,
             )
-        sim_metrics, eval_results = result
+        sim_metrics, _eval_results = result
         self.assertEqual(sim_metrics["row_id"], "row_1")
         self.assertEqual(sim_metrics["name"], "n1")
         self.assertEqual(sim_metrics["x"], 1.0)

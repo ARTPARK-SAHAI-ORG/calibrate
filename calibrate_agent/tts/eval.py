@@ -145,7 +145,6 @@ def save_audio(audio_bytes: bytes, output_path: str, sample_rate: int = 24000):
         output_path: Path to save the WAV file
         sample_rate: Audio sample rate (default: 24000)
     """
-    import wave
 
     output_dir = os.path.dirname(output_path)
     if output_dir:
@@ -1290,7 +1289,7 @@ async def main():
 
     # Print summary
     print(f"\n\033[92m{'='*60}\033[0m")
-    print(f"\033[92mSummary\033[0m")
+    print("\033[92mSummary\033[0m")
     print(f"\033[92m{'='*60}\033[0m\n")
 
     if result.get("status") == "error":

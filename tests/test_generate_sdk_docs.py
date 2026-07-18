@@ -8,9 +8,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from generate_sdk_docs import _examples_for_route, render_method_page  # noqa: E402
-from request_examples import NamedExample  # noqa: E402
-from sdk_reference import SdkMethodDoc, SdkRoute  # noqa: E402
+from generate_sdk_docs import _examples_for_route, render_method_page
+from request_examples import NamedExample
+from sdk_reference import SdkMethodDoc, SdkRoute
 
 _ROUTE = SdkRoute(
     http="POST",

@@ -35,17 +35,17 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from docs_mdx import escape_mdx_prose, frontmatter_value, table_cell  # noqa: E402
-from docs_nav import insert_tab  # noqa: E402
-from mcp_reference import McpTool, operation_key, parse_tools_dir  # noqa: E402
-from request_examples import (  # noqa: E402
+from docs_mdx import escape_mdx_prose, frontmatter_value, table_cell
+from docs_nav import insert_tab
+from mcp_reference import McpTool, operation_key, parse_tools_dir
+from request_examples import (
     NamedExample,
     command_key,
     learn_more_markdown,
     named_request_examples,
     render_mcp_snippet,
 )
-from sdk_reference import api_group_from_tag  # noqa: E402
+from sdk_reference import api_group_from_tag
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = REPO_ROOT / "docs"

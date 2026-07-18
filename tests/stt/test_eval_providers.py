@@ -1,6 +1,5 @@
 """Happy path tests for STT provider transcribe methods (heavy SDK mocking)."""
 
-import asyncio
 import os
 import unittest
 from pathlib import Path

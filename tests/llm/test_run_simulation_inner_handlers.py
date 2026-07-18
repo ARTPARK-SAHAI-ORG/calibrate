@@ -1,6 +1,5 @@
 """Test the inner tool handlers in run_simulation by triggering tool registration paths."""
 
-import asyncio
 import tempfile
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock

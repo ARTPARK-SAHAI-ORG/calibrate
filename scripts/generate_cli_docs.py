@@ -31,7 +31,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from cli_reference import (  # noqa: E402
+from cli_reference import (
     CliCommand,
     Option,
     last_segment,
@@ -41,17 +41,17 @@ from cli_reference import (  # noqa: E402
     resource_slug,
     strip_md_suffix,
 )
-from docs_mdx import escape_mdx_prose as _escape_mdx_prose  # noqa: E402
-from docs_mdx import frontmatter_value as _frontmatter_value  # noqa: E402
-from docs_mdx import table_cell as _table_cell  # noqa: E402
-from docs_nav import insert_tab  # noqa: E402
-from request_examples import (  # noqa: E402
+from docs_mdx import escape_mdx_prose as _escape_mdx_prose
+from docs_mdx import frontmatter_value as _frontmatter_value
+from docs_mdx import table_cell as _table_cell
+from docs_nav import insert_tab
+from request_examples import (
     NamedExample,
     learn_more_markdown,
     named_request_examples,
     render_cli_snippet,
 )
-from sdk_reference import api_group_from_tag, load_route_map  # noqa: E402
+from sdk_reference import api_group_from_tag, load_route_map
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DOCS_ROOT = REPO_ROOT / "docs"

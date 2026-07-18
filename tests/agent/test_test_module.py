@@ -1,9 +1,7 @@
 """Tests for calibrate_agent/agent/test.py — CLI args, parse_bot_config, bot() entry."""
 
 import argparse
-import asyncio
 import json
-import os
 import tempfile
 import unittest
 from pathlib import Path

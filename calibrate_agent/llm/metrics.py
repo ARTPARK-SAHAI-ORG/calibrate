@@ -4,7 +4,7 @@ LLM evaluation metrics.
 Thin wrappers around calibrate_agent.judges that take pre-rendered evaluators.
 """
 
-from typing import List, Optional
+from typing import List
 
 from calibrate_agent.judges import (
     text_judge,

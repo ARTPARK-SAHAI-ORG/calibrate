@@ -1,6 +1,5 @@
 """Shared output helpers for LLM benchmark results."""
 
-import sys
 
 
 def print_benchmark_summary(
@@ -19,7 +18,7 @@ def print_benchmark_summary(
         model_label: Optional callable to format display label from model name.
     """
     print(f"\n\033[92m{'='*60}\033[0m")
-    print(f"\033[92mOverall Summary\033[0m")
+    print("\033[92mOverall Summary\033[0m")
     print(f"\033[92m{'='*60}\033[0m\n")
 
     has_errors = False

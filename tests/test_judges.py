@@ -36,7 +36,6 @@ from calibrate_agent.judges import (
     CriterionResult,
     DEFAULT_TEXT_JUDGE_MODEL,
     DEFAULT_AUDIO_JUDGE_MODEL,
-    DEFAULT_SIMULATION_JUDGE_MODEL,
     DEFAULT_LLM_TEST_EVALUATOR,
     DEFAULT_GENERAL_TASK_EVALUATOR,
     DEFAULT_STT_EVALUATOR,
@@ -312,7 +311,8 @@ class TestJudgeIOLogging(unittest.IsolatedAsyncioTestCase):
     """The judge writes its prompt/response into the bound run log file."""
 
     async def test_logs_judge_io_to_bound_file(self):
-        import tempfile, os
+        import tempfile
+        import os
         from calibrate_agent.utils import provider_log_file
 
         client = _mock_instructor_chat_completions(

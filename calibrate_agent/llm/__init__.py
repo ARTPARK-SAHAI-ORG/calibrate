@@ -57,7 +57,7 @@ Library Usage:
     simulations.leaderboard(output_dir="./out", save_dir="./leaderboard")
 """
 
-from typing import Literal, Optional, List, Dict, Any, TYPE_CHECKING
+from typing import Literal, Optional, List, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from calibrate_agent.connections import TextAgentConnection

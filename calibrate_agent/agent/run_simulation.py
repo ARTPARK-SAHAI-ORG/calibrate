@@ -1,27 +1,21 @@
 import aiohttp
 import asyncio
-import gc
 import json
 import os
 import sys
 import socket
 from os.path import join, exists
 import shutil
-from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional, Tuple, Literal
-import traceback
+from typing import Any, Optional, Literal
 from uuid import uuid4
 from loguru import logger
-from PIL.ImageFile import ImageFile
-from dataclasses import dataclass
 import numpy as np
 from collections import defaultdict
 
 from calibrate_agent.utils import (
     current_context,
     current_simulation_name,
-    add_default_source,
     configure_print_logger,
     cleanup_print_logger,
     log_and_print,
@@ -109,8 +103,6 @@ def count_agent_message_turns(messages: list) -> int:
 # Create a contextual logger with EVAL prefix
 eval_logger = logger.bind(source="EVAL")
 
-from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.audio.vad.silero import SileroVADAnalyzer, VADParams
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.transcriptions.language import Language
@@ -119,30 +111,21 @@ from pipecat.frames.frames import (
     EndFrame,
     BotSpeakingFrame,
     UserSpeakingFrame,
-    LLMContextFrame,
-    StopFrame,
     CancelFrame,
     InterimTranscriptionFrame,
     LLMRunFrame,
     TTSTextFrame,
     TranscriptionFrame,
-    BotStartedSpeakingFrame,
-    BotStoppedSpeakingFrame,
     UserStoppedSpeakingFrame,
     InputAudioRawFrame,
     OutputAudioRawFrame,
-    LLMMessagesAppendFrame,
     LLMFullResponseStartFrame,
     LLMFullResponseEndFrame,
     TextFrame,
     InputTransportMessageFrame,
     OutputTransportMessageUrgentFrame,
-    Frame,
-    InterruptionFrame,
     InterruptionTaskFrame,
     TTSStoppedFrame,
-    TTSAudioRawFrame,
-    ErrorFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
@@ -161,8 +144,6 @@ from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from pipecat.processors.audio.audio_buffer_processor import AudioBufferProcessor
 from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import RunnerArguments
-from pipecat.services.cartesia.tts import CartesiaTTSService
-from pipecat.services.llm_service import FunctionCallParams
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.elevenlabs.tts import ElevenLabsHttpTTSService
 
@@ -1026,7 +1007,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 for generated_frame in generated_frames:
                     await self.push_frame(generated_frame, direction)
 
-        if isinstance(frame, EndFrame) or isinstance(frame, CancelFrame):
+        if isinstance(frame, (EndFrame, CancelFrame)):
             # Build and save final transcript
             end_reason = "max_turns" if self._ended_due_to_max_turns else None
             transcript = self._build_serialized_transcript(end_reason=end_reason)
@@ -1496,7 +1477,7 @@ async def _run_simulation_inner(
     if tools:
         _, webhook_configs = build_tools_schema(tools)
 
-    eval_logger.info(f"Starting evaluation pipeline")
+    eval_logger.info("Starting evaluation pipeline")
 
     stt_outputs = []
     ttft = defaultdict[Any, list](list)
@@ -1735,7 +1716,7 @@ async def _run_simulation_inner(
 
     @transport.event_handler("on_connected")
     async def on_connected(transport, client):
-        eval_logger.info(f"WebSocket connected")
+        eval_logger.info("WebSocket connected")
         await audio_buffer.start_recording()
 
         if not agent_speaks_first:
@@ -1743,7 +1724,7 @@ async def _run_simulation_inner(
 
     @transport.event_handler("on_disconnected")
     async def on_disconnected(transport, client):
-        eval_logger.info(f"WebSocket disconnected")
+        eval_logger.info("WebSocket disconnected")
         await task.cancel()
 
     @context_aggregator.user().event_handler("on_user_turn_stopped")
@@ -1894,7 +1875,7 @@ async def _run_simulation_inner(
         stt_eval_references, stt_eval_predictions = stt_judge_inputs
         min_len = len(stt_eval_references)
         # Align lengths - take minimum length
-        log_and_print(f"Evaluating the STT outputs with user messages")
+        log_and_print("Evaluating the STT outputs with user messages")
 
         if min_len > 0:
             stt_llm_judge_result = await stt_llm_judge_score(
@@ -2249,7 +2230,7 @@ async def _run_single_simulation_inner(
             )
             if pending:
                 eval_logger.error(
-                    f"ERROR: Eval timeout expired, cancelling pending tasks..."
+                    "ERROR: Eval timeout expired, cancelling pending tasks..."
                 )
                 # Both pipeline idle timeouts should have worked and both tasks
                 # should have exited already, but if we got here something went

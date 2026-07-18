@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from generate_mcp_docs import (  # noqa: E402
+from generate_mcp_docs import (
     Arg,
     Operation,
     _anchor,
@@ -26,9 +26,9 @@ from generate_mcp_docs import (  # noqa: E402
     build_tab,
     generate_mcp_docs,
 )
-from mcp_reference import McpTool, parse_tool_ts  # noqa: E402
-from request_examples import NamedExample  # noqa: E402
-from mcp_tool_samples import (  # noqa: E402
+from mcp_reference import McpTool, parse_tool_ts
+from request_examples import NamedExample
+from mcp_tool_samples import (
     CREATE_WIDGET_TS,
     GET_WIDGET_TS,
     LIST_WIDGETS_TS,

@@ -183,7 +183,7 @@ class TestVerifyWithModelParams(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
-        ctx, mock_client = _patch_httpx({"response": "I am using gemma", "tool_calls": []})
+        ctx, _mock_client = _patch_httpx({"response": "I am using gemma", "tool_calls": []})
         with ctx:
             result = await agent.verify(model="gemma-4-26b-a4b-it")
 

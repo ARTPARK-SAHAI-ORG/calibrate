@@ -147,7 +147,7 @@ async def run_bot(
     if language not in ["english", "hindi", "kannada"]:
         raise ValueError(f"Invalid language: {language}")
 
-    bot_logger.info(f"Starting bot")
+    bot_logger.info("Starting bot")
 
     # Create STT service using common utility
     stt = create_stt_service(stt_config.provider, language)
@@ -376,7 +376,7 @@ async def run_bot(
             logger.info(f"input bot frame: {frame}")
 
             if isinstance(frame, RTVIClientMessageFrame) and frame.type == "interrupt":
-                logger.info(f"Simulating user interruption of the bot")
+                logger.info("Simulating user interruption of the bot")
                 await self.broadcast_interruption()
                 await self.push_frame(UserStartedSpeakingFrame())
                 await self.push_frame(
@@ -493,7 +493,7 @@ async def run_bot(
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
-        bot_logger.info(f"Client connected")
+        bot_logger.info("Client connected")
         # Kick off the conversation.
         if agent_speaks_first:
             messages.append(
@@ -507,7 +507,7 @@ async def run_bot(
 
     @transport.event_handler("on_client_disconnected")
     async def on_client_disconnected(transport, client):
-        bot_logger.info(f"Client disconnected")
+        bot_logger.info("Client disconnected")
         await task.cancel()
 
     @context_aggregator.user().event_handler("on_user_turn_stopped")

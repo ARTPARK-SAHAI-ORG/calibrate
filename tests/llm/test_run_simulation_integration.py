@@ -16,8 +16,6 @@ Strategy:
 import asyncio
 import argparse
 import json
-import os
-import sys
 
 import pytest
 from pytest_httpserver import HTTPServer
@@ -483,7 +481,6 @@ class TestAgentConnectionDetection:
             json.dump(config_dict, f)
 
         captured_agents = []
-        original_task_fn = None
 
         async def mock_task(*args, **kwargs):
             captured_agents.append(kwargs.get("agent", "NOT_PASSED"))

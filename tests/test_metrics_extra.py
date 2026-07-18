@@ -23,7 +23,7 @@ class TestSTTLlmJudge(unittest.IsolatedAsyncioTestCase):
              patch.object(M, "langfuse_enabled", True), \
              patch.object(M, "langfuse", fake_lf):
             inner = M.stt_llm_judge.__wrapped__ if hasattr(M.stt_llm_judge, "__wrapped__") else M.stt_llm_judge
-            result = await inner("ref", "pred")
+            await inner("ref", "pred")
         fake_lf.update_current_trace.assert_called_once()
 
 

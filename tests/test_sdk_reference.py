@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from sdk_reference import (  # noqa: E402
+from sdk_reference import (
     SdkRoute,
     api_group_from_tag,
     build_route_map,
@@ -22,7 +22,7 @@ from sdk_reference import (  # noqa: E402
     parse_reference_md,
     routes_with_sdk_docs,
 )
-from sdk_route_samples import SAMPLE_OPENAPI, SAMPLE_OVERRIDES  # noqa: E402
+from sdk_route_samples import SAMPLE_OPENAPI, SAMPLE_OVERRIDES
 
 REFERENCE_FIXTURE = dedent(
     """\

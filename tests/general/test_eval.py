@@ -38,7 +38,7 @@ def _write_json(obj) -> str:
 
 class TestValidateDataset(unittest.TestCase):
     def test_missing_file(self):
-        ok, err, rows = validate_general_eval_dataset("/no/such/file.json")
+        ok, err, _rows = validate_general_eval_dataset("/no/such/file.json")
         self.assertFalse(ok)
         self.assertIn("does not exist", err)
 

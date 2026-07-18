@@ -1461,7 +1461,7 @@ class TestValidateLLMEvalOnlyDataset(unittest.TestCase):
     def test_valid(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, err = validate_llm_eval_only_dataset([
+        is_valid, _err = validate_llm_eval_only_dataset([
             {
                 "test_case": {
                     "history": [{"role": "user", "content": "hi"}],
@@ -1501,13 +1501,13 @@ class TestValidateLLMEvalOnlyDataset(unittest.TestCase):
     def test_not_a_list(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, err = validate_llm_eval_only_dataset({})
+        is_valid, _err = validate_llm_eval_only_dataset({})
         self.assertFalse(is_valid)
 
     def test_item_not_dict(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, err = validate_llm_eval_only_dataset(["not a dict"])
+        is_valid, _err = validate_llm_eval_only_dataset(["not a dict"])
         self.assertFalse(is_valid)
 
     def test_missing_keys(self):
@@ -1844,7 +1844,9 @@ class TestProcessorTokenCapture(unittest.IsolatedAsyncioTestCase):
         proc._task = None
         with patch.object(RT.FrameProcessor, "process_frame", AsyncMock()), \
              patch.object(proc, "push_frame", AsyncMock()):
-            await proc.process_frame(frame, RT.FrameDirection.DOWNSTREAM)
+            from pipecat.processors.frame_processor import FrameDirection
+
+            await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
 
     async def test_accumulates_total_tokens_across_frames(self):
         from calibrate_agent.llm.run_tests import Processor

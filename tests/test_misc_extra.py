@@ -1,8 +1,6 @@
 """Cover remaining gaps in stt/eval, status, and other modules to push to 70%."""
 
-import asyncio
 import os
-import sys
 import tempfile
 import unittest
 from pathlib import Path

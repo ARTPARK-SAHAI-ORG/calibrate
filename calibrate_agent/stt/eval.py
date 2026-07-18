@@ -5,7 +5,6 @@ import os
 import json
 import base64
 from os.path import join, exists
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 from urllib.parse import urlencode
@@ -1374,7 +1373,7 @@ async def run_single_provider_eval(
             previous_processed_count = current_processed
 
             # Run transcription
-            success_count = await run_stt_eval(
+            await run_stt_eval(
                 gt_data=gt_data,
                 audio_dir=audio_dir,
                 provider=provider,
@@ -1944,7 +1943,7 @@ async def main():
 
     # Print summary
     print(f"\n\033[92m{'='*60}\033[0m")
-    print(f"\033[92mSummary\033[0m")
+    print("\033[92mSummary\033[0m")
     print(f"\033[92m{'='*60}\033[0m\n")
 
     if result.get("status") == "error":

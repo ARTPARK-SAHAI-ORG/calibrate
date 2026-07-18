@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from generate_cli_docs import (  # noqa: E402
+from generate_cli_docs import (
     _escape_mdx_prose,
     _options_table,
     _subcommand_section,
@@ -28,8 +28,8 @@ from generate_cli_docs import (  # noqa: E402
     resource_title,
     subcommand_order,
 )
-from cli_reference import Option, parse_cli_doc  # noqa: E402
-from cli_doc_samples import API_TAGS, SAMPLES, write_samples  # noqa: E402
+from cli_reference import Option, parse_cli_doc
+from cli_doc_samples import API_TAGS, SAMPLES, write_samples
 
 
 def _sample(name: str):

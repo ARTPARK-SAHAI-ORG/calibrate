@@ -1,11 +1,8 @@
 """Cover calibrate_agent/agent/__init__.py public API via mocks."""
 
-import os
-import json
 import tempfile
 import unittest
-from pathlib import Path
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch, AsyncMock
 
 
 class TestConfigDataclasses(unittest.TestCase):
@@ -170,7 +167,7 @@ class TestCalibrateInit(unittest.TestCase):
         import calibrate_agent
 
         with self.assertRaises(AttributeError):
-            calibrate_agent.does_not_exist
+            calibrate_agent.does_not_exist  # noqa: B018
 
 
 if __name__ == "__main__":

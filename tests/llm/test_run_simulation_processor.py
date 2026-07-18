@@ -1,6 +1,5 @@
 """Tests for Processor.process_frame in llm/run_simulation.py."""
 
-import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 

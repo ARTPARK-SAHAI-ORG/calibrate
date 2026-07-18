@@ -13,15 +13,15 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "tests"))
 
-from fetch_public_openapi import (  # noqa: E402
+from fetch_public_openapi import (
     _normalize_for_docs,
     public_api_base_url,
     public_openapi_spec_url,
     render_templates,
     sync_cli_docs,
 )
-from generate_sdk_docs import generate_sdk_docs  # noqa: E402
-from sdk_route_samples import SAMPLE_OPENAPI, SAMPLE_OVERRIDES  # noqa: E402
+from generate_sdk_docs import generate_sdk_docs
+from sdk_route_samples import SAMPLE_OPENAPI, SAMPLE_OVERRIDES
 
 TEST_BASE_URL = "https://api.example.test"
 REFERENCE_FIXTURE = ROOT / "tests" / "fixtures" / "reference.md"

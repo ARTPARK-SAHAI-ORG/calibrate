@@ -1,7 +1,6 @@
 """Tests for simple helpers in calibrate_agent/agent/run_simulation.py."""
 
 import asyncio
-import socket
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 

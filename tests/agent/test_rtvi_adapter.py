@@ -1,8 +1,6 @@
 """Tests for RTVIMessageFrameAdapter helper methods that don't require pipecat runtime."""
 
-import asyncio
 import json
-import os
 import tempfile
 import unittest
 from collections import defaultdict

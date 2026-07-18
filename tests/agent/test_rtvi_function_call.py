@@ -1,6 +1,5 @@
 """Tests for RTVIFunctionCallResponder in agent/run_simulation.py."""
 
-import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 

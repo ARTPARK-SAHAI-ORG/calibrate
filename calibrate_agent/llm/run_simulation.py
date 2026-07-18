@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from calibrate_agent.connections import TextAgentConnection
 from loguru import logger
 import os
-from os.path import join, exists, splitext, basename
+from os.path import join, exists
 import shutil
 from collections import defaultdict
 import traceback
@@ -25,12 +25,9 @@ from calibrate_agent.utils import (
     save_transcript,
 )
 from pipecat.frames.frames import (
-    TranscriptionFrame,
     LLMRunFrame,
     EndFrame,
-    EndTaskFrame,
     LLMFullResponseEndFrame,
-    CancelFrame,
     LLMMessagesAppendFrame,
     TextFrame,
     FunctionCallResultProperties,
@@ -42,7 +39,7 @@ from pipecat.services.llm_service import FunctionCallParams
 from pipecat.pipeline.pipeline import Pipeline
 from pipecat.pipeline.runner import PipelineRunner
 from pipecat.pipeline.task import PipelineParams, PipelineTask
-from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
+from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -640,7 +637,7 @@ async def run_simulation_with_agent(
         agent sees its own prior tool calls. Returns None if no text response after
         3 attempts, logging a warning.
         """
-        for attempt in range(_MAX_TOOL_CALL_RETRIES):
+        for _attempt in range(_MAX_TOOL_CALL_RETRIES):
             output = await agent.call(messages)
             if output.get("response"):
                 return output["response"]

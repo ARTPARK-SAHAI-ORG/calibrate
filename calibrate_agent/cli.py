@@ -713,7 +713,7 @@ Examples:
                             print(f"✗ Verification failed: {_verify_result['error']}")
                             _print_sample_output(_verify_result)
                             sys.exit(1)
-                        print(f"✓ Verified")
+                        print("✓ Verified")
                         _print_sample_output(_verify_result)
                         print()
 

@@ -38,7 +38,7 @@ except Exception:
     except NameError:
         pass
 
-    from openai import AsyncOpenAI
+    from openai import AsyncOpenAI  # noqa: F401  re-exported
 
     LangfuseMedia = None
     langfuse = None
