@@ -51,6 +51,10 @@ follow this process before writing code:
 5. **Share the plan and surface the choices — don't assume.** Present the plan
    and explicitly raise any decisions to be made, along with their tradeoffs,
    and ask the user instead of silently picking an option.
+6. **Implement through the `/parallelize` skill.** Once the plan is settled and
+   it's time to write code, invoke the `parallelize` skill and let it run the
+   independent chunks as parallel agents. This applies to every implementation,
+   including single-file ones.
 
 ## Repository layout
 
