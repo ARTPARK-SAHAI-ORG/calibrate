@@ -67,11 +67,14 @@ class TestCreateSTTService(unittest.TestCase):
         for prov, expected in STT_PROVIDER_MODELS.items():
             if prov in BENCHMARK_ONLY_PROVIDERS:
                 continue
-            with patch.dict(os.environ, ALL_KEYS), \
-                    patch(STT_SERVICE_TARGETS[prov]) as svc:
+            with (
+                patch.dict(os.environ, ALL_KEYS),
+                patch(STT_SERVICE_TARGETS[prov]) as svc,
+            ):
                 create_stt_service(prov, "english")
                 self.assertEqual(
-                    svc.Settings.call_args.kwargs["model"], expected,
+                    svc.Settings.call_args.kwargs["model"],
+                    expected,
                     f"{prov}: STT model default drifted from STT_PROVIDER_MODELS",
                 )
 
@@ -79,8 +82,16 @@ class TestCreateSTTService(unittest.TestCase):
         # parity coverage here (benchmark-only providers excepted).
         self.assertEqual(
             set(STT_PROVIDER_MODELS) - BENCHMARK_ONLY_PROVIDERS,
-            {"deepgram", "openai", "groq", "google", "cartesia",
-             "elevenlabs", "smallest", "sarvam"},
+            {
+                "deepgram",
+                "openai",
+                "groq",
+                "google",
+                "cartesia",
+                "elevenlabs",
+                "smallest",
+                "sarvam",
+            },
         )
 
     def test_sarvam_stt_transcribes(self):
@@ -89,8 +100,10 @@ class TestCreateSTTService(unittest.TestCase):
         stt/eval.py's transcribe_sarvam."""
         from calibrate_agent.utils import create_stt_service, STT_PROVIDER_MODELS
 
-        with patch.dict(os.environ, ALL_KEYS), \
-                patch(STT_SERVICE_TARGETS["sarvam"]) as svc:
+        with (
+            patch.dict(os.environ, ALL_KEYS),
+            patch(STT_SERVICE_TARGETS["sarvam"]) as svc,
+        ):
             create_stt_service("sarvam", "english")
             self.assertEqual(svc.call_args.kwargs["mode"], "transcribe")
             self.assertEqual(
@@ -145,17 +158,21 @@ class TestCreateTTSService(unittest.TestCase):
 
         for prov in benchmarked:
             for language in ("english", "hindi", "kannada"):
-                with patch.dict(os.environ, ALL_KEYS), \
-                        patch(TTS_SERVICE_TARGETS[prov]) as svc:
+                with (
+                    patch.dict(os.environ, ALL_KEYS),
+                    patch(TTS_SERVICE_TARGETS[prov]) as svc,
+                ):
                     create_tts_service(prov, language)
                     kwargs = svc.Settings.call_args.kwargs
                     self.assertEqual(
-                        kwargs["voice"], get_tts_voice(prov, language),
+                        kwargs["voice"],
+                        get_tts_voice(prov, language),
                         f"{prov}/{language}: TTS voice drifted from get_tts_voice",
                     )
                     if prov in self._TTS_MODEL_PROVIDERS:
                         self.assertEqual(
-                            kwargs["model"], TTS_PROVIDER_MODELS[prov],
+                            kwargs["model"],
+                            TTS_PROVIDER_MODELS[prov],
                             f"{prov}: TTS model drifted from TTS_PROVIDER_MODELS",
                         )
 

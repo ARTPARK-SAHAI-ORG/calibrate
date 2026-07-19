@@ -28,12 +28,12 @@ class TestGoogleStreaming(unittest.TestCase):
             [interim_response, final_response, empty_response]
         )
 
-        with patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT_ID": "proj"}), \
-             patch.object(E, "SpeechClient", return_value=fake_client), \
-             patch.object(E, "load_audio", return_value=b"\x00" * 100000):
-            result = E._transcribe_google_streaming(
-                Path("/tmp/x.wav"), "en-US"
-            )
+        with (
+            patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT_ID": "proj"}),
+            patch.object(E, "SpeechClient", return_value=fake_client),
+            patch.object(E, "load_audio", return_value=b"\x00" * 100000),
+        ):
+            result = E._transcribe_google_streaming(Path("/tmp/x.wav"), "en-US")
 
         # Only the final result contributes to the transcript.
         self.assertEqual(result["transcript"], "hello world")
@@ -51,9 +51,11 @@ class TestGoogleStreaming(unittest.TestCase):
         fake_client = MagicMock()
         fake_client.streaming_recognize.side_effect = fake_streaming_recognize
 
-        with patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT_ID": "proj"}), \
-             patch.object(E, "SpeechClient", return_value=fake_client), \
-             patch.object(E, "load_audio", return_value=b"\x00" * 100):
+        with (
+            patch.dict(os.environ, {"GOOGLE_CLOUD_PROJECT_ID": "proj"}),
+            patch.object(E, "SpeechClient", return_value=fake_client),
+            patch.object(E, "load_audio", return_value=b"\x00" * 100),
+        ):
             result = E._transcribe_google_streaming(Path("/tmp/x.wav"), "en-US")
 
         # No results -> empty transcript.

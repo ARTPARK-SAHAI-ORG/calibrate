@@ -13,6 +13,7 @@ from calibrate_agent.llm.run_simulation import ConversationState
 # 1. record_turn increments turn_count
 # ---------------------------------------------------------------------------
 
+
 def test_record_turn_increments_turn_count():
     state = ConversationState(max_turns=5)
     asyncio.run(state.record_turn())
@@ -24,6 +25,7 @@ def test_record_turn_increments_turn_count():
 # ---------------------------------------------------------------------------
 # 2. record_turn returns True while under max_turns
 # ---------------------------------------------------------------------------
+
 
 def test_record_turn_returns_true_while_under_max_turns():
     state = ConversationState(max_turns=3)
@@ -37,6 +39,7 @@ def test_record_turn_returns_true_while_under_max_turns():
 # 3. record_turn returns False when turn_count >= max_turns
 # ---------------------------------------------------------------------------
 
+
 def test_record_turn_returns_false_at_max_turns():
     state = ConversationState(max_turns=2)
     asyncio.run(state.record_turn())  # turn 1 -> True
@@ -49,6 +52,7 @@ def test_record_turn_returns_false_at_max_turns():
 # 4. record_turn returns False when already finished (after mark_finished)
 # ---------------------------------------------------------------------------
 
+
 def test_record_turn_returns_false_when_already_finished():
     state = ConversationState(max_turns=10)
     asyncio.run(state.mark_finished())
@@ -60,6 +64,7 @@ def test_record_turn_returns_false_when_already_finished():
 # 5. mark_finished returns True on first call
 # ---------------------------------------------------------------------------
 
+
 def test_mark_finished_returns_true_first_call():
     state = ConversationState(max_turns=5)
     result = asyncio.run(state.mark_finished())
@@ -69,6 +74,7 @@ def test_mark_finished_returns_true_first_call():
 # ---------------------------------------------------------------------------
 # 6. mark_finished returns False on second call (idempotent)
 # ---------------------------------------------------------------------------
+
 
 def test_mark_finished_returns_false_second_call():
     state = ConversationState(max_turns=5)
@@ -81,6 +87,7 @@ def test_mark_finished_returns_false_second_call():
 # 7. finished flag is True after mark_finished
 # ---------------------------------------------------------------------------
 
+
 def test_finished_flag_true_after_mark_finished():
     state = ConversationState(max_turns=5)
     assert state.finished is False
@@ -91,6 +98,7 @@ def test_finished_flag_true_after_mark_finished():
 # ---------------------------------------------------------------------------
 # 8. Concurrent record_turn calls from multiple tasks don't exceed max_turns
 # ---------------------------------------------------------------------------
+
 
 def test_concurrent_record_turn_does_not_exceed_max_turns():
     """Fire many concurrent record_turn tasks; the turn count must not exceed max_turns."""

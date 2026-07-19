@@ -24,13 +24,15 @@ _DOC = SdkMethodDoc(
     sdk_group="agents",
     sdk_method="create",
     description="Create an agent.",
-    usage_code="client.agents.create(name=\"Support Agent\")\n",
+    usage_code='client.agents.create(name="Support Agent")\n',
 )
 
 
 def _examples(n: int) -> list[NamedExample]:
     return [
-        NamedExample(key=f"k{i}", summary=f"Variant {i}", description="", value={"name": f"a{i}"})
+        NamedExample(
+            key=f"k{i}", summary=f"Variant {i}", description="", value={"name": f"a{i}"}
+        )
         for i in range(n)
     ]
 
@@ -41,7 +43,11 @@ def test_examples_section_renders_each_variant() -> None:
     assert "**Variant 0**" in page and "**Variant 1**" in page
     assert page.count("```python") == 3  # 1 Usage + 2 example snippets
     # Ordered: Usage before Examples before the API-endpoint callout.
-    assert page.index("## Usage") < page.index("## Examples") < page.index("## API endpoint")
+    assert (
+        page.index("## Usage")
+        < page.index("## Examples")
+        < page.index("## API endpoint")
+    )
 
 
 def test_single_example_suppresses_section() -> None:
@@ -81,7 +87,9 @@ def test_examples_section_includes_learn_more_link() -> None:
 
     examples = [
         NamedExample(key="build", summary="Build", description="", value={"name": "a"}),
-        NamedExample(key="connect", summary="Connect", description="", value={"name": "b"}),
+        NamedExample(
+            key="connect", summary="Connect", description="", value={"name": "b"}
+        ),
     ]
     page = render_method_page(_ROUTE, _DOC, examples)
     assert "[Agent connections](/core-concepts/agent-connections)" in page

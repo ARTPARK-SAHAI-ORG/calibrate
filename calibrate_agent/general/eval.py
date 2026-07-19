@@ -298,9 +298,9 @@ async def main():
         evaluators=evaluators,
     )
 
-    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\n\033[92m{'=' * 60}\033[0m")
     print("\033[92mSummary\033[0m")
-    print(f"\033[92m{'='*60}\033[0m\n")
+    print(f"\033[92m{'=' * 60}\033[0m\n")
 
     if result.get("status") == "error":
         print(f"  \033[31mError - {result.get('error')}\033[0m")
@@ -310,9 +310,7 @@ async def main():
     # Evaluator entries are dicts carrying a ``type`` field; that's the marker
     # used to pick them out from any other top-level metrics.
     judge_scores = {
-        k: v["mean"]
-        for k, v in metrics.items()
-        if isinstance(v, dict) and "type" in v
+        k: v["mean"] for k, v in metrics.items() if isinstance(v, dict) and "type" in v
     }
     judge_str = ", ".join(f"{k}={v:.4f}" for k, v in judge_scores.items())
     print(f"  {judge_str}" if judge_str else "  (no scores)")

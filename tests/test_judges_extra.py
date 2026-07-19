@@ -38,7 +38,13 @@ class TestUtilityHelpers(unittest.TestCase):
         from calibrate_agent.judges import format_evaluation_result_lines
 
         lines = format_evaluation_result_lines(
-            {"name": "n", "type": "rating", "value": 4, "scale_max": 5, "reasoning": "ok"}
+            {
+                "name": "n",
+                "type": "rating",
+                "value": 4,
+                "scale_max": 5,
+                "reasoning": "ok",
+            }
         )
         self.assertIn("4/5", lines[0])
         self.assertIn("Reason:", lines[1])
@@ -54,13 +60,17 @@ class TestUtilityHelpers(unittest.TestCase):
     def test_format_eval_lines_binary_fail(self):
         from calibrate_agent.judges import format_evaluation_result_lines
 
-        lines = format_evaluation_result_lines({"name": "x", "type": "binary", "value": 0})
+        lines = format_evaluation_result_lines(
+            {"name": "x", "type": "binary", "value": 0}
+        )
         self.assertIn("Fail", lines[0])
 
     def test_format_eval_lines_no_reasoning(self):
         from calibrate_agent.judges import format_evaluation_result_lines
 
-        lines = format_evaluation_result_lines({"name": "x", "type": "binary", "value": 1})
+        lines = format_evaluation_result_lines(
+            {"name": "x", "type": "binary", "value": 1}
+        )
         self.assertEqual(len(lines), 1)
 
     def test_rating_range_invalid(self):
@@ -155,10 +165,12 @@ class TestJudgeOneTextWithLangfuse(unittest.IsolatedAsyncioTestCase):
 
         fake_lf = MagicMock()
 
-        with patch.object(J, "instructor") as mock_instructor, \
-             patch.object(J, "_build_openrouter_client", return_value=MagicMock()), \
-             patch.object(J, "langfuse_enabled", True), \
-             patch.object(J, "langfuse", fake_lf):
+        with (
+            patch.object(J, "instructor") as mock_instructor,
+            patch.object(J, "_build_openrouter_client", return_value=MagicMock()),
+            patch.object(J, "langfuse_enabled", True),
+            patch.object(J, "langfuse", fake_lf),
+        ):
             mock_instructor.apatch.return_value = fake_client
             result = await J._judge_one_text(
                 {"name": "n", "system_prompt": "sp"},
@@ -182,11 +194,16 @@ class TestJudgeOneAudioWithLangfuse(unittest.IsolatedAsyncioTestCase):
 
         fake_lf = MagicMock()
 
-        with patch.object(J, "instructor") as mock_instructor, \
-             patch.object(J, "_build_openrouter_client", return_value=MagicMock()), \
-             patch.object(J, "langfuse_enabled", True), \
-             patch.object(J, "langfuse", fake_lf), \
-             patch("calibrate_agent.langfuse.create_langfuse_audio_media", return_value=None):
+        with (
+            patch.object(J, "instructor") as mock_instructor,
+            patch.object(J, "_build_openrouter_client", return_value=MagicMock()),
+            patch.object(J, "langfuse_enabled", True),
+            patch.object(J, "langfuse", fake_lf),
+            patch(
+                "calibrate_agent.langfuse.create_langfuse_audio_media",
+                return_value=None,
+            ),
+        ):
             mock_instructor.apatch.return_value = fake_client
             result = await J._judge_one_audio(
                 {"name": "n", "system_prompt": "sp"},

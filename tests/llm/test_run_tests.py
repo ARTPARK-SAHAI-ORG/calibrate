@@ -17,6 +17,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 def _make_httpx_response(body: dict, status: int = 200):
     import httpx
+
     mock = MagicMock()
     mock.status_code = status
     mock.json.return_value = body
@@ -38,7 +39,11 @@ def _patch_httpx(response_body: dict, status: int = 200):
 
 
 def _binary_ev(name: str) -> dict:
-    return {"name": name, "system_prompt": f"eval {name}", "judge_model": "openai/gpt-4.1"}
+    return {
+        "name": name,
+        "system_prompt": f"eval {name}",
+        "judge_model": "openai/gpt-4.1",
+    }
 
 
 def _rating_ev(name: str, lo: int = 1, hi: int = 5) -> dict:
@@ -58,7 +63,6 @@ def _rating_ev(name: str, lo: int = 1, hi: int = 5) -> dict:
 
 
 class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
-
     async def _run(self, agent_response, evaluators, judge_result, criteria=None):
         from calibrate_agent.connections import TextAgentConnection
         from calibrate_agent.llm.run_tests import run_test_external
@@ -67,14 +71,14 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
         fake_body = {"response": agent_response, "tool_calls": []}
         evaluation = {
             "type": "response",
-            "criteria": criteria
-            or [{"name": ev["name"]} for ev in evaluators],
+            "criteria": criteria or [{"name": ev["name"]} for ev in evaluators],
         }
 
         mock_judge = AsyncMock(return_value=judge_result)
         ctx, _ = _patch_httpx(fake_body)
-        with ctx, patch(
-            "calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge
+        with (
+            ctx,
+            patch("calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge),
         ):
             return await run_test_external(
                 chat_history=[{"role": "user", "content": "Hi"}],
@@ -106,12 +110,8 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(result["metrics"]["passed"])
         self.assertIn("judge_results", result["metrics"])
-        self.assertEqual(
-            result["metrics"]["judge_results"]["greeting"]["match"], True
-        )
-        self.assertEqual(
-            result["metrics"]["judge_results"]["helpful"]["match"], True
-        )
+        self.assertEqual(result["metrics"]["judge_results"]["greeting"]["match"], True)
+        self.assertEqual(result["metrics"]["judge_results"]["helpful"]["match"], True)
 
     async def test_one_evaluator_fails_overall_fails(self):
         result = await self._run(
@@ -124,9 +124,7 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(result["metrics"]["passed"])
         # Reasoning surfaces the first failing evaluator
-        self.assertEqual(
-            result["metrics"]["reasoning"], "did not offer help"
-        )
+        self.assertEqual(result["metrics"]["reasoning"], "did not offer help")
 
     async def test_all_fail(self):
         result = await self._run(
@@ -147,9 +145,7 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
                 "greeting": {"match": True, "reasoning": "greeted"},
             },
         )
-        self.assertEqual(
-            result["metrics"]["reasoning"], "All evaluators passed"
-        )
+        self.assertEqual(result["metrics"]["reasoning"], "All evaluators passed")
 
     async def test_rating_below_scale_max_fails_test_case(self):
         """A rating evaluator below scale_max fails the test case."""
@@ -160,9 +156,7 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(result["metrics"]["passed"])
         self.assertEqual(result["metrics"]["reasoning"], "meh")
-        self.assertEqual(
-            result["metrics"]["judge_results"]["fluency"]["score"], 2
-        )
+        self.assertEqual(result["metrics"]["judge_results"]["fluency"]["score"], 2)
 
     async def test_rating_at_scale_max_passes_test_case(self):
         """A rating evaluator equal to scale_max passes the test case."""
@@ -172,9 +166,7 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
             judge_result={"fluency": {"score": 5, "reasoning": "great"}},
         )
         self.assertTrue(result["metrics"]["passed"])
-        self.assertEqual(
-            result["metrics"]["judge_results"]["fluency"]["score"], 5
-        )
+        self.assertEqual(result["metrics"]["judge_results"]["fluency"]["score"], 5)
 
     async def test_mixed_binary_fails_overrides_rating(self):
         """A failing binary evaluator fails the test even if rating is high."""
@@ -198,6 +190,7 @@ class TestRunTestExternalMultiCriteria(unittest.IsolatedAsyncioTestCase):
 class TestAggregateCriteria(unittest.TestCase):
     def _registry(self, *evaluators) -> dict:
         from calibrate_agent.judges import DEFAULT_LLM_TEST_EVALUATOR
+
         reg = {DEFAULT_LLM_TEST_EVALUATOR["name"]: DEFAULT_LLM_TEST_EVALUATOR}
         for ev in evaluators:
             reg[ev["name"]] = ev
@@ -205,10 +198,12 @@ class TestAggregateCriteria(unittest.TestCase):
 
     def test_empty_list_returns_empty_dict(self):
         from calibrate_agent.llm.run_tests import _aggregate_criteria
+
         self.assertEqual(_aggregate_criteria([], self._registry()), {})
 
     def test_tool_call_tests_excluded(self):
         from calibrate_agent.llm.run_tests import _aggregate_criteria
+
         results = [
             {
                 "metrics": {"passed": True},
@@ -224,6 +219,7 @@ class TestAggregateCriteria(unittest.TestCase):
     def test_string_criteria_aggregates_under_default_evaluator(self):
         """String criteria are normalized to the implicit ``correctness`` evaluator."""
         from calibrate_agent.llm.run_tests import _aggregate_criteria
+
         results = [
             {
                 "metrics": {
@@ -254,6 +250,7 @@ class TestAggregateCriteria(unittest.TestCase):
 
     def test_multi_evaluators_counted_independently(self):
         from calibrate_agent.llm.run_tests import _aggregate_criteria
+
         accuracy = _binary_ev("accuracy")
         tone = _binary_ev("tone")
         results = [
@@ -289,6 +286,7 @@ class TestAggregateCriteria(unittest.TestCase):
 
     def test_rating_evaluator_aggregates_mean(self):
         from calibrate_agent.llm.run_tests import _aggregate_criteria
+
         fluency = _rating_ev("fluency")
         results = [
             {
@@ -338,6 +336,7 @@ class TestAggregateCriteria(unittest.TestCase):
 
     def test_mixed_binary_and_rating_evaluators(self):
         from calibrate_agent.llm.run_tests import _aggregate_criteria
+
         accuracy = _binary_ev("accuracy")
         fluency = _rating_ev("fluency")
         results = [
@@ -371,6 +370,7 @@ class TestAggregateCriteria(unittest.TestCase):
 
     def test_mixed_string_and_multi_evaluator_criteria(self):
         from calibrate_agent.llm.run_tests import _aggregate_criteria
+
         accuracy = _binary_ev("accuracy")
         tone = _binary_ev("tone")
         results = [

@@ -15,15 +15,22 @@ import pandas as pd
 # LLM Benchmark
 # =============================================================================
 
+
 class TestLLMBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_basic(self):
         from calibrate_agent.llm import benchmark as B
 
-        fake_results = {"model": "m1", "provider": "openrouter",
-                        "metrics": {"passed": 1, "total": 1}, "results": []}
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(B, "run_model_tests", AsyncMock(return_value=fake_results)), \
-             patch.object(B, "generate_leaderboard"):
+        fake_results = {
+            "model": "m1",
+            "provider": "openrouter",
+            "metrics": {"passed": 1, "total": 1},
+            "results": [],
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(B, "run_model_tests", AsyncMock(return_value=fake_results)),
+            patch.object(B, "generate_leaderboard"),
+        ):
             result = await B.run(
                 config={"system_prompt": "sp", "tools": [], "test_cases": []},
                 models=["m1", "m2"],
@@ -37,11 +44,19 @@ class TestLLMBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_leaderboard_error_recorded(self):
         from calibrate_agent.llm import benchmark as B
 
-        fake_results = {"model": "m1", "provider": "openrouter",
-                        "metrics": {"passed": 1, "total": 1}, "results": []}
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(B, "run_model_tests", AsyncMock(return_value=fake_results)), \
-             patch.object(B, "generate_leaderboard", side_effect=RuntimeError("lb fail")):
+        fake_results = {
+            "model": "m1",
+            "provider": "openrouter",
+            "metrics": {"passed": 1, "total": 1},
+            "results": [],
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(B, "run_model_tests", AsyncMock(return_value=fake_results)),
+            patch.object(
+                B, "generate_leaderboard", side_effect=RuntimeError("lb fail")
+            ),
+        ):
             result = await B.run(
                 config={"system_prompt": "sp", "tools": [], "test_cases": []},
                 models=["m1"],
@@ -57,16 +72,36 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
-            cfg.write_text(json.dumps({
-                "system_prompt": "sp", "tools": [], "test_cases": [],
-            }))
-            argv = ["b.py", "-c", str(cfg), "-m", "m1", "-p", "openrouter",
-                    "-o", str(Path(tmp) / "out")]
-            fake_results = {"status": "completed", "output_dir": tmp,
-                            "leaderboard_dir": tmp,
-                            "models": {"m1": {"metrics": {"passed": 1, "total": 1}}}}
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_results)):
+            cfg.write_text(
+                json.dumps(
+                    {
+                        "system_prompt": "sp",
+                        "tools": [],
+                        "test_cases": [],
+                    }
+                )
+            )
+            argv = [
+                "b.py",
+                "-c",
+                str(cfg),
+                "-m",
+                "m1",
+                "-p",
+                "openrouter",
+                "-o",
+                str(Path(tmp) / "out"),
+            ]
+            fake_results = {
+                "status": "completed",
+                "output_dir": tmp,
+                "leaderboard_dir": tmp,
+                "models": {"m1": {"metrics": {"passed": 1, "total": 1}}},
+            }
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run", AsyncMock(return_value=fake_results)),
+            ):
                 await B.main()
 
     async def test_main_error_path_exits(self):
@@ -74,16 +109,36 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
-            cfg.write_text(json.dumps({
-                "system_prompt": "sp", "tools": [], "test_cases": [],
-            }))
-            argv = ["b.py", "-c", str(cfg), "-m", "m1", "-p", "openrouter",
-                    "-o", str(Path(tmp) / "out")]
-            fake_results = {"status": "completed", "output_dir": tmp,
-                            "leaderboard_dir": tmp,
-                            "models": {"m1": {"status": "error", "error": "boom"}}}
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_results)):
+            cfg.write_text(
+                json.dumps(
+                    {
+                        "system_prompt": "sp",
+                        "tools": [],
+                        "test_cases": [],
+                    }
+                )
+            )
+            argv = [
+                "b.py",
+                "-c",
+                str(cfg),
+                "-m",
+                "m1",
+                "-p",
+                "openrouter",
+                "-o",
+                str(Path(tmp) / "out"),
+            ]
+            fake_results = {
+                "status": "completed",
+                "output_dir": tmp,
+                "leaderboard_dir": tmp,
+                "models": {"m1": {"status": "error", "error": "boom"}},
+            }
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run", AsyncMock(return_value=fake_results)),
+            ):
                 with self.assertRaises(SystemExit):
                     await B.main()
 
@@ -92,20 +147,40 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
-            cfg.write_text(json.dumps({
-                "system_prompt": "sp", "tools": [], "test_cases": [],
-            }))
+            cfg.write_text(
+                json.dumps(
+                    {
+                        "system_prompt": "sp",
+                        "tools": [],
+                        "test_cases": [],
+                    }
+                )
+            )
             out_dir = Path(tmp) / "out"
             out_dir.mkdir()
             (out_dir / "logs").write_text("existing")
-            argv = ["b.py", "-c", str(cfg), "-m", "m1", "-p", "openrouter",
-                    "-o", str(out_dir)]
-            fake_results = {"status": "completed", "output_dir": str(out_dir),
-                            "leaderboard_dir": str(out_dir),
-                            "models": {"m1": {"metrics": {"passed": 1, "total": 1}}}}
-            with patch.object(sys, "argv", argv), \
-                 patch.dict(os.environ, {"CALIBRATE_LLM_LOG_APPEND": "1"}), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_results)):
+            argv = [
+                "b.py",
+                "-c",
+                str(cfg),
+                "-m",
+                "m1",
+                "-p",
+                "openrouter",
+                "-o",
+                str(out_dir),
+            ]
+            fake_results = {
+                "status": "completed",
+                "output_dir": str(out_dir),
+                "leaderboard_dir": str(out_dir),
+                "models": {"m1": {"metrics": {"passed": 1, "total": 1}}},
+            }
+            with (
+                patch.object(sys, "argv", argv),
+                patch.dict(os.environ, {"CALIBRATE_LLM_LOG_APPEND": "1"}),
+                patch.object(B, "run", AsyncMock(return_value=fake_results)),
+            ):
                 await B.main()
 
 
@@ -113,22 +188,30 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 # STT Benchmark
 # =============================================================================
 
+
 class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_basic(self):
         from calibrate_agent.stt import benchmark as B
 
-        fake_result = {"provider": "deepgram", "status": "completed",
-                       "metrics": {"wer": 0.1,
-                                   "semantic_match": {"type": "binary", "mean": 0.9}}}
+        fake_result = {
+            "provider": "deepgram",
+            "status": "completed",
+            "metrics": {"wer": 0.1, "semantic_match": {"type": "binary", "mean": 0.9}},
+        }
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             (base / "audios").mkdir()
             (base / "audios" / "a.wav").write_bytes(b"\x00")
-            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(base / "stt.csv", index=False)
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(
+                base / "stt.csv", index=False
+            )
             output_dir = str(base / "out")
-            with patch.object(B, "run_single_provider_eval",
-                              AsyncMock(return_value=fake_result)), \
-                 patch.object(B, "generate_leaderboard"):
+            with (
+                patch.object(
+                    B, "run_single_provider_eval", AsyncMock(return_value=fake_result)
+                ),
+                patch.object(B, "generate_leaderboard"),
+            ):
                 result = await B.run(
                     providers=["deepgram", "google"],
                     input_dir=str(base),
@@ -140,12 +223,17 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_forwards_intent_entity_to_provider_eval(self):
         from calibrate_agent.stt import benchmark as B
 
-        fake_result = {"provider": "deepgram", "status": "completed",
-                       "metrics": {"wer": 0.1}}
+        fake_result = {
+            "provider": "deepgram",
+            "status": "completed",
+            "metrics": {"wer": 0.1},
+        }
         mock_eval = AsyncMock(return_value=fake_result)
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(B, "run_single_provider_eval", mock_eval), \
-             patch.object(B, "generate_leaderboard"):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(B, "run_single_provider_eval", mock_eval),
+            patch.object(B, "generate_leaderboard"),
+        ):
             await B.run(
                 providers=["deepgram"],
                 input_dir=tmp,
@@ -157,12 +245,18 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_leaderboard_error(self):
         from calibrate_agent.stt import benchmark as B
 
-        fake_result = {"provider": "deepgram", "status": "completed",
-                       "metrics": {"wer": 0.1}}
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(B, "run_single_provider_eval",
-                          AsyncMock(return_value=fake_result)), \
-             patch.object(B, "generate_leaderboard", side_effect=Exception("lb fail")):
+        fake_result = {
+            "provider": "deepgram",
+            "status": "completed",
+            "metrics": {"wer": 0.1},
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(
+                B, "run_single_provider_eval", AsyncMock(return_value=fake_result)
+            ),
+            patch.object(B, "generate_leaderboard", side_effect=Exception("lb fail")),
+        ):
             result = await B.run(
                 providers=["deepgram"],
                 input_dir=tmp,
@@ -191,8 +285,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
     async def test_main_invalid_input(self):
         from calibrate_agent.stt import benchmark as B
 
-        argv = ["b.py", "-p", "deepgram", "-i", "/nonexistent/missing",
-                "-o", "/tmp/x"]
+        argv = ["b.py", "-p", "deepgram", "-i", "/nonexistent/missing", "-o", "/tmp/x"]
         with patch.object(sys, "argv", argv):
             with self.assertRaises(SystemExit):
                 await B.main()
@@ -215,12 +308,18 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             ds.write_text(json.dumps([{"id": "a", "gt": "hi", "pred": "hi"}]))
             out = base / "out"
 
-            fake_result = {"status": "completed",
-                           "metrics": {"wer": 0.1,
-                                       "semantic_match": {"type": "binary", "mean": 0.9}}}
+            fake_result = {
+                "status": "completed",
+                "metrics": {
+                    "wer": 0.1,
+                    "semantic_match": {"type": "binary", "mean": 0.9},
+                },
+            }
             argv = ["b.py", "--eval-only", "--dataset", str(ds), "-o", str(out)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run_eval_only", AsyncMock(return_value=fake_result)):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run_eval_only", AsyncMock(return_value=fake_result)),
+            ):
                 await B.main()
 
     async def test_main_eval_only_forwards_language(self):
@@ -234,10 +333,20 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
             fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
             mock_eval = AsyncMock(return_value=fake_result)
-            argv = ["b.py", "--eval-only", "--dataset", str(ds),
-                    "-o", str(out), "--language", "hindi"]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run_eval_only", mock_eval):
+            argv = [
+                "b.py",
+                "--eval-only",
+                "--dataset",
+                str(ds),
+                "-o",
+                str(out),
+                "--language",
+                "hindi",
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run_eval_only", mock_eval),
+            ):
                 await B.main()
 
             self.assertEqual(mock_eval.call_args.kwargs["language"], "hindi")
@@ -254,8 +363,10 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
             mock_eval = AsyncMock(return_value=fake_result)
             argv = ["b.py", "--eval-only", "--dataset", str(ds), "-o", str(out)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run_eval_only", mock_eval):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run_eval_only", mock_eval),
+            ):
                 await B.main()
 
             self.assertTrue(mock_eval.call_args.kwargs["run_llm_judges"])
@@ -271,10 +382,19 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
             fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
             mock_eval = AsyncMock(return_value=fake_result)
-            argv = ["b.py", "--eval-only", "--dataset", str(ds),
-                    "-o", str(out), "--skip-llm-judges"]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run_eval_only", mock_eval):
+            argv = [
+                "b.py",
+                "--eval-only",
+                "--dataset",
+                str(ds),
+                "-o",
+                str(out),
+                "--skip-llm-judges",
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run_eval_only", mock_eval),
+            ):
                 await B.main()
 
             self.assertFalse(mock_eval.call_args.kwargs["run_llm_judges"])
@@ -290,8 +410,10 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
             fake_result = {"status": "error", "error": "boom"}
             argv = ["b.py", "--eval-only", "--dataset", str(ds), "-o", str(out)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run_eval_only", AsyncMock(return_value=fake_result)):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run_eval_only", AsyncMock(return_value=fake_result)),
+            ):
                 with self.assertRaises(SystemExit):
                     await B.main()
 
@@ -326,14 +448,20 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 "output_dir": str(out),
                 "leaderboard_dir": str(out / "leaderboard"),
                 "providers": {
-                    "deepgram": {"status": "completed",
-                                 "metrics": {"wer": 0.1,
-                                             "semantic_match": {"type": "binary", "mean": 0.9}}},
+                    "deepgram": {
+                        "status": "completed",
+                        "metrics": {
+                            "wer": 0.1,
+                            "semantic_match": {"type": "binary", "mean": 0.9},
+                        },
+                    },
                 },
             }
             argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run", AsyncMock(return_value=fake_run_result)),
+            ):
                 await B.main()
 
     async def test_main_forwards_intent_entity_flag_to_run(self):
@@ -383,8 +511,10 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 },
             }
             argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run", AsyncMock(return_value=fake_run_result)),
+            ):
                 with self.assertRaises(SystemExit):
                     await B.main()
 
@@ -396,7 +526,15 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             self._make_input_dir(base)
             out = base / "out"
             cfg = base / "cfg.json"
-            cfg.write_text(json.dumps({"evaluators": [{"name": "x", "system_prompt": "...", "judge_model": "m"}]}))
+            cfg.write_text(
+                json.dumps(
+                    {
+                        "evaluators": [
+                            {"name": "x", "system_prompt": "...", "judge_model": "m"}
+                        ]
+                    }
+                )
+            )
 
             fake_run_result = {
                 "status": "completed",
@@ -406,10 +544,21 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                     "deepgram": "error: lb",
                 },
             }
-            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out),
-                    "-c", str(cfg)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
+            argv = [
+                "b.py",
+                "-p",
+                "deepgram",
+                "-i",
+                str(base),
+                "-o",
+                str(out),
+                "-c",
+                str(cfg),
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run", AsyncMock(return_value=fake_run_result)),
+            ):
                 await B.main()
 
 
@@ -417,16 +566,26 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 # TTS Benchmark
 # =============================================================================
 
+
 class TestTTSBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_basic(self):
         from calibrate_agent.tts import benchmark as B
 
-        fake_result = {"provider": "openai", "status": "completed",
-                       "metrics": {"ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2},
-                                   "pronunciation": {"type": "binary", "mean": 0.9}}}
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(B, "run_single_provider_eval", AsyncMock(return_value=fake_result)), \
-             patch.object(B, "generate_leaderboard"):
+        fake_result = {
+            "provider": "openai",
+            "status": "completed",
+            "metrics": {
+                "ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2},
+                "pronunciation": {"type": "binary", "mean": 0.9},
+            },
+        }
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(
+                B, "run_single_provider_eval", AsyncMock(return_value=fake_result)
+            ),
+            patch.object(B, "generate_leaderboard"),
+        ):
             result = await B.run(
                 providers=["openai", "google"],
                 input="/tmp/in.csv",
@@ -438,9 +597,13 @@ class TestTTSBenchmarkRun(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.tts import benchmark as B
 
         fake_result = {"status": "completed"}
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(B, "run_single_provider_eval", AsyncMock(return_value=fake_result)), \
-             patch.object(B, "generate_leaderboard", side_effect=Exception("lb fail")):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(
+                B, "run_single_provider_eval", AsyncMock(return_value=fake_result)
+            ),
+            patch.object(B, "generate_leaderboard", side_effect=Exception("lb fail")),
+        ):
             result = await B.run(
                 providers=["openai"],
                 input="/tmp/in.csv",
@@ -482,16 +645,20 @@ class TestTTSBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 "output_dir": str(out),
                 "leaderboard_dir": str(out / "lb"),
                 "providers": {
-                    "openai": {"status": "completed",
-                               "metrics": {
-                                   "ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2},
-                                   "pronunciation": {"type": "binary", "mean": 0.9},
-                               }},
+                    "openai": {
+                        "status": "completed",
+                        "metrics": {
+                            "ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2},
+                            "pronunciation": {"type": "binary", "mean": 0.9},
+                        },
+                    },
                 },
             }
             argv = ["b.py", "-p", "openai", "-i", str(inp), "-o", str(out)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run", AsyncMock(return_value=fake_run_result)),
+            ):
                 await B.main()
 
     async def test_main_with_config_and_error(self):
@@ -502,7 +669,15 @@ class TestTTSBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(str(inp), index=False)
             out = Path(tmp) / "out"
             cfg = Path(tmp) / "cfg.json"
-            cfg.write_text(json.dumps({"evaluators": [{"name": "x", "system_prompt": "x", "judge_model": "m"}]}))
+            cfg.write_text(
+                json.dumps(
+                    {
+                        "evaluators": [
+                            {"name": "x", "system_prompt": "x", "judge_model": "m"}
+                        ]
+                    }
+                )
+            )
 
             fake_run_result = {
                 "status": "completed",
@@ -512,9 +687,21 @@ class TestTTSBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                     "openai": {"status": "error", "error": "boom"},
                 },
             }
-            argv = ["b.py", "-p", "openai", "-i", str(inp), "-o", str(out), "-c", str(cfg)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
+            argv = [
+                "b.py",
+                "-p",
+                "openai",
+                "-i",
+                str(inp),
+                "-o",
+                str(out),
+                "-c",
+                str(cfg),
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(B, "run", AsyncMock(return_value=fake_run_result)),
+            ):
                 with self.assertRaises(SystemExit):
                     await B.main()
 

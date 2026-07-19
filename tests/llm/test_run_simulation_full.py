@@ -28,16 +28,23 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         ]
         fake_bot_context.get_messages.return_value = fake_bot_context._messages
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RS, "OpenAILLMService", side_effect=[fake_bot_llm, fake_user_llm]), \
-             patch.object(RS, "OpenRouterLLMService"), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
-             patch.object(RS, "Pipeline"), \
-             patch.object(RS, "LLMContext", return_value=fake_bot_context), \
-             patch.object(RS, "LLMContextAggregatorPair"), \
-             patch.object(RS, "evaluate_simuation",
-                          AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}})):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(
+                RS, "OpenAILLMService", side_effect=[fake_bot_llm, fake_user_llm]
+            ),
+            patch.object(RS, "OpenRouterLLMService"),
+            patch.object(RS, "PipelineTask"),
+            patch.object(RS, "PipelineRunner", return_value=fake_runner),
+            patch.object(RS, "Pipeline"),
+            patch.object(RS, "LLMContext", return_value=fake_bot_context),
+            patch.object(RS, "LLMContextAggregatorPair"),
+            patch.object(
+                RS,
+                "evaluate_simuation",
+                AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}}),
+            ),
+        ):
             result = await RS.run_simulation(
                 bot_system_prompt="bp",
                 tools=[],
@@ -62,16 +69,21 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         fake_context._messages = [{"role": "system", "content": "sp"}]
         fake_context.get_messages.return_value = []
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RS, "OpenAILLMService"), \
-             patch.object(RS, "OpenRouterLLMService", return_value=fake_llm), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
-             patch.object(RS, "Pipeline"), \
-             patch.object(RS, "LLMContext", return_value=fake_context), \
-             patch.object(RS, "LLMContextAggregatorPair"), \
-             patch.object(RS, "evaluate_simuation",
-                          AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}})):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RS, "OpenAILLMService"),
+            patch.object(RS, "OpenRouterLLMService", return_value=fake_llm),
+            patch.object(RS, "PipelineTask"),
+            patch.object(RS, "PipelineRunner", return_value=fake_runner),
+            patch.object(RS, "Pipeline"),
+            patch.object(RS, "LLMContext", return_value=fake_context),
+            patch.object(RS, "LLMContextAggregatorPair"),
+            patch.object(
+                RS,
+                "evaluate_simuation",
+                AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}}),
+            ),
+        ):
             await RS.run_simulation(
                 bot_system_prompt="bp",
                 tools=[],
@@ -94,19 +106,23 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         fake_context._messages = []
         fake_context.get_messages.return_value = []
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RS, "OpenAILLMService", return_value=fake_llm), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
-             patch.object(RS, "Pipeline"), \
-             patch.object(RS, "LLMContext", return_value=fake_context), \
-             patch.object(RS, "LLMContextAggregatorPair"):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RS, "OpenAILLMService", return_value=fake_llm),
+            patch.object(RS, "PipelineTask"),
+            patch.object(RS, "PipelineRunner", return_value=fake_runner),
+            patch.object(RS, "Pipeline"),
+            patch.object(RS, "LLMContext", return_value=fake_context),
+            patch.object(RS, "LLMContextAggregatorPair"),
+        ):
             with self.assertRaises(RuntimeError):
                 await RS.run_simulation(
                     bot_system_prompt="bp",
                     tools=[],
                     user_system_prompt="up",
-                    evaluators=[{"name": "x", "system_prompt": "x", "judge_model": "m"}],
+                    evaluators=[
+                        {"name": "x", "system_prompt": "x", "judge_model": "m"}
+                    ],
                     output_dir=tmp,
                     max_turns=1,
                 )

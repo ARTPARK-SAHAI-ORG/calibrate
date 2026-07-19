@@ -1,7 +1,6 @@
 """Shared output helpers for LLM benchmark results."""
 
 
-
 def print_benchmark_summary(
     models: list,
     model_results: dict,
@@ -17,16 +16,18 @@ def print_benchmark_summary(
         leaderboard_dir: Path where leaderboard was saved.
         model_label: Optional callable to format display label from model name.
     """
-    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\n\033[92m{'=' * 60}\033[0m")
     print("\033[92mOverall Summary\033[0m")
-    print(f"\033[92m{'='*60}\033[0m\n")
+    print(f"\033[92m{'=' * 60}\033[0m\n")
 
     has_errors = False
     for model in models:
         label = model_label(model) if model_label else model
         mr = model_results.get(model, {})
         if not isinstance(mr, dict) or mr.get("status") == "error":
-            print(f"  {label}: \033[31mError - {mr.get('error') if isinstance(mr, dict) else mr}\033[0m")
+            print(
+                f"  {label}: \033[31mError - {mr.get('error') if isinstance(mr, dict) else mr}\033[0m"
+            )
             has_errors = True
         else:
             metrics = mr.get("metrics", {})

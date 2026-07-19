@@ -17,7 +17,9 @@ class TestEditMetrics(unittest.TestCase):
 
         # Row 1: case-only diff normalizes to identical -> 0.0.
         # Row 2: one of two words wrong -> 0.5.
-        result = M.get_wer_score(["Hello, World!", "foo bar"], ["hello world", "foo baz"])
+        result = M.get_wer_score(
+            ["Hello, World!", "foo bar"], ["hello world", "foo baz"]
+        )
 
         self.assertEqual(result["per_row"], [0.0, 0.5])
 
@@ -107,9 +109,7 @@ class TestEditMetrics(unittest.TestCase):
         # Empty GT + hallucinated prediction → the extra words count as
         # insertions and are penalized. One real ref (4 words, 1 sub) plus two
         # inserted junk words → (1 + 2) / 4 = 0.75.
-        halluc = M.get_wer_score(
-            ["a b c d", ""], ["a b x d", "junk here"]
-        )
+        halluc = M.get_wer_score(["a b c d", ""], ["a b x d", "junk here"])
         self.assertAlmostEqual(halluc["score"], 0.75)
 
     def test_all_empty_references_guarded(self):
@@ -126,9 +126,7 @@ class TestEditMetrics(unittest.TestCase):
         # Urdu (needs an optional dep indic-nlp lacks here) and an unknown
         # language must not crash — they fall back to NFC-only normalization.
         for lang in ("urdu", "klingon"):
-            result = M.get_wer_score(
-                ["hello world"], ["hello world"], language=lang
-            )
+            result = M.get_wer_score(["hello world"], ["hello world"], language=lang)
             self.assertEqual(result["score"], 0.0)
         self.assertIsNone(M._indic_normalizer("english"))
         self.assertIsNotNone(M._indic_normalizer("hindi"))
@@ -141,7 +139,9 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         # Patch stt_llm_judge directly (it has @backoff + @observe decorators
         # so patching text_judge inside it is unreliable).
         # tqdm_asyncio.gather may not preserve input order, so return based on input.
-        async def fake_judge(reference, prediction, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            reference, prediction, evaluators=None, fallback_model=None
+        ):
             match = reference == prediction
             return {
                 "semantic_match": {
@@ -150,7 +150,9 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
                 }
             }
 
-        with patch.object(stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_judge)):
+        with patch.object(
+            stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_judge)
+        ):
             result = await stt_metrics.get_llm_judge_score(
                 references=["hello", "goodnight"],
                 predictions=["hello", "goodbye"],  # first matches, second doesn't
@@ -221,7 +223,9 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
             "scale_max": 5,
         }
 
-        async def fake_judge(reference, prediction, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            reference, prediction, evaluators=None, fallback_model=None
+        ):
             # Return score based on whether strings match: match=5, mismatch=2
             return {
                 "semantic_accuracy": {
@@ -230,7 +234,9 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
                 }
             }
 
-        with patch.object(stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_judge)):
+        with patch.object(
+            stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_judge)
+        ):
             result = await stt_metrics.get_llm_judge_score(
                 references=["hello", "world", "foo"],
                 predictions=["hello", "word", "foo"],  # 2 match, 1 doesn't

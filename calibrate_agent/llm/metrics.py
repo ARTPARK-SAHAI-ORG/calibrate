@@ -43,7 +43,7 @@ async def test_response_llm_judge(
         ``{"reasoning": str, "score": int}``.
     """
     conversation_as_prompt = "\n".join(
-        [f'{msg["role"]}: {msg["content"]}' for msg in conversation if "content" in msg]
+        [f"{msg['role']}: {msg['content']}" for msg in conversation if "content" in msg]
     )
 
     user_prompt = (

@@ -53,8 +53,10 @@ class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.agent.bot import MetricsLogger
         from pipecat.frames.frames import MetricsFrame
         from pipecat.metrics.metrics import (
-            TTFBMetricsData, ProcessingMetricsData,
-            LLMUsageMetricsData, TTSUsageMetricsData,
+            TTFBMetricsData,
+            ProcessingMetricsData,
+            LLMUsageMetricsData,
+            TTSUsageMetricsData,
         )
         from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 
@@ -72,8 +74,10 @@ class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
         frame = MagicMock(spec=MetricsFrame)
         frame.data = [ttfb, proc, llm_usage, tts_usage]
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(MetricsLogger, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(MetricsLogger, "push_frame", AsyncMock()),
+        ):
             await ml.process_frame(frame, FrameDirection.DOWNSTREAM)
 
     async def test_non_metrics_frame(self):
@@ -84,8 +88,10 @@ class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
         ml = MetricsLogger()
         frame = MagicMock(spec=Frame)
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(MetricsLogger, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(MetricsLogger, "push_frame", AsyncMock()),
+        ):
             await ml.process_frame(frame, FrameDirection.DOWNSTREAM)
 
 

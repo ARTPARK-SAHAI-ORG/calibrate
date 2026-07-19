@@ -117,9 +117,13 @@ class _Tests:
                 final_output_dir = os.path.join(output_dir, save_folder_name)
         elif agent is not None:
             # Single agent connection run: save directly to output_dir (no subfolder).
-            final_output_dir = os.path.join(output_dir, run_name) if run_name else output_dir
+            final_output_dir = (
+                os.path.join(output_dir, run_name) if run_name else output_dir
+            )
         else:
-            save_folder_name = f"{provider}/{model}" if provider == "openai" else f"{model}"
+            save_folder_name = (
+                f"{provider}/{model}" if provider == "openai" else f"{model}"
+            )
             save_folder_name = save_folder_name.replace("/", "__")
             if run_name:
                 final_output_dir = os.path.join(output_dir, run_name, save_folder_name)
@@ -141,7 +145,9 @@ class _Tests:
         results_file_path = os.path.join(final_output_dir, "results.json")
 
         # Pass model name to agent for benchmark routing; None for single runs.
-        agent_model_hint: Optional[str] = model if (agent is not None and model) else None
+        agent_model_hint: Optional[str] = (
+            model if (agent is not None and model) else None
+        )
 
         evaluator_config = {"evaluators": evaluators or []}
         name_to_evaluator = _get_name_to_evaluator_dict(evaluator_config)
@@ -184,9 +190,13 @@ class _Tests:
 
             label_prefix = f"[{model}] " if (label_output and model) else ""
             if result["metrics"]["passed"]:
-                log_and_print(f"{label_prefix}✅ Test case {test_case_index + 1} passed")
+                log_and_print(
+                    f"{label_prefix}✅ Test case {test_case_index + 1} passed"
+                )
             else:
-                log_and_print(f"{label_prefix}❌ Test case {test_case_index + 1} failed")
+                log_and_print(
+                    f"{label_prefix}❌ Test case {test_case_index + 1} failed"
+                )
             if "reasoning" in result["metrics"]:
                 log_and_print(result["metrics"]["reasoning"])
 
@@ -221,10 +231,10 @@ class _Tests:
             log_and_print("❌ All tests failed!")
         else:
             log_and_print(
-                f"✅ Total Passed: {total_passed}/{total_tests} ({(total_passed/total_tests)*100:.1f}%)"
+                f"✅ Total Passed: {total_passed}/{total_tests} ({(total_passed / total_tests) * 100:.1f}%)"
             )
             log_and_print(
-                f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
+                f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count / total_tests) * 100:.1f}%)"
             )
 
         # Save final results
@@ -238,6 +248,7 @@ class _Tests:
             _aggregate_latency,
             _aggregate_total_tokens,
         )
+
         metrics = {
             "total": total_tests,
             "passed": total_passed,
@@ -619,7 +630,10 @@ class _Simulations:
                 a model-specific subfolder. Used by the single-model path in run()
                 for backward compatibility.
         """
-        from calibrate_agent.judges import require_simulation_evaluators, write_evaluator_config
+        from calibrate_agent.judges import (
+            require_simulation_evaluators,
+            write_evaluator_config,
+        )
         from calibrate_agent.llm.run_simulation import run_single_simulation_task
 
         require_simulation_evaluators(evaluators or [])
@@ -628,7 +642,9 @@ class _Simulations:
         if _flat_output:
             final_output_dir = output_dir
         else:
-            save_folder_name = f"{provider}/{model}" if provider == "openai" else f"{model}"
+            save_folder_name = (
+                f"{provider}/{model}" if provider == "openai" else f"{model}"
+            )
             save_folder_name = save_folder_name.replace("/", "__")
             final_output_dir = os.path.join(output_dir, save_folder_name)
 

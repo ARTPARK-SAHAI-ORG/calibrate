@@ -157,8 +157,10 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         def fake_normalize(text, normalizer):
             return real_normalize(text, normalizer).lower()
 
-        with patch.object(metrics, "_normalize_text", side_effect=fake_normalize), \
-             patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
+        with (
+            patch.object(metrics, "_normalize_text", side_effect=fake_normalize),
+            patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)),
+        ):
             await metrics.get_llm_wer_cer_score(
                 references=["HELLO WORLD"],
                 predictions=["HELLO WORD"],
@@ -173,9 +175,11 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         refs = ["doctor ne bola"]
         preds = ["daktar ne bola"]
 
-        with patch.object(slw, "equivalence_judge", AsyncMock(
-            return_value={"index": 0, "equivalent": False, "reasoning": "r"}
-        )):
+        with patch.object(
+            slw,
+            "equivalence_judge",
+            AsyncMock(return_value={"index": 0, "equivalent": False, "reasoning": "r"}),
+        ):
             wer = metrics.get_wer_score(refs, preds)
             llm = await metrics.get_llm_wer_cer_score(refs, preds)
 
@@ -234,8 +238,10 @@ class TestEquivalenceJudge(unittest.IsolatedAsyncioTestCase):
         while hasattr(inner, "__wrapped__"):
             inner = inner.__wrapped__
 
-        with patch.object(jw, "_build_openrouter_client", return_value=MagicMock()), \
-             patch.object(jw.instructor, "apatch", return_value=fake_client):
+        with (
+            patch.object(jw, "_build_openrouter_client", return_value=MagicMock()),
+            patch.object(jw.instructor, "apatch", return_value=fake_client),
+        ):
             result = await inner("doctor", "daktar", model="m")
 
         self.assertEqual(result, fake_result)

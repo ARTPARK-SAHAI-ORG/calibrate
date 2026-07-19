@@ -18,7 +18,6 @@ from unittest.mock import patch
 
 
 class TestSDKSimulationMetricsCarryType(unittest.IsolatedAsyncioTestCase):
-
     async def test_rating_criterion_aggregate_gets_type_field(self):
         """After `calibrate_agent.llm.simulations.run(...)` completes, the saved
         metrics.json should include `type: "rating"` for each rating
@@ -29,23 +28,42 @@ class TestSDKSimulationMetricsCarryType(unittest.IsolatedAsyncioTestCase):
         # (simulation_metrics_row, evaluation_results)
         # Each evaluation_result carries {name, type, value, reasoning}.
         async def fake_task(
-            semaphore, config, persona_index, user_persona, scenario_index,
-            scenario, output_dir, args, agent=None,
+            semaphore,
+            config,
+            persona_index,
+            user_persona,
+            scenario_index,
+            scenario,
+            output_dir,
+            args,
+            agent=None,
         ):
             async with semaphore:
                 sim_name = f"sim_{persona_index}_{scenario_index}"
                 eval_results = [
-                    {"name": "tool_usage", "type": "binary", "value": 1.0, "reasoning": "ok"},
-                    {"name": "fluency", "type": "rating", "value": 4.0, "reasoning": "good"},
+                    {
+                        "name": "tool_usage",
+                        "type": "binary",
+                        "value": 1.0,
+                        "reasoning": "ok",
+                    },
+                    {
+                        "name": "fluency",
+                        "type": "rating",
+                        "value": 4.0,
+                        "reasoning": "good",
+                    },
                 ]
                 sim_metrics = {"name": sim_name, "tool_usage": 1.0, "fluency": 4.0}
                 return sim_metrics, eval_results
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch(
-                 "calibrate_agent.llm.run_simulation.run_single_simulation_task",
-                 side_effect=fake_task,
-             ):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "calibrate_agent.llm.run_simulation.run_single_simulation_task",
+                side_effect=fake_task,
+            ),
+        ):
             await simulations.run(
                 system_prompt="...",
                 tools=[],
@@ -91,7 +109,6 @@ class TestSDKSimulationMetricsCarryType(unittest.IsolatedAsyncioTestCase):
 
 
 class TestSimulationLeaderboardOverallUnitConsistent(unittest.TestCase):
-
     def test_overall_uses_normalized_values_for_rating(self):
         """Binary % and rating raw means can't be averaged directly.
         The overall column should be computed from normalized (0-100) values:
@@ -106,35 +123,40 @@ class TestSimulationLeaderboardOverallUnitConsistent(unittest.TestCase):
             # Expected overall (normalized mean) = (80 + 75) / 2 = 77.5
             (base / "model-a").mkdir()
             (base / "model-a" / "metrics.json").write_text(
-                json.dumps({
-                    "accuracy": {"type": "binary", "mean": 0.8},
-                    "fluency": {
-                        "type": "rating",
-                        "mean": 4.0,
-                        "scale_min": 1,
-                        "scale_max": 5,
-                    },
-                })
+                json.dumps(
+                    {
+                        "accuracy": {"type": "binary", "mean": 0.8},
+                        "fluency": {
+                            "type": "rating",
+                            "mean": 4.0,
+                            "scale_min": 1,
+                            "scale_max": 5,
+                        },
+                    }
+                )
             )
             # Model B: binary 100%, rating mean 1/5 → normalized 0%.
             # Expected overall = (100 + 0) / 2 = 50
             (base / "model-b").mkdir()
             (base / "model-b" / "metrics.json").write_text(
-                json.dumps({
-                    "accuracy": {"type": "binary", "mean": 1.0},
-                    "fluency": {
-                        "type": "rating",
-                        "mean": 1.0,
-                        "scale_min": 1,
-                        "scale_max": 5,
-                    },
-                })
+                json.dumps(
+                    {
+                        "accuracy": {"type": "binary", "mean": 1.0},
+                        "fluency": {
+                            "type": "rating",
+                            "mean": 1.0,
+                            "scale_min": 1,
+                            "scale_max": 5,
+                        },
+                    }
+                )
             )
 
             save_dir = base / "leaderboard"
             generate_leaderboard(str(base), str(save_dir))
 
             import pandas as pd
+
             df = pd.read_csv(save_dir / "simulation_leaderboard.csv")
 
             row_a = df[df["model"] == "model-a"].iloc[0]
@@ -159,7 +181,6 @@ class TestSimulationLeaderboardOverallUnitConsistent(unittest.TestCase):
 
 
 class TestSimulationMetricsPersistScaleBounds(unittest.IsolatedAsyncioTestCase):
-
     async def test_sdk_simulation_writes_scale_for_rating_criterion(self):
         """The simulation leaderboard normalizes rating means via
         (mean - scale_min) / (scale_max - scale_min) * 100. Without the
@@ -170,8 +191,15 @@ class TestSimulationMetricsPersistScaleBounds(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.llm import simulations
 
         async def fake_task(
-            semaphore, config, persona_index, user_persona, scenario_index,
-            scenario, output_dir, args, agent=None,
+            semaphore,
+            config,
+            persona_index,
+            user_persona,
+            scenario_index,
+            scenario,
+            output_dir,
+            args,
+            agent=None,
         ):
             async with semaphore:
                 eval_results = [
@@ -184,27 +212,34 @@ class TestSimulationMetricsPersistScaleBounds(unittest.IsolatedAsyncioTestCase):
                         "scale_max": 5,
                     },
                 ]
-                sim_metrics = {"name": f"sim_{persona_index}_{scenario_index}", "fluency": 4.0}
+                sim_metrics = {
+                    "name": f"sim_{persona_index}_{scenario_index}",
+                    "fluency": 4.0,
+                }
                 return sim_metrics, eval_results
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch(
-                 "calibrate_agent.llm.run_simulation.run_single_simulation_task",
-                 side_effect=fake_task,
-             ):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "calibrate_agent.llm.run_simulation.run_single_simulation_task",
+                side_effect=fake_task,
+            ),
+        ):
             await simulations.run(
                 system_prompt="...",
                 tools=[],
                 personas=[{"characteristics": "x", "language": "english"}],
                 scenarios=[{"description": "x"}],
-                evaluators=[{
-                    "name": "fluency",
-                    "system_prompt": "rate fluency",
-                    "judge_model": "openai/gpt-5.2",
-                    "type": "rating",
-                    "scale_min": 1,
-                    "scale_max": 5,
-                }],
+                evaluators=[
+                    {
+                        "name": "fluency",
+                        "system_prompt": "rate fluency",
+                        "judge_model": "openai/gpt-5.2",
+                        "type": "rating",
+                        "scale_min": 1,
+                        "scale_max": 5,
+                    }
+                ],
                 output_dir=tmp,
                 model="gpt-4.1",
                 provider="openai",
@@ -231,14 +266,18 @@ class TestSimulationLeaderboardNormalizesWithPersistedBounds(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = pathlib.Path(tmp)
             (base / "model-a").mkdir()
-            (base / "model-a" / "metrics.json").write_text(json.dumps({
-                "fluency": {
-                    "type": "rating",
-                    "mean": 4.0,
-                    "scale_min": 1,
-                    "scale_max": 5,
-                },
-            }))
+            (base / "model-a" / "metrics.json").write_text(
+                json.dumps(
+                    {
+                        "fluency": {
+                            "type": "rating",
+                            "mean": 4.0,
+                            "scale_min": 1,
+                            "scale_max": 5,
+                        },
+                    }
+                )
+            )
 
             save_dir = base / "leaderboard"
             generate_leaderboard(str(base), str(save_dir))

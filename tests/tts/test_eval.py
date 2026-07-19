@@ -54,9 +54,7 @@ class TestTTSValidateInputFile(unittest.TestCase):
         from calibrate_agent.tts.eval import validate_tts_input_file
 
         with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
-            pd.DataFrame({"id": ["1"], "text": ["hello"]}).to_csv(
-                f.name, index=False
-            )
+            pd.DataFrame({"id": ["1"], "text": ["hello"]}).to_csv(f.name, index=False)
             path = f.name
         try:
             ok, err = validate_tts_input_file(path)
@@ -175,8 +173,9 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
 
         fake = AsyncMock(return_value={"ttfb": 0.42})
 
-        with patch.object(tts_eval, "synthesize_openai", fake), patch.object(
-            tts_eval, "create_langfuse_audio_media", lambda p: None
+        with (
+            patch.object(tts_eval, "synthesize_openai", fake),
+            patch.object(tts_eval, "create_langfuse_audio_media", lambda p: None),
         ):
             result = await tts_eval.synthesize_speech.__wrapped__(
                 "hello", "openai", "english", "/tmp/x.wav"
@@ -337,9 +336,9 @@ class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
 
         kwargs = stream_fn.await_args.kwargs
         self.assertEqual(kwargs["model"], tts_eval.TTS_PROVIDER_MODELS["gemini"])
-        voice = (
-            kwargs["config"].speech_config.voice_config.prebuilt_voice_config.voice_name
-        )
+        voice = kwargs[
+            "config"
+        ].speech_config.voice_config.prebuilt_voice_config.voice_name
         self.assertEqual(voice, tts_eval.get_tts_voice("gemini", "kannada"))
 
     async def test_no_audio_raises_without_writing(self):
@@ -392,7 +391,9 @@ def _write_wav(path: str) -> None:
         wf.writeframes(b"\x00\x00" * 100)
 
 
-def _make_run_dir(tmp: str, audio_path: str = "audios/row_1.wav", extra_cols: dict = None) -> str:
+def _make_run_dir(
+    tmp: str, audio_path: str = "audios/row_1.wav", extra_cols: dict = None
+) -> str:
     """Create a minimal TTS run dir (results.csv + audios/row_1.wav) under ``tmp``."""
     run_dir = os.path.join(tmp, "openai")
     os.makedirs(os.path.join(run_dir, "audios"))

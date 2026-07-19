@@ -138,8 +138,10 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
         inner = E.synthesize_speech
         while hasattr(inner, "__wrapped__"):
             inner = inner.__wrapped__
-        with patch.object(E, "synthesize_openai", fake_fn), \
-             patch.object(E, "create_langfuse_audio_media", return_value=None):
+        with (
+            patch.object(E, "synthesize_openai", fake_fn),
+            patch.object(E, "create_langfuse_audio_media", return_value=None),
+        ):
             result = await inner("hi", "openai", "english", "/tmp/x.wav")
         self.assertEqual(result["ttfb"], 0.5)
 
@@ -151,10 +153,12 @@ class TestSynthesizeSpeechRouter(unittest.IsolatedAsyncioTestCase):
         while hasattr(inner, "__wrapped__"):
             inner = inner.__wrapped__
         fake_lf = MagicMock()
-        with patch.object(E, "synthesize_openai", fake_fn), \
-             patch.object(E, "create_langfuse_audio_media", return_value=None), \
-             patch.object(E, "langfuse_enabled", True), \
-             patch.object(E, "langfuse", fake_lf):
+        with (
+            patch.object(E, "synthesize_openai", fake_fn),
+            patch.object(E, "create_langfuse_audio_media", return_value=None),
+            patch.object(E, "langfuse_enabled", True),
+            patch.object(E, "langfuse", fake_lf),
+        ):
             await inner("hi", "openai", "english", "/tmp/x.wav")
         fake_lf.update_current_trace.assert_called_once()
 
@@ -290,11 +294,13 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
             out = Path(tmp) / "out"
             out.mkdir()
             results_csv = out / "results.csv"
-            pd.DataFrame([{"id": "a", "text": "hi", "audio_path": "x.wav", "ttfb": 0.1}]).to_csv(
-                str(results_csv), index=False
-            )
+            pd.DataFrame(
+                [{"id": "a", "text": "hi", "audio_path": "x.wav", "ttfb": 0.1}]
+            ).to_csv(str(results_csv), index=False)
 
-            with patch.object(E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})):
+            with patch.object(
+                E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})
+            ):
                 result = await E.run_tts_eval(
                     gt_data=[{"id": "a", "text": "hi"}, {"id": "b", "text": "hello"}],
                     provider="openai",
@@ -311,11 +317,13 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
             out = Path(tmp) / "out"
             out.mkdir()
             results_csv = out / "results.csv"
-            pd.DataFrame([{"id": "a", "text": "hi", "audio_path": "x", "ttfb": 0.1}]).to_csv(
-                str(results_csv), index=False
-            )
+            pd.DataFrame(
+                [{"id": "a", "text": "hi", "audio_path": "x", "ttfb": 0.1}]
+            ).to_csv(str(results_csv), index=False)
 
-            with patch.object(E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})):
+            with patch.object(
+                E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})
+            ):
                 result = await E.run_tts_eval(
                     gt_data=[{"id": "a", "text": "hi"}],
                     provider="openai",
@@ -337,11 +345,25 @@ class TestRunSingleProviderEvalTTS(unittest.IsolatedAsyncioTestCase):
             out = Path(tmp) / "out"
             out.mkdir()
 
-            with patch.object(E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})), \
-                 patch.object(E, "get_tts_llm_judge_score", AsyncMock(return_value={
-                     "scores": {"pronunciation": {"type": "binary", "mean": 1.0}},
-                     "per_row": [{"pronunciation": {"match": True, "reasoning": "ok"}}],
-                 })):
+            with (
+                patch.object(
+                    E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})
+                ),
+                patch.object(
+                    E,
+                    "get_tts_llm_judge_score",
+                    AsyncMock(
+                        return_value={
+                            "scores": {
+                                "pronunciation": {"type": "binary", "mean": 1.0}
+                            },
+                            "per_row": [
+                                {"pronunciation": {"match": True, "reasoning": "ok"}}
+                            ],
+                        }
+                    ),
+                ),
+            ):
                 result = await E.run_single_provider_eval(
                     provider="openai",
                     language="english",
@@ -380,17 +402,42 @@ class TestRunSingleProviderEvalTTS(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             inp = Path(tmp) / "in.csv"
-            pd.DataFrame({"id": ["a", "b"], "text": ["hi", "ho"]}).to_csv(str(inp), index=False)
+            pd.DataFrame({"id": ["a", "b"], "text": ["hi", "ho"]}).to_csv(
+                str(inp), index=False
+            )
             out = Path(tmp) / "out"
             out.mkdir()
-            rating_ev = {"name": "r", "system_prompt": "x", "judge_model": "m",
-                         "type": "rating", "scale_min": 1, "scale_max": 5}
+            rating_ev = {
+                "name": "r",
+                "system_prompt": "x",
+                "judge_model": "m",
+                "type": "rating",
+                "scale_min": 1,
+                "scale_max": 5,
+            }
 
-            with patch.object(E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})), \
-                 patch.object(E, "get_tts_llm_judge_score", AsyncMock(return_value={
-                     "scores": {"r": {"type": "rating", "mean": 4.0, "scale_min": 1, "scale_max": 5}},
-                     "per_row": [{"r": {"score": 4, "reasoning": "ok"}}],
-                 })):
+            with (
+                patch.object(
+                    E, "synthesize_speech", AsyncMock(return_value={"ttfb": 0.5})
+                ),
+                patch.object(
+                    E,
+                    "get_tts_llm_judge_score",
+                    AsyncMock(
+                        return_value={
+                            "scores": {
+                                "r": {
+                                    "type": "rating",
+                                    "mean": 4.0,
+                                    "scale_min": 1,
+                                    "scale_max": 5,
+                                }
+                            },
+                            "per_row": [{"r": {"score": 4, "reasoning": "ok"}}],
+                        }
+                    ),
+                ),
+            ):
                 result = await E.run_single_provider_eval(
                     provider="openai",
                     language="english",
@@ -433,11 +480,20 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
             out = Path(tmp) / "out"
 
             argv = ["e.py", "-p", "openai", "-i", str(inp), "-o", str(out)]
-            fake_result = {"provider": "openai", "status": "completed",
-                           "metrics": {"pronunciation": {"type": "binary", "mean": 0.9},
-                                       "ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2}}}
-            with patch.object(sys, "argv", argv), \
-                 patch.object(E, "run_single_provider_eval", AsyncMock(return_value=fake_result)):
+            fake_result = {
+                "provider": "openai",
+                "status": "completed",
+                "metrics": {
+                    "pronunciation": {"type": "binary", "mean": 0.9},
+                    "ttfb": {"p50": 0.5, "p95": 0.6, "p99": 0.6, "count": 2},
+                },
+            }
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    E, "run_single_provider_eval", AsyncMock(return_value=fake_result)
+                ),
+            ):
                 await E.main()
 
     async def test_main_error_result(self):
@@ -450,8 +506,12 @@ class TestTTSMainCLI(unittest.IsolatedAsyncioTestCase):
 
             argv = ["e.py", "-p", "openai", "-i", str(inp), "-o", str(out)]
             fake_result = {"provider": "openai", "status": "error", "error": "boom"}
-            with patch.object(sys, "argv", argv), \
-                 patch.object(E, "run_single_provider_eval", AsyncMock(return_value=fake_result)):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    E, "run_single_provider_eval", AsyncMock(return_value=fake_result)
+                ),
+            ):
                 await E.main()
 
 

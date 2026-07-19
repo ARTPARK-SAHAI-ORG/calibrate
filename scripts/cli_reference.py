@@ -57,29 +57,29 @@ ROOT_FILENAME = "calibrate.md"
 
 @dataclass
 class SeeAlso:
-    label: str          # "calibrate agents"
-    target: str         # "calibrate_agents.md"
-    description: str     # "Operations for agents"
+    label: str  # "calibrate agents"
+    target: str  # "calibrate_agents.md"
+    description: str  # "Operations for agents"
 
 
 @dataclass
 class Option:
-    flag: str            # "-o, --output-format" / "--dry-run"
-    type: str = ""       # "string" / "stringArray" / "" for bool
-    default: str = ""    # value inside (default "...")
+    flag: str  # "-o, --output-format" / "--dry-run"
+    type: str = ""  # "string" / "stringArray" / "" for bool
+    default: str = ""  # value inside (default "...")
     description: str = ""
     required: bool = False
 
 
 @dataclass
 class CliCommand:
-    command: str                       # "calibrate agents list"
-    short: str                         # one-line description
-    synopsis: str = ""                 # long description prose
-    usage: str = ""                    # contents of the usage code block
-    examples: str = ""                 # contents of the examples code block
-    options: str = ""                  # contents of the options code block
-    inherited_options: str = ""        # inherited-options code block
+    command: str  # "calibrate agents list"
+    short: str  # one-line description
+    synopsis: str = ""  # long description prose
+    usage: str = ""  # contents of the usage code block
+    examples: str = ""  # contents of the examples code block
+    options: str = ""  # contents of the options code block
+    inherited_options: str = ""  # inherited-options code block
     see_also: list[SeeAlso] = field(default_factory=list)
 
     @property
@@ -157,12 +157,12 @@ def parse_options(block: str) -> list[Option]:
         tm = re.match(r"^\s(\S+)\s{2,}", rest)
         if tm:
             type_ = tm.group(1)
-            desc = rest[tm.end():].strip()
+            desc = rest[tm.end() :].strip()
         else:
             desc = rest.strip()
 
         default = ""
-        dm = re.search(r'\(default (.*?)\)\s*$', desc)
+        dm = re.search(r"\(default (.*?)\)\s*$", desc)
         if dm:
             default = dm.group(1).strip().strip('"')
             desc = desc[: dm.start()].strip()
@@ -173,7 +173,13 @@ def parse_options(block: str) -> list[Option]:
             desc = desc[: -len("[required]")].strip()
 
         options.append(
-            Option(flag=flag, type=type_, default=default, description=desc, required=required)
+            Option(
+                flag=flag,
+                type=type_,
+                default=default,
+                description=desc,
+                required=required,
+            )
         )
     return options
 
@@ -211,7 +217,9 @@ def _parse_see_also(section: str) -> list[SeeAlso]:
         if not m:
             continue
         label, target, desc = m.group(1), m.group(2), m.group(3).strip()
-        entries.append(SeeAlso(label=label.strip(), target=target.strip(), description=desc))
+        entries.append(
+            SeeAlso(label=label.strip(), target=target.strip(), description=desc)
+        )
     return entries
 
 
@@ -224,10 +232,12 @@ def parse_cli_doc(text: str) -> CliCommand:
         raise ValueError("CLI doc missing '## <command>' title")
     command = title_match.group(1).strip()
 
-    body = text[title_match.end():]
+    body = text[title_match.end() :]
     preamble, sections = _split_sections(body)
 
-    short = " ".join(line.strip() for line in preamble.strip().splitlines() if line.strip())
+    short = " ".join(
+        line.strip() for line in preamble.strip().splitlines() if line.strip()
+    )
 
     synopsis_section = sections.get("Synopsis", "")
     usage = _extract_code_block(synopsis_section)

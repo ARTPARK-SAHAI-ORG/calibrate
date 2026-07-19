@@ -57,9 +57,7 @@ class TestIsRating(unittest.TestCase):
 
     def test_rating_evaluator(self):
         self.assertTrue(
-            is_rating(
-                {"name": "x", "type": "rating", "scale_min": 1, "scale_max": 5}
-            )
+            is_rating({"name": "x", "type": "rating", "scale_min": 1, "scale_max": 5})
         )
 
 
@@ -100,9 +98,7 @@ class TestRenderTemplate(unittest.TestCase):
         self.assertEqual(out, "hello world")
 
     def test_substitutes_multiple(self):
-        out = render_template(
-            "{{a}} and {{b}}", {"a": "foo", "b": "bar"}
-        )
+        out = render_template("{{a}} and {{b}}", {"a": "foo", "b": "bar"})
         self.assertEqual(out, "foo and bar")
 
     def test_missing_placeholder_left_intact(self):
@@ -231,9 +227,7 @@ class TestNormalizeJudgeApiResult(unittest.TestCase):
 
 class TestResultModelForEvaluator(unittest.TestCase):
     def test_binary_uses_criterion_result(self):
-        Output = _result_model_for_evaluator(
-            {"name": "x", "system_prompt": "y"}
-        )
+        Output = _result_model_for_evaluator({"name": "x", "system_prompt": "y"})
         self.assertIs(Output, CriterionResult)
         instance = Output(reasoning="ok", match=True)
         self.assertTrue(instance.match)
@@ -322,10 +316,12 @@ class TestJudgeIOLogging(unittest.IsolatedAsyncioTestCase):
         f.close()
         token = provider_log_file.set(f.name)
         try:
-            with patch(
-                "calibrate_agent.judges.instructor.apatch", return_value=client
-            ), patch(
-                "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+            with (
+                patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+                patch(
+                    "calibrate_agent.judges._build_openrouter_client",
+                    return_value=MagicMock(),
+                ),
             ):
                 await text_judge(
                     evaluators=[
@@ -343,29 +339,27 @@ class TestJudgeIOLogging(unittest.IsolatedAsyncioTestCase):
             os.unlink(f.name)
 
         self.assertIn("judge call", contents)
-        self.assertIn("accuracy", contents)            # evaluator name
-        self.assertIn("openai/gpt-4.1", contents)      # model
+        self.assertIn("accuracy", contents)  # evaluator name
+        self.assertIn("openai/gpt-4.1", contents)  # model
         self.assertIn("Evaluate accuracy of", contents)  # system prompt
-        self.assertIn("my-context", contents)          # user input
-        self.assertIn("looks right", contents)         # judge output reasoning
+        self.assertIn("my-context", contents)  # user input
+        self.assertIn("looks right", contents)  # judge output reasoning
 
     async def test_no_log_file_does_not_crash(self):
         from calibrate_agent.utils import provider_log_file
 
         # Ensure unbound (default None) — judge should run without writing anywhere.
         self.assertIsNone(provider_log_file.get())
-        client = _mock_instructor_chat_completions(
-            [{"reasoning": "ok", "match": True}]
-        )
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch(
-            "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+        client = _mock_instructor_chat_completions([{"reasoning": "ok", "match": True}])
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch(
+                "calibrate_agent.judges._build_openrouter_client",
+                return_value=MagicMock(),
+            ),
         ):
             result = await text_judge(
-                evaluators=[
-                    {"name": "x", "system_prompt": "p", "judge_model": "m"}
-                ],
+                evaluators=[{"name": "x", "system_prompt": "p", "judge_model": "m"}],
                 user_prompt="ctx",
             )
         self.assertEqual(result, {"x": {"reasoning": "ok", "match": True}})
@@ -384,10 +378,12 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch(
-            "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch(
+                "calibrate_agent.judges._build_openrouter_client",
+                return_value=MagicMock(),
+            ),
         ):
             result = await text_judge(
                 evaluators=[
@@ -427,10 +423,12 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
                 },
             ]
         )
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch(
-            "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch(
+                "calibrate_agent.judges._build_openrouter_client",
+                return_value=MagicMock(),
+            ),
         ):
             result = await text_judge(
                 evaluators=[
@@ -451,13 +449,13 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_uses_evaluator_judge_model(self):
-        client = _mock_instructor_chat_completions(
-            {"reasoning": "ok", "match": True}
-        )
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch(
-            "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+        client = _mock_instructor_chat_completions({"reasoning": "ok", "match": True})
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch(
+                "calibrate_agent.judges._build_openrouter_client",
+                return_value=MagicMock(),
+            ),
         ):
             await text_judge(
                 evaluators=[
@@ -473,13 +471,13 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call_kwargs["model"], "custom-model")
 
     async def test_falls_back_when_evaluator_has_no_model(self):
-        client = _mock_instructor_chat_completions(
-            {"reasoning": "ok", "match": True}
-        )
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch(
-            "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+        client = _mock_instructor_chat_completions({"reasoning": "ok", "match": True})
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch(
+                "calibrate_agent.judges._build_openrouter_client",
+                return_value=MagicMock(),
+            ),
         ):
             await text_judge(
                 evaluators=[{"name": "x", "system_prompt": "sys"}],
@@ -490,13 +488,13 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call_kwargs["model"], "fallback-model")
 
     async def test_system_prompt_is_passed_verbatim(self):
-        client = _mock_instructor_chat_completions(
-            {"reasoning": "ok", "match": True}
-        )
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch(
-            "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+        client = _mock_instructor_chat_completions({"reasoning": "ok", "match": True})
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch(
+                "calibrate_agent.judges._build_openrouter_client",
+                return_value=MagicMock(),
+            ),
         ):
             await text_judge(
                 evaluators=[
@@ -515,13 +513,12 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(user_msg["content"], "UNIQUE-USER-PROMPT")
 
     async def test_uses_openrouter_client(self):
-        client = _mock_instructor_chat_completions(
-            {"reasoning": "ok", "match": True}
-        )
+        client = _mock_instructor_chat_completions({"reasoning": "ok", "match": True})
         build_mock = MagicMock(return_value=MagicMock())
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch("calibrate_agent.judges._build_openrouter_client", build_mock):
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch("calibrate_agent.judges._build_openrouter_client", build_mock),
+        ):
             await text_judge(
                 evaluators=[
                     {
@@ -571,9 +568,7 @@ class TestSimulationJudge(unittest.IsolatedAsyncioTestCase):
                 evaluators=evaluators,
             )
 
-        self.assertEqual(
-            result, {"greeting": {"reasoning": "ok", "match": True}}
-        )
+        self.assertEqual(result, {"greeting": {"reasoning": "ok", "match": True}})
         call_kwargs = mock_text_judge.call_args.kwargs
         self.assertEqual(call_kwargs["evaluators"], evaluators)
         # User prompt includes conversation transcript
@@ -663,9 +658,7 @@ class TestGeneralTaskJudge(unittest.IsolatedAsyncioTestCase):
                 output="a faithful summary",
                 input_text="a long document",
             )
-        self.assertEqual(
-            result, {"task_quality": {"reasoning": "ok", "match": True}}
-        )
+        self.assertEqual(result, {"task_quality": {"reasoning": "ok", "match": True}})
         call_kwargs = mock_text_judge.call_args.kwargs
         self.assertEqual(call_kwargs["evaluators"], evaluators)
         prompt = call_kwargs["user_prompt"]
@@ -680,10 +673,8 @@ class TestGeneralTaskJudge(unittest.IsolatedAsyncioTestCase):
         )
         with patch("calibrate_agent.judges.text_judge", mock_text_judge):
             await general_task_judge(
-                evaluators=[
-                    {"name": "x", "system_prompt": "y", "judge_model": "m"}
-                ],
-                output="{\"k\": 1}",
+                evaluators=[{"name": "x", "system_prompt": "y", "judge_model": "m"}],
+                output='{"k": 1}',
             )
         prompt = mock_text_judge.call_args.kwargs["user_prompt"]
         self.assertNotIn("`Input`", prompt)
@@ -705,10 +696,12 @@ class TestGeneralTaskJudge(unittest.IsolatedAsyncioTestCase):
         client = _mock_instructor_chat_completions(
             [{"reasoning": "faithful", "match": True}]
         )
-        with patch(
-            "calibrate_agent.judges.instructor.apatch", return_value=client
-        ), patch(
-            "calibrate_agent.judges._build_openrouter_client", return_value=MagicMock()
+        with (
+            patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+            patch(
+                "calibrate_agent.judges._build_openrouter_client",
+                return_value=MagicMock(),
+            ),
         ):
             result = await general_task_judge(
                 evaluators=[
@@ -755,11 +748,12 @@ class TestAudioJudge(unittest.IsolatedAsyncioTestCase):
                 ]
             )
 
-            with patch(
-                "calibrate_agent.judges.instructor.apatch", return_value=client
-            ), patch(
-                "calibrate_agent.judges._build_openrouter_client",
-                return_value=MagicMock(),
+            with (
+                patch("calibrate_agent.judges.instructor.apatch", return_value=client),
+                patch(
+                    "calibrate_agent.judges._build_openrouter_client",
+                    return_value=MagicMock(),
+                ),
             ):
                 result = await audio_judge(
                     evaluators=[
@@ -791,14 +785,10 @@ class TestAudioJudge(unittest.IsolatedAsyncioTestCase):
             # First call carries the reference text and an audio block
             call_kwargs = client.chat.completions.create.call_args_list[0].kwargs
             self.assertEqual(call_kwargs["model"], DEFAULT_AUDIO_JUDGE_MODEL)
-            user_msg = next(
-                m for m in call_kwargs["messages"] if m["role"] == "user"
-            )
+            user_msg = next(m for m in call_kwargs["messages"] if m["role"] == "user")
             text_parts = [p for p in user_msg["content"] if p["type"] == "text"]
             self.assertTrue(any("hello world" in p["text"] for p in text_parts))
-            audio_parts = [
-                p for p in user_msg["content"] if p["type"] == "input_audio"
-            ]
+            audio_parts = [p for p in user_msg["content"] if p["type"] == "input_audio"]
             self.assertEqual(len(audio_parts), 1)
         finally:
             os.unlink(audio_path)
@@ -854,9 +844,7 @@ class TestDefaultEvaluators(unittest.TestCase):
 
     def test_general_task_default_evaluator_shape(self):
         self.assertEqual(DEFAULT_GENERAL_TASK_EVALUATOR["name"], "task_quality")
-        self.assertIn(
-            "{{criteria}}", DEFAULT_GENERAL_TASK_EVALUATOR["system_prompt"]
-        )
+        self.assertIn("{{criteria}}", DEFAULT_GENERAL_TASK_EVALUATOR["system_prompt"])
         self.assertEqual(DEFAULT_GENERAL_TASK_EVALUATOR["type"], "binary")
         self.assertEqual(
             DEFAULT_GENERAL_TASK_EVALUATOR["judge_model"], DEFAULT_TEXT_JUDGE_MODEL
@@ -865,9 +853,7 @@ class TestDefaultEvaluators(unittest.TestCase):
     def test_stt_default_evaluator_shape(self):
         self.assertEqual(DEFAULT_STT_EVALUATOR["name"], "semantic_match")
         self.assertTrue(DEFAULT_STT_EVALUATOR["system_prompt"])
-        self.assertEqual(
-            DEFAULT_STT_EVALUATOR["judge_model"], DEFAULT_TEXT_JUDGE_MODEL
-        )
+        self.assertEqual(DEFAULT_STT_EVALUATOR["judge_model"], DEFAULT_TEXT_JUDGE_MODEL)
 
     def test_tts_default_evaluator_shape(self):
         self.assertEqual(DEFAULT_TTS_EVALUATOR["name"], "pronunciation")

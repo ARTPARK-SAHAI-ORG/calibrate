@@ -6,8 +6,19 @@ from unittest.mock import patch
 
 
 STT_LANGUAGES = [
-    "english", "hindi", "kannada", "bengali", "malayalam", "marathi",
-    "odia", "punjabi", "tamil", "telugu", "gujarati", "sindhi", "maithili",
+    "english",
+    "hindi",
+    "kannada",
+    "bengali",
+    "malayalam",
+    "marathi",
+    "odia",
+    "punjabi",
+    "tamil",
+    "telugu",
+    "gujarati",
+    "sindhi",
+    "maithili",
 ]
 
 
@@ -63,7 +74,9 @@ class TestGoogleModelAndLocation(unittest.TestCase):
             (STT_PROVIDER_MODELS["google"], "us"),
         )
         # Explicit model override wins for non-Sindhi.
-        self.assertEqual(google_stt_model_and_location("hindi", "chirp_3"), ("chirp_3", "us"))
+        self.assertEqual(
+            google_stt_model_and_location("hindi", "chirp_3"), ("chirp_3", "us")
+        )
 
 
 class TestGoogleSindhiRouting(unittest.TestCase):

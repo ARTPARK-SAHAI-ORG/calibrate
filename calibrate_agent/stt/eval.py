@@ -89,7 +89,9 @@ def _stt_result_row(
         "id": row_id,
         "gt": gt_text,
         "pred": pred_text,
-        "audio_duration_seconds": get_audio_duration_seconds(audio_dir / f"{row_id}.wav"),
+        "audio_duration_seconds": get_audio_duration_seconds(
+            audio_dir / f"{row_id}.wav"
+        ),
     }
 
 
@@ -344,7 +346,9 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
     transcription = await asyncio.wait_for(
         client.audio.transcriptions.create(
             file=audio_file,  # Required audio file
-            model=STT_PROVIDER_MODELS["groq"],  # Required model to use for transcription
+            model=STT_PROVIDER_MODELS[
+                "groq"
+            ],  # Required model to use for transcription
             response_format="text",  # Optional
             language=lang_code,  # Optional
             temperature=0.0,  # Optional
@@ -499,9 +503,7 @@ async def transcribe_gemini(audio_path: Path, language: str) -> Dict:
             model=STT_PROVIDER_MODELS["gemini"],
             contents=[
                 prompt,
-                genai_types.Part.from_bytes(
-                    data=audio_bytes, mime_type="audio/wav"
-                ),
+                genai_types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav"),
             ],
         ),
         timeout=STT_PROVIDER_TIMEOUT_SECONDS,
@@ -1060,9 +1062,7 @@ async def _run_stt_eval_concurrent(
                 results.append(row)
                 pd.DataFrame(results).to_csv(results_csv_path, index=False)
 
-    await asyncio.gather(
-        *(worker(i + 1, gt_info) for i, gt_info in enumerate(pending))
-    )
+    await asyncio.gather(*(worker(i + 1, gt_info) for i, gt_info in enumerate(pending)))
     return success_count
 
 
@@ -1106,6 +1106,7 @@ async def run_stt_eval(
         transcribe_fn=transcribe_fn,
         with_ttfs=(engine == "pipeline"),
     )
+
 
 def validate_stt_input_dir(input_dir: str, input_file_name: str) -> tuple[bool, str]:
     """Validate STT input directory structure.
@@ -1624,9 +1625,7 @@ async def _score_and_write_results(
         else [None] * len(ids)
     )
     llm_wer_per_row = (
-        llm_wer_results["per_row"]
-        if llm_wer_results is not None
-        else [None] * len(ids)
+        llm_wer_results["per_row"] if llm_wer_results is not None else [None] * len(ids)
     )
     llm_per_row = (
         llm_results["per_row"] if llm_results is not None else [None] * len(ids)
@@ -1942,9 +1941,9 @@ async def main():
     )
 
     # Print summary
-    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\n\033[92m{'=' * 60}\033[0m")
     print("\033[92mSummary\033[0m")
-    print(f"\033[92m{'='*60}\033[0m\n")
+    print(f"\033[92m{'=' * 60}\033[0m\n")
 
     if result.get("status") == "error":
         print(f"  {provider}: \033[31mError - {result.get('error')}\033[0m")

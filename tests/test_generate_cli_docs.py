@@ -75,7 +75,9 @@ def test_options_table_keeps_body_when_it_is_the_only_input() -> None:
 def test_options_table_omits_default_column_when_all_empty() -> None:
     table = _options_table(
         [
-            Option(flag="-a, --agent-uuid", type="string", required=True, description="x"),
+            Option(
+                flag="-a, --agent-uuid", type="string", required=True, description="x"
+            ),
             Option(flag="-t, --test-uuids", type="string", description="y"),
         ]
     )
@@ -101,7 +103,9 @@ def test_options_table_drops_placeholder_only_flags() -> None:
         [
             Option(flag="--x-api-key", type="string", description="string value"),
             Option(flag="--x-org-uuid", type="string", description="string value"),
-            Option(flag="-n, --names", type="stringArray", description="Names to resolve"),
+            Option(
+                flag="-n, --names", type="stringArray", description="Names to resolve"
+            ),
         ]
     )
     assert "--x-api-key" not in table
@@ -111,7 +115,9 @@ def test_options_table_drops_placeholder_only_flags() -> None:
 
 def test_options_table_keeps_required_flag_even_without_description() -> None:
     # a required flag with no description ("[required]") must survive the filter
-    table = _options_table([Option(flag="-n, --names", type="stringArray", required=True)])
+    table = _options_table(
+        [Option(flag="-n, --names", type="stringArray", required=True)]
+    )
     assert "`-n, --names`" in table
     assert "**Required.**" in table
 
@@ -259,7 +265,10 @@ def test_build_tab_orders_getting_started_then_resources() -> None:
     assert tab["tab"] == "CLI"
     assert [g["group"] for g in tab["groups"]] == ["Getting started", "Guides"]
     groups = {g["group"]: g["pages"] for g in tab["groups"]}
-    assert groups["Getting started"] == ["cli/calibrate/overview", "cli/calibrate/agent-mode"]
+    assert groups["Getting started"] == [
+        "cli/calibrate/overview",
+        "cli/calibrate/agent-mode",
+    ]
     assert groups["Guides"] == ["cli/calibrate/agents", "cli/calibrate/version"]
 
 
@@ -308,7 +317,9 @@ def test_generate_includes_all_when_tags_unknown(tmp_path: Path) -> None:
 def test_patch_docs_json_inserts_after_and_is_idempotent(tmp_path: Path) -> None:
     docs_json = tmp_path / "docs.json"
     docs_json.write_text(
-        json.dumps({"navigation": {"tabs": [{"tab": "Home"}, {"tab": "API reference"}]}}),
+        json.dumps(
+            {"navigation": {"tabs": [{"tab": "Home"}, {"tab": "API reference"}]}}
+        ),
         encoding="utf-8",
     )
     tab = {"tab": "CLI", "groups": []}
@@ -332,7 +343,9 @@ def _setup_e2e(tmp_path: Path):
     output_root.mkdir(parents=True)
     docs_json = tmp_path / "docs" / "docs.json"
     docs_json.write_text(
-        json.dumps({"navigation": {"tabs": [{"tab": "Home"}, {"tab": "API reference"}]}}),
+        json.dumps(
+            {"navigation": {"tabs": [{"tab": "Home"}, {"tab": "API reference"}]}}
+        ),
         encoding="utf-8",
     )
     template_dir = tmp_path / "templates"
@@ -382,7 +395,10 @@ def test_generate_cli_docs_end_to_end(tmp_path: Path) -> None:
     assert [t["tab"] for t in tabs] == ["Home", "API reference", "CLI"]
     cli_tab = next(t for t in tabs if t["tab"] == "CLI")
     groups = {g["group"]: g["pages"] for g in cli_tab["groups"]}
-    assert groups["Getting started"] == ["cli/calibrate/overview", "cli/calibrate/agent-mode"]
+    assert groups["Getting started"] == [
+        "cli/calibrate/overview",
+        "cli/calibrate/agent-mode",
+    ]
     # only API-backed resources appear under Guides
     assert set(groups["Guides"]) == {"cli/calibrate/widgets", "cli/calibrate/ping"}
 
@@ -452,14 +468,19 @@ def _spec_two_examples() -> dict:
                                 "examples": {
                                     "build": {
                                         "summary": "Agent within Calibrate",
-                                        "value": {"name": "Support Agent", "type": "agent"},
+                                        "value": {
+                                            "name": "Support Agent",
+                                            "type": "agent",
+                                        },
                                     },
                                     "connect": {
                                         "summary": "Connect external agent",
                                         "value": {
                                             "name": "My Hosted Agent",
                                             "type": "connection",
-                                            "config": {"agent_url": "https://x.example.com/v1"},
+                                            "config": {
+                                                "agent_url": "https://x.example.com/v1"
+                                            },
                                         },
                                     },
                                 }
@@ -474,10 +495,14 @@ def _spec_two_examples() -> dict:
 
 def test_examples_by_command_maps_via_route_map() -> None:
     overrides = {
-        "paths": {"/agents": {"post": {
-            "x-fern-sdk-group-name": "agents",
-            "x-fern-sdk-method-name": "create",
-        }}}
+        "paths": {
+            "/agents": {
+                "post": {
+                    "x-fern-sdk-group-name": "agents",
+                    "x-fern-sdk-method-name": "create",
+                }
+            }
+        }
     }
     from sdk_reference import build_route_map
 
@@ -519,7 +544,7 @@ def test_subcommand_section_injects_spec_examples() -> None:
     section = "\n".join(_subcommand_section(cmd, {"agents create": examples}))
     assert "_Agent within Calibrate_" in section
     assert "_Connect external agent_" in section
-    assert "--config-param '{\"agent_url\":\"https://x.example.com/v1\"}'" in section
+    assert '--config-param \'{"agent_url":"https://x.example.com/v1"}\'' in section
     # Spec examples REPLACE Cobra's minimal block, not append to it.
     assert section.count("**Examples**") == 1
 

@@ -24,8 +24,10 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
 
         frame = MagicMock(spec=Frame)
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(Processor, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(Processor, "push_frame", AsyncMock()),
+        ):
             await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
         # Queued LLMRunFrame
         task.queue_frames.assert_called_once()
@@ -41,8 +43,10 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
         frame = MagicMock(spec=TextFrame)
         frame.text = "hello"
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(Processor, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(Processor, "push_frame", AsyncMock()),
+        ):
             await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertEqual(proc._current_response, "hello")
 
@@ -60,8 +64,10 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
 
         frame = MagicMock(spec=LLMFullResponseEndFrame)
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(Processor, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(Processor, "push_frame", AsyncMock()),
+        ):
             await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertEqual(proc._current_response, "")
         partner.queue_frames.assert_called_once()
@@ -83,8 +89,10 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
 
         frame = MagicMock(spec=LLMFullResponseEndFrame)
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(Processor, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(Processor, "push_frame", AsyncMock()),
+        ):
             await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
 
     async def test_no_speaks_first_no_run(self):
@@ -100,8 +108,10 @@ class TestProcessorProcessFrame(unittest.IsolatedAsyncioTestCase):
         proc.set_task(task)
         frame = MagicMock(spec=Frame)
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(Processor, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(Processor, "push_frame", AsyncMock()),
+        ):
             await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertTrue(proc._ready)
         task.queue_frames.assert_not_called()

@@ -13,7 +13,10 @@ from unittest.mock import MagicMock
 
 class TestBuildPrompt(unittest.TestCase):
     def test_prompt_carries_input_json_and_template(self):
-        from calibrate_agent.stt.sarvam_intent_entity.main import build_prompt, PROMPT_TEMPLATE
+        from calibrate_agent.stt.sarvam_intent_entity.main import (
+            build_prompt,
+            PROMPT_TEMPLATE,
+        )
 
         prompt = build_prompt(
             {
@@ -71,7 +74,9 @@ class TestScoreAggregators(unittest.TestCase):
         m = calculate_entity_metrics([1.0, 0.0])
         self.assertEqual(m["mean"], 0.5)
         self.assertEqual(m["median"], 0.5)
-        self.assertEqual(calculate_entity_metrics([]), {"mean": 0.0, "median": 0.0, "std": 0.0})
+        self.assertEqual(
+            calculate_entity_metrics([]), {"mean": 0.0, "median": 0.0, "std": 0.0}
+        )
 
 
 def _normalizer_with_mocks():

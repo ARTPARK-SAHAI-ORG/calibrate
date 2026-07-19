@@ -34,7 +34,9 @@ class TestRTVIFunctionCallResponder(unittest.IsolatedAsyncioTestCase):
         responder = _make_responder()
         end_cb = AsyncMock()
         responder.set_end_call_callback(end_cb)
-        result, post_cb = await responder._execute_function("end_call", {"reason": "done"})
+        result, post_cb = await responder._execute_function(
+            "end_call", {"reason": "done"}
+        )
         self.assertEqual(result["acknowledged"], True)
         self.assertEqual(result["reason"], "done")
         await post_cb()
@@ -49,11 +51,12 @@ class TestRTVIFunctionCallResponder(unittest.IsolatedAsyncioTestCase):
     async def test_execute_webhook(self):
         from calibrate_agent.agent import run_simulation as RS
 
-        responder = _make_responder(webhooks={
-            "fn1": {"url": "http://x", "method": "GET", "headers": []}
-        })
-        with patch.object(RS, "make_webhook_call",
-                          AsyncMock(return_value={"status": "success"})):
+        responder = _make_responder(
+            webhooks={"fn1": {"url": "http://x", "method": "GET", "headers": []}}
+        )
+        with patch.object(
+            RS, "make_webhook_call", AsyncMock(return_value={"status": "success"})
+        ):
             result, _ = await responder._execute_function("fn1", {"x": 1})
         self.assertEqual(result["status"], "success")
 
@@ -94,8 +97,10 @@ class TestRTVIFunctionCallResponder(unittest.IsolatedAsyncioTestCase):
             },
         }
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(RTVIFunctionCallResponder, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(RTVIFunctionCallResponder, "push_frame", AsyncMock()),
+        ):
             await responder.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertEqual(len(responder._tool_calls), 1)
         sender.assert_called_once()
@@ -109,8 +114,10 @@ class TestRTVIFunctionCallResponder(unittest.IsolatedAsyncioTestCase):
         frame = MagicMock(spec=InputTransportMessageFrame)
         frame.message = {"label": "other"}
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(RTVIFunctionCallResponder, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(RTVIFunctionCallResponder, "push_frame", AsyncMock()),
+        ):
             await responder.process_frame(frame, FrameDirection.DOWNSTREAM)
 
 

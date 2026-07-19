@@ -44,7 +44,10 @@ from mcp_tool_samples import (
 def test_schema_type_labels() -> None:
     assert _schema_type({"type": "string"}) == "string"
     assert _schema_type({"$ref": "#/components/schemas/WidgetCreate"}) == "WidgetCreate"
-    assert _schema_type({"type": "array", "items": {"type": "string"}}) == "array of string"
+    assert (
+        _schema_type({"type": "array", "items": {"type": "string"}})
+        == "array of string"
+    )
     assert _schema_type({"anyOf": [{"type": "string"}, {"type": "null"}]}) == "string"
     assert _schema_type({}) == "object"
 
@@ -61,7 +64,9 @@ def test_anchor_matches_mintlify_heading_slug() -> None:
 
 
 def test_tool_sort_key_orders_read_before_write() -> None:
-    tools = [parse_tool_ts(t) for t in (CREATE_WIDGET_TS, GET_WIDGET_TS, LIST_WIDGETS_TS)]
+    tools = [
+        parse_tool_ts(t) for t in (CREATE_WIDGET_TS, GET_WIDGET_TS, LIST_WIDGETS_TS)
+    ]
     ordered = sorted(tools, key=_tool_sort_key)
     # list -> get -> create (CRUD read-before-write), mirroring Coval
     assert [t.name for t in ordered] == ["list-widgets", "get-widget", "create-widget"]
@@ -149,7 +154,9 @@ def test_examples_block_renders_labelled_tools_call_payloads() -> None:
         "widgets",
         [
             NamedExample("basic", "Basic widget", "A minimal widget.", {"name": "s"}),
-            NamedExample("colored", "Colored widget", "", {"name": "s", "color": "red"}),
+            NamedExample(
+                "colored", "Colored widget", "", {"name": "s", "color": "red"}
+            ),
         ],
     )
     text = "\n".join(_examples_block(_tool("create-widget"), op))
@@ -176,7 +183,9 @@ def test_examples_block_renders_single_variant() -> None:
 
 
 def test_examples_block_omitted_when_no_examples() -> None:
-    assert _examples_block(_tool("create-widget"), _op_with_examples("widgets", [])) == []
+    assert (
+        _examples_block(_tool("create-widget"), _op_with_examples("widgets", [])) == []
+    )
 
 
 def test_examples_block_adds_agent_connection_learn_more() -> None:
@@ -185,7 +194,9 @@ def test_examples_block_adds_agent_connection_learn_more() -> None:
         "agents",
         [
             NamedExample("build", "Build in Calibrate", "", {"name": "a"}),
-            NamedExample("connect", "Connect external", "", {"name": "a", "config": {}}),
+            NamedExample(
+                "connect", "Connect external", "", {"name": "a", "config": {}}
+            ),
         ],
     )
     text = "\n".join(_examples_block(_tool("create-agent"), op))
@@ -276,7 +287,13 @@ def _run(tmp_path: Path, samples=None):
 
 def test_generate_writes_all_five_pages(tmp_path: Path) -> None:
     output_root, _ = _run(tmp_path)
-    for name in ("overview", "installation", "tools", "beginners-guide", "troubleshooting"):
+    for name in (
+        "overview",
+        "installation",
+        "tools",
+        "beginners-guide",
+        "troubleshooting",
+    ):
         assert (output_root / f"{name}.mdx").is_file()
     # no per-resource pages in the Coval-style structure
     assert not (output_root / "widgets.mdx").exists()
@@ -322,10 +339,12 @@ def test_tools_page_content(tmp_path: Path) -> None:
     assert "| `name` | string | Yes | Widget name. |" in tools
     assert "GET /widgets/&#123;widget_uuid&#125;" in tools
     # no-arg tool omits the Parameters block
-    list_section = tools[tools.index("### list-widgets"):tools.index("### get-widget")]
+    list_section = tools[
+        tools.index("### list-widgets") : tools.index("### get-widget")
+    ]
     assert "**Parameters**" not in list_section
     # multi-variant create-widget grows an Examples block of tools/call payloads
-    create_section = tools[tools.index("### create-widget"):]
+    create_section = tools[tools.index("### create-widget") :]
     assert "**Examples**" in create_section
     assert "**Basic widget**" in create_section
     assert '"name": "create-widget"' in create_section

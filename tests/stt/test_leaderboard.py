@@ -19,7 +19,9 @@ from pathlib import Path
 import pandas as pd
 import openpyxl  # noqa: F401 — ensures xlsx reading works
 
-from calibrate_agent.stt.leaderboard import generate_leaderboard as generate_stt_leaderboard
+from calibrate_agent.stt.leaderboard import (
+    generate_leaderboard as generate_stt_leaderboard,
+)
 
 
 def _write_provider(
@@ -32,28 +34,35 @@ def _write_provider(
     provider_dir.mkdir(parents=True, exist_ok=True)
     (provider_dir / "metrics.json").write_text(json.dumps(metrics))
     if results_rows is not None:
-        pd.DataFrame(results_rows).to_csv(
-            provider_dir / "results.csv", index=False
-        )
+        pd.DataFrame(results_rows).to_csv(provider_dir / "results.csv", index=False)
 
 
 class TestSTTLeaderboard(unittest.TestCase):
-
     def test_default_single_evaluator_produces_score_metric(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "deepgram", {
-                "wer": 0.1,
-                "semantic_match": {"type": "binary", "mean": 0.85},
-            }, results_rows=[
-                {"id": 1, "gt": "hello", "pred": "hello", "semantic_match": True},
-            ])
-            _write_provider(base, "google", {
-                "wer": 0.2,
-                "semantic_match": {"type": "binary", "mean": 0.75},
-            }, results_rows=[
-                {"id": 1, "gt": "hello", "pred": "hallo", "semantic_match": False},
-            ])
+            _write_provider(
+                base,
+                "deepgram",
+                {
+                    "wer": 0.1,
+                    "semantic_match": {"type": "binary", "mean": 0.85},
+                },
+                results_rows=[
+                    {"id": 1, "gt": "hello", "pred": "hello", "semantic_match": True},
+                ],
+            )
+            _write_provider(
+                base,
+                "google",
+                {
+                    "wer": 0.2,
+                    "semantic_match": {"type": "binary", "mean": 0.75},
+                },
+                results_rows=[
+                    {"id": 1, "gt": "hello", "pred": "hallo", "semantic_match": False},
+                ],
+            )
 
             save_dir = base / "leaderboard"
             generate_stt_leaderboard(str(base), str(save_dir))
@@ -71,11 +80,15 @@ class TestSTTLeaderboard(unittest.TestCase):
         column in the summary."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "provider-a", {
-                "wer": 0.05,
-                "semantic_match": {"type": "binary", "mean": 0.9},
-                "completeness": {"type": "binary", "mean": 0.7},
-            })
+            _write_provider(
+                base,
+                "provider-a",
+                {
+                    "wer": 0.05,
+                    "semantic_match": {"type": "binary", "mean": 0.9},
+                    "completeness": {"type": "binary", "mean": 0.7},
+                },
+            )
 
             save_dir = base / "leaderboard"
             generate_stt_leaderboard(str(base), str(save_dir))
@@ -88,20 +101,26 @@ class TestSTTLeaderboard(unittest.TestCase):
     def test_cost_metrics_surface_as_scalar_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "openai", {
-                "wer": 0.1,
-                "semantic_match": {"type": "binary", "mean": 0.9},
-                "cost": {
-                    "audio_minutes": 2.0,
-                    "cost_per_minute_currency": 0.006,
-                    "cost_usd": 0.012,
+            _write_provider(
+                base,
+                "openai",
+                {
+                    "wer": 0.1,
+                    "semantic_match": {"type": "binary", "mean": 0.9},
+                    "cost": {
+                        "audio_minutes": 2.0,
+                        "cost_per_minute_currency": 0.006,
+                        "cost_usd": 0.012,
+                    },
                 },
-            })
+            )
 
             save_dir = base / "leaderboard"
             generate_stt_leaderboard(str(base), str(save_dir))
 
-            summary = pd.read_excel(save_dir / "stt_leaderboard.xlsx", sheet_name="summary")
+            summary = pd.read_excel(
+                save_dir / "stt_leaderboard.xlsx", sheet_name="summary"
+            )
             self.assertIn("cost_usd", summary.columns)
             self.assertNotIn("cost_per_minute_currency", summary.columns)
             self.assertNotIn("audio_minutes", summary.columns)
@@ -112,12 +131,17 @@ class TestSTTLeaderboard(unittest.TestCase):
         treated as a provider (hardcoded skip in the leaderboard code)."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "provider-x", {
-                "wer": 0.1,
-                "semantic_match": {"type": "binary", "mean": 1.0},
-            }, results_rows=[
-                {"id": 1, "gt": "hi", "pred": "hi", "semantic_match": True},
-            ])
+            _write_provider(
+                base,
+                "provider-x",
+                {
+                    "wer": 0.1,
+                    "semantic_match": {"type": "binary", "mean": 1.0},
+                },
+                results_rows=[
+                    {"id": 1, "gt": "hi", "pred": "hi", "semantic_match": True},
+                ],
+            )
             # Pre-existing leaderboard directory — must be skipped
             (base / "leaderboard").mkdir()
             (base / "leaderboard" / "metrics.json").write_text(

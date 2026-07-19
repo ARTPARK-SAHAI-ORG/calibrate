@@ -202,7 +202,9 @@ def _param_args(parameters: list[dict[str, Any]]) -> list[Arg]:
                 name=p.get("name", ""),
                 type=_schema_type(schema),
                 required=bool(p.get("required")),
-                description=(p.get("description") or schema.get("description") or "").strip(),
+                description=(
+                    p.get("description") or schema.get("description") or ""
+                ).strip(),
             )
         )
     return args
@@ -342,8 +344,7 @@ def available_tools_table(rows: list[tuple[str, str, list[McpTool]]]) -> str:
         return ""
     total = sum(len(tools) for _, _, tools in rows)
     lead = (
-        f"The Calibrate MCP server exposes {total} tools across "
-        f"{len(rows)} categories:"
+        f"The Calibrate MCP server exposes {total} tools across {len(rows)} categories:"
     )
     lines = [lead, "", "| Category | Tools | Purpose |", "| --- | --- | --- |"]
     for title, purpose, tools in rows:
@@ -366,7 +367,9 @@ def _frontmatter(title: str, description: str) -> list[str]:
     ]
 
 
-def render_tools_page(grouped: list[tuple[str, list[tuple[McpTool, Operation]]]]) -> str:
+def render_tools_page(
+    grouped: list[tuple[str, list[tuple[McpTool, Operation]]]],
+) -> str:
     lines = _frontmatter("Tools", "Every tool the Calibrate MCP server exposes")
     lines += [
         "Each tool maps 1-to-1 to a [public API](/api-reference/introduction) "
@@ -516,7 +519,9 @@ def generate_mcp_docs(
 def main(argv: list[str] | None = None) -> int:
     argv = argv if argv is not None else sys.argv[1:]
     if not argv:
-        raise SystemExit("usage: generate_mcp_docs.py <calibrate-mcp/src/mcp-server/tools>")
+        raise SystemExit(
+            "usage: generate_mcp_docs.py <calibrate-mcp/src/mcp-server/tools>"
+        )
     generate_mcp_docs(Path(argv[0]))
     return 0
 

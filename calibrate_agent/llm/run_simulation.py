@@ -47,7 +47,10 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from calibrate_agent.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
+from calibrate_agent.llm.metrics import (
+    evaluate_simuation,
+    DEFAULT_SIMULATION_JUDGE_MODEL,
+)
 from calibrate_agent.judges import (
     attach_evaluator_id,
     evaluator_result_value,

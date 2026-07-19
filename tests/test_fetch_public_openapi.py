@@ -43,7 +43,11 @@ def minimal_spec() -> dict:
                     "tags": ["agents"],
                     "security": [{"HTTPBearer": []}],
                     "parameters": [
-                        {"in": "header", "name": "X-API-Key", "schema": {"type": "string"}}
+                        {
+                            "in": "header",
+                            "name": "X-API-Key",
+                            "schema": {"type": "string"},
+                        }
                     ],
                     "responses": {"200": {"description": "ok"}},
                 }
@@ -139,9 +143,13 @@ def test_normalize_preserves_x_code_samples(minimal_spec: dict) -> None:
     assert out["paths"]["/agents"]["get"]["x-codeSamples"] == samples
 
 
-def test_render_templates_substitutes_base_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_render_templates_substitutes_base_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     template_a = tmp_path / "intro.mdx"
-    template_a.write_text("curl __PUBLIC_API_BASE_URL__/agents\nspec __PUBLIC_OPENAPI_SPEC_URL__\n")
+    template_a.write_text(
+        "curl __PUBLIC_API_BASE_URL__/agents\nspec __PUBLIC_OPENAPI_SPEC_URL__\n"
+    )
     output_a = tmp_path / "out" / "intro.mdx"
 
     import fetch_public_openapi as mod
@@ -235,7 +243,9 @@ def test_sync_cli_docs_invokes_generator_when_dir_exists(
     import generate_cli_docs as gen_mod
 
     calls: list[Path] = []
-    monkeypatch.setattr(gen_mod, "generate_cli_docs", lambda src_dir: calls.append(src_dir))
+    monkeypatch.setattr(
+        gen_mod, "generate_cli_docs", lambda src_dir: calls.append(src_dir)
+    )
 
     sync_cli_docs()
 

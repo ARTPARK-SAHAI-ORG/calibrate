@@ -7,19 +7,25 @@ from unittest.mock import patch, AsyncMock, MagicMock
 
 class TestIsBenignGoogleSttIdleError(unittest.TestCase):
     def test_benign_match(self):
-        from calibrate_agent.agent.run_simulation import _is_benign_google_stt_idle_error
+        from calibrate_agent.agent.run_simulation import (
+            _is_benign_google_stt_idle_error,
+        )
 
-        self.assertTrue(_is_benign_google_stt_idle_error(
-            "GoogleSTTService error: 409 Stream timed out after receiving no more client requests"
-        ))
+        self.assertTrue(
+            _is_benign_google_stt_idle_error(
+                "GoogleSTTService error: 409 Stream timed out after receiving no more client requests"
+            )
+        )
 
     def test_not_benign(self):
-        from calibrate_agent.agent.run_simulation import _is_benign_google_stt_idle_error
+        from calibrate_agent.agent.run_simulation import (
+            _is_benign_google_stt_idle_error,
+        )
 
         self.assertFalse(_is_benign_google_stt_idle_error("Some other error"))
-        self.assertFalse(_is_benign_google_stt_idle_error(
-            "GoogleSTTService: different error"
-        ))
+        self.assertFalse(
+            _is_benign_google_stt_idle_error("GoogleSTTService: different error")
+        )
 
 
 class TestCountAgentMessageTurns(unittest.TestCase):
@@ -182,12 +188,11 @@ class TestConfigWithoutTools(unittest.IsolatedAsyncioTestCase):
         }
         scenario = {"name": "s", "description": "d"}
 
-        with tempfile.TemporaryDirectory() as tmp, patch.object(
-            RS, "start_bot", AsyncMock()
-        ) as mock_start_bot, patch.object(
-            RS, "run_simulation", AsyncMock(return_value={})
-        ), patch.object(
-            RS, "find_available_port", return_value=54321
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RS, "start_bot", AsyncMock()) as mock_start_bot,
+            patch.object(RS, "run_simulation", AsyncMock(return_value={})),
+            patch.object(RS, "find_available_port", return_value=54321),
         ):
             # The mocked bot task completes immediately, so the inner routine
             # raises "Bot task completed unexpectedly" — but only *after* it has
@@ -222,13 +227,18 @@ class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
             "label": "rtvi-ai",
             "type": "metrics",
             "data": {
-                "ttfb": [{"processor": "p1", "value": 0.5}, {"processor": "p2", "value": 0}],
+                "ttfb": [
+                    {"processor": "p1", "value": 0.5},
+                    {"processor": "p2", "value": 0},
+                ],
                 "processing": [{"processor": "p1", "value": 0.3}],
             },
         }
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(MetricsLogger, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(MetricsLogger, "push_frame", AsyncMock()),
+        ):
             await logger.process_frame(frame, FrameDirection.DOWNSTREAM)
 
         self.assertEqual(ttft["p1"], [0.5])
@@ -247,8 +257,10 @@ class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
         frame = MagicMock(spec=InputTransportMessageFrame)
         frame.message = {"label": "rtvi-ai", "type": "metrics", "data": {}}
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(MetricsLogger, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(MetricsLogger, "push_frame", AsyncMock()),
+        ):
             await logger.process_frame(frame, FrameDirection.DOWNSTREAM)
 
 
@@ -262,8 +274,10 @@ class TestIOLogger(unittest.IsolatedAsyncioTestCase):
         frame = MagicMock(spec=TTSTextFrame)
         frame.text = "hello"
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(IOLogger, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(IOLogger, "push_frame", AsyncMock()),
+        ):
             await logger.process_frame(frame, FrameDirection.DOWNSTREAM)
 
 
@@ -278,8 +292,10 @@ class TestSimulatedUserTurnIndexHook(unittest.IsolatedAsyncioTestCase):
         hook = SimulatedUserTurnIndexHook(adapter)
         frame = MagicMock(spec=LLMFullResponseStartFrame)
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(SimulatedUserTurnIndexHook, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(SimulatedUserTurnIndexHook, "push_frame", AsyncMock()),
+        ):
             await hook.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertTrue(adapter._sim_user_turn_pending)
 
@@ -313,7 +329,9 @@ class TestBuildUserContextAggregator(unittest.TestCase):
         strategies = controller._user_turn_strategies
         # Smart-turn decides turn-end for normal turns.
         self.assertTrue(
-            any(isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop)
+            any(
+                isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop
+            )
         )
         # ExternalUserTurnStopStrategy is present ONLY to hard-stop the turn on an
         # explicit interrupt UserStopped; timeout=None disables its auto-timeout so
@@ -351,8 +369,10 @@ class TestSTTLogger(unittest.IsolatedAsyncioTestCase):
             "data": {"text": "hello", "final": True},
         }
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(STTLogger, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(STTLogger, "push_frame", AsyncMock()),
+        ):
             await logger.process_frame(frame, FrameDirection.DOWNSTREAM)
         self.assertEqual(outputs[-1], "hello")
 
@@ -372,8 +392,10 @@ class TestSTTLogger(unittest.IsolatedAsyncioTestCase):
             "data": {"text": "more", "final": True},
         }
 
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(STTLogger, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(STTLogger, "push_frame", AsyncMock()),
+        ):
             await logger.process_frame(frame, FrameDirection.DOWNSTREAM)
         # Empty turn appends to outputs[-1] which is ""
         self.assertEqual(outputs[-1], "more")
@@ -531,8 +553,10 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
 
         frame = MagicMock(spec=InputTransportMessageFrame)
         frame.message = {"label": "rtvi-ai", "type": "bot-started-speaking", "data": {}}
-        with patch.object(FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(RTVIMessageFrameAdapter, "push_frame", AsyncMock()):
+        with (
+            patch.object(FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(RTVIMessageFrameAdapter, "push_frame", AsyncMock()),
+        ):
             await adapter.process_frame(frame, FrameDirection.DOWNSTREAM)
 
     async def test_stale_interrupt_flags_cleared_on_new_utterance(self):

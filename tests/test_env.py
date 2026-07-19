@@ -28,6 +28,7 @@ class TestEnvInt:
         monkeypatch.setenv("CALIBRATE_TEST_INT", "-1")
         assert env_int("CALIBRATE_TEST_INT", 2) == -1
 
+
 class TestResolveSTTParallelism:
     def _clear(self, monkeypatch):
         monkeypatch.delenv("CALIBRATE_STT_MAX_PARALLEL", raising=False)

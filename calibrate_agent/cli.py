@@ -722,9 +722,9 @@ Examples:
 
                 # Run — all models together (tests.run fans them out in parallel)
                 if _models:
-                    print(f"\n\033[92m{'='*60}\033[0m")
+                    print(f"\n\033[92m{'=' * 60}\033[0m")
                     print(f"\033[92m  Models: {', '.join(_models)}\033[0m")
-                    print(f"\033[92m{'='*60}\033[0m\n")
+                    print(f"\033[92m{'=' * 60}\033[0m\n")
                     _results = asyncio.run(
                         _tests.run(
                             agent=_agent,
@@ -737,9 +737,7 @@ Examples:
                             overwrite=args.overwrite,
                         )
                     )
-                    _model_results = {
-                        _m: _results.get(_m, _results) for _m in _models
-                    }
+                    _model_results = {_m: _results.get(_m, _results) for _m in _models}
 
                     _lb_dir = os.path.join(args.output_dir, "leaderboard")
                     generate_leaderboard(output_dir=args.output_dir, save_dir=_lb_dir)

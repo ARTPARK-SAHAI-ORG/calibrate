@@ -50,8 +50,8 @@ class TestBuildSerializedTranscript(unittest.TestCase):
 
     def test_role_flipping(self):
         adapter = _make_adapter()
-        adapter.record_agent_turn("hi")        # agent → assistant
-        adapter.record_persona_text("hello")   # persona → user (flushed at build)
+        adapter.record_agent_turn("hi")  # agent → assistant
+        adapter.record_persona_text("hello")  # persona → user (flushed at build)
         result = adapter._build_serialized_transcript()
         self.assertEqual(result[0]["role"], "assistant")
         self.assertEqual(result[0]["content"], "hi")
@@ -190,6 +190,7 @@ class TestSaveTranscript(unittest.TestCase):
             adapter = _make_adapter(output_dir=tmp)
             adapter._save_transcript([{"role": "assistant", "content": "hi"}])
             from calibrate_agent.agent.run_simulation import TRANSCRIPT_FILE_NAME
+
             transcript_path = Path(tmp) / TRANSCRIPT_FILE_NAME
             self.assertTrue(transcript_path.exists())
             data = json.loads(transcript_path.read_text())
@@ -275,9 +276,7 @@ class TestResetBuffers(unittest.IsolatedAsyncioTestCase):
 def _rtvi_frame(msg_type):
     from pipecat.frames.frames import InputTransportMessageFrame
 
-    return InputTransportMessageFrame(
-        message={"label": "rtvi-ai", "type": msg_type}
-    )
+    return InputTransportMessageFrame(message={"label": "rtvi-ai", "type": msg_type})
 
 
 async def _drive_bot_started(adapter, pushed=None):
@@ -452,9 +451,7 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
 
         adapter = _make_adapter(is_external=True)
         adapter._is_bot_interrupt_triggered = True
-        frame = InputAudioRawFrame(
-            audio=b"\x00\x00", sample_rate=16000, num_channels=1
-        )
+        frame = InputAudioRawFrame(audio=b"\x00\x00", sample_rate=16000, num_channels=1)
         pushed = await _drive_frame(adapter, frame)
         # Dropped, not forwarded to the aggregator's VAD (would cancel the sim user).
         self.assertEqual(_count_frames(pushed, InputAudioRawFrame), 0)

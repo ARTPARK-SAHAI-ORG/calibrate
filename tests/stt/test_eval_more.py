@@ -98,20 +98,39 @@ class TestRunSinglProviderEvalProgressNoChange(unittest.IsolatedAsyncioTestCase)
             )
 
             # First call returns 0 (no new), second loop sees no progress -> writes empty
-            with patch.object(E, "transcribe_audio",
-                              AsyncMock(side_effect=Exception("provider down"))), \
-                 patch.object(E, "get_wer_score",
-                              return_value={"score": 0.0, "per_row": [0.0, 0.0]}), \
-                 patch.object(E, "get_cer_score",
-                              return_value={"score": 0.0, "per_row": [0.0, 0.0]}), \
-                 patch.object(E, "get_intent_entity_score", _fake_intent_entity()), \
-                 patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
-                     "scores": {"semantic_match": {"type": "binary", "mean": 0.5}},
-                     "per_row": [
-                         {"semantic_match": {"match": True, "reasoning": "ok"}},
-                         {"semantic_match": {"match": False, "reasoning": "no"}},
-                     ],
-                 })):
+            with (
+                patch.object(
+                    E,
+                    "transcribe_audio",
+                    AsyncMock(side_effect=Exception("provider down")),
+                ),
+                patch.object(
+                    E,
+                    "get_wer_score",
+                    return_value={"score": 0.0, "per_row": [0.0, 0.0]},
+                ),
+                patch.object(
+                    E,
+                    "get_cer_score",
+                    return_value={"score": 0.0, "per_row": [0.0, 0.0]},
+                ),
+                patch.object(E, "get_intent_entity_score", _fake_intent_entity()),
+                patch.object(
+                    E,
+                    "get_llm_judge_score",
+                    AsyncMock(
+                        return_value={
+                            "scores": {
+                                "semantic_match": {"type": "binary", "mean": 0.5}
+                            },
+                            "per_row": [
+                                {"semantic_match": {"match": True, "reasoning": "ok"}},
+                                {"semantic_match": {"match": False, "reasoning": "no"}},
+                            ],
+                        }
+                    ),
+                ),
+            ):
                 # Will raise after first attempt since transcribe_audio raises
                 try:
                     await E.run_single_provider_eval(
@@ -147,15 +166,29 @@ class TestRunSinglProviderEvalAlreadyAllProcessed(unittest.IsolatedAsyncioTestCa
                 out / "deepgram" / "results.csv", index=False
             )
 
-            with patch.object(E, "get_wer_score",
-                              return_value={"score": 0.0, "per_row": [0.0]}), \
-                 patch.object(E, "get_cer_score",
-                              return_value={"score": 0.0, "per_row": [0.0]}), \
-                 patch.object(E, "get_intent_entity_score", _fake_intent_entity()), \
-                 patch.object(E, "get_llm_judge_score", AsyncMock(return_value={
-                     "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
-                     "per_row": [{"semantic_match": {"match": True, "reasoning": "ok"}}],
-                 })):
+            with (
+                patch.object(
+                    E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}
+                ),
+                patch.object(
+                    E, "get_cer_score", return_value={"score": 0.0, "per_row": [0.0]}
+                ),
+                patch.object(E, "get_intent_entity_score", _fake_intent_entity()),
+                patch.object(
+                    E,
+                    "get_llm_judge_score",
+                    AsyncMock(
+                        return_value={
+                            "scores": {
+                                "semantic_match": {"type": "binary", "mean": 1.0}
+                            },
+                            "per_row": [
+                                {"semantic_match": {"match": True, "reasoning": "ok"}}
+                            ],
+                        }
+                    ),
+                ),
+            ):
                 result = await E.run_single_provider_eval(
                     provider="deepgram",
                     language="english",

@@ -87,7 +87,10 @@ def test_render_python_snippet_non_object_is_positional() -> None:
 
 
 def test_render_mcp_snippet_wraps_body_as_tools_call_arguments() -> None:
-    value = {"name": "Support Agent", "config": {"agent_url": "https://x.example.com/v1"}}
+    value = {
+        "name": "Support Agent",
+        "config": {"agent_url": "https://x.example.com/v1"},
+    }
     snippet = render_mcp_snippet("create-agent", value)
     assert json.loads(snippet) == {"name": "create-agent", "arguments": value}
     # indented (pretty) JSON, not a compact one-liner
@@ -114,7 +117,7 @@ def test_render_cli_snippet_maps_fields_to_flags() -> None:
     assert '--name "Support Agent"' in snippet
     assert '--type "connection"' in snippet
     # `config` resolves to the renamed `--config-param` flag; object → JSON string.
-    assert "--config-param '{\"agent_url\":\"https://x.example.com/v1\"}'" in snippet
+    assert '--config-param \'{"agent_url":"https://x.example.com/v1"}\'' in snippet
 
 
 def test_render_cli_snippet_falls_back_to_field_flag() -> None:

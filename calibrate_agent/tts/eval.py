@@ -132,7 +132,9 @@ def _build_tts_cost_metrics(
         "total_characters": total_characters,
     }
     metrics.update(
-        cost_breakdown(pricing, total_characters / 1_000_000.0, "cost_per_million_chars")
+        cost_breakdown(
+            pricing, total_characters / 1_000_000.0, "cost_per_million_chars"
+        )
     )
     return metrics
 
@@ -557,9 +559,7 @@ async def synthesize_gemini(text: str, language: str, audio_path: str) -> Dict:
         speech_config=genai_types.SpeechConfig(
             language_code=lang_code,
             voice_config=genai_types.VoiceConfig(
-                prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(
-                    voice_name=voice
-                )
+                prebuilt_voice_config=genai_types.PrebuiltVoiceConfig(voice_name=voice)
             ),
         ),
     )
@@ -690,7 +690,7 @@ async def run_tts_eval(
             _log(f"Skipping already processed: {_id}")
             continue
 
-        _log(f"Processing [{i+1}/{len(gt_data)}]: {_id}")
+        _log(f"Processing [{i + 1}/{len(gt_data)}]: {_id}")
 
         audio_path = join(audio_output_dir, f"{_id}.wav")
         try:
@@ -1288,9 +1288,9 @@ async def main():
     )
 
     # Print summary
-    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\n\033[92m{'=' * 60}\033[0m")
     print("\033[92mSummary\033[0m")
-    print(f"\033[92m{'='*60}\033[0m\n")
+    print(f"\033[92m{'=' * 60}\033[0m\n")
 
     if result.get("status") == "error":
         print(f"  {provider}: \033[31mError - {result.get('error')}\033[0m")
@@ -1304,9 +1304,7 @@ async def main():
             if isinstance(v, dict) and "type" in v
         }
         ttfb_data = metrics.get("ttfb", {})
-        ttfb_p50 = (
-            ttfb_data.get("p50", "N/A") if isinstance(ttfb_data, dict) else "N/A"
-        )
+        ttfb_p50 = ttfb_data.get("p50", "N/A") if isinstance(ttfb_data, dict) else "N/A"
         judge_str = ", ".join(f"{k}={v:.2f}" for k, v in judge_scores.items())
         ttfb_str = (
             f"TTFB(p50)={ttfb_p50:.3f}s"

@@ -26,10 +26,10 @@ from typing import Any
 class NamedExample:
     """One entry of an operation's request-body ``examples`` map."""
 
-    key: str          # the map key, e.g. "openai_compatible_connection"
-    summary: str      # human label; falls back to the key
+    key: str  # the map key, e.g. "openai_compatible_connection"
+    summary: str  # human label; falls back to the key
     description: str  # optional prose shown above the snippet
-    value: Any        # the example request body
+    value: Any  # the example request body
 
 
 def named_request_examples(op: dict[str, Any]) -> list[NamedExample]:
@@ -148,6 +148,7 @@ def _flag_for(field: str, options: list[Any]) -> str:
     or contains the field name (Speakeasy renames e.g. ``config`` to
     ``--config-param``). Falls back to ``--<field>`` when nothing matches.
     """
+
     def long_flags(opt: Any) -> list[str]:
         return [
             token.strip()

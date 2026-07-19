@@ -63,7 +63,7 @@ def test_description_with_escaped_backtick_is_not_truncated() -> None:
     # Speakeasy escapes a literal backtick as \` and `${` as \${ inside the
     # template literal. The parser must consume the whole body and unescape it,
     # not stop at the first (escaped) backtick.
-    ts = r'''
+    ts = r"""
 import { WidgetsGetRequest$zodSchema } from "../../models/getwidgetwidgetswidgetuuidgetop.js";
 export const tool$x: ToolDefinition<typeof args> = {
   name: "get-widget",
@@ -72,11 +72,14 @@ export const tool$x: ToolDefinition<typeof args> = {
   scopes: ["read"],
   annotations: { "readOnlyHint": true },
 };
-'''
+"""
     tool = parse_tool_ts(ts)
     assert tool is not None
     # full text preserved, backticks/`${` unescaped, nothing cut off
-    assert tool.description == "Fetch the `config` field for a widget. Cost is ${amount}. Done."
+    assert (
+        tool.description
+        == "Fetch the `config` field for a widget. Cost is ${amount}. Done."
+    )
 
 
 def test_parse_tool_with_no_args_still_has_operation_ref() -> None:

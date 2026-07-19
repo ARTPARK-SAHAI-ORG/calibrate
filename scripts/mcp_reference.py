@@ -70,12 +70,12 @@ def _unescape_template(body: str) -> str:
 
 @dataclass
 class McpTool:
-    name: str                       # kebab tool name, e.g. "resolve-agent-names"
+    name: str  # kebab tool name, e.g. "resolve-agent-names"
     description: str = ""
     scopes: list[str] = field(default_factory=list)
     read_only: bool = False
     destructive: bool = False
-    operation_ref: str = ""         # models/<stem> — links to an OpenAPI op
+    operation_ref: str = ""  # models/<stem> — links to an OpenAPI op
 
     @property
     def read_write_label(self) -> str:
@@ -117,7 +117,9 @@ def parse_tool_ts(text: str) -> McpTool | None:
 
     return McpTool(
         name=name_match.group(1),
-        description=_unescape_template(desc_match.group(1)).strip() if desc_match else "",
+        description=_unescape_template(desc_match.group(1)).strip()
+        if desc_match
+        else "",
         scopes=_parse_scopes(scopes_match.group(1)) if scopes_match else [],
         read_only=bool(read_only_match) and read_only_match.group(1) == "true",
         destructive=bool(destructive_match) and destructive_match.group(1) == "true",

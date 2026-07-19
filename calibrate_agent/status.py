@@ -456,7 +456,9 @@ _CHECK_FUNCTIONS = {
 # ─────────────────────────────────────────────────────────────────────
 
 
-async def _emit_status_event(emit, provider: dict, stage: str, message: str, result=None):
+async def _emit_status_event(
+    emit, provider: dict, stage: str, message: str, result=None
+):
     if emit is None:
         return
 
@@ -615,9 +617,12 @@ async def iter_status_events(include_internal: bool = False):
         await queue.put(event)
 
     async with httpx.AsyncClient(timeout=30.0) as client:
+
         async def run_check(provider):
             result = await _check_single_provider(provider, client, emit=emit)
-            await queue.put({"type": "_done", "provider": provider["name"], "result": result})
+            await queue.put(
+                {"type": "_done", "provider": provider["name"], "result": result}
+            )
 
         tasks = [asyncio.create_task(run_check(provider)) for provider in PROVIDERS]
         finished = 0
@@ -670,7 +675,9 @@ async def run_status_live(table: bool = False):
     if table:
         _print_results(raw_results)
     else:
-        print(json.dumps({"type": "summary", "result": status_json}, indent=2), flush=True)
+        print(
+            json.dumps({"type": "summary", "result": status_json}, indent=2), flush=True
+        )
 
     return status_json
 
@@ -763,13 +770,17 @@ def _print_status_event(event: dict) -> None:
 
     result = event["result"]
     if result["status"] == "pass":
-        latency = f" ({result['latency_ms']}ms)" if result["latency_ms"] is not None else ""
+        latency = (
+            f" ({result['latency_ms']}ms)" if result["latency_ms"] is not None else ""
+        )
         print(f"  {GREEN}✓ {provider}: working{latency}{RESET}", flush=True)
     elif result["status"] == "skipped":
         missing = ", ".join(result["missing_vars"])
         print(f"  {YELLOW}— {provider}: skipped, missing {missing}{RESET}", flush=True)
     else:
-        print(f"  {RED}✗ {provider}: not working - {result['error']}{RESET}", flush=True)
+        print(
+            f"  {RED}✗ {provider}: not working - {result['error']}{RESET}", flush=True
+        )
 
 
 def _print_status_summary(status_json: dict) -> None:

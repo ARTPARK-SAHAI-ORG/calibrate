@@ -70,8 +70,10 @@ class TestUsdToInrRate(unittest.TestCase):
     def test_raises_when_fetch_fails(self):
         import calibrate_agent.utils as U
 
-        with patch("urllib.request.urlopen", side_effect=OSError("no network")), \
-             patch("time.sleep"):  # skip backoff waits
+        with (
+            patch("urllib.request.urlopen", side_effect=OSError("no network")),
+            patch("time.sleep"),
+        ):  # skip backoff waits
             with self.assertRaises(Exception):
                 U.get_usd_to_inr_rate()
 
@@ -88,14 +90,17 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write(tmp, {
-                "pronunciation": {"type": "binary", "mean": 0.9},
-                "cost": {
-                    "total_characters": 2000,
-                    "cost_per_million_chars_currency": 15.0,
-                    "cost_usd": 0.03,
+            path = self._write(
+                tmp,
+                {
+                    "pronunciation": {"type": "binary", "mean": 0.9},
+                    "cost": {
+                        "total_characters": 2000,
+                        "cost_per_million_chars_currency": 15.0,
+                        "cost_usd": 0.03,
+                    },
                 },
-            })
+            )
             metrics = read_leaderboard_metrics(path)
 
             self.assertEqual(metrics["cost_usd"], 0.03)
@@ -108,15 +113,18 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write(tmp, {
-                "cost": {
-                    "currency": "INR",
-                    "cost_per_million_chars_currency": 3000.0,
-                    "cost_in_currency": 3.0,
-                    "conversion_rate": 96.0,
-                    "cost_usd": 0.03125,
+            path = self._write(
+                tmp,
+                {
+                    "cost": {
+                        "currency": "INR",
+                        "cost_per_million_chars_currency": 3000.0,
+                        "cost_in_currency": 3.0,
+                        "conversion_rate": 96.0,
+                        "cost_usd": 0.03125,
+                    },
                 },
-            })
+            )
             metrics = read_leaderboard_metrics(path)
 
             self.assertEqual(metrics["cost_usd"], 0.03125)
@@ -128,14 +136,17 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write(tmp, {
-                "wer": 0.1,
-                "cost": {
-                    "audio_minutes": 2.0,
-                    "cost_per_minute_currency": 0.006,
-                    "cost_usd": 0.012,
+            path = self._write(
+                tmp,
+                {
+                    "wer": 0.1,
+                    "cost": {
+                        "audio_minutes": 2.0,
+                        "cost_per_minute_currency": 0.006,
+                        "cost_usd": 0.012,
+                    },
                 },
-            })
+            )
             metrics = read_leaderboard_metrics(path)
 
             self.assertEqual(metrics["cost_usd"], 0.012)
@@ -146,13 +157,16 @@ class TestReadLeaderboardCostMetrics(unittest.TestCase):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
-            path = self._write(tmp, {
-                "cost": {
-                    "currency": "INR",
-                    "cost_per_million_chars_currency": 3000.0,
-                    "cost_in_currency": 3.0,
+            path = self._write(
+                tmp,
+                {
+                    "cost": {
+                        "currency": "INR",
+                        "cost_per_million_chars_currency": 3000.0,
+                        "cost_in_currency": 3.0,
+                    },
                 },
-            })
+            )
             metrics = read_leaderboard_metrics(path)
 
             self.assertNotIn("cost_usd", metrics)
@@ -435,8 +449,11 @@ class TestLogJudgeIO(unittest.TestCase):
         self.assertIsNone(provider_log_file.get())
         # Must not raise when no run log file is bound.
         log_judge_io(
-            evaluator="x", model="m", system_prompt="s",
-            user_input="i", output="o",
+            evaluator="x",
+            model="m",
+            system_prompt="s",
+            user_input="i",
+            output="o",
         )
 
     def test_concurrent_writes_are_not_interleaved(self):
@@ -573,12 +590,14 @@ class TestBuildParamProperty(unittest.TestCase):
     def test_with_items_and_enum(self):
         from calibrate_agent.utils import _build_param_property
 
-        prop = _build_param_property({
-            "type": "array",
-            "description": "d",
-            "items": {"type": "string"},
-            "enum": ["a", "b"],
-        })
+        prop = _build_param_property(
+            {
+                "type": "array",
+                "description": "d",
+                "items": {"type": "string"},
+                "enum": ["a", "b"],
+            }
+        )
         self.assertEqual(prop["items"], {"type": "string"})
         self.assertEqual(prop["enum"], ["a", "b"])
 
@@ -587,17 +606,23 @@ class TestBuildToolsSchema(unittest.TestCase):
     def test_structured_tool(self):
         from calibrate_agent.utils import build_tools_schema
 
-        schemas, webhooks = build_tools_schema([
-            {
-                "name": "get_weather",
-                "description": "Get weather",
-                "parameters": [
-                    {"id": "location", "type": "string", "description": "Where",
-                     "required": True},
-                    {"id": "units", "type": "string", "description": "Units"},
-                ],
-            },
-        ])
+        schemas, webhooks = build_tools_schema(
+            [
+                {
+                    "name": "get_weather",
+                    "description": "Get weather",
+                    "parameters": [
+                        {
+                            "id": "location",
+                            "type": "string",
+                            "description": "Where",
+                            "required": True,
+                        },
+                        {"id": "units", "type": "string", "description": "Units"},
+                    ],
+                },
+            ]
+        )
         self.assertEqual(len(schemas), 1)
         self.assertEqual(webhooks, {})
         self.assertEqual(schemas[0].name, "get_weather")
@@ -605,29 +630,39 @@ class TestBuildToolsSchema(unittest.TestCase):
     def test_webhook_tool_full(self):
         from calibrate_agent.utils import build_tools_schema
 
-        schemas, webhooks = build_tools_schema([
-            {
-                "name": "post_data",
-                "description": "post data",
-                "type": "webhook",
-                "webhook": {
-                    "url": "http://x/y",
-                    "method": "POST",
-                    "headers": [],
-                    "queryParameters": [
-                        {"id": "q1", "type": "string", "description": "q",
-                         "required": True},
-                    ],
-                    "body": {
-                        "description": "the body",
-                        "parameters": [
-                            {"id": "b1", "type": "string", "description": "b",
-                             "required": True},
+        schemas, webhooks = build_tools_schema(
+            [
+                {
+                    "name": "post_data",
+                    "description": "post data",
+                    "type": "webhook",
+                    "webhook": {
+                        "url": "http://x/y",
+                        "method": "POST",
+                        "headers": [],
+                        "queryParameters": [
+                            {
+                                "id": "q1",
+                                "type": "string",
+                                "description": "q",
+                                "required": True,
+                            },
                         ],
+                        "body": {
+                            "description": "the body",
+                            "parameters": [
+                                {
+                                    "id": "b1",
+                                    "type": "string",
+                                    "description": "b",
+                                    "required": True,
+                                },
+                            ],
+                        },
                     },
                 },
-            },
-        ])
+            ]
+        )
         self.assertEqual(len(schemas), 1)
         self.assertEqual(webhooks["post_data"]["method"], "POST")
 
@@ -635,19 +670,31 @@ class TestBuildToolsSchema(unittest.TestCase):
         from calibrate_agent.utils import build_tools_schema
 
         with self.assertRaises(ValueError):
-            build_tools_schema([{
-                "name": "x", "description": "d", "type": "webhook",
-                "webhook": {"method": "GET"},
-            }])
+            build_tools_schema(
+                [
+                    {
+                        "name": "x",
+                        "description": "d",
+                        "type": "webhook",
+                        "webhook": {"method": "GET"},
+                    }
+                ]
+            )
 
     def test_webhook_missing_method(self):
         from calibrate_agent.utils import build_tools_schema
 
         with self.assertRaises(ValueError):
-            build_tools_schema([{
-                "name": "x", "description": "d", "type": "webhook",
-                "webhook": {"url": "http://x"},
-            }])
+            build_tools_schema(
+                [
+                    {
+                        "name": "x",
+                        "description": "d",
+                        "type": "webhook",
+                        "webhook": {"url": "http://x"},
+                    }
+                ]
+            )
 
 
 class TestMakeWebhookCall(unittest.IsolatedAsyncioTestCase):
@@ -667,7 +714,11 @@ class TestMakeWebhookCall(unittest.IsolatedAsyncioTestCase):
 
         with patch("aiohttp.ClientSession", return_value=fake_session):
             result = await U.make_webhook_call(
-                {"url": "http://x", "method": "GET", "headers": [{"name": "K", "value": "V"}]},
+                {
+                    "url": "http://x",
+                    "method": "GET",
+                    "headers": [{"name": "K", "value": "V"}],
+                },
                 {"query": {"a": 1}},
             )
         self.assertEqual(result["status"], "success")
@@ -773,7 +824,9 @@ class TestPatchLangfuseTrace(unittest.TestCase):
             patch_langfuse_trace("test_trace")
             # Now exercise the patched function
             span = MagicMock()
-            service_decorators.add_llm_span_attributes(span, messages=[{"role": "user"}])
+            service_decorators.add_llm_span_attributes(
+                span, messages=[{"role": "user"}]
+            )
             # Call set_attribute with key "output" to exercise that branch
             span.set_attribute("output", "x")
         finally:
@@ -826,19 +879,20 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertEqual(
-                read_leaderboard_metrics(Path(tmp) / "nope.json"), {}
-            )
+            self.assertEqual(read_leaderboard_metrics(Path(tmp) / "nope.json"), {})
 
     def test_current_format_extracts_mean(self):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
-            p = self._write(Path(tmp) / "m.json", {
-                "wer": 0.1,
-                "semantic_match": {"type": "binary", "mean": 0.85},
-                "ttfb": {"mean": 0.4},
-            })
+            p = self._write(
+                Path(tmp) / "m.json",
+                {
+                    "wer": 0.1,
+                    "semantic_match": {"type": "binary", "mean": 0.85},
+                    "ttfb": {"mean": 0.4},
+                },
+            )
             out = read_leaderboard_metrics(p)
             self.assertEqual(out["semantic_match"], 0.85)
             self.assertEqual(out["ttfb"], 0.4)
@@ -848,10 +902,13 @@ class TestReadLeaderboardMetrics(unittest.TestCase):
         from calibrate_agent.utils import read_leaderboard_metrics
 
         with tempfile.TemporaryDirectory() as tmp:
-            p = self._write(Path(tmp) / "m.json", {
-                "wer": 0.1,
-                "ttfb": {"p50": 0.4, "p95": 0.55, "p99": 0.6, "count": 5},
-            })
+            p = self._write(
+                Path(tmp) / "m.json",
+                {
+                    "wer": 0.1,
+                    "ttfb": {"p50": 0.4, "p95": 0.55, "p99": 0.6, "count": 5},
+                },
+            )
             out = read_leaderboard_metrics(p)
             self.assertEqual(out["ttfb_p50"], 0.4)
             self.assertEqual(out["ttfb_p95"], 0.55)

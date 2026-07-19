@@ -93,13 +93,18 @@ def test_build_route_map_joins_sdk_names_summary_and_tags() -> None:
 
 def test_build_route_map_sorts_paths_and_methods() -> None:
     routes = build_route_map(SAMPLE_OVERRIDES, SAMPLE_OPENAPI)
-    assert [route.http for route in routes if route.path == "/agents"] == ["GET", "POST"]
+    assert [route.http for route in routes if route.path == "/agents"] == [
+        "GET",
+        "POST",
+    ]
     assert routes[0].path == "/agent-tests/run"
     assert routes[1].path == "/agents"
 
 
 def test_build_route_map_raises_when_openapi_operation_missing() -> None:
-    openapi = {"paths": {"/agents": {"get": {"tags": ["agents"], "summary": "List agents"}}}}
+    openapi = {
+        "paths": {"/agents": {"get": {"tags": ["agents"], "summary": "List agents"}}}
+    }
     overrides = {
         "paths": {
             "/agents": {

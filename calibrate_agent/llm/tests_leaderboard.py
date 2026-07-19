@@ -38,8 +38,7 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
 
     # Find model directories (skip 'leaderboard' folder if present)
     model_dirs = sorted(
-        p for p in base_path.iterdir()
-        if p.is_dir() and p.name != "leaderboard"
+        p for p in base_path.iterdir() if p.is_dir() and p.name != "leaderboard"
     )
 
     if not model_dirs:
@@ -122,7 +121,9 @@ def _build_leaderboard(
         data = model_data[model_name]
         passed = int(data.get("passed", 0))
         total = int(data.get("total", 0))
-        latency = data.get("latency_ms") if isinstance(data.get("latency_ms"), dict) else {}
+        latency = (
+            data.get("latency_ms") if isinstance(data.get("latency_ms"), dict) else {}
+        )
         cost = data.get("cost") if isinstance(data.get("cost"), dict) else {}
         total_tokens = (
             data.get("total_tokens")

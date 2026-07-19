@@ -13,7 +13,9 @@ from pathlib import Path
 import pandas as pd
 import openpyxl  # noqa: F401
 
-from calibrate_agent.tts.leaderboard import generate_leaderboard as generate_tts_leaderboard
+from calibrate_agent.tts.leaderboard import (
+    generate_leaderboard as generate_tts_leaderboard,
+)
 
 
 def _write_provider(
@@ -26,28 +28,35 @@ def _write_provider(
     provider_dir.mkdir(parents=True, exist_ok=True)
     (provider_dir / "metrics.json").write_text(json.dumps(metrics))
     if results_rows is not None:
-        pd.DataFrame(results_rows).to_csv(
-            provider_dir / "results.csv", index=False
-        )
+        pd.DataFrame(results_rows).to_csv(provider_dir / "results.csv", index=False)
 
 
 class TestTTSLeaderboard(unittest.TestCase):
-
     def test_default_single_evaluator_and_ttfb(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "openai", {
-                "pronunciation": {"type": "binary", "mean": 0.95},
-                "ttfb": {"p50": 0.4, "p95": 0.45, "p99": 0.46, "count": 2},
-            }, results_rows=[
-                {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.4},
-            ])
-            _write_provider(base, "elevenlabs", {
-                "pronunciation": {"type": "binary", "mean": 0.8},
-                "ttfb": {"p50": 0.3, "p95": 0.31, "p99": 0.31, "count": 2},
-            }, results_rows=[
-                {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.3},
-            ])
+            _write_provider(
+                base,
+                "openai",
+                {
+                    "pronunciation": {"type": "binary", "mean": 0.95},
+                    "ttfb": {"p50": 0.4, "p95": 0.45, "p99": 0.46, "count": 2},
+                },
+                results_rows=[
+                    {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.4},
+                ],
+            )
+            _write_provider(
+                base,
+                "elevenlabs",
+                {
+                    "pronunciation": {"type": "binary", "mean": 0.8},
+                    "ttfb": {"p50": 0.3, "p95": 0.31, "p99": 0.31, "count": 2},
+                },
+                results_rows=[
+                    {"id": 1, "text": "hi", "pronunciation": True, "ttfb": 0.3},
+                ],
+            )
 
             save_dir = base / "leaderboard"
             generate_tts_leaderboard(str(base), str(save_dir))
@@ -63,19 +72,25 @@ class TestTTSLeaderboard(unittest.TestCase):
     def test_cost_metrics_surface_as_scalar_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "openai", {
-                "pronunciation": {"type": "binary", "mean": 0.9},
-                "cost": {
-                    "total_characters": 2000,
-                    "cost_per_million_chars_currency": 15.0,
-                    "cost_usd": 0.03,
+            _write_provider(
+                base,
+                "openai",
+                {
+                    "pronunciation": {"type": "binary", "mean": 0.9},
+                    "cost": {
+                        "total_characters": 2000,
+                        "cost_per_million_chars_currency": 15.0,
+                        "cost_usd": 0.03,
+                    },
                 },
-            })
+            )
 
             save_dir = base / "leaderboard"
             generate_tts_leaderboard(str(base), str(save_dir))
 
-            summary = pd.read_excel(save_dir / "tts_leaderboard.xlsx", sheet_name="summary")
+            summary = pd.read_excel(
+                save_dir / "tts_leaderboard.xlsx", sheet_name="summary"
+            )
             self.assertIn("cost_usd", summary.columns)
             self.assertNotIn("cost_per_million_chars_currency", summary.columns)
             self.assertNotIn("total_characters", summary.columns)
@@ -84,11 +99,15 @@ class TestTTSLeaderboard(unittest.TestCase):
     def test_multi_criterion_metrics_surface_dynamically(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "provider-a", {
-                "intelligibility": {"type": "binary", "mean": 0.9},
-                "pronunciation": {"type": "binary", "mean": 0.85},
-                "ttfb": {"p50": 0.4, "p95": 0.45, "p99": 0.46, "count": 2},
-            })
+            _write_provider(
+                base,
+                "provider-a",
+                {
+                    "intelligibility": {"type": "binary", "mean": 0.9},
+                    "pronunciation": {"type": "binary", "mean": 0.85},
+                    "ttfb": {"p50": 0.4, "p95": 0.45, "p99": 0.46, "count": 2},
+                },
+            )
 
             save_dir = base / "leaderboard"
             generate_tts_leaderboard(str(base), str(save_dir))

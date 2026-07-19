@@ -43,24 +43,33 @@ class TestNumericOrNone(unittest.TestCase):
 
 
 class TestLeaderboardMultiCriteria(unittest.TestCase):
-
     def test_per_criterion_columns_present(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_model(base, "model-a", {
-                "total": 4, "passed": 3,
-                "criteria": {
-                    "accuracy": {"passed": 2, "total": 2, "pass_rate": 100.0},
-                    "tone": {"passed": 1, "total": 2, "pass_rate": 50.0},
+            _write_model(
+                base,
+                "model-a",
+                {
+                    "total": 4,
+                    "passed": 3,
+                    "criteria": {
+                        "accuracy": {"passed": 2, "total": 2, "pass_rate": 100.0},
+                        "tone": {"passed": 1, "total": 2, "pass_rate": 50.0},
+                    },
                 },
-            })
-            _write_model(base, "model-b", {
-                "total": 4, "passed": 4,
-                "criteria": {
-                    "accuracy": {"passed": 2, "total": 2, "pass_rate": 100.0},
-                    "tone": {"passed": 2, "total": 2, "pass_rate": 100.0},
+            )
+            _write_model(
+                base,
+                "model-b",
+                {
+                    "total": 4,
+                    "passed": 4,
+                    "criteria": {
+                        "accuracy": {"passed": 2, "total": 2, "pass_rate": 100.0},
+                        "tone": {"passed": 2, "total": 2, "pass_rate": 100.0},
+                    },
                 },
-            })
+            )
 
             save_dir = base / "leaderboard"
             generate_leaderboard(str(base), str(save_dir))
@@ -72,29 +81,35 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
 
             # Row order is sorted by model name
             self.assertEqual(list(df["model"]), ["model-a", "model-b"])
-            self.assertEqual(
-                df.loc[df["model"] == "model-a", "tone"].iloc[0], 50.0
-            )
-            self.assertEqual(
-                df.loc[df["model"] == "model-b", "tone"].iloc[0], 100.0
-            )
+            self.assertEqual(df.loc[df["model"] == "model-a", "tone"].iloc[0], 50.0)
+            self.assertEqual(df.loc[df["model"] == "model-b", "tone"].iloc[0], 100.0)
 
     def test_union_of_criteria_across_models(self):
         """Model A has criterion X but not Y; model B has Y but not X."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_model(base, "model-a", {
-                "total": 1, "passed": 1,
-                "criteria": {
-                    "accuracy": {"passed": 1, "total": 1, "pass_rate": 100.0},
+            _write_model(
+                base,
+                "model-a",
+                {
+                    "total": 1,
+                    "passed": 1,
+                    "criteria": {
+                        "accuracy": {"passed": 1, "total": 1, "pass_rate": 100.0},
+                    },
                 },
-            })
-            _write_model(base, "model-b", {
-                "total": 1, "passed": 0,
-                "criteria": {
-                    "tone": {"passed": 0, "total": 1, "pass_rate": 0.0},
+            )
+            _write_model(
+                base,
+                "model-b",
+                {
+                    "total": 1,
+                    "passed": 0,
+                    "criteria": {
+                        "tone": {"passed": 0, "total": 1, "pass_rate": 0.0},
+                    },
                 },
-            })
+            )
 
             save_dir = base / "leaderboard"
             generate_leaderboard(str(base), str(save_dir))
@@ -103,9 +118,7 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             self.assertIn("accuracy", df.columns)
             self.assertIn("tone", df.columns)
             # Missing criterion → NaN
-            self.assertTrue(
-                pd.isna(df.loc[df["model"] == "model-a", "tone"].iloc[0])
-            )
+            self.assertTrue(pd.isna(df.loc[df["model"] == "model-a", "tone"].iloc[0]))
             self.assertTrue(
                 pd.isna(df.loc[df["model"] == "model-b", "accuracy"].iloc[0])
             )
@@ -127,8 +140,15 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             # No criterion columns (latency percentiles, cost and total_tokens
             # are standard columns, empty here)
             expected_cols = {
-                "model", "passed", "total", "pass_rate", "latency_p50",
-                "latency_p95", "latency_p99", "cost", "total_tokens",
+                "model",
+                "passed",
+                "total",
+                "pass_rate",
+                "latency_p50",
+                "latency_p95",
+                "latency_p99",
+                "cost",
+                "total_tokens",
             }
             self.assertEqual(set(df.columns), expected_cols)
             # Cost is absent in old-style metrics → empty column
@@ -138,10 +158,15 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
         """The leaderboard surfaces the per-model mean cost, None when absent."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_model(base, "model-a", {
-                "total": 2, "passed": 2,
-                "cost": {"mean": 0.03, "min": 0.02, "max": 0.04, "count": 2},
-            })
+            _write_model(
+                base,
+                "model-a",
+                {
+                    "total": 2,
+                    "passed": 2,
+                    "cost": {"mean": 0.03, "min": 0.02, "max": 0.04, "count": 2},
+                },
+            )
             _write_model(base, "model-b", {"total": 2, "passed": 1})
 
             save_dir = base / "leaderboard"
@@ -157,10 +182,20 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
         """The leaderboard surfaces the per-model mean total tokens, None when absent."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_model(base, "model-a", {
-                "total": 2, "passed": 2,
-                "total_tokens": {"mean": 4387, "min": 4000, "max": 4774, "count": 2},
-            })
+            _write_model(
+                base,
+                "model-a",
+                {
+                    "total": 2,
+                    "passed": 2,
+                    "total_tokens": {
+                        "mean": 4387,
+                        "min": 4000,
+                        "max": 4774,
+                        "count": 2,
+                    },
+                },
+            )
             _write_model(base, "model-b", {"total": 2, "passed": 1})
 
             save_dir = base / "leaderboard"
@@ -194,46 +229,64 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
         mean score (raw), not a pass_rate percentage."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_model(base, "model-a", {
-                "total": 3, "passed": 3,
-                "criteria": {
-                    "accuracy": {
-                        "type": "binary",
-                        "passed": 3, "total": 3, "pass_rate": 100.0,
-                    },
-                    "fluency": {
-                        "type": "rating",
-                        "mean": 4.2, "min": 3, "max": 5, "count": 3,
-                        "scale_min": 1, "scale_max": 5,
-                    },
-                },
-            })
-            _write_model(base, "model-b", {
-                "total": 3, "passed": 2,
-                "criteria": {
-                    "accuracy": {
-                        "type": "binary",
-                        "passed": 2, "total": 3, "pass_rate": 66.67,
-                    },
-                    "fluency": {
-                        "type": "rating",
-                        "mean": 3.0, "min": 2, "max": 4, "count": 3,
-                        "scale_min": 1, "scale_max": 5,
+            _write_model(
+                base,
+                "model-a",
+                {
+                    "total": 3,
+                    "passed": 3,
+                    "criteria": {
+                        "accuracy": {
+                            "type": "binary",
+                            "passed": 3,
+                            "total": 3,
+                            "pass_rate": 100.0,
+                        },
+                        "fluency": {
+                            "type": "rating",
+                            "mean": 4.2,
+                            "min": 3,
+                            "max": 5,
+                            "count": 3,
+                            "scale_min": 1,
+                            "scale_max": 5,
+                        },
                     },
                 },
-            })
+            )
+            _write_model(
+                base,
+                "model-b",
+                {
+                    "total": 3,
+                    "passed": 2,
+                    "criteria": {
+                        "accuracy": {
+                            "type": "binary",
+                            "passed": 2,
+                            "total": 3,
+                            "pass_rate": 66.67,
+                        },
+                        "fluency": {
+                            "type": "rating",
+                            "mean": 3.0,
+                            "min": 2,
+                            "max": 4,
+                            "count": 3,
+                            "scale_min": 1,
+                            "scale_max": 5,
+                        },
+                    },
+                },
+            )
 
             save_dir = base / "leaderboard"
             generate_leaderboard(str(base), str(save_dir))
 
             df = pd.read_csv(save_dir / "llm_leaderboard.csv")
             # fluency column holds raw mean, not a percentage
-            self.assertEqual(
-                df.loc[df["model"] == "model-a", "fluency"].iloc[0], 4.2
-            )
-            self.assertEqual(
-                df.loc[df["model"] == "model-b", "fluency"].iloc[0], 3.0
-            )
+            self.assertEqual(df.loc[df["model"] == "model-a", "fluency"].iloc[0], 4.2)
+            self.assertEqual(df.loc[df["model"] == "model-b", "fluency"].iloc[0], 3.0)
             # accuracy (binary) shows pass_rate
             self.assertEqual(
                 df.loc[df["model"] == "model-a", "accuracy"].iloc[0], 100.0
@@ -243,10 +296,15 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
         """latency percentiles are surfaced; absent → None/NaN."""
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_model(base, "model-a", {
-                "total": 2, "passed": 2,
-                "latency_ms": {"p50": 150, "p95": 190, "p99": 198, "count": 2},
-            })
+            _write_model(
+                base,
+                "model-a",
+                {
+                    "total": 2,
+                    "passed": 2,
+                    "latency_ms": {"p50": 150, "p95": 190, "p99": 198, "count": 2},
+                },
+            )
             # model-b has no latency (e.g. eval-only)
             _write_model(base, "model-b", {"total": 2, "passed": 1})
 

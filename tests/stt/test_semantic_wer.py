@@ -60,14 +60,22 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
         # mocked judges concurrently, so ordering isn't guaranteed).
         by_ref = {
             "a": {
-                "substitutions": 1, "deletions": 0, "insertions": 0,
-                "reference_words": 10, "normalized_reference": "r1",
-                "normalized_hypothesis": "h1", "reasoning": "one sub",
+                "substitutions": 1,
+                "deletions": 0,
+                "insertions": 0,
+                "reference_words": 10,
+                "normalized_reference": "r1",
+                "normalized_hypothesis": "h1",
+                "reasoning": "one sub",
             },
             "b": {
-                "substitutions": 0, "deletions": 0, "insertions": 0,
-                "reference_words": 5, "normalized_reference": "r2",
-                "normalized_hypothesis": "h2", "reasoning": "clean",
+                "substitutions": 0,
+                "deletions": 0,
+                "insertions": 0,
+                "reference_words": 5,
+                "normalized_reference": "r2",
+                "normalized_hypothesis": "h2",
+                "reasoning": "clean",
                 # A judge dict may also carry the full CoT — it must be dropped,
                 # not echoed into per_row (which feeds the persisted outputs).
                 "chain_of_thought": "long verbose working-out",
@@ -100,9 +108,13 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
 
         async def fake_judge(reference, prediction, model=None):
             return {
-                "substitutions": 0, "deletions": 0, "insertions": 2,
-                "reference_words": 0, "normalized_reference": "",
-                "normalized_hypothesis": "x y", "reasoning": "hallucinated",
+                "substitutions": 0,
+                "deletions": 0,
+                "insertions": 2,
+                "reference_words": 0,
+                "normalized_reference": "",
+                "normalized_hypothesis": "x y",
+                "reasoning": "hallucinated",
             }
 
         with patch(
@@ -121,14 +133,22 @@ class TestGetSemanticWERScore(unittest.IsolatedAsyncioTestCase):
         # 2 errors nor its 0 ref words), matching pipecat's compute_pooled_wer.
         by_ref = {
             "ok": {
-                "substitutions": 1, "deletions": 0, "insertions": 0,
-                "reference_words": 10, "normalized_reference": "r",
-                "normalized_hypothesis": "h", "reasoning": "one sub",
+                "substitutions": 1,
+                "deletions": 0,
+                "insertions": 0,
+                "reference_words": 10,
+                "normalized_reference": "r",
+                "normalized_hypothesis": "h",
+                "reasoning": "one sub",
             },
             "bad": {
-                "substitutions": 0, "deletions": 0, "insertions": 2,
-                "reference_words": 0, "normalized_reference": "",
-                "normalized_hypothesis": "x y", "reasoning": "no reference",
+                "substitutions": 0,
+                "deletions": 0,
+                "insertions": 2,
+                "reference_words": 0,
+                "normalized_reference": "",
+                "normalized_hypothesis": "x y",
+                "reasoning": "no reference",
             },
         }
 
@@ -150,14 +170,20 @@ def _tool_completion(args: dict):
     tc = SimpleNamespace(
         function=SimpleNamespace(name="calculate_wer", arguments=json.dumps(args))
     )
-    return SimpleNamespace(choices=[SimpleNamespace(
-        message=SimpleNamespace(content=None, tool_calls=[tc]))])
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(content=None, tool_calls=[tc]))
+        ]
+    )
 
 
 def _text_completion(content: str):
     """OpenAI-style completion with plain reasoning text and no tool call."""
-    return SimpleNamespace(choices=[SimpleNamespace(
-        message=SimpleNamespace(content=content, tool_calls=None))])
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(message=SimpleNamespace(content=content, tool_calls=None))
+        ]
+    )
 
 
 class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
@@ -169,9 +195,9 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
 
         async def fake_create(*a, **kw):
             calls.append(kw)
-            if "tools" in kw:            # phase 2 — commit
+            if "tools" in kw:  # phase 2 — commit
                 return _tool_completion(args)
-            return _text_completion(reasoning)   # phase 1 — reason
+            return _text_completion(reasoning)  # phase 1 — reason
 
         fake_client = MagicMock()
         fake_client.chat.completions.create = fake_create
@@ -214,7 +240,9 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(p2["tools"][0]["function"]["name"], "calculate_wer")
         self.assertEqual(p2["tool_choice"]["function"]["name"], "calculate_wer")
         self.assertEqual(p2["messages"][2]["role"], "assistant")
-        self.assertEqual(p2["messages"][2]["content"], "savings->checking changes the account")
+        self.assertEqual(
+            p2["messages"][2]["content"], "savings->checking changes the account"
+        )
         # Phase 2 nudges for the concise, public summary.
         self.assertIn("summary", p2["messages"][3]["content"])
 
@@ -228,7 +256,9 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
         )
         # The full CoT rides along for debug surfaces but is distinct from the
         # public reasoning.
-        self.assertEqual(result["chain_of_thought"], "savings->checking changes the account")
+        self.assertEqual(
+            result["chain_of_thought"], "savings->checking changes the account"
+        )
 
     async def test_reasoning_falls_back_to_cot_when_summary_missing(self):
         # Older models / truncated calls may omit ``summary`` — the row must still
@@ -251,7 +281,8 @@ class TestJudgeToolLoop(unittest.IsolatedAsyncioTestCase):
         # the composed form to the model, not the decomposed input it received.
         nfd_ref = unicodedata.normalize("NFD", "café résumé")
         _, calls = await self._run(
-            nfd_ref, nfd_ref,
+            nfd_ref,
+            nfd_ref,
             {"substitutions": 0, "deletions": 0, "insertions": 0, "reference_words": 3},
         )
         captured = {"messages": calls[0]["messages"]}
@@ -295,12 +326,24 @@ class TestJudgeEmptyShortCircuit(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.stt import metrics as M
 
         by_ref = {
-            "": {"substitutions": 0, "deletions": 0, "insertions": 2,
-                 "reference_words": 0, "normalized_reference": "",
-                 "normalized_hypothesis": "", "reasoning": "empty reference"},
-            "hi there": {"substitutions": 1, "deletions": 0, "insertions": 0,
-                         "reference_words": 2, "normalized_reference": "",
-                         "normalized_hypothesis": "", "reasoning": "one sub"},
+            "": {
+                "substitutions": 0,
+                "deletions": 0,
+                "insertions": 2,
+                "reference_words": 0,
+                "normalized_reference": "",
+                "normalized_hypothesis": "",
+                "reasoning": "empty reference",
+            },
+            "hi there": {
+                "substitutions": 1,
+                "deletions": 0,
+                "insertions": 0,
+                "reference_words": 2,
+                "normalized_reference": "",
+                "normalized_hypothesis": "",
+                "reasoning": "one sub",
+            },
         }
 
         async def fake_judge(reference, prediction, model=None):
@@ -339,9 +382,13 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
                 "semantic_wer": 0.05,
                 "per_row": [
                     {
-                        "semantic_wer": 0.05, "substitutions": 1, "deletions": 0,
-                        "insertions": 0, "reference_words": 20,
-                        "normalized_reference": "r", "normalized_hypothesis": "h",
+                        "semantic_wer": 0.05,
+                        "substitutions": 1,
+                        "deletions": 0,
+                        "insertions": 0,
+                        "reference_words": 20,
+                        "normalized_reference": "r",
+                        "normalized_hypothesis": "h",
                         "reasoning": "x",
                     }
                     for _ in references
@@ -352,18 +399,21 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
         # raise so isolation skips them, keeping this test focused on semantic WER.
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            with patch.object(
-                stt_eval, "get_llm_judge_score", _fake_judge()
-            ), patch.object(
-                stt_eval, "get_semantic_wer_score", AsyncMock(side_effect=fake_sem)
-            ), patch.object(
-                stt_eval,
-                "get_intent_entity_score",
-                AsyncMock(side_effect=RuntimeError("skip")),
-            ), patch.object(
-                stt_eval,
-                "get_llm_wer_cer_score",
-                AsyncMock(side_effect=RuntimeError("skip")),
+            with (
+                patch.object(stt_eval, "get_llm_judge_score", _fake_judge()),
+                patch.object(
+                    stt_eval, "get_semantic_wer_score", AsyncMock(side_effect=fake_sem)
+                ),
+                patch.object(
+                    stt_eval,
+                    "get_intent_entity_score",
+                    AsyncMock(side_effect=RuntimeError("skip")),
+                ),
+                patch.object(
+                    stt_eval,
+                    "get_llm_wer_cer_score",
+                    AsyncMock(side_effect=RuntimeError("skip")),
+                ),
             ):
                 metrics = await stt_eval._score_and_write_results(
                     ids=["a", "b"],
@@ -390,11 +440,12 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
-            with patch.object(
-                stt_eval, "get_llm_judge_score", _fake_judge()
-            ), patch.object(
-                stt_eval, "get_semantic_wer_score", AsyncMock()
-            ) as sem_mock:
+            with (
+                patch.object(stt_eval, "get_llm_judge_score", _fake_judge()),
+                patch.object(
+                    stt_eval, "get_semantic_wer_score", AsyncMock()
+                ) as sem_mock,
+            ):
                 metrics = await stt_eval._score_and_write_results(
                     ids=["a"],
                     gt_transcripts=["hi"],

@@ -41,7 +41,9 @@ indic_langs = {"hi", "bn", "ta", "te", "gu", "kn", "ml", "mr", "or", "pa"}
 class IndicNormalizer:
     def __init__(self):
         self.indic_factory = IndicNormalizerFactory()
-        self.whisper_processor = WhisperProcessor.from_pretrained("openai/whisper-small")
+        self.whisper_processor = WhisperProcessor.from_pretrained(
+            "openai/whisper-small"
+        )
         self.whisper_tokenizer = self.whisper_processor.tokenizer  # type: ignore
 
     def normalize_text(self, text: str, lang_code: str) -> str:
@@ -88,13 +90,13 @@ class IndicNormalizer:
 
         batches: List[Tuple[List[str], List[str]]] = []
         for i in range(0, len(text_list), batch_size):
-            batches.append((text_list[i : i + batch_size], lang_list[i : i + batch_size]))
+            batches.append(
+                (text_list[i : i + batch_size], lang_list[i : i + batch_size])
+            )
 
         processed_batches = Parallel(n_jobs=n_jobs)(
             delayed(self._normalize_batch)(text_batch, lang_batch)
-            for text_batch, lang_batch in tqdm(
-                batches, desc="Normalizing text batches"
-            )
+            for text_batch, lang_batch in tqdm(batches, desc="Normalizing text batches")
         )
 
         if processed_batches:

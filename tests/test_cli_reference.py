@@ -35,7 +35,10 @@ from cli_doc_samples import ROOT_CMD, WIDGETS, WIDGETS_CREATE
 # filename helpers
 # --------------------------------------------------------------------------- #
 def test_command_from_filename_hyphenated_segment() -> None:
-    assert command_from_filename("calibrate_agent-tests_run.md") == "calibrate agent-tests run"
+    assert (
+        command_from_filename("calibrate_agent-tests_run.md")
+        == "calibrate agent-tests run"
+    )
 
 
 def test_command_from_filename_simple() -> None:
@@ -47,7 +50,10 @@ def test_filename_to_slug_leaf() -> None:
 
 
 def test_filename_to_slug_hyphenated_segment() -> None:
-    assert filename_to_slug("calibrate_agent-tests_run.md") == "cli/calibrate/agent-tests/run"
+    assert (
+        filename_to_slug("calibrate_agent-tests_run.md")
+        == "cli/calibrate/agent-tests/run"
+    )
 
 
 def test_filename_to_slug_root_is_overview() -> None:
@@ -136,7 +142,10 @@ def test_parse_cli_doc_requires_title() -> None:
 
 
 def test_subcommand_property() -> None:
-    assert CliCommand(command="calibrate agents list", short="x").subcommand == "agents list"
+    assert (
+        CliCommand(command="calibrate agents list", short="x").subcommand
+        == "agents list"
+    )
 
 
 # --------------------------------------------------------------------------- #

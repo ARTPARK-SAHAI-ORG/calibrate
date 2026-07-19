@@ -59,13 +59,20 @@ _HELPFULNESS_EVALUATOR = {
 }
 
 
-def _make_config(agent_url, max_turns=2, agent_speaks_first=True, num_personas=1, num_scenarios=1):
+def _make_config(
+    agent_url, max_turns=2, agent_speaks_first=True, num_personas=1, num_scenarios=1
+):
     personas = [
-        {"label": f"p{i+1}", "characteristics": "friendly", "gender": "neutral", "language": "english"}
+        {
+            "label": f"p{i + 1}",
+            "characteristics": "friendly",
+            "gender": "neutral",
+            "language": "english",
+        }
         for i in range(num_personas)
     ]
     scenarios = [
-        {"name": f"s{i+1}", "description": "ask about order"}
+        {"name": f"s{i + 1}", "description": "ask about order"}
         for i in range(num_scenarios)
     ]
     return {
@@ -85,7 +92,9 @@ def _make_config(agent_url, max_turns=2, agent_speaks_first=True, num_personas=1
 @pytest.fixture
 def agent_server(httpserver: HTTPServer):
     """Fake agent that always returns a valid text response."""
-    httpserver.expect_request("/chat", method="POST").respond_with_json(FAKE_AGENT_RESPONSE)
+    httpserver.expect_request("/chat", method="POST").respond_with_json(
+        FAKE_AGENT_RESPONSE
+    )
     return httpserver
 
 
@@ -106,7 +115,13 @@ def agent_server_500(httpserver: HTTPServer):
 class TestRunSimulationWithAgent:
     """6 tests for run_simulation_with_agent."""
 
-    def _run(self, agent_url, max_turns=2, agent_speaks_first=True, user_content="I need help"):
+    def _run(
+        self,
+        agent_url,
+        max_turns=2,
+        agent_speaks_first=True,
+        user_content="I need help",
+    ):
         from calibrate_agent.llm.run_simulation import run_simulation_with_agent
         from calibrate_agent.connections import TextAgentConnection
 
@@ -114,9 +129,13 @@ class TestRunSimulationWithAgent:
         MockAsyncOpenAI = _make_mock_openai_client(user_content)
 
         async def _inner():
-            with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
-                       AsyncMock(return_value=FAKE_EVAL_RESULT)):
+            with (
+                patch("openai.AsyncOpenAI", MockAsyncOpenAI),
+                patch(
+                    "calibrate_agent.llm.run_simulation.evaluate_simuation",
+                    AsyncMock(return_value=FAKE_EVAL_RESULT),
+                ),
+            ):
                 return await run_simulation_with_agent(
                     agent=agent,
                     user_system_prompt="You are a friendly user.",
@@ -136,24 +155,30 @@ class TestRunSimulationWithAgent:
         bodies = [json.loads(req.data) for req, _ in agent_server.log]
         assert len(bodies) >= 1, "Expected at least one request to agent"
         first_messages = bodies[0].get("messages", [])
-        assert any(
-            msg.get("content") == "Hi" for msg in first_messages
-        ), f"First request should contain 'Hi' greeting, got: {first_messages}"
+        assert any(msg.get("content") == "Hi" for msg in first_messages), (
+            f"First request should contain 'Hi' greeting, got: {first_messages}"
+        )
 
     def test_agent_speaks_first_false_no_initial_request(self, agent_server):
         """agent_speaks_first=False: first request has user message, not 'Hi'."""
-        self._run(agent_server.url_for("/chat"), agent_speaks_first=False, user_content="I need help")
+        self._run(
+            agent_server.url_for("/chat"),
+            agent_speaks_first=False,
+            user_content="I need help",
+        )
 
         bodies = [json.loads(req.data) for req, _ in agent_server.log]
         assert len(bodies) >= 1, "Expected at least one request to agent"
         first_messages = bodies[0].get("messages", [])
-        assert not any(
-            msg.get("content") == "Hi" for msg in first_messages
-        ), f"First request should NOT contain 'Hi' greeting when agent_speaks_first=False, got: {first_messages}"
+        assert not any(msg.get("content") == "Hi" for msg in first_messages), (
+            f"First request should NOT contain 'Hi' greeting when agent_speaks_first=False, got: {first_messages}"
+        )
 
     def test_transcript_has_correct_roles(self, agent_server):
         """result['transcript'] starts with assistant (agent speaks first) then alternates."""
-        result = self._run(agent_server.url_for("/chat"), agent_speaks_first=True, max_turns=2)
+        result = self._run(
+            agent_server.url_for("/chat"), agent_speaks_first=True, max_turns=2
+        )
 
         transcript = result["transcript"]
         # Filter out end_reason entries
@@ -190,8 +215,12 @@ class TestRunSimulationWithAgent:
         evaluators = [_HELPFULNESS_EVALUATOR]
 
         async def _inner():
-            with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation", eval_mock):
+            with (
+                patch("openai.AsyncOpenAI", MockAsyncOpenAI),
+                patch(
+                    "calibrate_agent.llm.run_simulation.evaluate_simuation", eval_mock
+                ),
+            ):
                 return await run_simulation_with_agent(
                     agent=agent,
                     user_system_prompt="You are a friendly user.",
@@ -206,7 +235,9 @@ class TestRunSimulationWithAgent:
         call_args = eval_mock.call_args
         transcript_arg = call_args[0][0]
         evaluators_arg = call_args[0][1]
-        assert isinstance(transcript_arg, list), "First arg to evaluate_simuation should be a list"
+        assert isinstance(transcript_arg, list), (
+            "First arg to evaluate_simuation should be a list"
+        )
         assert evaluators_arg == evaluators, "Second arg should be evaluators list"
 
     def test_returns_transcript_and_evaluation_results(self, agent_server):
@@ -214,10 +245,14 @@ class TestRunSimulationWithAgent:
         result = self._run(agent_server.url_for("/chat"), max_turns=2)
 
         assert "transcript" in result, "Result must have 'transcript' key"
-        assert "evaluation_results" in result, "Result must have 'evaluation_results' key"
+        assert "evaluation_results" in result, (
+            "Result must have 'evaluation_results' key"
+        )
 
         eval_results = result["evaluation_results"]
-        assert len(eval_results) == 1, f"Expected 1 evaluation result, got {len(eval_results)}"
+        assert len(eval_results) == 1, (
+            f"Expected 1 evaluation result, got {len(eval_results)}"
+        )
         item = eval_results[0]
         assert "name" in item, "Evaluation result item must have 'name'"
         assert "value" in item, "Evaluation result item must have 'value'"
@@ -234,7 +269,9 @@ class TestRunSimulationWithAgent:
 class TestRunSingleSimulationTask:
     """5 tests for run_single_simulation_task."""
 
-    def _run_task(self, agent_url, tmp_path, persona_index=0, scenario_index=0, max_turns=2):
+    def _run_task(
+        self, agent_url, tmp_path, persona_index=0, scenario_index=0, max_turns=2
+    ):
         from calibrate_agent.llm.run_simulation import run_single_simulation_task
         from calibrate_agent.connections import TextAgentConnection
 
@@ -247,9 +284,13 @@ class TestRunSingleSimulationTask:
         MockAsyncOpenAI = _make_mock_openai_client()
 
         async def _inner():
-            with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
-                       AsyncMock(return_value=FAKE_EVAL_RESULT)):
+            with (
+                patch("openai.AsyncOpenAI", MockAsyncOpenAI),
+                patch(
+                    "calibrate_agent.llm.run_simulation.evaluate_simuation",
+                    AsyncMock(return_value=FAKE_EVAL_RESULT),
+                ),
+            ):
                 return await run_single_simulation_task(
                     semaphore=semaphore,
                     config=config,
@@ -276,8 +317,12 @@ class TestRunSingleSimulationTask:
     def test_writes_transcript_json(self, agent_server, tmp_path):
         """transcript.json exists and is valid JSON containing a list of messages."""
         self._run_task(agent_server.url_for("/chat"), tmp_path)
-        transcript_path = tmp_path / "simulation_persona_1_scenario_1" / "transcript.json"
-        assert transcript_path.exists(), f"transcript.json not found at {transcript_path}"
+        transcript_path = (
+            tmp_path / "simulation_persona_1_scenario_1" / "transcript.json"
+        )
+        assert transcript_path.exists(), (
+            f"transcript.json not found at {transcript_path}"
+        )
         with open(transcript_path) as f:
             data = json.load(f)
         assert isinstance(data, list), "transcript.json must be a list"
@@ -286,9 +331,12 @@ class TestRunSingleSimulationTask:
     def test_writes_evaluation_results_csv(self, agent_server, tmp_path):
         """evaluation_results.csv exists with name/value/reasoning columns."""
         self._run_task(agent_server.url_for("/chat"), tmp_path)
-        csv_path = tmp_path / "simulation_persona_1_scenario_1" / "evaluation_results.csv"
+        csv_path = (
+            tmp_path / "simulation_persona_1_scenario_1" / "evaluation_results.csv"
+        )
         assert csv_path.exists(), f"evaluation_results.csv not found at {csv_path}"
         import pandas as pd
+
         df = pd.read_csv(csv_path)
         assert "name" in df.columns, "CSV must have 'name' column"
         assert "value" in df.columns, "CSV must have 'value' column"
@@ -318,9 +366,13 @@ class TestRunSingleSimulationTask:
         MockAsyncOpenAI = _make_mock_openai_client()
 
         async def _inner():
-            with patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-                 patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
-                       AsyncMock(return_value=FAKE_EVAL_RESULT)):
+            with (
+                patch("openai.AsyncOpenAI", MockAsyncOpenAI),
+                patch(
+                    "calibrate_agent.llm.run_simulation.evaluate_simuation",
+                    AsyncMock(return_value=FAKE_EVAL_RESULT),
+                ),
+            ):
                 return await run_single_simulation_task(
                     semaphore=semaphore,
                     config=config,
@@ -362,10 +414,17 @@ class TestSimulationMain:
 
         MockAsyncOpenAI = _make_mock_openai_client()
 
-        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
-             patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-             patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
-                   AsyncMock(return_value=FAKE_EVAL_RESULT)):
+        with (
+            patch(
+                "sys.argv",
+                ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)],
+            ),
+            patch("openai.AsyncOpenAI", MockAsyncOpenAI),
+            patch(
+                "calibrate_agent.llm.run_simulation.evaluate_simuation",
+                AsyncMock(return_value=FAKE_EVAL_RESULT),
+            ),
+        ):
             asyncio.run(sim_main())
 
         return output_dir
@@ -376,7 +435,8 @@ class TestSimulationMain:
             agent_server.url_for("/chat"), tmp_path, num_personas=2, num_scenarios=2
         )
         sim_dirs = [
-            d for d in output_dir.iterdir()
+            d
+            for d in output_dir.iterdir()
             if d.is_dir() and d.name.startswith("simulation_")
         ]
         assert len(sim_dirs) == 4, (
@@ -389,6 +449,7 @@ class TestSimulationMain:
             agent_server.url_for("/chat"), tmp_path, num_personas=2, num_scenarios=2
         )
         import pandas as pd
+
         results_csv = output_dir / "results.csv"
         assert results_csv.exists(), f"results.csv not found at {results_csv}"
         df = pd.read_csv(results_csv)
@@ -424,16 +485,25 @@ class TestSimulationMain:
         def mock_exit(code=0):
             exit_calls.append(code)
 
-        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
-             patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-             patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
-                   AsyncMock(return_value=FAKE_EVAL_RESULT)), \
-             patch("sys.exit", mock_exit):
+        with (
+            patch(
+                "sys.argv",
+                ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)],
+            ),
+            patch("openai.AsyncOpenAI", MockAsyncOpenAI),
+            patch(
+                "calibrate_agent.llm.run_simulation.evaluate_simuation",
+                AsyncMock(return_value=FAKE_EVAL_RESULT),
+            ),
+            patch("sys.exit", mock_exit),
+        ):
             asyncio.run(sim_main())
 
         # Either no exit was called, or it was called with 0
         for code in exit_calls:
-            assert code == 0 or code is None, f"sys.exit called with non-zero code: {code}"
+            assert code == 0 or code is None, (
+                f"sys.exit called with non-zero code: {code}"
+            )
 
     def test_exits_1_on_failure(self, agent_server_500, tmp_path):
         """If all tasks fail (agent 500), sys.exit(1) is called."""
@@ -451,11 +521,18 @@ class TestSimulationMain:
         def mock_exit(code=0):
             exit_calls.append(code)
 
-        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
-             patch("openai.AsyncOpenAI", MockAsyncOpenAI), \
-             patch("calibrate_agent.llm.run_simulation.evaluate_simuation",
-                   AsyncMock(return_value=FAKE_EVAL_RESULT)), \
-             patch("sys.exit", mock_exit):
+        with (
+            patch(
+                "sys.argv",
+                ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)],
+            ),
+            patch("openai.AsyncOpenAI", MockAsyncOpenAI),
+            patch(
+                "calibrate_agent.llm.run_simulation.evaluate_simuation",
+                AsyncMock(return_value=FAKE_EVAL_RESULT),
+            ),
+            patch("sys.exit", mock_exit),
+        ):
             asyncio.run(sim_main())
 
         assert 1 in exit_calls, (
@@ -490,8 +567,16 @@ class TestAgentConnectionDetection:
                 [{"name": "helpfulness", "value": 1, "reasoning": "ok"}],
             )
 
-        with patch("sys.argv", ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)]), \
-             patch("calibrate_agent.llm.run_simulation.run_single_simulation_task", side_effect=mock_task):
+        with (
+            patch(
+                "sys.argv",
+                ["calibrate_agent", "-c", str(config_path), "-o", str(output_dir)],
+            ),
+            patch(
+                "calibrate_agent.llm.run_simulation.run_single_simulation_task",
+                side_effect=mock_task,
+            ),
+        ):
             asyncio.run(sim_main())
 
         return captured_agents
@@ -499,7 +584,14 @@ class TestAgentConnectionDetection:
     def test_config_without_agent_url_passes_none_agent(self, tmp_path):
         """Config with no agent_url means agent=None passed to each task."""
         config = {
-            "personas": [{"label": "p1", "characteristics": "friendly", "gender": "neutral", "language": "english"}],
+            "personas": [
+                {
+                    "label": "p1",
+                    "characteristics": "friendly",
+                    "gender": "neutral",
+                    "language": "english",
+                }
+            ],
             "scenarios": [{"name": "s1", "description": "ask about order"}],
             "evaluators": [_HELPFULNESS_EVALUATOR],
             "settings": {"agent_speaks_first": True, "max_turns": 2},
@@ -511,14 +603,25 @@ class TestAgentConnectionDetection:
             f"Expected agent=None when no agent_url, got: {agents[0]}"
         )
 
-    def test_config_with_agent_url_passes_agent_connection(self, tmp_path, httpserver: HTTPServer):
+    def test_config_with_agent_url_passes_agent_connection(
+        self, tmp_path, httpserver: HTTPServer
+    ):
         """Config with agent_url means a TextAgentConnection is passed to each task."""
         from calibrate_agent.connections import TextAgentConnection
 
-        httpserver.expect_request("/chat", method="POST").respond_with_json(FAKE_AGENT_RESPONSE)
+        httpserver.expect_request("/chat", method="POST").respond_with_json(
+            FAKE_AGENT_RESPONSE
+        )
         config = {
             "agent_url": httpserver.url_for("/chat"),
-            "personas": [{"label": "p1", "characteristics": "friendly", "gender": "neutral", "language": "english"}],
+            "personas": [
+                {
+                    "label": "p1",
+                    "characteristics": "friendly",
+                    "gender": "neutral",
+                    "language": "english",
+                }
+            ],
             "scenarios": [{"name": "s1", "description": "ask about order"}],
             "evaluators": [_HELPFULNESS_EVALUATOR],
             "settings": {"agent_speaks_first": True, "max_turns": 2},

@@ -252,9 +252,9 @@ async def main():
             judge_evaluators=judge_evaluators,
         )
 
-        print(f"\n\033[92m{'='*60}\033[0m")
+        print(f"\n\033[92m{'=' * 60}\033[0m")
         print("\033[92mSummary\033[0m")
-        print(f"\033[92m{'='*60}\033[0m\n")
+        print(f"\033[92m{'=' * 60}\033[0m\n")
 
         if result.get("status") == "error":
             print(f"  \033[31mError - {result.get('error')}\033[0m")
@@ -271,7 +271,9 @@ async def main():
         return
 
     if not providers:
-        print("\033[31mError: --provider is required (omit only with --eval-only)\033[0m")
+        print(
+            "\033[31mError: --provider is required (omit only with --eval-only)\033[0m"
+        )
         sys.exit(1)
     if not args.input:
         print("\033[31mError: --input is required (omit only with --eval-only)\033[0m")
@@ -328,9 +330,9 @@ async def main():
         )
 
         # Print summary
-        print(f"\n\033[92m{'='*60}\033[0m")
+        print(f"\n\033[92m{'=' * 60}\033[0m")
         print("\033[92mSummary\033[0m")
-        print(f"\033[92m{'='*60}\033[0m\n")
+        print(f"\033[92m{'=' * 60}\033[0m\n")
 
         has_errors = False
         for provider in providers:
@@ -351,9 +353,19 @@ async def main():
                         if isinstance(v, dict) and "type" in v
                     }
                     ttfb_data = metrics.get("ttfb", {})
-                    ttfb_p50 = ttfb_data.get("p50", "N/A") if isinstance(ttfb_data, dict) else "N/A"
-                    judge_str = ", ".join(f"{k}={v:.2f}" for k, v in judge_scores.items())
-                    ttfb_str = f"TTFB(p50)={ttfb_p50:.3f}s" if isinstance(ttfb_p50, float) else f"TTFB(p50)={ttfb_p50}"
+                    ttfb_p50 = (
+                        ttfb_data.get("p50", "N/A")
+                        if isinstance(ttfb_data, dict)
+                        else "N/A"
+                    )
+                    judge_str = ", ".join(
+                        f"{k}={v:.2f}" for k, v in judge_scores.items()
+                    )
+                    ttfb_str = (
+                        f"TTFB(p50)={ttfb_p50:.3f}s"
+                        if isinstance(ttfb_p50, float)
+                        else f"TTFB(p50)={ttfb_p50}"
+                    )
                     print(f"  {provider}: {judge_str}, {ttfb_str}")
 
         print(f"\n\033[92mLeaderboard saved to {result['leaderboard_dir']}\033[0m")

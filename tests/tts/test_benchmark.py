@@ -70,7 +70,9 @@ class TestTTSBenchmarkEvalOnly(unittest.IsolatedAsyncioTestCase):
                     ["--dataset", tmp, "-o", os.path.join(tmp, "out"), "-c", str(cfg)]
                 )
 
-        self.assertEqual(captured["judge_evaluators"], [{"name": "q", "system_prompt": "p"}])
+        self.assertEqual(
+            captured["judge_evaluators"], [{"name": "q", "system_prompt": "p"}]
+        )
 
     async def test_error_result_exits(self):
         async def fake_run_eval_only(*, dataset_path, output_dir, judge_evaluators):
@@ -82,7 +84,9 @@ class TestTTSBenchmarkEvalOnly(unittest.IsolatedAsyncioTestCase):
                 AsyncMock(side_effect=fake_run_eval_only),
             ):
                 with self.assertRaises(SystemExit):
-                    await self._run_main(["--dataset", tmp, "-o", os.path.join(tmp, "out")])
+                    await self._run_main(
+                        ["--dataset", tmp, "-o", os.path.join(tmp, "out")]
+                    )
 
 
 if __name__ == "__main__":

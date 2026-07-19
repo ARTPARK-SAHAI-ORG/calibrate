@@ -46,8 +46,12 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
             }
             return mapping[(reference, prediction)]
 
-        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-             patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
+        with (
+            patch.object(
+                metrics, "_get_indic_normalizer", return_value=_identity_normalizer()
+            ),
+            patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)),
+        ):
             result = await metrics.get_intent_entity_score(
                 references=["a", "b"],
                 predictions=["a", "x"],
@@ -73,8 +77,10 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
             seen.append((reference, prediction))
             return _row(1, 1.0)
 
-        with patch.object(metrics, "_get_indic_normalizer", return_value=norm_inst), \
-             patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)):
+        with (
+            patch.object(metrics, "_get_indic_normalizer", return_value=norm_inst),
+            patch.object(sie, "intent_entity_judge", AsyncMock(side_effect=fake_judge)),
+        ):
             await metrics.get_intent_entity_score(
                 references=["HELLO"],
                 predictions=["Hello"],
@@ -86,9 +92,15 @@ class TestGetIntentEntityScore(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.stt import sarvam_intent_entity as sie
         from calibrate_agent.stt import metrics
 
-        with patch.object(metrics, "_get_indic_normalizer", return_value=_identity_normalizer()), \
-             patch.object(sie, "intent_entity_judge", AsyncMock()):
-            result = await metrics.get_intent_entity_score(references=[], predictions=[])
+        with (
+            patch.object(
+                metrics, "_get_indic_normalizer", return_value=_identity_normalizer()
+            ),
+            patch.object(sie, "intent_entity_judge", AsyncMock()),
+        ):
+            result = await metrics.get_intent_entity_score(
+                references=[], predictions=[]
+            )
 
         self.assertEqual(result["intent"], 0.0)
         self.assertEqual(result["entity"], 0.0)
@@ -163,8 +175,10 @@ class TestIntentEntityJudge(unittest.IsolatedAsyncioTestCase):
         while hasattr(inner, "__wrapped__"):
             inner = inner.__wrapped__
 
-        with patch.object(ie, "_build_openrouter_client", return_value=MagicMock()), \
-             patch.object(ie.instructor, "apatch", return_value=fake_client):
+        with (
+            patch.object(ie, "_build_openrouter_client", return_value=MagicMock()),
+            patch.object(ie.instructor, "apatch", return_value=fake_client),
+        ):
             result = await inner(
                 "hello world", "helo world", model="m", index=3, context="ctx"
             )

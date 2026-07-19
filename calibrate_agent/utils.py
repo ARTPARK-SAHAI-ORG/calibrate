@@ -43,7 +43,9 @@ def _fetch_usd_to_inr() -> float:
     last_error: Exception | None = None
     for url in _FX_ENDPOINTS:
         try:
-            request = urllib.request.Request(url, headers={"User-Agent": "calibrate-agent"})
+            request = urllib.request.Request(
+                url, headers={"User-Agent": "calibrate-agent"}
+            )
             with urllib.request.urlopen(request, timeout=5) as response:
                 data = json.loads(response.read().decode("utf-8"))
             rate = float(data["rates"]["INR"])
@@ -2112,7 +2114,9 @@ def create_tts_service(
     elif provider == "deepgram":
         return DeepgramTTSService(
             api_key=os.getenv("DEEPGRAM_API_KEY"),
-            settings=DeepgramTTSService.Settings(voice=voice_id or "aura-2-andromeda-en"),
+            settings=DeepgramTTSService.Settings(
+                voice=voice_id or "aura-2-andromeda-en"
+            ),
         )
     elif provider == "smallest":
         return SmallestTTSService(

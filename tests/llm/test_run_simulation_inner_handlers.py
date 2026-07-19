@@ -32,21 +32,34 @@ class TestRunSimulationWithTools(unittest.IsolatedAsyncioTestCase):
 
         tools = [
             {"name": "do_stuff", "description": "d", "parameters": []},
-            {"name": "wh", "description": "wh", "type": "webhook", "webhook": {
-                "url": "http://x", "method": "POST", "headers": [],
-            }},
+            {
+                "name": "wh",
+                "description": "wh",
+                "type": "webhook",
+                "webhook": {
+                    "url": "http://x",
+                    "method": "POST",
+                    "headers": [],
+                },
+            },
         ]
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RS, "OpenAILLMService",
-                          side_effect=[fake_bot_llm, fake_user_llm]), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
-             patch.object(RS, "Pipeline"), \
-             patch.object(RS, "LLMContext", return_value=fake_context), \
-             patch.object(RS, "LLMContextAggregatorPair"), \
-             patch.object(RS, "evaluate_simuation",
-                          AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}})):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(
+                RS, "OpenAILLMService", side_effect=[fake_bot_llm, fake_user_llm]
+            ),
+            patch.object(RS, "PipelineTask"),
+            patch.object(RS, "PipelineRunner", return_value=fake_runner),
+            patch.object(RS, "Pipeline"),
+            patch.object(RS, "LLMContext", return_value=fake_context),
+            patch.object(RS, "LLMContextAggregatorPair"),
+            patch.object(
+                RS,
+                "evaluate_simuation",
+                AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}}),
+            ),
+        ):
             await RS.run_simulation(
                 bot_system_prompt="bp",
                 tools=tools,
@@ -89,8 +102,9 @@ class TestRunSimulationWithTools(unittest.IsolatedAsyncioTestCase):
         params_wh.function_name = "wh"
         params_wh.arguments = {"body": {"k": "v"}}
         params_wh.result_callback = AsyncMock()
-        with patch.object(RS, "make_webhook_call",
-                          AsyncMock(return_value={"status": "success"})):
+        with patch.object(
+            RS, "make_webhook_call", AsyncMock(return_value={"status": "success"})
+        ):
             await webhook_fn(params_wh)
         params_wh.result_callback.assert_called_once()
 

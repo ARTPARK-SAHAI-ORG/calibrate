@@ -46,7 +46,9 @@ TEST_CASES_TOOL_CALL = [
         "history": [{"role": "user", "content": "Get weather in Mumbai"}],
         "evaluation": {
             "type": "tool_call",
-            "tool_calls": [{"tool": "get_weather", "arguments": {"location": "Mumbai"}}],
+            "tool_calls": [
+                {"tool": "get_weather", "arguments": {"location": "Mumbai"}}
+            ],
         },
     }
 ]
@@ -58,6 +60,7 @@ VERIFY_MESSAGE_CONTENT = "Hello, are you there?"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def run_cli(*args, extra_env=None):
     """Run `calibrate_agent llm ...` as a subprocess and return CompletedProcess."""
@@ -103,10 +106,7 @@ def _is_verify_request(body: dict) -> bool:
     messages = body.get("messages", [])
     if not messages:
         return False
-    return any(
-        msg.get("content", "") == VERIFY_MESSAGE_CONTENT
-        for msg in messages
-    )
+    return any(msg.get("content", "") == VERIFY_MESSAGE_CONTENT for msg in messages)
 
 
 def _is_test_request(body: dict) -> bool:
@@ -114,20 +114,20 @@ def _is_test_request(body: dict) -> bool:
     messages = body.get("messages", [])
     if not messages:
         return False
-    return any(
-        msg.get("content", "") == "Get weather in Mumbai"
-        for msg in messages
-    )
+    return any(msg.get("content", "") == "Get weather in Mumbai" for msg in messages)
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture
 def agent_server(httpserver: HTTPServer):
     """Fake agent that always returns a valid tool-call response."""
-    httpserver.expect_request("/chat", method="POST").respond_with_json(TOOL_CALL_RESPONSE)
+    httpserver.expect_request("/chat", method="POST").respond_with_json(
+        TOOL_CALL_RESPONSE
+    )
     return httpserver
 
 
@@ -159,13 +159,16 @@ def bad_agent_config(tmp_path, bad_agent_server):
 # TestAgentSingleRun
 # ---------------------------------------------------------------------------
 
+
 class TestAgentSingleRun:
     """Single run — no model flag, results saved directly to output_dir."""
 
     def test_exit_0_on_success(self, agent_config):
         cfg, out = agent_config
         result = run_cli("llm", "-c", cfg, "-o", out)
-        assert result.returncode == 0, f"stderr: {result.stderr}\nstdout: {result.stdout}"
+        assert result.returncode == 0, (
+            f"stderr: {result.stderr}\nstdout: {result.stdout}"
+        )
 
     def test_results_json_at_output_root(self, agent_config, tmp_path):
         cfg, out = agent_config
@@ -192,13 +195,16 @@ class TestAgentSingleRun:
             f"Expected 2 requests (1 verify + 1 test), got {len(bodies)}: {bodies}"
         )
         # First should be verify, second should be the test case
-        assert _is_verify_request(bodies[0]), f"First request is not verify: {bodies[0]}"
+        assert _is_verify_request(bodies[0]), (
+            f"First request is not verify: {bodies[0]}"
+        )
         assert _is_test_request(bodies[1]), f"Second request is not test: {bodies[1]}"
 
 
 # ---------------------------------------------------------------------------
 # TestAgentBenchmark
 # ---------------------------------------------------------------------------
+
 
 class TestAgentBenchmark:
     """Benchmark mode — two models, per-model subfolders, leaderboard."""
@@ -227,9 +233,7 @@ class TestAgentBenchmark:
     def test_leaderboard_csv_generated(self, agent_config):
         _, _, out = self._run_benchmark(agent_config)
         csv_path = os.path.join(out, "leaderboard", "llm_leaderboard.csv")
-        assert os.path.exists(csv_path), (
-            f"leaderboard CSV not found at {csv_path}"
-        )
+        assert os.path.exists(csv_path), f"leaderboard CSV not found at {csv_path}"
 
     def test_each_model_verified_separately(self, agent_config, agent_server):
         _, _, _ = self._run_benchmark(agent_config)
@@ -260,9 +264,11 @@ class TestAgentBenchmark:
             f"'Overall Summary' not in stdout.\nstdout: {result.stdout}"
         )
 
+
 # ---------------------------------------------------------------------------
 # TestSkipVerify
 # ---------------------------------------------------------------------------
+
 
 class TestSkipVerify:
     """--skip-verify flag skips verification request."""
@@ -281,6 +287,7 @@ class TestSkipVerify:
 # ---------------------------------------------------------------------------
 # TestVerifyCommand
 # ---------------------------------------------------------------------------
+
 
 class TestVerifyCommand:
     """--verify flag alone (no -c config): verify connection only."""
@@ -307,6 +314,7 @@ class TestVerifyCommand:
 # ---------------------------------------------------------------------------
 # TestVerifyFailureDuringRun
 # ---------------------------------------------------------------------------
+
 
 class TestVerifyFailureDuringRun:
     """When agent returns bad response, verify fails before tests run."""
@@ -357,7 +365,9 @@ def _run_voice_cli_in_process(cfg, out, *extra_argv):
     import calibrate_agent.cli as cli_module
 
     mock_ws_cls = MagicMock()
-    mock_ws_cls.return_value.verify = AsyncMock(return_value={"ok": True, "error": None})
+    mock_ws_cls.return_value.verify = AsyncMock(
+        return_value={"ok": True, "error": None}
+    )
 
     mock_agent_main = AsyncMock()
     fake_run_simulation = MagicMock()
@@ -379,13 +389,16 @@ def _run_voice_cli_in_process(cfg, out, *extra_argv):
     ]
 
     raised = None
-    with patch.dict(
-        "sys.modules",
-        {
-            "calibrate_agent.agent.run_simulation": fake_run_simulation,
-            "calibrate_agent.connections": fake_connections,
-        },
-    ), patch.object(cli_module.sys, "argv", argv):
+    with (
+        patch.dict(
+            "sys.modules",
+            {
+                "calibrate_agent.agent.run_simulation": fake_run_simulation,
+                "calibrate_agent.connections": fake_connections,
+            },
+        ),
+        patch.object(cli_module.sys, "argv", argv),
+    ):
         try:
             cli_module.main()
         except SystemExit as exc:
@@ -451,15 +464,25 @@ class TestVoicePreVerify:
         fake_connections.WebSocketAgentConnection = mock_ws_cls
 
         argv = [
-            "calibrate_agent", "simulations", "--type", "voice", "-c", cfg, "-o", out,
+            "calibrate_agent",
+            "simulations",
+            "--type",
+            "voice",
+            "-c",
+            cfg,
+            "-o",
+            out,
         ]
-        with patch.dict(
-            "sys.modules",
-            {
-                "calibrate_agent.agent.run_simulation": fake_run_simulation,
-                "calibrate_agent.connections": fake_connections,
-            },
-        ), patch.object(cli_module.sys, "argv", argv):
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "calibrate_agent.agent.run_simulation": fake_run_simulation,
+                    "calibrate_agent.connections": fake_connections,
+                },
+            ),
+            patch.object(cli_module.sys, "argv", argv),
+        ):
             with pytest.raises(SystemExit) as exc_info:
                 cli_module.main()
 

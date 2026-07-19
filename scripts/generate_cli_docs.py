@@ -117,9 +117,12 @@ def _options_table(options: list[Option]) -> str:
     show_type = any(o.type for o in rows)
     show_default = any(o.default for o in rows)
 
-    headers = ["Option"] + (["Type"] if show_type else []) + (
-        ["Default"] if show_default else []
-    ) + ["Description"]
+    headers = (
+        ["Option"]
+        + (["Type"] if show_type else [])
+        + (["Default"] if show_default else [])
+        + ["Description"]
+    )
     lines = [
         "| " + " | ".join(headers) + " |",
         "| " + " | ".join("---" for _ in headers) + " |",
@@ -516,9 +519,7 @@ def generate_cli_docs(
                 title, entry["parent"], subs, examples_by_command
             )
         elif entry["parent"] is not None:
-            content = render_leaf_page(
-                title, entry["parent"], examples_by_command
-            )
+            content = render_leaf_page(title, entry["parent"], examples_by_command)
         else:
             continue
         slug = resource_slug(res)
@@ -539,7 +540,9 @@ def generate_cli_docs(
 
     print(f"Generated {len(resource_pages)} CLI resource page(s) under {output_root}")
     if skipped:
-        print(f"Skipped {len(skipped)} non-API command(s): {', '.join(sorted(skipped))}")
+        print(
+            f"Skipped {len(skipped)} non-API command(s): {', '.join(sorted(skipped))}"
+        )
     if removed:
         print(f"Pruned {len(removed)} stale page(s)")
 

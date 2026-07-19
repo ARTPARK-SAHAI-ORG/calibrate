@@ -41,18 +41,20 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
         fake_context = MagicMock()
         fake_context.get_messages.return_value = []
 
-        with patch.object(B, "create_stt_service", MagicMock()), \
-             patch.object(B, "create_tts_service", MagicMock()), \
-             patch.object(B, "OpenAILLMService"), \
-             patch.object(B, "OpenRouterLLMService", return_value=fake_llm), \
-             patch.object(B, "RTVIProcessor"), \
-             patch.object(B, "SileroVADAnalyzer"), \
-             patch.object(B, "LocalSmartTurnAnalyzerV3"), \
-             patch.object(B, "Pipeline"), \
-             patch.object(B, "PipelineTask"), \
-             patch.object(B, "PipelineRunner", return_value=fake_runner), \
-             patch.object(B, "LLMContext", return_value=fake_context), \
-             patch.object(B, "LLMContextAggregatorPair"):
+        with (
+            patch.object(B, "create_stt_service", MagicMock()),
+            patch.object(B, "create_tts_service", MagicMock()),
+            patch.object(B, "OpenAILLMService"),
+            patch.object(B, "OpenRouterLLMService", return_value=fake_llm),
+            patch.object(B, "RTVIProcessor"),
+            patch.object(B, "SileroVADAnalyzer"),
+            patch.object(B, "LocalSmartTurnAnalyzerV3"),
+            patch.object(B, "Pipeline"),
+            patch.object(B, "PipelineTask"),
+            patch.object(B, "PipelineRunner", return_value=fake_runner),
+            patch.object(B, "LLMContext", return_value=fake_context),
+            patch.object(B, "LLMContextAggregatorPair"),
+        ):
             await B.run_bot(
                 transport=fake_transport,
                 runner_args=_make_runner_args(),
@@ -78,18 +80,20 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
         fake_context = MagicMock()
         fake_context.get_messages.return_value = []
 
-        with patch.object(B, "create_stt_service", MagicMock()), \
-             patch.object(B, "create_tts_service", MagicMock()), \
-             patch.object(B, "OpenAILLMService", return_value=fake_llm), \
-             patch.object(B, "OpenRouterLLMService"), \
-             patch.object(B, "RTVIProcessor"), \
-             patch.object(B, "SileroVADAnalyzer"), \
-             patch.object(B, "LocalSmartTurnAnalyzerV3"), \
-             patch.object(B, "Pipeline"), \
-             patch.object(B, "PipelineTask"), \
-             patch.object(B, "PipelineRunner", return_value=fake_runner), \
-             patch.object(B, "LLMContext", return_value=fake_context), \
-             patch.object(B, "LLMContextAggregatorPair"):
+        with (
+            patch.object(B, "create_stt_service", MagicMock()),
+            patch.object(B, "create_tts_service", MagicMock()),
+            patch.object(B, "OpenAILLMService", return_value=fake_llm),
+            patch.object(B, "OpenRouterLLMService"),
+            patch.object(B, "RTVIProcessor"),
+            patch.object(B, "SileroVADAnalyzer"),
+            patch.object(B, "LocalSmartTurnAnalyzerV3"),
+            patch.object(B, "Pipeline"),
+            patch.object(B, "PipelineTask"),
+            patch.object(B, "PipelineRunner", return_value=fake_runner),
+            patch.object(B, "LLMContext", return_value=fake_context),
+            patch.object(B, "LLMContextAggregatorPair"),
+        ):
             await B.run_bot(
                 transport=fake_transport,
                 runner_args=_make_runner_args(),

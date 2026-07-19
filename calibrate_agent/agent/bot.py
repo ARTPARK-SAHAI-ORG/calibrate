@@ -353,7 +353,11 @@ async def run_bot(
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
             user_turn_strategies=UserTurnStrategies(
-                stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
+                stop=[
+                    TurnAnalyzerUserTurnStopStrategy(
+                        turn_analyzer=LocalSmartTurnAnalyzerV3()
+                    )
+                ]
             ),
         ),
     )
@@ -516,7 +520,9 @@ async def run_bot(
 
     @context_aggregator.assistant().event_handler("on_assistant_turn_stopped")
     async def on_assistant_turn_stopped(aggregator, message):
-        bot_logger.info(f"Bot transcript:[{message.timestamp}] assistant: {message.content}")
+        bot_logger.info(
+            f"Bot transcript:[{message.timestamp}] assistant: {message.content}"
+        )
 
     # Handle client connection
     @rtvi.event_handler("on_client_ready")

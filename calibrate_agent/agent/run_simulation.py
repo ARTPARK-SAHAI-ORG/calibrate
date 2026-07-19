@@ -30,7 +30,10 @@ from calibrate_agent.utils import (
     save_transcript,
     TRANSCRIPT_FILE_NAME,
 )
-from calibrate_agent.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
+from calibrate_agent.llm.metrics import (
+    evaluate_simuation,
+    DEFAULT_SIMULATION_JUDGE_MODEL,
+)
 from calibrate_agent.stt.metrics import (
     get_llm_judge_score as stt_llm_judge_score,
     DEFAULT_STT_JUDGE_MODEL,
@@ -220,8 +223,7 @@ def resolve_serializer(name: str) -> FrameSerializer:
     factory = SERIALIZER_REGISTRY.get(name)
     if factory is None:
         raise ValueError(
-            f"Unknown serializer '{name}'. "
-            f"Available: {sorted(SERIALIZER_REGISTRY)}"
+            f"Unknown serializer '{name}'. Available: {sorted(SERIALIZER_REGISTRY)}"
         )
     return factory()
 
@@ -1178,9 +1180,7 @@ class SilencePadder(FrameProcessor):
         self._audio_save_dir = audio_save_dir
         self._rtvi_message_adapter = rtvi_message_adapter
         self._latency_tracker = latency_tracker
-        self._user_audio_chunk_indices = (
-            {}
-        )  # Track chunk indices for user audio per turn
+        self._user_audio_chunk_indices = {}  # Track chunk indices for user audio per turn
 
     async def process_frame(self, frame, direction):
         await super().process_frame(frame, direction)
@@ -1199,8 +1199,10 @@ class SilencePadder(FrameProcessor):
             ):
                 self._rtvi_message_adapter._sim_user_turn_pending = False
                 if self._rtvi_message_adapter._active_transcript_audio_role != "user":
-                    line = self._rtvi_message_adapter._assign_next_transcript_audio_line(
-                        role="user"
+                    line = (
+                        self._rtvi_message_adapter._assign_next_transcript_audio_line(
+                            role="user"
+                        )
                     )
                     self._rtvi_message_adapter._turn_index = line
                     eval_logger.info(f"[sim user] transcript audio index: {line}")
@@ -1298,9 +1300,7 @@ class RTVIFunctionCallResponder(FrameProcessor):
                     )
 
                     if self._transcript_recorder is not None:
-                        self._transcript_recorder.record_tool_call(
-                            message.get("data")
-                        )
+                        self._transcript_recorder.record_tool_call(message.get("data"))
 
                     data = message.get("data") or {}
                     function_name = data.get("function_name")
@@ -1546,7 +1546,9 @@ async def _run_simulation_inner(
     tts_language = (
         Language.KN
         if language == "kannada"
-        else Language.HI if language == "hindi" else Language.EN
+        else Language.HI
+        if language == "hindi"
+        else Language.EN
     )
 
     # Simulated-user voice + provider come from SIMULATED_USER_VOICES (module
@@ -1863,8 +1865,10 @@ async def _run_simulation_inner(
     stt_judge_inputs = prepare_stt_judge_inputs(
         user_messages_in_transcript, filtered_stt_outputs, agent_uri
     )
-    if stt_judge_inputs is None and agent_uri is not None and (
-        filtered_stt_outputs and user_messages_in_transcript
+    if (
+        stt_judge_inputs is None
+        and agent_uri is not None
+        and (filtered_stt_outputs and user_messages_in_transcript)
     ):
         log_and_print(
             f"{GENERAL_LOG_COLOR}Skipping STT accuracy scoring for the external "
@@ -2245,7 +2249,11 @@ async def _run_single_simulation_inner(
                 if sim_task.cancelled():
                     # Simulation was cancelled (likely due to websocket disconnect from error)
                     # Check if bot_task has an exception that caused this
-                    if bot_task is not None and bot_task in done and not bot_task.cancelled():
+                    if (
+                        bot_task is not None
+                        and bot_task in done
+                        and not bot_task.cancelled()
+                    ):
                         # This will raise if bot_task failed with an exception
                         bot_task.result()
                     raise RuntimeError("Simulation task was cancelled unexpectedly")

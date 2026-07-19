@@ -12,9 +12,11 @@ class TestNoOpObserveDecorator(unittest.TestCase):
 
         # When langfuse is not enabled, observe returns identity decorator.
         if not L.langfuse_enabled:
+
             @L.observe(name="x")
             def f(x):
                 return x + 1
+
             self.assertEqual(f(1), 2)
 
 
@@ -45,16 +47,20 @@ class TestCreateLangfuseAudioMedia(unittest.TestCase):
     def test_lf_media_missing_returns_none(self):
         from calibrate_agent import langfuse as L
 
-        with patch.object(L, "langfuse_enabled", True), \
-             patch.object(L, "LangfuseMedia", None):
+        with (
+            patch.object(L, "langfuse_enabled", True),
+            patch.object(L, "LangfuseMedia", None),
+        ):
             self.assertIsNone(L.create_langfuse_audio_media("/tmp/x.wav"))
 
     def test_read_error_returns_none(self):
         from calibrate_agent import langfuse as L
 
         fake_media_cls = MagicMock()
-        with patch.object(L, "langfuse_enabled", True), \
-             patch.object(L, "LangfuseMedia", fake_media_cls):
+        with (
+            patch.object(L, "langfuse_enabled", True),
+            patch.object(L, "LangfuseMedia", fake_media_cls),
+        ):
             result = L.create_langfuse_audio_media("/nonexistent/audio.wav")
             self.assertIsNone(result)
 
@@ -65,8 +71,10 @@ class TestCreateLangfuseAudioMedia(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             audio = Path(tmp) / "a.wav"
             audio.write_bytes(b"\x00\x01\x02")
-            with patch.object(L, "langfuse_enabled", True), \
-                 patch.object(L, "LangfuseMedia", fake_media_cls):
+            with (
+                patch.object(L, "langfuse_enabled", True),
+                patch.object(L, "LangfuseMedia", fake_media_cls),
+            ):
                 result = L.create_langfuse_audio_media(str(audio))
         self.assertEqual(result, "MEDIA")
         fake_media_cls.assert_called_once()

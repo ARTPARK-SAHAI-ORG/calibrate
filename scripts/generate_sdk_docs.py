@@ -85,8 +85,7 @@ def render_method_page(
 ) -> str:
     api_page = _mdx_escape(route.mintlify_api_page)
     api_callout = (
-        f"See **{api_page}** in the "
-        f"[API reference](/api-reference/introduction) tab."
+        f"See **{api_page}** in the [API reference](/api-reference/introduction) tab."
     )
     summary, body = _split_description(doc.description)
     if not summary:
@@ -120,9 +119,7 @@ def render_method_page(
     return "".join(parts)
 
 
-def _examples_for_route(
-    route: SdkRoute, openapi: dict[str, Any]
-) -> list[NamedExample]:
+def _examples_for_route(route: SdkRoute, openapi: dict[str, Any]) -> list[NamedExample]:
     op = openapi.get("paths", {}).get(route.path, {}).get(route.http.lower(), {})
     return named_request_examples(op) if isinstance(op, dict) else []
 
@@ -136,16 +133,16 @@ def write_sdk_pages(
         out = SDK_ROOT / route.sdk_group.replace("_", "-") / f"{route.sdk_method}.mdx"
         out.parent.mkdir(parents=True, exist_ok=True)
         examples = _examples_for_route(route, openapi)
-        out.write_text(
-            render_method_page(route, doc, examples), encoding="utf-8"
-        )
+        out.write_text(render_method_page(route, doc, examples), encoding="utf-8")
         written.append(route.doc_slug)
     return written
 
 
 def copy_overview() -> None:
     OVERVIEW_OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OVERVIEW_OUTPUT.write_text(OVERVIEW_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8")
+    OVERVIEW_OUTPUT.write_text(
+        OVERVIEW_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8"
+    )
 
 
 def _api_reference_groups(routes: list[SdkRoute]) -> list[dict[str, Any]]:
@@ -168,7 +165,9 @@ def _api_reference_groups(routes: list[SdkRoute]) -> list[dict[str, Any]]:
     return groups
 
 
-def _sdk_nav_groups(paired: list[tuple[SdkRoute, SdkMethodDoc]]) -> list[dict[str, Any]]:
+def _sdk_nav_groups(
+    paired: list[tuple[SdkRoute, SdkMethodDoc]],
+) -> list[dict[str, Any]]:
     by_group: dict[str, list[str]] = defaultdict(list)
     for route, _ in paired:
         slug = route.doc_slug

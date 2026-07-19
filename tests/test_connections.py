@@ -15,6 +15,7 @@ from unittest.mock import patch, AsyncMock, MagicMock
 # Helpers to mock httpx responses
 # ---------------------------------------------------------------------------
 
+
 def _make_httpx_response(body: dict, status: int = 200):
     """Return a mock that quacks like an httpx.Response."""
     mock = MagicMock()
@@ -23,6 +24,7 @@ def _make_httpx_response(body: dict, status: int = 200):
     mock.raise_for_status = MagicMock()
     if status >= 400:
         import httpx
+
         mock.raise_for_status.side_effect = httpx.HTTPStatusError(
             message=f"HTTP {status}",
             request=MagicMock(),
@@ -67,8 +69,8 @@ def _patch_httpx_sequence(outcomes):
 # Tests for TextAgentConnection.call()
 # ---------------------------------------------------------------------------
 
-class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
 
+class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
     async def test_returns_response_text(self):
         from calibrate_agent.connections import TextAgentConnection
 
@@ -88,12 +90,16 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
         agent = TextAgentConnection(url="http://fake-agent/chat")
         fake_body = {
             "response": None,
-            "tool_calls": [{"tool": "get_weather", "arguments": {"location": "Mumbai"}}],
+            "tool_calls": [
+                {"tool": "get_weather", "arguments": {"location": "Mumbai"}}
+            ],
         }
 
         ctx, _ = _patch_httpx(fake_body)
         with ctx:
-            result = await agent.call([{"role": "user", "content": "Weather in Mumbai?"}])
+            result = await agent.call(
+                [{"role": "user", "content": "Weather in Mumbai?"}]
+            )
 
         self.assertIsNone(result["response"])
         self.assertEqual(len(result["tool_calls"]), 1)
@@ -157,17 +163,19 @@ class TestCallTextAgent(unittest.IsolatedAsyncioTestCase):
 # Tests for TextAgentConnection.call() — retry on transient failures
 # ---------------------------------------------------------------------------
 
-class TestCallRetry(unittest.IsolatedAsyncioTestCase):
 
+class TestCallRetry(unittest.IsolatedAsyncioTestCase):
     async def test_retries_then_succeeds_on_502(self):
         from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
-        ctx, mock_client = _patch_httpx_sequence([
-            ({}, 502),
-            ({}, 503),
-            ({"response": "recovered", "tool_calls": []}, 200),
-        ])
+        ctx, mock_client = _patch_httpx_sequence(
+            [
+                ({}, 502),
+                ({}, 503),
+                ({"response": "recovered", "tool_calls": []}, 200),
+            ]
+        )
         with ctx, patch("asyncio.sleep", AsyncMock()):
             result = await agent.call([{"role": "user", "content": "Hi"}])
 
@@ -179,10 +187,12 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
-        ctx, mock_client = _patch_httpx_sequence([
-            httpx.ConnectError("boom"),
-            ({"response": "ok", "tool_calls": []}, 200),
-        ])
+        ctx, mock_client = _patch_httpx_sequence(
+            [
+                httpx.ConnectError("boom"),
+                ({"response": "ok", "tool_calls": []}, 200),
+            ]
+        )
         with ctx, patch("asyncio.sleep", AsyncMock()):
             result = await agent.call([{"role": "user", "content": "Hi"}])
 
@@ -207,10 +217,12 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
-        ctx, mock_client = _patch_httpx_sequence([
-            ({}, 401),
-            ({"response": "should not reach", "tool_calls": []}, 200),
-        ])
+        ctx, mock_client = _patch_httpx_sequence(
+            [
+                ({}, 401),
+                ({"response": "should not reach", "tool_calls": []}, 200),
+            ]
+        )
         with ctx, patch("asyncio.sleep", AsyncMock()):
             with self.assertRaises(RuntimeError) as cm:
                 await agent.call([{"role": "user", "content": "Hi"}])
@@ -223,8 +235,8 @@ class TestCallRetry(unittest.IsolatedAsyncioTestCase):
 # Tests for run_test_external — tool_call evaluation
 # ---------------------------------------------------------------------------
 
-class TestRunTestExternalToolCall(unittest.IsolatedAsyncioTestCase):
 
+class TestRunTestExternalToolCall(unittest.IsolatedAsyncioTestCase):
     async def _run(self, agent_tool_calls, expected_tool_calls):
         from calibrate_agent.connections import TextAgentConnection
         from calibrate_agent.llm.run_tests import run_test_external
@@ -240,44 +252,62 @@ class TestRunTestExternalToolCall(unittest.IsolatedAsyncioTestCase):
         ctx, _ = _patch_httpx(fake_body)
         with ctx:
             return await run_test_external(
-                chat_history=[{"role": "user", "content": "What's the weather in Mumbai?"}],
+                chat_history=[
+                    {"role": "user", "content": "What's the weather in Mumbai?"}
+                ],
                 evaluation=evaluation,
                 agent=agent,
             )
 
     async def test_tool_call_pass_exact_match(self):
         result = await self._run(
-            agent_tool_calls=[{"tool": "get_weather", "arguments": {"location": "Mumbai"}}],
-            expected_tool_calls=[{"tool": "get_weather", "arguments": {"location": "Mumbai"}}],
+            agent_tool_calls=[
+                {"tool": "get_weather", "arguments": {"location": "Mumbai"}}
+            ],
+            expected_tool_calls=[
+                {"tool": "get_weather", "arguments": {"location": "Mumbai"}}
+            ],
         )
         self.assertTrue(result["metrics"]["passed"])
 
     async def test_tool_call_fail_wrong_tool(self):
         result = await self._run(
-            agent_tool_calls=[{"tool": "search_web", "arguments": {"query": "Mumbai weather"}}],
-            expected_tool_calls=[{"tool": "get_weather", "arguments": {"location": "Mumbai"}}],
+            agent_tool_calls=[
+                {"tool": "search_web", "arguments": {"query": "Mumbai weather"}}
+            ],
+            expected_tool_calls=[
+                {"tool": "get_weather", "arguments": {"location": "Mumbai"}}
+            ],
         )
         self.assertFalse(result["metrics"]["passed"])
         self.assertIn("mismatch", result["metrics"]["reasoning"].lower())
 
     async def test_tool_call_fail_wrong_arguments(self):
         result = await self._run(
-            agent_tool_calls=[{"tool": "get_weather", "arguments": {"location": "Delhi"}}],
-            expected_tool_calls=[{"tool": "get_weather", "arguments": {"location": "Mumbai"}}],
+            agent_tool_calls=[
+                {"tool": "get_weather", "arguments": {"location": "Delhi"}}
+            ],
+            expected_tool_calls=[
+                {"tool": "get_weather", "arguments": {"location": "Mumbai"}}
+            ],
         )
         self.assertFalse(result["metrics"]["passed"])
 
     async def test_tool_call_fail_no_tool_calls(self):
         result = await self._run(
             agent_tool_calls=[],
-            expected_tool_calls=[{"tool": "get_weather", "arguments": {"location": "Mumbai"}}],
+            expected_tool_calls=[
+                {"tool": "get_weather", "arguments": {"location": "Mumbai"}}
+            ],
         )
         self.assertFalse(result["metrics"]["passed"])
 
     async def test_tool_call_pass_no_argument_check(self):
         """If expected tool_call has no 'arguments' key, only tool name is checked."""
         result = await self._run(
-            agent_tool_calls=[{"tool": "get_weather", "arguments": {"location": "anywhere"}}],
+            agent_tool_calls=[
+                {"tool": "get_weather", "arguments": {"location": "anywhere"}}
+            ],
             expected_tool_calls=[{"tool": "get_weather"}],
         )
         self.assertTrue(result["metrics"]["passed"])
@@ -287,8 +317,8 @@ class TestRunTestExternalToolCall(unittest.IsolatedAsyncioTestCase):
 # Tests for run_test_external — response evaluation
 # ---------------------------------------------------------------------------
 
-class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
 
+class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
     @staticmethod
     def _default_evaluator(name: str = "default") -> dict:
         return {
@@ -313,8 +343,9 @@ class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
         mock_judge = AsyncMock(return_value=judge_result)
 
         ctx, _ = _patch_httpx(fake_body)
-        with ctx, patch(
-            "calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge
+        with (
+            ctx,
+            patch("calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge),
         ):
             return await run_test_external(
                 chat_history=[{"role": "user", "content": "Who are you?"}],
@@ -373,8 +404,8 @@ class TestRunTestExternalResponse(unittest.IsolatedAsyncioTestCase):
 # Tests for run_test_external — optional agent-reported metrics
 # ---------------------------------------------------------------------------
 
-class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
 
+class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
     async def _run(self, fake_body):
         from calibrate_agent.connections import TextAgentConnection
         from calibrate_agent.llm.run_tests import run_test_external
@@ -391,8 +422,11 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
 
     async def test_metrics_dict_passed_through_to_output(self):
         result = await self._run(
-            {"response": "hi", "tool_calls": [],
-             "metrics": {"cost": 0.0021, "prompt_tokens": 1200}}
+            {
+                "response": "hi",
+                "tool_calls": [],
+                "metrics": {"cost": 0.0021, "prompt_tokens": 1200},
+            }
         )
         self.assertEqual(result["output"]["metrics"]["cost"], 0.0021)
 
@@ -463,8 +497,11 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
 
     async def test_total_tokens_derived_from_prompt_and_completion(self):
         result = await self._run(
-            {"response": "hi", "tool_calls": [],
-             "metrics": {"prompt_tokens": 1200, "completion_tokens": 340}}
+            {
+                "response": "hi",
+                "tool_calls": [],
+                "metrics": {"prompt_tokens": 1200, "completion_tokens": 340},
+            }
         )
         self.assertEqual(result["output"]["total_tokens"], 1540)
 
@@ -492,8 +529,8 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
 # Tests for TextAgentConnection.verify()
 # ---------------------------------------------------------------------------
 
-class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
 
+class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
     async def test_verify_passes_valid_response(self):
         from calibrate_agent.connections import TextAgentConnection
 
@@ -516,7 +553,9 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(result["ok"])
         self.assertIsNone(result["sample_output"]["response"])
-        self.assertEqual(result["sample_output"]["tool_calls"], [{"tool": "fn", "arguments": {}}])
+        self.assertEqual(
+            result["sample_output"]["tool_calls"], [{"tool": "fn", "arguments": {}}]
+        )
 
     async def test_verify_preserves_tool_call_output(self):
         """``verify`` accepts and echoes an optional per-tool-call ``output``."""
@@ -555,10 +594,12 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(url="http://fake-agent/chat")
-        ctx, mock_client = _patch_httpx_sequence([
-            ({}, 503),
-            ({"response": "up now", "tool_calls": []}, 200),
-        ])
+        ctx, mock_client = _patch_httpx_sequence(
+            [
+                ({}, 503),
+                ({"response": "up now", "tool_calls": []}, 200),
+            ]
+        )
         with ctx, patch("asyncio.sleep", AsyncMock()):
             result = await agent.verify()
 

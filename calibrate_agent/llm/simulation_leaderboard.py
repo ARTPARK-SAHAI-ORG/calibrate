@@ -42,9 +42,7 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
         print("No results found to compile.")
         return
 
-    leaderboard_df = _build_leaderboard(
-        model_results, model_normalized, metric_names
-    )
+    leaderboard_df = _build_leaderboard(model_results, model_normalized, metric_names)
     csv_path = save_path / "simulation_leaderboard.csv"
     leaderboard_df.to_csv(csv_path, index=False)
     print(f"Saved leaderboard CSV to {csv_path}")
@@ -95,9 +93,7 @@ def _read_metrics(
                 scale_max = float(metric_data.get("scale_max", 1))
                 scale_range = scale_max - scale_min
                 if scale_range > 0:
-                    normalized[metric_name] = (
-                        (mean - scale_min) / scale_range * 100
-                    )
+                    normalized[metric_name] = (mean - scale_min) / scale_range * 100
                 else:
                     normalized[metric_name] = 0.0
                 info[metric_name] = {

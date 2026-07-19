@@ -74,6 +74,7 @@ def _short_circuit(
         "reasoning": reasoning,
     }
 
+
 # pipecat's Anthropic tool → OpenAI function-calling shape. The Anthropic
 # ``input_schema`` doubles as the OpenAI ``parameters`` object unchanged.
 _OPENAI_TOOL = {
@@ -167,11 +168,17 @@ async def semantic_wer_judge(
     )
     message = commit_resp.choices[0].message
     wer_call = next(
-        (tc for tc in (message.tool_calls or []) if tc.function.name == "calculate_wer"),
+        (
+            tc
+            for tc in (message.tool_calls or [])
+            if tc.function.name == "calculate_wer"
+        ),
         None,
     )
     if wer_call is None:
-        raise ValueError("semantic_wer_judge: forced calculate_wer call was not returned")
+        raise ValueError(
+            "semantic_wer_judge: forced calculate_wer call was not returned"
+        )
     tool_input = json.loads(wer_call.function.arguments)
 
     # The publicly-shown reasoning is the model's concise phase-2 ``summary``, not

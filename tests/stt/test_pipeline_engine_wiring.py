@@ -17,8 +17,19 @@ import pandas as pd
 
 
 STT_LANGUAGES = [
-    "english", "hindi", "kannada", "bengali", "malayalam", "marathi",
-    "odia", "punjabi", "tamil", "telugu", "gujarati", "sindhi", "maithili",
+    "english",
+    "hindi",
+    "kannada",
+    "bengali",
+    "malayalam",
+    "marathi",
+    "odia",
+    "punjabi",
+    "tamil",
+    "telugu",
+    "gujarati",
+    "sindhi",
+    "maithili",
 ]
 
 

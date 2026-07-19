@@ -15,8 +15,12 @@ def _bin_ev(name):
 
 def _rate_ev(name, lo=1, hi=5):
     return {
-        "name": name, "system_prompt": "x", "judge_model": "openai/gpt-4.1",
-        "type": "rating", "scale_min": lo, "scale_max": hi,
+        "name": name,
+        "system_prompt": "x",
+        "judge_model": "openai/gpt-4.1",
+        "type": "rating",
+        "scale_min": lo,
+        "scale_max": hi,
     }
 
 
@@ -68,12 +72,14 @@ class TestGetNameToEvaluatorDict(unittest.TestCase):
         from calibrate_agent.judges import DEFAULT_LLM_TEST_EVALUATOR
 
         with self.assertRaises(ValueError):
-            _get_name_to_evaluator_dict({
-                "evaluators": [
-                    _bin_ev("default"),
-                    _bin_ev(DEFAULT_LLM_TEST_EVALUATOR["name"]),
-                ]
-            })
+            _get_name_to_evaluator_dict(
+                {
+                    "evaluators": [
+                        _bin_ev("default"),
+                        _bin_ev(DEFAULT_LLM_TEST_EVALUATOR["name"]),
+                    ]
+                }
+            )
 
     def test_missing_required_field_raises(self):
         from calibrate_agent.llm.run_tests import _get_name_to_evaluator_dict
@@ -106,11 +112,17 @@ class TestResolveEvaluatorsForTestCase(unittest.TestCase):
                 "type": "response",
                 "criteria": [{"name": "x", "arguments": {"criteria": "be polite"}}],
             },
-            _get_name_to_evaluator_dict({
-                "evaluators": [
-                    {"name": "x", "system_prompt": "Check {{criteria}}", "judge_model": "m"}
-                ]
-            }),
+            _get_name_to_evaluator_dict(
+                {
+                    "evaluators": [
+                        {
+                            "name": "x",
+                            "system_prompt": "Check {{criteria}}",
+                            "judge_model": "m",
+                        }
+                    ]
+                }
+            ),
         )
         self.assertEqual(result[0]["system_prompt"], "Check be polite")
 
@@ -159,7 +171,9 @@ class TestDisplayLabel(unittest.TestCase):
     def test_openrouter_strips_provider(self):
         from calibrate_agent.llm.run_tests import display_label
 
-        self.assertEqual(display_label("openrouter", "openai/gpt-4.1"), "openai/gpt-4.1")
+        self.assertEqual(
+            display_label("openrouter", "openai/gpt-4.1"), "openai/gpt-4.1"
+        )
 
     def test_other_provider(self):
         from calibrate_agent.llm.run_tests import display_label
@@ -177,10 +191,12 @@ class TestSortAndWebhookTools(unittest.TestCase):
     def test_get_webhook_tool_names(self):
         from calibrate_agent.llm.run_tests import get_webhook_tool_names
 
-        names = get_webhook_tool_names([
-            {"name": "fn1", "type": "webhook"},
-            {"name": "fn2", "type": "structured"},
-        ])
+        names = get_webhook_tool_names(
+            [
+                {"name": "fn1", "type": "webhook"},
+                {"name": "fn2", "type": "structured"},
+            ]
+        )
         self.assertEqual(names, {"fn1"})
 
 
@@ -193,10 +209,12 @@ class TestPreprocessConversationHistory(unittest.TestCase):
             {"role": "user", "content": "do it"},
             {
                 "role": "assistant",
-                "tool_calls": [{
-                    "id": "call_1",
-                    "function": {"name": "fn1", "arguments": "{}"},
-                }],
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "function": {"name": "fn1", "arguments": "{}"},
+                    }
+                ],
             },
         ]
         result = preprocess_conversation_history(history, tools)
@@ -211,10 +229,12 @@ class TestPreprocessConversationHistory(unittest.TestCase):
         history = [
             {
                 "role": "assistant",
-                "tool_calls": [{
-                    "id": "call_1",
-                    "function": {"name": "fn1", "arguments": "{}"},
-                }],
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "function": {"name": "fn1", "arguments": "{}"},
+                    }
+                ],
             },
             {"role": "tool", "tool_call_id": "call_1", "content": "real"},
         ]
@@ -229,10 +249,12 @@ class TestPreprocessConversationHistory(unittest.TestCase):
         history = [
             {
                 "role": "assistant",
-                "tool_calls": [{
-                    "id": "call_1",
-                    "function": {"name": "fn1", "arguments": "{}"},
-                }],
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "function": {"name": "fn1", "arguments": "{}"},
+                    }
+                ],
             },
         ]
         result = preprocess_conversation_history(history, tools)
@@ -254,10 +276,12 @@ class TestToolCallPairs(unittest.TestCase):
         from calibrate_agent.llm.run_tests import _tool_call_pair_mismatch
 
         # Expected lacks 'arguments' → don't check args
-        self.assertIsNone(_tool_call_pair_mismatch(
-            {"tool": "a", "arguments": {"x": 1}},
-            {"tool": "a"},
-        ))
+        self.assertIsNone(
+            _tool_call_pair_mismatch(
+                {"tool": "a", "arguments": {"x": 1}},
+                {"tool": "a"},
+            )
+        )
 
     def test_pair_args_mismatch(self):
         from calibrate_agent.llm.run_tests import _tool_call_pair_mismatch
@@ -323,10 +347,12 @@ class TestToolCallPairs(unittest.TestCase):
     def test_pair_none_args_match(self):
         from calibrate_agent.llm.run_tests import _tool_call_pair_mismatch
 
-        self.assertIsNone(_tool_call_pair_mismatch(
-            {"tool": "a", "arguments": {"x": 1}},
-            {"tool": "a", "arguments": None},
-        ))
+        self.assertIsNone(
+            _tool_call_pair_mismatch(
+                {"tool": "a", "arguments": {"x": 1}},
+                {"tool": "a", "arguments": None},
+            )
+        )
 
     def test_evaluate_tool_calls_empty_output(self):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
@@ -338,10 +364,12 @@ class TestToolCallPairs(unittest.TestCase):
     def test_evaluate_tool_calls_pass(self):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
-        result = asyncio.run(evaluate_tool_calls(
-            [{"tool": "a", "arguments": {}}],
-            [{"tool": "a", "arguments": {}}],
-        ))
+        result = asyncio.run(
+            evaluate_tool_calls(
+                [{"tool": "a", "arguments": {}}],
+                [{"tool": "a", "arguments": {}}],
+            )
+        )
         self.assertTrue(result["passed"])
         self.assertEqual(result["tool_call_results"], [{"tool": "a", "passed": True}])
 
@@ -379,8 +407,11 @@ class TestParamCriteriaSpec(unittest.TestCase):
         from calibrate_agent.llm.run_tests import _param_criteria_spec
 
         spec = _param_criteria_spec(
-            {"match_type": "llm_judge", "criteria": "a polite greeting",
-             "judge_model": "openai/gpt-4.1"},
+            {
+                "match_type": "llm_judge",
+                "criteria": "a polite greeting",
+                "judge_model": "openai/gpt-4.1",
+            },
             "msg",
         )
         self.assertEqual(spec["match_type"], "llm_judge")
@@ -430,12 +461,27 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge_returning(True),
         ) as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "send_sms", "arguments": {"message": "Hi there, welcome!"}}],
-                [{"tool": "send_sms", "arguments": {
-                    "message": {"match_type": "llm_judge",
-                                "criteria": "a friendly greeting"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "send_sms",
+                            "arguments": {"message": "Hi there, welcome!"},
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "send_sms",
+                            "arguments": {
+                                "message": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "a friendly greeting",
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         # A passing llm_judge parameter now retains its verdict + reasoning.
         self.assertEqual(
@@ -462,7 +508,10 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
         self.assertIn("criteria met", result["reasoning"])
         self.assertIn("because", result["reasoning"])
         # The judge prompt should mention the argument name and actual value.
-        prompt = mock_judge.call_args.kwargs.get("user_prompt") or mock_judge.call_args.args[1]
+        prompt = (
+            mock_judge.call_args.kwargs.get("user_prompt")
+            or mock_judge.call_args.args[1]
+        )
         self.assertIn("send_sms", prompt)
         self.assertIn("message", prompt)
         self.assertIn("Hi there, welcome!", prompt)
@@ -474,12 +523,27 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge_returning(False, "not a greeting"),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "send_sms", "arguments": {"message": "Your code is 1234"}}],
-                [{"tool": "send_sms", "arguments": {
-                    "message": {"match_type": "llm_judge",
-                                "criteria": "a friendly greeting"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "send_sms",
+                            "arguments": {"message": "Your code is 1234"},
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "send_sms",
+                            "arguments": {
+                                "message": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "a friendly greeting",
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         self.assertIn("message", result["reasoning"])
         self.assertIn("not a greeting", result["reasoning"])
@@ -507,10 +571,12 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
-                [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
+                    [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
+                )
+            )
         self.assertTrue(result["passed"])
         mock_judge.assert_not_called()
 
@@ -518,12 +584,27 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"x": {"match_type": "exact", "value": 1}}}],
-                [{"tool": "a", "arguments": {
-                    "x": {"match_type": "exact",
-                          "value": {"match_type": "exact", "value": 1}}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {"x": {"match_type": "exact", "value": 1}},
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {
+                                "x": {
+                                    "match_type": "exact",
+                                    "value": {"match_type": "exact", "value": 1},
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         mock_judge.assert_not_called()
 
@@ -531,11 +612,22 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {}}],
-                [{"tool": "a", "arguments": {
-                    "msg": {"match_type": "llm_judge", "criteria": "a greeting"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {}}],
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {
+                                "msg": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "a greeting",
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         self.assertIn("missing in actual", result["reasoning"])
         mock_judge.assert_not_called()
@@ -547,12 +639,23 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge_returning(True),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"id": 7, "note": "looks good"}}],
-                [{"tool": "a", "arguments": {
-                    "id": 7,
-                    "note": {"match_type": "llm_judge", "criteria": "positive"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {"id": 7, "note": "looks good"}}],
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {
+                                "id": 7,
+                                "note": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "positive",
+                                },
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
 
     def test_literal_mismatch_alongside_passing_judge(self):
@@ -562,12 +665,23 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge_returning(True),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"id": 9, "note": "looks good"}}],
-                [{"tool": "a", "arguments": {
-                    "id": 7,
-                    "note": {"match_type": "llm_judge", "criteria": "positive"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {"id": 9, "note": "looks good"}}],
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {
+                                "id": 7,
+                                "note": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "positive",
+                                },
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         self.assertIn("id", result["reasoning"])
         # Both params are captured on the failing slot: the failing exact one
@@ -595,10 +709,12 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"x": 1}}],
-                [{"tool": "a", "arguments": {"x": 1}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {"x": 1}}],
+                    [{"tool": "a", "arguments": {"x": 1}}],
+                )
+            )
         self.assertTrue(result["passed"])
         self.assertEqual(
             result["reasoning"],
@@ -615,13 +731,23 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge_returning(True, "reads as friendly"),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "send_sms", "arguments": {"id": 7, "message": "Hi!"}}],
-                [{"tool": "send_sms", "arguments": {
-                    "id": 7,
-                    "message": {"match_type": "llm_judge",
-                                "criteria": "a friendly greeting"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "send_sms", "arguments": {"id": 7, "message": "Hi!"}}],
+                    [
+                        {
+                            "tool": "send_sms",
+                            "arguments": {
+                                "id": 7,
+                                "message": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "a friendly greeting",
+                                },
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         # Consolidated: base sentence, the exact-matched param line, and the
         # judged parameter's verdict/reasoning.
@@ -654,36 +780,69 @@ class TestAnyWildcardParam(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "lookup", "arguments": {"city": "London"}}],
-                [{"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "lookup", "arguments": {"city": "London"}}],
+                    [
+                        {
+                            "tool": "lookup",
+                            "arguments": {"city": "London", "token": self.ANY},
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
-        self.assertEqual(result["tool_call_results"], [{"tool": "lookup", "passed": True}])
+        self.assertEqual(
+            result["tool_call_results"], [{"tool": "lookup", "passed": True}]
+        )
         mock_judge.assert_not_called()
 
     def test_wildcard_present_with_arbitrary_value_passes(self):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "lookup",
-                  "arguments": {"city": "London", "token": "xyz-123"}}],
-                [{"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "lookup",
+                            "arguments": {"city": "London", "token": "xyz-123"},
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "lookup",
+                            "arguments": {"city": "London", "token": self.ANY},
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
-        self.assertEqual(result["tool_call_results"], [{"tool": "lookup", "passed": True}])
+        self.assertEqual(
+            result["tool_call_results"], [{"tool": "lookup", "passed": True}]
+        )
         mock_judge.assert_not_called()
 
     def test_wildcard_does_not_mask_sibling_failure(self):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "lookup",
-                  "arguments": {"city": "Paris", "token": "whatever"}}],
-                [{"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "lookup",
+                            "arguments": {"city": "Paris", "token": "whatever"},
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "lookup",
+                            "arguments": {"city": "London", "token": self.ANY},
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         self.assertIn("city", result["reasoning"])
         # The wildcard sibling must not appear in the failure reasoning.
@@ -694,20 +853,42 @@ class TestAnyWildcardParam(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "book",
-                  "arguments": {"patient": {"name": "John Doe", "session": "s-999"}}}],
-                [{"tool": "book",
-                  "arguments": {"patient": {"name": "John Doe", "session": self.ANY}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {"name": "John Doe", "session": "s-999"}
+                            },
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {"name": "John Doe", "session": self.ANY}
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         # Also passes when the wildcard sub-key is absent entirely.
         with patch("calibrate_agent.llm.run_tests.text_judge"):
-            result_absent = asyncio.run(evaluate_tool_calls(
-                [{"tool": "book", "arguments": {"patient": {"name": "John Doe"}}}],
-                [{"tool": "book",
-                  "arguments": {"patient": {"name": "John Doe", "session": self.ANY}}}],
-            ))
+            result_absent = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "book", "arguments": {"patient": {"name": "John Doe"}}}],
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {"name": "John Doe", "session": self.ANY}
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result_absent["passed"])
         mock_judge.assert_not_called()
 
@@ -716,14 +897,18 @@ class TestAnyWildcardParam(unittest.TestCase):
 
         # A bare "any" string is NOT the wildcard — it must match exactly.
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            passing = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"x": "any"}}],
-                [{"tool": "a", "arguments": {"x": "any"}}],
-            ))
-            failing = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"x": "other"}}],
-                [{"tool": "a", "arguments": {"x": "any"}}],
-            ))
+            passing = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {"x": "any"}}],
+                    [{"tool": "a", "arguments": {"x": "any"}}],
+                )
+            )
+            failing = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {"x": "other"}}],
+                    [{"tool": "a", "arguments": {"x": "any"}}],
+                )
+            )
         self.assertTrue(passing["passed"])
         self.assertFalse(failing["passed"])
         self.assertIn("x", failing["reasoning"])
@@ -737,14 +922,34 @@ class TestAnyWildcardParam(unittest.TestCase):
         async def fake_text_judge(evaluators, user_prompt, *a, **k):
             return {evaluators[0]["name"]: {"match": True, "reasoning": "ok"}}
 
-        with patch("calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a",
-                  "arguments": {"note": "looks good", "token": "anything-goes"}}],
-                [{"tool": "a", "arguments": {
-                    "note": {"match_type": "llm_judge", "criteria": "positive"},
-                    "token": self.ANY}}],
-            ))
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge
+        ):
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {
+                                "note": "looks good",
+                                "token": "anything-goes",
+                            },
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {
+                                "note": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "positive",
+                                },
+                                "token": self.ANY,
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         judgments = result["tool_call_results"][0]["param_judgments"]
         params = [r["param"] for r in judgments]
@@ -757,10 +962,12 @@ class TestAnyWildcardParam(unittest.TestCase):
         # Parity contract: when the only difference is an absent wildcard param,
         # the sync matcher (used by _per_slot_tool_passes / the leaderboard)
         # agrees with the async path and reports a match.
-        self.assertIsNone(_tool_call_pair_mismatch(
-            {"tool": "lookup", "arguments": {"city": "London"}},
-            {"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}},
-        ))
+        self.assertIsNone(
+            _tool_call_pair_mismatch(
+                {"tool": "lookup", "arguments": {"city": "London"}},
+                {"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}},
+            )
+        )
 
     def test_sync_pair_mismatch_wildcard_present_matches(self):
         from calibrate_agent.llm.run_tests import _tool_call_pair_mismatch
@@ -768,10 +975,12 @@ class TestAnyWildcardParam(unittest.TestCase):
         # Parity contract: when the ONLY difference is a wildcard param carrying
         # an arbitrary value, the sync matcher agrees with the async
         # evaluate_tool_calls and reports a match.
-        self.assertIsNone(_tool_call_pair_mismatch(
-            {"tool": "lookup", "arguments": {"city": "London", "token": "xyz-123"}},
-            {"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}},
-        ))
+        self.assertIsNone(
+            _tool_call_pair_mismatch(
+                {"tool": "lookup", "arguments": {"city": "London", "token": "xyz-123"}},
+                {"tool": "lookup", "arguments": {"city": "London", "token": self.ANY}},
+            )
+        )
 
 
 class TestArgumentLevelTicksAndCrosses(unittest.TestCase):
@@ -779,6 +988,7 @@ class TestArgumentLevelTicksAndCrosses(unittest.TestCase):
     def _judge_returning(match, reasoning="because"):
         async def fake_text_judge(evaluators, user_prompt, *a, **k):
             return {evaluators[0]["name"]: {"match": match, "reasoning": reasoning}}
+
         return fake_text_judge
 
     def test_failures_listed_before_passes_with_emoji_prefixes(self):
@@ -788,13 +998,24 @@ class TestArgumentLevelTicksAndCrosses(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge_returning(True, "ok"),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "a", "arguments": {"id": 9, "ok": 1, "note": "g"}}],
-                [{"tool": "a", "arguments": {
-                    "id": 7,
-                    "ok": 1,
-                    "note": {"match_type": "llm_judge", "criteria": "positive"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "a", "arguments": {"id": 9, "ok": 1, "note": "g"}}],
+                    [
+                        {
+                            "tool": "a",
+                            "arguments": {
+                                "id": 7,
+                                "ok": 1,
+                                "note": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "positive",
+                                },
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         reasoning = result["reasoning"]
         self.assertIn("❌ id:", reasoning)
@@ -808,10 +1029,12 @@ class TestArgumentLevelTicksAndCrosses(unittest.TestCase):
     def test_exact_only_failure_includes_passing_args_with_tick(self):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
-        result = asyncio.run(evaluate_tool_calls(
-            [{"tool": "a", "arguments": {"x": 1, "y": 9}}],
-            [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
-        ))
+        result = asyncio.run(
+            evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"x": 1, "y": 9}}],
+                [{"tool": "a", "arguments": {"x": 1, "y": 2}}],
+            )
+        )
         self.assertFalse(result["passed"])
         reasoning = result["reasoning"]
         self.assertIn("❌ y:", reasoning)
@@ -825,13 +1048,23 @@ class TestArgumentLevelTicksAndCrosses(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge_returning(True, "reads as friendly"),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "send_sms", "arguments": {"id": 7, "message": "Hi!"}}],
-                [{"tool": "send_sms", "arguments": {
-                    "id": 7,
-                    "message": {"match_type": "llm_judge",
-                                "criteria": "a friendly greeting"}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "send_sms", "arguments": {"id": 7, "message": "Hi!"}}],
+                    [
+                        {
+                            "tool": "send_sms",
+                            "arguments": {
+                                "id": 7,
+                                "message": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "a friendly greeting",
+                                },
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         self.assertIn("✅ id:", result["reasoning"])
         self.assertIn("✅ message:", result["reasoning"])
@@ -843,10 +1076,12 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
     def test_pair_async_wrong_tool(self):
         from calibrate_agent.llm.run_tests import _tool_call_pair_mismatch_async
 
-        res = asyncio.run(_tool_call_pair_mismatch_async(
-            {"tool": "a", "arguments": {}},
-            {"tool": "b", "arguments": {}},
-        ))
+        res = asyncio.run(
+            _tool_call_pair_mismatch_async(
+                {"tool": "a", "arguments": {}},
+                {"tool": "b", "arguments": {}},
+            )
+        )
         self.assertIn("Tool call mismatch", res["mismatch"])
         self.assertEqual(res["records"], [])
         self.assertFalse(res["had_llm"])
@@ -854,25 +1089,39 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
     def test_pair_async_no_arguments_key(self):
         from calibrate_agent.llm.run_tests import _tool_call_pair_mismatch_async
 
-        self.assertEqual(asyncio.run(_tool_call_pair_mismatch_async(
-            {"tool": "a", "arguments": {"x": 1}},
-            {"tool": "a"},
-        )), {"mismatch": None, "records": [], "had_llm": False})
+        self.assertEqual(
+            asyncio.run(
+                _tool_call_pair_mismatch_async(
+                    {"tool": "a", "arguments": {"x": 1}},
+                    {"tool": "a"},
+                )
+            ),
+            {"mismatch": None, "records": [], "had_llm": False},
+        )
 
     def test_pair_async_none_arguments(self):
         from calibrate_agent.llm.run_tests import _tool_call_pair_mismatch_async
 
-        self.assertEqual(asyncio.run(_tool_call_pair_mismatch_async(
-            {"tool": "a", "arguments": {"x": 1}},
-            {"tool": "a", "arguments": None},
-        )), {"mismatch": None, "records": [], "had_llm": False})
+        self.assertEqual(
+            asyncio.run(
+                _tool_call_pair_mismatch_async(
+                    {"tool": "a", "arguments": {"x": 1}},
+                    {"tool": "a", "arguments": None},
+                )
+            ),
+            {"mismatch": None, "records": [], "had_llm": False},
+        )
 
     def test_message_async_expected_non_dict(self):
         from calibrate_agent.llm.run_tests import _tool_call_arguments_eval_async
 
-        res = asyncio.run(_tool_call_arguments_eval_async(
-            "a", "not-a-dict", {"x": 1},
-        ))
+        res = asyncio.run(
+            _tool_call_arguments_eval_async(
+                "a",
+                "not-a-dict",
+                {"x": 1},
+            )
+        )
         self.assertIn("cannot diff", res["message"])
         self.assertEqual(res["records"], [])
         self.assertFalse(res["had_llm"])
@@ -880,9 +1129,13 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
     def test_message_async_actual_non_dict(self):
         from calibrate_agent.llm.run_tests import _tool_call_arguments_eval_async
 
-        res = asyncio.run(_tool_call_arguments_eval_async(
-            "a", {"x": 1}, "not-a-dict",
-        ))
+        res = asyncio.run(
+            _tool_call_arguments_eval_async(
+                "a",
+                {"x": 1},
+                "not-a-dict",
+            )
+        )
         self.assertIn("expected dict", res["message"])
         self.assertEqual(res["records"], [])
 
@@ -891,10 +1144,12 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
 
         # Output has only "a"; expected wants "a" and "b". Per zip-min the case
         # still passes, but the unmatched "b" slot is recorded as failed.
-        result = asyncio.run(evaluate_tool_calls(
-            [{"tool": "a", "arguments": {}}],
-            [{"tool": "a", "arguments": {}}, {"tool": "b", "arguments": {}}],
-        ))
+        result = asyncio.run(
+            evaluate_tool_calls(
+                [{"tool": "a", "arguments": {}}],
+                [{"tool": "a", "arguments": {}}, {"tool": "b", "arguments": {}}],
+            )
+        )
         self.assertTrue(result["passed"])
         self.assertEqual(
             result["tool_call_results"],
@@ -911,14 +1166,21 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
             captured["prompt"] = user_prompt
             return {evaluators[0]["name"]: {"match": True, "reasoning": "ok"}}
 
-        with patch("calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge):
-            res = asyncio.run(_judge_tool_call_parameter(
-                "send_sms",
-                "message",
-                {"match_type": "llm_judge", "criteria": "polite",
-                 "judge_model": "openai/gpt-4.1"},
-                "Hello!",
-            ))
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge
+        ):
+            res = asyncio.run(
+                _judge_tool_call_parameter(
+                    "send_sms",
+                    "message",
+                    {
+                        "match_type": "llm_judge",
+                        "criteria": "polite",
+                        "judge_model": "openai/gpt-4.1",
+                    },
+                    "Hello!",
+                )
+            )
         self.assertTrue(res["match"])
         self.assertEqual(captured["judge_model"], "openai/gpt-4.1")
         self.assertIn("Hello!", captured["prompt"])
@@ -932,12 +1194,17 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
         circular = []
         circular.append(circular)  # json.dumps raises -> repr() fallback
 
-        with patch("calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge):
-            res = asyncio.run(_judge_tool_call_parameter(
-                "tool", "param",
-                {"match_type": "llm_judge", "criteria": "x"},
-                circular,
-            ))
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge
+        ):
+            res = asyncio.run(
+                _judge_tool_call_parameter(
+                    "tool",
+                    "param",
+                    {"match_type": "llm_judge", "criteria": "x"},
+                    circular,
+                )
+            )
         self.assertTrue(res["match"])
 
     def test_judge_parameter_missing_result_defaults_to_fail(self):
@@ -946,12 +1213,17 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
         async def fake_text_judge(evaluators, user_prompt, *a, **k):
             return {}  # judge returned nothing for this evaluator
 
-        with patch("calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge):
-            res = asyncio.run(_judge_tool_call_parameter(
-                "tool", "param",
-                {"match_type": "llm_judge", "criteria": "x"},
-                "value",
-            ))
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge
+        ):
+            res = asyncio.run(
+                _judge_tool_call_parameter(
+                    "tool",
+                    "param",
+                    {"match_type": "llm_judge", "criteria": "x"},
+                    "value",
+                )
+            )
         self.assertFalse(res["match"])
 
 
@@ -960,6 +1232,7 @@ class TestNestedToolCallCriteria(unittest.TestCase):
     def _judge(match, reasoning="r"):
         async def fake_text_judge(evaluators, user_prompt, *a, **k):
             return {evaluators[0]["name"]: {"match": match, "reasoning": reasoning}}
+
         return fake_text_judge
 
     def test_nested_subparam_judged_pass(self):
@@ -968,15 +1241,35 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         with patch(
             "calibrate_agent.llm.run_tests.text_judge", side_effect=self._judge(True)
         ) as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "book", "arguments": {
-                    "patient": {"name": "John Doe", "note": "severe headache since morning"}}}],
-                [{"tool": "book", "arguments": {
-                    "patient": {
-                        "name": "John Doe",                       # nested exact
-                        "note": {"match_type": "llm_judge",       # nested judged
-                                 "criteria": "describes a symptom"}}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {
+                                    "name": "John Doe",
+                                    "note": "severe headache since morning",
+                                }
+                            },
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {
+                                    "name": "John Doe",  # nested exact
+                                    "note": {
+                                        "match_type": "llm_judge",  # nested judged
+                                        "criteria": "describes a symptom",
+                                    },
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         # Both nested leaves are captured with their dotted paths: the exact
         # name match and the judged note.
@@ -997,10 +1290,15 @@ class TestNestedToolCallCriteria(unittest.TestCase):
                 },
             ],
         )
-        self.assertIn("patient.name: value matches the expected value", result["reasoning"])
+        self.assertIn(
+            "patient.name: value matches the expected value", result["reasoning"]
+        )
         self.assertIn("patient.note", result["reasoning"])
         # The judge prompt should carry the dotted path as the argument name.
-        prompt = mock_judge.call_args.kwargs.get("user_prompt") or mock_judge.call_args.args[1]
+        prompt = (
+            mock_judge.call_args.kwargs.get("user_prompt")
+            or mock_judge.call_args.args[1]
+        )
         self.assertIn("patient.note", prompt)
         self.assertIn("severe headache", prompt)
 
@@ -1011,14 +1309,35 @@ class TestNestedToolCallCriteria(unittest.TestCase):
             "calibrate_agent.llm.run_tests.text_judge",
             side_effect=self._judge(False, "not a symptom"),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "book", "arguments": {
-                    "patient": {"name": "John Doe", "note": "wants a discount"}}}],
-                [{"tool": "book", "arguments": {
-                    "patient": {
-                        "name": "John Doe",
-                        "note": {"match_type": "llm_judge", "criteria": "describes a symptom"}}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {
+                                    "name": "John Doe",
+                                    "note": "wants a discount",
+                                }
+                            },
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {
+                                    "name": "John Doe",
+                                    "note": {
+                                        "match_type": "llm_judge",
+                                        "criteria": "describes a symptom",
+                                    },
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         self.assertIn("patient.note", result["reasoning"])
         self.assertIn("not a symptom", result["reasoning"])
@@ -1031,14 +1350,30 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         with patch(
             "calibrate_agent.llm.run_tests.text_judge", side_effect=self._judge(True)
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "book", "arguments": {
-                    "patient": {"name": "Jane", "note": "fever"}}}],
-                [{"tool": "book", "arguments": {
-                    "patient": {
-                        "name": "John Doe",
-                        "note": {"match_type": "llm_judge", "criteria": "a symptom"}}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {"patient": {"name": "Jane", "note": "fever"}},
+                        }
+                    ],
+                    [
+                        {
+                            "tool": "book",
+                            "arguments": {
+                                "patient": {
+                                    "name": "John Doe",
+                                    "note": {
+                                        "match_type": "llm_judge",
+                                        "criteria": "a symptom",
+                                    },
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         self.assertIn("patient.name", result["reasoning"])
 
@@ -1051,16 +1386,26 @@ class TestNestedToolCallCriteria(unittest.TestCase):
             calls["n"] += 1
             return {evaluators[0]["name"]: {"match": True, "reasoning": "ok"}}
 
-        with patch("calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge):
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "t", "arguments": {
-                    "a": {"b": "x", "c": "y"}, "d": "z"}}],
-                [{"tool": "t", "arguments": {
-                    "a": {
-                        "b": {"match_type": "llm_judge", "criteria": "c1"},
-                        "c": {"match_type": "llm_judge", "criteria": "c2"}},
-                    "d": {"match_type": "llm_judge", "criteria": "c3"}}}],
-            ))
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge", side_effect=fake_text_judge
+        ):
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "t", "arguments": {"a": {"b": "x", "c": "y"}, "d": "z"}}],
+                    [
+                        {
+                            "tool": "t",
+                            "arguments": {
+                                "a": {
+                                    "b": {"match_type": "llm_judge", "criteria": "c1"},
+                                    "c": {"match_type": "llm_judge", "criteria": "c2"},
+                                },
+                                "d": {"match_type": "llm_judge", "criteria": "c3"},
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         self.assertEqual(calls["n"], 3)  # all three judged
 
@@ -1068,11 +1413,21 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch("calibrate_agent.llm.run_tests.text_judge") as mock_judge:
-            result = asyncio.run(evaluate_tool_calls(
-                [{"tool": "t", "arguments": {"a": {"b": "x"}}}],
-                [{"tool": "t", "arguments": {
-                    "a": {"note": {"match_type": "llm_judge", "criteria": "c"}}}}],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [{"tool": "t", "arguments": {"a": {"b": "x"}}}],
+                    [
+                        {
+                            "tool": "t",
+                            "arguments": {
+                                "a": {
+                                    "note": {"match_type": "llm_judge", "criteria": "c"}
+                                }
+                            },
+                        }
+                    ],
+                )
+            )
         self.assertFalse(result["passed"])
         self.assertIn("a.note", result["reasoning"])
         self.assertIn("missing in actual", result["reasoning"])
@@ -1085,21 +1440,38 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
         with patch(
-            "calibrate_agent.llm.run_tests.text_judge", side_effect=self._judge(True, "ok")
+            "calibrate_agent.llm.run_tests.text_judge",
+            side_effect=self._judge(True, "ok"),
         ):
-            result = asyncio.run(evaluate_tool_calls(
-                [
-                    {"tool": "log", "arguments": {"id": 1, "note": "fever"}},
-                    {"tool": "sms", "arguments": {"msg": "hello there"}},
-                ],
-                [
-                    {"tool": "log", "arguments": {
-                        "id": 1,
-                        "note": {"match_type": "llm_judge", "criteria": "a symptom"}}},
-                    {"tool": "sms", "arguments": {
-                        "msg": {"match_type": "llm_judge", "criteria": "a greeting"}}},
-                ],
-            ))
+            result = asyncio.run(
+                evaluate_tool_calls(
+                    [
+                        {"tool": "log", "arguments": {"id": 1, "note": "fever"}},
+                        {"tool": "sms", "arguments": {"msg": "hello there"}},
+                    ],
+                    [
+                        {
+                            "tool": "log",
+                            "arguments": {
+                                "id": 1,
+                                "note": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "a symptom",
+                                },
+                            },
+                        },
+                        {
+                            "tool": "sms",
+                            "arguments": {
+                                "msg": {
+                                    "match_type": "llm_judge",
+                                    "criteria": "a greeting",
+                                }
+                            },
+                        },
+                    ],
+                )
+            )
         self.assertTrue(result["passed"])
         self.assertIn("log.id: value matches the expected value", result["reasoning"])
         self.assertIn("log.note: criteria met", result["reasoning"])
@@ -1110,11 +1482,19 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         # mismatch the per-parameter record captures the nested diff.
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
-        result = asyncio.run(evaluate_tool_calls(
-            [{"tool": "a", "arguments": {"loc": {"city": "Lyon"}}}],
-            [{"tool": "a", "arguments": {
-                "loc": {"match_type": "exact", "value": {"city": "Paris"}}}}],
-        ))
+        result = asyncio.run(
+            evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"loc": {"city": "Lyon"}}}],
+                [
+                    {
+                        "tool": "a",
+                        "arguments": {
+                            "loc": {"match_type": "exact", "value": {"city": "Paris"}}
+                        },
+                    }
+                ],
+            )
+        )
         self.assertFalse(result["passed"])
         self.assertIn("loc", result["reasoning"])
         self.assertIn("Paris", result["reasoning"])
@@ -1124,10 +1504,12 @@ class TestNestedToolCallCriteria(unittest.TestCase):
         # missing (no judge involved, plain exact-only mismatch message).
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
-        result = asyncio.run(evaluate_tool_calls(
-            [{"tool": "a", "arguments": {}}],
-            [{"tool": "a", "arguments": {"x": 1}}],
-        ))
+        result = asyncio.run(
+            evaluate_tool_calls(
+                [{"tool": "a", "arguments": {}}],
+                [{"tool": "a", "arguments": {"x": 1}}],
+            )
+        )
         self.assertFalse(result["passed"])
         self.assertIn("x: missing in actual output", result["reasoning"])
         self.assertEqual(result["tool_call_results"], [{"tool": "a", "passed": False}])
@@ -1196,14 +1578,16 @@ class TestAggregateToolCallsStored(unittest.TestCase):
 
         results = [
             {
-                "test_case": {"evaluation": {"type": "tool_call",
-                                             "tool_calls": [{"tool": "a"}]}},
+                "test_case": {
+                    "evaluation": {"type": "tool_call", "tool_calls": [{"tool": "a"}]}
+                },
                 "metrics": {"tool_call_results": [{"tool": "a", "passed": True}]},
                 "output": {"tool_calls": []},
             },
             {
-                "test_case": {"evaluation": {"type": "tool_call",
-                                             "tool_calls": [{"tool": "a"}]}},
+                "test_case": {
+                    "evaluation": {"type": "tool_call", "tool_calls": [{"tool": "a"}]}
+                },
                 "metrics": {"tool_call_results": [{"tool": "a", "passed": False}]},
                 "output": {"tool_calls": []},
             },
@@ -1217,8 +1601,12 @@ class TestAggregateToolCallsStored(unittest.TestCase):
 
         results = [
             {
-                "test_case": {"evaluation": {"type": "tool_call",
-                                             "tool_calls": [{"tool": "a", "arguments": {}}]}},
+                "test_case": {
+                    "evaluation": {
+                        "type": "tool_call",
+                        "tool_calls": [{"tool": "a", "arguments": {}}],
+                    }
+                },
                 "metrics": {},
                 "output": {"tool_calls": [{"tool": "a", "arguments": {}}]},
             },
@@ -1244,8 +1632,14 @@ class TestNoResponseJudgeResults(unittest.TestCase):
     def test_rating_with_bad_scale(self):
         from calibrate_agent.llm.run_tests import _no_response_judge_results
 
-        ev = {"name": "x", "system_prompt": "x", "judge_model": "m",
-              "type": "rating", "scale_min": "not_int", "scale_max": 5}
+        ev = {
+            "name": "x",
+            "system_prompt": "x",
+            "judge_model": "m",
+            "type": "rating",
+            "scale_min": "not_int",
+            "scale_max": 5,
+        }
         result = _no_response_judge_results([ev], "no reply")
         self.assertEqual(result["x"]["score"], 0)
 
@@ -1282,8 +1676,10 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
     async def test_evaluate_response_passing(self):
         from calibrate_agent.llm.run_tests import _evaluate_response
 
-        with patch("calibrate_agent.llm.run_tests.test_response_llm_judge",
-                   AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}})):
+        with patch(
+            "calibrate_agent.llm.run_tests.test_response_llm_judge",
+            AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}}),
+        ):
             result = await _evaluate_response(
                 chat_history=[],
                 response="Hi",
@@ -1297,11 +1693,15 @@ class TestEvaluateResponse(unittest.IsolatedAsyncioTestCase):
     async def test_evaluate_response_failing_uses_first_reasoning(self):
         from calibrate_agent.llm.run_tests import _evaluate_response
 
-        with patch("calibrate_agent.llm.run_tests.test_response_llm_judge",
-                   AsyncMock(return_value={
-                       "x": {"reasoning": "no good", "match": False},
-                       "y": {"reasoning": "ok", "match": True},
-                   })):
+        with patch(
+            "calibrate_agent.llm.run_tests.test_response_llm_judge",
+            AsyncMock(
+                return_value={
+                    "x": {"reasoning": "no good", "match": False},
+                    "y": {"reasoning": "ok", "match": True},
+                }
+            ),
+        ):
             result = await _evaluate_response(
                 chat_history=[],
                 response="Hi",
@@ -1381,11 +1781,15 @@ class TestAggregateCriteria(unittest.TestCase):
         registry = {"x": dict(_bin_ev("x"), id="ev1")}
         results = [
             {
-                "test_case": {"evaluation": {"type": "response", "criteria": [{"name": "x"}]}},
+                "test_case": {
+                    "evaluation": {"type": "response", "criteria": [{"name": "x"}]}
+                },
                 "metrics": {"judge_results": {"x": {"match": True}}},
             },
             {
-                "test_case": {"evaluation": {"type": "response", "criteria": [{"name": "x"}]}},
+                "test_case": {
+                    "evaluation": {"type": "response", "criteria": [{"name": "x"}]}
+                },
                 "metrics": {"judge_results": {"x": {"match": False}}},
             },
             # Skip — wrong type
@@ -1395,7 +1799,9 @@ class TestAggregateCriteria(unittest.TestCase):
             },
             # Skip — no judge_results
             {
-                "test_case": {"evaluation": {"type": "response", "criteria": [{"name": "x"}]}},
+                "test_case": {
+                    "evaluation": {"type": "response", "criteria": [{"name": "x"}]}
+                },
                 "metrics": {},
             },
         ]
@@ -1410,11 +1816,15 @@ class TestAggregateCriteria(unittest.TestCase):
         registry = {"r": _rate_ev("r", 1, 5)}
         results = [
             {
-                "test_case": {"evaluation": {"type": "response", "criteria": [{"name": "r"}]}},
+                "test_case": {
+                    "evaluation": {"type": "response", "criteria": [{"name": "r"}]}
+                },
                 "metrics": {"judge_results": {"r": {"score": 5}}},
             },
             {
-                "test_case": {"evaluation": {"type": "response", "criteria": [{"name": "r"}]}},
+                "test_case": {
+                    "evaluation": {"type": "response", "criteria": [{"name": "r"}]}
+                },
                 "metrics": {"judge_results": {"r": {"score": 3}}},
             },
         ]
@@ -1428,7 +1838,12 @@ class TestAggregateCriteria(unittest.TestCase):
         registry = {}
         results = [
             {
-                "test_case": {"evaluation": {"type": "response", "criteria": [{"name": "unknown"}]}},
+                "test_case": {
+                    "evaluation": {
+                        "type": "response",
+                        "criteria": [{"name": "unknown"}],
+                    }
+                },
                 "metrics": {"judge_results": {"unknown": {"match": True}}},
             },
         ]
@@ -1442,11 +1857,21 @@ class TestAggregateToolCalls(unittest.TestCase):
 
         results = [
             {
-                "test_case": {"evaluation": {"type": "tool_call", "tool_calls": [{"tool": "a", "arguments": {}}]}},
+                "test_case": {
+                    "evaluation": {
+                        "type": "tool_call",
+                        "tool_calls": [{"tool": "a", "arguments": {}}],
+                    }
+                },
                 "output": {"tool_calls": [{"tool": "a", "arguments": {}}]},
             },
             {
-                "test_case": {"evaluation": {"type": "tool_call", "tool_calls": [{"tool": "a", "arguments": {}}]}},
+                "test_case": {
+                    "evaluation": {
+                        "type": "tool_call",
+                        "tool_calls": [{"tool": "a", "arguments": {}}],
+                    }
+                },
                 "output": {"tool_calls": []},
             },
             # Skip non-tool_call
@@ -1461,41 +1886,48 @@ class TestValidateLLMEvalOnlyDataset(unittest.TestCase):
     def test_valid(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _err = validate_llm_eval_only_dataset([
-            {
-                "test_case": {
-                    "history": [{"role": "user", "content": "hi"}],
-                    "evaluation": {"type": "response", "criteria": "x"},
-                },
-                "output": {"response": "ok", "tool_calls": []},
-            }
-        ])
+        is_valid, _err = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {
+                        "history": [{"role": "user", "content": "hi"}],
+                        "evaluation": {"type": "response", "criteria": "x"},
+                    },
+                    "output": {"response": "ok", "tool_calls": []},
+                }
+            ]
+        )
         self.assertTrue(is_valid)
 
     def test_valid_with_tool_call_output(self):
         """Optional per-tool-call ``output`` is accepted by the validator."""
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, err = validate_llm_eval_only_dataset([
-            {
-                "test_case": {
-                    "history": [{"role": "user", "content": "weather?"}],
-                    "evaluation": {"type": "tool_call", "tool_calls": [
-                        {"tool": "get_weather", "arguments": {"city": "NYC"}}
-                    ]},
-                },
-                "output": {
-                    "response": None,
-                    "tool_calls": [
-                        {
-                            "tool": "get_weather",
-                            "arguments": {"city": "NYC"},
-                            "output": {"temp": 72},
-                        }
-                    ],
-                },
-            }
-        ])
+        is_valid, err = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {
+                        "history": [{"role": "user", "content": "weather?"}],
+                        "evaluation": {
+                            "type": "tool_call",
+                            "tool_calls": [
+                                {"tool": "get_weather", "arguments": {"city": "NYC"}}
+                            ],
+                        },
+                    },
+                    "output": {
+                        "response": None,
+                        "tool_calls": [
+                            {
+                                "tool": "get_weather",
+                                "arguments": {"city": "NYC"},
+                                "output": {"temp": 72},
+                            }
+                        ],
+                    },
+                }
+            ]
+        )
         self.assertTrue(is_valid, err)
 
     def test_not_a_list(self):
@@ -1531,54 +1963,77 @@ class TestValidateLLMEvalOnlyDataset(unittest.TestCase):
     def test_tc_missing_history(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([{
-            "test_case": {"evaluation": {"type": "response"}}, "output": {}
-        }])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [{"test_case": {"evaluation": {"type": "response"}}, "output": {}}]
+        )
         self.assertFalse(is_valid)
 
     def test_history_not_list(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([{
-            "test_case": {"history": "not list", "evaluation": {"type": "response"}},
-            "output": {"response": "", "tool_calls": []},
-        }])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {
+                        "history": "not list",
+                        "evaluation": {"type": "response"},
+                    },
+                    "output": {"response": "", "tool_calls": []},
+                }
+            ]
+        )
         self.assertFalse(is_valid)
 
     def test_evaluation_not_dict(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([{
-            "test_case": {"history": [], "evaluation": "x"},
-            "output": {"response": "", "tool_calls": []},
-        }])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {"history": [], "evaluation": "x"},
+                    "output": {"response": "", "tool_calls": []},
+                }
+            ]
+        )
         self.assertFalse(is_valid)
 
     def test_invalid_eval_type(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([{
-            "test_case": {"history": [], "evaluation": {"type": "bogus"}},
-            "output": {"response": "", "tool_calls": []},
-        }])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {"history": [], "evaluation": {"type": "bogus"}},
+                    "output": {"response": "", "tool_calls": []},
+                }
+            ]
+        )
         self.assertFalse(is_valid)
 
     def test_missing_output_keys(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([{
-            "test_case": {"history": [], "evaluation": {"type": "response"}},
-            "output": {"response": ""},
-        }])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {"history": [], "evaluation": {"type": "response"}},
+                    "output": {"response": ""},
+                }
+            ]
+        )
         self.assertFalse(is_valid)
 
     def test_tool_calls_not_list(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([{
-            "test_case": {"history": [], "evaluation": {"type": "response"}},
-            "output": {"response": "", "tool_calls": "nope"},
-        }])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {"history": [], "evaluation": {"type": "response"}},
+                    "output": {"response": "", "tool_calls": "nope"},
+                }
+            ]
+        )
         self.assertFalse(is_valid)
 
 
@@ -1586,9 +2041,15 @@ class TestRunEvalOnlyTests(unittest.IsolatedAsyncioTestCase):
     async def test_eval_only_basic(self):
         from calibrate_agent.llm.run_tests import run_eval_only_tests
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate_agent.llm.run_tests.test_response_llm_judge",
-                   AsyncMock(return_value={"correctness": {"reasoning": "ok", "match": True}})):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "calibrate_agent.llm.run_tests.test_response_llm_judge",
+                AsyncMock(
+                    return_value={"correctness": {"reasoning": "ok", "match": True}}
+                ),
+            ),
+        ):
             result = await run_eval_only_tests(
                 config={"evaluators": []},
                 dataset=[
@@ -1604,7 +2065,10 @@ class TestRunEvalOnlyTests(unittest.IsolatedAsyncioTestCase):
                     {
                         "test_case": {
                             "history": [],
-                            "evaluation": {"type": "tool_call", "tool_calls": [{"tool": "x"}]},
+                            "evaluation": {
+                                "type": "tool_call",
+                                "tool_calls": [{"tool": "x"}],
+                            },
                         },
                         "output": {"response": "", "tool_calls": []},
                     },
@@ -1623,7 +2087,9 @@ class TestWriteTestResults(unittest.TestCase):
             results = [
                 {
                     "metrics": {"passed": True, "judge_results": {}},
-                    "test_case": {"evaluation": {"type": "tool_call", "tool_calls": []}},
+                    "test_case": {
+                        "evaluation": {"type": "tool_call", "tool_calls": []}
+                    },
                     "output": {"response": "", "tool_calls": []},
                 },
             ]
@@ -1639,12 +2105,16 @@ class TestWriteTestResults(unittest.TestCase):
             results = [
                 {
                     "metrics": {"passed": True, "judge_results": {}},
-                    "test_case": {"evaluation": {"type": "tool_call", "tool_calls": []}},
+                    "test_case": {
+                        "evaluation": {"type": "tool_call", "tool_calls": []}
+                    },
                     "output": {"response": "", "tool_calls": [], "cost": 0.02},
                 },
                 {
                     "metrics": {"passed": True, "judge_results": {}},
-                    "test_case": {"evaluation": {"type": "tool_call", "tool_calls": []}},
+                    "test_case": {
+                        "evaluation": {"type": "tool_call", "tool_calls": []}
+                    },
                     "output": {"response": "", "tool_calls": [], "cost": 0.04},
                 },
             ]
@@ -1662,7 +2132,9 @@ class TestWriteTestResults(unittest.TestCase):
             results = [
                 {
                     "metrics": {"passed": True, "judge_results": {}},
-                    "test_case": {"evaluation": {"type": "tool_call", "tool_calls": []}},
+                    "test_case": {
+                        "evaluation": {"type": "tool_call", "tool_calls": []}
+                    },
                     "output": {"response": "", "tool_calls": []},
                 },
             ]
@@ -1710,15 +2182,14 @@ class TestAggregateCost(unittest.TestCase):
         self.assertAlmostEqual(agg["mean"], 0.01)
         self.assertEqual(agg["count"], 2)
 
-
     def test_cost_read_only_from_output_cost(self):
         """Cost lives at ``output.cost`` for both paths; a nested-only metrics
         cost is not dug out here (run_test_external lifts it first)."""
         from calibrate_agent.llm.run_tests import _aggregate_cost
 
         results = [
-            {"output": {"cost": 0.02}},                       # counted
-            {"output": {"metrics": {"cost": 0.04}}},          # not lifted → ignored
+            {"output": {"cost": 0.02}},  # counted
+            {"output": {"metrics": {"cost": 0.04}}},  # not lifted → ignored
             {"output": {"response": "x", "tool_calls": []}},  # no cost
         ]
         agg = _aggregate_cost(results)
@@ -1764,9 +2235,9 @@ class TestAggregateTotalTokens(unittest.TestCase):
         from calibrate_agent.llm.run_tests import _aggregate_total_tokens
 
         results = [
-            {"output": {"total_tokens": 50}},                    # counted
-            {"output": {"metrics": {"total_tokens": 999}}},      # not lifted → ignored
-            {"output": {"response": "x", "tool_calls": []}},     # no tokens
+            {"output": {"total_tokens": 50}},  # counted
+            {"output": {"metrics": {"total_tokens": 999}}},  # not lifted → ignored
+            {"output": {"response": "x", "tool_calls": []}},  # no tokens
         ]
         agg = _aggregate_total_tokens(results)
         self.assertEqual(agg["mean"], 50)
@@ -1842,8 +2313,10 @@ class TestProcessorTokenCapture(unittest.IsolatedAsyncioTestCase):
 
         proc._ready = True  # skip the initial queue_frames branch
         proc._task = None
-        with patch.object(RT.FrameProcessor, "process_frame", AsyncMock()), \
-             patch.object(proc, "push_frame", AsyncMock()):
+        with (
+            patch.object(RT.FrameProcessor, "process_frame", AsyncMock()),
+            patch.object(proc, "push_frame", AsyncMock()),
+        ):
             from pipecat.processors.frame_processor import FrameDirection
 
             await proc.process_frame(frame, FrameDirection.DOWNSTREAM)
@@ -1861,8 +2334,11 @@ class TestRunInferenceWrapping(unittest.IsolatedAsyncioTestCase):
     async def test_run_inference_wraps(self):
         from calibrate_agent.llm import run_tests as RT
 
-        with patch.object(RT, "_run_inference_inner",
-                          AsyncMock(return_value={"response": "ok", "tool_calls": []})):
+        with patch.object(
+            RT,
+            "_run_inference_inner",
+            AsyncMock(return_value={"response": "ok", "tool_calls": []}),
+        ):
             result = await RT.run_inference([], "sp", "m", "openrouter", [])
         self.assertEqual(result["response"], "ok")
         self.assertIn("captured_errors", result)
@@ -1872,32 +2348,57 @@ class TestRunTestErrorPath(unittest.IsolatedAsyncioTestCase):
     async def test_no_response_no_tool_calls_raises(self):
         from calibrate_agent.llm import run_tests as RT
 
-        with patch.object(RT, "run_inference",
-                          AsyncMock(return_value={
-                              "response": "", "tool_calls": [], "captured_errors": ["fail"],
-                          })):
+        with patch.object(
+            RT,
+            "run_inference",
+            AsyncMock(
+                return_value={
+                    "response": "",
+                    "tool_calls": [],
+                    "captured_errors": ["fail"],
+                }
+            ),
+        ):
             with self.assertRaises(RT.LLMInferenceError):
                 await RT.run_test(
                     chat_history=[],
                     evaluation={"type": "response"},
-                    system_prompt="x", model="m", provider="openrouter",
-                    tools=[], unique_id="u",
+                    system_prompt="x",
+                    model="m",
+                    provider="openrouter",
+                    tools=[],
+                    unique_id="u",
                 )
 
     async def test_response_path(self):
         from calibrate_agent.llm import run_tests as RT
 
-        with patch.object(RT, "run_inference",
-                          AsyncMock(return_value={
-                              "response": "Hi", "tool_calls": [], "captured_errors": [],
-                          })), \
-             patch.object(RT, "test_response_llm_judge",
-                          AsyncMock(return_value={"default": {"reasoning": "ok", "match": True}})):
+        with (
+            patch.object(
+                RT,
+                "run_inference",
+                AsyncMock(
+                    return_value={
+                        "response": "Hi",
+                        "tool_calls": [],
+                        "captured_errors": [],
+                    }
+                ),
+            ),
+            patch.object(
+                RT,
+                "test_response_llm_judge",
+                AsyncMock(return_value={"default": {"reasoning": "ok", "match": True}}),
+            ),
+        ):
             result = await RT.run_test(
                 chat_history=[],
                 evaluation={"type": "response", "criteria": "x"},
-                system_prompt="x", model="m", provider="openrouter",
-                tools=[], unique_id="u",
+                system_prompt="x",
+                model="m",
+                provider="openrouter",
+                tools=[],
+                unique_id="u",
                 evaluators=[_bin_ev("default")],
             )
         self.assertTrue(result["metrics"]["passed"])
@@ -1906,19 +2407,34 @@ class TestRunTestErrorPath(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.llm import run_tests as RT
 
         fake_lf = MagicMock()
-        with patch.object(RT, "run_inference",
-                          AsyncMock(return_value={
-                              "response": "Hi", "tool_calls": [], "captured_errors": [],
-                          })), \
-             patch.object(RT, "test_response_llm_judge",
-                          AsyncMock(return_value={"default": {"reasoning": "ok", "match": True}})), \
-             patch.object(RT, "langfuse_enabled", True), \
-             patch.object(RT, "langfuse", fake_lf):
+        with (
+            patch.object(
+                RT,
+                "run_inference",
+                AsyncMock(
+                    return_value={
+                        "response": "Hi",
+                        "tool_calls": [],
+                        "captured_errors": [],
+                    }
+                ),
+            ),
+            patch.object(
+                RT,
+                "test_response_llm_judge",
+                AsyncMock(return_value={"default": {"reasoning": "ok", "match": True}}),
+            ),
+            patch.object(RT, "langfuse_enabled", True),
+            patch.object(RT, "langfuse", fake_lf),
+        ):
             await RT.run_test(
                 chat_history=[],
                 evaluation={"type": "response", "criteria": "x"},
-                system_prompt="x", model="m", provider="openrouter",
-                tools=[], unique_id="u",
+                system_prompt="x",
+                model="m",
+                provider="openrouter",
+                tools=[],
+                unique_id="u",
                 evaluators=[_bin_ev("default")],
             )
         fake_lf.update_current_trace.assert_called_once()
@@ -1932,20 +2448,27 @@ class TestRunModelTests(unittest.IsolatedAsyncioTestCase):
             "output": {"response": "Hi", "tool_calls": []},
             "metrics": {"passed": True, "judge_results": {}, "reasoning": "ok"},
         }
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RT, "run_test", AsyncMock(return_value=fake_test)):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RT, "run_test", AsyncMock(return_value=fake_test)),
+        ):
             config = {
                 "system_prompt": "sp",
                 "tools": [],
                 "evaluators": [],
-                "test_cases": [{
-                    "id": "tc1",
-                    "history": [{"role": "user", "content": "hi"}],
-                    "evaluation": {"type": "response", "criteria": "be polite"},
-                }],
+                "test_cases": [
+                    {
+                        "id": "tc1",
+                        "history": [{"role": "user", "content": "hi"}],
+                        "evaluation": {"type": "response", "criteria": "be polite"},
+                    }
+                ],
             }
             result = await RT.run_model_tests(
-                model="m", provider="openrouter", config=config, output_dir=tmp,
+                model="m",
+                provider="openrouter",
+                config=config,
+                output_dir=tmp,
             )
         self.assertEqual(result["metrics"]["passed"], 1)
 
@@ -1964,21 +2487,31 @@ class TestResolveTestParallel(unittest.TestCase):
             self.assertEqual(_resolve_test_parallel(None), 7)
 
     def test_default_when_neither_set(self):
-        from calibrate_agent.llm.run_tests import _resolve_test_parallel, DEFAULT_TEST_PARALLEL
+        from calibrate_agent.llm.run_tests import (
+            _resolve_test_parallel,
+            DEFAULT_TEST_PARALLEL,
+        )
 
         with patch.dict("os.environ", {}, clear=False):
             import os
+
             os.environ.pop("CALIBRATE_TEST_PARALLEL", None)
             self.assertEqual(_resolve_test_parallel(None), DEFAULT_TEST_PARALLEL)
 
     def test_invalid_env_falls_back_to_default(self):
-        from calibrate_agent.llm.run_tests import _resolve_test_parallel, DEFAULT_TEST_PARALLEL
+        from calibrate_agent.llm.run_tests import (
+            _resolve_test_parallel,
+            DEFAULT_TEST_PARALLEL,
+        )
 
         with patch.dict("os.environ", {"CALIBRATE_TEST_PARALLEL": "abc"}):
             self.assertEqual(_resolve_test_parallel(None), DEFAULT_TEST_PARALLEL)
 
     def test_non_positive_values_ignored(self):
-        from calibrate_agent.llm.run_tests import _resolve_test_parallel, DEFAULT_TEST_PARALLEL
+        from calibrate_agent.llm.run_tests import (
+            _resolve_test_parallel,
+            DEFAULT_TEST_PARALLEL,
+        )
 
         with patch.dict("os.environ", {"CALIBRATE_TEST_PARALLEL": "0"}):
             # CLI 0 ignored, env 0 ignored -> default
@@ -2021,12 +2554,17 @@ class TestRunModelTestsParallel(unittest.IsolatedAsyncioTestCase):
                 for i in range(n_cases)
             ],
         }
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RT, "run_test", side_effect=fake_run_test):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RT, "run_test", side_effect=fake_run_test),
+        ):
             result = await asyncio.wait_for(
                 RT.run_model_tests(
-                    model="m", provider="openrouter", config=config,
-                    output_dir=tmp, test_parallel=n_cases,
+                    model="m",
+                    provider="openrouter",
+                    config=config,
+                    output_dir=tmp,
+                    test_parallel=n_cases,
                 ),
                 timeout=5,
             )
@@ -2059,11 +2597,16 @@ class TestRunModelTestsParallel(unittest.IsolatedAsyncioTestCase):
                 for i in range(5)
             ],
         }
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RT, "run_test", side_effect=fake_run_test):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RT, "run_test", side_effect=fake_run_test),
+        ):
             result = await RT.run_model_tests(
-                model="m", provider="openrouter", config=config,
-                output_dir=tmp, test_parallel=5,
+                model="m",
+                provider="openrouter",
+                config=config,
+                output_dir=tmp,
+                test_parallel=5,
             )
             with open(Path(tmp) / "m" / "results.json") as f:
                 saved = json.load(f)
@@ -2072,7 +2615,9 @@ class TestRunModelTestsParallel(unittest.IsolatedAsyncioTestCase):
             [r["test_case_id"] for r in result["results"]],
             [f"tc{i}" for i in range(5)],
         )
-        self.assertEqual([r["test_case_id"] for r in saved], [f"tc{i}" for i in range(5)])
+        self.assertEqual(
+            [r["test_case_id"] for r in saved], [f"tc{i}" for i in range(5)]
+        )
 
 
 class TestMainCLI(unittest.IsolatedAsyncioTestCase):
@@ -2083,17 +2628,39 @@ class TestMainCLI(unittest.IsolatedAsyncioTestCase):
             cfg = Path(tmp) / "config.json"
             cfg.write_text(json.dumps({"evaluators": []}))
             ds = Path(tmp) / "ds.json"
-            ds.write_text(json.dumps([{
-                "test_case": {
-                    "history": [],
-                    "evaluation": {"type": "response", "criteria": "x"},
-                },
-                "output": {"response": "Hi", "tool_calls": []},
-            }]))
-            argv = ["rt.py", "-c", str(cfg), "-o", tmp, "--eval-only", "--dataset", str(ds)]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(RT, "test_response_llm_judge",
-                              AsyncMock(return_value={"correctness": {"reasoning": "ok", "match": True}})):
+            ds.write_text(
+                json.dumps(
+                    [
+                        {
+                            "test_case": {
+                                "history": [],
+                                "evaluation": {"type": "response", "criteria": "x"},
+                            },
+                            "output": {"response": "Hi", "tool_calls": []},
+                        }
+                    ]
+                )
+            )
+            argv = [
+                "rt.py",
+                "-c",
+                str(cfg),
+                "-o",
+                tmp,
+                "--eval-only",
+                "--dataset",
+                str(ds),
+            ]
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    RT,
+                    "test_response_llm_judge",
+                    AsyncMock(
+                        return_value={"correctness": {"reasoning": "ok", "match": True}}
+                    ),
+                ),
+            ):
                 await RT.main()
 
     async def test_main_eval_only_missing_dataset(self):
@@ -2115,7 +2682,16 @@ class TestMainCLI(unittest.IsolatedAsyncioTestCase):
             cfg.write_text(json.dumps({"evaluators": []}))
             ds = Path(tmp) / "ds.json"
             ds.write_text("{not json")
-            argv = ["rt.py", "-c", str(cfg), "-o", tmp, "--eval-only", "--dataset", str(ds)]
+            argv = [
+                "rt.py",
+                "-c",
+                str(cfg),
+                "-o",
+                tmp,
+                "--eval-only",
+                "--dataset",
+                str(ds),
+            ]
             with patch.object(sys, "argv", argv):
                 with self.assertRaises(SystemExit):
                     await RT.main()
@@ -2128,7 +2704,16 @@ class TestMainCLI(unittest.IsolatedAsyncioTestCase):
             cfg.write_text(json.dumps({"evaluators": []}))
             ds = Path(tmp) / "ds.json"
             ds.write_text(json.dumps({}))  # not a list
-            argv = ["rt.py", "-c", str(cfg), "-o", tmp, "--eval-only", "--dataset", str(ds)]
+            argv = [
+                "rt.py",
+                "-c",
+                str(cfg),
+                "-o",
+                tmp,
+                "--eval-only",
+                "--dataset",
+                str(ds),
+            ]
             with patch.object(sys, "argv", argv):
                 with self.assertRaises(SystemExit):
                     await RT.main()
@@ -2149,19 +2734,32 @@ class TestMainCLI(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
-            cfg.write_text(json.dumps({
-                "evaluators": [],
-                "test_cases": [],
-                "system_prompt": "sp",
-                "tools": [],
-            }))
+            cfg.write_text(
+                json.dumps(
+                    {
+                        "evaluators": [],
+                        "test_cases": [],
+                        "system_prompt": "sp",
+                        "tools": [],
+                    }
+                )
+            )
             argv = ["rt.py", "-c", str(cfg), "-o", tmp, "-m", "model-x"]
-            with patch.object(sys, "argv", argv), \
-                 patch.object(RT, "run_model_tests",
-                              AsyncMock(return_value={
-                                  "model": "model-x", "provider": "openrouter",
-                                  "metrics": {"passed": 0, "total": 0}, "results": [],
-                              })):
+            with (
+                patch.object(sys, "argv", argv),
+                patch.object(
+                    RT,
+                    "run_model_tests",
+                    AsyncMock(
+                        return_value={
+                            "model": "model-x",
+                            "provider": "openrouter",
+                            "metrics": {"passed": 0, "total": 0},
+                            "results": [],
+                        }
+                    ),
+                ),
+            ):
                 await RT.main()
 
 
@@ -2208,8 +2806,11 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
     async def test_binary_pass(self):
         from calibrate_agent.llm import run_tests as RT
 
-        with patch.object(RT, "evaluate_simuation",
-                          AsyncMock(return_value={"tone": {"reasoning": "good", "match": True}})):
+        with patch.object(
+            RT,
+            "evaluate_simuation",
+            AsyncMock(return_value={"tone": {"reasoning": "good", "match": True}}),
+        ):
             metrics = await RT._evaluate_conversation(
                 chat_history=[{"role": "user", "content": "hi"}],
                 evaluators=[_bin_ev("tone")],
@@ -2223,10 +2824,14 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
     async def test_binary_fail_uses_failing_reasoning(self):
         from calibrate_agent.llm import run_tests as RT
 
-        with patch.object(RT, "evaluate_simuation",
-                          AsyncMock(return_value={"tone": {"reasoning": "rude", "match": False}})):
+        with patch.object(
+            RT,
+            "evaluate_simuation",
+            AsyncMock(return_value={"tone": {"reasoning": "rude", "match": False}}),
+        ):
             metrics = await RT._evaluate_conversation(
-                chat_history=[], evaluators=[_bin_ev("tone")],
+                chat_history=[],
+                evaluators=[_bin_ev("tone")],
                 output={"response": "x", "tool_calls": []},
                 no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
@@ -2236,10 +2841,14 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
     async def test_rating_below_max_fails(self):
         from calibrate_agent.llm import run_tests as RT
 
-        with patch.object(RT, "evaluate_simuation",
-                          AsyncMock(return_value={"qual": {"reasoning": "ok", "score": 3}})):
+        with patch.object(
+            RT,
+            "evaluate_simuation",
+            AsyncMock(return_value={"qual": {"reasoning": "ok", "score": 3}}),
+        ):
             metrics = await RT._evaluate_conversation(
-                chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
+                chat_history=[],
+                evaluators=[_rate_ev("qual", 1, 5)],
                 output={"response": "x", "tool_calls": []},
                 no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
@@ -2248,10 +2857,14 @@ class TestEvaluateConversation(unittest.IsolatedAsyncioTestCase):
     async def test_rating_at_max_passes(self):
         from calibrate_agent.llm import run_tests as RT
 
-        with patch.object(RT, "evaluate_simuation",
-                          AsyncMock(return_value={"qual": {"reasoning": "great", "score": 5}})):
+        with patch.object(
+            RT,
+            "evaluate_simuation",
+            AsyncMock(return_value={"qual": {"reasoning": "great", "score": 5}}),
+        ):
             metrics = await RT._evaluate_conversation(
-                chat_history=[], evaluators=[_rate_ev("qual", 1, 5)],
+                chat_history=[],
+                evaluators=[_rate_ev("qual", 1, 5)],
                 output={"response": "x", "tool_calls": []},
                 no_response_reasoning_no_tool_calls=self._NO_REPLY,
             )
@@ -2309,17 +2922,26 @@ class TestRunTestConversation(unittest.IsolatedAsyncioTestCase):
 
         # Live mode: the agent generates the next reply, which is appended and
         # the whole conversation is judged by the simulation judge.
-        infer = AsyncMock(return_value={
-            "response": "It ships tomorrow.", "tool_calls": [], "captured_errors": [],
-        })
+        infer = AsyncMock(
+            return_value={
+                "response": "It ships tomorrow.",
+                "tool_calls": [],
+                "captured_errors": [],
+            }
+        )
         sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
-        with patch.object(RT, "run_inference", infer), \
-             patch.object(RT, "evaluate_simuation", sim):
+        with (
+            patch.object(RT, "run_inference", infer),
+            patch.object(RT, "evaluate_simuation", sim),
+        ):
             result = await RT.run_test(
                 chat_history=[{"role": "user", "content": "when does my order ship?"}],
                 evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
-                system_prompt="x", model="m", provider="openrouter",
-                tools=[], unique_id="u",
+                system_prompt="x",
+                model="m",
+                provider="openrouter",
+                tools=[],
+                unique_id="u",
                 evaluators=[_bin_ev("tone")],
             )
         infer.assert_awaited_once()
@@ -2327,25 +2949,34 @@ class TestRunTestConversation(unittest.IsolatedAsyncioTestCase):
         # conversation.
         self.assertEqual(result["output"]["response"], "It ships tomorrow.")
         judged = sim.await_args.kwargs["conversation"]
-        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
+        self.assertEqual(
+            judged[-1], {"role": "assistant", "content": "It ships tomorrow."}
+        )
         self.assertTrue(result["metrics"]["passed"])
 
     async def test_tool_calls_appended_in_function_shape(self):
         from calibrate_agent.llm import run_tests as RT
 
-        infer = AsyncMock(return_value={
-            "response": "",
-            "tool_calls": [{"tool": "check_order", "arguments": '{"id": "1"}'}],
-            "captured_errors": [],
-        })
+        infer = AsyncMock(
+            return_value={
+                "response": "",
+                "tool_calls": [{"tool": "check_order", "arguments": '{"id": "1"}'}],
+                "captured_errors": [],
+            }
+        )
         sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
-        with patch.object(RT, "run_inference", infer), \
-             patch.object(RT, "evaluate_simuation", sim):
+        with (
+            patch.object(RT, "run_inference", infer),
+            patch.object(RT, "evaluate_simuation", sim),
+        ):
             await RT.run_test(
                 chat_history=[{"role": "user", "content": "check order 1"}],
                 evaluation={"type": "conversation", "criteria": [{"name": "tone"}]},
-                system_prompt="x", model="m", provider="openrouter",
-                tools=[], unique_id="u",
+                system_prompt="x",
+                model="m",
+                provider="openrouter",
+                tools=[],
+                unique_id="u",
                 evaluators=[_bin_ev("tone")],
             )
         judged = sim.await_args.kwargs["conversation"]
@@ -2378,7 +3009,9 @@ class TestRunTestExternalConversation(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.llm import run_tests as RT
 
         agent = MagicMock()
-        agent.call = AsyncMock(return_value={"response": "It ships tomorrow.", "tool_calls": []})
+        agent.call = AsyncMock(
+            return_value={"response": "It ships tomorrow.", "tool_calls": []}
+        )
         sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
         with patch.object(RT, "evaluate_simuation", sim):
             result = await RT.run_test_external(
@@ -2388,7 +3021,9 @@ class TestRunTestExternalConversation(unittest.IsolatedAsyncioTestCase):
                 evaluators=[_bin_ev("tone")],
             )
         judged = sim.await_args.kwargs["conversation"]
-        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
+        self.assertEqual(
+            judged[-1], {"role": "assistant", "content": "It ships tomorrow."}
+        )
         self.assertTrue(result["metrics"]["passed"])
 
 
@@ -2399,11 +3034,21 @@ class TestAggregateCriteriaConversation(unittest.TestCase):
         registry = {"tone": dict(_bin_ev("tone"), id="ev1")}
         results = [
             {
-                "test_case": {"evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]}},
+                "test_case": {
+                    "evaluation": {
+                        "type": "conversation",
+                        "criteria": [{"name": "tone"}],
+                    }
+                },
                 "metrics": {"judge_results": {"tone": {"match": True}}},
             },
             {
-                "test_case": {"evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]}},
+                "test_case": {
+                    "evaluation": {
+                        "type": "conversation",
+                        "criteria": [{"name": "tone"}],
+                    }
+                },
                 "metrics": {"judge_results": {"tone": {"match": False}}},
             },
         ]
@@ -2416,22 +3061,27 @@ class TestValidateConversationEvalOnly(unittest.TestCase):
     def test_conversation_requires_output_like_response(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([
-            {
-                "test_case": {
-                    "history": [{"role": "user", "content": "hi"}],
-                    "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
-                },
-            }
-        ])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [
+                {
+                    "test_case": {
+                        "history": [{"role": "user", "content": "hi"}],
+                        "evaluation": {
+                            "type": "conversation",
+                            "criteria": [{"name": "tone"}],
+                        },
+                    },
+                }
+            ]
+        )
         self.assertFalse(is_valid)
 
     def test_conversation_still_requires_history(self):
         from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
 
-        is_valid, _ = validate_llm_eval_only_dataset([
-            {"test_case": {"evaluation": {"type": "conversation"}}}
-        ])
+        is_valid, _ = validate_llm_eval_only_dataset(
+            [{"test_case": {"evaluation": {"type": "conversation"}}}]
+        )
         self.assertFalse(is_valid)
 
 
@@ -2440,9 +3090,14 @@ class TestRunEvalOnlyConversation(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.llm.run_tests import run_eval_only_tests
         from calibrate_agent.llm import run_tests as RT
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RT, "evaluate_simuation",
-                          AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(
+                RT,
+                "evaluate_simuation",
+                AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}}),
+            ),
+        ):
             result = await run_eval_only_tests(
                 config={"evaluators": [_bin_ev("tone")]},
                 dataset=[
@@ -2503,23 +3158,32 @@ class TestConversationEvalOnlyNotMutated(unittest.IsolatedAsyncioTestCase):
             },
         ]
         sim = AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RT, "evaluate_simuation", sim):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RT, "evaluate_simuation", sim),
+        ):
             await run_eval_only_tests(
                 config={"evaluators": [_bin_ev("tone")]},
-                dataset=[{
-                    "test_case": {
-                        "id": "c1",
-                        "history": history,
-                        "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
-                    },
-                    "output": {"response": "It ships tomorrow.", "tool_calls": []},
-                }],
+                dataset=[
+                    {
+                        "test_case": {
+                            "id": "c1",
+                            "history": history,
+                            "evaluation": {
+                                "type": "conversation",
+                                "criteria": [{"name": "tone"}],
+                            },
+                        },
+                        "output": {"response": "It ships tomorrow.", "tool_calls": []},
+                    }
+                ],
                 output_dir=tmp,
             )
         judged = sim.await_args.kwargs["conversation"]
         self.assertEqual(judged[2]["role"], "tool")
-        self.assertEqual(judged[-1], {"role": "assistant", "content": "It ships tomorrow."})
+        self.assertEqual(
+            judged[-1], {"role": "assistant", "content": "It ships tomorrow."}
+        )
 
 
 class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):
@@ -2528,23 +3192,40 @@ class TestRunModelTestsConversationOnlyConfig(unittest.IsolatedAsyncioTestCase):
 
         # A conversation-only suite need not define tools or system_prompt; in
         # live mode the agent still runs to produce the next reply.
-        infer = AsyncMock(return_value={
-            "response": "hello", "tool_calls": [], "captured_errors": [],
-        })
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RT, "run_inference", infer), \
-             patch.object(RT, "evaluate_simuation",
-                          AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}})):
+        infer = AsyncMock(
+            return_value={
+                "response": "hello",
+                "tool_calls": [],
+                "captured_errors": [],
+            }
+        )
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch.object(RT, "run_inference", infer),
+            patch.object(
+                RT,
+                "evaluate_simuation",
+                AsyncMock(return_value={"tone": {"reasoning": "ok", "match": True}}),
+            ),
+        ):
             config = {
                 "evaluators": [_bin_ev("tone")],
-                "test_cases": [{
-                    "id": "c1",
-                    "history": [{"role": "user", "content": "hi"}],
-                    "evaluation": {"type": "conversation", "criteria": [{"name": "tone"}]},
-                }],
+                "test_cases": [
+                    {
+                        "id": "c1",
+                        "history": [{"role": "user", "content": "hi"}],
+                        "evaluation": {
+                            "type": "conversation",
+                            "criteria": [{"name": "tone"}],
+                        },
+                    }
+                ],
             }
             result = await RT.run_model_tests(
-                model="m", provider="openrouter", config=config, output_dir=tmp,
+                model="m",
+                provider="openrouter",
+                config=config,
+                output_dir=tmp,
             )
         self.assertEqual(result["metrics"]["passed"], 1)
 
@@ -2723,14 +3404,33 @@ class TestRunTestsMainDebug(unittest.IsolatedAsyncioTestCase):
             cfg.write_text("{}")
             ds = Path(tmp) / "d.json"
             ds.write_text(json.dumps(dataset))
-            with patch.object(sys, "argv", [
-                "calibrate_agent", "-c", str(cfg), "-o", tmp,
-                "--eval-only", "--dataset", str(ds), "-d", "-dc", "2",
-            ]), \
-                patch("calibrate_agent.llm.run_tests.run_eval_only_tests",
-                      side_effect=fake_eval), \
-                patch("calibrate_agent.llm.run_tests.validate_llm_eval_only_dataset",
-                      return_value=(True, "")):
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "calibrate_agent",
+                        "-c",
+                        str(cfg),
+                        "-o",
+                        tmp,
+                        "--eval-only",
+                        "--dataset",
+                        str(ds),
+                        "-d",
+                        "-dc",
+                        "2",
+                    ],
+                ),
+                patch(
+                    "calibrate_agent.llm.run_tests.run_eval_only_tests",
+                    side_effect=fake_eval,
+                ),
+                patch(
+                    "calibrate_agent.llm.run_tests.validate_llm_eval_only_dataset",
+                    return_value=(True, ""),
+                ),
+            ):
                 await run_tests.main()
         self.assertEqual(len(captured["dataset"]), 2)
 
@@ -2755,12 +3455,28 @@ class TestRunTestsMainDebug(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "c.json"
             cfg.write_text(json.dumps(config))
-            with patch.object(sys, "argv", [
-                "calibrate_agent", "-c", str(cfg), "-o", tmp,
-                "-m", "gpt-4.1", "-d", "-dc", "3",
-            ]), \
-                patch("calibrate_agent.llm.run_tests.run_model_tests",
-                      side_effect=fake_run):
+            with (
+                patch.object(
+                    sys,
+                    "argv",
+                    [
+                        "calibrate_agent",
+                        "-c",
+                        str(cfg),
+                        "-o",
+                        tmp,
+                        "-m",
+                        "gpt-4.1",
+                        "-d",
+                        "-dc",
+                        "3",
+                    ],
+                ),
+                patch(
+                    "calibrate_agent.llm.run_tests.run_model_tests",
+                    side_effect=fake_run,
+                ),
+            ):
                 await run_tests.main()
         self.assertEqual(len(captured["config"]["test_cases"]), 3)
 
@@ -2853,15 +3569,19 @@ class TestRequireUniqueTestCaseIds(unittest.TestCase):
     def test_unique_ids_pass(self):
         from calibrate_agent.llm.run_tests import require_unique_test_case_ids
 
-        cases = [{"id": "a", "history": [], "evaluation": {}},
-                 {"id": "b", "history": [], "evaluation": {}}]
+        cases = [
+            {"id": "a", "history": [], "evaluation": {}},
+            {"id": "b", "history": [], "evaluation": {}},
+        ]
         require_unique_test_case_ids(cases)  # no raise
 
     def test_missing_ids_are_left_alone(self):
         from calibrate_agent.llm.run_tests import require_unique_test_case_ids
 
-        cases = [{"history": [], "evaluation": {}},
-                 {"history": [{"role": "user"}], "evaluation": {}}]
+        cases = [
+            {"history": [], "evaluation": {}},
+            {"history": [{"role": "user"}], "evaluation": {}},
+        ]
         require_unique_test_case_ids(cases)  # no raise
         # No ids are invented.
         self.assertNotIn("id", cases[0])

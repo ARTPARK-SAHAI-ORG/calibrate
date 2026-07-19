@@ -16,7 +16,10 @@ import instructor
 from calibrate_agent.judges import _build_openrouter_client
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 from calibrate_agent.utils import log_judge_io
-from calibrate_agent.stt.sarvam_intent_entity.main import IntentEntityResponse, build_prompt
+from calibrate_agent.stt.sarvam_intent_entity.main import (
+    IntentEntityResponse,
+    build_prompt,
+)
 
 # Model used to grade intent/entity. Matches Sarvam's llm_intent_entity flow,
 # which judges with google/gemini-2.5-flash (reached here via OpenRouter).

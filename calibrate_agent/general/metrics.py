@@ -155,8 +155,7 @@ async def get_general_judge_score(
                 row_arguments, evaluator_names, context=f"Row {i} arguments"
             )
             row_evaluators = [
-                render_evaluator(ev, row_arguments.get(ev["name"]))
-                for ev in evaluators
+                render_evaluator(ev, row_arguments.get(ev["name"])) for ev in evaluators
             ]
         else:
             row_evaluators = evaluators

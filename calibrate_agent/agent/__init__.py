@@ -124,7 +124,10 @@ class _Simulation:
             ...     llm=LLMConfig(provider="openrouter", model=DEFAULT_TEST_AGENT_LLM_MODEL),
             ... ))
         """
-        from calibrate_agent.judges import require_simulation_evaluators, write_evaluator_config
+        from calibrate_agent.judges import (
+            require_simulation_evaluators,
+            write_evaluator_config,
+        )
         from calibrate_agent.agent.run_simulation import run_single_simulation_task
         import gc
 
@@ -217,9 +220,7 @@ class _Simulation:
             for eval_result in evaluation_results:
                 criterion_name = eval_result["name"]
                 # value works for both binary (0/1) and rating (int score)
-                metrics_by_criterion[criterion_name].append(
-                    float(eval_result["value"])
-                )
+                metrics_by_criterion[criterion_name].append(float(eval_result["value"]))
 
             if stt_judge and "score" in stt_judge:
                 stt_llm_judge_scores.append(stt_judge["score"])
@@ -320,8 +321,13 @@ class _Simulation:
             ...     output_dir="./out"
             ... ))
         """
-        from calibrate_agent.judges import require_simulation_evaluators, write_evaluator_config
-        from calibrate_agent.agent.run_simulation import run_simulation as _run_simulation
+        from calibrate_agent.judges import (
+            require_simulation_evaluators,
+            write_evaluator_config,
+        )
+        from calibrate_agent.agent.run_simulation import (
+            run_simulation as _run_simulation,
+        )
 
         require_simulation_evaluators(evaluators)
         write_evaluator_config(output_dir, evaluators)

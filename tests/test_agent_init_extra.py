@@ -9,7 +9,9 @@ class TestConfigDataclasses(unittest.TestCase):
     def test_stt_config_to_dict(self):
         from calibrate_agent.agent import STTConfig
 
-        self.assertEqual(STTConfig(provider="deepgram").to_dict(), {"provider": "deepgram"})
+        self.assertEqual(
+            STTConfig(provider="deepgram").to_dict(), {"provider": "deepgram"}
+        )
 
     def test_tts_config_with_voice(self):
         from calibrate_agent.agent import TTSConfig
@@ -57,15 +59,23 @@ class TestSimulationRun(unittest.IsolatedAsyncioTestCase):
             {"score": 0.85},
         )
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate_agent.agent.run_simulation.run_single_simulation_task",
-                   AsyncMock(return_value=fake_result)):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "calibrate_agent.agent.run_simulation.run_single_simulation_task",
+                AsyncMock(return_value=fake_result),
+            ),
+        ):
             result = await simulation.run(
                 system_prompt="sp",
                 tools=[],
-                personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
+                personas=[
+                    {"characteristics": "p", "gender": "male", "language": "english"}
+                ],
                 scenarios=[{"description": "s"}],
-                evaluators=[{"name": "criterion_a", "system_prompt": "x", "judge_model": "m"}],
+                evaluators=[
+                    {"name": "criterion_a", "system_prompt": "x", "judge_model": "m"}
+                ],
                 output_dir=tmp,
                 stt=STTConfig(),
                 tts=TTSConfig(),
@@ -81,16 +91,28 @@ class TestSimulationRun(unittest.IsolatedAsyncioTestCase):
     async def test_simulation_run_failure_aggregates(self):
         from calibrate_agent.agent import simulation
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate_agent.agent.run_simulation.run_single_simulation_task",
-                   AsyncMock(side_effect=RuntimeError("simfail"))):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "calibrate_agent.agent.run_simulation.run_single_simulation_task",
+                AsyncMock(side_effect=RuntimeError("simfail")),
+            ),
+        ):
             with self.assertRaises(RuntimeError) as ctx:
                 await simulation.run(
                     system_prompt="sp",
                     tools=[],
-                    personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
+                    personas=[
+                        {
+                            "characteristics": "p",
+                            "gender": "male",
+                            "language": "english",
+                        }
+                    ],
                     scenarios=[{"description": "s"}],
-                    evaluators=[{"name": "c", "system_prompt": "x", "judge_model": "m"}],
+                    evaluators=[
+                        {"name": "c", "system_prompt": "x", "judge_model": "m"}
+                    ],
                     output_dir=tmp,
                 )
         self.assertIn("simulation(s) failed", str(ctx.exception))
@@ -98,13 +120,19 @@ class TestSimulationRun(unittest.IsolatedAsyncioTestCase):
     async def test_simulation_run_handles_none_result(self):
         from calibrate_agent.agent import simulation
 
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate_agent.agent.run_simulation.run_single_simulation_task",
-                   AsyncMock(return_value=None)):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch(
+                "calibrate_agent.agent.run_simulation.run_single_simulation_task",
+                AsyncMock(return_value=None),
+            ),
+        ):
             result = await simulation.run(
                 system_prompt="sp",
                 tools=[],
-                personas=[{"characteristics": "p", "gender": "male", "language": "english"}],
+                personas=[
+                    {"characteristics": "p", "gender": "male", "language": "english"}
+                ],
                 scenarios=[{"description": "s"}],
                 evaluators=[{"name": "c", "system_prompt": "x", "judge_model": "m"}],
                 output_dir=tmp,
@@ -116,8 +144,10 @@ class TestSimulationRun(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.agent import simulation
 
         fake_inner = AsyncMock(return_value={"status": "completed"})
-        with tempfile.TemporaryDirectory() as tmp, \
-             patch("calibrate_agent.agent.run_simulation.run_simulation", fake_inner):
+        with (
+            tempfile.TemporaryDirectory() as tmp,
+            patch("calibrate_agent.agent.run_simulation.run_simulation", fake_inner),
+        ):
             result = await simulation.run_single(
                 system_prompt="sp",
                 language="english",
@@ -136,8 +166,12 @@ class TestCalibrateInit(unittest.TestCase):
         import importlib
         from importlib.metadata import PackageNotFoundError
 
-        with patch("importlib.metadata.version", side_effect=PackageNotFoundError("calibrate-agent")):
+        with patch(
+            "importlib.metadata.version",
+            side_effect=PackageNotFoundError("calibrate-agent"),
+        ):
             import calibrate_agent
+
             importlib.reload(calibrate_agent)
             self.assertEqual(calibrate_agent.__version__, "0.0.0-dev")
 
@@ -151,16 +185,29 @@ class TestCalibrateInit(unittest.TestCase):
         import sys
         import importlib
 
-        for name in ("calibrate_agent", "calibrate_agent.stt", "calibrate_agent.tts", "calibrate_agent.llm", "calibrate_agent.agent"):
+        for name in (
+            "calibrate_agent",
+            "calibrate_agent.stt",
+            "calibrate_agent.tts",
+            "calibrate_agent.llm",
+            "calibrate_agent.agent",
+        ):
             sys.modules.pop(name, None)
 
         import calibrate_agent
 
-        for name in ("calibrate_agent.stt", "calibrate_agent.tts", "calibrate_agent.llm", "calibrate_agent.agent"):
+        for name in (
+            "calibrate_agent.stt",
+            "calibrate_agent.tts",
+            "calibrate_agent.llm",
+            "calibrate_agent.agent",
+        ):
             self.assertNotIn(name, sys.modules)
 
         # Submodules remain accessible as attributes (imported on demand).
-        self.assertIs(calibrate_agent.stt, importlib.import_module("calibrate_agent.stt"))
+        self.assertIs(
+            calibrate_agent.stt, importlib.import_module("calibrate_agent.stt")
+        )
         self.assertIn("stt", dir(calibrate_agent))
 
     def test_unknown_attribute_raises(self):

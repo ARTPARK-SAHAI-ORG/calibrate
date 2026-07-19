@@ -68,12 +68,12 @@ class TestGeneralJudge(unittest.IsolatedAsyncioTestCase):
     async def test_updates_langfuse_trace_when_enabled(self):
         judge = AsyncMock(return_value={"faithful": {"reasoning": "ok", "match": True}})
         lf = MagicMock()
-        with patch("calibrate_agent.general.metrics.general_task_judge", judge), patch(
-            "calibrate_agent.general.metrics.langfuse_enabled", True
-        ), patch("calibrate_agent.general.metrics.langfuse", lf):
-            await general_judge(
-                input_text="src", output="out", evaluators=[BINARY_EV]
-            )
+        with (
+            patch("calibrate_agent.general.metrics.general_task_judge", judge),
+            patch("calibrate_agent.general.metrics.langfuse_enabled", True),
+            patch("calibrate_agent.general.metrics.langfuse", lf),
+        ):
+            await general_judge(input_text="src", output="out", evaluators=[BINARY_EV])
         lf.update_current_trace.assert_called_once()
         call = lf.update_current_trace.call_args.kwargs
         self.assertEqual(call["input"], {"input": "src", "output": "out"})
@@ -95,7 +95,9 @@ class TestGetGeneralJudgeScore(unittest.IsolatedAsyncioTestCase):
         async def fake(_input, output, **kwargs):
             return {"faithful": {"reasoning": output, "match": output == "o1"}}
 
-        with patch("calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)):
+        with patch(
+            "calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)
+        ):
             result = await get_general_judge_score(
                 inputs=["i1", "i2"],
                 outputs=["o1", "o2"],
@@ -119,7 +121,9 @@ class TestGetGeneralJudgeScore(unittest.IsolatedAsyncioTestCase):
         async def fake(_input, output, **kwargs):
             return {"quality": {"reasoning": output, "score": scores_by_output[output]}}
 
-        with patch("calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)):
+        with patch(
+            "calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)
+        ):
             result = await get_general_judge_score(
                 inputs=["i1", "i2"],
                 outputs=["o1", "o2"],

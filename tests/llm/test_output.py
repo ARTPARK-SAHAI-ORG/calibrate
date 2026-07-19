@@ -14,9 +14,12 @@ def _call(models, model_results, leaderboard_dir="./leaderboard", model_label=No
     from calibrate_agent.llm._output import print_benchmark_summary
 
     captured = []
-    with patch("builtins.print", side_effect=lambda *args, **kwargs: captured.append(
-        " ".join(str(a) for a in args)
-    )):
+    with patch(
+        "builtins.print",
+        side_effect=lambda *args, **kwargs: captured.append(
+            " ".join(str(a) for a in args)
+        ),
+    ):
         result = print_benchmark_summary(
             models=models,
             model_results=model_results,
@@ -30,6 +33,7 @@ def _call(models, model_results, leaderboard_dir="./leaderboard", model_label=No
 def _strip_ansi(text: str) -> str:
     """Strip ANSI escape sequences for easier assertion."""
     import re
+
     return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
@@ -114,14 +118,18 @@ class TestErrorModel(unittest.TestCase):
     def test_error_model_returns_true(self):
         _, result = _call(
             models=["bad-model"],
-            model_results={"bad-model": {"status": "error", "error": "API key invalid"}},
+            model_results={
+                "bad-model": {"status": "error", "error": "API key invalid"}
+            },
         )
         self.assertTrue(result)
 
     def test_error_message_in_output(self):
         captured, _ = _call(
             models=["bad-model"],
-            model_results={"bad-model": {"status": "error", "error": "API key invalid"}},
+            model_results={
+                "bad-model": {"status": "error", "error": "API key invalid"}
+            },
         )
         combined = "\n".join(captured)
         self.assertIn("API key invalid", combined)

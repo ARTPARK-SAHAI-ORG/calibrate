@@ -272,7 +272,6 @@ class LLMInferenceError(Exception):
     """Raised when LLM inference fails due to system error (API error, invalid model, etc.)"""
 
 
-
 # Lock to protect logger add/remove operations from race conditions when running in parallel
 import threading
 
@@ -331,11 +330,7 @@ async def _run_items_parallel(
                     json.dump([r for r in results if r is not None], f, indent=4)
 
     await asyncio.gather(
-        *[
-            run_one(i, item)
-            for i, item in enumerate(items)
-            if results[i] is None
-        ]
+        *[run_one(i, item) for i, item in enumerate(items) if results[i] is None]
     )
     return results
 
@@ -917,9 +912,7 @@ def _collect_arg_diffs(
         av = actual[key]
         if ev == av:
             if records is not None:
-                records.append(
-                    {"param": path, "match_type": "exact", "match": True}
-                )
+                records.append({"param": path, "match_type": "exact", "match": True})
             continue
         if isinstance(ev, dict) and isinstance(av, dict):
             if spec is not None:
@@ -933,9 +926,7 @@ def _collect_arg_diffs(
                             "param": path,
                             "match_type": "exact",
                             "match": False,
-                            "reasoning": "; ".join(
-                                line.strip() for line in sub_lines
-                            ),
+                            "reasoning": "; ".join(line.strip() for line in sub_lines),
                         }
                     )
             else:
@@ -979,7 +970,9 @@ def _render_passing_param_line(record: dict, *, tool: Optional[str] = None) -> s
     return f"  ✅ {path}: value matches the expected value"
 
 
-def _detailed_call_lines(records: List[dict], *, tool: Optional[str] = None) -> List[str]:
+def _detailed_call_lines(
+    records: List[dict], *, tool: Optional[str] = None
+) -> List[str]:
     """Full per-parameter breakdown for a call's arguments.
 
     Failures (``❌``) are rendered first so the things that need attention are
@@ -997,9 +990,7 @@ def _detailed_call_lines(records: List[dict], *, tool: Optional[str] = None) -> 
     return lines
 
 
-async def _tool_call_arguments_eval_async(
-    tool_name: str, expected, actual
-) -> dict:
+async def _tool_call_arguments_eval_async(tool_name: str, expected, actual) -> dict:
     """Evaluate one tool call's arguments, returning a structured result.
 
     Returns ``{"message", "records", "had_llm"}``:
@@ -1877,9 +1868,9 @@ async def run_model_tests(
     label = display_label(provider, model)
 
     # Print model header (mirrored to results.log)
-    _print_and_log(f"\n\033[94m{'='*60}\033[0m", print_log_save_path)
+    _print_and_log(f"\n\033[94m{'=' * 60}\033[0m", print_log_save_path)
     _print_and_log(f"\033[94mModel: {label}\033[0m", print_log_save_path)
-    _print_and_log(f"\033[94m{'='*60}\033[0m\n", print_log_save_path)
+    _print_and_log(f"\033[94m{'=' * 60}\033[0m\n", print_log_save_path)
 
     results_file_path = join(model_output_dir, "results.json")
 
@@ -1973,7 +1964,7 @@ async def run_model_tests(
         _print_and_log(f"[{label}] ❌ All tests failed!", print_log_save_path)
     else:
         _print_and_log(
-            f"[{label}] ✅ Total Passed: {passed_count}/{total_tests} ({(passed_count/total_tests)*100:.1f}%)",
+            f"[{label}] ✅ Total Passed: {passed_count}/{total_tests} ({(passed_count / total_tests) * 100:.1f}%)",
             print_log_save_path,
         )
 
@@ -2313,9 +2304,9 @@ async def main():
         passed = result["passed"]
         total = result["total"]
         pct = (passed / total * 100) if total else 0.0
-        print(f"\n\033[92m{'='*60}\033[0m")
+        print(f"\n\033[92m{'=' * 60}\033[0m")
         print("\033[92mSummary\033[0m")
-        print(f"\033[92m{'='*60}\033[0m\n")
+        print(f"\033[92m{'=' * 60}\033[0m\n")
         print(f"  eval-only: {passed}/{total} ({pct:.1f}%)")
         return
 
@@ -2346,9 +2337,9 @@ async def main():
     )
 
     # Print summary
-    print(f"\n\033[92m{'='*60}\033[0m")
+    print(f"\n\033[92m{'=' * 60}\033[0m")
     print("\033[92mSummary\033[0m")
-    print(f"\033[92m{'='*60}\033[0m\n")
+    print(f"\033[92m{'=' * 60}\033[0m\n")
 
     passed = result["metrics"]["passed"]
     total = result["metrics"]["total"]

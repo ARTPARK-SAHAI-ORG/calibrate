@@ -53,7 +53,9 @@ class TestAsyncRateLimiterBehavior(unittest.IsolatedAsyncioTestCase):
             fake_now[0] += seconds
 
         with patch("calibrate_agent.rate_limit.time.monotonic", side_effect=mono):
-            with patch("calibrate_agent.rate_limit.asyncio.sleep", side_effect=fake_sleep):
+            with patch(
+                "calibrate_agent.rate_limit.asyncio.sleep", side_effect=fake_sleep
+            ):
                 await limiter.acquire()
                 fake_now[0] = 1.0
                 await limiter.acquire()

@@ -12,6 +12,7 @@ def _mock_load_audio(*args, **kwargs):
         return b"\x00\x00" * 100
     if kwargs.get("as_file"):
         import io
+
         buf = io.BytesIO(b"RIFF\x00\x00\x00\x00WAVE")
         buf.name = "audio.wav"
         return buf
@@ -25,9 +26,11 @@ class TestTranscribeGroq(unittest.IsolatedAsyncioTestCase):
         fake_client = MagicMock()
         fake_client.audio.transcriptions.create = AsyncMock(return_value="hello world ")
 
-        with patch.dict(os.environ, {"GROQ_API_KEY": "k"}), \
-             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
-             patch.object(E, "AsyncGroq", return_value=fake_client):
+        with (
+            patch.dict(os.environ, {"GROQ_API_KEY": "k"}),
+            patch.object(E, "load_audio", side_effect=_mock_load_audio),
+            patch.object(E, "AsyncGroq", return_value=fake_client),
+        ):
             result = await E.transcribe_groq(Path("/tmp/x.wav"), "english")
         self.assertEqual(result["transcript"], "hello world")
 
@@ -45,21 +48,30 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
         class FakeWS:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, *args):
                 return False
-            async def transcribe(self, **kwargs): pass
-            async def flush(self): pass
+
+            async def transcribe(self, **kwargs):
+                pass
+
+            async def flush(self):
+                pass
+
             def __aiter__(self):
                 async def gen():
                     yield msg
+
                 return gen()
 
         fake_client = MagicMock()
         fake_client.speech_to_text_streaming.connect = MagicMock(return_value=FakeWS())
 
-        with patch.dict(os.environ, {"SARVAM_API_KEY": "k"}), \
-             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
-             patch.object(E, "AsyncSarvamAI", return_value=fake_client):
+        with (
+            patch.dict(os.environ, {"SARVAM_API_KEY": "k"}),
+            patch.object(E, "load_audio", side_effect=_mock_load_audio),
+            patch.object(E, "AsyncSarvamAI", return_value=fake_client),
+        ):
             result = await E.transcribe_sarvam(Path("/tmp/x.wav"), "english")
         self.assertEqual(result["transcript"], "hello")
 
@@ -73,21 +85,30 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
         class FakeWS:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, *args):
                 return False
-            async def transcribe(self, **kwargs): pass
-            async def flush(self): pass
+
+            async def transcribe(self, **kwargs):
+                pass
+
+            async def flush(self):
+                pass
+
             def __aiter__(self):
                 async def gen():
                     yield err_msg
+
                 return gen()
 
         fake_client = MagicMock()
         fake_client.speech_to_text_streaming.connect = MagicMock(return_value=FakeWS())
 
-        with patch.dict(os.environ, {"SARVAM_API_KEY": "k"}), \
-             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
-             patch.object(E, "AsyncSarvamAI", return_value=fake_client):
+        with (
+            patch.dict(os.environ, {"SARVAM_API_KEY": "k"}),
+            patch.object(E, "load_audio", side_effect=_mock_load_audio),
+            patch.object(E, "AsyncSarvamAI", return_value=fake_client),
+        ):
             with self.assertRaises(RuntimeError):
                 await E.transcribe_sarvam(Path("/tmp/x.wav"), "english")
 
@@ -96,20 +117,38 @@ class TestTranscribeGoogle(unittest.IsolatedAsyncioTestCase):
     async def test_google_happy(self):
         from calibrate_agent.stt import eval as E
 
-        with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/creds.json",
-                                      "GOOGLE_CLOUD_PROJECT_ID": "proj"}), \
-             patch("calibrate_agent.stt.eval._transcribe_google_streaming",
-                   return_value={"transcript": "hello world"}):
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "GOOGLE_APPLICATION_CREDENTIALS": "/creds.json",
+                    "GOOGLE_CLOUD_PROJECT_ID": "proj",
+                },
+            ),
+            patch(
+                "calibrate_agent.stt.eval._transcribe_google_streaming",
+                return_value={"transcript": "hello world"},
+            ),
+        ):
             result = await E.transcribe_google(Path("/tmp/x.wav"), "english")
         self.assertEqual(result["transcript"], "hello world")
 
     async def test_google_sindhi(self):
         from calibrate_agent.stt import eval as E
 
-        with patch.dict(os.environ, {"GOOGLE_APPLICATION_CREDENTIALS": "/creds.json",
-                                      "GOOGLE_CLOUD_PROJECT_ID": "proj"}), \
-             patch("calibrate_agent.stt.eval._transcribe_google_streaming",
-                   return_value={"transcript": "hello"}):
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "GOOGLE_APPLICATION_CREDENTIALS": "/creds.json",
+                    "GOOGLE_CLOUD_PROJECT_ID": "proj",
+                },
+            ),
+            patch(
+                "calibrate_agent.stt.eval._transcribe_google_streaming",
+                return_value={"transcript": "hello"},
+            ),
+        ):
             result = await E.transcribe_google(Path("/tmp/x.wav"), "sindhi")
         self.assertEqual(result["transcript"], "hello")
 

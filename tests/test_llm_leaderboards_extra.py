@@ -12,7 +12,9 @@ def _write(base: Path, name: str, metrics):
     d = base / name
     d.mkdir(parents=True, exist_ok=True)
     if metrics is not None:
-        (d / "metrics.json").write_text(metrics if isinstance(metrics, str) else json.dumps(metrics))
+        (d / "metrics.json").write_text(
+            metrics if isinstance(metrics, str) else json.dumps(metrics)
+        )
 
 
 class TestSimulationLeaderboard(unittest.TestCase):
@@ -21,7 +23,9 @@ class TestSimulationLeaderboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(FileNotFoundError):
-                generate_leaderboard(str(Path(tmp) / "missing"), str(Path(tmp) / "save"))
+                generate_leaderboard(
+                    str(Path(tmp) / "missing"), str(Path(tmp) / "save")
+                )
 
     def test_no_model_dirs(self):
         from calibrate_agent.llm.simulation_leaderboard import generate_leaderboard
@@ -50,12 +54,26 @@ class TestSimulationLeaderboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write(base, "m1", {
-                "task_complete": {"type": "binary", "mean": 0.75},
-                "helpfulness": {"type": "rating", "mean": 4.0, "scale_min": 1, "scale_max": 5},
-                "no_scale": {"type": "rating", "mean": 0, "scale_min": 1, "scale_max": 1},
-                "legacy": 0.8,
-            })
+            _write(
+                base,
+                "m1",
+                {
+                    "task_complete": {"type": "binary", "mean": 0.75},
+                    "helpfulness": {
+                        "type": "rating",
+                        "mean": 4.0,
+                        "scale_min": 1,
+                        "scale_max": 5,
+                    },
+                    "no_scale": {
+                        "type": "rating",
+                        "mean": 0,
+                        "scale_min": 1,
+                        "scale_max": 1,
+                    },
+                    "legacy": 0.8,
+                },
+            )
             generate_leaderboard(tmp, str(base / "lb"))
             csv = base / "lb" / "simulation_leaderboard.csv"
             self.assertTrue(csv.exists())
@@ -65,10 +83,14 @@ class TestSimulationLeaderboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write(base, "m1", {
-                "accuracy": {"type": "binary", "mean": 0.8},
-                "e2e_latency": {"type": "latency", "mean": 2.5},
-            })
+            _write(
+                base,
+                "m1",
+                {
+                    "accuracy": {"type": "binary", "mean": 0.8},
+                    "e2e_latency": {"type": "latency", "mean": 2.5},
+                },
+            )
             display, normalized, info = _read_metrics(base / "m1" / "metrics.json")
 
         # Latency shows raw seconds, binary is scaled to %.
@@ -95,7 +117,9 @@ class TestTestsLeaderboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(FileNotFoundError):
-                generate_leaderboard(str(Path(tmp) / "missing"), str(Path(tmp) / "save"))
+                generate_leaderboard(
+                    str(Path(tmp) / "missing"), str(Path(tmp) / "save")
+                )
 
     def test_no_model_dirs(self):
         from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
@@ -117,17 +141,27 @@ class TestTestsLeaderboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write(base, "m1", {
-                "passed": 2, "total": 3,
-                "criteria": {
-                    "accuracy": {"type": "binary", "pass_rate": 0.66},
-                    "tone": {"type": "rating", "mean": 4.0},
+            _write(
+                base,
+                "m1",
+                {
+                    "passed": 2,
+                    "total": 3,
+                    "criteria": {
+                        "accuracy": {"type": "binary", "pass_rate": 0.66},
+                        "tone": {"type": "rating", "mean": 4.0},
+                    },
                 },
-            })
-            _write(base, "m2", {
-                "passed": 0, "total": 0,  # tests _to_percent total<=0 branch
-                "criteria": {"missing_one": {"type": "binary", "pass_rate": 0.0}},
-            })
+            )
+            _write(
+                base,
+                "m2",
+                {
+                    "passed": 0,
+                    "total": 0,  # tests _to_percent total<=0 branch
+                    "criteria": {"missing_one": {"type": "binary", "pass_rate": 0.0}},
+                },
+            )
             generate_leaderboard(tmp, str(base / "lb"))
             self.assertTrue((base / "lb" / "llm_leaderboard.csv").exists())
 

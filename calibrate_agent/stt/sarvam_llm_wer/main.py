@@ -39,9 +39,7 @@ class LLMEquivalenceResponse(BaseModel):
     reasoning: str
 
 
-def get_segments(
-    reference_string: str, predicted_string: str
-) -> List[Dict[str, Any]]:
+def get_segments(reference_string: str, predicted_string: str) -> List[Dict[str, Any]]:
     """Word-align ``reference_string`` against ``predicted_string``.
 
     Returns one dict per ``difflib`` opcode. ``tag`` is one of ``equal``,

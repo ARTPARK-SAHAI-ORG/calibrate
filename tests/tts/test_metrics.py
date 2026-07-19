@@ -107,7 +107,11 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.tts import metrics as tts_metrics
 
         custom_evaluators = [
-            {"name": "x", "system_prompt": "y", "judge_model": "openai/gpt-4o-audio-preview"}
+            {
+                "name": "x",
+                "system_prompt": "y",
+                "judge_model": "openai/gpt-4o-audio-preview",
+            }
         ]
         mock_tts_judge = AsyncMock(
             return_value={"x": {"match": True, "reasoning": "ok"}}

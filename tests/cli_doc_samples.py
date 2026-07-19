@@ -22,7 +22,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-ROOT_CMD = '''## calibrate
+ROOT_CMD = """## calibrate
 
 Calibrate CLI
 
@@ -50,9 +50,9 @@ calibrate [flags]
 * [calibrate widgets](calibrate_widgets.md)\t - Operations for widgets
 * [calibrate ping](calibrate_ping.md)\t - Check connectivity
 * [calibrate secrets](calibrate_secrets.md)\t - Manage local secrets
-'''
+"""
 
-WIDGETS = '''## calibrate widgets
+WIDGETS = """## calibrate widgets
 
 Operations for widgets
 
@@ -75,9 +75,9 @@ calibrate widgets [flags]
 * [calibrate](calibrate.md)\t - Calibrate CLI
 * [calibrate widgets list](calibrate_widgets_list.md)\t - List widgets
 * [calibrate widgets create](calibrate_widgets_create.md)\t - Create a widget
-'''
+"""
 
-WIDGETS_LIST = '''## calibrate widgets list
+WIDGETS_LIST = """## calibrate widgets list
 
 List widgets
 
@@ -106,9 +106,9 @@ calibrate widgets list [flags]
 ### SEE ALSO
 
 * [calibrate widgets](calibrate_widgets.md)\t - Operations for widgets
-'''
+"""
 
-WIDGETS_CREATE = '''## calibrate widgets create
+WIDGETS_CREATE = """## calibrate widgets create
 
 Create a widget
 
@@ -150,10 +150,10 @@ calibrate widgets create [flags]
 ### SEE ALSO
 
 * [calibrate widgets](calibrate_widgets.md)\t - Operations for widgets
-'''
+"""
 
 # A single-command (leaf) resource: parent file, no subcommands.
-PING = '''## calibrate ping
+PING = """## calibrate ping
 
 Check connectivity
 
@@ -180,10 +180,10 @@ calibrate ping [flags]
 ### SEE ALSO
 
 * [calibrate](calibrate.md)\t - Calibrate CLI
-'''
+"""
 
 # A local/utility command that is NOT an API resource — filtered out.
-SECRETS = '''## calibrate secrets
+SECRETS = """## calibrate secrets
 
 Manage local secrets
 
@@ -204,7 +204,7 @@ calibrate secrets [flags]
 ### SEE ALSO
 
 * [calibrate](calibrate.md)\t - Calibrate CLI
-'''
+"""
 
 # filename -> raw markdown
 SAMPLES: dict[str, str] = {
