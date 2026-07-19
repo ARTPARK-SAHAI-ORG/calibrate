@@ -51,14 +51,16 @@ uv run pytest tests/
 
 ### Pre-commit
 
-Enable the project's git hooks so the pre-commit test
-runner fires on commits to `main`:
+Enable the project's git hooks so lint, formatting, type and secret checks
+fire on every commit, and the test suite runs on commits to `main`:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-Every contributor needs to run it once.
+Every contributor needs to run it once. The secret scan is skipped unless
+[gitleaks](https://github.com/gitleaks/gitleaks) is on your `PATH`
+(`brew install gitleaks`); CI runs it either way.
 
 ## License
 

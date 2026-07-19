@@ -559,7 +559,7 @@ async def run_simulation(
     transcript = [
         message
         for message in bot_context._messages
-        if message["role"] not in ["system"]
+        if message["role"] not in ["system"]  # type: ignore[index]
     ]
 
     if conversation_state._is_max_turns_reached:

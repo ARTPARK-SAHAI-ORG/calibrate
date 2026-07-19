@@ -44,7 +44,7 @@ class IndicNormalizer:
         self.whisper_processor = WhisperProcessor.from_pretrained(
             "openai/whisper-small"
         )
-        self.whisper_tokenizer = self.whisper_processor.tokenizer  # type: ignore
+        self.whisper_tokenizer = self.whisper_processor.tokenizer
 
     def normalize_text(self, text: str, lang_code: str) -> str:
         lang_code = lang_to_code.get(lang_code, lang_code)
@@ -100,7 +100,7 @@ class IndicNormalizer:
         )
 
         if processed_batches:
-            return [item for sublist in processed_batches for item in sublist]  # type: ignore
+            return [item for sublist in processed_batches for item in sublist]
         return []
 
 

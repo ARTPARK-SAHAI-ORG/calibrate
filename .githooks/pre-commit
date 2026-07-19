@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Lint staged Python files on every branch.
+# Lint, format-check and type-check staged Python files on every branch, and
+# scan staged changes for secrets.
 # Additionally run the full test suite when committing to main.
 
 branch=$(git symbolic-ref --short HEAD 2>/dev/null)
@@ -19,7 +20,35 @@ if [ -n "$staged_py" ]; then
         echo "  Run 'uv run --extra dev ruff check --fix .' to fix what is auto-fixable."
         exit 1
     fi
-    echo "✓ Lint passed."
+
+    if ! echo "$staged_py" | xargs uv run --extra dev ruff format --check --force-exclude; then
+        echo ""
+        echo "✗ Formatting check failed. Commit aborted."
+        echo "  Run 'uv run --extra dev ruff format .' and stage the result."
+        exit 1
+    fi
+    echo "✓ Lint and formatting passed."
+
+    # mypy reads its file list from pyproject.toml, so it always checks the
+    # whole package rather than only what is staged.
+    echo "→ pre-commit: type-checking..."
+    if ! uv run --extra dev mypy; then
+        echo ""
+        echo "✗ Type check failed. Commit aborted."
+        exit 1
+    fi
+    echo "✓ Type check passed."
+fi
+
+if command -v gitleaks >/dev/null 2>&1; then
+    echo "→ pre-commit: scanning staged changes for secrets..."
+    if ! gitleaks git --staged --redact --no-banner; then
+        echo ""
+        echo "✗ Possible secret in staged changes. Commit aborted."
+        echo "  Remove it, or add an allowlist entry to .gitleaks.toml if it is a placeholder."
+        exit 1
+    fi
+    echo "✓ No secrets found."
 fi
 
 if [ "$branch" != "main" ]; then

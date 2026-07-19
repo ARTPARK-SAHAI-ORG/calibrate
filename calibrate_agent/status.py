@@ -431,7 +431,7 @@ async def _check_gemini(client: httpx.AsyncClient) -> str:
             ),
         ),
     )
-    audio = resp.candidates[0].content.parts[0].inline_data.data
+    audio = resp.candidates[0].content.parts[0].inline_data.data  # type: ignore[index]
     if not audio or len(audio) < 100:
         raise ValueError("Empty audio response")
     return "tts"

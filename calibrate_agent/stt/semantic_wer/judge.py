@@ -129,7 +129,7 @@ async def semantic_wer_judge(
     reason_resp = await client.chat.completions.create(
         model=model,
         messages=[
-            _CACHED_SYSTEM_MESSAGE,
+            _CACHED_SYSTEM_MESSAGE,  # type: ignore[list-item]
             {"role": "user", "content": user_msg},
         ],
         temperature=0,

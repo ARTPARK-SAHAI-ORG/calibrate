@@ -312,26 +312,48 @@ runs rely on them.
 
 ## Workflows
 
-### Linting
+### Code quality checks
 
-Ruff is the linter. It is configured in `pyproject.toml` under `[tool.ruff]`
-and catches unused imports, unused variables, unused function arguments that
-are unpacked, unreachable or useless expressions, undefined names, and a few
-duplicated-branch patterns.
+Four checks gate every PR (`.github/workflows/tests.yml`) and run in
+`.githooks/pre-commit` on every branch:
 
 ```bash
-uv run --extra dev ruff check .          # check
-uv run --extra dev ruff check --fix .    # auto-fix what is fixable
+uv run --extra dev ruff check .          # lint
+uv run --extra dev ruff format .         # format
+uv run --extra dev mypy                  # type check
+uv lock --check                          # lock file matches pyproject.toml
+gitleaks dir . --redact                  # secret scan
 ```
 
-Run this before committing. The `lint` job in `.github/workflows/tests.yml`
-fails the PR on any finding, and `.githooks/pre-commit` lints staged `.py`
-files on every branch.
+**Ruff lint** is configured in `pyproject.toml` under `[tool.ruff.lint]`. It
+catches unused imports, unused variables, unused unpacked variables, unused
+loop variables, useless expressions, undefined names, stale `noqa` comments,
+and a few duplicated-branch patterns.
 
 Some imports exist only to be re-exported (e.g. `AsyncOpenAI` in
 `calibrate_agent/langfuse.py`). Mark those with `# noqa: F401` rather than
 deleting them, and check for module-attribute access in tests
 (`patch.object(module, "Name")`) before removing an import that looks unused.
+
+**Ruff format** owns formatting at the default 88-column width. There is no
+separate formatter config to keep in sync.
+
+**Mypy** is configured under `[tool.mypy]`. Annotation-level strictness is off
+because the codebase is largely unannotated; what stays on is the set that
+flags genuine mistakes: calls that do not match a signature, attributes that
+do not exist, and values used in ways their type does not allow. Prefer fixing
+the annotation over adding `# type: ignore`. When an ignore is genuinely
+needed for a third-party stub mismatch, give it a specific code
+(`# type: ignore[attr-defined]`) so `warn_unused_ignores` can retire it later.
+
+Tests that patch a function with a bare `AsyncMock` accept any arguments, so a
+call that does not match the real signature passes the suite. Pass
+`autospec=True` to `patch` so the mock enforces the real signature.
+
+**Gitleaks** scans the working tree using `.gitleaks.toml`, which allowlists
+documentation placeholders (`your_api_key`) and empty template assignments in
+`.env.example`. Add an allowlist entry for a new placeholder rather than
+loosening the rule.
 
 ### Running the test suite
 

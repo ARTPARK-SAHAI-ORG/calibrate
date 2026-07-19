@@ -168,12 +168,14 @@ class _Simulation:
         results = []
         total_simulations = len(personas) * len(scenarios)
         simulation_count = 0
+        semaphore = asyncio.Semaphore(1)
 
         for persona_index, user_persona in enumerate(personas):
             for scenario_index, scenario in enumerate(scenarios):
                 simulation_count += 1
                 try:
                     result = await run_single_simulation_task(
+                        semaphore=semaphore,
                         config=config,
                         persona_index=persona_index,
                         user_persona=user_persona,
@@ -181,7 +183,6 @@ class _Simulation:
                         scenario=scenario,
                         output_dir=output_dir,
                         interrupt_sensitivity_map=interrupt_sensitivity_map,
-                        base_port=port,
                     )
                     results.append(result)
                 except Exception as e:

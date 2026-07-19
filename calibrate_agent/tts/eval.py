@@ -649,7 +649,7 @@ async def run_tts_eval(
     output_dir: str,
     results_csv_path: Path,
     overwrite: bool = False,
-) -> int:
+) -> Dict:
     """Process texts and synthesize speech, saving results immediately to CSV.
 
     Args:

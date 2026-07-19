@@ -65,6 +65,7 @@ import os
 import json
 import asyncio
 from collections import defaultdict
+from types import SimpleNamespace
 import pandas as pd
 
 
@@ -664,13 +665,7 @@ class _Simulations:
             },
         }
 
-        # Create a mock args object
-        class Args:
-            pass
-
-        args = Args()
-        args.model = model
-        args.provider = provider
+        args = SimpleNamespace(model=model, provider=provider)
 
         # Create semaphore for parallel execution
         semaphore = asyncio.Semaphore(parallel)
@@ -703,7 +698,7 @@ class _Simulations:
         all_simulation_metrics = []
 
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 continue
             if result is None:
                 continue

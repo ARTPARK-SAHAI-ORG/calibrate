@@ -63,7 +63,8 @@ class TestSimulationRun(unittest.IsolatedAsyncioTestCase):
             tempfile.TemporaryDirectory() as tmp,
             patch(
                 "calibrate_agent.agent.run_simulation.run_single_simulation_task",
-                AsyncMock(return_value=fake_result),
+                autospec=True,
+                side_effect=AsyncMock(return_value=fake_result),
             ),
         ):
             result = await simulation.run(
@@ -95,7 +96,8 @@ class TestSimulationRun(unittest.IsolatedAsyncioTestCase):
             tempfile.TemporaryDirectory() as tmp,
             patch(
                 "calibrate_agent.agent.run_simulation.run_single_simulation_task",
-                AsyncMock(side_effect=RuntimeError("simfail")),
+                autospec=True,
+                side_effect=AsyncMock(side_effect=RuntimeError("simfail")),
             ),
         ):
             with self.assertRaises(RuntimeError) as ctx:
@@ -124,7 +126,8 @@ class TestSimulationRun(unittest.IsolatedAsyncioTestCase):
             tempfile.TemporaryDirectory() as tmp,
             patch(
                 "calibrate_agent.agent.run_simulation.run_single_simulation_task",
-                AsyncMock(return_value=None),
+                autospec=True,
+                side_effect=AsyncMock(return_value=None),
             ),
         ):
             result = await simulation.run(

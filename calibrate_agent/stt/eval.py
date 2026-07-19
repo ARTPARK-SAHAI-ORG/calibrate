@@ -6,7 +6,7 @@ import json
 import base64
 from os.path import join, exists
 from pathlib import Path
-from typing import Dict, List
+from typing import Any, Callable, Dict, Iterator, List
 from urllib.parse import urlencode
 import backoff
 from sarvamai import AsyncSarvamAI
@@ -356,8 +356,10 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
         timeout=STT_PROVIDER_TIMEOUT_SECONDS,
     )
 
+    # response_format="text" makes the SDK return a plain string, not a
+    # Transcription object.
     return {
-        "transcript": transcription.strip(),
+        "transcript": transcription.strip(),  # type: ignore[attr-defined]
     }
 
 
@@ -420,7 +422,7 @@ def _transcribe_google_streaming(
     def requests(
         config: cloud_speech_types.StreamingRecognizeRequest,
         audio: list,
-    ) -> list:
+    ) -> Iterator:
         yield config
         for req in audio:
             yield req
@@ -890,7 +892,7 @@ async def transcribe_audio(
     unique_id: str,
 ) -> str:
     """Route audio transcription to the appropriate provider."""
-    provider_methods = {
+    provider_methods: Dict[str, Callable[..., Any]] = {
         "deepgram": transcribe_deepgram_streaming,
         "openai": transcribe_openai_streaming,
         "groq": transcribe_groq,

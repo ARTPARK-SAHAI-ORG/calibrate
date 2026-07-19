@@ -1,7 +1,7 @@
 import argparse
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
@@ -128,7 +128,7 @@ def _build_leaderboard(
     """
     rows = []
     for model_name in sorted(model_results):
-        row: Dict[str, Optional[float]] = {"model": model_name}
+        row: Dict[str, Any] = {"model": model_name}
         for metric in metric_names:
             row[metric] = model_results[model_name].get(metric)
 

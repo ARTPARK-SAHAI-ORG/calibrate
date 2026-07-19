@@ -57,6 +57,7 @@ dev = [
     "pytest-cov>=4.0",
     "pyyaml>=6.0",
     "ruff>=0.9",
+    "mypy>=1.14",
 ]
 
 [project.urls]
@@ -86,6 +87,25 @@ exclude = ["ui", "docs", ".venv"]
 # Unused / dead / duplicated code, plus syntax and undefined-name errors.
 select = ["E4", "E7", "E9", "F", "B007", "B018", "PIE790", "RUF059", "RUF100", "SIM101", "SIM110", "SIM114"]
 ignore = ["E402", "E741", "F541"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["calibrate_agent"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_unused_configs = true
+# Annotation-level strictness is off while the codebase is largely unannotated.
+# What stays on is the set that flags genuine mistakes: calls that do not match
+# a signature, attributes that do not exist, and values used in ways their type
+# does not allow.
+disable_error_code = [
+    "arg-type",
+    "assignment",
+    "call-overload",
+    "return-value",
+    "union-attr",
+    "var-annotated",
+]
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"

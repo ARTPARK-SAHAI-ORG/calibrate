@@ -1,0 +1,12 @@
+title = "calibrate gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Documentation placeholders and empty template assignments"
+regexTarget = "match"
+regexes = [
+  '''(?i)your[_-]?api[_-]?key''',
+  '''[A-Z_]+_(API_)?KEY\s*=\s*$''',
+]

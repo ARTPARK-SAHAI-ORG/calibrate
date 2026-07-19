@@ -40,11 +40,11 @@ except Exception:
 
     from openai import AsyncOpenAI  # noqa: F401  re-exported
 
-    LangfuseMedia = None
+    LangfuseMedia = None  # type: ignore[misc]
     langfuse = None
     langfuse_enabled = False
 
-    def observe(**kwargs):
+    def observe(**kwargs):  # type: ignore[misc]
         """No-op decorator when langfuse is not available."""
 
         def decorator(func):

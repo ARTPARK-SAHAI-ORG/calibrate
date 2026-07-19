@@ -19,6 +19,46 @@ jobs:
       - name: Run ruff
         run: uvx ruff check .
 
+      - name: Check formatting
+        run: uvx ruff format --check .
+
+      - name: Check uv.lock is up to date
+        run: uv lock --check
+
+  types:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libasound2-dev
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run mypy
+        run: uv run mypy
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+        env:
+          GITLEAKS_VERSION: 8.28.0
+
+      - name: Scan working tree for secrets
+        run: gitleaks dir . --redact --verbose
+
   test:
     runs-on: ubuntu-latest
     steps:
