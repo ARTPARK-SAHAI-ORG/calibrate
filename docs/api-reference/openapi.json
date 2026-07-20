@@ -680,6 +680,12 @@
             "title": "Item Count",
             "description": "Number of items in the task"
           },
+          "has_agreement": {
+            "type": "boolean",
+            "title": "Has Agreement",
+            "description": "Whether the task has at least one comparable human-vs-human or human-vs-evaluator pair, computed over all time",
+            "default": false
+          },
           "items": {
             "items": {
               "additionalProperties": true,
@@ -901,6 +907,21 @@
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
             "description": "Current status of the run"
+          },
+          "test_uuids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Uuids",
+            "description": "IDs of the tests this benchmark executed, in run order"
           },
           "evaluators": {
             "anyOf": [
@@ -3586,6 +3607,21 @@
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
             "description": "Current status of the run"
+          },
+          "test_uuids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Uuids",
+            "description": "IDs of the tests this run executed, in run order"
           },
           "total_tests": {
             "anyOf": [
