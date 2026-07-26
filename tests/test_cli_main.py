@@ -133,6 +133,26 @@ class TestRunAgentVerify(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli._run_agent_verify("http://x", None)
 
+    def test_invalid_json_inputs(self):
+        from calibrate_agent import cli
+
+        with self.assertRaises(SystemExit):
+            cli._run_agent_verify("http://x", None, agent_inputs_raw="{bad json")
+
+    def test_agent_inputs_passed_as_default_inputs(self):
+        from calibrate_agent import cli
+
+        fake_result = {"ok": True, "sample_output": {"response": "Hi", "tool_calls": []}}
+        with patch("calibrate_agent.connections.TextAgentConnection") as MockConn:
+            MockConn.return_value.verify = AsyncMock(return_value=fake_result)
+            cli._run_agent_verify(
+                "http://x", None, agent_inputs_raw='{"condition_area": "cardiology"}'
+            )
+            _, kwargs = MockConn.call_args
+            self.assertEqual(
+                kwargs.get("default_inputs"), {"condition_area": "cardiology"}
+            )
+
 
 class TestMainDispatch(unittest.TestCase):
     def _run_with_argv(self, argv):

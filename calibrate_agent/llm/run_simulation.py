@@ -982,6 +982,7 @@ async def main():
         agent = TextAgentConnection(
             url=config["agent_url"],
             headers=config.get("agent_headers"),
+            default_inputs=config.get("agent_default_inputs"),
         )
 
     # Create all simulation tasks
