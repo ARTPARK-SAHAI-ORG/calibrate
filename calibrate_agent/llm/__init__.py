@@ -168,6 +168,7 @@ class _Tests:
                     evaluation=evaluation,
                     agent=agent,
                     model=agent_model_hint,
+                    inputs=test_case.get("inputs"),
                     evaluators=resolved_evaluators,
                 )
             else:

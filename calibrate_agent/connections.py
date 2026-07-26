@@ -114,10 +114,24 @@ class TextAgentConnection:
     headers: Optional[dict] = field(default=None)
     """Optional HTTP headers, e.g. ``{"Authorization": "Bearer sk-..."}``. Default: none."""
 
+    default_inputs: Optional[dict] = field(default=None)
+    """Inputs merged into every request body to this agent (e.g. ``{"condition_area": "cardiology"}``)."""
+
+    def _build_body(self, messages, inputs=None, model=None) -> dict:
+        body = {"messages": messages}
+        if self.default_inputs:
+            body.update(self.default_inputs)
+        if inputs:
+            body.update(inputs)
+        if model is not None:
+            body["model"] = model
+        return body
+
     async def verify(
         self,
         messages: Optional[list] = None,
         model: Optional[str] = None,
+        inputs: Optional[dict] = None,
     ) -> dict:
         """Check the endpoint is reachable and returns the expected format.
 
@@ -130,6 +144,10 @@ class TextAgentConnection:
                 Defaults to a simple greeting when not provided.
             model: Optional model name to include in the request (for verifying
                 benchmark mode, e.g. ``"gemma-4-26b-a4b-it"``).
+            inputs: Optional extra request fields. Omitted → ``default_inputs``
+                is used as-is (so verify works with no test case). Passed →
+                merged over ``default_inputs`` per key, so individual inputs can
+                be edited while untouched ones keep their default.
 
         Returns:
             ``{"ok": True, "sample_output": {"response": "...", "tool_calls": [...]}}``
@@ -148,9 +166,7 @@ class TextAgentConnection:
         """
         input_messages = messages if messages is not None else _DEFAULT_VERIFY_MESSAGES
 
-        body: dict = {"messages": input_messages}
-        if model is not None:
-            body["model"] = model
+        body = self._build_body(input_messages, inputs=inputs, model=model)
 
         # ── 1. POST to endpoint (retry transient failures) ───────────────
         try:
@@ -248,6 +264,7 @@ class TextAgentConnection:
         self,
         messages: list,
         model: "Optional[str]" = None,
+        inputs: "Optional[dict]" = None,
     ) -> dict:
         """POST a messages array to the agent endpoint and return its output.
 
@@ -255,6 +272,8 @@ class TextAgentConnection:
             messages: List of ``{"role": ..., "content": ...}`` dicts.
             model: Optional model name to include in the request body (for
                 benchmarking, e.g. ``"gemma-4-26b-a4b-it"``).
+            inputs: Optional per-call extra request fields, merged over
+                ``default_inputs`` per key.
 
         Returns:
             dict with ``response`` (str | None) and ``tool_calls`` (list) keys.
@@ -269,9 +288,7 @@ class TextAgentConnection:
                 timeouts, and HTTP 429/502/503/504) are retried with
                 exponential backoff before giving up.
         """
-        body: dict = {"messages": messages}
-        if model is not None:
-            body["model"] = model
+        body = self._build_body(messages, inputs=inputs, model=model)
 
         try:
             resp = await self._post_with_retry(body, timeout=60.0)

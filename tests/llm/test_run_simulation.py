@@ -112,3 +112,23 @@ def test_concurrent_record_turn_does_not_exceed_max_turns():
         )
 
     asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# 9. run_simulation_with_agent refuses an agent configured with custom inputs
+# ---------------------------------------------------------------------------
+
+def test_run_simulation_rejects_agent_with_default_inputs():
+    from calibrate_agent.llm.run_simulation import run_simulation_with_agent
+
+    class _Agent:
+        default_inputs = {"condition_area": "cardiology"}
+
+    with pytest.raises(ValueError):
+        asyncio.run(
+            run_simulation_with_agent(
+                agent=_Agent(),
+                user_system_prompt="be a user",
+                evaluators=[{"name": "e", "system_prompt": "p"}],
+            )
+        )

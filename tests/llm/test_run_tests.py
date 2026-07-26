@@ -473,5 +473,38 @@ class TestEvaluatorsRegistryLegacyDefaultAlias(unittest.TestCase):
         self.assertIn("be polite", rendered[0]["system_prompt"])
 
 
+class TestRunTestExternalInputs(unittest.IsolatedAsyncioTestCase):
+
+    async def test_inputs_passed_through_to_agent_call(self):
+        from calibrate_agent.llm.run_tests import run_test_external
+
+        class RecordingAgent:
+            def __init__(self):
+                self.recorded = {}
+
+            async def call(self, messages, model=None, inputs=None):
+                self.recorded["inputs"] = inputs
+                return {"response": "hi", "tool_calls": []}
+
+        agent = RecordingAgent()
+        inputs = {"temperature": 0.2, "extra": "field"}
+
+        mock_judge = AsyncMock(
+            return_value={"greeting": {"match": True, "reasoning": "ok"}}
+        )
+        with patch(
+            "calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge
+        ):
+            await run_test_external(
+                chat_history=[{"role": "user", "content": "Hi"}],
+                evaluation={"type": "response", "criteria": [{"name": "greeting"}]},
+                agent=agent,
+                inputs=inputs,
+                evaluators=[_binary_ev("greeting")],
+            )
+
+        self.assertEqual(agent.recorded["inputs"], inputs)
+
+
 if __name__ == "__main__":
     unittest.main()
