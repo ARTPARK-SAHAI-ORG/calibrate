@@ -977,12 +977,18 @@ async def main():
     # Detect agent connection path
     agent = None
     if config.get("agent_url"):
+        if config.get("agent_default_inputs"):
+            print(
+                "✗ Text simulation is not supported for an agent configured with "
+                "custom inputs (agent_default_inputs). The simulator sends only "
+                "conversation messages each turn."
+            )
+            sys.exit(1)
         from calibrate_agent.connections import TextAgentConnection
 
         agent = TextAgentConnection(
             url=config["agent_url"],
             headers=config.get("agent_headers"),
-            default_inputs=config.get("agent_default_inputs"),
         )
 
     # Create all simulation tasks

@@ -870,6 +870,13 @@ Examples:
 
                 with open(args.config) as _f:
                     _sim_config = _json.load(_f)
+                if _sim_config.get("agent_default_inputs"):
+                    print(
+                        "✗ Text simulation is not supported for an agent configured "
+                        "with custom inputs (agent_default_inputs). The simulator "
+                        "sends only conversation messages each turn."
+                    )
+                    sys.exit(1)
                 if _sim_config.get("agent_url") and not getattr(
                     args, "skip_verify", False
                 ):
@@ -878,7 +885,6 @@ Examples:
                     _sim_agent = TextAgentConnection(
                         url=_sim_config["agent_url"],
                         headers=_sim_config.get("agent_headers"),
-                        default_inputs=_sim_config.get("agent_default_inputs"),
                     )
                     print(f"\nVerifying agent connection: {_sim_config['agent_url']}")
                     _verify = asyncio.run(_sim_agent.verify())
