@@ -477,12 +477,6 @@ Examples:
         help='HTTP headers for the agent as a JSON string, e.g. \'{"Authorization": "Bearer sk-..."}\'',
     )
     sim_parser.add_argument(
-        "--agent-inputs",
-        type=str,
-        default=None,
-        help='Extra input fields sent with the verify request as a JSON string, e.g. \'{"condition_area": "cardiology"}\'',
-    )
-    sim_parser.add_argument(
         "--skip-verify",
         action="store_true",
         help="Skip agent connection verification (used internally when already verified)",
@@ -818,7 +812,6 @@ Examples:
                 args.agent_url,
                 args.agent_headers,
                 models=[_model_str] if _model_str else None,
-                agent_inputs_raw=args.agent_inputs,
             )
         # Hidden leaderboard subcommand (used by Ink UI)
         elif getattr(args, "sim_subcmd", None) == "leaderboard":

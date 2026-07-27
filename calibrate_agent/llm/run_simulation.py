@@ -610,12 +610,6 @@ async def run_simulation_with_agent(
     Returns:
         dict with ``transcript`` and ``evaluation_results`` keys.
     """
-    if getattr(agent, "default_inputs", None):
-        raise ValueError(
-            "Text simulation is not supported for an agent configured with custom inputs "
-            "(default_inputs). The simulator sends only conversation messages each turn."
-        )
-
     require_simulation_evaluators(evaluators)
 
     from openai import AsyncOpenAI as _AsyncOpenAI
