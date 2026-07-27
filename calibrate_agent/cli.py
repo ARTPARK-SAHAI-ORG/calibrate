@@ -118,6 +118,7 @@ def _run_agent_verify(
     agent_url: str,
     agent_headers_raw: str | None,
     models: list[str] | None = None,
+    agent_inputs_raw: str | None = None,
 ) -> None:
     """Verify an external agent connection and print the result."""
     from calibrate_agent.connections import TextAgentConnection
@@ -130,16 +131,27 @@ def _run_agent_verify(
             print("✗ --agent-headers is not valid JSON")
             sys.exit(1)
 
-    agent = TextAgentConnection(url=agent_url, headers=headers)
+    default_inputs = None
+    if agent_inputs_raw:
+        try:
+            default_inputs = json.loads(agent_inputs_raw)
+        except json.JSONDecodeError:
+            print("✗ --agent-inputs is not valid JSON")
+            sys.exit(1)
+
+    agent = TextAgentConnection(
+        url=agent_url, headers=headers, default_inputs=default_inputs
+    )
 
     # If models provided, send the first model name in the verify request
     model_hint: str | None = models[0] if models else None
 
-    body_preview = (
-        '{"messages": [...], "model": "' + model_hint + '"}'
-        if model_hint
-        else '{"messages": [{"role": "user", "content": "Hi"}]}'
-    )
+    _preview_body: dict = {"messages": [{"role": "user", "content": "Hi"}]}
+    if default_inputs:
+        _preview_body.update(default_inputs)
+    if model_hint:
+        _preview_body["model"] = model_hint
+    body_preview = json.dumps(_preview_body)
 
     print(f"\nVerifying agent connection: {agent_url}")
     print(f"Sending: {body_preview}")
@@ -380,6 +392,12 @@ Examples:
         type=str,
         default=None,
         help='HTTP headers for the agent as a JSON string, e.g. \'{"Authorization": "Bearer sk-..."}\'',
+    )
+    llm_parser.add_argument(
+        "--agent-inputs",
+        type=str,
+        default=None,
+        help='Extra input fields sent with the verify request as a JSON string, e.g. \'{"condition_area": "cardiology"}\'',
     )
     llm_parser.add_argument(
         "--skip-verify",
@@ -674,6 +692,7 @@ Examples:
                 args.agent_url,
                 args.agent_headers,
                 models=args.model,
+                agent_inputs_raw=args.agent_inputs,
             )
         elif args.config is None:
             # No config → interactive mode
@@ -699,6 +718,7 @@ Examples:
                 _agent = TextAgentConnection(
                     url=_config["agent_url"],
                     headers=_config.get("agent_headers"),
+                    default_inputs=_config.get("agent_default_inputs"),
                 )
                 _models = args.model if args.model else []
 
@@ -843,6 +863,13 @@ Examples:
 
                 with open(args.config) as _f:
                     _sim_config = _json.load(_f)
+                if _sim_config.get("agent_default_inputs"):
+                    print(
+                        "✗ Text simulation is not supported for an agent configured "
+                        "with custom inputs (agent_default_inputs). The simulator "
+                        "sends only conversation messages each turn."
+                    )
+                    sys.exit(1)
                 if _sim_config.get("agent_url") and not getattr(
                     args, "skip_verify", False
                 ):

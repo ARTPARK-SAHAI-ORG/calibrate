@@ -491,6 +491,87 @@ class TestRunTestExternalMetrics(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Tests for extra input fields (default_inputs + per-call inputs)
+# ---------------------------------------------------------------------------
+
+class TestExtraInputs(unittest.IsolatedAsyncioTestCase):
+
+    @staticmethod
+    def _sent_body(mock_client):
+        return mock_client.post.call_args.kwargs["json"]
+
+    async def test_call_includes_default_inputs(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(
+            url="http://fake-agent/chat",
+            default_inputs={"condition_area": "cardiology"},
+        )
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertEqual(self._sent_body(mock_client)["condition_area"], "cardiology")
+
+    async def test_call_inputs_override_default_inputs_per_key(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(
+            url="http://fake-agent/chat",
+            default_inputs={"condition_area": "cardiology", "lang": "en"},
+        )
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            await agent.call(
+                [{"role": "user", "content": "Hi"}],
+                inputs={"condition_area": "oncology"},
+            )
+
+        body = self._sent_body(mock_client)
+        self.assertEqual(body["condition_area"], "oncology")
+        self.assertEqual(body["lang"], "en")
+
+    async def test_verify_sends_default_inputs(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(
+            url="http://fake-agent/chat",
+            default_inputs={"condition_area": "cardiology"},
+        )
+        ctx, mock_client = _patch_httpx({"response": "ok", "tool_calls": []})
+        with ctx:
+            await agent.verify()
+
+        self.assertEqual(self._sent_body(mock_client)["condition_area"], "cardiology")
+
+    async def test_verify_inputs_override_default_inputs_per_key(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(
+            url="http://fake-agent/chat",
+            default_inputs={"condition_area": "cardiology", "lang": "en"},
+        )
+        ctx, mock_client = _patch_httpx({"response": "ok", "tool_calls": []})
+        with ctx:
+            await agent.verify(inputs={"condition_area": "oncology"})
+
+        body = self._sent_body(mock_client)
+        self.assertEqual(body["condition_area"], "oncology")
+        self.assertEqual(body["lang"], "en")
+
+    async def test_call_body_unchanged_without_inputs(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        messages = [{"role": "user", "content": "Hi"}]
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            await agent.call(messages)
+
+        self.assertEqual(self._sent_body(mock_client), {"messages": messages})
+
+
+# ---------------------------------------------------------------------------
 # Tests for TextAgentConnection.verify()
 # ---------------------------------------------------------------------------
 

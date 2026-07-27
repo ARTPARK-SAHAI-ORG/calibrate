@@ -1497,6 +1497,7 @@ async def run_test_external(
     evaluation: dict,
     agent,
     model: Optional[str] = None,
+    inputs: Optional[dict] = None,
     evaluators: Optional[List[dict]] = None,
 ) -> dict:
     """Run a single LLM test case against an external text agent.
@@ -1523,11 +1524,12 @@ async def run_test_external(
         evaluation: Evaluation dict with ``type`` and criteria.
         agent: A :class:`~calibrate_agent.connections.TextAgentConnection`.
         model: Optional model name included in the request body (for benchmarking).
+        inputs: Optional dict of extra request fields for this test case.
 
     Returns:
         dict with ``output`` and ``metrics`` keys.
     """
-    output = await agent.call(chat_history, model=model)
+    output = await agent.call(chat_history, model=model, inputs=inputs)
     response = output.get("response")
     tool_calls = output.get("tool_calls", [])
     agent_metrics = output.get("metrics")

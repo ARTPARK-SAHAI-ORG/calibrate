@@ -133,6 +133,26 @@ class TestRunAgentVerify(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 cli._run_agent_verify("http://x", None)
 
+    def test_invalid_json_inputs(self):
+        from calibrate_agent import cli
+
+        with self.assertRaises(SystemExit):
+            cli._run_agent_verify("http://x", None, agent_inputs_raw="{bad json")
+
+    def test_agent_inputs_passed_as_default_inputs(self):
+        from calibrate_agent import cli
+
+        fake_result = {"ok": True, "sample_output": {"response": "Hi", "tool_calls": []}}
+        with patch("calibrate_agent.connections.TextAgentConnection") as MockConn:
+            MockConn.return_value.verify = AsyncMock(return_value=fake_result)
+            cli._run_agent_verify(
+                "http://x", None, agent_inputs_raw='{"condition_area": "cardiology"}'
+            )
+            _, kwargs = MockConn.call_args
+            self.assertEqual(
+                kwargs.get("default_inputs"), {"condition_area": "cardiology"}
+            )
+
 
 class TestMainDispatch(unittest.TestCase):
     def _run_with_argv(self, argv):
@@ -382,6 +402,27 @@ class TestMainDispatch(unittest.TestCase):
                     "-o", tmp, "-m", "m1", "--skip-verify",
                 ])
 
+    def test_llm_with_config_agent_default_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "agent_default_inputs": {"condition_area": "cardiology"},
+                "test_cases": [],
+            }))
+            with patch("calibrate_agent.connections.TextAgentConnection") as MockConn, \
+                 patch("calibrate_agent.llm.tests_leaderboard.generate_leaderboard"), \
+                 patch("calibrate_agent.llm.tests.run",
+                       AsyncMock(return_value={"m1": {"metrics": {"passed": 1, "total": 1}}})):
+                self._run_with_argv([
+                    "calibrate_agent", "llm", "-c", str(cfg),
+                    "-o", tmp, "-m", "m1", "--skip-verify",
+                ])
+                _, kwargs = MockConn.call_args
+                self.assertEqual(
+                    kwargs.get("default_inputs"), {"condition_area": "cardiology"}
+                )
+
     def test_llm_with_config_agent_url_no_models(self):
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "config.json"
@@ -539,6 +580,19 @@ class TestMainDispatch(unittest.TestCase):
                         "calibrate_agent", "simulations", "--type", "text",
                         "-c", str(cfg), "-o", tmp,
                     ])
+
+    def test_simulations_text_rejects_agent_default_inputs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "agent_default_inputs": {"condition_area": "cardiology"},
+            }))
+            with self.assertRaises(SystemExit):
+                self._run_with_argv([
+                    "calibrate_agent", "simulations", "--type", "text",
+                    "-c", str(cfg), "-o", tmp,
+                ])
 
     def test_simulations_leaderboard(self):
         with patch("calibrate_agent.llm.simulation_leaderboard.main") as mock:
