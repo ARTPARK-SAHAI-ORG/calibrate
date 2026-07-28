@@ -112,6 +112,57 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
   </Accordion>
 </AccordionGroup>
 
+### Judge cost estimate
+
+Before any audio judge call is made, the CLI estimates the total cost of the
+judge phase — one call per evaluator per row — and asks for confirmation:
+
+```text
+Estimated LLM-as-judge cost for this run:
+
+  pronunciation (openai/gpt-audio): 300 calls, 6,000 input + 15,000 output tokens + 12,000 audio tokens = $0.5490
+
+  Total via OpenRouter: $0.5490
+  Total via direct provider APIs: $0.5490
+
+  Estimated from a bundled rate table and a character-based token heuristic, so
+  the actual cost will differ: token counts are approximate and provider billing
+  quirks (minimums, rounding, taxes, discounts) are not modeled.
+
+Proceed with the judge run? [y/N]:
+```
+
+The audio judge model bills audio by token rather than by minute: audio
+duration is converted to tokens at roughly 10 audio tokens per second before
+being priced. The estimate as a whole is a token-count approximation, not a
+bill — actual cost depends on the real tokenizer output and each provider's
+exact billing. The estimate and the prompt are printed to stderr, so
+redirecting stdout to a file still shows the prompt on screen.
+
+| Flag                     | Description                                                                                       |
+| ------------------------ | --------------------------------------------------------------------------------------------------- |
+| `--yes`, `-y`             | Skip the confirmation prompt and proceed with the judge run.                                       |
+| `CALIBRATE_ASSUME_YES`    | Environment variable; set to any non-empty value to skip the confirmation prompt without passing `--yes`. |
+
+The prompt is also skipped automatically when stdin isn't a terminal (piped
+input, CI) or when the process is running in the background of one — the case
+that matters for `calibrate-agent tts ... &`, since a backgrounded process
+reading from the terminal would otherwise be suspended by the operating
+system rather than shown a prompt. For a backgrounded or scheduled run, pass
+`--yes` or set `CALIBRATE_ASSUME_YES=1` regardless, so the run proceeds
+unattended without depending on that detection.
+
+### Resuming an interrupted judge run
+
+Every judge result is written to `judge_cache.jsonl` in the run's output
+directory as soon as it's computed. If a judge run is interrupted or a row's
+judge call fails, restarting the same command reuses the cached results
+instead of re-grading — and re-paying for — rows already judged. Editing an
+evaluator's `system_prompt`, switching its `judge_model`, or re-synthesizing a
+row's audio invalidates that row's cached result, so it's judged again
+automatically. Pass `--overwrite` to discard `judge_cache.jsonl` along with
+`results.csv` and start clean.
+
 ## Output
 
 Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.

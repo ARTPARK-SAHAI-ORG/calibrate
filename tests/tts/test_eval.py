@@ -289,6 +289,148 @@ class TestRunTTSEval(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(df.iloc[0]["ttfb"], 0.5)
 
 
+class TestScoreAndWriteResultsStore(unittest.IsolatedAsyncioTestCase):
+    """JudgeStore checkpointing in _score_and_write_results."""
+
+    def _wav(self, tmp: str, name: str, content: bytes = b"audio-bytes") -> str:
+        path = os.path.join(tmp, name)
+        with open(path, "wb") as f:
+            f.write(content)
+        return path
+
+    async def test_writes_judge_cache_file(self):
+        from calibrate_agent.tts import eval as tts_eval
+        from calibrate_agent.tts import metrics as tts_metrics
+        from calibrate_agent.judge_store import JudgeStore
+
+        async def fake_tts_llm_judge(audio_path, reference_text, evaluators=None,
+                                      fallback_model=None):
+            return {"pronunciation": {"match": True, "reasoning": "ok"}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_path = self._wav(tmp, "a.wav")
+            with patch.object(
+                tts_metrics, "tts_llm_judge", AsyncMock(side_effect=fake_tts_llm_judge)
+            ):
+                await tts_eval._score_and_write_results(
+                    ids=["row_a"],
+                    texts=["hello"],
+                    audio_paths=[audio_path],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                )
+
+            self.assertTrue(os.path.exists(os.path.join(tmp, JudgeStore.FILENAME)))
+
+    async def test_second_call_reuses_cache_and_judges_fewer_times(self):
+        """End-to-end (real get_tts_llm_judge_score) resume: a second call
+        over the same audio reuses the cached grade instead of re-judging."""
+        from calibrate_agent.tts import eval as tts_eval
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        call_count = {"n": 0}
+
+        async def fake_tts_llm_judge(audio_path, reference_text, evaluators=None,
+                                      fallback_model=None):
+            call_count["n"] += 1
+            return {"pronunciation": {"match": True, "reasoning": "ok"}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_path = self._wav(tmp, "a.wav")
+
+            with patch.object(
+                tts_metrics, "tts_llm_judge", AsyncMock(side_effect=fake_tts_llm_judge)
+            ):
+                await tts_eval._score_and_write_results(
+                    ids=["row_a"],
+                    texts=["hello"],
+                    audio_paths=[audio_path],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                )
+                self.assertEqual(call_count["n"], 1)
+
+                await tts_eval._score_and_write_results(
+                    ids=["row_a"],
+                    texts=["hello"],
+                    audio_paths=[audio_path],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                )
+
+            # No new judge call — the second run reused the checkpoint.
+            self.assertEqual(call_count["n"], 1)
+
+    async def test_overwrite_clears_judge_cache(self):
+        from calibrate_agent.tts import eval as tts_eval
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        call_count = {"n": 0}
+
+        async def fake_tts_llm_judge(audio_path, reference_text, evaluators=None,
+                                      fallback_model=None):
+            call_count["n"] += 1
+            return {"pronunciation": {"match": True, "reasoning": "ok"}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_path = self._wav(tmp, "a.wav")
+
+            with patch.object(
+                tts_metrics, "tts_llm_judge", AsyncMock(side_effect=fake_tts_llm_judge)
+            ):
+                await tts_eval._score_and_write_results(
+                    ids=["row_a"],
+                    texts=["hello"],
+                    audio_paths=[audio_path],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                )
+                self.assertEqual(call_count["n"], 1)
+
+                await tts_eval._score_and_write_results(
+                    ids=["row_a"],
+                    texts=["hello"],
+                    audio_paths=[audio_path],
+                    output_dir=tmp,
+                    evaluator_config_dir=tmp,
+                    overwrite=True,
+                )
+
+            # overwrite=True discarded the checkpoint, so the row is re-judged.
+            self.assertEqual(call_count["n"], 2)
+
+    async def test_run_eval_only_threads_overwrite_to_store(self):
+        from calibrate_agent.tts import eval as tts_eval
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        call_count = {"n": 0}
+
+        async def fake_tts_llm_judge(audio_path, reference_text, evaluators=None,
+                                      fallback_model=None):
+            call_count["n"] += 1
+            return {"pronunciation": {"match": True, "reasoning": "ok"}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_run_dir(tmp)
+            out = os.path.join(tmp, "eval")
+
+            with patch.object(
+                tts_metrics, "tts_llm_judge", AsyncMock(side_effect=fake_tts_llm_judge)
+            ):
+                await tts_eval.run_eval_only(dataset_path=run_dir, output_dir=out)
+                self.assertEqual(call_count["n"], 1)
+
+                # Resumed run: cache hit, no new judge call.
+                await tts_eval.run_eval_only(dataset_path=run_dir, output_dir=out)
+                self.assertEqual(call_count["n"], 1)
+
+                # overwrite=True clears the checkpoint and re-judges.
+                await tts_eval.run_eval_only(
+                    dataset_path=run_dir, output_dir=out, overwrite=True
+                )
+                self.assertEqual(call_count["n"], 2)
+
+
 class TestSynthesizeGemini(unittest.IsolatedAsyncioTestCase):
     def _chunk(self, pcm: bytes):
         from types import SimpleNamespace
@@ -502,7 +644,8 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
         """End-to-end: point run_eval_only at a run dir, no dataset transform."""
         from calibrate_agent.tts import eval as tts_eval
 
-        async def fake_judge(audio_paths, texts, evaluators=None, fallback_model=None):
+        async def fake_judge(audio_paths, texts, evaluators=None, fallback_model=None,
+                              store=None, row_ids=None):
             return {
                 "scores": {"quality": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,

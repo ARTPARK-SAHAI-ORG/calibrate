@@ -254,6 +254,73 @@ class TestMainDispatch(unittest.TestCase):
         self.assertIn("--skip-llm-judges", captured["argv"])
         self.assertIn("hindi", captured["argv"])
 
+    def test_stt_benchmark_forwards_yes_flag(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            import pandas as pd
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(
+                base / "stt.csv", index=False
+            )
+            (base / "audios" / "a.wav").write_bytes(b"\x00")
+
+            with patch("calibrate_agent.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "stt", "-p", "deepgram",
+                    "-i", str(base), "-o", str(base / "out"),
+                    "--yes",
+                ])
+
+        self.assertIn("--yes", captured["argv"])
+
+    def test_stt_benchmark_omits_yes_flag_by_default(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            import pandas as pd
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(
+                base / "stt.csv", index=False
+            )
+            (base / "audios" / "a.wav").write_bytes(b"\x00")
+
+            with patch("calibrate_agent.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "stt", "-p", "deepgram",
+                    "-i", str(base), "-o", str(base / "out"),
+                ])
+
+        self.assertNotIn("--yes", captured["argv"])
+
+    def test_stt_eval_only_forwards_yes_flag(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate_agent.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "stt", "--eval-only", "--dataset", str(ds),
+                    "-o", tmp, "--yes",
+                ])
+
+        self.assertIn("--yes", captured["argv"])
+
     def test_tts_no_provider_launches_ui(self):
         from calibrate_agent import cli
         with patch.object(cli, "_launch_ink_ui") as mock:
@@ -306,6 +373,41 @@ class TestMainDispatch(unittest.TestCase):
         self.assertIn("--config", captured["argv"])
         # Language is not forwarded to the eval-only path (judge ignores it).
         self.assertNotIn("-l", captured["argv"])
+
+    def test_tts_benchmark_forwards_yes_flag(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            inp = Path(tmp) / "in.csv"
+            import pandas as pd
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(str(inp), index=False)
+            with patch("calibrate_agent.tts.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "tts", "-p", "openai",
+                    "-i", str(inp), "-o", tmp, "--yes",
+                ])
+
+        self.assertIn("--yes", captured["argv"])
+
+    def test_tts_eval_only_forwards_yes_flag(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("calibrate_agent.tts.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "tts", "--eval-only", "--dataset", tmp,
+                    "-o", str(Path(tmp) / "out"), "--yes",
+                ])
+
+        self.assertIn("--yes", captured["argv"])
 
     def test_llm_no_config_launches_ui(self):
         from calibrate_agent import cli

@@ -24,17 +24,25 @@ import os
 from os.path import exists, join
 from typing import Literal
 
+import pandas as pd
+
 from calibrate_agent.stt.eval import (
     run_single_provider_eval,
     run_eval_only,
     validate_stt_input_dir,
+    validate_stt_eval_only_dataset,
     format_metrics_summary,
     STT_PROVIDERS,
     STT_LANGUAGES,
 )
 from calibrate_agent.stt.leaderboard import generate_leaderboard
 from calibrate_agent._env import resolve_stt_parallelism
-from calibrate_agent._cli_args import add_stt_eval_args
+from calibrate_agent._cli_args import add_assume_yes_arg, add_stt_eval_args
+from calibrate_agent.judge_cost import (
+    build_stt_judge_groups,
+    confirm_estimated_judge_cost,
+)
+from calibrate_agent.judge_store import JudgeStore
 from calibrate_agent.utils import StreamTee
 
 
@@ -253,6 +261,7 @@ async def main():
         help="Path to optional JSON config file with an `evaluators` list",
     )
     add_stt_eval_args(parser, include_max_parallel=True)
+    add_assume_yes_arg(parser)
 
     args = parser.parse_args()
 
@@ -310,12 +319,36 @@ async def main():
         print(f"Output: {args.output_dir}")
         print("")
 
+        run_llm_judges = not args.skip_llm_judges
+
+        def plan_eval_only_judges():
+            is_valid, _error_msg, rows = validate_stt_eval_only_dataset(args.dataset)
+            if not is_valid:
+                return [], 0
+            # The dataset carries both gt and pred, so this estimate is exact
+            # rather than a prediction-length guess.
+            groups = build_stt_judge_groups(
+                references=[str(r["gt"]) for r in rows],
+                predictions=[
+                    "" if r["pred"] is None else str(r["pred"]) for r in rows
+                ],
+                evaluators=judge_evaluators,
+                run_llm_judges=run_llm_judges,
+            )
+            return groups, len(JudgeStore.load(args.output_dir))
+
+        if not confirm_estimated_judge_cost(
+            plan_eval_only_judges, assume_yes=args.yes
+        ):
+            print("Judge run cancelled.")
+            sys.exit(0)
+
         result = await run_eval_only(
             dataset_path=args.dataset,
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
             language=args.language,
-            run_llm_judges=not args.skip_llm_judges,
+            run_llm_judges=run_llm_judges,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
@@ -349,6 +382,31 @@ async def main():
         print(f"Input: {args.input_dir}")
         print(f"Output: {args.output_dir}")
         print("")
+
+        def plan_benchmark_judges():
+            gt_df = pd.read_csv(join(args.input_dir, args.input_file_name))
+            if args.debug:
+                gt_df = gt_df.head(args.debug_count)
+            # Nothing has been transcribed yet, so the prediction half of each
+            # judge prompt is sized from its reference.
+            groups = build_stt_judge_groups(
+                references=gt_df["text"].astype(str).tolist(),
+                evaluators=judge_evaluators,
+                run_llm_judges=not args.skip_llm_judges,
+                providers=len(providers),
+            )
+            cached_count = sum(
+                len(JudgeStore.load(join(args.output_dir, provider)))
+                for provider in providers
+                if exists(join(args.output_dir, provider))
+            )
+            return groups, cached_count
+
+        if not confirm_estimated_judge_cost(
+            plan_benchmark_judges, assume_yes=args.yes
+        ):
+            print("Judge run cancelled.")
+            sys.exit(0)
 
         result = await run(
             providers=providers,

@@ -41,6 +41,16 @@ _COMPONENT_BILLING = {
 # that publish in USD; INR covers providers billed in rupees (e.g. Sarvam).
 _SUPPORTED_CURRENCIES = ("usd", "inr")
 
+# Where an LLM call is billed: through OpenRouter, or against the model
+# provider's own API. Both are priced per million tokens, in USD.
+LLM_PRICING_SOURCES = ("openrouter", "direct")
+
+# Present only on models that price audio separately from text.
+_LLM_OPTIONAL_RATE_KEYS = (
+    "audio_input_price_per_million_tokens_usd",
+    "audio_output_price_per_million_tokens_usd",
+)
+
 _COMPONENT_DEFAULT_MODELS = {
     "stt": STT_PROVIDER_MODELS,
     "tts": TTS_DEFAULT_MODELS,
@@ -88,6 +98,56 @@ def resolve_pricing(
                     "native_rate": float(price),
                 }
     return None
+
+
+def resolve_llm_pricing(model: str, source: str = "openrouter") -> dict | None:
+    """Return per-token pricing for an LLM ``model``.
+
+    ``model`` is the full model id used by the judges (e.g.
+    ``"anthropic/claude-sonnet-4.5"``), so the lookup is keyed by that single id
+    rather than by provider and model separately. ``source`` selects the
+    ``"openrouter"`` or ``"direct"`` rate block.
+
+    The returned dict carries ``model``, ``source``, the text
+    ``input_price_per_million_tokens_usd`` and
+    ``output_price_per_million_tokens_usd``, and
+    ``reasoning_billed_as_output`` (``False`` unless the model bills hidden
+    reasoning tokens at the output rate). Audio rates
+    (``audio_input_price_per_million_tokens_usd`` /
+    ``audio_output_price_per_million_tokens_usd``) appear only for models that
+    price audio separately. Returns ``None`` when the model or the requested
+    source has no rates, so callers can report the model as unpriced instead of
+    failing.
+    """
+    if source not in LLM_PRICING_SOURCES:
+        raise ValueError(f"Unsupported LLM pricing source: {source}")
+
+    model_pricing = _load_pricing_data().get("llm", {}).get(model)
+    if not isinstance(model_pricing, dict):
+        return None
+
+    source_pricing = model_pricing.get(source)
+    if not isinstance(source_pricing, dict):
+        return None
+
+    resolved = {
+        "model": model,
+        "source": source,
+        "input_price_per_million_tokens_usd": float(
+            source_pricing.get("input_price_per_million_tokens_usd", 0.0)
+        ),
+        "output_price_per_million_tokens_usd": float(
+            source_pricing.get("output_price_per_million_tokens_usd", 0.0)
+        ),
+        "reasoning_billed_as_output": bool(
+            source_pricing.get("reasoning_billed_as_output", False)
+        ),
+    }
+    for rate_key in _LLM_OPTIONAL_RATE_KEYS:
+        rate = source_pricing.get(rate_key)
+        if isinstance(rate, (int, float)):
+            resolved[rate_key] = float(rate)
+    return resolved
 
 
 def cost_breakdown(

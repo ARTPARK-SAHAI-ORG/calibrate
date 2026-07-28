@@ -1,11 +1,14 @@
-"""Shared argparse builders for the STT eval/benchmark CLIs.
+"""Shared argparse builders for the STT/TTS eval/benchmark CLIs.
 
 The ``--skip-llm-judges``, ``--max-parallel``, ``--engine`` and
 ``--max-concurrency`` flags are accepted by three entry points that must stay in
 lock-step: the top-level ``calibrate-agent stt`` parser (``calibrate_agent.cli``),
 the multi-provider benchmark (``calibrate_agent.stt.benchmark``) and the
-single-provider eval (``calibrate_agent.stt.eval``). Defining each flag once here
-keeps their help text, defaults and choices from drifting apart.
+single-provider eval (``calibrate_agent.stt.eval``). ``--yes`` is accepted by a
+wider set of entry points — the top-level ``stt``/``tts`` parsers plus both
+their benchmarks — since both eval kinds show a judge cost estimate before
+running. Defining each flag once here keeps their help text, defaults and
+choices from drifting apart.
 
 Deliberately stdlib-only (imports nothing): ``calibrate_agent.cli`` builds its
 parser by calling these, and the CLI must build its parser *without* importing
@@ -66,6 +69,19 @@ def add_stt_engine_args(parser):
             "Concurrent clips per provider, both engines (default: pipeline 1, "
             "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
             "1 to keep TTFS latency uncontended."
+        ),
+    )
+
+
+def add_assume_yes_arg(parser):
+    """Add ``--yes`` (skip the judge cost confirmation prompt)."""
+    parser.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help=(
+            "Proceed with the LLM-as-judge run without the interactive "
+            "cost-confirmation prompt."
         ),
     )
 

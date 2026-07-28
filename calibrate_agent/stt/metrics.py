@@ -5,11 +5,10 @@ STT evaluation metrics.
 import asyncio
 import unicodedata
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Optional, Sequence
 
 import numpy as np
 import jiwer
-from tqdm.asyncio import tqdm_asyncio
 import backoff
 
 from calibrate_agent.judges import (
@@ -18,6 +17,13 @@ from calibrate_agent.judges import (
     evaluator_result_value,
     DEFAULT_TEXT_JUDGE_MODEL,
     DEFAULT_STT_EVALUATOR,
+)
+from calibrate_agent.judge_store import (
+    JudgeKey,
+    JudgeStore,
+    gather_evaluators_with_store,
+    gather_with_store,
+    make_fingerprint,
 )
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 
@@ -258,6 +264,8 @@ async def get_semantic_wer_score(
     references: List[str],
     predictions: List[str],
     model: Optional[str] = None,
+    store: Optional[JudgeStore] = None,
+    row_ids: Optional[Sequence] = None,
 ) -> dict:
     """Compute pipecat-style semantic WER over (reference, prediction) pairs.
 
@@ -293,6 +301,11 @@ async def get_semantic_wer_score(
 
     ``model`` defaults to ``DEFAULT_SEMANTIC_WER_MODEL`` when omitted; ``per_row``
     order matches the input order.
+
+    ``store``, when given, checkpoints each row's judge result under kind
+    ``"stt_semantic_wer"`` — a row already graded for the same reference,
+    prediction, and model is skipped instead of re-judged. ``row_ids``
+    identifies each row for the checkpoint; row index is used when omitted.
     """
     if not references:
         return {"semantic_wer": 0.0, "per_row": []}
@@ -303,13 +316,23 @@ async def get_semantic_wer_score(
     if model is None:
         model = DEFAULT_SEMANTIC_WER_MODEL
 
-    coroutines = [
-        _semantic_wer.semantic_wer_judge(str(reference), str(prediction), model=model)
-        for reference, prediction in zip(references, predictions)
+    keys = [
+        JudgeKey(
+            kind="stt_semantic_wer",
+            row_id=row_ids[i] if row_ids is not None else i,
+            fingerprint=make_fingerprint(str(reference), str(prediction), model),
+        )
+        for i, (reference, prediction) in enumerate(zip(references, predictions))
     ]
-    results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running semantic WER judge",
+
+    async def run_one(index: int) -> dict:
+        reference, prediction = references[index], predictions[index]
+        return await _semantic_wer.semantic_wer_judge(
+            str(reference), str(prediction), model=model
+        )
+
+    results = await gather_with_store(
+        keys, run_one, store, desc="Running semantic WER judge"
     )
 
     total_errors = 0
@@ -441,6 +464,8 @@ async def get_llm_judge_score(
     predictions: List[str],
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_STT_JUDGE_MODEL,
+    store: Optional[JudgeStore] = None,
+    row_ids: Optional[Sequence] = None,
 ) -> dict:
     """Run STT judge across all rows and aggregate per-evaluator scores.
 
@@ -460,22 +485,57 @@ async def get_llm_judge_score(
     Iteration order of ``scores`` and each ``per_row`` entry matches the
     order of the ``evaluators`` argument (Python dicts preserve insertion
     order; ``asyncio.gather`` preserves coroutine order).
+
+    ``store``, when given, checkpoints each row/evaluator pair under kind
+    ``"stt_evaluators"``. A row that is already graded for an evaluator
+    skips that evaluator's call entirely; adding a new evaluator to
+    ``evaluators`` only pays for that evaluator on rows already graded for
+    the others. The checkpoint fingerprint covers the reference, the
+    prediction, the evaluator's ``system_prompt``, its resolved model, and
+    (for rating evaluators) its scale, so editing a prompt or re-scoring
+    with a different model invalidates the cached grade. ``row_ids``
+    identifies each row for the checkpoint; row index is used when omitted.
     """
     evaluators = _resolve_evaluators(evaluators)
 
-    coroutines = [
-        stt_llm_judge(
+    row_keys: List[dict] = []
+    for i, (reference, prediction) in enumerate(zip(references, predictions)):
+        ref = str(reference)
+        pred = str(prediction)
+        row_id = row_ids[i] if row_ids is not None else i
+        keys_for_row: dict = {}
+        for ev in evaluators:
+            model_id = ev.get("judge_model") or fallback_model
+            fp_parts = [
+                ref,
+                pred,
+                ev.get("system_prompt", ""),
+                model_id,
+                ev.get("type", "binary"),
+            ]
+            if is_rating(ev):
+                fp_parts.append(int(ev["scale_min"]))
+                fp_parts.append(int(ev["scale_max"]))
+            keys_for_row[ev["name"]] = JudgeKey(
+                kind="stt_evaluators",
+                row_id=row_id,
+                fingerprint=make_fingerprint(*fp_parts),
+                evaluator=ev["name"],
+            )
+        row_keys.append(keys_for_row)
+
+    async def run_subset(index: int, names: list[str]) -> dict:
+        reference, prediction = references[index], predictions[index]
+        subset = [ev for ev in evaluators if ev["name"] in names]
+        return await stt_llm_judge(
             str(reference),
             str(prediction),
-            evaluators=evaluators,
+            evaluators=subset,
             fallback_model=fallback_model,
         )
-        for reference, prediction in zip(references, predictions)
-    ]
 
-    results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running STT evaluators",
+    results = await gather_evaluators_with_store(
+        row_keys, run_subset, store, desc="Running STT evaluators"
     )
 
     # Aggregate per-evaluator scores — mean of 0/1 for binary, mean of scores for rating.
@@ -511,6 +571,8 @@ async def get_intent_entity_score(
     predictions: List[str],
     language: str = "english",
     model: Optional[str] = None,
+    store: Optional[JudgeStore] = None,
+    row_ids: Optional[Sequence] = None,
 ) -> dict:
     """Normalize, judge, and aggregate intent/entity preservation.
 
@@ -531,6 +593,12 @@ async def get_intent_entity_score(
     ``model`` defaults to ``DEFAULT_INTENT_ENTITY_MODEL`` when omitted.
     ``per_row`` order matches the input order (``asyncio.gather`` preserves
     coroutine order).
+
+    ``store``, when given, checkpoints each row's judge result under kind
+    ``"stt_intent_entity"``, fingerprinted on the *normalized* reference and
+    prediction actually sent to the judge (plus the language and model), so
+    a row already graded is skipped instead of re-judged. ``row_ids``
+    identifies each row for the checkpoint; row index is used when omitted.
     """
     if not references:
         return {"intent": 0.0, "entity": 0.0, "per_row": []}
@@ -550,18 +618,27 @@ async def get_intent_entity_score(
         _normalize_pairs, references, predictions, language
     )
 
-    coroutines = [
-        sarvam_intent_entity.intent_entity_judge(
-            str(reference), str(prediction), model=model, index=i
+    keys = [
+        JudgeKey(
+            kind="stt_intent_entity",
+            row_id=row_ids[i] if row_ids is not None else i,
+            fingerprint=make_fingerprint(
+                str(norm_reference), str(norm_prediction), model, language
+            ),
         )
-        for i, (reference, prediction) in enumerate(
+        for i, (norm_reference, norm_prediction) in enumerate(
             zip(norm_references, norm_predictions)
         )
     ]
 
-    results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running intent/entity judge",
+    async def run_one(index: int) -> dict:
+        reference, prediction = norm_references[index], norm_predictions[index]
+        return await sarvam_intent_entity.intent_entity_judge(
+            str(reference), str(prediction), model=model, index=index
+        )
+
+    results = await gather_with_store(
+        keys, run_one, store, desc="Running intent/entity judge"
     )
 
     intent_scores = [int(row["intent_score"]) for row in results]
@@ -579,6 +656,8 @@ async def get_llm_wer_cer_score(
     predictions: List[str],
     language: str = "english",
     model: Optional[str] = None,
+    store: Optional[JudgeStore] = None,
+    row_ids: Optional[Sequence] = None,
 ) -> dict:
     """Normalize, judge segment equivalence, forgive, and re-score WER/CER.
 
@@ -617,6 +696,17 @@ async def get_llm_wer_cer_score(
 
     ``model`` defaults to ``DEFAULT_LLM_WER_MODEL`` when omitted. ``per_row``
     order matches the input order.
+
+    ``store``, when given, checkpoints the equivalence judge under kind
+    ``"stt_llm_wer"``. The judged unit here is a deduplicated *segment pair*,
+    not a dataset row — the same pair can recur across many rows, or none,
+    depending on the dataset — so the checkpoint key identifies a pair by its
+    own (reference segment, prediction segment) content rather than by
+    ``row_ids``; ``row_ids`` is accepted for signature parity with the other
+    judge functions but is not used to build these keys. A segment pair
+    already judged for the same model is skipped instead of re-judged, and a
+    prediction change that alters which segments differ naturally produces a
+    different pair and a cache miss.
     """
     if not references:
         return {"llm_wer": 0.0, "llm_cer": 0.0, "per_row": []}
@@ -659,13 +749,21 @@ async def get_llm_wer_cer_score(
                 unique_pairs.setdefault((seg["reference"], seg["prediction"]), None)
 
     pair_list = list(unique_pairs.keys())
-    coroutines = [
-        sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
+    keys = [
+        JudgeKey(
+            kind="stt_llm_wer",
+            row_id=make_fingerprint(ref, pred),
+            fingerprint=make_fingerprint(ref, pred, model),
+        )
         for ref, pred in pair_list
     ]
-    judge_results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running LLM-WER equivalence judge",
+
+    async def run_one(index: int) -> dict:
+        ref, pred = pair_list[index]
+        return await sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
+
+    judge_results = await gather_with_store(
+        keys, run_one, store, desc="Running LLM-WER equivalence judge"
     )
 
     verdicts = {

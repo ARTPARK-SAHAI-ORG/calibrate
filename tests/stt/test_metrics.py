@@ -5,8 +5,11 @@ Run with:
     python -m unittest tests.stt.test_metrics -v
 """
 
+import tempfile
 import unittest
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
+
+from calibrate_agent.judge_store import JudgeStore
 
 
 class TestEditMetrics(unittest.TestCase):
@@ -265,6 +268,455 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         call_kwargs = mock_stt_judge.call_args.kwargs
         self.assertEqual(call_kwargs["evaluators"], custom_evaluators)
         self.assertEqual(call_kwargs["fallback_model"], "custom-model")
+
+
+class TestSTTGetLLMJudgeScoreWithStore(unittest.IsolatedAsyncioTestCase):
+    async def _fake_judge(self, reference, prediction, evaluators=None, fallback_model=None):
+        return {
+            ev["name"]: {"match": reference == prediction, "reasoning": "ok"}
+            for ev in evaluators
+        }
+
+    async def test_store_none_matches_pre_store_behavior(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        mock = AsyncMock(side_effect=self._fake_judge)
+        evaluators = [
+            {"name": "semantic_match", "system_prompt": "match", "judge_model": "m"}
+        ]
+        with patch.object(stt_metrics, "stt_llm_judge", mock):
+            result = await stt_metrics.get_llm_judge_score(
+                references=["a", "b"],
+                predictions=["a", "x"],
+                evaluators=evaluators,
+                store=None,
+            )
+
+        self.assertEqual(mock.call_count, 2)
+        self.assertEqual(result["scores"]["semantic_match"]["mean"], 0.5)
+
+    async def test_prepopulated_store_skips_cached_rows(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        evaluators = [
+            {"name": "semantic_match", "system_prompt": "match", "judge_model": "m"}
+        ]
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(stt_metrics, "stt_llm_judge", mock):
+                # First pass grades only row "r1".
+                await stt_metrics.get_llm_judge_score(
+                    references=["a"],
+                    predictions=["a"],
+                    evaluators=evaluators,
+                    store=store,
+                    row_ids=["r1"],
+                )
+                self.assertEqual(mock.call_count, 1)
+
+                # Second pass includes "r1" (cached) and "r2" (new).
+                mock.reset_mock()
+                result = await stt_metrics.get_llm_judge_score(
+                    references=["a", "b"],
+                    predictions=["a", "y"],
+                    evaluators=evaluators,
+                    store=store,
+                    row_ids=["r1", "r2"],
+                )
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertEqual(mock.call_args.args[0], "b")
+        self.assertEqual(mock.call_args.args[1], "y")
+        matches = [row["semantic_match"]["match"] for row in result["per_row"]]
+        self.assertEqual(matches, [True, False])
+
+    async def test_row_order_preserved_with_partial_cache(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        evaluators = [
+            {"name": "semantic_match", "system_prompt": "match", "judge_model": "m"}
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(
+                stt_metrics, "stt_llm_judge", AsyncMock(side_effect=self._fake_judge)
+            ):
+                # Cache the middle row only.
+                await stt_metrics.get_llm_judge_score(
+                    references=["b"],
+                    predictions=["b"],
+                    evaluators=evaluators,
+                    store=store,
+                    row_ids=["row1"],
+                )
+                result = await stt_metrics.get_llm_judge_score(
+                    references=["a", "b", "c"],
+                    predictions=["x", "b", "c"],
+                    evaluators=evaluators,
+                    store=store,
+                    row_ids=["row0", "row1", "row2"],
+                )
+
+        matches = [row["semantic_match"]["match"] for row in result["per_row"]]
+        self.assertEqual(matches, [False, True, True])
+
+    async def test_changed_system_prompt_invalidates_row(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        base_evaluator = {
+            "name": "semantic_match",
+            "system_prompt": "prompt v1",
+            "judge_model": "m",
+        }
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(stt_metrics, "stt_llm_judge", mock):
+                await stt_metrics.get_llm_judge_score(
+                    references=["a"],
+                    predictions=["a"],
+                    evaluators=[base_evaluator],
+                    store=store,
+                    row_ids=["r1"],
+                )
+                self.assertEqual(mock.call_count, 1)
+
+                # Same row, same prediction, but the prompt text changed.
+                changed_evaluator = dict(base_evaluator, system_prompt="prompt v2")
+                await stt_metrics.get_llm_judge_score(
+                    references=["a"],
+                    predictions=["a"],
+                    evaluators=[changed_evaluator],
+                    store=store,
+                    row_ids=["r1"],
+                )
+
+        self.assertEqual(mock.call_count, 2)
+
+    async def test_changed_prediction_invalidates_row(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        evaluator = {
+            "name": "semantic_match",
+            "system_prompt": "match",
+            "judge_model": "m",
+        }
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(stt_metrics, "stt_llm_judge", mock):
+                await stt_metrics.get_llm_judge_score(
+                    references=["a"],
+                    predictions=["a"],
+                    evaluators=[evaluator],
+                    store=store,
+                    row_ids=["r1"],
+                )
+                await stt_metrics.get_llm_judge_score(
+                    references=["a"],
+                    predictions=["different"],
+                    evaluators=[evaluator],
+                    store=store,
+                    row_ids=["r1"],
+                )
+
+        self.assertEqual(mock.call_count, 2)
+
+    async def test_adding_second_evaluator_runs_only_the_new_one(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        first_evaluator = {
+            "name": "semantic_match",
+            "system_prompt": "match",
+            "judge_model": "m",
+        }
+        second_evaluator = {
+            "name": "completeness",
+            "system_prompt": "complete",
+            "judge_model": "m",
+        }
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(stt_metrics, "stt_llm_judge", mock):
+                await stt_metrics.get_llm_judge_score(
+                    references=["a"],
+                    predictions=["a"],
+                    evaluators=[first_evaluator],
+                    store=store,
+                    row_ids=["r1"],
+                )
+                self.assertEqual(mock.call_count, 1)
+
+                mock.reset_mock()
+                result = await stt_metrics.get_llm_judge_score(
+                    references=["a"],
+                    predictions=["a"],
+                    evaluators=[first_evaluator, second_evaluator],
+                    store=store,
+                    row_ids=["r1"],
+                )
+
+        # Only the newly-added evaluator triggers a fresh judge call.
+        self.assertEqual(mock.call_count, 1)
+        called_names = {ev["name"] for ev in mock.call_args.kwargs["evaluators"]}
+        self.assertEqual(called_names, {"completeness"})
+        self.assertIn("semantic_match", result["per_row"][0])
+        self.assertIn("completeness", result["per_row"][0])
+
+
+def _identity_normalizer():
+    inst = MagicMock()
+    inst.normalize_texts.side_effect = lambda texts, langs, n_jobs=1: list(texts)
+    return inst
+
+
+def _intent_entity_row(intent=1, entity=1.0):
+    return {
+        "intent_score": intent,
+        "intent_explanation": "because",
+        "entity_score": entity,
+        "ground_truth_entities": "x",
+        "preserved_entities": "x" if entity else "",
+        "missing_entities": "" if entity else "x",
+        "entity_explanation": "because",
+    }
+
+
+class TestGetIntentEntityScoreWithStore(unittest.IsolatedAsyncioTestCase):
+    async def test_store_none_matches_pre_store_behavior(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+        from calibrate_agent.stt import sarvam_intent_entity as sie
+
+        mock = AsyncMock(return_value=_intent_entity_row(1, 1.0))
+        with patch.object(
+            stt_metrics, "_get_indic_normalizer", return_value=_identity_normalizer()
+        ), patch.object(sie, "intent_entity_judge", mock):
+            result = await stt_metrics.get_intent_entity_score(
+                references=["a", "b"], predictions=["a", "b"], store=None
+            )
+
+        self.assertEqual(mock.call_count, 2)
+        self.assertEqual(result["intent"], 1.0)
+
+    async def test_prepopulated_store_skips_cached_rows(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+        from calibrate_agent.stt import sarvam_intent_entity as sie
+
+        mock = AsyncMock(return_value=_intent_entity_row(1, 1.0))
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(
+                stt_metrics,
+                "_get_indic_normalizer",
+                return_value=_identity_normalizer(),
+            ), patch.object(sie, "intent_entity_judge", mock):
+                await stt_metrics.get_intent_entity_score(
+                    references=["a"],
+                    predictions=["a"],
+                    store=store,
+                    row_ids=["r1"],
+                )
+                self.assertEqual(mock.call_count, 1)
+
+                mock.reset_mock()
+                result = await stt_metrics.get_intent_entity_score(
+                    references=["a", "b"],
+                    predictions=["a", "b"],
+                    store=store,
+                    row_ids=["r1", "r2"],
+                )
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertEqual(len(result["per_row"]), 2)
+
+    async def test_changed_prediction_invalidates_row(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+        from calibrate_agent.stt import sarvam_intent_entity as sie
+
+        mock = AsyncMock(return_value=_intent_entity_row(1, 1.0))
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(
+                stt_metrics,
+                "_get_indic_normalizer",
+                return_value=_identity_normalizer(),
+            ), patch.object(sie, "intent_entity_judge", mock):
+                await stt_metrics.get_intent_entity_score(
+                    references=["a"],
+                    predictions=["a"],
+                    store=store,
+                    row_ids=["r1"],
+                )
+                await stt_metrics.get_intent_entity_score(
+                    references=["a"],
+                    predictions=["changed"],
+                    store=store,
+                    row_ids=["r1"],
+                )
+
+        self.assertEqual(mock.call_count, 2)
+
+
+class TestGetLLMWerCerScoreWithStore(unittest.IsolatedAsyncioTestCase):
+    async def _fake_judge(self, reference, prediction, model=None):
+        return {"equivalent": reference == prediction, "reasoning": "ok"}
+
+    async def test_store_none_matches_pre_store_behavior(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+        from calibrate_agent.stt import sarvam_llm_wer as slw
+
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with patch.object(slw, "equivalence_judge", mock):
+            result = await stt_metrics.get_llm_wer_cer_score(
+                references=["hello world"],
+                predictions=["hello word"],
+                store=None,
+            )
+
+        mock.assert_awaited()
+        self.assertIn("llm_wer", result)
+
+    async def test_prepopulated_store_skips_cached_segment_pairs(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+        from calibrate_agent.stt import sarvam_llm_wer as slw
+
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(slw, "equivalence_judge", mock):
+                await stt_metrics.get_llm_wer_cer_score(
+                    references=["hello world"],
+                    predictions=["hello word"],
+                    store=store,
+                    row_ids=["r1"],
+                )
+                first_call_count = mock.call_count
+                self.assertGreater(first_call_count, 0)
+
+                mock.reset_mock()
+                # Same differing segment ("world" vs "word") reappears in a
+                # second row; it should not be re-judged.
+                result = await stt_metrics.get_llm_wer_cer_score(
+                    references=["hello world", "say world"],
+                    predictions=["hello word", "say word"],
+                    store=store,
+                    row_ids=["r1", "r2"],
+                )
+
+        self.assertEqual(mock.call_count, 0)
+        self.assertEqual(len(result["per_row"]), 2)
+
+    async def test_changed_prediction_reruns_segment_judge(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+        from calibrate_agent.stt import sarvam_llm_wer as slw
+
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch.object(slw, "equivalence_judge", mock):
+                await stt_metrics.get_llm_wer_cer_score(
+                    references=["hello world"],
+                    predictions=["hello word"],
+                    store=store,
+                    row_ids=["r1"],
+                )
+                mock.reset_mock()
+
+                # A different mismatched prediction produces a different
+                # segment pair, which must be judged (not silently reused).
+                await stt_metrics.get_llm_wer_cer_score(
+                    references=["hello world"],
+                    predictions=["hello wprld"],
+                    store=store,
+                    row_ids=["r1"],
+                )
+
+        self.assertEqual(mock.call_count, 1)
+
+
+class TestGetSemanticWerScoreWithStore(unittest.IsolatedAsyncioTestCase):
+    async def _fake_judge(self, reference, prediction, model=None):
+        if reference == prediction:
+            return {
+                "substitutions": 0, "deletions": 0, "insertions": 0,
+                "reference_words": len(reference.split()) or 1,
+                "normalized_reference": reference, "normalized_hypothesis": prediction,
+                "reasoning": "match",
+            }
+        return {
+            "substitutions": 1, "deletions": 0, "insertions": 0,
+            "reference_words": len(reference.split()) or 1,
+            "normalized_reference": reference, "normalized_hypothesis": prediction,
+            "reasoning": "mismatch",
+        }
+
+    async def test_store_none_matches_pre_store_behavior(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with patch(
+            "calibrate_agent.stt.semantic_wer.semantic_wer_judge",
+            mock,
+        ):
+            result = await stt_metrics.get_semantic_wer_score(
+                references=["a", "b"], predictions=["a", "c"], store=None
+            )
+
+        self.assertEqual(mock.call_count, 2)
+        self.assertEqual(len(result["per_row"]), 2)
+
+    async def test_prepopulated_store_skips_cached_rows(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch(
+                "calibrate_agent.stt.semantic_wer.semantic_wer_judge",
+                mock,
+            ):
+                await stt_metrics.get_semantic_wer_score(
+                    references=["a"], predictions=["a"], store=store, row_ids=["r1"]
+                )
+                self.assertEqual(mock.call_count, 1)
+
+                mock.reset_mock()
+                result = await stt_metrics.get_semantic_wer_score(
+                    references=["a", "b"],
+                    predictions=["a", "c"],
+                    store=store,
+                    row_ids=["r1", "r2"],
+                )
+
+        self.assertEqual(mock.call_count, 1)
+        self.assertEqual(mock.call_args.args[0], "b")
+        # Row order is preserved even though only row "r2" re-ran.
+        self.assertEqual(result["per_row"][0]["reasoning"], "match")
+        self.assertEqual(result["per_row"][1]["reasoning"], "mismatch")
+
+    async def test_changed_prediction_invalidates_row(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        mock = AsyncMock(side_effect=self._fake_judge)
+        with tempfile.TemporaryDirectory() as tmp:
+            store = JudgeStore.load(tmp)
+            with patch(
+                "calibrate_agent.stt.semantic_wer.semantic_wer_judge",
+                mock,
+            ):
+                await stt_metrics.get_semantic_wer_score(
+                    references=["a"], predictions=["a"], store=store, row_ids=["r1"]
+                )
+                await stt_metrics.get_semantic_wer_score(
+                    references=["a"],
+                    predictions=["changed"],
+                    store=store,
+                    row_ids=["r1"],
+                )
+
+        self.assertEqual(mock.call_count, 2)
 
 
 if __name__ == "__main__":

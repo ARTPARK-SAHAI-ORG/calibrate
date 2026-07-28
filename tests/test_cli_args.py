@@ -4,6 +4,7 @@ import inspect
 
 import calibrate_agent._cli_args as cli_args
 from calibrate_agent._cli_args import (
+    add_assume_yes_arg,
     add_stt_engine_args,
     add_stt_eval_args,
     add_stt_max_parallel_arg,
@@ -87,6 +88,26 @@ class TestBuildersComposeConsistently:
             }
 
         assert signature(combined) == signature(pieces)
+
+
+class TestAddAssumeYesArg:
+    def test_default_false(self):
+        parser = argparse.ArgumentParser()
+        add_assume_yes_arg(parser)
+        ns = parser.parse_args([])
+        assert ns.yes is False
+
+    def test_long_flag_parses(self):
+        parser = argparse.ArgumentParser()
+        add_assume_yes_arg(parser)
+        ns = parser.parse_args(["--yes"])
+        assert ns.yes is True
+
+    def test_short_flag_parses(self):
+        parser = argparse.ArgumentParser()
+        add_assume_yes_arg(parser)
+        ns = parser.parse_args(["-y"])
+        assert ns.yes is True
 
 
 class TestStdlibOnly:

@@ -44,6 +44,7 @@ from calibrate_agent.stt.metrics import (
     get_ttfs_stats,
 )
 from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
+from calibrate_agent.judge_store import JudgeStore
 from calibrate_agent._env import resolve_stt_max_concurrency
 from calibrate_agent._cli_args import add_stt_eval_args
 from calibrate_agent.judges import (
@@ -1432,6 +1433,7 @@ async def run_single_provider_eval(
             audio_durations=audio_durations,
             cost_metrics=cost_metrics,
             ttfs_values=all_ttfs,
+            overwrite=overwrite,
         )
 
         return {
@@ -1491,6 +1493,7 @@ async def _score_and_write_results(
     cost_metrics: dict | None = None,
     audio_durations: list[float | None] | None = None,
     ttfs_values: list = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1507,12 +1510,30 @@ async def _score_and_write_results(
     Each judge is isolated: if any judge raises, the failure is logged and that
     judge's columns/metrics are dropped, but WER/CER and any judges that
     succeeded are still written.
+
+    Every judge call is checkpointed through a :class:`JudgeStore` loaded
+    from ``output_dir``, keyed by ``ids``: a row already graded in a prior
+    (interrupted or completed) run for the same input, evaluator prompt, and
+    model is reused instead of re-judged. ``overwrite=True`` discards that
+    checkpoint (along with ``results.csv``) before scoring so every row is
+    graded fresh.
     """
     wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
 
     cer_results = get_cer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
+
+    store = JudgeStore.load(output_dir)
+    if overwrite:
+        store.clear()
+        _log("Overwrite enabled - cleared cached judge grades", to_terminal=False)
+    elif len(store) > 0:
+        _log(
+            f"Resuming judge grading: {len(store)} cached result(s) found in "
+            f"{store.path} and will be reused",
+            to_terminal=False,
+        )
 
     # Each judge below runs independently and is isolated: a failure in one
     # (Sarvam intent/entity, Sarvam LLM-WER/CER, or the LLM judge) is logged and
@@ -1527,7 +1548,11 @@ async def _score_and_write_results(
     if run_llm_judges:
         try:
             intent_entity_results = await get_intent_entity_score(
-                gt_transcripts, pred_transcripts, language=language
+                gt_transcripts,
+                pred_transcripts,
+                language=language,
+                store=store,
+                row_ids=ids,
             )
             _log(
                 f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
@@ -1538,7 +1563,11 @@ async def _score_and_write_results(
             _log(f"Sarvam intent/entity judge failed, skipping: {e}")
         try:
             llm_wer_results = await get_llm_wer_cer_score(
-                gt_transcripts, pred_transcripts, language=language
+                gt_transcripts,
+                pred_transcripts,
+                language=language,
+                store=store,
+                row_ids=ids,
             )
             _log(
                 f"Sarvam LLM WER: {llm_wer_results['llm_wer']:.4f}  Sarvam LLM CER: {llm_wer_results['llm_cer']:.4f}",
@@ -1553,7 +1582,7 @@ async def _score_and_write_results(
     if run_llm_judges:
         try:
             semantic_wer_results = await get_semantic_wer_score(
-                gt_transcripts, pred_transcripts
+                gt_transcripts, pred_transcripts, store=store, row_ids=ids
             )
             _log(
                 f"Semantic WER: {semantic_wer_results['semantic_wer']:.4f}",
@@ -1576,6 +1605,8 @@ async def _score_and_write_results(
                 gt_transcripts,
                 pred_transcripts,
                 evaluators=_evaluators,
+                store=store,
+                row_ids=ids,
             )
             for name, score_dict in llm_results["scores"].items():
                 _log(f"  {name}: {score_dict['mean']:.4f}")
@@ -1729,6 +1760,7 @@ async def run_eval_only(
     judge_evaluators: list[dict] = None,
     language: str = "english",
     run_llm_judges: bool = True,
+    overwrite: bool = False,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
@@ -1745,6 +1777,8 @@ async def run_eval_only(
         run_llm_judges: Run the Sarvam intent/entity judge (default True).
             Setting it to False skips the normalizer model load and the judge
             calls entirely.
+        overwrite: Discard any judge results checkpointed under ``output_dir``
+            from a prior run before scoring, so every row is graded fresh.
 
     Returns:
         dict with status, metrics, and output_dir.
@@ -1779,6 +1813,7 @@ async def run_eval_only(
             judge_evaluators=judge_evaluators,
             language=language,
             run_llm_judges=run_llm_judges,
+            overwrite=overwrite,
         )
 
         return {

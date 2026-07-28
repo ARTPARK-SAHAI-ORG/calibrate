@@ -232,7 +232,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
 def _fake_intent_entity(intent=1, entity=1.0):
     """Build a fake ``get_intent_entity_score`` returning fixed scores per row."""
 
-    async def _fn(refs, preds, language="english", model=None):
+    async def _fn(refs, preds, language="english", model=None, **kwargs):
         return {
             "intent": float(intent),
             "entity": float(entity),
@@ -256,7 +256,7 @@ def _fake_intent_entity(intent=1, entity=1.0):
 def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
     """Build a fake ``get_llm_wer_cer_score`` returning fixed scores per row."""
 
-    async def _fn(refs, preds, language="english", model=None):
+    async def _fn(refs, preds, language="english", model=None, **kwargs):
         return {
             "llm_wer": float(llm_wer),
             "llm_cer": float(llm_cer),
@@ -276,7 +276,7 @@ def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
 def _fake_semantic_wer():
     """Fake ``get_semantic_wer_score`` (part of the default LLM-judge group)."""
 
-    async def _sem(references, predictions, model=None):
+    async def _sem(references, predictions, model=None, **kwargs):
         return {
             "semantic_wer": 0.0,
             "per_row": [
@@ -304,7 +304,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_writes_metrics_and_results(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {
                     "semantic_match": {"type": "binary", "mean": 1.0}
@@ -383,7 +383,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             }
         ]
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"completeness": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,
@@ -425,7 +425,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_run_by_default(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -472,7 +472,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_skipped_when_disabled(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -559,7 +559,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_failure_still_writes_wer_cer_and_evaluator(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -645,7 +645,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             "scale_max": 5,
         }
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {
                     "accuracy": {
@@ -692,7 +692,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_runs_evaluator_on_dataset(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,

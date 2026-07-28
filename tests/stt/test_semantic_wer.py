@@ -318,7 +318,7 @@ class TestJudgeEmptyShortCircuit(unittest.IsolatedAsyncioTestCase):
 
 
 def _fake_judge():
-    async def judge(refs, preds, evaluators=None, fallback_model=None):
+    async def judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
         return {
             "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
             "score": 1.0,
@@ -334,7 +334,7 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
     async def test_semantic_wer_in_metrics_and_results_when_enabled(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_sem(references, predictions, model=None):
+        async def fake_sem(references, predictions, model=None, **kwargs):
             return {
                 "semantic_wer": 0.05,
                 "per_row": [

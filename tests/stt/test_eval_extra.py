@@ -16,7 +16,7 @@ import pandas as pd
 def _fake_intent_entity(intent=1, entity=1.0):
     """Adaptive ``get_intent_entity_score`` mock — one row per input pair."""
 
-    async def _fn(refs, preds, language="english", model=None):
+    async def _fn(refs, preds, language="english", model=None, **kwargs):
         return {
             "intent": float(intent),
             "entity": float(entity),
@@ -37,7 +37,7 @@ def _fake_intent_entity(intent=1, entity=1.0):
 def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
     """Adaptive ``get_llm_wer_cer_score`` mock — one row per input pair."""
 
-    async def _fn(refs, preds, language="english", model=None):
+    async def _fn(refs, preds, language="english", model=None, **kwargs):
         return {
             "llm_wer": float(llm_wer),
             "llm_cer": float(llm_cer),
@@ -703,7 +703,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         from calibrate_agent.stt import eval as E
 
-        async def _sem(references, predictions, model=None):
+        async def _sem(references, predictions, model=None, **kwargs):
             return {
                 "semantic_wer": 0.0,
                 "per_row": [

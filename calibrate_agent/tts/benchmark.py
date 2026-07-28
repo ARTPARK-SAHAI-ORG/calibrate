@@ -20,16 +20,25 @@ import sys
 from os.path import exists, join
 from typing import Literal
 
+import pandas as pd
+
 from calibrate_agent.tts.eval import (
     TTS_LANGUAGES,
     TTS_PROVIDERS,
     run_eval_only,
     run_single_provider_eval,
+    validate_tts_eval_only_dataset,
     validate_tts_input_file,
 )
 from calibrate_agent.tts.leaderboard import generate_leaderboard
 from calibrate_agent._env import env_int
-from calibrate_agent.utils import StreamTee
+from calibrate_agent._cli_args import add_assume_yes_arg
+from calibrate_agent.judge_cost import (
+    build_tts_judge_groups,
+    confirm_estimated_judge_cost,
+)
+from calibrate_agent.judge_store import JudgeStore
+from calibrate_agent.utils import StreamTee, get_audio_duration_seconds
 
 # Maximum number of providers to run in parallel
 MAX_PARALLEL_PROVIDERS = 2
@@ -215,6 +224,7 @@ async def main():
             "$CALIBRATE_TTS_MAX_PARALLEL)."
         ),
     )
+    add_assume_yes_arg(parser)
 
     args = parser.parse_args()
 
@@ -245,6 +255,28 @@ async def main():
         print(f"Dataset: {args.dataset}")
         print(f"Output: {args.output_dir}")
         print("")
+
+        def plan_eval_only_judges():
+            is_valid, _error_msg, rows = validate_tts_eval_only_dataset(args.dataset)
+            if not is_valid:
+                return [], 0
+            # The prior run's .wav files are on disk, so the audio is measured
+            # rather than estimated from the text.
+            audio_seconds = [
+                get_audio_duration_seconds(r["audio_path"]) or 0.0 for r in rows
+            ]
+            groups = build_tts_judge_groups(
+                texts=[str(r["text"]) for r in rows],
+                audio_seconds=audio_seconds,
+                evaluators=judge_evaluators,
+            )
+            return groups, len(JudgeStore.load(args.output_dir))
+
+        if not confirm_estimated_judge_cost(
+            plan_eval_only_judges, assume_yes=args.yes
+        ):
+            print("Judge run cancelled.")
+            sys.exit(0)
 
         result = await run_eval_only(
             dataset_path=args.dataset,
@@ -314,6 +346,30 @@ async def main():
         print(f"Input: {args.input}")
         print(f"Output: {args.output_dir}")
         print("")
+
+        def plan_benchmark_judges():
+            input_df = pd.read_csv(args.input)
+            if args.debug:
+                input_df = input_df.head(args.debug_count)
+            # Nothing has been synthesized yet, so audio duration is derived
+            # from the text that will be spoken.
+            groups = build_tts_judge_groups(
+                texts=input_df["text"].astype(str).tolist(),
+                evaluators=judge_evaluators,
+                providers=len(providers),
+            )
+            cached_count = sum(
+                len(JudgeStore.load(join(args.output_dir, provider)))
+                for provider in providers
+                if exists(join(args.output_dir, provider))
+            )
+            return groups, cached_count
+
+        if not confirm_estimated_judge_cost(
+            plan_benchmark_judges, assume_yes=args.yes
+        ):
+            print("Judge run cancelled.")
+            sys.exit(0)
 
         result = await run(
             input=args.input,
