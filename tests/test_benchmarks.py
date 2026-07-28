@@ -1,15 +1,30 @@
 """Tests for benchmark modules — llm, stt, tts."""
 
 import asyncio
+import io
 import json
 import os
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from os.path import join
 from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
 import pandas as pd
+
+
+def _write_judge_cache(provider_dir: Path, *, kind: str = "tts_evaluators") -> None:
+    provider_dir.mkdir(parents=True, exist_ok=True)
+    record = {
+        "kind": kind,
+        "row_id": "1",
+        "evaluator": None,
+        "fingerprint": "fp",
+        "result": {"ok": True},
+    }
+    (provider_dir / "judge_cache.jsonl").write_text(json.dumps(record) + "\n")
 
 
 # =============================================================================
@@ -450,6 +465,78 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                  patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
                 await B.main()
 
+    async def test_main_eval_only_cancel_on_decline(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            ds = base / "ds.json"
+            ds.write_text(json.dumps([{"id": "a", "gt": "hi", "pred": "hi"}]))
+            out = base / "out"
+
+            buf = io.StringIO()
+            argv = ["b.py", "--eval-only", "--dataset", str(ds), "-o", str(out)]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run_eval_only", AsyncMock()) as mock_eval, \
+                 patch(
+                     "calibrate_agent.stt.benchmark.confirm_estimated_judge_cost",
+                     return_value=False,
+                 ), redirect_stdout(buf):
+                with self.assertRaises(SystemExit) as ctx:
+                    await B.main()
+
+            self.assertEqual(ctx.exception.code, 0)
+            mock_eval.assert_not_called()
+            self.assertIn("Judge run cancelled.", buf.getvalue())
+
+    async def test_main_multi_provider_cancel_on_decline(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            out = base / "out"
+
+            buf = io.StringIO()
+            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run", AsyncMock()) as mock_run, \
+                 patch(
+                     "calibrate_agent.stt.benchmark.confirm_estimated_judge_cost",
+                     return_value=False,
+                 ), redirect_stdout(buf):
+                with self.assertRaises(SystemExit) as ctx:
+                    await B.main()
+
+            self.assertEqual(ctx.exception.code, 0)
+            mock_run.assert_not_called()
+            self.assertIn("Judge run cancelled.", buf.getvalue())
+
+    async def test_main_debug_yes_prints_cached_count_note(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            out = base / "out"
+            _write_judge_cache(out / "deepgram", kind="stt")
+
+            fake_run_result = {
+                "status": "completed",
+                "output_dir": str(out),
+                "leaderboard_dir": str(out / "leaderboard"),
+                "providers": {
+                    "deepgram": {"status": "completed", "metrics": {"wer": 0.1}},
+                },
+            }
+            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out), "-d", "-y"]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
+                await B.main()
+
+            log_content = Path(join(out, "logs")).read_text()
+            self.assertIn("checkpointed", log_content)
+
 
 # =============================================================================
 # TTS Benchmark
@@ -555,6 +642,77 @@ class TestTTSBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                  patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
                 with self.assertRaises(SystemExit):
                     await B.main()
+
+    async def test_main_cancel_on_decline(self):
+        from calibrate_agent.tts import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            inp = Path(tmp) / "in.csv"
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(str(inp), index=False)
+            out = Path(tmp) / "out"
+
+            buf = io.StringIO()
+            argv = ["b.py", "-p", "openai", "-i", str(inp), "-o", str(out)]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run", AsyncMock()) as mock_run, \
+                 patch(
+                     "calibrate_agent.tts.benchmark.confirm_estimated_judge_cost",
+                     return_value=False,
+                 ), redirect_stdout(buf):
+                with self.assertRaises(SystemExit) as ctx:
+                    await B.main()
+
+            self.assertEqual(ctx.exception.code, 0)
+            mock_run.assert_not_called()
+            self.assertIn("Judge run cancelled.", buf.getvalue())
+
+    async def test_main_yes_proceeds_to_run(self):
+        from calibrate_agent.tts import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            inp = Path(tmp) / "in.csv"
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(str(inp), index=False)
+            out = Path(tmp) / "out"
+
+            fake_run_result = {
+                "status": "completed",
+                "output_dir": str(out),
+                "leaderboard_dir": str(out / "lb"),
+                "providers": {
+                    "openai": {"status": "completed", "metrics": {}},
+                },
+            }
+            mock_run = AsyncMock(return_value=fake_run_result)
+            argv = ["b.py", "-p", "openai", "-i", str(inp), "-o", str(out), "-y"]
+            with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
+                await B.main()
+
+            mock_run.assert_called_once()
+
+    async def test_main_yes_prints_cached_count_note(self):
+        from calibrate_agent.tts import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            inp = Path(tmp) / "in.csv"
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(str(inp), index=False)
+            out = Path(tmp) / "out"
+            _write_judge_cache(out / "openai")
+
+            fake_run_result = {
+                "status": "completed",
+                "output_dir": str(out),
+                "leaderboard_dir": str(out / "lb"),
+                "providers": {
+                    "openai": {"status": "completed", "metrics": {}},
+                },
+            }
+            argv = ["b.py", "-p", "openai", "-i", str(inp), "-o", str(out), "-y"]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
+                await B.main()
+
+            log_content = Path(join(out, "logs")).read_text()
+            self.assertIn("checkpointed", log_content)
 
 
 if __name__ == "__main__":

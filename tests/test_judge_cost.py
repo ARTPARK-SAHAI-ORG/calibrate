@@ -434,6 +434,14 @@ class TestConfirmJudgeCost(unittest.TestCase):
         self.assertFalse(decision)
         input_mock.assert_called_once()
 
+    def test_failing_tcgetpgrp_value_error_falls_back_to_isatty(self):
+        decision, _, _, input_mock = self._invoke(
+            tcgetpgrp=MagicMock(side_effect=ValueError), answer="n"
+        )
+
+        self.assertFalse(decision)
+        input_mock.assert_called_once()
+
     def test_yes_answers_proceed(self):
         for answer in ("y", "Y", "yes", "YES", " y "):
             with self.subTest(answer=answer):

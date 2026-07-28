@@ -712,6 +712,35 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["accuracy"], 4)
 
+    async def test_resume_logs_cached_judge_count(self):
+        from calibrate_agent.stt import eval as stt_eval
+        from calibrate_agent.judge_store import JudgeKey, JudgeStore
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            store = JudgeStore.load(str(out))
+            await store.put(
+                JudgeKey(kind="intent", row_id="1", fingerprint="fp"),
+                {"ok": True},
+            )
+
+            log_mock = MagicMock()
+            with patch.object(stt_eval, "_log", log_mock):
+                await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    llm_judges=frozenset(),
+                )
+
+            resume_logged = any(
+                "Resuming judge grading" in str(call)
+                for call in log_mock.call_args_list
+            )
+            self.assertTrue(resume_logged)
+
 
 class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     def setUp(self):

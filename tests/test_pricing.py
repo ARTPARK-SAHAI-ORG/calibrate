@@ -144,7 +144,9 @@ class TestCostBreakdown(unittest.TestCase):
         from calibrate_agent import pricing as P
 
         entry = {"currency": "INR", "native_rate": 3000.0, "provider": "sarvam"}
-        with patch.object(P, "get_usd_to_inr_rate", side_effect=RuntimeError("no FX")):
+        with patch.object(
+            P, "get_usd_to_inr_rate", side_effect=RuntimeError("no FX")
+        ), patch.object(P, "provider_log") as log_mock:
             fields = P.cost_breakdown(entry, 2.0, "cost_per_million_chars")
 
         # Native-currency cost is still reported; USD is skipped, not raised.
@@ -153,6 +155,10 @@ class TestCostBreakdown(unittest.TestCase):
         self.assertEqual(fields["cost_in_currency"], 6000.0)
         self.assertNotIn("cost_usd", fields)
         self.assertNotIn("conversion_rate", fields)
+        log_mock.assert_called_once()
+        message = log_mock.call_args[0][0]
+        self.assertIn("FX", message)
+        self.assertIn("skipping cost_usd", message)
 
 
 class TestLLMPricingResolver(unittest.TestCase):
