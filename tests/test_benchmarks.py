@@ -151,9 +151,9 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
                 providers=["deepgram"],
                 input_dir=tmp,
                 output_dir=tmp,
-                run_llm_judges=True,
+                llm_judges=None,
             )
-        self.assertTrue(mock_eval.call_args.kwargs["run_llm_judges"])
+        self.assertIsNone(mock_eval.call_args.kwargs["llm_judges"])
 
     async def test_run_leaderboard_error(self):
         from calibrate_agent.stt import benchmark as B
@@ -244,6 +244,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(mock_eval.call_args.kwargs["language"], "hindi")
 
     async def test_main_eval_only_intent_entity_on_by_default(self):
+        from calibrate_agent._cli_args import DEFAULT_STT_LLM_JUDGES
         from calibrate_agent.stt import benchmark as B
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -254,12 +255,14 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
 
             fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
             mock_eval = AsyncMock(return_value=fake_result)
-            argv = ["b.py", "--eval-only", "--dataset", str(ds), "-o", str(out)]
+            argv = ["b.py", "--eval-only", "--dataset", str(ds), "-o", str(out), "-y"]
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run_eval_only", mock_eval):
                 await B.main()
 
-            self.assertTrue(mock_eval.call_args.kwargs["run_llm_judges"])
+            self.assertEqual(
+                mock_eval.call_args.kwargs["llm_judges"], DEFAULT_STT_LLM_JUDGES
+            )
 
     async def test_main_eval_only_skip_llm_judges_flag(self):
         from calibrate_agent.stt import benchmark as B
@@ -273,12 +276,43 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
             mock_eval = AsyncMock(return_value=fake_result)
             argv = ["b.py", "--eval-only", "--dataset", str(ds),
-                    "-o", str(out), "--skip-llm-judges"]
+                    "-o", str(out), "--skip-llm-judges", "-y"]
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run_eval_only", mock_eval):
                 await B.main()
 
-            self.assertFalse(mock_eval.call_args.kwargs["run_llm_judges"])
+            self.assertEqual(mock_eval.call_args.kwargs["llm_judges"], frozenset())
+
+    async def test_main_eval_only_judges_subset_flag(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            ds = base / "ds.json"
+            ds.write_text(json.dumps([{"id": "a", "gt": "hi", "pred": "hi"}]))
+            out = base / "out"
+
+            fake_result = {"status": "completed", "metrics": {"wer": 0.1}}
+            mock_eval = AsyncMock(return_value=fake_result)
+            argv = [
+                "b.py",
+                "--eval-only",
+                "--dataset",
+                str(ds),
+                "-o",
+                str(out),
+                "--judges",
+                "intent,llm_wer",
+                "-y",
+            ]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run_eval_only", mock_eval):
+                await B.main()
+
+            self.assertEqual(
+                mock_eval.call_args.kwargs["llm_judges"],
+                frozenset({"intent", "llm_wer"}),
+            )
 
     async def test_main_eval_only_error(self):
         from calibrate_agent.stt import benchmark as B
@@ -338,6 +372,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 await B.main()
 
     async def test_main_forwards_intent_entity_flag_to_run(self):
+        from calibrate_agent._cli_args import DEFAULT_STT_LLM_JUDGES
         from calibrate_agent.stt import benchmark as B
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -356,16 +391,18 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             mock_run = AsyncMock(return_value=fake_run_result)
 
             # Default on.
-            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
+            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out), "-y"]
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
-            self.assertTrue(mock_run.call_args.kwargs["run_llm_judges"])
+            self.assertEqual(
+                mock_run.call_args.kwargs["llm_judges"], DEFAULT_STT_LLM_JUDGES
+            )
 
             # Skip flag.
             argv.append("--skip-llm-judges")
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
-            self.assertFalse(mock_run.call_args.kwargs["run_llm_judges"])
+            self.assertEqual(mock_run.call_args.kwargs["llm_judges"], frozenset())
 
     async def test_main_error_provider_exits(self):
         from calibrate_agent.stt import benchmark as B

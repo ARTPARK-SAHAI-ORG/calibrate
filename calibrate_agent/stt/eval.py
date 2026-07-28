@@ -46,7 +46,11 @@ from calibrate_agent.stt.metrics import (
 from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
 from calibrate_agent.judge_store import JudgeStore
 from calibrate_agent._env import resolve_stt_max_concurrency
-from calibrate_agent._cli_args import add_stt_eval_args
+from calibrate_agent._cli_args import (
+    DEFAULT_STT_LLM_JUDGES,
+    add_stt_eval_args,
+    resolve_stt_llm_judges,
+)
 from calibrate_agent.judges import (
     is_rating,
     require_unique_evaluator_names,
@@ -1266,7 +1270,7 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
     engine: str = "pipeline",
     max_concurrency: int = None,
 ) -> dict:
@@ -1429,7 +1433,7 @@ async def run_single_provider_eval(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            run_llm_judges=run_llm_judges,
+            llm_judges=llm_judges,
             audio_durations=audio_durations,
             cost_metrics=cost_metrics,
             ttfs_values=all_ttfs,
@@ -1489,7 +1493,7 @@ async def _score_and_write_results(
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
     cost_metrics: dict | None = None,
     audio_durations: list[float | None] | None = None,
     ttfs_values: list = None,
@@ -1502,10 +1506,10 @@ async def _score_and_write_results(
     is empty/omitted, no judge runs, no evaluator config is written, and the
     evaluator columns/metrics are omitted. Returns the metrics_data dict.
 
-    The Sarvam intent/entity judge runs by default. When
-    ``run_llm_judges`` is False it is skipped entirely — no normalizer model
-    is loaded, no judge calls are made, and the ``sarvam_*`` columns/metrics are
-    omitted.
+    Built-in LLM judges are selected via ``llm_judges`` (``intent``,
+    ``llm_wer``, ``semantic_wer``). ``None`` runs all three; an empty
+    frozenset skips them entirely — no normalizer model is loaded, no judge
+    calls are made, and the corresponding columns/metrics are omitted.
 
     Each judge is isolated: if any judge raises, the failure is logged and that
     judge's columns/metrics are dropped, but WER/CER and any judges that
@@ -1536,16 +1540,13 @@ async def _score_and_write_results(
         )
 
     # Each judge below runs independently and is isolated: a failure in one
-    # (Sarvam intent/entity, Sarvam LLM-WER/CER, or the LLM judge) is logged and
-    # that judge's columns/metrics are omitted, but WER/CER and any judges that
-    # succeeded are still written.
+    # is logged and that judge's columns/metrics are omitted, but WER/CER and
+    # any judges that succeeded are still written.
+    enabled = DEFAULT_STT_LLM_JUDGES if llm_judges is None else llm_judges
 
-    # Intent + entity preservation and LLM-WER/CER run by default; setting
-    # ``run_llm_judges`` to False skips loading the normalizer model and the
-    # per-row judge calls.
     intent_entity_results = None
     llm_wer_results = None
-    if run_llm_judges:
+    if "intent" in enabled:
         try:
             intent_entity_results = await get_intent_entity_score(
                 gt_transcripts,
@@ -1561,6 +1562,7 @@ async def _score_and_write_results(
         except Exception as e:
             intent_entity_results = None
             _log(f"Sarvam intent/entity judge failed, skipping: {e}")
+    if "llm_wer" in enabled:
         try:
             llm_wer_results = await get_llm_wer_cer_score(
                 gt_transcripts,
@@ -1577,9 +1579,8 @@ async def _score_and_write_results(
             llm_wer_results = None
             _log(f"Sarvam LLM-WER/CER judge failed, skipping: {e}")
 
-    # Semantic WER (pipecat methodology) runs as part of the LLM judges group.
     semantic_wer_results = None
-    if run_llm_judges:
+    if "semantic_wer" in enabled:
         try:
             semantic_wer_results = await get_semantic_wer_score(
                 gt_transcripts, pred_transcripts, store=store, row_ids=ids
@@ -1759,7 +1760,7 @@ async def run_eval_only(
     output_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
     overwrite: bool = False,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
@@ -1774,9 +1775,9 @@ async def run_eval_only(
             LLM judge runs and only WER/CER are reported.
         language: Language of the dataset, used to normalize text before the
             intent/entity judge. Defaults to ``english``.
-        run_llm_judges: Run the Sarvam intent/entity judge (default True).
-            Setting it to False skips the normalizer model load and the judge
-            calls entirely.
+        llm_judges: Built-in LLM judges to run (``intent``, ``llm_wer``,
+            ``semantic_wer``). ``None`` runs all three; an empty frozenset
+            skips them.
         overwrite: Discard any judge results checkpointed under ``output_dir``
             from a prior run before scoring, so every row is graded fresh.
 
@@ -1812,7 +1813,7 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            run_llm_judges=run_llm_judges,
+            llm_judges=llm_judges,
             overwrite=overwrite,
         )
 
@@ -1830,7 +1831,7 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
     shared by the single-provider, multi-provider, and eval-only paths.
 
     The Sarvam judge fields are only included when present in ``metrics``
-    (i.e. unless ``--skip-llm-judges`` was passed for the run).
+    (i.e. when those built-in judges ran for the run).
     """
     parts = [
         f"WER={metrics.get('wer', 0):.4f}",
@@ -1972,7 +1973,9 @@ async def main():
         debug_count=args.debug_count,
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
-        run_llm_judges=not args.skip_llm_judges,
+        llm_judges=resolve_stt_llm_judges(
+            skip_llm_judges=args.skip_llm_judges, judges=args.judges
+        ),
         engine=args.engine,
         max_concurrency=args.max_concurrency,
     )

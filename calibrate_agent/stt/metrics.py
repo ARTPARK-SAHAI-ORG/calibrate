@@ -30,7 +30,8 @@ from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 # NOTE: ``calibrate_agent.stt.sarvam_intent_entity`` is imported lazily inside the
 # intent/entity functions below — importing it eagerly pulls in transformers,
 # indic-nlp, and joblib, which we want to avoid unless intent/entity scoring is
-# actually requested (it runs by default unless ``--skip-llm-judges`` is passed).
+# actually requested (it runs by default unless ``intent`` is omitted from
+# ``--judges`` / ``llm_judges``, or ``--skip-llm-judges`` is passed).
 
 # Re-export for existing imports
 DEFAULT_STT_JUDGE_MODEL = DEFAULT_TEXT_JUDGE_MODEL

@@ -338,7 +338,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_llm_judges=True,
+                    llm_judges=None,
                 )
 
             self.assertIn("wer", metrics)
@@ -408,7 +408,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=custom,
-                    run_llm_judges=True,
+                    llm_judges=None,
                 )
 
             # With the flag on, intent/entity report alongside a custom evaluator.
@@ -501,7 +501,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
 
             # Disabled: the Sarvam judge is never invoked and no sarvam_* keys appear.
@@ -514,6 +514,38 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             # WER/CER and the judge column are still written.
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
+
+    async def test_llm_judges_subset_runs_only_selected(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        ie_mock = _fake_intent_entity(1, 1.0)
+        llm_wer_mock = AsyncMock()
+        semantic_wer_mock = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_intent_entity_score", ie_mock), patch.object(
+                stt_eval, "get_llm_wer_cer_score", llm_wer_mock
+            ), patch.object(stt_eval, "get_semantic_wer_score", semantic_wer_mock):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    llm_judges=frozenset({"intent"}),
+                )
+
+            ie_mock.assert_awaited_once()
+            llm_wer_mock.assert_not_awaited()
+            semantic_wer_mock.assert_not_awaited()
+            self.assertIn("sarvam_intent_score", metrics)
+            self.assertIn("sarvam_entity_score", metrics)
+            self.assertNotIn("sarvam_llm_wer", metrics)
+            self.assertNotIn("semantic_wer", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertIn("sarvam_intent_score", df.columns)
+            self.assertNotIn("sarvam_llm_wer", df.columns)
+            self.assertNotIn("semantic_wer", df.columns)
 
     async def test_llm_judge_failure_still_writes_wer_cer_and_sarvam(self):
         from calibrate_agent.stt import eval as stt_eval
@@ -619,7 +651,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "goodbye"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
 
             # No evaluators passed: the LLM judge is never invoked, no evaluator
@@ -675,7 +707,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=[rating],
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["accuracy"], 4)
@@ -722,7 +754,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                 result = await stt_eval.run_eval_only(
                     dataset_path=str(ds_path),
                     output_dir=str(out),
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
 
             self.assertEqual(result["status"], "completed")

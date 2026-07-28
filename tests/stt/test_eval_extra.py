@@ -748,7 +748,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
             self.assertEqual(result["wer"], 0.1)
             self.assertEqual(result["cer"], 0.2)
@@ -781,7 +781,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["x", "y"],
                     output_dir=tmp,
                     evaluator_config_dir=tmp,
-                    run_llm_judges=True,
+                    llm_judges=None,
                 )
             self.assertEqual(result["sarvam_llm_wer"], 0.05)
             self.assertEqual(result["sarvam_llm_cer"], 0.03)
@@ -809,7 +809,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["x"],
                     output_dir=tmp,
                     evaluator_config_dir=tmp,
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
             llm_wer_mock.assert_not_called()
             self.assertNotIn("sarvam_llm_wer", result)
@@ -839,7 +839,7 @@ class TestScoreAndWrite(unittest.IsolatedAsyncioTestCase):
                 output_dir=tmp,
                 evaluator_config_dir=tmp,
                 judge_evaluators=[rating_ev],
-                run_llm_judges=False,
+                llm_judges=frozenset(),
             )
 
     async def test_short_row_extras_do_not_truncate_results(self):
@@ -1002,7 +1002,7 @@ class TestRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                      ],
                  })):
                 result = await E.run_eval_only(
-                    str(ds), str(out), run_llm_judges=False
+                    str(ds), str(out), llm_judges=frozenset()
                 )
         self.assertEqual(result["status"], "completed")
 
@@ -1083,7 +1083,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                     debug_count=5,
                     ignore_retry=False,
                     overwrite=True,
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
             self.assertEqual(result["status"], "completed")
 
@@ -1146,7 +1146,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                     debug_count=1,
                     ignore_retry=True,
                     overwrite=False,
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                     engine="direct",
                 )
             self.assertEqual(result["status"], "completed")

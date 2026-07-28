@@ -254,6 +254,36 @@ class TestMainDispatch(unittest.TestCase):
         self.assertIn("--skip-llm-judges", captured["argv"])
         self.assertIn("hindi", captured["argv"])
 
+    def test_stt_benchmark_forwards_judges_flag(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            import pandas as pd
+            pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(
+                base / "stt.csv", index=False
+            )
+            (base / "audios" / "a.wav").write_bytes(b"\x00")
+
+            with patch("calibrate_agent.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "stt", "-p", "deepgram",
+                    "-i", str(base), "-o", str(base / "out"),
+                    "--judges", "intent,llm_wer",
+                ])
+
+        self.assertIn("--judges", captured["argv"])
+        judges_idx = captured["argv"].index("--judges")
+        self.assertEqual(
+            frozenset(captured["argv"][judges_idx + 1].split(",")),
+            frozenset({"intent", "llm_wer"}),
+        )
+
     def test_stt_benchmark_forwards_yes_flag(self):
         captured = {}
 

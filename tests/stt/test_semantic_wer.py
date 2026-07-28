@@ -3,7 +3,7 @@
 The judge (two-phase reason-then-tool call per row) is mocked — no network.
 Covers the pooled/per-row WER formula, the prompt/tool text, and that semantic
 WER threads through ``_score_and_write_results`` into metrics.json +
-results.csv when the LLM-judge group is enabled (``run_llm_judges``).
+results.csv when the LLM-judge group is enabled (``llm_judges``).
 """
 
 import json
@@ -348,7 +348,7 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
                 ],
             }
 
-        # run_llm_judges=True now also triggers the Sarvam judges — make them
+        # llm_judges=None now also triggers the Sarvam judges — make them
         # raise so isolation skips them, keeping this test focused on semantic WER.
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp)
@@ -371,7 +371,7 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hi", "there"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
-                    run_llm_judges=True,
+                    llm_judges=None,
                 )
 
             self.assertEqual(metrics["semantic_wer"], 0.05)
@@ -401,7 +401,7 @@ class TestScoreAndWriteSemanticWER(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hi"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
 
             sem_mock.assert_not_called()

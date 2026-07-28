@@ -37,7 +37,11 @@ from calibrate_agent.stt.eval import (
 )
 from calibrate_agent.stt.leaderboard import generate_leaderboard
 from calibrate_agent._env import resolve_stt_parallelism
-from calibrate_agent._cli_args import add_assume_yes_arg, add_stt_eval_args
+from calibrate_agent._cli_args import (
+    add_assume_yes_arg,
+    add_stt_eval_args,
+    resolve_stt_llm_judges,
+)
 from calibrate_agent.judge_cost import (
     build_stt_judge_groups,
     confirm_estimated_judge_cost,
@@ -83,7 +87,7 @@ async def run(
     overwrite: bool = False,
     max_parallel: int = None,
     judge_evaluators: list[dict] = None,
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
     engine: str = "pipeline",
     max_concurrency: int = None,
 ) -> dict:
@@ -108,9 +112,9 @@ async def run(
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted no
             LLM judge runs and only WER/CER are reported.
-        run_llm_judges: Run the Sarvam intent/entity judge (default True;
-            loads a normalizer model + makes per-row judge calls). Set to False
-            to skip it.
+        llm_judges: Built-in LLM judges to run (``intent``, ``llm_wer``,
+            ``semantic_wer``). ``None`` runs all three; an empty frozenset
+            skips them.
 
     Returns:
         dict: Results summary with status and output paths
@@ -145,7 +149,7 @@ async def run(
                 ignore_retry=ignore_retry,
                 overwrite=overwrite,
                 judge_evaluators=judge_evaluators,
-                run_llm_judges=run_llm_judges,
+                llm_judges=llm_judges,
                 engine=engine,
                 max_concurrency=max_concurrency,
             )
@@ -319,7 +323,9 @@ async def main():
         print(f"Output: {args.output_dir}")
         print("")
 
-        run_llm_judges = not args.skip_llm_judges
+        llm_judges = resolve_stt_llm_judges(
+            skip_llm_judges=args.skip_llm_judges, judges=args.judges
+        )
 
         def plan_eval_only_judges():
             is_valid, _error_msg, rows = validate_stt_eval_only_dataset(args.dataset)
@@ -333,7 +339,7 @@ async def main():
                     "" if r["pred"] is None else str(r["pred"]) for r in rows
                 ],
                 evaluators=judge_evaluators,
-                run_llm_judges=run_llm_judges,
+                llm_judges=llm_judges,
             )
             return groups, len(JudgeStore.load(args.output_dir))
 
@@ -348,7 +354,7 @@ async def main():
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
             language=args.language,
-            run_llm_judges=run_llm_judges,
+            llm_judges=llm_judges,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
@@ -383,6 +389,10 @@ async def main():
         print(f"Output: {args.output_dir}")
         print("")
 
+        llm_judges = resolve_stt_llm_judges(
+            skip_llm_judges=args.skip_llm_judges, judges=args.judges
+        )
+
         def plan_benchmark_judges():
             gt_df = pd.read_csv(join(args.input_dir, args.input_file_name))
             if args.debug:
@@ -392,7 +402,7 @@ async def main():
             groups = build_stt_judge_groups(
                 references=gt_df["text"].astype(str).tolist(),
                 evaluators=judge_evaluators,
-                run_llm_judges=not args.skip_llm_judges,
+                llm_judges=llm_judges,
                 providers=len(providers),
             )
             cached_count = sum(
@@ -419,7 +429,7 @@ async def main():
             ignore_retry=args.ignore_retry,
             overwrite=args.overwrite,
             judge_evaluators=judge_evaluators,
-            run_llm_judges=not args.skip_llm_judges,
+            llm_judges=llm_judges,
             max_parallel=args.max_parallel,
             engine=args.engine,
             max_concurrency=args.max_concurrency,

@@ -23,6 +23,7 @@ import sys
 from dataclasses import dataclass
 from typing import Callable, Optional, Sequence, TextIO
 
+from calibrate_agent._cli_args import DEFAULT_STT_LLM_JUDGES
 from calibrate_agent.judges import (
     DEFAULT_AUDIO_JUDGE_MODEL,
     DEFAULT_TEXT_JUDGE_MODEL,
@@ -163,19 +164,20 @@ def build_stt_judge_groups(
     references: Sequence[str],
     predictions: Optional[Sequence[str]] = None,
     evaluators: Optional[Sequence[dict]] = None,
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
     providers: int = 1,
 ) -> list[JudgeCallGroup]:
     """Build the judge workload for an STT run, mirroring ``_score_and_write_results``.
 
     One group per judge that will actually run: the user ``evaluators`` (via
     ``get_llm_judge_score``), grouped by resolved model so a config mixing
-    models prices correctly; the Sarvam intent/entity judge; the Sarvam
-    LLM-WER/CER judge; and the semantic WER judge, split into its two calls
-    per row (a free-form reasoning call, then a forced tool-call commit). The
-    three built-in judges only appear when ``run_llm_judges`` is True; the
-    evaluators group only appears when ``evaluators`` is non-empty. Returns
-    ``[]`` when neither would run, or when ``references`` is empty.
+    models prices correctly; and each enabled built-in judge from
+    ``llm_judges`` (``intent``, ``llm_wer``, ``semantic_wer``). ``llm_judges``
+    of ``None`` means all three; an empty frozenset means none. Semantic WER
+    splits into two call groups per row (free-form reasoning, then a forced
+    tool-call commit). The evaluators group only appears when ``evaluators``
+    is non-empty. Returns ``[]`` when neither would run, or when
+    ``references`` is empty.
 
     The Sarvam LLM-WER/CER judge actually calls its equivalence judge once per
     *unique differing word segment* after alignment, not once per row — but
@@ -196,6 +198,7 @@ def build_stt_judge_groups(
     if n == 0:
         return []
     preds = list(predictions) if predictions is not None else list(references)
+    enabled = DEFAULT_STT_LLM_JUDGES if llm_judges is None else llm_judges
 
     groups: list[JudgeCallGroup] = []
 
@@ -227,22 +230,16 @@ def build_stt_judge_groups(
                 )
             )
 
-    if run_llm_judges:
-        # Deferred: importing sarvam_intent_entity eagerly pulls in
-        # transformers/indic-nlp/joblib (see stt/metrics.py), which should only
-        # happen when these judges are actually going to run.
+    if not enabled:
+        return groups
+
+    # Deferred: importing sarvam_intent_entity eagerly pulls in
+    # transformers/indic-nlp/joblib (see stt/metrics.py), which should only
+    # happen when these judges are actually going to run.
+    if "intent" in enabled:
         from calibrate_agent.stt.sarvam_intent_entity import (
             DEFAULT_INTENT_ENTITY_MODEL,
             build_prompt as build_intent_entity_prompt,
-        )
-        from calibrate_agent.stt.sarvam_llm_wer import (
-            DEFAULT_LLM_WER_MODEL,
-            build_prompt as build_llm_wer_prompt,
-        )
-        from calibrate_agent.stt.semantic_wer import (
-            DEFAULT_SEMANTIC_WER_MODEL,
-            SYSTEM_PROMPT as SEMANTIC_WER_SYSTEM_PROMPT,
-            build_user_prompt as build_semantic_wer_user_prompt,
         )
 
         intent_entity_tokens = _mean_tokens(
@@ -268,6 +265,12 @@ def build_stt_judge_groups(
             )
         )
 
+    if "llm_wer" in enabled:
+        from calibrate_agent.stt.sarvam_llm_wer import (
+            DEFAULT_LLM_WER_MODEL,
+            build_prompt as build_llm_wer_prompt,
+        )
+
         llm_wer_tokens = _mean_tokens(
             estimate_tokens(build_llm_wer_prompt({"reference": ref, "prediction": pred}))
             for ref, pred in zip(references, preds)
@@ -280,6 +283,13 @@ def build_stt_judge_groups(
                 input_tokens_per_call=llm_wer_tokens,
                 output_tokens_per_call=LLM_WER_OUTPUT_TOKENS,
             )
+        )
+
+    if "semantic_wer" in enabled:
+        from calibrate_agent.stt.semantic_wer import (
+            DEFAULT_SEMANTIC_WER_MODEL,
+            SYSTEM_PROMPT as SEMANTIC_WER_SYSTEM_PROMPT,
+            build_user_prompt as build_semantic_wer_user_prompt,
         )
 
         semantic_wer_system_tokens = estimate_tokens(SEMANTIC_WER_SYSTEM_PROMPT)

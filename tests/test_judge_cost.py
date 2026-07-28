@@ -501,7 +501,7 @@ class TestBuildSttJudgeGroups(unittest.TestCase):
         from calibrate_agent.judge_cost import build_stt_judge_groups
 
         groups = build_stt_judge_groups(
-            self.references, self.predictions, evaluators=None, run_llm_judges=False
+            self.references, self.predictions, evaluators=None, llm_judges=frozenset()
         )
 
         self.assertEqual(groups, [])
@@ -510,7 +510,7 @@ class TestBuildSttJudgeGroups(unittest.TestCase):
         from calibrate_agent.judge_cost import build_stt_judge_groups
 
         groups = build_stt_judge_groups(
-            self.references, self.predictions, evaluators=None, run_llm_judges=True
+            self.references, self.predictions, evaluators=None, llm_judges=None
         )
         labels = [g.label for g in groups]
 
@@ -531,18 +531,50 @@ class TestBuildSttJudgeGroups(unittest.TestCase):
             self.references,
             self.predictions,
             evaluators=evaluators,
-            run_llm_judges=False,
+            llm_judges=frozenset(),
         )
         labels = [g.label for g in groups]
 
         self.assertEqual(len(groups), 1)
         self.assertIn("semantic_match", labels[0])
 
+    def test_llm_judges_subset_emits_only_selected_groups(self):
+        from calibrate_agent.judge_cost import build_stt_judge_groups
+
+        groups = build_stt_judge_groups(
+            self.references,
+            self.predictions,
+            evaluators=None,
+            llm_judges=frozenset({"intent", "llm_wer"}),
+        )
+        labels = [g.label for g in groups]
+
+        self.assertEqual(
+            labels,
+            ["Sarvam intent/entity", "Sarvam LLM-WER/CER"],
+        )
+
+    def test_semantic_wer_only_emits_both_semantic_wer_call_groups(self):
+        from calibrate_agent.judge_cost import build_stt_judge_groups
+
+        groups = build_stt_judge_groups(
+            self.references,
+            self.predictions,
+            evaluators=None,
+            llm_judges=frozenset({"semantic_wer"}),
+        )
+        labels = [g.label for g in groups]
+
+        self.assertEqual(
+            labels,
+            ["Semantic WER (reasoning)", "Semantic WER (commit)"],
+        )
+
     def test_semantic_wer_issues_two_calls_per_row(self):
         from calibrate_agent.judge_cost import build_stt_judge_groups
 
         groups = build_stt_judge_groups(
-            self.references, self.predictions, evaluators=None, run_llm_judges=True
+            self.references, self.predictions, evaluators=None, llm_judges=None
         )
         by_label = {g.label: g for g in groups}
 
@@ -571,7 +603,7 @@ class TestBuildSttJudgeGroups(unittest.TestCase):
             self.references,
             self.predictions,
             evaluators=evaluators,
-            run_llm_judges=False,
+            llm_judges=frozenset(),
         )
         models = {g.model for g in groups}
 
@@ -586,14 +618,14 @@ class TestBuildSttJudgeGroups(unittest.TestCase):
             self.references,
             self.predictions,
             evaluators=evaluators,
-            run_llm_judges=True,
+            llm_judges=None,
             providers=1,
         )
         tripled = build_stt_judge_groups(
             self.references,
             self.predictions,
             evaluators=evaluators,
-            run_llm_judges=True,
+            llm_judges=None,
             providers=3,
         )
         base_by_label = {g.label: g.calls for g in base}
@@ -610,7 +642,7 @@ class TestBuildSttJudgeGroups(unittest.TestCase):
             self.references,
             predictions=None,
             evaluators=evaluators,
-            run_llm_judges=True,
+            llm_judges=None,
         )
 
         self.assertTrue(groups)
@@ -621,7 +653,7 @@ class TestBuildSttJudgeGroups(unittest.TestCase):
     def test_empty_references_yields_no_calls(self):
         from calibrate_agent.judge_cost import build_stt_judge_groups
 
-        groups = build_stt_judge_groups([], evaluators=None, run_llm_judges=True)
+        groups = build_stt_judge_groups([], evaluators=None, llm_judges=None)
 
         self.assertEqual(groups, [])
 

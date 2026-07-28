@@ -561,6 +561,8 @@ Examples:
                 argv.extend(["--config", args.config])
             if args.skip_llm_judges:
                 argv.append("--skip-llm-judges")
+            if args.judges is not None:
+                argv.extend(["--judges", ",".join(sorted(args.judges))])
             if args.yes:
                 argv.append("--yes")
 
@@ -588,6 +590,8 @@ Examples:
                 argv.extend(["--config", args.config])
             if args.skip_llm_judges:
                 argv.append("--skip-llm-judges")
+            if args.judges is not None:
+                argv.extend(["--judges", ",".join(sorted(args.judges))])
             # Only forward the parallelism knobs when the user set them
             # explicitly; otherwise let the benchmark resolve the per-engine
             # default (pipeline 1/1, direct 2/4).
