@@ -131,6 +131,35 @@ class TestSTTLeaderboard(unittest.TestCase):
             summary = pd.read_excel(xlsx, sheet_name="summary")
             self.assertEqual(list(summary["run"]), ["provider-x"])
 
+    def test_regenerate_archives_previous_summary_to_past_runs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_provider(
+                base,
+                "deepgram",
+                {"wer": 0.1, "sarvam_intent_score": 0.9},
+                results_rows=[{"id": 1, "gt": "a", "pred": "a"}],
+            )
+            save_dir = base / "leaderboard"
+            generate_stt_leaderboard(str(base), str(save_dir))
+
+            # Update metrics and regenerate — prior summary should land on past_runs.
+            _write_provider(
+                base,
+                "deepgram",
+                {"wer": 0.2, "sarvam_llm_wer": 0.15},
+                results_rows=[{"id": 1, "gt": "a", "pred": "a"}],
+            )
+            generate_stt_leaderboard(str(base), str(save_dir))
+
+            xlsx = save_dir / "stt_leaderboard.xlsx"
+            summary = pd.read_excel(xlsx, sheet_name="summary")
+            past = pd.read_excel(xlsx, sheet_name="past_runs")
+            self.assertIn("sarvam_llm_wer", summary.columns)
+            self.assertIn("archived_at", past.columns)
+            self.assertIn("sarvam_intent_score", past.columns)
+            self.assertAlmostEqual(float(past["sarvam_intent_score"].iloc[0]), 0.9)
+
 
 if __name__ == "__main__":
     unittest.main()

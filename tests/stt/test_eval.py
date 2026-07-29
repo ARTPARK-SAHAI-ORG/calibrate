@@ -547,6 +547,85 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("sarvam_llm_wer", df.columns)
             self.assertNotIn("semantic_wer", df.columns)
 
+    async def test_subset_run_preserves_prior_judge_outputs(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            # Prior full-judge artifacts on disk.
+            (out / "metrics.json").write_text(
+                json.dumps(
+                    {
+                        "wer": 0.5,
+                        "cer": 0.4,
+                        "sarvam_intent_score": 0.9,
+                        "sarvam_entity_score": 0.8,
+                        "sarvam_llm_wer": 0.2,
+                        "sarvam_llm_cer": 0.1,
+                    }
+                )
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "hello",
+                        "pred": "hello",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "sarvam_intent_score": 1,
+                        "sarvam_intent_reasoning": "ok",
+                        "sarvam_entity_score": 1.0,
+                        "sarvam_entity_reasoning": "ok",
+                        "sarvam_llm_wer": 0.0,
+                        "sarvam_llm_cer": 0.0,
+                        "sarvam_llm_wer_reasoning": "[]",
+                    },
+                    {
+                        "id": "2",
+                        "gt": "world",
+                        "pred": "word",
+                        "wer": 1.0,
+                        "cer": 0.2,
+                        "sarvam_intent_score": 0,
+                        "sarvam_intent_reasoning": "miss",
+                        "sarvam_entity_score": 0.5,
+                        "sarvam_entity_reasoning": "partial",
+                        "sarvam_llm_wer": 0.5,
+                        "sarvam_llm_cer": 0.2,
+                        "sarvam_llm_wer_reasoning": "[]",
+                    },
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            llm_wer_mock = _fake_llm_wer(0.05, 0.03)
+            with patch.object(stt_eval, "get_llm_wer_cer_score", llm_wer_mock), patch.object(
+                stt_eval, "get_intent_entity_score", AsyncMock()
+            ) as ie_mock, patch.object(
+                stt_eval, "get_semantic_wer_score", AsyncMock()
+            ) as sem_mock:
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "word"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    llm_judges=frozenset({"llm_wer"}),
+                )
+
+            ie_mock.assert_not_awaited()
+            sem_mock.assert_not_awaited()
+            # Fresh llm_wer + preserved intent/entity from prior.
+            self.assertEqual(metrics["sarvam_llm_wer"], 0.05)
+            self.assertEqual(metrics["sarvam_intent_score"], 0.9)
+            self.assertEqual(metrics["sarvam_entity_score"], 0.8)
+            history = list((out / "judge_history").glob("metrics_*.json"))
+            self.assertEqual(len(history), 1)
+            df = pd.read_csv(out / "results.csv")
+            self.assertIn("sarvam_intent_score", df.columns)
+            self.assertIn("sarvam_llm_wer", df.columns)
+            self.assertEqual(int(df.loc[df["id"].astype(str) == "1", "sarvam_intent_score"].iloc[0]), 1)
+
     async def test_llm_judge_failure_still_writes_wer_cer_and_sarvam(self):
         from calibrate_agent.stt import eval as stt_eval
 

@@ -763,8 +763,21 @@ async def get_llm_wer_cer_score(
         ref, pred = pair_list[index]
         return await sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
 
+    def _failed_segment(_index: int, exc: BaseException) -> dict:
+        # Treat the segment as not equivalent so WER still finishes; do not
+        # cache (gather_with_store skips store.put when error_result is used).
+        return {
+            "index": 0,
+            "equivalent": False,
+            "reasoning": f"equivalence judge failed: {exc}",
+        }
+
     judge_results = await gather_with_store(
-        keys, run_one, store, desc="Running LLM-WER equivalence judge"
+        keys,
+        run_one,
+        store,
+        desc="Running LLM-WER equivalence judge",
+        error_result=_failed_segment,
     )
 
     verdicts = {

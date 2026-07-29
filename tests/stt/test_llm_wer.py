@@ -77,6 +77,28 @@ class TestGetLlmWerCerScore(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["per_row"][0]["segments"][0]["equivalent"])
         self.assertFalse(result["per_row"][1]["segments"][0]["equivalent"])
 
+    async def test_one_segment_failure_does_not_abort_metric(self):
+        from calibrate_agent.stt import sarvam_llm_wer as slw
+        from calibrate_agent.stt import metrics
+
+        async def fake_judge(reference, prediction, model=None):
+            if (reference, prediction) == ("doctor", "daktar"):
+                raise RuntimeError("boom")
+            return {"index": 0, "equivalent": False, "reasoning": "different"}
+
+        with patch.object(slw, "equivalence_judge", AsyncMock(side_effect=fake_judge)):
+            result = await metrics.get_llm_wer_cer_score(
+                references=["doctor ne bola", "hello world"],
+                predictions=["daktar ne bola", "hello word"],
+            )
+
+        # Failed segment is treated as not equivalent; metric still returns.
+        self.assertIn("llm_wer", result)
+        self.assertEqual(len(result["per_row"]), 2)
+        failed_seg = result["per_row"][0]["segments"][0]
+        self.assertFalse(failed_seg["equivalent"])
+        self.assertIn("failed", failed_seg["reasoning"].lower())
+
     async def test_unique_segments_judged_once(self):
         from calibrate_agent.stt import sarvam_llm_wer as slw
         from calibrate_agent.stt import metrics
@@ -246,6 +268,39 @@ class TestEquivalenceJudge(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(kwargs["temperature"], 0)
         self.assertEqual(kwargs["response_model"], jw.LLMEquivalenceResponse)
 
+    async def test_judge_recovers_from_multiple_tool_calls(self):
+        from calibrate_agent.stt.sarvam_llm_wer import judge as jw
+
+        fake_result = {"index": 0, "equivalent": True, "reasoning": "same"}
+        fake_response = MagicMock()
+        fake_response.model_dump.return_value = fake_result
+        list_item = MagicMock()
+        list_item.model_dump.return_value = fake_result
+
+        fake_client = MagicMock()
+        fake_client.chat.completions.create = AsyncMock(
+            side_effect=[
+                RuntimeError("Instructor does not support multiple tool calls"),
+                [list_item],
+            ]
+        )
+
+        inner = jw.equivalence_judge
+        while hasattr(inner, "__wrapped__"):
+            inner = inner.__wrapped__
+
+        with patch.object(jw, "_build_openrouter_client", return_value=MagicMock()), \
+             patch.object(jw.instructor, "apatch", return_value=fake_client):
+            result = await inner("a", "a", model="m")
+
+        self.assertEqual(result, fake_result)
+        self.assertEqual(fake_client.chat.completions.create.await_count, 2)
+        second_kwargs = fake_client.chat.completions.create.await_args_list[1].kwargs
+        from typing import List as TypingList
+
+        self.assertEqual(
+            second_kwargs["response_model"], TypingList[jw.LLMEquivalenceResponse]
+        )
 
 if __name__ == "__main__":
     unittest.main()

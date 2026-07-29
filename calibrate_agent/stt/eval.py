@@ -5,7 +5,7 @@ import os
 import json
 import base64
 from os.path import join, exists
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 from urllib.parse import urlencode
@@ -48,6 +48,7 @@ from calibrate_agent.judge_store import JudgeStore
 from calibrate_agent._env import resolve_stt_max_concurrency
 from calibrate_agent._cli_args import (
     DEFAULT_STT_LLM_JUDGES,
+    STT_LLM_JUDGES,
     add_stt_eval_args,
     resolve_stt_llm_judges,
 )
@@ -1259,6 +1260,162 @@ STT_LANGUAGES = [
 ]
 
 
+# metrics.json keys written by each built-in LLM judge.
+_BUILT_IN_JUDGE_METRIC_KEYS: dict[str, tuple[str, ...]] = {
+    "intent": ("sarvam_intent_score", "sarvam_entity_score"),
+    "llm_wer": ("sarvam_llm_wer", "sarvam_llm_cer"),
+    "semantic_wer": ("semantic_wer",),
+}
+
+# results.csv columns written by each built-in LLM judge.
+_BUILT_IN_JUDGE_RESULT_COLUMNS: dict[str, tuple[str, ...]] = {
+    "intent": (
+        "sarvam_intent_score",
+        "sarvam_intent_reasoning",
+        "sarvam_entity_score",
+        "sarvam_entity_reasoning",
+    ),
+    "llm_wer": (
+        "sarvam_llm_wer",
+        "sarvam_llm_cer",
+        "sarvam_llm_wer_reasoning",
+    ),
+    "semantic_wer": (
+        "semantic_wer",
+        "semantic_wer_metadata",
+        "semantic_wer_reasoning",
+    ),
+}
+
+# Always refreshed on every scoring pass; never restored from a prior file.
+_ALWAYS_FRESH_METRIC_KEYS = frozenset({"wer", "cer", "cost", "ttfs"})
+_ALWAYS_FRESH_RESULT_COLUMNS = frozenset(
+    {"id", "gt", "pred", "wer", "cer", "audio_duration_seconds", "ttfs"}
+)
+
+
+def _load_prior_metrics(output_dir: str) -> dict | None:
+    path = join(output_dir, "metrics.json")
+    if not exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _load_prior_results(output_dir: str) -> pd.DataFrame | None:
+    path = join(output_dir, "results.csv")
+    if not exists(path):
+        return None
+    try:
+        return pd.read_csv(path)
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return None
+
+
+def _archive_prior_metrics(output_dir: str, prior: dict) -> None:
+    """Write a timestamped copy of ``prior`` under ``judge_history/``."""
+    history_dir = Path(output_dir) / "judge_history"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    path = history_dir / f"metrics_{stamp}.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(prior, f, indent=4)
+
+
+def _prior_evaluator_names(prior_metrics: dict) -> set[str]:
+    """Names of config-evaluator entries in a prior ``metrics.json``."""
+    names: set[str] = set()
+    for key, value in prior_metrics.items():
+        if key in _ALWAYS_FRESH_METRIC_KEYS:
+            continue
+        if any(key in keys for keys in _BUILT_IN_JUDGE_METRIC_KEYS.values()):
+            continue
+        if isinstance(value, dict) and "type" in value and "mean" in value:
+            names.add(key)
+    return names
+
+
+def _merge_prior_judge_outputs(
+    metrics_data: dict,
+    rows: list[dict],
+    output_dir: str,
+    *,
+    overwrite: bool,
+    enabled_judges: frozenset[str],
+    this_run_evaluator_names: set[str],
+) -> tuple[dict, list[dict]]:
+    """Keep prior built-in / config-evaluator outputs that this run did not refresh.
+
+    Always archives an existing ``metrics.json`` under ``judge_history/`` before
+    replacing it. When ``overwrite`` is True, returns the fresh artifacts
+    unchanged after that archive. Otherwise copies metrics keys and per-row
+    columns for judges (and config evaluators) that were not part of this
+    scoring pass, matched by ``id``.
+    """
+    prior_metrics = _load_prior_metrics(output_dir)
+    prior_df = _load_prior_results(output_dir)
+    if prior_metrics is None and prior_df is None:
+        return metrics_data, rows
+
+    if prior_metrics is not None:
+        _archive_prior_metrics(output_dir, prior_metrics)
+
+    if overwrite:
+        return metrics_data, rows
+
+    if prior_metrics is not None:
+        fresh_metric_keys = set(_ALWAYS_FRESH_METRIC_KEYS)
+        for name in enabled_judges:
+            fresh_metric_keys.update(_BUILT_IN_JUDGE_METRIC_KEYS.get(name, ()))
+        fresh_metric_keys.update(this_run_evaluator_names)
+
+        for key, value in prior_metrics.items():
+            if key in fresh_metric_keys:
+                continue
+            if key not in metrics_data:
+                metrics_data[key] = value
+
+    if prior_df is not None and not prior_df.empty and "id" in prior_df.columns:
+        prior_by_id = {
+            str(r["id"]): r for r in prior_df.to_dict("records")
+        }
+        preserve_columns: set[str] = set()
+        for name in STT_LLM_JUDGES:
+            if name in enabled_judges:
+                continue
+            preserve_columns.update(_BUILT_IN_JUDGE_RESULT_COLUMNS.get(name, ()))
+        if prior_metrics is not None:
+            for ev_name in _prior_evaluator_names(prior_metrics):
+                if ev_name in this_run_evaluator_names:
+                    continue
+                preserve_columns.add(ev_name)
+                preserve_columns.add(f"{ev_name}_reasoning")
+
+        preserve_columns = {
+            c
+            for c in preserve_columns
+            if c in prior_df.columns and c not in _ALWAYS_FRESH_RESULT_COLUMNS
+        }
+        if preserve_columns:
+            for row in rows:
+                prior_row = prior_by_id.get(str(row["id"]))
+                if prior_row is None:
+                    continue
+                for col in preserve_columns:
+                    if col in row:
+                        continue
+                    value = prior_row.get(col)
+                    if value is None or (isinstance(value, float) and pd.isna(value)):
+                        continue
+                    row[col] = value
+
+    return metrics_data, rows
+
+
 async def run_single_provider_eval(
     provider: str,
     language: str,
@@ -1746,6 +1903,15 @@ async def _score_and_write_results(
                 row[name] = bool(ev_result["match"])
             row[f"{name}_reasoning"] = ev_result["reasoning"]
         data.append(row)
+
+    metrics_data, data = _merge_prior_judge_outputs(
+        metrics_data,
+        data,
+        output_dir,
+        overwrite=overwrite,
+        enabled_judges=enabled,
+        this_run_evaluator_names=set(_evaluators_by_name),
+    )
 
     with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics_data, f, indent=4)

@@ -172,6 +172,8 @@ async def gather_with_store(
     run_one: Callable[[int], Awaitable[dict]],
     store: JudgeStore | None,
     desc: str,
+    *,
+    error_result: Callable[[int, BaseException], dict] | None = None,
 ) -> list[dict]:
     """Run one judge call per row, reusing cached results where possible.
 
@@ -183,9 +185,11 @@ async def gather_with_store(
     on. When ``store`` is ``None``, or ``keys[i]`` is ``None``, row ``i``
     always runs.
 
-    An exception raised by ``run_one`` propagates to the caller; any result
-    already computed and stored for other rows before the failure remains
-    on disk.
+    When ``error_result`` is ``None``, an exception from ``run_one``
+    propagates to the caller (any results already stored for other rows
+    remain on disk). When ``error_result`` is set, a failed ``run_one`` is
+    replaced with ``error_result(index, exc)`` and is **not** written to
+    ``store``, so a transient failure is not cached as a permanent grade.
 
     Returns:
         Results in row order (index ``i`` is row ``i``'s result),
@@ -200,7 +204,13 @@ async def gather_with_store(
             if cached is not None:
                 results[index] = cached
                 return
-        result = await run_one(index)
+        try:
+            result = await run_one(index)
+        except Exception as exc:
+            if error_result is None:
+                raise
+            results[index] = error_result(index, exc)
+            return
         if store is not None and key is not None:
             await store.put(key, result)
         results[index] = result
