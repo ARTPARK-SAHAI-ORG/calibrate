@@ -302,5 +302,37 @@ class TestEquivalenceJudge(unittest.IsolatedAsyncioTestCase):
             second_kwargs["response_model"], TypingList[jw.LLMEquivalenceResponse]
         )
 
+    async def test_judge_non_multi_tool_error_reraises(self):
+        from calibrate_agent.stt.sarvam_llm_wer import judge as jw
+
+        fake_client = MagicMock()
+        fake_client.chat.completions.create = AsyncMock(
+            side_effect=RuntimeError("rate limited")
+        )
+
+        with self.assertRaises(RuntimeError) as ctx:
+            await jw._create_equivalence_response(
+                fake_client, model="m", prompt="hi"
+            )
+        self.assertIn("rate limited", str(ctx.exception))
+        self.assertEqual(fake_client.chat.completions.create.await_count, 1)
+
+    async def test_judge_empty_list_fallback_reraises(self):
+        from calibrate_agent.stt.sarvam_llm_wer import judge as jw
+
+        original = RuntimeError("Instructor does not support multiple tool calls")
+        fake_client = MagicMock()
+        fake_client.chat.completions.create = AsyncMock(
+            side_effect=[original, []]
+        )
+
+        with self.assertRaises(RuntimeError) as ctx:
+            await jw._create_equivalence_response(
+                fake_client, model="m", prompt="hi"
+            )
+        self.assertIs(ctx.exception, original)
+        self.assertEqual(fake_client.chat.completions.create.await_count, 2)
+
+
 if __name__ == "__main__":
     unittest.main()

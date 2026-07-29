@@ -283,6 +283,38 @@ class TestGatherWithStore(JudgeStoreTestBase):
         self.assertEqual(reloaded.get(keys[2]), {"score": 2})
         self.assertIsNone(reloaded.get(keys[1]))
 
+    async def test_error_result_isolates_failure_and_skips_cache(self):
+        store = JudgeStore.load(self.output_dir)
+        keys = [
+            JudgeKey(kind="llm_wer", row_id=str(i), fingerprint=f"fp{i}")
+            for i in range(3)
+        ]
+
+        async def run_one(index):
+            if index == 1:
+                raise ValueError("judge call failed")
+            return {"score": index}
+
+        results = await gather_with_store(
+            keys,
+            run_one,
+            store,
+            desc="test",
+            error_result=lambda i, exc: {
+                "score": "fallback",
+                "error": str(exc),
+                "index": i,
+            },
+        )
+
+        self.assertEqual(results[0]["score"], 0)
+        self.assertEqual(results[1]["score"], "fallback")
+        self.assertEqual(results[2]["score"], 2)
+        reloaded = JudgeStore.load(self.output_dir)
+        self.assertEqual(reloaded.get(keys[0]), {"score": 0})
+        self.assertIsNone(reloaded.get(keys[1]))
+        self.assertEqual(reloaded.get(keys[2]), {"score": 2})
+
 
 class TestGatherEvaluatorsWithStore(JudgeStoreTestBase):
     async def test_fully_cached_row_skips_run_subset(self):

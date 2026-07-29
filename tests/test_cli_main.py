@@ -284,6 +284,29 @@ class TestMainDispatch(unittest.TestCase):
             frozenset({"intent", "llm_wer"}),
         )
 
+    def test_stt_eval_only_forwards_judges_flag(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate_agent.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "stt", "--eval-only", "--dataset", str(ds),
+                    "-o", tmp, "--judges", "intent,semantic_wer",
+                ])
+
+        self.assertIn("--judges", captured["argv"])
+        judges_idx = captured["argv"].index("--judges")
+        self.assertEqual(
+            frozenset(captured["argv"][judges_idx + 1].split(",")),
+            frozenset({"intent", "semantic_wer"}),
+        )
+
     def test_stt_benchmark_forwards_yes_flag(self):
         captured = {}
 

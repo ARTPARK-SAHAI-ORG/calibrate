@@ -419,6 +419,41 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 await B.main()
             self.assertEqual(mock_run.call_args.kwargs["llm_judges"], frozenset())
 
+    async def test_main_provider_judges_subset_flag(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            out = base / "out"
+
+            fake_run_result = {
+                "status": "completed",
+                "output_dir": str(out),
+                "leaderboard_dir": str(out / "leaderboard"),
+                "providers": {
+                    "deepgram": {"status": "completed", "metrics": {"wer": 0.1}},
+                },
+            }
+            mock_run = AsyncMock(return_value=fake_run_result)
+            argv = [
+                "b.py",
+                "-p",
+                "deepgram",
+                "-i",
+                str(base),
+                "-o",
+                str(out),
+                "--judges",
+                "intent",
+                "-y",
+            ]
+            with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
+                await B.main()
+            self.assertEqual(
+                mock_run.call_args.kwargs["llm_judges"], frozenset({"intent"})
+            )
+
     async def test_main_error_provider_exits(self):
         from calibrate_agent.stt import benchmark as B
 

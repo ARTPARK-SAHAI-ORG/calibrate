@@ -626,6 +626,176 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             self.assertIn("sarvam_llm_wer", df.columns)
             self.assertEqual(int(df.loc[df["id"].astype(str) == "1", "sarvam_intent_score"].iloc[0]), 1)
 
+    async def test_merge_no_prior_returns_unchanged(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics = {"wer": 0.1, "cer": 0.2}
+            rows = [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}]
+            out_m, out_r = stt_eval._merge_prior_judge_outputs(
+                metrics,
+                rows,
+                tmp,
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(out_m, metrics)
+            self.assertEqual(out_r, rows)
+            self.assertFalse((Path(tmp) / "judge_history").exists())
+
+    async def test_merge_overwrite_archives_but_does_not_restore(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps(
+                    {
+                        "wer": 0.5,
+                        "cer": 0.4,
+                        "sarvam_intent_score": 0.9,
+                        "sarvam_entity_score": 0.8,
+                    }
+                )
+            )
+            fresh = {"wer": 0.1, "cer": 0.05, "sarvam_llm_wer": 0.02}
+            rows = [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}]
+            out_m, out_r = stt_eval._merge_prior_judge_outputs(
+                dict(fresh),
+                rows,
+                str(out),
+                overwrite=True,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(out_m, fresh)
+            self.assertNotIn("sarvam_intent_score", out_m)
+            self.assertEqual(len(list((out / "judge_history").glob("metrics_*.json"))), 1)
+
+    async def test_merge_skips_nan_prior_cells(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps({"wer": 0.5, "cer": 0.4, "sarvam_intent_score": 0.9})
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "a",
+                        "pred": "a",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "sarvam_intent_score": float("nan"),
+                        "sarvam_intent_reasoning": "ok",
+                    }
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            rows = [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}]
+            _, out_rows = stt_eval._merge_prior_judge_outputs(
+                {"wer": 0.1, "cer": 0.05},
+                rows,
+                str(out),
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertNotIn("sarvam_intent_score", out_rows[0])
+            self.assertEqual(out_rows[0]["sarvam_intent_reasoning"], "ok")
+
+    async def test_merge_preserves_config_evaluator_columns(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps(
+                    {
+                        "wer": 0.5,
+                        "cer": 0.4,
+                        "semantic_match": {"type": "binary", "mean": 0.9},
+                    }
+                )
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "a",
+                        "pred": "a",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "semantic_match": True,
+                        "semantic_match_reasoning": "match",
+                    }
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            metrics, rows = stt_eval._merge_prior_judge_outputs(
+                {"wer": 0.1, "cer": 0.05, "sarvam_llm_wer": 0.02},
+                [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}],
+                str(out),
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(metrics["semantic_match"]["mean"], 0.9)
+            self.assertTrue(rows[0]["semantic_match"])
+            self.assertEqual(rows[0]["semantic_match_reasoning"], "match")
+
+    async def test_load_prior_helpers_handle_corrupt_inputs(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text("{not-json")
+            self.assertIsNone(stt_eval._load_prior_metrics(str(out)))
+
+            (out / "metrics.json").write_text("[1, 2]")
+            self.assertIsNone(stt_eval._load_prior_metrics(str(out)))
+
+            (out / "results.csv").write_text("")
+            self.assertIsNone(stt_eval._load_prior_results(str(out)))
+
+    async def test_merge_skips_rows_missing_from_prior(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps({"wer": 0.5, "sarvam_intent_score": 0.9})
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "a",
+                        "pred": "a",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "sarvam_intent_score": 1,
+                    }
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            _, rows = stt_eval._merge_prior_judge_outputs(
+                {"wer": 0.1},
+                [
+                    {"id": "1", "gt": "a", "pred": "a", "wer": 0.0},
+                    {"id": "new", "gt": "b", "pred": "b", "wer": 0.0},
+                ],
+                str(out),
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(rows[0]["sarvam_intent_score"], 1)
+            self.assertNotIn("sarvam_intent_score", rows[1])
+
     async def test_llm_judge_failure_still_writes_wer_cer_and_sarvam(self):
         from calibrate_agent.stt import eval as stt_eval
 
