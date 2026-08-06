@@ -255,6 +255,20 @@ class TestResultModelForEvaluator(unittest.TestCase):
         self.assertEqual(instance.score, 4)
         self.assertEqual(instance.reasoning, "good")
 
+    def test_rating_coerces_string_score(self):
+        Output = _result_model_for_evaluator(
+            {
+                "name": "pronunciation",
+                "type": "rating",
+                "scale_min": 1,
+                "scale_max": 3,
+                "system_prompt": "rate",
+            }
+        )
+        instance = Output(reasoning="ok", score="3")
+        self.assertEqual(instance.score, 3)
+        self.assertIsInstance(instance.score, int)
+
     def test_rating_rejects_score_out_of_range(self):
         from pydantic import ValidationError
 
