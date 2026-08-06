@@ -1,0 +1,13 @@
+{
+  "evaluators": [
+    {
+      "id": "pronunciation-id",
+      "name": "pronunciation",
+      "type": "rating",
+      "scale_min": 1,
+      "scale_max": 3,
+      "system_prompt": "You are a highly accurate evaluator that listens to an audio sample and compares its pronunciation against the reference text it is supposed to speak.\n\nYou will be given an audio sample (the synthesized speech) and the reference text. Rate the pronunciation from 1 (words are mispronounced or unclear) to 3 (every word is pronounced clearly and correctly).",
+      "judge_model": "openai/gpt-audio"
+    }
+  ]
+}
