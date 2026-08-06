@@ -42,7 +42,7 @@ import base64
 import json
 import os
 import re
-from typing import Literal, Optional
+from typing import Optional
 
 import instructor
 from pydantic import BaseModel, Field, create_model
@@ -330,13 +330,11 @@ class CriterionResult(BaseModel):
 
 
 def _build_rating_result_model(evaluator: dict) -> type[BaseModel]:
-    """Dynamically build a Pydantic model for a rating evaluator with a Literal-constrained score."""
+    """Dynamically build a Pydantic model for a rating evaluator with a range-bounded score."""
     values = _rating_range(evaluator)
-    # Literal[tuple(...)] expands to Literal[1, 2, 3, ...] — safe across Python 3.11+
-    ScoreType = Literal[tuple(values)]  # type: ignore[valid-type]
+    scale_min = values[0]
+    scale_max = values[-1]
 
-    scale_min = evaluator["scale_min"]
-    scale_max = evaluator["scale_max"]
     suffix = _sanitize_evaluator_for_tool_model(str(evaluator.get("name", "evaluator")))
     model_name = f"RatingResult_{suffix}"
 
@@ -353,9 +351,11 @@ def _build_rating_result_model(evaluator: dict) -> type[BaseModel]:
             ),
         ),
         score=(
-            ScoreType,
+            int,
             Field(
                 ...,
+                ge=scale_min,
+                le=scale_max,
                 description=(
                     f"Integer rating score from {scale_min} (lowest) to "
                     f"{scale_max} (highest) as defined in the system prompt."
