@@ -116,6 +116,11 @@
             ],
             "title": "Connection Verified",
             "description": "Whether the agent's connection has been verified, for a `type=connection` agent"
+          },
+          "has_default_inputs": {
+            "type": "boolean",
+            "title": "Has Default Inputs",
+            "description": "Whether the agent has custom request fields configured"
           }
         },
         "type": "object",
@@ -123,7 +128,8 @@
           "uuid",
           "name",
           "type",
-          "updated_at"
+          "updated_at",
+          "has_default_inputs"
         ],
         "title": "AgentSummary"
       },
@@ -1170,6 +1176,18 @@
             ],
             "title": "Tool Calls",
             "description": "Expected tool calls. **Required for `tool_call` batches**"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extra request fields for this test, overriding the agent's `default_inputs` per key"
           }
         },
         "type": "object",
@@ -3122,6 +3140,18 @@
               }
             ],
             "description": "The test case definition that was run"
+          },
+          "inputs": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Extra request fields sent to the agent for this case, the agent's `default_inputs` with this case's overrides applied"
           },
           "judge_results": {
             "anyOf": [
