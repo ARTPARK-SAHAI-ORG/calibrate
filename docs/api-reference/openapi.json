@@ -74,6 +74,65 @@
         ],
         "title": "AgentCreateResponse"
       },
+      "AgentResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the agent",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the agent"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "agent",
+              "connection"
+            ],
+            "title": "Type",
+            "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Agent configuration"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the agent was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the agent was last updated (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AgentResponse"
+      },
       "AgentSummary": {
         "properties": {
           "uuid": {
@@ -99,6 +158,11 @@
             ],
             "title": "Type",
             "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the agent was created (ISO 8601 UTC)"
           },
           "updated_at": {
             "type": "string",
@@ -128,6 +192,7 @@
           "uuid",
           "name",
           "type",
+          "created_at",
           "updated_at",
           "has_default_inputs"
         ],
@@ -4040,65 +4105,6 @@
         ],
         "title": "VersionCreateResponse"
       },
-      "routers__agents__AgentResponse": {
-        "properties": {
-          "uuid": {
-            "type": "string",
-            "maxLength": 36,
-            "minLength": 36,
-            "title": "Uuid",
-            "description": "ID of the agent",
-            "examples": [
-              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-            ]
-          },
-          "name": {
-            "type": "string",
-            "title": "Name",
-            "description": "Name of the agent"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "agent",
-              "connection"
-            ],
-            "title": "Type",
-            "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate"
-          },
-          "config": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Agent configuration"
-          },
-          "created_at": {
-            "type": "string",
-            "title": "Created At",
-            "description": "When the agent was created (ISO 8601 UTC)"
-          },
-          "updated_at": {
-            "type": "string",
-            "title": "Updated At",
-            "description": "When the agent was last updated (ISO 8601 UTC)"
-          }
-        },
-        "type": "object",
-        "required": [
-          "uuid",
-          "name",
-          "type",
-          "created_at",
-          "updated_at"
-        ],
-        "title": "AgentResponse"
-      },
       "routers__agents__EvaluatorLinkRequest": {
         "properties": {
           "evaluator_ids": {
@@ -4679,7 +4685,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/routers__agents__AgentResponse"
+                  "$ref": "#/components/schemas/AgentResponse"
                 }
               }
             }
@@ -4740,7 +4746,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/routers__agents__AgentResponse"
+                  "$ref": "#/components/schemas/AgentResponse"
                 }
               }
             }
