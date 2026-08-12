@@ -2968,7 +2968,7 @@
               "type": "object"
             },
             "type": "array",
-            "description": "Agreement between each evaluator and the annotators, one entry per linked evaluator"
+            "description": "Agreement between each evaluator and the annotators, plus that evaluator's own results, one entry per linked evaluator"
           }
         },
         "additionalProperties": true,
