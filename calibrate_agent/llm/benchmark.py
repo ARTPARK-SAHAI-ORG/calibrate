@@ -24,7 +24,7 @@ import asyncio
 import json
 import os
 import sys
-from os.path import exists, join
+from os.path import join
 
 from calibrate_agent.llm.run_tests import display_label, run_model_tests
 from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
@@ -195,27 +195,16 @@ async def main():
             config["test_cases"], args.debug, args.debug_count
         )
 
-    # ``exist_ok=True`` makes this safe when several ``calibrate-agent llm``
-    # subprocesses (e.g. one per model spawned by the interactive UI) race to
-    # create the output dir — the previous ``if not exists: makedirs(...)``
-    # pattern was non-atomic and the loser raised ``FileExistsError``.
+    # ``exist_ok=True`` is safe on a resume run where the output dir already
+    # exists from a prior invocation.
     os.makedirs(args.output_dir, exist_ok=True)
 
     # Mirror everything written to stdout/stderr into a single output-dir-level
     # `logs` file so the full terminal session (banner, per-model output,
     # leaderboard prints, summary) is captured in one place — same pattern as
     # the STT/TTS benchmark CLIs.
-    #
-    # When the interactive UI runs each model in its own ``calibrate-agent llm``
-    # subprocess, multiple processes target the same ``logs`` path concurrently;
-    # the UI sets ``CALIBRATE_LLM_LOG_APPEND=1`` so subprocesses append instead
-    # of racing to truncate each other's output. The UI itself clears the file
-    # once before kicking off the run.
     log_path = join(args.output_dir, "logs")
-    append_mode = os.environ.get("CALIBRATE_LLM_LOG_APPEND") == "1"
-    if not append_mode and exists(log_path):
-        os.remove(log_path)
-    log_file = open(log_path, "a" if append_mode else "w")
+    log_file = open(log_path, "w")
     original_stdout, original_stderr = sys.stdout, sys.stderr
     sys.stdout = StreamTee(original_stdout, log_file)
     sys.stderr = StreamTee(original_stderr, log_file)

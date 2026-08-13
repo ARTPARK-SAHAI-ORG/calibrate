@@ -22,14 +22,13 @@ pip install calibrate-agent
 ## Usage
 
 ```bash
-calibrate-agent              # Interactive main menu
-calibrate-agent stt          # Benchmark STT providers
-calibrate-agent tts          # Benchmark TTS providers
-calibrate-agent llm          # Interactive LLM evaluation
-calibrate-agent simulations  # Interactive text or voice simulations
+calibrate-agent stt -p deepgram google -i ./data -o ./out    # Benchmark STT providers
+calibrate-agent tts -p openai google -i sample.csv -o ./out  # Benchmark TTS providers
+calibrate-agent llm -c config.json -m openai/gpt-4.1         # LLM evaluation
+calibrate-agent simulations --type text -c config.json      # Text or voice simulations
 ```
 
-- [CLI Documentation](https://calibrate.artpark.ai/docs/cli/overview)
+- [CLI Documentation](https://calibrate.artpark.ai/docs/local/overview)
 
 ## Contributing
 

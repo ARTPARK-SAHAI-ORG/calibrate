@@ -16,13 +16,13 @@ description: "Run simulated conversations to test your agent end-to-end"
 There are two ways to run simulations:
 
 <CardGroup cols={2}>
-  <Card title="Calibrate agent" icon="robot" href="/cli/calibrate-agent">
+  <Card title="Calibrate agent" icon="robot" href="/local/calibrate-agent">
     Define your agent completely within Calibrate
   </Card>
   <Card
     title="Agent connection"
     icon="link"
-    href="/cli/agent-connections/overview"
+    href="/local/agent-connections/overview"
   >
     Connect your existing text or voice agent
   </Card>
@@ -239,7 +239,7 @@ For voice simulations, specify the STT, LLM, and TTS providers:
   <Accordion title="Agent connection (Chat agent) example">
     See the [full file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_text_agent_connection.json).
 
-    Refer to [Agent Connections → Chat agent](/cli/agent-connections/chat) for the full reference.
+    Refer to [Agent Connections → Chat agent](/local/agent-connections/chat) for the full reference.
 
     ```json
     {
@@ -281,7 +281,7 @@ For voice simulations, specify the STT, LLM, and TTS providers:
   <Accordion title="Agent connection (Outbound voice agent) example">
     See the [full file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_voice_agent_connection.json).
 
-    Refer to [Agent Connections → Outbound voice agent](/cli/agent-connections/outbound-voice) for the full reference.
+    Refer to [Agent Connections → Outbound voice agent](/local/agent-connections/outbound-voice) for the full reference.
 
     ```json
     {
@@ -320,43 +320,13 @@ For voice simulations, specify the STT, LLM, and TTS providers:
 
 ## Get started
 
-### Interactive mode
-
-Run `calibrate-agent simulations` with no arguments to launch the interactive UI:
-
-```bash
-calibrate-agent simulations
-```
-
-**Calibrate agent (text):**
-
-1. **Simulation type** — select "Text"
-2. **Config file** — path to your config file
-3. **Provider** — OpenRouter or OpenAI
-4. **Model** — the model used for both the agent and user simulator
-5. **Parallel count** — how many simulations to run simultaneously (default: `1`)
-6. **Output directory** — where results will be saved (defaults to `./out`)
-7. **API keys** — enter the API keys for the selected provider
-
-**Calibrate agent (voice):**
-
-1. **Simulation type** — select "Voice"
-2. **Config file** — path to your config file (with `stt`, `tts`, and `llm` set)
-3. **Parallel count** — how many simulations to run simultaneously (default: `1`)
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — enter the API keys for the selected providers
-
-**Agent connection (text & voice):**
-
-1. **Simulation type** — select `Text` or `Voice`
-2. **Config file** — path to your config file
-3. **Parallel count** — how many simulations to run simultaneously (default: `1`)
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — only `OPENAI_API_KEY` is required (used by the user simulator and LLM judge)
-
-### Non-interactive mode
-
-Pass `--type text` or `--type voice` and a config file directly to skip the UI.
+Pass `--type text` or `--type voice` and a config file with `-c`. Set the API
+keys for the selected provider in your environment (or a `.env` file in the
+directory you run the command from). For text simulations against a Calibrate
+agent, `-m`/`-p` set the model and provider used for both the agent and the user
+simulator; for agent connections and voice, only `OPENAI_API_KEY` is required
+(used by the user simulator and LLM judge). Use `-n` to control parallelism
+(default: `1`).
 
 **Calibrate agent (text):**
 
@@ -423,6 +393,33 @@ and review the reasoning for each evaluation criterion:
 <Frame>
   <img src="./images/simulation_eval.png" alt="Simulation evaluation" />
 </Frame>
+
+## Evaluate existing transcripts
+
+Already have conversation transcripts? Skip running the simulation and score them directly with `--eval-only` (text simulations only):
+
+```bash
+calibrate-agent simulations --type text -c config.json --eval-only --dataset transcripts.json -o ./out
+```
+
+`--dataset` is a JSON list of `{conversation_history, name?}` items. To only check that an external agent endpoint is reachable, use `--verify --agent-url <url>`.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-t, --type` | string | — | Simulation type: `text` or `voice`. |
+| `-c, --config` | string | — | Simulation config JSON. |
+| `-o, --output-dir` | string | `./out` | Where results are written. |
+| `-m, --model` | string | — | Model for text simulations (drives both the agent and the user simulator). |
+| `-p, --provider` | string | `openrouter` | LLM provider for text simulations: `openrouter` or `openai`. |
+| `-n, --parallel` | integer | `1` | Simulations to run concurrently (env `CALIBRATE_SIMULATION_PARALLEL`). |
+| `--verify` | flag | off | Verify an external agent connection and exit (needs `--agent-url`). |
+| `--agent-url` | string | — | External agent endpoint URL (with `--verify`). |
+| `--agent-headers` | string | — | HTTP headers for the agent as a JSON string. |
+| `--skip-verify` | flag | off | Skip the agent connection check before running. |
+| `--eval-only` | flag | off | Skip the simulation; judge pre-existing transcripts (text only; needs `--dataset`). |
+| `--dataset` | string | — | Path to the `--eval-only` transcripts JSON. |
 
 ## Resources
 

@@ -16,13 +16,13 @@ description: "Create edge cases to test the LLM powering your agent"
 There are two ways to run LLM evaluations:
 
 <CardGroup cols={2}>
-  <Card title="Calibrate agent" icon="robot" href="/cli/calibrate-agent">
+  <Card title="Calibrate agent" icon="robot" href="/local/calibrate-agent">
     Define your agent completely within Calibrate
   </Card>
   <Card
     title="Agent connection"
     icon="link"
-    href="/cli/agent-connections/overview"
+    href="/local/agent-connections/overview"
   >
     Connect your existing text or voice agent
   </Card>
@@ -602,45 +602,10 @@ If you want thresholds different from “top-of-scale” (for example “tone at
 
 ## Get started
 
-### Interactive mode
-
-Run `calibrate-agent llm` with no arguments to launch the interactive UI:
-
-```bash
-calibrate-agent llm
-```
-
-**Calibrate agent** — the UI detects that your config defines a system prompt and tools and guides you through:
-
-1. **Config file** — path to your config file
-2. **Provider** — OpenRouter or OpenAI
-3. **Model entry** — enter model names one at a time (single or multiple)
-4. **Confirm models** — review the list and add more or proceed
-5. **Output directory** — where results will be saved (defaults to `./out`)
-6. **API keys** — enter the API keys for the selected provider
-
-The evaluation runs the selected models in parallel (max 2 at a time), showing results for each test as they complete.
-
-**Agent connection** — the UI detects `agent_url` in your config and switches to agent mode:
-
-_Single test:_
-
-1. **Config file** — path to your config file (with `agent_url` and optionally `agent_headers`)
-2. **Mode** — select "Single test"
-3. **Verify** — calibrate verifies the connection; shows success or failure with the option to go back
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — only `OPENAI_API_KEY` is required (used by the LLM judge)
-
-_Benchmark across models:_
-
-1. **Config file** — path to your config file (with `agent_url` and optionally `agent_headers`)
-2. **Mode** — select "Benchmark across models"
-3. **Model entry** — enter a model name; calibrate verifies the connection with that model before asking if you want to add another
-4. **Confirm models** — review the list and add more or proceed
-5. **Output directory** — where results will be saved (defaults to `./out`)
-6. **API keys** — only `OPENAI_API_KEY` is required (used by the LLM judge)
-
-### Non-interactive mode
+Pass your config with `-c` and the model(s) with `-m`. Set the API keys for the
+selected provider in your environment (or a `.env` file in the directory you run
+the command from). The evaluation runs the selected models in parallel (max 2 at
+a time), showing results for each test as they complete.
 
 **Calibrate agent:**
 
@@ -713,6 +678,42 @@ You can drill into each model to view the results for each test with the reasoni
     alt="LLM model outputs (pass)"
   />
 </Frame>
+
+## Verify and evaluate existing outputs
+
+Check that an external agent endpoint is reachable and returns the expected response format before running a full suite, with `--verify`:
+
+```bash
+calibrate-agent llm --verify --agent-url https://your-agent/chat
+```
+
+Or skip inference entirely and run the evaluators on outputs you already have, with `--eval-only`:
+
+```bash
+calibrate-agent llm --eval-only -c config.json --dataset outputs.json -o ./out
+```
+
+`--dataset` is a JSON list of `{test_case, output}` items. For agent-connection configs, `--skip-verify` runs without the pre-flight connection check.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-c, --config` | string | — | Test config JSON (system prompt + tools + test cases, or an `agent_url`). |
+| `-m, --model` | string(s) | `gpt-4.1` | Model(s) to evaluate, space-separated. Multiple models produce a benchmark leaderboard. |
+| `-p, --provider` | string | `openrouter` | LLM provider: `openrouter` or `openai`. |
+| `-o, --output-dir` | string | `./out` | Where results are written. |
+| `-n, --parallel` | integer | — | Test cases to evaluate concurrently per model. |
+| `--max-parallel` | integer | `2` | Models to evaluate concurrently (env `CALIBRATE_LLM_MAX_PARALLEL`). |
+| `--overwrite` | flag | off | Ignore a prior `results.json` and start a clean run instead of resuming. |
+| `-d, --debug` | flag | off | Evaluate only the first N test cases. |
+| `-dc, --debug_count` | integer | `5` | Number of test cases in debug mode. |
+| `--verify` | flag | off | Verify an external agent connection and exit (needs `--agent-url`). |
+| `--agent-url` | string | — | External agent endpoint URL (with `--verify`). |
+| `--agent-headers` | string | — | HTTP headers for the agent as a JSON string. |
+| `--skip-verify` | flag | off | Skip the agent connection check before running (agent-connection configs). |
+| `--eval-only` | flag | off | Skip inference; judge a `{test_case, output}` dataset (needs `--config` and `--dataset`). |
+| `--dataset` | string | — | Path to the `--eval-only` dataset JSON. |
 
 ## Resources
 

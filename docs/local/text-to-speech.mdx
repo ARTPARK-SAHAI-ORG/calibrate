@@ -6,7 +6,7 @@ description: "Evaluate Text to Speech providers via CLI"
 ## Get started
 
 ```bash
-calibrate-agent tts
+calibrate-agent tts -p openai google -l english -i sample.csv -o ./out
 ```
 
 <iframe
@@ -17,11 +17,12 @@ calibrate-agent tts
   allowFullScreen
 ></iframe>
 
-The interactive UI guides you through the full evaluation process:
+The command takes:
 
-1. **Language selection** — pick from 10+ supported Indic languages
-2. **Provider selection** — choose providers (only those supporting your language are shown)
-3. **Input CSV** — path to CSV file with `id` and `text` columns
+- `-p`/`--provider`: one or more providers to evaluate (space-separated). Only providers that support the chosen language are run.
+- `-l`/`--language`: one of the 10+ supported Indic languages (defaults to `english`).
+- `-i`/`--input`: path to a CSV file with `id` and `text` columns.
+- `-o`/`--output-dir`: where results are saved (defaults to `./out`).
 
 The **input CSV** should have this format:
 
@@ -33,14 +34,33 @@ The **input CSV** should have this format:
 
 Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/sample.csv) for a template.
 
-4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — enter the API keys for the selected providers
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel (2 at a time by default; tune with `--max-parallel`), showing progress as audio files are generated.
 
-The evaluation runs providers in parallel (max 2 at a time), showing the progress as audio files are generated.
+When the run finishes, it prints a summary leaderboard to your terminal and writes the following under each provider's output directory:
+
+```
+<output-dir>/<provider>/
+├── audios/
+│   └── <id>.wav          # one synthesized clip per input row
+├── results.csv           # per row: id, text, audio_path, ttfb, evaluator scores + reasoning
+├── metrics.json          # evaluator scores, TTFB latency, and a cost estimate
+└── leaderboard/
+    └── tts_leaderboard.xlsx
+```
+
+`metrics.json` includes a `cost` object priced in each provider's native billing unit: character-billed providers (most) report `total_characters` and a per-million-character rate, while audio-billed providers (OpenAI, Gemini) report `audio_minutes` and a per-minute rate. A provider billed in a non-USD currency (e.g. Sarvam in INR) reports the native-currency cost plus `cost_usd` when the exchange rate is reachable. `cost_usd` is the figure comparable across providers, and the leaderboard ranks on it.
+
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/core-concepts/text-to-speech#metrics"
+>
+  Detailed explanation of all metrics and how an LLM judge works
+</Card>
 
 ## Evaluator configuration
 
-By default, an audio LLM judge — routed through [OpenRouter](https://openrouter.ai/) (set `OPENROUTER_API_KEY` in your environment) — evaluates whether the reference text is pronounced correctly in the synthesized audio using the built-in **`pronunciation`** evaluator; expand **Default evaluator: pronunciation** below for the exact `system_prompt` from the codebase. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
+By default, a built-in **`pronunciation`** evaluator uses an audio LLM judge to check whether the reference text is pronounced correctly in the synthesized audio. You can customize the judge model and add multiple evaluators by passing an optional config file with `--config`:
 
 ```bash
 calibrate-agent tts -p openai google -i sample.csv -o ./out --config config.json
@@ -75,7 +95,7 @@ The config file supports:
 | `evaluators[].id`            | string | Optional unique id. Output `config.json` includes the raw `evaluators` list and an `evaluators_map` from id to name.                                                                                                                                                                                                                                                                |
 | `evaluators[].name`          | string | Unique evaluator name. Becomes the column name in the leaderboard.                                                                                                                                                                                                                                                                                                                  |
 | `evaluators[].system_prompt` | string | Full system prompt used for this evaluator's audio LLM judge call.                                                                                                                                                                                                                                                                                                                  |
-| `evaluators[].judge_model`   | string | OpenRouter model id for this evaluator (default: `openai/gpt-audio`). Must be an audio-capable model in the [OpenRouter catalog](https://openrouter.ai/models) — for example OpenAI’s audio models or Google’s Gemini audio-capable entries; the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) uses `google/gemini-2.5-flash`. |
+| `evaluators[].judge_model`   | string | OpenRouter model id for this evaluator (default: `openai/gpt-audio`). Must be an audio-capable model in the [OpenRouter catalog](https://openrouter.ai/models), for example OpenAI’s audio models or Google’s Gemini audio-capable entries; the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) uses `google/gemini-2.5-flash`. |
 
 Each evaluator also accepts:
 
@@ -87,7 +107,9 @@ Each evaluator also accepts:
 
 Binary evaluators produce per-row pass/fail and a mean pass-rate. Rating evaluators produce an integer score on your scale and a mean score in the leaderboard.
 
-When multiple evaluators are defined, each is scored independently — one audio LLM call per evaluator per row, all run in parallel — and appears as a separate column in the results and leaderboard.
+When multiple evaluators are defined, each is scored independently (one audio LLM call per evaluator per row, all run in parallel) and appears as a separate column in the results and leaderboard.
+
+Every judge call routes through [OpenRouter](https://openrouter.ai/), so set `OPENROUTER_API_KEY` in your environment before running.
 
 Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) for a template.
 
@@ -99,7 +121,7 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
 
 <AccordionGroup>
   <Accordion title="pronunciation (default evaluator system prompt)">
-    Matches [`DEFAULT_TTS_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate/judges.py) in `calibrate/judges.py` when no `--config` is passed.
+    Matches [`DEFAULT_TTS_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate_agent/judges.py) in `calibrate_agent/judges.py` when no `--config` is passed.
 
     ```text
     You are a highly accurate evaluator evaluating the audio output of a TTS model.
@@ -112,33 +134,33 @@ Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob
   </Accordion>
 </AccordionGroup>
 
-## Output
+## Evaluate an existing dataset
 
-Once all the providers have completed, it displays a leaderboard measuring key metrics along with bar charts for better visualization.
+Already synthesized audio in a prior run? Skip synthesis and re-run only the audio judge on that run's output with `--eval-only`:
 
-Each provider output directory includes:
+```bash
+calibrate-agent tts --eval-only --dataset ./out/run/openai -o ./out
+```
 
-- `results.csv` with one row per input text (`id`, `text`, `audio_path`, `ttfb`, evaluator scores, and evaluator reasoning).
-- `metrics.json` with evaluator summaries, `ttfb` percentiles, and a `cost` object. Each provider is priced in its **native billing unit** — no unit conversion. Character-billed providers (most) report `billing_unit: "character"`, `total_characters`, and the per-million-character rate (`cost_per_million_chars_currency`); audio-billed providers (OpenAI, Gemini) report `billing_unit: "minute"`, `total_seconds`, `audio_minutes`, and the per-minute rate (`cost_per_minute_currency`), with the audio duration measured from the synthesized output. The rate is denominated in `currency`. Providers billed in a non-USD currency (e.g. Sarvam in INR) report the native-currency total `cost_in_currency` and, when the live exchange rate is reachable, the `conversion_rate` used (native-currency units per 1 USD) and `cost_usd`. If the exchange rate can't be fetched, the native-currency cost is still reported and `cost_usd` is omitted, so that provider is left out of the USD comparison rather than failing the run. `cost_usd` is the metric comparable across all providers.
-- `leaderboard/tts_leaderboard.xlsx` with a `cost_usd` column in the summary sheet (the one cost figure comparable across providers; per-unit rates and native-currency figures stay in each provider's `metrics.json`).
+`--dataset` points at a prior TTS run directory (e.g. `./out/<run>/<provider>`) whose `results.csv` is read directly. Add `--config` to customize the audio evaluators.
 
-<Frame>
-  <img src="./images/tts_leaderboard.png" alt="TTS leaderboard" />
-</Frame>
+## Options
 
-You can also view the generated audio and metrics for each row of your dataset including the LLM judge score and reasoning. Use the arrow keys to navigate rows and press **Enter** or **p** to play the generated audio.
-
-<Frame>
-  <img src="./images/tts_output_provider.png" alt="TTS provider outputs" />
-</Frame>
-
-<Card
-  title="Learn more about metrics"
-  icon="chart-bar"
-  href="/core-concepts/text-to-speech#metrics"
->
-  Detailed explanation of all metrics and how LLM Judge works
-</Card>
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-p, --provider` | string(s) | — | TTS provider(s) to evaluate, space-separated. Only providers supporting the language run. |
+| `-l, --language` | string | `english` | Synthesis language (one of the supported Indic languages). |
+| `-i, --input` | string | — | CSV file with `id` and `text` columns. |
+| `-o, --output-dir` | string | `./out` | Where results and generated audio are written. |
+| `-c, --config` | string | — | JSON config defining custom audio evaluators. |
+| `--leaderboard` | flag | off | Generate a leaderboard after a single-provider run (multi-provider runs always do). |
+| `-s, --save-dir` | string | — | Directory to write the leaderboard workbook. |
+| `--max-parallel` | integer | `2` | Providers to synthesize concurrently (env `CALIBRATE_TTS_MAX_PARALLEL`). |
+| `--overwrite` | flag | off | Ignore a prior `results.csv` and start a clean run instead of resuming. |
+| `-d, --debug` | flag | off | Synthesize only the first N rows. |
+| `-dc, --debug_count` | integer | `5` | Number of rows in debug mode. |
+| `--eval-only` | flag | off | Skip synthesis; run the audio judge on a prior run's audio (needs `--dataset`). |
+| `--dataset` | string | — | Prior TTS run directory whose `results.csv` is re-judged (with `--eval-only`). |
 
 ## Resources
 

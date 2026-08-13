@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import os
 import sys
 import tempfile
 import unittest
@@ -88,7 +87,7 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(SystemExit):
                     await B.main()
 
-    async def test_main_append_mode(self):
+    async def test_main_truncates_existing_log(self):
         from calibrate_agent.llm import benchmark as B
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -98,16 +97,19 @@ class TestLLMBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             }))
             out_dir = Path(tmp) / "out"
             out_dir.mkdir()
-            (out_dir / "logs").write_text("existing")
+            (out_dir / "logs").write_text("stale-from-prior-run")
             argv = ["b.py", "-c", str(cfg), "-m", "m1", "-p", "openrouter",
                     "-o", str(out_dir)]
             fake_results = {"status": "completed", "output_dir": str(out_dir),
                             "leaderboard_dir": str(out_dir),
                             "models": {"m1": {"metrics": {"passed": 1, "total": 1}}}}
             with patch.object(sys, "argv", argv), \
-                 patch.dict(os.environ, {"CALIBRATE_LLM_LOG_APPEND": "1"}), \
                  patch.object(B, "run", AsyncMock(return_value=fake_results)):
                 await B.main()
+
+            # A prior run's log is overwritten, not appended to.
+            self.assertNotIn("stale-from-prior-run",
+                             (out_dir / "logs").read_text())
 
 
 # =============================================================================

@@ -1,0 +1,256 @@
+---
+title: "Speech to Text"
+description: "Evaluate Speech to Text providers via CLI"
+---
+
+## Get started
+
+```bash
+calibrate-agent stt -p deepgram google -l english -i ./data -o ./out
+```
+
+<iframe
+  className="w-full aspect-video rounded-xl"
+  src="https://www.youtube.com/embed/pFdsOMo_J2s"
+  title="CLI Speech-to-Text Evaluation Walkthrough"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+
+The command takes:
+
+- `-p`/`--provider`: one or more providers to evaluate (space-separated). Only providers that support the chosen language are run.
+- `-l`/`--language`: one of the 10+ supported Indic languages (defaults to `english`).
+- `-i`/`--input-dir`: path to the directory containing your audio files and reference transcripts.
+- `-o`/`--output-dir`: where results are saved (defaults to `./out`).
+
+The input directory should have this structure:
+
+```
+/path/to/data/
+├── stt.csv
+└── audios/
+    ├── audio_1.wav
+    └── audio_2.wav
+```
+
+The **stt.csv** file contains the reference transcriptions:
+
+| id      | text                            |
+| ------- | ------------------------------- |
+| audio_1 | Hi                              |
+| audio_2 | Madam, my name is Geeta Shankar |
+
+<Note>
+  All audio files should be in WAV format. The evaluation script expects files
+  at `audios/<id>.wav` where `<id>` matches the `id` column in your CSV.
+</Note>
+
+Refer to the [sample dataset](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/sample_input) for a template.
+
+Set the API keys for the selected providers in your environment (or a `.env` file in the directory you run the command from). The evaluation runs providers in parallel, showing the transcriptions as they are generated.
+
+When the run finishes, it prints a summary leaderboard to your terminal and writes the following under each provider's output directory:
+
+```
+<output-dir>/<provider>/
+├── results.csv           # one row per input clip
+├── metrics.json          # run-level aggregates + cost
+└── leaderboard/
+    └── stt_leaderboard.xlsx
+```
+
+**`results.csv`** has one row per clip. By default it carries WER/CER and the built-in LLM judges (Sarvam intent/entity, Sarvam LLM WER/CER, and semantic WER):
+
+```csv
+id,gt,pred,wer,cer,audio_duration_seconds,ttfs,sarvam_intent_score,sarvam_entity_score,sarvam_llm_wer,semantic_wer
+audio_1,Hi,Hi,0.0,0.0,1.2,0.41,1,1.0,0.0,0.0
+audio_2,Madam my name is Geeta Shankar,madam my name is geetha shankar,0.14,0.06,3.4,0.55,1,0.5,0.08,0.05
+```
+
+`ttfs` appears only on the `pipeline` engine. Each LLM judge also writes a matching `_reasoning` column (and `semantic_wer` a `_metadata` column). Any evaluators you add with `--config` get their own score and `_reasoning` columns too.
+
+**`metrics.json`** is one aggregate object for the run:
+
+```json
+{
+  "wer": 0.06,
+  "cer": 0.03,
+  "sarvam_intent_score": 1.0,
+  "sarvam_entity_score": 0.95,
+  "sarvam_llm_wer": 0.04,
+  "sarvam_llm_cer": 0.02,
+  "semantic_wer": 0.03,
+  "cost": {
+    "provider": "deepgram",
+    "pricing_model": "nova-3",
+    "billing_unit": "minute",
+    "total_seconds": 128.4,
+    "audio_minutes": 2.14,
+    "currency": "USD",
+    "cost_per_minute_currency": 0.0043,
+    "cost_usd": 0.0092
+  },
+  "ttfs": { "p50": 0.42, "p95": 0.71, "p99": 0.83, "mean": 0.48 }
+}
+```
+
+`ttfs` appears only on the `pipeline` engine. Any evaluators you add with `--config` appear as their own `{ "type", "mean" }` block (e.g. `"semantic_match": { "type": "binary", "mean": 0.9 }`). A provider billed in a non-USD currency (e.g. Sarvam in INR) reports `cost_in_currency` and, when the live exchange rate is reachable, the `conversion_rate` (native units per 1 USD) and `cost_usd`; if the rate can't be fetched, `cost_usd` is omitted so that provider is left out of the USD comparison rather than failing the run. Cost is a proportional estimate from bundled rates, so provider invoices may differ because of per-file rounding, minimums, tiers, or regional pricing.
+
+**`leaderboard/stt_leaderboard.xlsx`** ranks every provider side by side (the same table printed to your terminal), one row per provider with WER/CER, each judge's mean, and `cost_usd` (the one cost figure comparable across providers; per-unit rates and native-currency figures stay in each provider's `metrics.json`):
+
+| provider | wer | cer | sarvam_entity_score | semantic_wer | cost_usd | count |
+| --- | --- | --- | --- | --- | --- | --- |
+| openai | 0.00 | 0.00 | 1.00 | 0.00 | 0.013 | 3 |
+| sarvam | 0.06 | 0.03 | 0.95 | 0.02 | 0.009 | 3 |
+
+<Card
+  title="Learn more about metrics"
+  icon="chart-bar"
+  href="/core-concepts/speech-to-text#metrics"
+>
+  Detailed explanation of all metrics and why an LLM judge is necessary
+</Card>
+
+## How it works
+
+Each provider can be run through one of two engines, chosen with `--engine`:
+
+- **`pipeline`** (the default) feeds each clip through a real pipecat pipeline at real-time pace, using the same STT setup your live voice agent runs, following the methodology of [pipecat's STT benchmark](https://github.com/pipecat-ai/stt-benchmark). The accuracy scores then match what your agent gets in production, and the run also measures latency: the gap between the speaker stopping and the final transcript arriving (TTFS). Running in real time makes it slower.
+- **`direct`** sends each clip straight to the provider's transcription SDK. It is faster and fine for a quick accuracy-only comparison, but it reports no latency.
+
+```bash
+calibrate-agent stt -p deepgram google -i ./data -o ./out --engine direct
+```
+
+Both engines evaluate several providers at once, and several clips per provider at once. `--max-parallel` sets how many providers run together; `--max-concurrency` sets how many clips per provider. The `pipeline` engine defaults both to `1` so that running things in parallel doesn't distort the latency measurements; `direct` defaults higher because it isn't measuring latency.
+
+## Evaluator configuration
+
+By default STT reports WER/CER and the built-in [LLM judges](#llm-judges-for-reliable-accuracy) only. To add your own text LLM judges on top, pass a config file with `--config`. For example, a `semantic_match` check that marks each transcription against the reference text:
+
+```bash
+calibrate-agent stt -p deepgram google -i ./data -o ./out --config config.json
+```
+
+Each evaluator's `system_prompt` is sent as the system message to its own dedicated LLM judge call (one call per evaluator, run in parallel). The user message contains the source/transcription pair.
+
+The config file supports:
+
+```json
+{
+  "evaluators": [
+    {
+      "id": "semantic-match-id",
+      "name": "semantic_match",
+      "system_prompt": "You are a highly accurate evaluator. You will be given a source text and a transcription. Mark True if the values represented by both strings match semantically.",
+      "judge_model": "openai/gpt-5.4-mini"
+    },
+    {
+      "id": "completeness-id",
+      "name": "completeness",
+      "system_prompt": "You are a highly accurate evaluator. You will be given a source text and a transcription. Mark True if all information from the source text is present in the transcription.",
+      "judge_model": "openai/gpt-5.4-mini"
+    }
+  ]
+}
+```
+
+| Key                          | Type   | Description                                                                                                                                       |
+| ---------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `evaluators`                 | array  | List of evaluators. Each one becomes its own LLM call per row.                                                                                    |
+| `evaluators[].id`            | string | Optional unique id. Output `config.json` includes the raw `evaluators` list and an `evaluators_map` from id to name.                              |
+| `evaluators[].name`          | string | Unique evaluator name. Becomes the column name in the leaderboard.                                                                                |
+| `evaluators[].system_prompt` | string | Full system prompt used for this evaluator's LLM judge call.                                                                                      |
+| `evaluators[].judge_model`   | string | OpenRouter model id for this evaluator (default: `openai/gpt-5.4-mini`). Use any model in the [OpenRouter catalog](https://openrouter.ai/models). |
+
+Each evaluator also accepts:
+
+| Key         | Type    | Description                                                |
+| ----------- | ------- | ---------------------------------------------------------- |
+| `type`      | string  | `"binary"` (default) or `"rating"`                         |
+| `scale_min` | integer | Required when `type` is `"rating"`. Lowest allowed score.  |
+| `scale_max` | integer | Required when `type` is `"rating"`. Highest allowed score. |
+
+Binary evaluators produce per-row pass/fail and a mean pass-rate. Rating evaluators produce an integer score on your scale and a mean score in the leaderboard.
+
+When multiple evaluators are defined, each is scored independently (one LLM call per evaluator per row, all run in parallel) and appears as a separate column in the results and leaderboard.
+
+Every judge call routes through [OpenRouter](https://openrouter.ai/), so set `OPENROUTER_API_KEY` in your environment before running.
+
+Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/config.json) for a template.
+
+<Note>
+  The `--config` flag is optional. When omitted, STT reports WER/CER and the
+  built-in LLM judges only; custom evaluators like `semantic_match` run only
+  when you define them here.
+</Note>
+
+<AccordionGroup>
+  <Accordion title="semantic_match (built-in evaluator system prompt)">
+The prompt template for the built-in `semantic_match` evaluator ([`DEFAULT_STT_EVALUATOR`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/calibrate_agent/judges.py) in `calibrate_agent/judges.py`), handy as a starting point for your own `--config`.
+
+    ```text
+    You are a highly accurate evaluator evaluating the transcription output of an STT model.
+
+    You will be given two strings - one is the source string used to produce an audio and the other is the transcription of that audio.
+
+    You need to evaluate if the two strings are the same.
+
+    # Important Instructions:
+    - Check whether the values represented by both the strings match. E.g. if one string says 1,2,3 but the other string says "one, two, three" or "one, 2, three", they should be considered the same as their underlying value is the same. However, if the actual values itself are different, e.g. for the name of a person or address or the value of any other key detail - that difference should be noted.
+    - Ignore differences like a word being split up into more than 1 word by spaces. Look at whether the values mean the same in both the strings.
+    - Minor differences in values of entities (e.g. proper nouns, numbers) matter and should be considered an error.
+    - If all the "values" for the strings match, mark it as True. Else, False.
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## LLM judges for reliable accuracy
+
+Alongside classic WER/CER, every run also computes a set of LLM-based judges tuned for Indian-language ASR. They all run by default; pass `--skip-llm-judges` to report WER/CER only.
+
+- **Sarvam intent & entity preservation** and **Sarvam LLM WER/CER**: adapted from Sarvam's [Evaluating Indian language ASR](https://www.sarvam.ai/blogs/evaluating-indian-language-asr), which makes the case that raw WER is a poor accuracy signal for Indic speech.
+- **Semantic WER**: a meaning-aware word error rate in the style of [pipecat's STT benchmark](https://github.com/pipecat-ai/stt-benchmark).
+
+These appear as extra columns (`sarvam_intent_score`, `sarvam_entity_score`, `sarvam_llm_wer`, `sarvam_llm_cer`, `semantic_wer`) in `metrics.json` and the leaderboard, next to WER and CER. Any custom evaluators you add with `--config` show up alongside them.
+
+## Evaluate an existing dataset
+
+Already have transcriptions from a prior run or another tool? Skip transcription and run only the judges on a dataset of `{id, gt, pred}` pairs with `--eval-only`:
+
+```bash
+calibrate-agent stt --eval-only --dataset gt_pred.json -o ./out
+```
+
+`--dataset` points at a JSON list of `{"id", "gt", "pred"}` items. Add `--config` to customize the evaluators, or `--skip-llm-judges` to report WER/CER only.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-p, --provider` | string(s) | — | STT provider(s) to evaluate, space-separated. Only providers supporting the language run. |
+| `-l, --language` | string | `english` | Evaluation language (one of the supported Indic languages). |
+| `-i, --input-dir` | string | — | Directory containing `stt.csv` and an `audios/` folder. |
+| `-o, --output-dir` | string | `./out` | Where results are written. |
+| `-f, --input-file-name` | string | `stt.csv` | Reference-transcript CSV filename inside the input directory. |
+| `-c, --config` | string | — | JSON config defining custom evaluators. |
+| `--skip-llm-judges` | flag | off | Skip the extra LLM judges (Sarvam intent/entity, Sarvam LLM-WER/CER, semantic WER); report WER/CER only. |
+| `--leaderboard` | flag | off | Generate a leaderboard after a single-provider run (multi-provider runs always do). |
+| `-s, --save-dir` | string | — | Directory to write the leaderboard workbook. |
+| `--engine` | `pipeline` \| `direct` | `pipeline` | Transcription engine. `pipeline` feeds each clip through a real pipecat pipeline, using the same STT setup your live agent runs and reporting TTFS latency; `direct` calls the provider SDK directly (faster, but reports no latency). |
+| `--max-parallel` | integer | pipeline `1`, direct `2` | Providers to evaluate concurrently (env `CALIBRATE_STT_MAX_PARALLEL`). |
+| `--max-concurrency` | integer | pipeline `1`, direct `4` | Clips per provider to transcribe concurrently (env `CALIBRATE_STT_MAX_CONCURRENCY`). |
+| `--overwrite` | flag | off | Ignore a prior `results.csv` and start a clean run instead of resuming. |
+| `-d, --debug` | flag | off | Evaluate only the first N rows. |
+| `-dc, --debug_count` | integer | `5` | Number of rows in debug mode. |
+| `--ignore_retry` | flag | off | Don't retry failed transcriptions. |
+| `--eval-only` | flag | off | Skip transcription; judge a `{id, gt, pred}` dataset (needs `--dataset`). |
+| `--dataset` | string | — | Path to the `--eval-only` dataset JSON. |
+
+## Resources
+
+<Card title="Integrations" icon="microphone" href="/integrations/stt">
+  See the full list of supported providers and their configuration options
+</Card>

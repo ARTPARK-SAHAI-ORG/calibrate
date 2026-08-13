@@ -54,34 +54,6 @@ class TestLoadCliDotenv(unittest.TestCase):
         load.assert_called_once_with("/project/src/.env", override=True)
 
 
-class TestLaunchInkUI(unittest.TestCase):
-    def test_no_node(self):
-        from calibrate_agent import cli
-
-        with patch("shutil.which", return_value=None):
-            with self.assertRaises(SystemExit):
-                cli._launch_ink_ui("stt")
-
-    def test_no_bundle(self):
-        from calibrate_agent import cli
-
-        with patch("shutil.which", return_value="/usr/bin/node"), \
-             patch("pathlib.Path.exists", return_value=False):
-            with self.assertRaises(SystemExit):
-                cli._launch_ink_ui("stt")
-
-    def test_runs_subprocess(self):
-        from calibrate_agent import cli
-
-        fake_result = MagicMock(returncode=0)
-        with patch("shutil.which", return_value="/usr/bin/node"), \
-             patch("pathlib.Path.exists", return_value=True), \
-             patch("subprocess.run", return_value=fake_result):
-            with self.assertRaises(SystemExit) as ctx:
-                cli._launch_ink_ui("stt")
-        self.assertEqual(ctx.exception.code, 0)
-
-
 class TestPrintSampleOutput(unittest.TestCase):
     def test_no_sample(self):
         from calibrate_agent.cli import _print_sample_output
@@ -160,19 +132,20 @@ class TestMainDispatch(unittest.TestCase):
         with patch.object(sys, "argv", argv):
             main()
 
-    def test_no_component_launches_menu(self):
-        from calibrate_agent import cli
-        with patch.object(cli, "_launch_ink_ui") as mock:
-            mock.side_effect = SystemExit(0)
-            with self.assertRaises(SystemExit):
-                self._run_with_argv(["calibrate_agent"])
+    def test_no_component_prints_help_and_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_argv(["calibrate_agent"])
+        self.assertNotEqual(ctx.exception.code, 0)
 
-    def test_stt_no_provider_launches_ui(self):
-        from calibrate_agent import cli
-        with patch.object(cli, "_launch_ink_ui") as mock:
-            mock.side_effect = SystemExit(0)
-            with self.assertRaises(SystemExit):
-                self._run_with_argv(["calibrate_agent", "stt"])
+    def test_stt_no_provider_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_argv(["calibrate_agent", "stt"])
+        self.assertNotEqual(ctx.exception.code, 0)
+
+    def test_stt_provider_no_input_dir_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_argv(["calibrate_agent", "stt", "-p", "deepgram"])
+        self.assertNotEqual(ctx.exception.code, 0)
 
     def test_stt_with_provider_runs_benchmark(self):
         from calibrate_agent import cli
@@ -274,12 +247,15 @@ class TestMainDispatch(unittest.TestCase):
         self.assertIn("--skip-llm-judges", captured["argv"])
         self.assertIn("hindi", captured["argv"])
 
-    def test_tts_no_provider_launches_ui(self):
-        from calibrate_agent import cli
-        with patch.object(cli, "_launch_ink_ui") as mock:
-            mock.side_effect = SystemExit(0)
-            with self.assertRaises(SystemExit):
-                self._run_with_argv(["calibrate_agent", "tts"])
+    def test_tts_no_provider_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_argv(["calibrate_agent", "tts"])
+        self.assertNotEqual(ctx.exception.code, 0)
+
+    def test_tts_provider_no_input_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_argv(["calibrate_agent", "tts", "-p", "openai"])
+        self.assertNotEqual(ctx.exception.code, 0)
 
     def test_tts_with_provider_runs_benchmark(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -327,12 +303,10 @@ class TestMainDispatch(unittest.TestCase):
         # Language is not forwarded to the eval-only path (judge ignores it).
         self.assertNotIn("-l", captured["argv"])
 
-    def test_llm_no_config_launches_ui(self):
-        from calibrate_agent import cli
-        with patch.object(cli, "_launch_ink_ui") as mock:
-            mock.side_effect = SystemExit(0)
-            with self.assertRaises(SystemExit):
-                self._run_with_argv(["calibrate_agent", "llm"])
+    def test_llm_no_config_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_argv(["calibrate_agent", "llm"])
+        self.assertNotEqual(ctx.exception.code, 0)
 
     def test_llm_verify_no_url_exits(self):
         with self.assertRaises(SystemExit):
@@ -518,12 +492,10 @@ class TestMainDispatch(unittest.TestCase):
         with self.assertRaises(SystemExit):
             self._run_with_argv(["calibrate_agent", "simulations", "--verify"])
 
-    def test_simulations_no_type_launches_ui(self):
-        from calibrate_agent import cli
-        with patch.object(cli, "_launch_ink_ui") as mock:
-            mock.side_effect = SystemExit(0)
-            with self.assertRaises(SystemExit):
-                self._run_with_argv(["calibrate_agent", "simulations"])
+    def test_simulations_no_type_exits(self):
+        with self.assertRaises(SystemExit) as ctx:
+            self._run_with_argv(["calibrate_agent", "simulations"])
+        self.assertNotEqual(ctx.exception.code, 0)
 
     def test_simulations_text_eval_only_no_dataset(self):
         with tempfile.TemporaryDirectory() as tmp:

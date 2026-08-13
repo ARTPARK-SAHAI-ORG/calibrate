@@ -1,54 +1,111 @@
 ---
 title: "Overview"
-description: "Command-line interface for evaluating AI agents"
+description: "Command-line interface for the Calibrate AI evaluation platform"
 ---
 
-<Note>
-  This is the **local** toolkit (`calibrate-agent`) for benchmarking STT, TTS,
-  and LLM providers and running agent simulations on your own machine. For
-  the hosted CLI that runs agent tests against your deployed agents, see the
-  [CLI](/cli/calibrate/overview) tab.
-</Note>
+The Calibrate CLI brings the full evaluation loop to your terminal — create and
+connect agents, author tests and evaluators, launch runs and benchmarks, poll
+results, and set up annotation tasks — for scripting, automation, and CI/CD
+integration. It's [agent-mode](/cli/agent-mode) aware, emitting
+structured errors and compact TOON output when an AI coding agent drives it.
 
-## Installation
+<Card title="Calibrate CLI on GitHub" icon="github" href="https://github.com/dalmia/calibrate-cli">
+  View source, releases, and contribute
+</Card>
 
-```bash
-pip install calibrate-agent
-```
+## What you can do
 
-## Get started
+- **Manage agents** — create, update, list, and verify-connect agents; resolve friendly names to UUIDs
+- **Build test suites** — author test cases individually or in bulk, update them, and link them to agents
+- **Configure evaluators** — create and version the judges that score runs
+- **Run evaluations** — launch test runs and benchmarks for one agent or many, then poll status and per-test-case results
+- **Review with humans** — create annotation tasks, run evaluators over them, and measure reviewer agreement
+- **Script anything** — JSON, YAML, table, or TOON output with `jq` filtering, plus a non-interactive mode built for CI/CD
 
-<Note>
-  The interactive CLI requires [Node.js](https://nodejs.org/) to be installed on
-  your system.
-</Note>
+## Quick start
 
-```bash
-calibrate-agent
-```
+<Steps>
+  <Step title="Install the CLI">
+    ```bash
+    brew install dalmia/tap/calibrate
+    ```
+  </Step>
+  <Step title="Authenticate">
+    ```bash
+    calibrate login
+    ```
 
-Launches the interactive main menu where you can select from all available options.
+    Create an API key under [**Workspace settings → API keys**](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) — see the [API keys guide](/reference/api-keys).
+  </Step>
+  <Step title="Run agent tests">
+    ```bash
+    calibrate agent-tests run \
+      --agent-uuid <agent_uuid> \
+      --test-uuids <test_uuids>
+    ```
 
-| Command                 | Description                                       |
-| ----------------------- | ------------------------------------------------- |
-| `calibrate-agent stt`         | Interactive STT evaluation — benchmark providers  |
-| `calibrate-agent tts`         | Interactive TTS evaluation — benchmark providers  |
-| `calibrate-agent llm`         | Interactive LLM evaluation — test agent responses |
-| `calibrate-agent simulations` | Interactive text or voice simulations             |
+    Returns the evaluation `task_id`.
+  </Step>
+  <Step title="Poll for the evaluation results">
+    ```bash
+    calibrate agent-tests get-run --task-id <task_id>
+    ```
+  </Step>
+</Steps>
 
-## Next steps
+## Command reference
 
 <CardGroup cols={2}>
-  <Card title="Speech to Text" icon="microphone" href="/cli/speech-to-text">
-    Benchmark STT providers on your audio dataset
+  <Card title="Agents" icon="robot" href="/cli/agents">
+    List agents and resolve names to UUIDs.
   </Card>
-  <Card title="Text to Speech" icon="volume-high" href="/cli/text-to-speech">
-    Benchmark TTS providers on your text dataset
+  <Card title="Agent tests" icon="flask" href="/cli/agent-tests">
+    Link tests, launch runs and benchmarks, and poll their results.
   </Card>
-  <Card title="LLM tests" icon="brain" href="/cli/text-to-text">
-    Test agent responses and tool calls
+  <Card title="Tests" icon="list-check" href="/cli/tests">
+    Create test cases individually or in bulk, and update them.
   </Card>
-  <Card title="Simulations" icon="comments" href="/cli/text-simulations">
-    Run text or voice simulations
+  <Card title="Evaluators" icon="scale-balanced" href="/cli/evaluators">
+    Create and version the judges that score runs.
+  </Card>
+  <Card title="Annotation tasks" icon="user-check" href="/cli/annotation-tasks">
+    Route runs to human reviewers and measure agreement.
   </Card>
 </CardGroup>
+
+## Global flags
+
+All commands support these flags:
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--agent-mode` | — | — | Enable structured errors and default TOON output for AI coding agents. Automatically enabled when a known agent environment is detected (CLAUDE_CODE, CURSOR_AGENT, etc.). Use --agent-mode=false to disable. |
+| `--api-key-auth` | string | — | Workspace API key. Create one under Workspace settings → API keys. |
+| `--color` | string | `auto` | Control colored output: auto (color when output is a TTY), always, or never. Respects NO_COLOR and FORCE_COLOR env vars. |
+| `-d, --debug` | — | — | Log request and response diagnostics to stderr |
+| `--dry-run` | — | — | Preview the request that would be sent without executing it (output to stderr) |
+| `-H, --header` | stringArray | — | Set a custom HTTP request header (format: "Key: Value"). Can be specified multiple times. |
+| `--include-headers` | — | — | Include HTTP response headers in the output |
+| `-q, --jq` | string | — | Filter and transform output using a jq expression (e.g., '.name', '.items[] \| .id') |
+| `--no-interactive` | — | — | Disable all interactive features (auto-prompting, explorer auto-launch, TUI forms) |
+| `-o, --output-format` | string | `pretty` | Specify the output format. Options: pretty, json, yaml, table, toon. |
+| `--server` | string | — | Select a server by index (for indexed servers) or name (for named servers) |
+| `--server-url` | string | — | Override the default server URL |
+| `--timeout` | string | — | HTTP request timeout (e.g., 30s, 5m, 100ms) |
+| `--usage` | — | — | Print the CLI Usage schema in KDL format |
+
+## JSON output
+
+Use `--output-format json` to get machine-readable output:
+
+```bash
+# List agent UUIDs
+calibrate agents list --output-format json | jq '.[].uuid'
+
+# Get an evaluation run's status
+calibrate agent-tests get-run --task-id <task_id> --output-format json | jq '.status'
+```
+
+## Requirements
+
+- macOS or Linux

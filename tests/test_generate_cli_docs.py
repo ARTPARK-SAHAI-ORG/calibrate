@@ -253,18 +253,18 @@ def test_subcommand_order_follows_parent_see_also() -> None:
 # --------------------------------------------------------------------------- #
 def test_build_tab_orders_getting_started_then_resources() -> None:
     tab = build_tab(
-        getting_started=["cli/calibrate/overview", "cli/calibrate/agent-mode"],
-        resources=["cli/calibrate/agents", "cli/calibrate/version"],
+        getting_started=["cli/overview", "cli/agent-mode"],
+        resources=["cli/agents", "cli/version"],
     )
     assert tab["tab"] == "CLI"
     assert [g["group"] for g in tab["groups"]] == ["Getting started", "Guides"]
     groups = {g["group"]: g["pages"] for g in tab["groups"]}
-    assert groups["Getting started"] == ["cli/calibrate/overview", "cli/calibrate/agent-mode"]
-    assert groups["Guides"] == ["cli/calibrate/agents", "cli/calibrate/version"]
+    assert groups["Getting started"] == ["cli/overview", "cli/agent-mode"]
+    assert groups["Guides"] == ["cli/agents", "cli/version"]
 
 
 def test_build_tab_omits_empty_resources_group() -> None:
-    tab = build_tab(getting_started=["cli/calibrate/overview"], resources=[])
+    tab = build_tab(getting_started=["cli/overview"], resources=[])
     assert [g["group"] for g in tab["groups"]] == ["Getting started"]
 
 
@@ -328,7 +328,7 @@ def test_patch_docs_json_inserts_after_and_is_idempotent(tmp_path: Path) -> None
 # generate_cli_docs (end-to-end)
 # --------------------------------------------------------------------------- #
 def _setup_e2e(tmp_path: Path):
-    output_root = tmp_path / "docs" / "cli" / "calibrate"
+    output_root = tmp_path / "docs" / "cli"
     output_root.mkdir(parents=True)
     docs_json = tmp_path / "docs" / "docs.json"
     docs_json.write_text(
@@ -355,8 +355,8 @@ def _run_e2e(output_root, docs_json, template_dir, src) -> None:
 
 def test_generate_cli_docs_end_to_end(tmp_path: Path) -> None:
     output_root, docs_json, template_dir, src = _setup_e2e(tmp_path)
-    # output_root.parents[1] must be the tmp docs dir so pages land under tmp
-    assert output_root.parents[1] == tmp_path / "docs"
+    # output_root.parent must be the tmp docs dir so pages land under tmp
+    assert output_root.parent == tmp_path / "docs"
 
     _run_e2e(output_root, docs_json, template_dir, src)
 
@@ -382,9 +382,9 @@ def test_generate_cli_docs_end_to_end(tmp_path: Path) -> None:
     assert [t["tab"] for t in tabs] == ["Home", "API reference", "CLI"]
     cli_tab = next(t for t in tabs if t["tab"] == "CLI")
     groups = {g["group"]: g["pages"] for g in cli_tab["groups"]}
-    assert groups["Getting started"] == ["cli/calibrate/overview", "cli/calibrate/agent-mode"]
+    assert groups["Getting started"] == ["cli/overview", "cli/agent-mode"]
     # only API-backed resources appear under Guides
-    assert set(groups["Guides"]) == {"cli/calibrate/widgets", "cli/calibrate/ping"}
+    assert set(groups["Guides"]) == {"cli/widgets", "cli/ping"}
 
     # running a second time still yields exactly one tab
     _run_e2e(output_root, docs_json, template_dir, src)

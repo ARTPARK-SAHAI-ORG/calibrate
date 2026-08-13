@@ -25,10 +25,9 @@ agent simulations — all from a single CLI / Python library.
 - Website / docs: https://calibrate.artpark.ai
 - Built on top of [pipecat](https://github.com/pipecat-ai/pipecat).
 - The CLI entry point is `calibrate-agent` (defined in `pyproject.toml:scripts` →
-  `calibrate_agent.cli:main`).
-
-The repo also ships an **Ink (React) terminal UI** in `ui/` that is bundled into
-the Python package and launched from the CLI.
+  `calibrate_agent.cli:main`). Every command runs directly from its flags — a
+  subcommand invoked without its required args prints an error and exits
+  non-zero.
 
 ## Before making any change
 
@@ -98,11 +97,6 @@ tests/                     # Test suite — mirrors the calibrate_agent/ structu
 ├── test_connections.py, test_cli.py, test_judges.py,
 │   test_sdk_judge_regressions.py
 
-ui/                        # Ink (React + TypeScript) terminal UI
-├── source/                # *.tsx entry points (app, llm-app, sim-app, etc.)
-├── tests/                 # vitest tests
-└── package.json           # Bundled into calibrate_agent/ui/cli.bundle.mjs
-
 docs/                      # Mintlify docs site (.mdx)
 examples/                  # Example datasets + scripts users can run
 .github/workflows/         # tests.yml, publish.yml, claude.yml, claude-code-review.yml
@@ -131,7 +125,7 @@ Some pages are **generated** from templates in `docs/templates/` by
 output, then re-run the script. Currently templated: `api-reference/introduction.mdx`,
 `reference/api-keys.mdx`, `reference/github-actions.mdx`.
 
-The **cloud `calibrate` CLI** pages under `docs/cli/calibrate/**` are also
+The **cloud `calibrate` CLI** pages under `docs/cli/**` are also
 generated — from the Cobra markdown that the separate `dalmia/calibrate-cli`
 repo ships in its `docs/` folder. `scripts/generate_cli_docs.py` (parser in
 `scripts/cli_reference.py`) produces one **Guides** page per command
@@ -143,7 +137,7 @@ there is **no per-page global-flags callout** (global flags are documented once
 under Getting started); option tables drop `-h, --help` and placeholder-only
 flags (e.g. Cobra's `--x-api-key string  string value`). The two **Getting
 started** pages (`overview`, `agent-mode`) are hand-written templates under
-`docs/templates/cli/calibrate/`. The generator patches the "CLI" tab
+`docs/templates/cli/`. The generator patches the "CLI" tab
 into `docs.json` (inserted after "Home") as two groups — Getting started, then
 Guides. Only **API-backed** command groups get a
 Guides page: a command whose name is an OpenAPI tag (`agents`,
@@ -154,13 +148,13 @@ Guides page: a command whose name is an OpenAPI tag (`agents`,
 resource titles come from `api_group_from_tag` (shared with
 `generate_sdk_docs.py` — `agent-tests` → "Agent tests"), and resource +
 subcommand order follow each command's Cobra `SEE ALSO` list. Never edit the
-generated `docs/cli/calibrate/*.mdx` (except the two Getting-started templates)
+generated `docs/cli/*.mdx` (except the two Getting-started templates)
 — edit the source markdown in `calibrate-cli` or the templates, then re-run.
 `fetch_public_openapi.py` calls the generator when `CLI_DOCS_PATH` points at a
 `calibrate-cli/docs` checkout (the `sync-api-spec.yml` workflow checks out that
 repo and sets it). The cloud CLI is the "CLI" tab; don't confuse it with
 the offline `calibrate-agent` eval CLI, which is the separate "Calibrate Local"
-tab (`docs/cli/overview.mdx` etc. — a static, hand-maintained tab in
+tab (`docs/local/overview.mdx` etc. — a static, hand-maintained tab in
 `docs.json`, positioned after "API reference"). The CLI-docs tests use synthetic
 Cobra samples (`tests/cli_doc_samples.py`), **not** a snapshot of the real CLI —
 so they don't drift; the live CLI is exercised by the sync workflow instead.

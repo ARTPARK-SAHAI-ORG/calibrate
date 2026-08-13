@@ -145,18 +145,18 @@
           {
             "group": "Getting started",
             "pages": [
-              "cli/calibrate/overview",
-              "cli/calibrate/agent-mode"
+              "cli/overview",
+              "cli/agent-mode"
             ]
           },
           {
             "group": "Guides",
             "pages": [
-              "cli/calibrate/agent-tests",
-              "cli/calibrate/agents",
-              "cli/calibrate/annotation-tasks",
-              "cli/calibrate/evaluators",
-              "cli/calibrate/tests"
+              "cli/agent-tests",
+              "cli/agents",
+              "cli/annotation-tasks",
+              "cli/evaluators",
+              "cli/tests"
             ]
           }
         ]
@@ -253,26 +253,27 @@
           {
             "group": "Getting started",
             "pages": [
-              "cli/overview"
+              "local/overview"
             ]
           },
           {
             "group": "Guides",
             "pages": [
-              "cli/speech-to-text",
-              "cli/text-to-text",
-              "cli/text-to-speech",
-              "cli/simulations",
+              "local/speech-to-text",
+              "local/text-to-text",
+              "local/text-to-speech",
+              "local/simulations",
               "guides/tools",
-              "cli/calibrate-agent",
+              "local/calibrate-agent",
               {
                 "group": "Agent Connection",
                 "pages": [
-                  "cli/agent-connections/overview",
-                  "cli/agent-connections/chat",
-                  "cli/agent-connections/outbound-voice"
+                  "local/agent-connections/overview",
+                  "local/agent-connections/chat",
+                  "local/agent-connections/outbound-voice"
                 ]
-              }
+              },
+              "local/general"
             ]
           }
         ]

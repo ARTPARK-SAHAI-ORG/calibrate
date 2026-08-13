@@ -1195,11 +1195,10 @@ async def run_eval_only(
 async def main():
     """CLI entry point for single-provider TTS evaluation.
 
-    Used by the Ink UI which spawns individual provider processes.
     For multi-provider benchmark, use benchmark.py via `calibrate-agent tts -p provider1 provider2 ...`
     """
     parser = argparse.ArgumentParser(
-        description="Single-provider TTS evaluation (used by Ink UI)"
+        description="Single-provider TTS evaluation"
     )
     parser.add_argument(
         "-p",

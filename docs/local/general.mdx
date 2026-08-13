@@ -1,0 +1,58 @@
+---
+title: "General task evaluation"
+description: "Score arbitrary input/output pairs with an LLM judge"
+---
+
+## Get started
+
+`calibrate-agent general` scores arbitrary `{id, input, output}` rows with an LLM judge. Use it for any task that isn't STT, TTS, or a conversation.
+
+```bash
+calibrate-agent general --dataset data.json -c config.json -o ./out
+```
+
+The command takes:
+
+- `--dataset`: a JSON list of `{id, input, output}` rows to score.
+- `-c`/`--config`: a JSON config defining the `evaluators` list.
+- `-o`/`--output-dir`: where results are written (defaults to `./out`).
+
+Set `OPENROUTER_API_KEY` in your environment (or a `.env` file in the directory you run the command from). The judges route through [OpenRouter](https://openrouter.ai/).
+
+## Dataset
+
+Each row is judged independently. The `input` and `output` are passed to every evaluator as the pair to score.
+
+```json
+[
+  { "id": "row_1", "input": "Summarize: ...", "output": "..." },
+  { "id": "row_2", "input": "Summarize: ...", "output": "..." }
+]
+```
+
+## Evaluators
+
+The `evaluators` list uses the same structure as every other command: one LLM judge call per evaluator per row, run in parallel, each appearing as its own column in the results.
+
+```json
+{
+  "evaluators": [
+    {
+      "id": "faithful-id",
+      "name": "faithful",
+      "system_prompt": "You are a highly accurate evaluator. You will be given an input and an output. Mark True if the output faithfully addresses the input without adding unsupported claims.",
+      "judge_model": "openai/gpt-5.4-mini"
+    }
+  ]
+}
+```
+
+Binary evaluators (the default) produce a per-row pass/fail and a mean pass-rate; set `"type": "rating"` with `scale_min`/`scale_max` for an integer score instead. See [Text to text → Evaluators](/local/text-to-text#evaluators) for the full evaluator reference.
+
+## Options
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `--dataset` | string | — | JSON list of `{id, input, output}` rows to score. |
+| `-c, --config` | string | — | JSON config defining the `evaluators` list. |
+| `-o, --output-dir` | string | `./out` | Where results are written. |

@@ -2,18 +2,12 @@
 CLI entry point for calibrate_agent package.
 
 Usage:
-    # Interactive mode (recommended):
-    calibrate-agent                                        # Main menu
-    calibrate-agent stt                                    # Interactive STT evaluation
-    calibrate-agent tts                                    # Interactive TTS evaluation
-    calibrate-agent llm                                    # Interactive LLM tests
-    calibrate-agent simulations                            # Interactive simulations
-    calibrate-agent status                                  # Check provider connectivity
-
-    # Direct mode:
+    calibrate-agent stt -p deepgram google -i ./data -o ./out
+    calibrate-agent tts -p openai google -i sample.csv -o ./out
     calibrate-agent llm -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
     calibrate-agent simulations --type text -c config.json -m openai/gpt-4.1 -p openrouter -o ./out
     calibrate-agent simulations --type voice -c config.json -o ./out
+    calibrate-agent status                                 # Check provider connectivity
 """
 
 import sys
@@ -70,33 +64,6 @@ def _load_cli_dotenv() -> None:
     """Load .env from the directory where the calibrate-agent command is run."""
     dotenv_path = find_dotenv(usecwd=True)
     load_dotenv(dotenv_path, override=True)
-
-
-def _launch_ink_ui(mode: str):
-    """Launch the bundled Ink UI for interactive TTS/STT evaluation."""
-    import shutil
-    from pathlib import Path
-
-    node_bin = shutil.which("node")
-    if not node_bin:
-        print(
-            f"Error: Node.js is required for the interactive {mode.upper()} UI.\n"
-            "Install it from https://nodejs.org/ or via your package manager."
-        )
-        sys.exit(1)
-
-    bundle_path = Path(__file__).parent / "ui" / "cli.bundle.mjs"
-    if not bundle_path.exists():
-        print(
-            f"Error: UI bundle not found at {bundle_path}\n"
-            "Run 'cd ui && npm run bundle' to build it."
-        )
-        sys.exit(1)
-
-    import subprocess
-
-    result = subprocess.run([node_bin, str(bundle_path), mode])
-    sys.exit(result.returncode)
 
 
 def _print_sample_output(result: dict) -> None:
@@ -180,15 +147,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-    calibrate-agent                                        # Main menu (interactive)
-    calibrate-agent stt                                    # Interactive STT evaluation
-    calibrate-agent tts                                    # Interactive TTS evaluation
-    calibrate-agent llm                                    # Interactive LLM tests
-    calibrate-agent llm -c config.json                     # Run LLM tests directly
-    calibrate-agent simulations                            # Interactive simulations
-    calibrate-agent simulations --type text -c config.json # Run text simulation directly
-    calibrate-agent general --dataset data.json -c config.json  # Score input/output pairs
-    calibrate-agent status                                 # Check provider connectivity
+    calibrate-agent stt -p deepgram google -i ./data -o ./out    # Benchmark STT providers
+    calibrate-agent tts -p openai google -i sample.csv -o ./out  # Benchmark TTS providers
+    calibrate-agent llm -c config.json -m openai/gpt-4.1          # Run LLM tests
+    calibrate-agent simulations --type text -c config.json       # Run text simulation
+    calibrate-agent general --dataset data.json -c config.json   # Score input/output pairs
+    calibrate-agent status                                       # Check provider connectivity
         """,
     )
 
@@ -204,10 +168,9 @@ Examples:
         help="Component to run",
         metavar="{stt,tts,llm,simulations,general,status}",
     )
-    subparsers.required = False  # Allow `calibrate-agent` alone for main menu
+    subparsers.required = False  # Allow bare `calibrate-agent` to print help
 
     # ── STT ───────────────────────────────────────────────────────
-    # `calibrate-agent stt` with no args → interactive UI
     # `calibrate-agent stt -p provider1 provider2 ... -i input-dir ...` → run benchmark (multi) or eval (single)
     stt_parser = subparsers.add_parser(
         "stt",
@@ -255,7 +218,6 @@ Examples:
     add_stt_eval_args(stt_parser, include_max_parallel=True)
 
     # ── TTS ───────────────────────────────────────────────────────
-    # `calibrate-agent tts` with no args → interactive UI
     # `calibrate-agent tts -p provider -i input ...` → single provider (eval.py)
     # `calibrate-agent tts -p provider1 provider2 -i input ...` → multi-provider (benchmark.py)
     tts_parser = subparsers.add_parser(
@@ -313,7 +275,6 @@ Examples:
     )
 
     # ── LLM tests ───────────────────────────────────────────────
-    # `calibrate-agent llm` with no args → interactive UI
     # `calibrate-agent llm -c config.json -m model ...` → single model (run_tests.py)
     # `calibrate-agent llm -c config.json -m model1 model2 ...` → multi-model (benchmark.py)
     # `calibrate-agent llm --verify --agent-url URL` → verify external agent connection
@@ -416,7 +377,6 @@ Examples:
         help="Path to dataset JSON for --eval-only (list of {test_case, output} items)",
     )
     # ── Simulations ─────────────────────────────────────────────
-    # `calibrate-agent simulations` with no args → interactive UI
     # `calibrate-agent simulations --type text -c config.json ...` → run directly
     # `calibrate-agent simulations --verify --agent-url URL` → verify external agent
     sim_parser = subparsers.add_parser(
@@ -493,7 +453,7 @@ Examples:
         help="Path to dataset JSON for --eval-only (list of {conversation_history, name?})",
     )
 
-    # Hidden internal subcommand for simulation leaderboard
+    # Hidden internal subcommand for regenerating the simulation leaderboard
     sim_subparsers = sim_parser.add_subparsers(dest="sim_subcmd", metavar="")
     sim_lb_parser = sim_subparsers.add_parser("leaderboard")
     sim_lb_parser.add_argument("-o", "--output-dir", type=str, required=True)
@@ -554,15 +514,15 @@ Examples:
     # ─────────────────────────────────────────────────────────────
     args = parser.parse_args()
 
-    # No component specified → launch main menu UI
+    # No component specified → show help
     if args.component is None:
-        _launch_ink_ui("menu")
+        parser.print_help()
+        sys.exit(1)
 
     # ── Dispatch ────────────────────────────────────────────────
     if args.component == "stt":
         # eval-only: skip STT inference and run evaluators on a (gt, pred) dataset.
         # benchmark: --provider given → run inference + evaluators.
-        # neither: launch interactive UI.
         if args.eval_only:
             from calibrate_agent.stt.benchmark import main as stt_benchmark_main
 
@@ -582,6 +542,10 @@ Examples:
             asyncio.run(stt_benchmark_main())
         elif args.provider is not None:
             from calibrate_agent.stt.benchmark import main as stt_benchmark_main
+
+            if not args.input_dir:
+                print("\033[31mError: -i/--input-dir is required\033[0m")
+                sys.exit(1)
 
             providers = args.provider
             argv = ["calibrate-agent", "-p"] + providers
@@ -614,12 +578,15 @@ Examples:
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
         else:
-            _launch_ink_ui("stt")
+            print(
+                "\033[31mError: -p/--provider is required "
+                "(or use --eval-only with --dataset)\033[0m"
+            )
+            sys.exit(1)
 
     elif args.component == "tts":
         # eval-only: skip synthesis and run the audio judge on a dataset.
         # provider given → run synthesis + evaluators.
-        # neither: launch interactive UI.
         if args.eval_only:
             from calibrate_agent.tts.benchmark import main as tts_benchmark_main
 
@@ -636,6 +603,10 @@ Examples:
             asyncio.run(tts_benchmark_main())
         elif args.provider is not None:
             from calibrate_agent.tts.benchmark import main as tts_benchmark_main
+
+            if not args.input:
+                print("\033[31mError: -i/--input is required\033[0m")
+                sys.exit(1)
 
             providers = args.provider
             argv = ["calibrate-agent", "-p"] + providers
@@ -654,7 +625,11 @@ Examples:
             sys.argv = argv
             asyncio.run(tts_benchmark_main())
         else:
-            _launch_ink_ui("tts")
+            print(
+                "\033[31mError: -p/--provider is required "
+                "(or use --eval-only with --dataset)\033[0m"
+            )
+            sys.exit(1)
 
     elif args.component == "llm":
         if getattr(args, "eval_only", False):
@@ -695,10 +670,10 @@ Examples:
                 agent_inputs_raw=args.agent_inputs,
             )
         elif args.config is None:
-            # No config → interactive mode
-            _launch_ink_ui("llm")
+            print("\033[31mError: -c/--config is required\033[0m")
+            sys.exit(1)
         else:
-            # Direct mode: run tests with provided config
+            # Run tests with the provided config
             import json as _json
             from calibrate_agent.utils import apply_debug_limit
 
@@ -722,7 +697,7 @@ Examples:
                 )
                 _models = args.model if args.model else []
 
-                # Verify once per model (skip if already verified upstream e.g. interactive UI)
+                # Verify once per model (skip with --skip-verify if already verified upstream)
                 if not getattr(args, "skip_verify", False):
                     _models_to_verify = _models if _models else [None]
                     for _m in _models_to_verify:
@@ -813,7 +788,7 @@ Examples:
                 args.agent_headers,
                 models=[_model_str] if _model_str else None,
             )
-        # Hidden leaderboard subcommand (used by Ink UI)
+        # Hidden leaderboard subcommand (regenerates the simulation leaderboard)
         elif getattr(args, "sim_subcmd", None) == "leaderboard":
             from calibrate_agent.llm.simulation_leaderboard import (
                 main as leaderboard_main,
@@ -834,8 +809,8 @@ Examples:
             )
             leaderboard_main()
         elif args.type is None or args.config is None:
-            # Missing type or config → interactive mode
-            _launch_ink_ui("simulations")
+            print("\033[31mError: --type and -c/--config are required\033[0m")
+            sys.exit(1)
         elif args.type == "text":
             from calibrate_agent.llm.run_simulation import main as llm_simulation_main
 

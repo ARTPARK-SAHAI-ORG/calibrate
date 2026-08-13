@@ -1,0 +1,52 @@
+---
+title: "Overview"
+description: "Command-line interface for evaluating AI agents"
+---
+
+<Note>
+  This is the **local** toolkit (`calibrate-agent`) for benchmarking STT, TTS,
+  and LLM providers and running agent simulations on your own machine. For
+  the hosted CLI that runs agent tests against your deployed agents, see the
+  [CLI](/cli/overview) tab.
+</Note>
+
+## Installation
+
+```bash
+pip install calibrate-agent
+```
+
+## Get started
+
+Calibrate provides the following commands:
+
+| Command                                                       | Description                                    |
+| ------------------------------------------------------------ | ---------------------------------------------- |
+| `calibrate-agent stt -p deepgram google -i ./data -o ./out`  | Benchmark STT providers                        |
+| `calibrate-agent tts -p openai google -i sample.csv -o ./out`| Benchmark TTS providers                        |
+| `calibrate-agent llm -c config.json -m openai/gpt-4.1`       | Test agent responses and tool calls            |
+| `calibrate-agent simulations --type text -c config.json`     | Text or voice simulations                      |
+| `calibrate-agent general --dataset data.json -c config.json` | Score arbitrary `{id, input, output}` pairs with an LLM judge |
+| `calibrate-agent status`                                     | Check API key configuration and connectivity   |
+
+Run `calibrate-agent <command> -h` to see all options for a command. Pass `calibrate-agent status --table` to print connectivity as a table instead of JSON.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Speech to Text" icon="microphone" href="/local/speech-to-text">
+    Benchmark STT providers on your audio dataset
+  </Card>
+  <Card title="Text to Speech" icon="volume-high" href="/local/text-to-speech">
+    Benchmark TTS providers on your text dataset
+  </Card>
+  <Card title="LLM tests" icon="brain" href="/local/text-to-text">
+    Test agent responses and tool calls
+  </Card>
+  <Card title="Simulations" icon="comments" href="/local/simulations">
+    Run text or voice simulations
+  </Card>
+  <Card title="General task evaluation" icon="scale-balanced" href="/local/general">
+    Score arbitrary input/output pairs with an LLM judge
+  </Card>
+</CardGroup>
