@@ -93,5 +93,55 @@
         "price_per_million_chars_usd": 17.5
       }
     }
+  },
+  "llm": {
+    "openai/gpt-5.4-mini": {
+      "openrouter": {
+        "input_price_per_million_tokens_usd": 0.75,
+        "output_price_per_million_tokens_usd": 4.5
+      },
+      "direct": {
+        "input_price_per_million_tokens_usd": 0.75,
+        "output_price_per_million_tokens_usd": 4.5
+      }
+    },
+    "openai/gpt-audio": {
+      "openrouter": {
+        "input_price_per_million_tokens_usd": 2.5,
+        "output_price_per_million_tokens_usd": 10.0,
+        "audio_input_price_per_million_tokens_usd": 32.0,
+        "audio_output_price_per_million_tokens_usd": 64.0
+      },
+      "direct": {
+        "input_price_per_million_tokens_usd": 2.5,
+        "output_price_per_million_tokens_usd": 10.0,
+        "audio_input_price_per_million_tokens_usd": 32.0,
+        "audio_output_price_per_million_tokens_usd": 64.0
+      }
+    },
+    "google/gemini-2.5-flash": {
+      "openrouter": {
+        "input_price_per_million_tokens_usd": 0.3,
+        "output_price_per_million_tokens_usd": 2.5,
+        "audio_input_price_per_million_tokens_usd": 1.0,
+        "reasoning_billed_as_output": true
+      },
+      "direct": {
+        "input_price_per_million_tokens_usd": 0.3,
+        "output_price_per_million_tokens_usd": 2.5,
+        "audio_input_price_per_million_tokens_usd": 1.0,
+        "reasoning_billed_as_output": true
+      }
+    },
+    "anthropic/claude-sonnet-4.5": {
+      "openrouter": {
+        "input_price_per_million_tokens_usd": 3.0,
+        "output_price_per_million_tokens_usd": 15.0
+      },
+      "direct": {
+        "input_price_per_million_tokens_usd": 3.0,
+        "output_price_per_million_tokens_usd": 15.0
+      }
+    }
   }
 }

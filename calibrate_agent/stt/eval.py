@@ -5,7 +5,7 @@ import os
 import json
 import base64
 from os.path import join, exists
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List
 from urllib.parse import urlencode
@@ -44,8 +44,14 @@ from calibrate_agent.stt.metrics import (
     get_ttfs_stats,
 )
 from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
+from calibrate_agent.judge_store import JudgeStore
 from calibrate_agent._env import resolve_stt_max_concurrency
-from calibrate_agent._cli_args import add_stt_eval_args
+from calibrate_agent._cli_args import (
+    DEFAULT_STT_LLM_JUDGES,
+    STT_LLM_JUDGES,
+    add_stt_eval_args,
+    resolve_stt_llm_judges,
+)
 from calibrate_agent.judges import (
     is_rating,
     require_unique_evaluator_names,
@@ -1254,6 +1260,162 @@ STT_LANGUAGES = [
 ]
 
 
+# metrics.json keys written by each built-in LLM judge.
+_BUILT_IN_JUDGE_METRIC_KEYS: dict[str, tuple[str, ...]] = {
+    "intent": ("sarvam_intent_score", "sarvam_entity_score"),
+    "llm_wer": ("sarvam_llm_wer", "sarvam_llm_cer"),
+    "semantic_wer": ("semantic_wer",),
+}
+
+# results.csv columns written by each built-in LLM judge.
+_BUILT_IN_JUDGE_RESULT_COLUMNS: dict[str, tuple[str, ...]] = {
+    "intent": (
+        "sarvam_intent_score",
+        "sarvam_intent_reasoning",
+        "sarvam_entity_score",
+        "sarvam_entity_reasoning",
+    ),
+    "llm_wer": (
+        "sarvam_llm_wer",
+        "sarvam_llm_cer",
+        "sarvam_llm_wer_reasoning",
+    ),
+    "semantic_wer": (
+        "semantic_wer",
+        "semantic_wer_metadata",
+        "semantic_wer_reasoning",
+    ),
+}
+
+# Always refreshed on every scoring pass; never restored from a prior file.
+_ALWAYS_FRESH_METRIC_KEYS = frozenset({"wer", "cer", "cost", "ttfs"})
+_ALWAYS_FRESH_RESULT_COLUMNS = frozenset(
+    {"id", "gt", "pred", "wer", "cer", "audio_duration_seconds", "ttfs"}
+)
+
+
+def _load_prior_metrics(output_dir: str) -> dict | None:
+    path = join(output_dir, "metrics.json")
+    if not exists(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _load_prior_results(output_dir: str) -> pd.DataFrame | None:
+    path = join(output_dir, "results.csv")
+    if not exists(path):
+        return None
+    try:
+        return pd.read_csv(path)
+    except (OSError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return None
+
+
+def _archive_prior_metrics(output_dir: str, prior: dict) -> None:
+    """Write a timestamped copy of ``prior`` under ``judge_history/``."""
+    history_dir = Path(output_dir) / "judge_history"
+    history_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    path = history_dir / f"metrics_{stamp}.json"
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(prior, f, indent=4)
+
+
+def _prior_evaluator_names(prior_metrics: dict) -> set[str]:
+    """Names of config-evaluator entries in a prior ``metrics.json``."""
+    names: set[str] = set()
+    for key, value in prior_metrics.items():
+        if key in _ALWAYS_FRESH_METRIC_KEYS:
+            continue
+        if any(key in keys for keys in _BUILT_IN_JUDGE_METRIC_KEYS.values()):
+            continue
+        if isinstance(value, dict) and "type" in value and "mean" in value:
+            names.add(key)
+    return names
+
+
+def _merge_prior_judge_outputs(
+    metrics_data: dict,
+    rows: list[dict],
+    output_dir: str,
+    *,
+    overwrite: bool,
+    enabled_judges: frozenset[str],
+    this_run_evaluator_names: set[str],
+) -> tuple[dict, list[dict]]:
+    """Keep prior built-in / config-evaluator outputs that this run did not refresh.
+
+    Always archives an existing ``metrics.json`` under ``judge_history/`` before
+    replacing it. When ``overwrite`` is True, returns the fresh artifacts
+    unchanged after that archive. Otherwise copies metrics keys and per-row
+    columns for judges (and config evaluators) that were not part of this
+    scoring pass, matched by ``id``.
+    """
+    prior_metrics = _load_prior_metrics(output_dir)
+    prior_df = _load_prior_results(output_dir)
+    if prior_metrics is None and prior_df is None:
+        return metrics_data, rows
+
+    if prior_metrics is not None:
+        _archive_prior_metrics(output_dir, prior_metrics)
+
+    if overwrite:
+        return metrics_data, rows
+
+    if prior_metrics is not None:
+        fresh_metric_keys = set(_ALWAYS_FRESH_METRIC_KEYS)
+        for name in enabled_judges:
+            fresh_metric_keys.update(_BUILT_IN_JUDGE_METRIC_KEYS.get(name, ()))
+        fresh_metric_keys.update(this_run_evaluator_names)
+
+        for key, value in prior_metrics.items():
+            if key in fresh_metric_keys:
+                continue
+            if key not in metrics_data:
+                metrics_data[key] = value
+
+    if prior_df is not None and not prior_df.empty and "id" in prior_df.columns:
+        prior_by_id = {
+            str(r["id"]): r for r in prior_df.to_dict("records")
+        }
+        preserve_columns: set[str] = set()
+        for name in STT_LLM_JUDGES:
+            if name in enabled_judges:
+                continue
+            preserve_columns.update(_BUILT_IN_JUDGE_RESULT_COLUMNS.get(name, ()))
+        if prior_metrics is not None:
+            for ev_name in _prior_evaluator_names(prior_metrics):
+                if ev_name in this_run_evaluator_names:
+                    continue
+                preserve_columns.add(ev_name)
+                preserve_columns.add(f"{ev_name}_reasoning")
+
+        preserve_columns = {
+            c
+            for c in preserve_columns
+            if c in prior_df.columns and c not in _ALWAYS_FRESH_RESULT_COLUMNS
+        }
+        if preserve_columns:
+            for row in rows:
+                prior_row = prior_by_id.get(str(row["id"]))
+                if prior_row is None:
+                    continue
+                for col in preserve_columns:
+                    if col in row:
+                        continue
+                    value = prior_row.get(col)
+                    if value is None or (isinstance(value, float) and pd.isna(value)):
+                        continue
+                    row[col] = value
+
+    return metrics_data, rows
+
+
 async def run_single_provider_eval(
     provider: str,
     language: str,
@@ -1265,7 +1427,7 @@ async def run_single_provider_eval(
     ignore_retry: bool,
     overwrite: bool,
     judge_evaluators: list[dict] = None,
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
     engine: str = "pipeline",
     max_concurrency: int = None,
 ) -> dict:
@@ -1428,10 +1590,11 @@ async def run_single_provider_eval(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            run_llm_judges=run_llm_judges,
+            llm_judges=llm_judges,
             audio_durations=audio_durations,
             cost_metrics=cost_metrics,
             ttfs_values=all_ttfs,
+            overwrite=overwrite,
         )
 
         return {
@@ -1487,10 +1650,11 @@ async def _score_and_write_results(
     evaluator_config_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
     cost_metrics: dict | None = None,
     audio_durations: list[float | None] | None = None,
     ttfs_values: list = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1499,14 +1663,21 @@ async def _score_and_write_results(
     is empty/omitted, no judge runs, no evaluator config is written, and the
     evaluator columns/metrics are omitted. Returns the metrics_data dict.
 
-    The Sarvam intent/entity judge runs by default. When
-    ``run_llm_judges`` is False it is skipped entirely — no normalizer model
-    is loaded, no judge calls are made, and the ``sarvam_*`` columns/metrics are
-    omitted.
+    Built-in LLM judges are selected via ``llm_judges`` (``intent``,
+    ``llm_wer``, ``semantic_wer``). ``None`` runs all three; an empty
+    frozenset skips them entirely — no normalizer model is loaded, no judge
+    calls are made, and the corresponding columns/metrics are omitted.
 
     Each judge is isolated: if any judge raises, the failure is logged and that
     judge's columns/metrics are dropped, but WER/CER and any judges that
     succeeded are still written.
+
+    Every judge call is checkpointed through a :class:`JudgeStore` loaded
+    from ``output_dir``, keyed by ``ids``: a row already graded in a prior
+    (interrupted or completed) run for the same input, evaluator prompt, and
+    model is reused instead of re-judged. ``overwrite=True`` discards that
+    checkpoint (along with ``results.csv``) before scoring so every row is
+    graded fresh.
     """
     wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
@@ -1514,20 +1685,32 @@ async def _score_and_write_results(
     cer_results = get_cer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
 
-    # Each judge below runs independently and is isolated: a failure in one
-    # (Sarvam intent/entity, Sarvam LLM-WER/CER, or the LLM judge) is logged and
-    # that judge's columns/metrics are omitted, but WER/CER and any judges that
-    # succeeded are still written.
+    store = JudgeStore.load(output_dir)
+    if overwrite:
+        store.clear()
+        _log("Overwrite enabled - cleared cached judge grades", to_terminal=False)
+    elif len(store) > 0:
+        _log(
+            f"Resuming judge grading: {len(store)} cached result(s) found in "
+            f"{store.path} and will be reused",
+            to_terminal=False,
+        )
 
-    # Intent + entity preservation and LLM-WER/CER run by default; setting
-    # ``run_llm_judges`` to False skips loading the normalizer model and the
-    # per-row judge calls.
+    # Each judge below runs independently and is isolated: a failure in one
+    # is logged and that judge's columns/metrics are omitted, but WER/CER and
+    # any judges that succeeded are still written.
+    enabled = DEFAULT_STT_LLM_JUDGES if llm_judges is None else llm_judges
+
     intent_entity_results = None
     llm_wer_results = None
-    if run_llm_judges:
+    if "intent" in enabled:
         try:
             intent_entity_results = await get_intent_entity_score(
-                gt_transcripts, pred_transcripts, language=language
+                gt_transcripts,
+                pred_transcripts,
+                language=language,
+                store=store,
+                row_ids=ids,
             )
             _log(
                 f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
@@ -1536,9 +1719,14 @@ async def _score_and_write_results(
         except Exception as e:
             intent_entity_results = None
             _log(f"Sarvam intent/entity judge failed, skipping: {e}")
+    if "llm_wer" in enabled:
         try:
             llm_wer_results = await get_llm_wer_cer_score(
-                gt_transcripts, pred_transcripts, language=language
+                gt_transcripts,
+                pred_transcripts,
+                language=language,
+                store=store,
+                row_ids=ids,
             )
             _log(
                 f"Sarvam LLM WER: {llm_wer_results['llm_wer']:.4f}  Sarvam LLM CER: {llm_wer_results['llm_cer']:.4f}",
@@ -1548,12 +1736,11 @@ async def _score_and_write_results(
             llm_wer_results = None
             _log(f"Sarvam LLM-WER/CER judge failed, skipping: {e}")
 
-    # Semantic WER (pipecat methodology) runs as part of the LLM judges group.
     semantic_wer_results = None
-    if run_llm_judges:
+    if "semantic_wer" in enabled:
         try:
             semantic_wer_results = await get_semantic_wer_score(
-                gt_transcripts, pred_transcripts
+                gt_transcripts, pred_transcripts, store=store, row_ids=ids
             )
             _log(
                 f"Semantic WER: {semantic_wer_results['semantic_wer']:.4f}",
@@ -1576,6 +1763,8 @@ async def _score_and_write_results(
                 gt_transcripts,
                 pred_transcripts,
                 evaluators=_evaluators,
+                store=store,
+                row_ids=ids,
             )
             for name, score_dict in llm_results["scores"].items():
                 _log(f"  {name}: {score_dict['mean']:.4f}")
@@ -1715,6 +1904,15 @@ async def _score_and_write_results(
             row[f"{name}_reasoning"] = ev_result["reasoning"]
         data.append(row)
 
+    metrics_data, data = _merge_prior_judge_outputs(
+        metrics_data,
+        data,
+        output_dir,
+        overwrite=overwrite,
+        enabled_judges=enabled,
+        this_run_evaluator_names=set(_evaluators_by_name),
+    )
+
     with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics_data, f, indent=4)
 
@@ -1728,7 +1926,8 @@ async def run_eval_only(
     output_dir: str,
     judge_evaluators: list[dict] = None,
     language: str = "english",
-    run_llm_judges: bool = True,
+    llm_judges: frozenset[str] | None = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
@@ -1742,9 +1941,11 @@ async def run_eval_only(
             LLM judge runs and only WER/CER are reported.
         language: Language of the dataset, used to normalize text before the
             intent/entity judge. Defaults to ``english``.
-        run_llm_judges: Run the Sarvam intent/entity judge (default True).
-            Setting it to False skips the normalizer model load and the judge
-            calls entirely.
+        llm_judges: Built-in LLM judges to run (``intent``, ``llm_wer``,
+            ``semantic_wer``). ``None`` runs all three; an empty frozenset
+            skips them.
+        overwrite: Discard any judge results checkpointed under ``output_dir``
+            from a prior run before scoring, so every row is graded fresh.
 
     Returns:
         dict with status, metrics, and output_dir.
@@ -1778,7 +1979,8 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             language=language,
-            run_llm_judges=run_llm_judges,
+            llm_judges=llm_judges,
+            overwrite=overwrite,
         )
 
         return {
@@ -1795,7 +1997,7 @@ def format_metrics_summary(metrics: dict, prefix: str = "") -> str:
     shared by the single-provider, multi-provider, and eval-only paths.
 
     The Sarvam judge fields are only included when present in ``metrics``
-    (i.e. unless ``--skip-llm-judges`` was passed for the run).
+    (i.e. when those built-in judges ran for the run).
     """
     parts = [
         f"WER={metrics.get('wer', 0):.4f}",
@@ -1937,7 +2139,9 @@ async def main():
         debug_count=args.debug_count,
         ignore_retry=args.ignore_retry,
         overwrite=args.overwrite,
-        run_llm_judges=not args.skip_llm_judges,
+        llm_judges=resolve_stt_llm_judges(
+            skip_llm_judges=args.skip_llm_judges, judges=args.judges
+        ),
         engine=args.engine,
         max_concurrency=args.max_concurrency,
     )

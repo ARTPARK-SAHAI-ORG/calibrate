@@ -11,6 +11,10 @@ One judge call per *unique differing word segment* returns whether the segment
 is semantically/phonetically equivalent (forgiven) or a genuine error.
 """
 
+from __future__ import annotations
+
+from typing import List
+
 import backoff
 import instructor
 
@@ -22,6 +26,41 @@ from calibrate_agent.stt.sarvam_llm_wer.main import LLMEquivalenceResponse, buil
 # Model used to grade segment equivalence. Matches Sarvam's llm_wer flow, which
 # judges with google/gemini-2.5-flash (reached here via OpenRouter).
 DEFAULT_LLM_WER_MODEL = "google/gemini-2.5-flash"
+
+_MULTI_TOOL_CALL_MARKER = "multiple tool calls"
+
+
+def _is_multiple_tool_calls_error(exc: BaseException) -> bool:
+    """True when instructor rejected a response that contained >1 tool call."""
+    return _MULTI_TOOL_CALL_MARKER in str(exc).lower()
+
+
+async def _create_equivalence_response(client, *, model: str, prompt: str):
+    """Ask instructor for one ``LLMEquivalenceResponse``.
+
+    Some models (notably Gemini via OpenRouter) occasionally emit two tool
+    calls for the same single-segment prompt. Instructor rejects that with
+    ``multiple tool calls``. In that case we retry once asking for a list and
+    keep the first element — both calls are usually duplicates of one verdict.
+    """
+    create = client.chat.completions.create
+    shared = dict(
+        model=model,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0,
+        max_completion_tokens=8192,
+    )
+    try:
+        return await create(response_model=LLMEquivalenceResponse, **shared)
+    except Exception as exc:
+        if not _is_multiple_tool_calls_error(exc):
+            raise
+        responses = await create(
+            response_model=List[LLMEquivalenceResponse], **shared
+        )
+        if not responses:
+            raise
+        return responses[0]
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
@@ -46,12 +85,8 @@ async def equivalence_judge(
 
     prompt = build_prompt({"reference": reference, "prediction": prediction})
 
-    response = await client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        response_model=LLMEquivalenceResponse,
-        temperature=0,
-        max_completion_tokens=8192,
+    response = await _create_equivalence_response(
+        client, model=model, prompt=prompt
     )
 
     result = response.model_dump()

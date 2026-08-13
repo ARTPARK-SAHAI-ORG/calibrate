@@ -30,7 +30,7 @@ from dotenv import find_dotenv, load_dotenv
 # which pulls in scipy/numpy/pipecat and trips a scipy ``_CopyMode``
 # incompatibility in the voice path if imported here.
 from calibrate_agent._env import env_int
-from calibrate_agent._cli_args import add_stt_eval_args
+from calibrate_agent._cli_args import add_assume_yes_arg, add_stt_eval_args
 
 
 def _args_to_argv(args, exclude_keys=None, flag_mapping=None):
@@ -253,6 +253,7 @@ Examples:
         help="Path to dataset JSON (list of {id, gt, pred}). Required with --eval-only.",
     )
     add_stt_eval_args(stt_parser, include_max_parallel=True)
+    add_assume_yes_arg(stt_parser)
 
     # ── TTS ───────────────────────────────────────────────────────
     # `calibrate-agent tts` with no args → interactive UI
@@ -311,6 +312,7 @@ Examples:
             "is read directly. Required with --eval-only."
         ),
     )
+    add_assume_yes_arg(tts_parser)
 
     # ── LLM tests ───────────────────────────────────────────────
     # `calibrate-agent llm` with no args → interactive UI
@@ -577,6 +579,10 @@ Examples:
                 argv.extend(["--config", args.config])
             if args.skip_llm_judges:
                 argv.append("--skip-llm-judges")
+            if args.judges is not None:
+                argv.extend(["--judges", ",".join(sorted(args.judges))])
+            if args.yes:
+                argv.append("--yes")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -602,6 +608,8 @@ Examples:
                 argv.extend(["--config", args.config])
             if args.skip_llm_judges:
                 argv.append("--skip-llm-judges")
+            if args.judges is not None:
+                argv.extend(["--judges", ",".join(sorted(args.judges))])
             # Only forward the parallelism knobs when the user set them
             # explicitly; otherwise let the benchmark resolve the per-engine
             # default (pipeline 1/1, direct 2/4).
@@ -610,6 +618,8 @@ Examples:
             if args.max_concurrency is not None:
                 argv.extend(["--max-concurrency", str(args.max_concurrency)])
             argv.extend(["--engine", args.engine])
+            if args.yes:
+                argv.append("--yes")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -631,6 +641,8 @@ Examples:
             argv.extend(["-o", args.output_dir])
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.yes:
+                argv.append("--yes")
 
             sys.argv = argv
             asyncio.run(tts_benchmark_main())
@@ -650,6 +662,8 @@ Examples:
             if args.config:
                 argv.extend(["--config", args.config])
             argv.extend(["--max-parallel", str(args.max_parallel)])
+            if args.yes:
+                argv.append("--yes")
 
             sys.argv = argv
             asyncio.run(tts_benchmark_main())

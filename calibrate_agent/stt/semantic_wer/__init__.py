@@ -11,7 +11,8 @@ OpenAI-compatible tool calling vs pipecat's native Anthropic SDK) differs.
 
 Distinct from ``stt/sarvam_llm_wer`` (deterministic difflib alignment + per-
 segment equivalence forgiveness). Runs by default as part of the LLM-judge
-group; disable the group with ``--skip-llm-judges``.
+group; select with ``--judges semantic_wer`` or skip all built-in judges with
+``--skip-llm-judges``.
 
 Reference: https://github.com/pipecat-ai/stt-benchmark
 """

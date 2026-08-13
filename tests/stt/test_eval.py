@@ -232,7 +232,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
 def _fake_intent_entity(intent=1, entity=1.0):
     """Build a fake ``get_intent_entity_score`` returning fixed scores per row."""
 
-    async def _fn(refs, preds, language="english", model=None):
+    async def _fn(refs, preds, language="english", model=None, **kwargs):
         return {
             "intent": float(intent),
             "entity": float(entity),
@@ -256,7 +256,7 @@ def _fake_intent_entity(intent=1, entity=1.0):
 def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
     """Build a fake ``get_llm_wer_cer_score`` returning fixed scores per row."""
 
-    async def _fn(refs, preds, language="english", model=None):
+    async def _fn(refs, preds, language="english", model=None, **kwargs):
         return {
             "llm_wer": float(llm_wer),
             "llm_cer": float(llm_cer),
@@ -276,7 +276,7 @@ def _fake_llm_wer(llm_wer=0.05, llm_cer=0.03):
 def _fake_semantic_wer():
     """Fake ``get_semantic_wer_score`` (part of the default LLM-judge group)."""
 
-    async def _sem(references, predictions, model=None):
+    async def _sem(references, predictions, model=None, **kwargs):
         return {
             "semantic_wer": 0.0,
             "per_row": [
@@ -304,7 +304,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_writes_metrics_and_results(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {
                     "semantic_match": {"type": "binary", "mean": 1.0}
@@ -338,7 +338,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_llm_judges=True,
+                    llm_judges=None,
                 )
 
             self.assertIn("wer", metrics)
@@ -383,7 +383,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             }
         ]
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"completeness": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,
@@ -408,7 +408,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=custom,
-                    run_llm_judges=True,
+                    llm_judges=None,
                 )
 
             # With the flag on, intent/entity report alongside a custom evaluator.
@@ -425,7 +425,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_run_by_default(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -472,7 +472,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_skipped_when_disabled(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -501,7 +501,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                             "judge_model": "openai/gpt-4.1",
                         }
                     ],
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
 
             # Disabled: the Sarvam judge is never invoked and no sarvam_* keys appear.
@@ -514,6 +514,287 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             # WER/CER and the judge column are still written.
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
+
+    async def test_llm_judges_subset_runs_only_selected(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        ie_mock = _fake_intent_entity(1, 1.0)
+        llm_wer_mock = AsyncMock()
+        semantic_wer_mock = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_intent_entity_score", ie_mock), patch.object(
+                stt_eval, "get_llm_wer_cer_score", llm_wer_mock
+            ), patch.object(stt_eval, "get_semantic_wer_score", semantic_wer_mock):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    llm_judges=frozenset({"intent"}),
+                )
+
+            ie_mock.assert_awaited_once()
+            llm_wer_mock.assert_not_awaited()
+            semantic_wer_mock.assert_not_awaited()
+            self.assertIn("sarvam_intent_score", metrics)
+            self.assertIn("sarvam_entity_score", metrics)
+            self.assertNotIn("sarvam_llm_wer", metrics)
+            self.assertNotIn("semantic_wer", metrics)
+            df = pd.read_csv(out / "results.csv")
+            self.assertIn("sarvam_intent_score", df.columns)
+            self.assertNotIn("sarvam_llm_wer", df.columns)
+            self.assertNotIn("semantic_wer", df.columns)
+
+    async def test_subset_run_preserves_prior_judge_outputs(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            # Prior full-judge artifacts on disk.
+            (out / "metrics.json").write_text(
+                json.dumps(
+                    {
+                        "wer": 0.5,
+                        "cer": 0.4,
+                        "sarvam_intent_score": 0.9,
+                        "sarvam_entity_score": 0.8,
+                        "sarvam_llm_wer": 0.2,
+                        "sarvam_llm_cer": 0.1,
+                    }
+                )
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "hello",
+                        "pred": "hello",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "sarvam_intent_score": 1,
+                        "sarvam_intent_reasoning": "ok",
+                        "sarvam_entity_score": 1.0,
+                        "sarvam_entity_reasoning": "ok",
+                        "sarvam_llm_wer": 0.0,
+                        "sarvam_llm_cer": 0.0,
+                        "sarvam_llm_wer_reasoning": "[]",
+                    },
+                    {
+                        "id": "2",
+                        "gt": "world",
+                        "pred": "word",
+                        "wer": 1.0,
+                        "cer": 0.2,
+                        "sarvam_intent_score": 0,
+                        "sarvam_intent_reasoning": "miss",
+                        "sarvam_entity_score": 0.5,
+                        "sarvam_entity_reasoning": "partial",
+                        "sarvam_llm_wer": 0.5,
+                        "sarvam_llm_cer": 0.2,
+                        "sarvam_llm_wer_reasoning": "[]",
+                    },
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            llm_wer_mock = _fake_llm_wer(0.05, 0.03)
+            with patch.object(stt_eval, "get_llm_wer_cer_score", llm_wer_mock), patch.object(
+                stt_eval, "get_intent_entity_score", AsyncMock()
+            ) as ie_mock, patch.object(
+                stt_eval, "get_semantic_wer_score", AsyncMock()
+            ) as sem_mock:
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "word"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    llm_judges=frozenset({"llm_wer"}),
+                )
+
+            ie_mock.assert_not_awaited()
+            sem_mock.assert_not_awaited()
+            # Fresh llm_wer + preserved intent/entity from prior.
+            self.assertEqual(metrics["sarvam_llm_wer"], 0.05)
+            self.assertEqual(metrics["sarvam_intent_score"], 0.9)
+            self.assertEqual(metrics["sarvam_entity_score"], 0.8)
+            history = list((out / "judge_history").glob("metrics_*.json"))
+            self.assertEqual(len(history), 1)
+            df = pd.read_csv(out / "results.csv")
+            self.assertIn("sarvam_intent_score", df.columns)
+            self.assertIn("sarvam_llm_wer", df.columns)
+            self.assertEqual(int(df.loc[df["id"].astype(str) == "1", "sarvam_intent_score"].iloc[0]), 1)
+
+    async def test_merge_no_prior_returns_unchanged(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics = {"wer": 0.1, "cer": 0.2}
+            rows = [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}]
+            out_m, out_r = stt_eval._merge_prior_judge_outputs(
+                metrics,
+                rows,
+                tmp,
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(out_m, metrics)
+            self.assertEqual(out_r, rows)
+            self.assertFalse((Path(tmp) / "judge_history").exists())
+
+    async def test_merge_overwrite_archives_but_does_not_restore(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps(
+                    {
+                        "wer": 0.5,
+                        "cer": 0.4,
+                        "sarvam_intent_score": 0.9,
+                        "sarvam_entity_score": 0.8,
+                    }
+                )
+            )
+            fresh = {"wer": 0.1, "cer": 0.05, "sarvam_llm_wer": 0.02}
+            rows = [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}]
+            out_m, out_r = stt_eval._merge_prior_judge_outputs(
+                dict(fresh),
+                rows,
+                str(out),
+                overwrite=True,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(out_m, fresh)
+            self.assertNotIn("sarvam_intent_score", out_m)
+            self.assertEqual(len(list((out / "judge_history").glob("metrics_*.json"))), 1)
+
+    async def test_merge_skips_nan_prior_cells(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps({"wer": 0.5, "cer": 0.4, "sarvam_intent_score": 0.9})
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "a",
+                        "pred": "a",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "sarvam_intent_score": float("nan"),
+                        "sarvam_intent_reasoning": "ok",
+                    }
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            rows = [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}]
+            _, out_rows = stt_eval._merge_prior_judge_outputs(
+                {"wer": 0.1, "cer": 0.05},
+                rows,
+                str(out),
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertNotIn("sarvam_intent_score", out_rows[0])
+            self.assertEqual(out_rows[0]["sarvam_intent_reasoning"], "ok")
+
+    async def test_merge_preserves_config_evaluator_columns(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps(
+                    {
+                        "wer": 0.5,
+                        "cer": 0.4,
+                        "semantic_match": {"type": "binary", "mean": 0.9},
+                    }
+                )
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "a",
+                        "pred": "a",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "semantic_match": True,
+                        "semantic_match_reasoning": "match",
+                    }
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            metrics, rows = stt_eval._merge_prior_judge_outputs(
+                {"wer": 0.1, "cer": 0.05, "sarvam_llm_wer": 0.02},
+                [{"id": "1", "gt": "a", "pred": "a", "wer": 0.0, "cer": 0.0}],
+                str(out),
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(metrics["semantic_match"]["mean"], 0.9)
+            self.assertTrue(rows[0]["semantic_match"])
+            self.assertEqual(rows[0]["semantic_match_reasoning"], "match")
+
+    async def test_load_prior_helpers_handle_corrupt_inputs(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text("{not-json")
+            self.assertIsNone(stt_eval._load_prior_metrics(str(out)))
+
+            (out / "metrics.json").write_text("[1, 2]")
+            self.assertIsNone(stt_eval._load_prior_metrics(str(out)))
+
+            (out / "results.csv").write_text("")
+            self.assertIsNone(stt_eval._load_prior_results(str(out)))
+
+    async def test_merge_skips_rows_missing_from_prior(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            (out / "metrics.json").write_text(
+                json.dumps({"wer": 0.5, "sarvam_intent_score": 0.9})
+            )
+            pd.DataFrame(
+                [
+                    {
+                        "id": "1",
+                        "gt": "a",
+                        "pred": "a",
+                        "wer": 0.0,
+                        "cer": 0.0,
+                        "sarvam_intent_score": 1,
+                    }
+                ]
+            ).to_csv(out / "results.csv", index=False)
+
+            _, rows = stt_eval._merge_prior_judge_outputs(
+                {"wer": 0.1},
+                [
+                    {"id": "1", "gt": "a", "pred": "a", "wer": 0.0},
+                    {"id": "new", "gt": "b", "pred": "b", "wer": 0.0},
+                ],
+                str(out),
+                overwrite=False,
+                enabled_judges=frozenset({"llm_wer"}),
+                this_run_evaluator_names=set(),
+            )
+            self.assertEqual(rows[0]["sarvam_intent_score"], 1)
+            self.assertNotIn("sarvam_intent_score", rows[1])
 
     async def test_llm_judge_failure_still_writes_wer_cer_and_sarvam(self):
         from calibrate_agent.stt import eval as stt_eval
@@ -559,7 +840,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_failure_still_writes_wer_cer_and_evaluator(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -619,7 +900,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     pred_transcripts=["hello", "goodbye"],
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
 
             # No evaluators passed: the LLM judge is never invoked, no evaluator
@@ -645,7 +926,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             "scale_max": 5,
         }
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {
                     "accuracy": {
@@ -675,10 +956,39 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
                     output_dir=str(out),
                     evaluator_config_dir=str(out),
                     judge_evaluators=[rating],
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["accuracy"], 4)
+
+    async def test_resume_logs_cached_judge_count(self):
+        from calibrate_agent.stt import eval as stt_eval
+        from calibrate_agent.judge_store import JudgeKey, JudgeStore
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            store = JudgeStore.load(str(out))
+            await store.put(
+                JudgeKey(kind="intent", row_id="1", fingerprint="fp"),
+                {"ok": True},
+            )
+
+            log_mock = MagicMock()
+            with patch.object(stt_eval, "_log", log_mock):
+                await stt_eval._score_and_write_results(
+                    ids=["1", "2"],
+                    gt_transcripts=["hello", "world"],
+                    pred_transcripts=["hello", "world"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    llm_judges=frozenset(),
+                )
+
+            resume_logged = any(
+                "Resuming judge grading" in str(call)
+                for call in log_mock.call_args_list
+            )
+            self.assertTrue(resume_logged)
 
 
 class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
@@ -692,7 +1002,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_runs_evaluator_on_dataset(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, **kwargs):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,
@@ -722,7 +1032,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
                 result = await stt_eval.run_eval_only(
                     dataset_path=str(ds_path),
                     output_dir=str(out),
-                    run_llm_judges=False,
+                    llm_judges=frozenset(),
                 )
 
             self.assertEqual(result["status"], "completed")

@@ -36,6 +36,7 @@ from calibrate_agent.utils import (
     get_gemini_api_key,
 )
 from calibrate_agent.pricing import TTS_DEFAULT_MODELS, cost_breakdown, resolve_pricing
+from calibrate_agent.judge_store import JudgeStore
 from calibrate_agent.tts.metrics import get_tts_llm_judge_score
 from calibrate_agent.llm._metrics_utils import _latency_percentiles
 from calibrate_agent.judges import (
@@ -867,6 +868,7 @@ async def _score_and_write_results(
     judge_evaluators: list[dict] = None,
     ttfb_values: list = None,
     cost_metrics: dict = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run the TTS audio judge over (audio_path, text) pairs and write outputs.
 
@@ -878,15 +880,34 @@ async def _score_and_write_results(
     and TTFB percentile metrics are included; when None (eval-only, where
     nothing is synthesized) both are omitted. When ``cost_metrics`` is provided
     it is attached under the ``cost`` key.
+
+    A ``JudgeStore`` checkpoint (``judge_cache.jsonl``) is loaded from
+    ``output_dir``, so a (row, evaluator) result already graded there is
+    reused instead of re-billing the audio judge for it. ``overwrite=True``
+    clears that checkpoint along with ``results.csv``, so a fresh run does
+    not resurrect stale grades.
     """
     _log("Running evaluators...")
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
     require_unique_evaluator_names(_evaluators)
     write_evaluator_config(evaluator_config_dir, _evaluators)
+
+    store = JudgeStore.load(output_dir)
+    if overwrite:
+        store.clear()
+    cached_before = len(store)
+    if cached_before:
+        _log(
+            f"Resuming from checkpoint: {cached_before} cached judge result(s) "
+            f"found in {store.path}, skipping their judge calls"
+        )
+
     llm_judge_results = await get_tts_llm_judge_score(
         audio_paths,
         texts,
         evaluators=_evaluators,
+        store=store,
+        row_ids=ids,
     )
     for name, score_dict in llm_judge_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
@@ -1050,6 +1071,7 @@ async def run_single_provider_eval(
             judge_evaluators=judge_evaluators,
             ttfb_values=all_ttfb,
             cost_metrics=cost_metrics,
+            overwrite=overwrite,
         )
 
         return {
@@ -1122,6 +1144,7 @@ async def run_eval_only(
     dataset_path: str,
     output_dir: str,
     judge_evaluators: list[dict] = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run the TTS audio judge only, on a prior run's audio. Skips synthesis
     and reads the run directory's ``results.csv`` directly. Writes
@@ -1134,6 +1157,8 @@ async def run_eval_only(
         output_dir: Directory to write results and metrics.
         judge_evaluators: Optional list of evaluator dicts. Defaults to the
             built-in TTS evaluator (``DEFAULT_TTS_EVALUATOR``) when omitted.
+        overwrite: If True, clear ``output_dir``'s judge checkpoint
+            (``judge_cache.jsonl``) before scoring instead of resuming from it.
 
     Returns:
         dict with status, metrics, and output_dir.
@@ -1181,6 +1206,7 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             ttfb_values=None,
+            overwrite=overwrite,
         )
 
         return {
