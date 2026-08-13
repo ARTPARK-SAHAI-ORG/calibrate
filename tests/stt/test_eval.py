@@ -304,7 +304,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_writes_metrics_and_results(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, on_row=None):
             return {
                 "scores": {
                     "semantic_match": {"type": "binary", "mean": 1.0}
@@ -383,7 +383,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             }
         ]
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, on_row=None):
             return {
                 "scores": {"completeness": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,
@@ -425,7 +425,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_run_by_default(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, on_row=None):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -472,7 +472,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_skipped_when_disabled(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, on_row=None):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -514,6 +514,130 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             # WER/CER and the judge column are still written.
             self.assertIn("wer", metrics)
             self.assertIn("semantic_match", metrics)
+
+    async def test_partial_results_written_while_judge_still_running(self):
+        import asyncio
+
+        from calibrate_agent.stt import eval as stt_eval
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        seen_by_second_row = {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            results_path = out / "results.csv"
+
+            async def fake_row_judge(
+                reference, prediction, evaluators=None, fallback_model=None
+            ):
+                if reference == "second":
+                    # Wait for the first row's result to land on disk, then
+                    # record what the file held mid-run.
+                    for _ in range(200):
+                        if results_path.exists():
+                            seen_by_second_row["csv"] = results_path.read_text()
+                            break
+                        await asyncio.sleep(0.01)
+                return {"semantic_match": {"match": True, "reasoning": reference}}
+
+            with patch.object(
+                stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_row_judge)
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
+            ), patch.object(
+                stt_eval, "get_llm_wer_cer_score", _fake_llm_wer(0.05, 0.03)
+            ):
+                await stt_eval._score_and_write_results(
+                    ids=["row_a", "row_b"],
+                    gt_transcripts=["first", "second"],
+                    pred_transcripts=["first", "second"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
+                    run_llm_judges=True,
+                    stream_rows=True,
+                )
+
+            partial = seen_by_second_row.get("csv")
+            self.assertIsNotNone(
+                partial, "results.csv was not written before the judge finished"
+            )
+            self.assertIn("row_a", partial)
+            self.assertIn("first", partial)
+
+            # The final file replaces the partial one and keeps its full shape.
+            df = pd.read_csv(results_path)
+            self.assertEqual(len(df), 2)
+            self.assertTrue(
+                set(df.columns)
+                >= {
+                    "id",
+                    "gt",
+                    "pred",
+                    "wer",
+                    "cer",
+                    "semantic_match",
+                    "semantic_match_reasoning",
+                }
+            )
+            self.assertEqual(sorted(df["id"]), ["row_a", "row_b"])
+
+    async def test_no_partial_results_without_stream_rows(self):
+        """The full evaluation keeps its own transcriptions in results.csv and
+        resumes from them, so the judge must not overwrite that file mid-run."""
+        import asyncio
+
+        from calibrate_agent.stt import eval as stt_eval
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        seen_by_second_row = {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            results_path = out / "results.csv"
+            results_path.write_text("id,gt,pred\nrow_a,first,first\n")
+
+            async def fake_row_judge(
+                reference, prediction, evaluators=None, fallback_model=None
+            ):
+                if reference == "second":
+                    await asyncio.sleep(0.05)
+                    seen_by_second_row["csv"] = results_path.read_text()
+                return {"semantic_match": {"match": True, "reasoning": reference}}
+
+            with patch.object(
+                stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_row_judge)
+            ), patch.object(
+                stt_eval, "get_intent_entity_score", _fake_intent_entity(1, 1.0)
+            ), patch.object(
+                stt_eval, "get_llm_wer_cer_score", _fake_llm_wer(0.05, 0.03)
+            ):
+                await stt_eval._score_and_write_results(
+                    ids=["row_a", "row_b"],
+                    gt_transcripts=["first", "second"],
+                    pred_transcripts=["first", "second"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
+                    run_llm_judges=True,
+                )
+
+            self.assertEqual(
+                seen_by_second_row.get("csv"),
+                "id,gt,pred\nrow_a,first,first\n",
+            )
 
     async def test_llm_judge_failure_still_writes_wer_cer_and_sarvam(self):
         from calibrate_agent.stt import eval as stt_eval
@@ -559,7 +683,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_failure_still_writes_wer_cer_and_evaluator(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, on_row=None):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -645,7 +769,7 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             "scale_max": 5,
         }
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, on_row=None):
             return {
                 "scores": {
                     "accuracy": {
@@ -692,7 +816,7 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_runs_evaluator_on_dataset(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(refs, preds, evaluators=None, fallback_model=None, on_row=None):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,

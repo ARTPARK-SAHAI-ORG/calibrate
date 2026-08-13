@@ -5,6 +5,7 @@ Run with:
     python -m unittest tests.tts.test_eval -v
 """
 
+import asyncio
 import os
 import tempfile
 import unittest
@@ -502,7 +503,7 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
         """End-to-end: point run_eval_only at a run dir, no dataset transform."""
         from calibrate_agent.tts import eval as tts_eval
 
-        async def fake_judge(audio_paths, texts, evaluators=None, fallback_model=None):
+        async def fake_judge(audio_paths, texts, **kwargs):
             return {
                 "scores": {"quality": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -563,6 +564,64 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
             # The original run's results.csv is untouched (ttfb column intact).
             df = pd.read_csv(os.path.join(run_dir, "results.csv"))
             self.assertIn("ttfb", df.columns)
+
+
+class TestTTSPartialResults(unittest.IsolatedAsyncioTestCase):
+    """results.csv holds the rows graded so far while the judge is still running."""
+
+    async def test_partial_results_written_during_run(self):
+        from calibrate_agent.tts import metrics as tts_metrics
+        from calibrate_agent.tts.eval import _score_and_write_results
+
+        evaluator = {
+            "name": "quality",
+            "system_prompt": "judge quality",
+            "judge_model": "openai/gpt-audio",
+            "type": "binary",
+        }
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            results_path = os.path.join(out_dir, "results.csv")
+            seen = {}
+
+            async def fake_judge(audio_path, reference_text, **kwargs):
+                if reference_text == "second":
+                    # The first row finishes first; capture what is on disk by then.
+                    await asyncio.sleep(0.05)
+                    seen["partial"] = pd.read_csv(results_path)
+                return {
+                    "quality": {
+                        "match": reference_text == "first",
+                        "reasoning": reference_text,
+                    }
+                }
+
+            with patch.object(
+                tts_metrics, "tts_llm_judge", AsyncMock(side_effect=fake_judge)
+            ):
+                metrics = await _score_and_write_results(
+                    ids=["row_a", "row_b"],
+                    texts=["first", "second"],
+                    audio_paths=["/tmp/a.wav", "/tmp/b.wav"],
+                    output_dir=out_dir,
+                    evaluator_config_dir=out_dir,
+                    judge_evaluators=[evaluator],
+                    stream_rows=True,
+                )
+
+            partial = seen["partial"]
+            self.assertEqual(list(partial["id"]), ["row_a"])
+            self.assertEqual(bool(partial.iloc[0]["quality"]), True)
+            self.assertEqual(partial.iloc[0]["quality_reasoning"], "first")
+
+            self.assertAlmostEqual(metrics["quality"]["mean"], 0.5)
+            df = pd.read_csv(results_path)
+            self.assertEqual(list(df["id"]), ["row_a", "row_b"])
+            self.assertEqual(
+                list(df.columns),
+                ["id", "text", "audio_path", "quality", "quality_reasoning"],
+            )
+            self.assertEqual([bool(v) for v in df["quality"]], [True, False])
 
 
 if __name__ == "__main__":

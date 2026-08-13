@@ -5,6 +5,7 @@ end-to-end run_general_eval path (with the judge mocked) producing
 metrics.json + results.csv.
 """
 
+import asyncio
 import json
 import os
 import sys
@@ -306,6 +307,50 @@ class TestRunGeneralEval(unittest.IsolatedAsyncioTestCase):
             judge_mock.call_args.kwargs["arguments_list"],
             [{"faithful": {"name": "Ann"}}, None],
         )
+
+
+class TestGeneralPartialResults(unittest.IsolatedAsyncioTestCase):
+    """results.csv holds the rows graded so far while the judge is still running."""
+
+    async def test_partial_results_written_during_run(self):
+        from calibrate_agent.general.eval import _score_and_write_results
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            results_path = os.path.join(out_dir, "results.csv")
+            seen = {}
+
+            async def fake_judge(_input, output, **kwargs):
+                if output == "sum B":
+                    # Row A finishes first; capture what is on disk by then.
+                    await asyncio.sleep(0.05)
+                    seen["partial"] = pd.read_csv(results_path)
+                return {"faithful": {"reasoning": output, "match": output == "sum A"}}
+
+            with patch(
+                "calibrate_agent.general.metrics.general_judge",
+                AsyncMock(side_effect=fake_judge),
+            ):
+                metrics = await _score_and_write_results(
+                    ids=["row_a", "row_b"],
+                    inputs=["doc A", "doc B"],
+                    outputs=["sum A", "sum B"],
+                    evaluators=[BINARY_EV],
+                    output_dir=out_dir,
+                )
+
+            partial = seen["partial"]
+            self.assertEqual(list(partial["id"]), ["row_a"])
+            self.assertEqual(bool(partial.iloc[0]["faithful"]), True)
+            self.assertEqual(partial.iloc[0]["faithful_reasoning"], "sum A")
+
+            self.assertAlmostEqual(metrics["faithful"]["mean"], 0.5)
+            df = pd.read_csv(results_path)
+            self.assertEqual(list(df["id"]), ["row_a", "row_b"])
+            self.assertEqual(
+                list(df.columns),
+                ["id", "input", "output", "faithful", "faithful_reasoning"],
+            )
+            self.assertEqual([bool(v) for v in df["faithful"]], [True, False])
 
 
 class TestMain(unittest.IsolatedAsyncioTestCase):
