@@ -133,6 +133,11 @@ async def _score_and_write_results(
     Writes ``results.csv`` and ``metrics.json`` plus the resolved evaluator
     ``config.json`` under ``output_dir``. Returns the metrics_data dict.
 
+    Each row is appended to ``results.csv`` as its judge result arrives, so a
+    run killed part-way still leaves the graded rows on disk. Nothing else owns
+    that file here — the general task has no inference step and no resume, so
+    the judge is free to write it from the first row onwards.
+
     Args:
         arguments_list: Optional per-row ``arguments`` dicts (one entry per
             row, ``None`` for rows with no injection) forwarded to the judge to

@@ -1576,6 +1576,7 @@ async def _score_and_write_results(
     # calls, no evaluator columns/metrics).
     _evaluators = judge_evaluators or []
     llm_results = None
+    evaluators_by_name: dict = {}
     if _evaluators:
         require_unique_evaluator_names(_evaluators)
         write_evaluator_config(evaluator_config_dir, _evaluators)
@@ -1731,8 +1732,7 @@ async def _score_and_write_results(
                 ensure_ascii=False,
             )
             row["semantic_wer_reasoning"] = semantic_wer_row["reasoning"]
-        if _evaluators_by_name:
-            row.update(evaluator_row_columns(_evaluators_by_name, llm_row))
+        row.update(evaluator_row_columns(_evaluators_by_name, llm_row))
         data.append(row)
 
     with open(join(output_dir, "metrics.json"), "w") as f:
