@@ -539,6 +539,60 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
             self.assertIn("quality", df.columns)
             self.assertIn("quality_reasoning", df.columns)
 
+    async def test_rows_land_in_results_csv_while_the_run_is_going(self):
+        """Guards the whole eval-only run, not just the scoring step it calls:
+        this fails if ``run_eval_only`` stops asking for row-by-row writing."""
+        from calibrate_agent.tts import eval as tts_eval
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        seen = {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = os.path.join(tmp, "openai")
+            os.makedirs(os.path.join(run_dir, "audios"))
+            for name in ("row_a", "row_b"):
+                _write_wav(os.path.join(run_dir, "audios", f"{name}.wav"))
+            pd.DataFrame(
+                [
+                    {"id": "row_a", "text": "first", "audio_path": "audios/row_a.wav"},
+                    {"id": "row_b", "text": "second", "audio_path": "audios/row_b.wav"},
+                ]
+            ).to_csv(os.path.join(run_dir, "results.csv"), index=False)
+            out = os.path.join(tmp, "eval")
+            results_path = os.path.join(out, "results.csv")
+
+            async def fake_row_judge(audio_path, reference_text, **kwargs):
+                if reference_text == "second":
+                    for _ in range(200):
+                        if os.path.exists(results_path):
+                            with open(results_path) as f:
+                                seen["csv"] = f.read()
+                            break
+                        await asyncio.sleep(0.01)
+                return {"quality": {"match": True, "reasoning": reference_text}}
+
+            with patch.object(
+                tts_metrics, "tts_llm_judge", AsyncMock(side_effect=fake_row_judge)
+            ):
+                result = await tts_eval.run_eval_only(
+                    dataset_path=run_dir,
+                    output_dir=out,
+                    judge_evaluators=[
+                        {
+                            "name": "quality",
+                            "system_prompt": "judge quality",
+                            "judge_model": "openai/gpt-4.1",
+                            "type": "binary",
+                        }
+                    ],
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertIn("row_a", seen.get("csv", ""))
+            self.assertEqual(
+                sorted(pd.read_csv(results_path)["id"]), ["row_a", "row_b"]
+            )
+
     async def test_invalid_dataset_returns_error(self):
         from calibrate_agent.tts import eval as tts_eval
 

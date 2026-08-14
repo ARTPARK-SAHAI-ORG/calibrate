@@ -853,6 +853,60 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
             self.assertTrue((out / "metrics.json").exists())
             self.assertTrue((out / "results.csv").exists())
 
+    async def test_rows_land_in_results_csv_while_the_run_is_going(self):
+        """Guards the whole eval-only run, not just the scoring step it calls:
+        this fails if ``run_eval_only`` stops asking for row-by-row writing."""
+        import asyncio
+
+        from calibrate_agent.stt import eval as stt_eval
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        seen = {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ds_path = Path(tmp) / "ds.json"
+            ds_path.write_text(
+                json.dumps(
+                    [
+                        {"id": "row_a", "gt": "first", "pred": "first"},
+                        {"id": "row_b", "gt": "second", "pred": "second"},
+                    ]
+                )
+            )
+            out = Path(tmp) / "out"
+            results_path = out / "results.csv"
+
+            async def fake_row_judge(
+                reference, prediction, evaluators=None, fallback_model=None
+            ):
+                if reference == "second":
+                    for _ in range(200):
+                        if results_path.exists():
+                            seen["csv"] = results_path.read_text()
+                            break
+                        await asyncio.sleep(0.01)
+                return {"semantic_match": {"match": True, "reasoning": reference}}
+
+            with patch.object(
+                stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_row_judge)
+            ):
+                result = await stt_eval.run_eval_only(
+                    dataset_path=str(ds_path),
+                    output_dir=str(out),
+                    judge_evaluators=[
+                        {
+                            "name": "semantic_match",
+                            "system_prompt": "match",
+                            "judge_model": "openai/gpt-4.1",
+                        }
+                    ],
+                    run_llm_judges=False,
+                )
+
+            self.assertEqual(result["status"], "completed")
+            self.assertIn("row_a", seen.get("csv", ""))
+            self.assertEqual(sorted(pd.read_csv(results_path)["id"]), ["row_a", "row_b"])
+
     async def test_invalid_dataset_returns_error(self):
         from calibrate_agent.stt import eval as stt_eval
 
