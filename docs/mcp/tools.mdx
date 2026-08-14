@@ -516,6 +516,45 @@ must be in your workspace.
 
 See **PUT /annotation-tasks/&#123;task_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
 
+## Annotators
+
+### list-annotators
+
+List your annotators with their job counts and agreement scores.
+
+**Scope:** `read` · **Access:** Read-only
+
+See **GET /annotators** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-annotator
+
+Create an annotator, a human labeller who can be assigned annotation tasks.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Annotator name, unique within your workspace |
+
+See **POST /annotators** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### update-annotator
+
+Rename an annotator in your workspace.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `annotator_uuid` | string | Yes | Annotator to update |
+| `name` | string | No | New annotator name, unique within your workspace. Omit to leave unchanged |
+
+See **PUT /annotators/&#123;annotator_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ## Evaluators
 
 ### list-evaluators

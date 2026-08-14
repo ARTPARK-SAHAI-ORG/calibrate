@@ -117,6 +117,15 @@
             ]
           },
           {
+            "group": "Annotators",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /annotators",
+              "POST /annotators",
+              "PUT /annotators/{annotator_uuid}"
+            ]
+          },
+          {
             "group": "Evaluators",
             "openapi": "api-reference/openapi.json",
             "pages": [
@@ -155,6 +164,7 @@
               "cli/calibrate/agent-tests",
               "cli/calibrate/agents",
               "cli/calibrate/annotation-tasks",
+              "cli/calibrate/annotators",
               "cli/calibrate/evaluators",
               "cli/calibrate/tests"
             ]
@@ -209,6 +219,14 @@
               "sdk/annotation-tasks/add_items",
               "sdk/annotation-tasks/update_items",
               "sdk/annotation-tasks/get_summary"
+            ]
+          },
+          {
+            "group": "Annotators",
+            "pages": [
+              "sdk/annotators/list",
+              "sdk/annotators/create",
+              "sdk/annotators/update"
             ]
           },
           {

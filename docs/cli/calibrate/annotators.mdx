@@ -1,0 +1,61 @@
+---
+title: "Annotators"
+description: "Operations for annotators"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Create annotator
+
+Create an annotator, a human labeller who can be assigned annotation tasks
+
+```bash
+calibrate annotators create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-n, --name` | string | **Required.** Annotator name, unique within your workspace |
+
+**Examples**
+
+```bash
+calibrate annotators create --name <value>
+```
+
+## List annotators
+
+List annotators with job counts and agreement stats
+
+```bash
+calibrate annotators list [flags]
+```
+
+**Examples**
+
+```bash
+calibrate annotators list
+```
+
+## Update annotator
+
+Update an annotator's name
+
+```bash
+calibrate annotators update [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --annotator-uuid` | string | **Required.** Annotator to update |
+| `-n, --name` | string | New annotator name, unique within your workspace. Omit to leave unchanged |
+
+**Examples**
+
+```bash
+calibrate annotators update --annotator-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479
+```

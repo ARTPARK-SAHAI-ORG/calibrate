@@ -1,0 +1,24 @@
+---
+title: "Create annotator"
+description: "Create an annotator, a human labeller who can be assigned annotation tasks"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.annotators.create(
+    name="name",
+)
+```
+
+## API endpoint
+
+See **POST /annotators** in the [API reference](/api-reference/introduction) tab.

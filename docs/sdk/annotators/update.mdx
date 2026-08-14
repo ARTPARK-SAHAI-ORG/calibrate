@@ -1,0 +1,24 @@
+---
+title: "Update annotator"
+description: "Update an annotator's name"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.annotators.update(
+    annotator_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+)
+```
+
+## API endpoint
+
+See **PUT /annotators/\{annotator_uuid}** in the [API reference](/api-reference/introduction) tab.

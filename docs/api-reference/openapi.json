@@ -786,6 +786,136 @@
         ],
         "title": "AnnotationTaskResponse"
       },
+      "AnnotatorCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Annotator name, unique within your workspace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "AnnotatorCreate"
+      },
+      "AnnotatorCreateResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "ID of the newly created annotator",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Success message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "message"
+        ],
+        "title": "AnnotatorCreateResponse"
+      },
+      "AnnotatorResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Annotator ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Annotator name"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the annotator was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the annotator was last updated (ISO 8601 UTC)"
+          },
+          "jobs_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobs Count",
+            "description": "Number of labelling jobs assigned to this annotator"
+          },
+          "current_agreement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Agreement",
+            "description": "Latest pairwise mean agreement with other annotators, from 0 to 1"
+          },
+          "pair_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pair Count",
+            "description": "Number of comparable annotation pairs behind the current agreement score"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AnnotatorResponse"
+      },
+      "AnnotatorUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "New annotator name, unique within your workspace. Omit to leave unchanged"
+          }
+        },
+        "type": "object",
+        "title": "AnnotatorUpdate"
+      },
       "BatchRunRequest": {
         "properties": {
           "agent_names": {
@@ -6928,6 +7058,155 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TaskSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotators": {
+      "post": {
+        "tags": [
+          "annotators"
+        ],
+        "summary": "Create annotator",
+        "description": "Create an annotator, a human labeller who can be assigned annotation tasks",
+        "operationId": "create_annotator_endpoint_annotators_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotatorCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotatorCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "annotators"
+        ],
+        "summary": "List annotators",
+        "description": "List annotators with job counts and agreement stats",
+        "operationId": "list_annotators_annotators_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnnotatorResponse"
+                  },
+                  "title": "Response List Annotators Annotators Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotators/{annotator_uuid}": {
+      "put": {
+        "tags": [
+          "annotators"
+        ],
+        "summary": "Update annotator",
+        "description": "Update an annotator's name",
+        "operationId": "update_annotator_endpoint_annotators__annotator_uuid__put",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "annotator_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotator to update",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Annotator Uuid"
+            },
+            "description": "Annotator to update"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnotatorUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnnotatorResponse"
                 }
               }
             }
