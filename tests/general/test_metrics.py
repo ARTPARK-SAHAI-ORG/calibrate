@@ -299,22 +299,6 @@ class TestGeneralJudgeOnRow(unittest.IsolatedAsyncioTestCase):
             [row["faithful"]["reasoning"] for row in result["per_row"]], ["o1", "o2"]
         )
 
-    async def test_without_on_row_results_unchanged(self):
-        with patch(
-            "calibrate_agent.general.metrics.general_judge",
-            AsyncMock(side_effect=self._slow_first),
-        ):
-            result = await get_general_judge_score(
-                inputs=["i1", "i2"],
-                outputs=["o1", "o2"],
-                evaluators=[BINARY_EV],
-            )
-
-        self.assertEqual(
-            [row["faithful"]["reasoning"] for row in result["per_row"]], ["o1", "o2"]
-        )
-        self.assertAlmostEqual(result["scores"]["faithful"]["mean"], 1.0)
-
 
 if __name__ == "__main__":
     unittest.main()

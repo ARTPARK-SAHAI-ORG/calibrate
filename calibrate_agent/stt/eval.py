@@ -1579,10 +1579,11 @@ async def _score_and_write_results(
     if _evaluators:
         require_unique_evaluator_names(_evaluators)
         write_evaluator_config(evaluator_config_dir, _evaluators)
+        evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
         partial_writer = (
             PartialResultsWriter(
                 join(output_dir, "results.csv"),
-                _evaluators,
+                evaluators_by_name,
                 [
                     {"id": _id, "gt": gt_text, "pred": pred_text}
                     for _id, gt_text, pred_text in zip(
@@ -1610,9 +1611,7 @@ async def _score_and_write_results(
                 partial_writer.close()
 
     # Only surface evaluator columns for judges that actually produced results.
-    _evaluators_by_name = (
-        {ev["name"]: ev for ev in _evaluators} if llm_results is not None else {}
-    )
+    _evaluators_by_name = evaluators_by_name if llm_results is not None else {}
 
     metrics_data = {
         "wer": wer_results["score"],

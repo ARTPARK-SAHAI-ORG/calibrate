@@ -41,7 +41,6 @@ import asyncio
 import base64
 import csv
 import json
-import logging
 import os
 import re
 from typing import Callable, Optional
@@ -50,7 +49,7 @@ import instructor
 from pydantic import BaseModel, Field, create_model
 
 from calibrate_agent.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
-from calibrate_agent.utils import log_judge_io
+from calibrate_agent.utils import log_judge_io, provider_log
 
 
 # ── OpenRouter configuration ────────────────────────────────────────────────
@@ -243,9 +242,11 @@ class PartialResultsWriter:
     order; the ``id`` column identifies each one.
     """
 
-    def __init__(self, path: str, evaluators: list[dict], base_rows: list[dict]):
+    def __init__(
+        self, path: str, evaluators_by_name: dict, base_rows: list[dict]
+    ):
         self._path = path
-        self._evaluators_by_name = {ev["name"]: ev for ev in evaluators}
+        self._evaluators_by_name = evaluators_by_name
         self._base_rows = base_rows
         self._file = None
         self._writer = None
@@ -254,8 +255,6 @@ class PartialResultsWriter:
         """Append one judged row. Never raises: a failure here must not take
         down the run whose results it is only mirroring."""
         try:
-            if index >= len(self._base_rows):
-                return
             row = {
                 **self._base_rows[index],
                 **evaluator_row_columns(self._evaluators_by_name, judge_row),
@@ -267,9 +266,7 @@ class PartialResultsWriter:
             self._writer.writerow(row)
             self._file.flush()
         except Exception as e:
-            logging.getLogger(__name__).warning(
-                f"Failed to append partial result row {index}: {e}"
-            )
+            provider_log(f"Failed to append partial result row {index}: {e}")
 
     def close(self) -> None:
         if self._file is not None:

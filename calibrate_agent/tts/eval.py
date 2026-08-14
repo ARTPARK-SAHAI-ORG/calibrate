@@ -891,10 +891,12 @@ async def _score_and_write_results(
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
     require_unique_evaluator_names(_evaluators)
     write_evaluator_config(evaluator_config_dir, _evaluators)
+    # Map evaluator name → evaluator dict (for per-row value extraction).
+    _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
     partial_writer = (
         PartialResultsWriter(
             join(output_dir, "results.csv"),
-            _evaluators,
+            _evaluators_by_name,
             [
                 {"id": _id, "text": text, "audio_path": audio_path}
                 for _id, text, audio_path in zip(ids, texts, audio_paths)
@@ -915,9 +917,6 @@ async def _score_and_write_results(
             partial_writer.close()
     for name, score_dict in llm_judge_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
-
-    # Map evaluator name → evaluator dict (for per-row value extraction).
-    _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
 
     # Each evaluator gets one entry keyed by its name. The value is the full
     # per-criterion dict (``type``, ``mean``, plus ``scale_min``/``scale_max``

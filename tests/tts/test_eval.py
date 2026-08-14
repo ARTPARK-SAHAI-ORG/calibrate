@@ -623,6 +623,49 @@ class TestTTSPartialResults(unittest.IsolatedAsyncioTestCase):
             )
             self.assertEqual([bool(v) for v in df["quality"]], [True, False])
 
+    async def test_no_partial_results_without_stream_rows(self):
+        """The full run keeps its synthesis results in results.csv and resumes
+        from them, so the judge must not overwrite that file mid-run."""
+        from calibrate_agent.tts import metrics as tts_metrics
+        from calibrate_agent.tts.eval import _score_and_write_results
+
+        evaluator = {
+            "name": "quality",
+            "system_prompt": "judge quality",
+            "judge_model": "openai/gpt-audio",
+            "type": "binary",
+        }
+
+        with tempfile.TemporaryDirectory() as out_dir:
+            results_path = os.path.join(out_dir, "results.csv")
+            synthesis_csv = "id,text,audio_path,ttfb\nrow_a,first,/tmp/a.wav,0.2\n"
+            with open(results_path, "w") as f:
+                f.write(synthesis_csv)
+            seen = {}
+
+            async def fake_judge(audio_path, reference_text, **kwargs):
+                if reference_text == "second":
+                    await asyncio.sleep(0.05)
+                    with open(results_path) as f:
+                        seen["mid_run"] = f.read()
+                return {
+                    "quality": {"match": True, "reasoning": reference_text}
+                }
+
+            with patch.object(
+                tts_metrics, "tts_llm_judge", AsyncMock(side_effect=fake_judge)
+            ):
+                await _score_and_write_results(
+                    ids=["row_a", "row_b"],
+                    texts=["first", "second"],
+                    audio_paths=["/tmp/a.wav", "/tmp/b.wav"],
+                    output_dir=out_dir,
+                    evaluator_config_dir=out_dir,
+                    judge_evaluators=[evaluator],
+                )
+
+            self.assertEqual(seen["mid_run"], synthesis_csv)
+
 
 if __name__ == "__main__":
     unittest.main()

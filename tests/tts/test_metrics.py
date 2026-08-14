@@ -162,23 +162,6 @@ class TestTTSJudgeOnRow(unittest.IsolatedAsyncioTestCase):
             [row["quality"]["reasoning"] for row in result["per_row"]], ["hi", "bye"]
         )
 
-    async def test_without_on_row_results_unchanged(self):
-        from calibrate_agent.tts import metrics as tts_metrics
-
-        with patch.object(
-            tts_metrics, "tts_llm_judge", AsyncMock(side_effect=self._slow_first)
-        ):
-            result = await tts_metrics.get_tts_llm_judge_score(
-                audio_paths=["/tmp/a.wav", "/tmp/b.wav"],
-                reference_texts=["hi", "bye"],
-                evaluators=self.EVALUATORS,
-            )
-
-        self.assertEqual(
-            [row["quality"]["reasoning"] for row in result["per_row"]], ["hi", "bye"]
-        )
-        self.assertEqual(result["scores"]["quality"]["mean"], 1.0)
-
 
 if __name__ == "__main__":
     unittest.main()

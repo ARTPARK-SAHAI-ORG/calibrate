@@ -140,9 +140,10 @@ async def _score_and_write_results(
     """
     write_evaluator_config(output_dir, evaluators)
 
+    evaluators_by_name = {ev["name"]: ev for ev in evaluators}
     partial_writer = PartialResultsWriter(
         join(output_dir, "results.csv"),
-        evaluators,
+        evaluators_by_name,
         [
             {"id": _id, "input": input_text, "output": output_text}
             for _id, input_text, output_text in zip(ids, inputs, outputs)
@@ -160,8 +161,6 @@ async def _score_and_write_results(
         partial_writer.close()
     for name, score_dict in llm_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
-
-    evaluators_by_name = {ev["name"]: ev for ev in evaluators}
 
     metrics_data: dict = {}
     for name, score_dict in llm_results["scores"].items():
