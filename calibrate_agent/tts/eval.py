@@ -884,8 +884,10 @@ async def _score_and_write_results(
     ``stream_rows`` appends each row to ``results.csv`` as its judge result
     arrives, so a run killed part-way still leaves the graded rows on disk.
     Only safe when nothing else owns that file: the full evaluation writes its
-    synthesis results there as it goes and resumes from them, and overwriting
-    it mid-judge would cost a re-synthesis of every row not yet graded.
+    synthesis results there as it goes and resumes from them. A judged row
+    carries no ``ttfb``, so replacing that file mid-judge leaves it missing a
+    column ``validate_existing_results_csv`` requires — the next run stops with
+    an error until ``--overwrite``, which re-synthesizes every row.
     """
     _log("Running evaluators...")
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]

@@ -306,9 +306,12 @@ break. Tests use non-numeric ids (`"row_a"`) for this reason.
 reads it back on retry. Only the `--eval-only` paths pass `stream_rows=True` to
 `_score_and_write_results`, which appends each row as its judge result arrives
 (`PartialResultsWriter` in `judges.py`). Turning that on for a full run would
-replace the transcriptions/synthesis rows mid-judge and cost a re-run of the
-provider on every ungraded row. `general` has no resume file, so it always
-streams.
+replace the transcription/synthesis rows mid-judge, and a judged row carries
+neither `ttfb` nor a transcription of its own: STT resumes off the surviving
+`id`s and re-transcribes everything else, while TTS fails
+`validate_existing_results_csv` (no `ttfb` column) and stops the next run until
+`--overwrite`, which re-synthesizes every row. `general` has no resume file, so
+it always streams.
 
 ### Logging
 `provider_log` (alias `_log` in eval modules) writes to both stdout and a
