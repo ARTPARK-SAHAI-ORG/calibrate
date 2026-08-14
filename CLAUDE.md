@@ -413,6 +413,11 @@ pre-commit hook on `main`.
 
 ### When the user asks "how do I test this?"
 
+This is always about running the real thing by hand — a `calibrate-agent …`
+invocation against a real dataset and real API keys. It is never `uv run
+pytest`, never a test file, never "the suite passes". Say what the output should
+look like when it worked.
+
 Answer with the **single specific command they should run locally** for the
 change at hand — the exact `uv run …` / `calibrate-agent …` invocation, with the
 real flags, dataset path, and provider filled in (use `examples/` datasets when
