@@ -2913,3 +2913,88 @@ class TestRunItemsParallelResume(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCriteriaArgumentsReachJudge(unittest.IsolatedAsyncioTestCase):
+    """End-to-end: evaluation.criteria arguments render into the judge's evaluators."""
+
+    def _config(self):
+        return {
+            "evaluators": [
+                {
+                    "name": "tone",
+                    "system_prompt": "Judge tone: {{style}}",
+                    "judge_model": "openai/gpt-4.1",
+                }
+            ]
+        }
+
+    async def _run(self, config, evaluation, judge_attr, judge_return):
+        judge = AsyncMock(return_value=judge_return)
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch(f"calibrate_agent.llm.run_tests.{judge_attr}", judge):
+            from calibrate_agent.llm.run_tests import run_eval_only_tests
+
+            await run_eval_only_tests(
+                config=config,
+                dataset=[
+                    {
+                        "test_case": {
+                            "id": "tc1",
+                            "history": [{"role": "user", "content": "hi"}],
+                            "evaluation": evaluation,
+                        },
+                        "output": {"response": "Hi!", "tool_calls": []},
+                    }
+                ],
+                output_dir=tmp,
+            )
+        return judge.call_args.kwargs["evaluators"]
+
+    async def test_response_criteria_ref_arguments_render(self):
+        evaluators = await self._run(
+            self._config(),
+            {
+                "type": "response",
+                "criteria": [{"name": "tone", "arguments": {"style": "formal"}}],
+            },
+            "test_response_llm_judge",
+            {"tone": {"reasoning": "ok", "match": True}},
+        )
+        self.assertEqual(evaluators[0]["system_prompt"], "Judge tone: formal")
+
+    async def test_conversation_criteria_ref_arguments_render(self):
+        evaluators = await self._run(
+            self._config(),
+            {
+                "type": "conversation",
+                "criteria": [{"name": "tone", "arguments": {"style": "curt"}}],
+            },
+            "evaluate_simuation",
+            {"tone": {"reasoning": "ok", "match": True}},
+        )
+        self.assertEqual(evaluators[0]["system_prompt"], "Judge tone: curt")
+
+    async def test_bare_string_criteria_renders_on_default_evaluator(self):
+        evaluators = await self._run(
+            {"evaluators": []},
+            {"type": "response", "criteria": "be polite"},
+            "test_response_llm_judge",
+            {"correctness": {"reasoning": "ok", "match": True}},
+        )
+        self.assertEqual(evaluators[0]["name"], "correctness")
+        self.assertIn("be polite", evaluators[0]["system_prompt"])
+        self.assertNotIn("{{criteria}}", evaluators[0]["system_prompt"])
+
+    async def test_unknown_evaluator_name_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            await self._run(
+                self._config(),
+                {
+                    "type": "response",
+                    "criteria": [{"name": "typo", "arguments": {"style": "x"}}],
+                },
+                "test_response_llm_judge",
+                {},
+            )
+        self.assertIn("typo", str(ctx.exception))

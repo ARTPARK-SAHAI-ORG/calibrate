@@ -15,8 +15,7 @@ from calibrate_agent.judges import (
     general_task_judge,
     is_rating,
     evaluator_result_value,
-    ensure_known_evaluator_names,
-    render_evaluator,
+    render_evaluators,
     require_unique_evaluator_names,
     DEFAULT_TEXT_JUDGE_MODEL,
 )
@@ -145,21 +144,12 @@ async def get_general_judge_score(
             f"(got {len(arguments_list)} arguments, {len(inputs)} inputs)."
         )
 
-    evaluator_names = {ev["name"] for ev in evaluators}
-
     coroutines = []
     for i, (input_text, output) in enumerate(zip(inputs, outputs)):
         row_arguments = arguments_list[i] if arguments_list is not None else None
-        if row_arguments:
-            ensure_known_evaluator_names(
-                row_arguments, evaluator_names, context=f"Row {i} arguments"
-            )
-            row_evaluators = [
-                render_evaluator(ev, row_arguments.get(ev["name"]))
-                for ev in evaluators
-            ]
-        else:
-            row_evaluators = evaluators
+        row_evaluators = render_evaluators(
+            evaluators, row_arguments, context=f"Row {i} arguments"
+        )
         coroutines.append(
             general_judge(
                 None if input_text is None else str(input_text),

@@ -267,5 +267,123 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call_kwargs["fallback_model"], "custom-model")
 
 
+TEMPLATED_EV = {
+    "name": "semantic_match",
+    "system_prompt": "judge against {{reference}}",
+    "judge_model": "openai/gpt-4.1",
+}
+
+
+class TestSTTGetLLMJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
+    """Per-row ``arguments`` render evaluator prompts before the judge runs.
+
+    ``text_judge`` is patched so the assertions cover the evaluators that
+    actually reach the judge call, not just what ``get_llm_judge_score`` builds.
+    """
+
+    def _patched_text_judge(self, seen, extra_names=()):
+        async def fake(evaluators, user_prompt, fallback_model=None):
+            seen[user_prompt] = {
+                ev["name"]: ev["system_prompt"] for ev in evaluators
+            }
+            result = {"semantic_match": {"match": True, "reasoning": "ok"}}
+            for name in extra_names:
+                result[name] = {"match": True, "reasoning": "ok"}
+            return result
+
+        return AsyncMock(side_effect=fake)
+
+    async def test_arguments_list_none_leaves_placeholder(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        seen = {}
+        with patch.object(
+            stt_metrics, "text_judge", self._patched_text_judge(seen)
+        ):
+            result = await stt_metrics.get_llm_judge_score(
+                references=["r1", "r2"],
+                predictions=["p1", "p2"],
+                evaluators=[TEMPLATED_EV],
+            )
+        self.assertAlmostEqual(result["scores"]["semantic_match"]["mean"], 1.0)
+        self.assertEqual(len(seen), 2)
+        for prompts in seen.values():
+            self.assertEqual(
+                prompts["semantic_match"], "judge against {{reference}}"
+            )
+
+    async def test_arguments_injected_per_row(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        seen = {}
+        with patch.object(
+            stt_metrics, "text_judge", self._patched_text_judge(seen)
+        ):
+            await stt_metrics.get_llm_judge_score(
+                references=["r1", "r2"],
+                predictions=["p1", "p2"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[
+                    {"semantic_match": {"reference": "gold-A"}},
+                    {"semantic_match": {"reference": "gold-B"}},
+                ],
+            )
+        self.assertEqual(
+            seen["Source: r1\nTranscription: p1"]["semantic_match"],
+            "judge against gold-A",
+        )
+        self.assertEqual(
+            seen["Source: r2\nTranscription: p2"]["semantic_match"],
+            "judge against gold-B",
+        )
+
+    async def test_arguments_target_only_named_evaluator(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        other_ev = {
+            "name": "completeness",
+            "system_prompt": "rate against {{reference}}",
+            "judge_model": "openai/gpt-4.1",
+        }
+        seen = {}
+        with patch.object(
+            stt_metrics,
+            "text_judge",
+            self._patched_text_judge(seen, extra_names=("completeness",)),
+        ):
+            await stt_metrics.get_llm_judge_score(
+                references=["r1"],
+                predictions=["p1"],
+                evaluators=[TEMPLATED_EV, other_ev],
+                arguments_list=[{"semantic_match": {"reference": "gold-A"}}],
+            )
+        prompts = seen["Source: r1\nTranscription: p1"]
+        self.assertEqual(prompts["semantic_match"], "judge against gold-A")
+        self.assertEqual(prompts["completeness"], "rate against {{reference}}")
+
+    async def test_unknown_evaluator_in_arguments_raises(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        with self.assertRaises(ValueError) as ctx:
+            await stt_metrics.get_llm_judge_score(
+                references=["r1"],
+                predictions=["p1"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[{"semantic_matchh": {"reference": "gold-A"}}],
+            )
+        self.assertIn("semantic_matchh", str(ctx.exception))
+
+    async def test_length_mismatch_raises(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        with self.assertRaises(ValueError):
+            await stt_metrics.get_llm_judge_score(
+                references=["r1", "r2"],
+                predictions=["p1", "p2"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[{"semantic_match": {"reference": "gold-A"}}],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

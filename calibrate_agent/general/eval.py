@@ -19,6 +19,7 @@ import pandas as pd
 
 from calibrate_agent.general.metrics import get_general_judge_score
 from calibrate_agent.judges import (
+    arguments_shape_error,
     is_rating,
     require_unique_evaluator_names,
     write_evaluator_config,
@@ -77,17 +78,9 @@ def validate_general_eval_dataset(
                 [],
             )
         if "arguments" in row:
-            row_args = row["arguments"]
-            if not isinstance(row_args, dict):
-                return False, f"Row {i} field 'arguments' must be an object", []
-            for ev_name, ev_args in row_args.items():
-                if not isinstance(ev_args, dict):
-                    return (
-                        False,
-                        f"Row {i} field 'arguments[{ev_name!r}]' must be an "
-                        f"object mapping variable names to values",
-                        [],
-                    )
+            err = arguments_shape_error(row["arguments"])
+            if err:
+                return False, f"Row {i} {err}", []
         row_id = row["id"]
         if row_id in seen_ids:
             return False, f"Duplicate row id: {row_id!r}", []

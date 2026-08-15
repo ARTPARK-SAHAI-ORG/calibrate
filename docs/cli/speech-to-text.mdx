@@ -40,6 +40,15 @@ The **stt.csv** file contains the reference transcriptions:
 | audio_1 | Hi                              |
 | audio_2 | Madam, my name is Geeta Shankar |
 
+An optional third column, `arguments`, holds a JSON object written as text, keyed by evaluator name, that fills the `{{variable}}` placeholders in that evaluator's `system_prompt` for this row:
+
+```csv
+id,text,arguments
+audio_1,Hi,"{""semantic_match"": {""dialect"": ""Indian English""}}"
+```
+
+Leave the cell blank for a row that passes no arguments. See [Variable substitution](#variable-substitution) for the details.
+
 <Note>
   All audio files should be in WAV format. The evaluation script expects files
   at `audios/<id>.wav` where `<id>` matches the `id` column in your CSV.
@@ -51,6 +60,31 @@ Refer to the [sample dataset](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blo
 5. **API keys** — enter the API keys for the selected providers
 
 The evaluation runs providers in parallel (max 2 at a time), showing the transcriptions as they are generated.
+
+### Scoring transcriptions you already have
+
+When you have transcriptions from elsewhere, `--eval-only` skips transcription and scores them directly. Pass the pairs as a JSON file with `--dataset`:
+
+```bash
+calibrate-agent stt --eval-only --dataset dataset.json --config config.json -l english -o ./out
+```
+
+Word error rate and character error rate are reported without a config file. The LLM judge is opt-in: `--config` supplies the `evaluators` list it runs, so pass it whenever you want evaluator scores.
+
+The dataset is a JSON list of rows. Each row needs a unique `id`, the reference text `gt`, and the transcription `pred`. A row may also carry an optional `arguments` object, keyed by evaluator name, that fills the `{{variable}}` placeholders in that evaluator's `system_prompt` for this row:
+
+```json
+[
+  {
+    "id": "row_1",
+    "gt": "Madam, my name is Geeta Shankar",
+    "pred": "madam my name is geeta shankar",
+    "arguments": { "semantic_match": { "dialect": "Indian English" } }
+  }
+]
+```
+
+See [Variable substitution](#variable-substitution) for the details.
 
 ## Evaluator configuration
 
@@ -88,7 +122,7 @@ The config file supports:
 | `evaluators`                 | array  | List of evaluators. Each one becomes its own LLM call per row.                                                                                    |
 | `evaluators[].id`            | string | Optional unique id. Output `config.json` includes the raw `evaluators` list and an `evaluators_map` from id to name.                              |
 | `evaluators[].name`          | string | Unique evaluator name. Becomes the column name in the leaderboard.                                                                                |
-| `evaluators[].system_prompt` | string | Full system prompt used for this evaluator's LLM judge call.                                                                                      |
+| `evaluators[].system_prompt` | string | Full system prompt used for this evaluator's LLM judge call. Supports `{{variable}}` placeholders that are filled from the row's `arguments`.                                                                                      |
 | `evaluators[].judge_model`   | string | OpenRouter model id for this evaluator (default: `openai/gpt-5.4-mini`). Use any model in the [OpenRouter catalog](https://openrouter.ai/models). |
 
 Each evaluator also accepts:
@@ -102,6 +136,33 @@ Each evaluator also accepts:
 Binary evaluators produce per-row pass/fail and a mean pass-rate. Rating evaluators produce an integer score on your scale and a mean score in the leaderboard.
 
 When multiple evaluators are defined, each is scored independently — one LLM call per evaluator per row, all run in parallel — and appears as a separate column in the results and leaderboard.
+
+### Variable substitution
+
+A row can pass `arguments` to an evaluator. Each `{{variable}}` placeholder in that evaluator's `system_prompt` is replaced with the matching value before the judge call, so one evaluator can be reused with per-row details.
+
+In the benchmark input CSV, `arguments` is a JSON object written as text in its own column, keyed by evaluator name:
+
+```csv
+id,text,arguments
+audio_1,Hi,"{""semantic_match"": {""dialect"": ""Indian English""}}"
+audio_2,Madam my name is Geeta Shankar,
+```
+
+In the `--eval-only` dataset, `arguments` is a nested object on the row, with the same evaluator-name keys:
+
+```json
+{
+  "id": "audio_1",
+  "gt": "Hi",
+  "pred": "hi",
+  "arguments": { "semantic_match": { "dialect": "Indian English" } }
+}
+```
+
+With an evaluator whose `system_prompt` reads `Judge the transcription as spoken in {{dialect}}.`, audio_1 is judged against `Judge the transcription as spoken in Indian English.`
+
+An `arguments` key that matches no evaluator name is an error and the run stops before any judge call. A `{{variable}}` placeholder with no matching value in `arguments` is left in the prompt exactly as written.
 
 Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/stt/config.json) for a template.
 

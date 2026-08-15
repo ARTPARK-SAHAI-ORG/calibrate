@@ -52,10 +52,14 @@ from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate_agent.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
 from calibrate_agent.judges import (
+    arguments_shape_error,
     attach_evaluator_id,
+    ensure_known_evaluator_names,
     evaluator_result_value,
     format_evaluation_result_lines,
     is_rating,
+    render_evaluators,
+    validate_scenario_arguments,
     write_evaluator_config,
 )
 
@@ -720,7 +724,14 @@ async def run_single_simulation_task(
     args,
     agent: Optional["TextAgentConnection"] = None,
 ):
-    """Run a single simulation task with semaphore for concurrency control."""
+    """Run a single simulation task with semaphore for concurrency control.
+
+    ``scenario`` may carry an ``arguments`` object keyed by evaluator ``name``
+    → that evaluator's variable dict. Those variables fill the ``{{variable}}``
+    placeholders in the named evaluator's ``system_prompt`` before judging.
+    Evaluators with no entry are judged with their prompt as configured; a name
+    matching no configured evaluator raises ``ValueError``.
+    """
     async with semaphore:
         characteristics = user_persona.get("characteristics", "")
         gender = user_persona.get("gender", "")
@@ -786,9 +797,13 @@ async def run_single_simulation_task(
             log_and_print(f"\033[93mAgent Speaks First:\033[0m {agent_speaks_first}")
             log_and_print("--------------------------------")
 
-            evaluators = config.get("evaluators") or []
-
             try:
+                evaluators = render_evaluators(
+                    config.get("evaluators") or [],
+                    scenario.get("arguments"),
+                    context=f"scenario {scenario_index + 1} arguments",
+                )
+
                 if agent is not None:
                     output = await run_simulation_with_agent(
                         agent=agent,
@@ -941,7 +956,9 @@ async def main():
             )
             sys.exit(1)
 
-        is_valid, err = validate_simulation_eval_only_dataset(dataset)
+        is_valid, err = validate_simulation_eval_only_dataset(
+            dataset, config.get("evaluators") or []
+        )
         if not is_valid:
             print(f"Dataset validation error: {err}", file=sys.stderr)
             sys.exit(1)
@@ -958,9 +975,14 @@ async def main():
             parallel=args.parallel,
         )
         if failed_count:
-            print(f"\n\033[31m{failed_count} simulation(s) failed\033[0m")
             sys.exit(1)
         return
+
+    try:
+        validate_scenario_arguments(config["scenarios"], config.get("evaluators") or [])
+    except ValueError as e:
+        print(f"Config validation error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     os.makedirs(output_dir, exist_ok=True)
     write_evaluator_config(output_dir, config["evaluators"])
@@ -1063,11 +1085,15 @@ def _aggregate_and_write_simulation_results(results: list, output_dir: str) -> l
     return failed_simulations
 
 
-def validate_simulation_eval_only_dataset(dataset: object) -> tuple[bool, str]:
+def validate_simulation_eval_only_dataset(
+    dataset: object, evaluators: list
+) -> tuple[bool, str]:
     """Validate the shape of a text-simulation eval-only dataset.
 
-    Each item must be ``{"conversation_history": list, "name"?: str}``.
-    Returns ``(is_valid, error_message)``.
+    Each item must be ``{"conversation_history": list, "name"?: str,
+    "arguments"?: dict}``. ``arguments`` is an object keyed by evaluator
+    ``name`` → that evaluator's variable dict, and every name used there must
+    match one of ``evaluators``. Returns ``(is_valid, error_message)``.
     """
     if not isinstance(dataset, list):
         return (
@@ -1084,6 +1110,16 @@ def validate_simulation_eval_only_dataset(dataset: object) -> tuple[bool, str]:
             return False, f"Item {i}: 'conversation_history' must be a list"
         if "name" in item and not isinstance(item["name"], str):
             return False, f"Item {i}: 'name' must be a string when provided"
+        if "arguments" in item:
+            err = arguments_shape_error(item["arguments"])
+            if err:
+                return False, f"Item {i}: {err}"
+            try:
+                ensure_known_evaluator_names(
+                    item["arguments"], {ev["name"] for ev in evaluators}
+                )
+            except ValueError as e:
+                return False, f"Item {i}: {e}"
 
     return True, ""
 
@@ -1098,10 +1134,15 @@ async def run_eval_only_simulation_task(
 ):
     """Evaluate a single pre-existing transcript and write per-simulation files.
 
-    ``item`` schema: ``{"conversation_history": [...], "name": str?}``. Only
-    ``conversation_history`` is required — it's the sole input to the
-    evaluators. ``name`` is optional metadata preserved into the aggregated
-    outputs and ``dataset_map.json`` for traceability.
+    ``item`` schema: ``{"conversation_history": [...], "name": str?,
+    "arguments": dict?}``. Only ``conversation_history`` is required — it's the
+    sole input to the evaluators. ``name`` is optional metadata preserved into
+    the aggregated outputs and ``dataset_map.json`` for traceability.
+    ``arguments`` is an object keyed by evaluator ``name`` → that evaluator's
+    variable dict, filling the ``{{variable}}`` placeholders in that
+    evaluator's ``system_prompt``. Evaluators with no entry are judged with
+    their prompt as configured; a name matching no configured evaluator raises
+    ``ValueError``.
 
     The per-simulation output subdirectory is derived from a stable internal
     ``row_id`` (``row_<1-based-index>``), not from the user-provided ``name``,
@@ -1119,7 +1160,11 @@ async def run_eval_only_simulation_task(
 
         evaluation_results = await _judge_and_emit(
             transcript,
-            evaluators,
+            render_evaluators(
+                evaluators,
+                item.get("arguments"),
+                context=f"Item {item_index} arguments",
+            ),
             fallback_judge_model,
             emit=lambda line: print(f"[{display_name}] {line}"),
         )
@@ -1179,6 +1224,10 @@ async def run_eval_only_simulations(
 
     results = await asyncio.gather(*tasks, return_exceptions=True)
     failed = _aggregate_and_write_simulation_results(results, output_dir)
+    if failed:
+        print(f"\n\033[31m{len(failed)} simulation(s) failed:\033[0m")
+        for err in failed:
+            print(f"  \033[31m- {err}\033[0m")
     return len(failed)
 
 

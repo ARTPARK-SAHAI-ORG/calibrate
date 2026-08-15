@@ -620,10 +620,15 @@ class _Simulations:
                 a model-specific subfolder. Used by the single-model path in run()
                 for backward compatibility.
         """
-        from calibrate_agent.judges import require_simulation_evaluators, write_evaluator_config
+        from calibrate_agent.judges import (
+            require_simulation_evaluators,
+            validate_scenario_arguments,
+            write_evaluator_config,
+        )
         from calibrate_agent.llm.run_simulation import run_single_simulation_task
 
         require_simulation_evaluators(evaluators or [])
+        validate_scenario_arguments(scenarios, evaluators or [])
 
         # Create output directory — flat for single-model runs, model-scoped for benchmarks
         if _flat_output:

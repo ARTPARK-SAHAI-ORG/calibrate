@@ -502,7 +502,7 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
         """End-to-end: point run_eval_only at a run dir, no dataset transform."""
         from calibrate_agent.tts import eval as tts_eval
 
-        async def fake_judge(audio_paths, texts, evaluators=None, fallback_model=None):
+        async def fake_judge(audio_paths, texts, evaluators=None, **kwargs):
             return {
                 "scores": {"quality": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -563,6 +563,248 @@ class TestTTSRunEvalOnly(unittest.IsolatedAsyncioTestCase):
             # The original run's results.csv is untouched (ttfb column intact).
             df = pd.read_csv(os.path.join(run_dir, "results.csv"))
             self.assertIn("ttfb", df.columns)
+
+
+class TestTTSInputFileArguments(unittest.TestCase):
+    def _validate(self, df: pd.DataFrame):
+        from calibrate_agent.tts.eval import validate_tts_input_file
+
+        with tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False) as f:
+            df.to_csv(f.name, index=False)
+            path = f.name
+        try:
+            return validate_tts_input_file(path)
+        finally:
+            os.remove(path)
+
+    def test_valid_arguments_column(self):
+        # arguments is keyed by evaluator name → that evaluator's var dict.
+        ok, err = self._validate(
+            pd.DataFrame(
+                {
+                    "id": ["row_1"],
+                    "text": ["hello world"],
+                    "arguments": [
+                        '{"pronunciation": {"dialect": "Indian English"}}'
+                    ],
+                }
+            )
+        )
+        self.assertTrue(ok, err)
+        self.assertEqual(err, "")
+
+    def test_blank_cell_and_missing_column_are_valid(self):
+        ok, err = self._validate(
+            pd.DataFrame(
+                {
+                    "id": ["row_1", "row_2"],
+                    "text": ["hello", "world"],
+                    "arguments": ['{"pronunciation": {"dialect": "x"}}', ""],
+                }
+            )
+        )
+        self.assertTrue(ok, err)
+
+        ok, err = self._validate(
+            pd.DataFrame({"id": ["row_1"], "text": ["hello"]})
+        )
+        self.assertTrue(ok, err)
+
+    def test_malformed_json_rejected(self):
+        ok, err = self._validate(
+            pd.DataFrame(
+                {
+                    "id": ["row_1", "row_2"],
+                    "text": ["hello", "world"],
+                    "arguments": ["", "{not json"],
+                }
+            )
+        )
+        self.assertFalse(ok)
+        self.assertIn("Row 1", err)
+        self.assertIn("not valid JSON", err)
+
+    def test_non_object_value_rejected(self):
+        ok, err = self._validate(
+            pd.DataFrame(
+                {
+                    "id": ["row_1"],
+                    "text": ["hello"],
+                    "arguments": ['{"pronunciation": "nope"}'],
+                }
+            )
+        )
+        self.assertFalse(ok)
+        self.assertEqual(
+            err,
+            "Row 0 field 'arguments['pronunciation']' must be an object mapping "
+            "variable names to values",
+        )
+
+    def test_top_level_not_an_object_rejected(self):
+        ok, err = self._validate(
+            pd.DataFrame(
+                {"id": ["row_1"], "text": ["hello"], "arguments": ['["nope"]']}
+            )
+        )
+        self.assertFalse(ok)
+        self.assertEqual(err, "Row 0 field 'arguments' must be an object")
+
+
+class TestTTSArgumentsRoundTrip(unittest.IsolatedAsyncioTestCase):
+    async def test_arguments_survive_results_csv(self):
+        """A row's arguments are written to results.csv and read back parsed."""
+        from calibrate_agent.tts import eval as tts_eval
+
+        raw = '{"pronunciation": {"dialect": "Indian English"}}'
+
+        async def fake_synth(text, provider, language, audio_path):
+            Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+            _write_wav(audio_path)
+            return {"ttfb": 0.1}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = os.path.join(tmp, "openai")
+            os.makedirs(run_dir)
+            results_csv = Path(run_dir) / "results.csv"
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                await tts_eval.run_tts_eval(
+                    gt_data=[
+                        {"id": "row_1", "text": "hello", "arguments": raw},
+                        {"id": "row_2", "text": "world", "arguments": None},
+                    ],
+                    provider="openai",
+                    language="english",
+                    output_dir=run_dir,
+                    results_csv_path=results_csv,
+                )
+
+            df = pd.read_csv(results_csv)
+            self.assertIn("arguments", df.columns)
+            self.assertEqual(df.iloc[0]["arguments"], raw)
+
+            ok, err, rows = tts_eval.validate_tts_eval_only_dataset(run_dir)
+            self.assertTrue(ok, err)
+            self.assertEqual(
+                rows[0]["arguments"], {"pronunciation": {"dialect": "Indian English"}}
+            )
+            self.assertIsNone(rows[1]["arguments"])
+
+    async def test_no_arguments_column_when_no_row_has_one(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        async def fake_synth(text, provider, language, audio_path):
+            Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+            Path(audio_path).write_bytes(b"RIFF" + b"\x00" * 40)
+            return {"ttfb": 0.1}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            results_csv = Path(tmp) / "results.csv"
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                await tts_eval.run_tts_eval(
+                    gt_data=[{"id": "row_1", "text": "hello", "arguments": None}],
+                    provider="openai",
+                    language="english",
+                    output_dir=tmp,
+                    results_csv_path=results_csv,
+                )
+
+            self.assertNotIn("arguments", pd.read_csv(results_csv).columns)
+
+    async def test_arguments_added_to_existing_results_csv_on_resume(self):
+        """Adding arguments to the input mid-run keeps every row's own values."""
+        from calibrate_agent.tts import eval as tts_eval
+
+        async def fake_synth(text, provider, language, audio_path):
+            Path(audio_path).parent.mkdir(parents=True, exist_ok=True)
+            _write_wav(audio_path)
+            return {"ttfb": 0.1}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = os.path.join(tmp, "openai")
+            os.makedirs(run_dir)
+            results_csv = Path(run_dir) / "results.csv"
+            with patch.object(
+                tts_eval, "synthesize_speech", AsyncMock(side_effect=fake_synth)
+            ):
+                # First run: no row carries arguments.
+                await tts_eval.run_tts_eval(
+                    gt_data=[
+                        {"id": "row_a", "text": "hello", "arguments": None},
+                        {"id": "row_b", "text": "world", "arguments": None},
+                    ],
+                    provider="openai",
+                    language="english",
+                    output_dir=run_dir,
+                    results_csv_path=results_csv,
+                )
+                self.assertNotIn("arguments", pd.read_csv(results_csv).columns)
+
+                # Second run: the input now carries arguments, and row_a /
+                # row_b are already processed so only row_c is appended.
+                raw_c = '{"pronunciation": {"dialect": "Indian English"}}'
+                await tts_eval.run_tts_eval(
+                    gt_data=[
+                        {"id": "row_a", "text": "hello", "arguments": None},
+                        {"id": "row_b", "text": "world", "arguments": None},
+                        {"id": "row_c", "text": "again", "arguments": raw_c},
+                    ],
+                    provider="openai",
+                    language="english",
+                    output_dir=run_dir,
+                    results_csv_path=results_csv,
+                )
+
+            df = pd.read_csv(results_csv)
+            self.assertEqual(df["id"].tolist(), ["row_a", "row_b", "row_c"])
+            self.assertEqual(df["text"].tolist(), ["hello", "world", "again"])
+            self.assertIn("arguments", df.columns)
+
+            ok, err, rows = tts_eval.validate_tts_eval_only_dataset(run_dir)
+            self.assertTrue(ok, err)
+            self.assertEqual(
+                {r["id"]: r["arguments"] for r in rows},
+                {
+                    "row_a": None,
+                    "row_b": None,
+                    "row_c": {"pronunciation": {"dialect": "Indian English"}},
+                },
+            )
+
+    def test_eval_only_rows_keep_own_arguments(self):
+        """Each row's arguments stay with that row, blanks included."""
+        from calibrate_agent.tts import eval as tts_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            os.makedirs(os.path.join(tmp, "audios"))
+            for name in ("row_a", "row_b", "row_c"):
+                _write_wav(os.path.join(tmp, "audios", f"{name}.wav"))
+            pd.DataFrame(
+                {
+                    "id": ["row_a", "row_b", "row_c"],
+                    "text": ["one", "two", "three"],
+                    "audio_path": [
+                        os.path.join(tmp, "audios", f"{n}.wav")
+                        for n in ("row_a", "row_b", "row_c")
+                    ],
+                    "arguments": ["", '{"acc": {"v": "b"}}', '{"acc": {"v": "c"}}'],
+                }
+            ).to_csv(os.path.join(tmp, "results.csv"), index=False)
+
+            ok, err, rows = tts_eval.validate_tts_eval_only_dataset(tmp)
+            self.assertTrue(ok, err)
+            self.assertEqual(
+                {r["id"]: r["arguments"] for r in rows},
+                {
+                    "row_a": None,
+                    "row_b": {"acc": {"v": "b"}},
+                    "row_c": {"acc": {"v": "c"}},
+                },
+            )
 
 
 if __name__ == "__main__":

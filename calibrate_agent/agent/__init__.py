@@ -124,11 +124,16 @@ class _Simulation:
             ...     llm=LLMConfig(provider="openrouter", model=DEFAULT_TEST_AGENT_LLM_MODEL),
             ... ))
         """
-        from calibrate_agent.judges import require_simulation_evaluators, write_evaluator_config
+        from calibrate_agent.judges import (
+            require_simulation_evaluators,
+            validate_scenario_arguments,
+            write_evaluator_config,
+        )
         from calibrate_agent.agent.run_simulation import run_single_simulation_task
         import gc
 
         require_simulation_evaluators(evaluators)
+        validate_scenario_arguments(scenarios, evaluators)
 
         os.makedirs(output_dir, exist_ok=True)
         write_evaluator_config(output_dir, evaluators)

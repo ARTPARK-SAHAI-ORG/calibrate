@@ -28,6 +28,8 @@ from calibrate_agent.judges import (
     evaluator_result_value,
     render_template,
     render_evaluator,
+    render_evaluators,
+    arguments_shape_error,
     ensure_known_evaluator_names,
     format_conversation,
     _result_model_for_evaluator,
@@ -135,6 +137,81 @@ class TestRenderEvaluator(unittest.TestCase):
         }
         render_evaluator(ev, {"criteria": "x"})
         self.assertEqual(ev["system_prompt"], "Evaluate: {{criteria}}")
+
+
+class TestRenderEvaluators(unittest.TestCase):
+    def _evaluators(self):
+        return [
+            {
+                "name": "tone",
+                "system_prompt": "Judge tone: {{style}}",
+                "judge_model": "openai/gpt-4.1",
+                "type": "rating",
+                "scale_min": 1,
+                "scale_max": 5,
+                "id": "ev_1",
+            },
+            {"name": "other", "system_prompt": "Keep {{var}} as-is"},
+        ]
+
+    def test_falsy_arguments_returns_same_list(self):
+        evaluators = self._evaluators()
+        self.assertIs(render_evaluators(evaluators, None), evaluators)
+        self.assertIs(render_evaluators(evaluators, {}), evaluators)
+        self.assertEqual(evaluators[0]["system_prompt"], "Judge tone: {{style}}")
+
+    def test_renders_named_evaluator_and_keeps_other_keys(self):
+        evaluators = self._evaluators()
+        rendered = render_evaluators(evaluators, {"tone": {"style": "formal"}})
+        self.assertEqual(rendered[0]["system_prompt"], "Judge tone: formal")
+        self.assertEqual(rendered[0]["name"], "tone")
+        self.assertEqual(rendered[0]["judge_model"], "openai/gpt-4.1")
+        self.assertEqual(rendered[0]["type"], "rating")
+        self.assertEqual(rendered[0]["scale_min"], 1)
+        self.assertEqual(rendered[0]["scale_max"], 5)
+        self.assertEqual(rendered[0]["id"], "ev_1")
+
+    def test_unreferenced_evaluator_keeps_prompt_verbatim(self):
+        rendered = render_evaluators(
+            self._evaluators(), {"tone": {"style": "formal"}}
+        )
+        self.assertEqual(rendered[1]["system_prompt"], "Keep {{var}} as-is")
+
+    def test_unknown_name_raises_with_name_and_context(self):
+        with self.assertRaises(ValueError) as ctx:
+            render_evaluators(
+                self._evaluators(), {"typo": {"x": "y"}}, context="Row 3 arguments"
+            )
+        msg = str(ctx.exception)
+        self.assertIn("typo", msg)
+        self.assertIn("Row 3 arguments", msg)
+
+    def test_does_not_mutate_input(self):
+        evaluators = self._evaluators()
+        render_evaluators(evaluators, {"tone": {"style": "formal"}})
+        self.assertEqual(evaluators[0]["system_prompt"], "Judge tone: {{style}}")
+        self.assertEqual(evaluators[1]["system_prompt"], "Keep {{var}} as-is")
+
+
+class TestArgumentsShapeError(unittest.TestCase):
+    def test_valid_map_returns_none(self):
+        self.assertIsNone(arguments_shape_error({"tone": {"style": "formal"}}))
+        self.assertIsNone(arguments_shape_error({}))
+
+    def test_non_object_value(self):
+        self.assertEqual(
+            arguments_shape_error("nope"), "field 'arguments' must be an object"
+        )
+        self.assertEqual(
+            arguments_shape_error(["a"]), "field 'arguments' must be an object"
+        )
+
+    def test_non_object_per_evaluator_value(self):
+        self.assertEqual(
+            arguments_shape_error({"tone": "formal"}),
+            "field 'arguments['tone']' must be an object mapping "
+            "variable names to values",
+        )
 
 
 class TestEnsureKnownEvaluatorNames(unittest.TestCase):

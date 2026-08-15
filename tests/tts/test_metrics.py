@@ -125,5 +125,119 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(call_kwargs["fallback_model"], "custom-audio-model")
 
 
+TEMPLATED_EV = {
+    "name": "pronunciation",
+    "system_prompt": "judge against {{dialect}}",
+    "judge_model": "openai/gpt-4o-audio-preview",
+}
+
+
+class TestTTSGetLLMJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
+    async def test_arguments_list_none_regression(self):
+        # arguments_list=None: evaluators reach the judge untouched.
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        seen = []
+
+        async def fake(evaluators, audio_path, reference_text, fallback_model):
+            seen.append(evaluators)
+            return {"pronunciation": {"reasoning": "ok", "match": True}}
+
+        with patch.object(tts_metrics, "audio_judge", AsyncMock(side_effect=fake)):
+            result = await tts_metrics.get_tts_llm_judge_score(
+                audio_paths=["/tmp/a.wav", "/tmp/b.wav"],
+                reference_texts=["hi", "bye"],
+                evaluators=[TEMPLATED_EV],
+            )
+
+        self.assertAlmostEqual(result["scores"]["pronunciation"]["mean"], 1.0)
+        for evaluators in seen:
+            self.assertEqual(
+                evaluators[0]["system_prompt"], "judge against {{dialect}}"
+            )
+
+    async def test_arguments_injected_per_row(self):
+        # Per-row args are keyed by evaluator name and reach audio_judge.
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        seen_by_audio = {}
+
+        async def fake(evaluators, audio_path, reference_text, fallback_model):
+            seen_by_audio[audio_path] = evaluators[0]["system_prompt"]
+            return {"pronunciation": {"reasoning": "ok", "match": True}}
+
+        with patch.object(tts_metrics, "audio_judge", AsyncMock(side_effect=fake)):
+            await tts_metrics.get_tts_llm_judge_score(
+                audio_paths=["/tmp/a.wav", "/tmp/b.wav"],
+                reference_texts=["hi", "bye"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[
+                    {"pronunciation": {"dialect": "Indian English"}},
+                    {"pronunciation": {"dialect": "British English"}},
+                ],
+            )
+
+        self.assertEqual(
+            seen_by_audio["/tmp/a.wav"], "judge against Indian English"
+        )
+        self.assertEqual(
+            seen_by_audio["/tmp/b.wav"], "judge against British English"
+        )
+
+    async def test_arguments_target_only_named_evaluator(self):
+        # An evaluator with no entry in the row's args is left unrendered,
+        # while a sibling evaluator named in the args is rendered.
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        other_ev = {
+            "name": "naturalness",
+            "system_prompt": "rate against {{dialect}}",
+            "judge_model": "openai/gpt-4o-audio-preview",
+        }
+        seen = {}
+
+        async def fake(evaluators, audio_path, reference_text, fallback_model):
+            seen.update({ev["name"]: ev["system_prompt"] for ev in evaluators})
+            return {
+                "pronunciation": {"reasoning": "ok", "match": True},
+                "naturalness": {"reasoning": "ok", "match": True},
+            }
+
+        with patch.object(tts_metrics, "audio_judge", AsyncMock(side_effect=fake)):
+            await tts_metrics.get_tts_llm_judge_score(
+                audio_paths=["/tmp/a.wav"],
+                reference_texts=["hi"],
+                evaluators=[TEMPLATED_EV, other_ev],
+                arguments_list=[{"pronunciation": {"dialect": "Indian English"}}],
+            )
+
+        self.assertEqual(seen["pronunciation"], "judge against Indian English")
+        self.assertEqual(seen["naturalness"], "rate against {{dialect}}")
+
+    async def test_unknown_evaluator_in_arguments_raises(self):
+        # A typo'd / stale evaluator name in a row's args must fail loudly.
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        with self.assertRaises(ValueError) as ctx:
+            await tts_metrics.get_tts_llm_judge_score(
+                audio_paths=["/tmp/a.wav"],
+                reference_texts=["hi"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[{"pronounciation": {"dialect": "Indian English"}}],
+            )
+        self.assertIn("pronounciation", str(ctx.exception))
+
+    async def test_length_mismatch_raises(self):
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        with self.assertRaises(ValueError):
+            await tts_metrics.get_tts_llm_judge_score(
+                audio_paths=["/tmp/a.wav", "/tmp/b.wav"],
+                reference_texts=["hi", "bye"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[{"pronunciation": {"dialect": "Indian English"}}],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,7 @@ from calibrate_agent.judges import (
     text_judge,
     is_rating,
     evaluator_result_value,
+    render_evaluators,
     DEFAULT_TEXT_JUDGE_MODEL,
     DEFAULT_STT_EVALUATOR,
 )
@@ -441,8 +442,20 @@ async def get_llm_judge_score(
     predictions: List[str],
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_STT_JUDGE_MODEL,
+    arguments_list: Optional[List[Optional[dict]]] = None,
 ) -> dict:
     """Run STT judge across all rows and aggregate per-evaluator scores.
+
+    ``arguments_list`` optionally supplies per-row, per-evaluator template
+    variables. When provided it must have the same length as ``references``.
+    Each entry is a dict keyed by evaluator ``name`` → that evaluator's
+    argument dict. For row ``i`` and evaluator ``ev``, ``ev``'s
+    ``system_prompt`` is rendered against ``arguments_list[i][ev["name"]]``
+    before the judge sees it; evaluators with no entry — and rows with
+    ``None``/empty arguments — are left unchanged. An ``arguments`` key naming
+    no known evaluator raises ``ValueError``. Rendering only changes
+    ``system_prompt``, so aggregation stays keyed off the base ``evaluators``
+    list.
 
     Returns:
         {
@@ -463,15 +476,25 @@ async def get_llm_judge_score(
     """
     evaluators = _resolve_evaluators(evaluators)
 
-    coroutines = [
-        stt_llm_judge(
-            str(reference),
-            str(prediction),
-            evaluators=evaluators,
-            fallback_model=fallback_model,
+    if arguments_list is not None and len(arguments_list) != len(references):
+        raise ValueError(
+            f"arguments_list must be the same length as references "
+            f"(got {len(arguments_list)} arguments, {len(references)} references)."
         )
-        for reference, prediction in zip(references, predictions)
-    ]
+
+    coroutines = []
+    for i, (reference, prediction) in enumerate(zip(references, predictions)):
+        row_arguments = arguments_list[i] if arguments_list is not None else None
+        coroutines.append(
+            stt_llm_judge(
+                str(reference),
+                str(prediction),
+                evaluators=render_evaluators(
+                    evaluators, row_arguments, context=f"Row {i} arguments"
+                ),
+                fallback_model=fallback_model,
+            )
+        )
 
     results = await tqdm_asyncio.gather(
         *coroutines,

@@ -195,6 +195,122 @@ class TestSTTValidateEvalOnlyDataset(unittest.TestCase):
             os.remove(path)
 
 
+class TestSTTEvalOnlyDatasetArguments(unittest.TestCase):
+    def _validate(self, rows):
+        from calibrate_agent.stt.eval import validate_stt_eval_only_dataset
+
+        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
+            json.dump(rows, f)
+            path = f.name
+        try:
+            return validate_stt_eval_only_dataset(path)
+        finally:
+            os.remove(path)
+
+    def test_valid_with_arguments_dict(self):
+        rows_in = [
+            {
+                "id": "row_a",
+                "gt": "hi",
+                "pred": "hi",
+                "arguments": {"semantic_match": {"reference": "v"}},
+            }
+        ]
+        ok, err, rows = self._validate(rows_in)
+        self.assertTrue(ok, err)
+        self.assertEqual(err, "")
+        self.assertEqual(rows, rows_in)
+
+    def test_valid_without_arguments(self):
+        ok, err, _ = self._validate([{"id": "row_a", "gt": "hi", "pred": "hi"}])
+        self.assertTrue(ok, err)
+        self.assertEqual(err, "")
+
+    def test_arguments_not_a_dict_rejected(self):
+        ok, err, _ = self._validate(
+            [{"id": "row_a", "gt": "hi", "pred": "hi", "arguments": "nope"}]
+        )
+        self.assertFalse(ok)
+        self.assertEqual(err, "Row 0 field 'arguments' must be an object")
+
+    def test_arguments_evaluator_value_not_a_dict_rejected(self):
+        ok, err, _ = self._validate(
+            [
+                {
+                    "id": "row_a",
+                    "gt": "hi",
+                    "pred": "hi",
+                    "arguments": {"semantic_match": "nope"},
+                }
+            ]
+        )
+        self.assertFalse(ok)
+        self.assertIn("semantic_match", err)
+        self.assertIn("must be an object", err)
+
+    def test_empty_dataset_rejected(self):
+        ok, err, _ = self._validate([])
+        self.assertFalse(ok)
+        self.assertIn("empty", err)
+
+    def test_duplicate_ids_rejected(self):
+        ok, err, _ = self._validate(
+            [
+                {"id": "row_a", "gt": "hi", "pred": "hi"},
+                {"id": "row_a", "gt": "bye", "pred": "by"},
+            ]
+        )
+        self.assertFalse(ok)
+        self.assertIn("Duplicate", err)
+
+    def test_non_scalar_id_rejected(self):
+        ok, err, _ = self._validate([{"id": ["row_a"], "gt": "hi", "pred": "hi"}])
+        self.assertFalse(ok)
+        self.assertEqual(err, "Row 0 field 'id' must be a string or number")
+
+
+class TestSTTInputDirArgumentsColumn(unittest.TestCase):
+    def _validate(self, tmp: str, arguments_column):
+        from calibrate_agent.stt.eval import validate_stt_input_dir
+
+        base = Path(tmp)
+        (base / "audios").mkdir()
+        data = {"id": ["row_a", "row_b"], "text": ["hi", "yo"]}
+        if arguments_column is not None:
+            data["arguments"] = arguments_column
+        pd.DataFrame(data).to_csv(base / "stt.csv", index=False)
+        for row_id in data["id"]:
+            (base / "audios" / f"{row_id}.wav").write_bytes(b"RIFF0000WAVE")
+        return validate_stt_input_dir(str(base), "stt.csv")
+
+    def test_valid_arguments_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ok, err = self._validate(
+                tmp,
+                [json.dumps({"semantic_match": {"reference": "gold"}}), ""],
+            )
+        self.assertTrue(ok, err)
+        self.assertEqual(err, "")
+
+    def test_absent_arguments_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ok, err = self._validate(tmp, None)
+        self.assertTrue(ok, err)
+
+    def test_malformed_json_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ok, err = self._validate(tmp, ["{not json", ""])
+        self.assertFalse(ok)
+        self.assertIn("Row 0", err)
+        self.assertIn("valid JSON", err)
+
+    def test_non_object_json_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            ok, err = self._validate(tmp, ['"nope"', ""])
+        self.assertFalse(ok)
+        self.assertEqual(err, "Row 0 field 'arguments' must be an object")
+
+
 class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
     async def test_unknown_provider_raises(self):
         from calibrate_agent.stt import eval as stt_eval
@@ -304,7 +420,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_writes_metrics_and_results(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
             return {
                 "scores": {
                     "semantic_match": {"type": "binary", "mean": 1.0}
@@ -383,7 +501,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             }
         ]
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
             return {
                 "scores": {"completeness": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,
@@ -425,7 +545,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_run_by_default(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -472,7 +594,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_judges_skipped_when_disabled(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -559,7 +683,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_failure_still_writes_wer_cer_and_evaluator(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
                 "score": 1.0,
@@ -645,7 +771,9 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             "scale_max": 5,
         }
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
             return {
                 "scores": {
                     "accuracy": {
@@ -680,6 +808,196 @@ class TestSTTScoreAndWriteResults(unittest.IsolatedAsyncioTestCase):
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(df.iloc[0]["accuracy"], 4)
 
+    async def test_unknown_evaluator_name_in_arguments_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        judge_mock = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_llm_judge_score", judge_mock):
+                with self.assertRaises(ValueError) as ctx:
+                    await stt_eval._score_and_write_results(
+                        ids=["row_a"],
+                        gt_transcripts=["hi"],
+                        pred_transcripts=["hi"],
+                        output_dir=str(out),
+                        evaluator_config_dir=str(out),
+                        judge_evaluators=[
+                            {
+                                "name": "semantic_match",
+                                "system_prompt": "match",
+                                "judge_model": "openai/gpt-4.1",
+                            }
+                        ],
+                        run_llm_judges=False,
+                        arguments_list=[{"semantic_mtach": {"reference": "gold"}}],
+                    )
+            self.assertIn("semantic_mtach", str(ctx.exception))
+            judge_mock.assert_not_awaited()
+
+    async def test_arguments_list_length_mismatch_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        judge_mock = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_llm_judge_score", judge_mock):
+                with self.assertRaises(ValueError):
+                    await stt_eval._score_and_write_results(
+                        ids=["row_a"],
+                        gt_transcripts=["hi"],
+                        pred_transcripts=["hi"],
+                        output_dir=str(out),
+                        evaluator_config_dir=str(out),
+                        judge_evaluators=[
+                            {
+                                "name": "semantic_match",
+                                "system_prompt": "match",
+                                "judge_model": "openai/gpt-4.1",
+                            }
+                        ],
+                        run_llm_judges=False,
+                        arguments_list=[None, None],
+                    )
+            judge_mock.assert_not_awaited()
+
+
+class TestSTTRunSingleProviderEvalArguments(unittest.IsolatedAsyncioTestCase):
+    async def test_malformed_arguments_cell_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "in"
+            (base / "audios").mkdir(parents=True)
+            pd.DataFrame(
+                {"id": ["row_a"], "text": ["hi"], "arguments": ["{not json"]}
+            ).to_csv(base / "stt.csv", index=False)
+            (base / "audios" / "row_a.wav").write_bytes(b"RIFF0000WAVE")
+            out = Path(tmp) / "out"
+            out.mkdir()
+
+            with self.assertRaises(ValueError) as ctx:
+                await stt_eval.run_single_provider_eval(
+                    provider="deepgram",
+                    language="english",
+                    input_dir=str(base),
+                    input_file_name="stt.csv",
+                    output_dir=str(out),
+                    debug=False,
+                    debug_count=5,
+                    ignore_retry=True,
+                    overwrite=True,
+                )
+            self.assertIn("Row 0", str(ctx.exception))
+
+    async def test_resumed_run_keeps_arguments_matched_to_their_row(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        evaluator = {
+            "name": "semantic_match",
+            "system_prompt": "match",
+            "judge_model": "openai/gpt-4.1",
+        }
+        seen = {}
+
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
+            seen["pairs"] = list(zip(refs, preds, arguments_list))
+            return {
+                "scores": {"semantic_match": {"type": "binary", "mean": 1.0}},
+                "score": 1.0,
+                "per_row": [
+                    {"semantic_match": {"match": True, "reasoning": "ok"}}
+                    for _ in refs
+                ],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp) / "in"
+            (base / "audios").mkdir(parents=True)
+            ids = ["row_a", "row_b", "row_c"]
+            texts = {"row_a": "alpha", "row_b": "bravo", "row_c": "charlie"}
+            pd.DataFrame(
+                {
+                    "id": ids,
+                    "text": [texts[i] for i in ids],
+                    "arguments": [
+                        json.dumps({"semantic_match": {"reference": texts[i]}})
+                        for i in ids
+                    ],
+                }
+            ).to_csv(base / "stt.csv", index=False)
+            for i in ids:
+                (base / "audios" / f"{i}.wav").write_bytes(b"RIFF0000WAVE")
+
+            out = Path(tmp) / "out"
+            provider_out = out / "deepgram"
+            provider_out.mkdir(parents=True)
+            results_csv = provider_out / "results.csv"
+            # A resumed run: row_c was already processed, so the remaining rows
+            # get appended after it and results.csv order differs from the input.
+            pd.DataFrame(
+                [
+                    {
+                        "id": "row_c",
+                        "gt": "charlie",
+                        "pred": "charlie",
+                        "audio_duration_seconds": 1.0,
+                    }
+                ]
+            ).to_csv(results_csv, index=False)
+
+            async def fake_run_stt_eval(gt_data=None, **kwargs):
+                done = set(pd.read_csv(results_csv)["id"])
+                rows = pd.read_csv(results_csv).to_dict("records")
+                for info in gt_data:
+                    if info["id"] not in done:
+                        rows.append(
+                            {
+                                "id": info["id"],
+                                "gt": info["gt"],
+                                "pred": info["gt"],
+                                "audio_duration_seconds": 1.0,
+                            }
+                        )
+                pd.DataFrame(rows).to_csv(results_csv, index=False)
+                return len(rows)
+
+            with patch.object(
+                stt_eval, "run_stt_eval", AsyncMock(side_effect=fake_run_stt_eval)
+            ), patch.object(
+                stt_eval, "get_llm_judge_score", AsyncMock(side_effect=fake_judge)
+            ):
+                result = await stt_eval.run_single_provider_eval(
+                    provider="deepgram",
+                    language="english",
+                    input_dir=str(base),
+                    input_file_name="stt.csv",
+                    output_dir=str(out),
+                    debug=False,
+                    debug_count=5,
+                    ignore_retry=True,
+                    overwrite=False,
+                    judge_evaluators=[evaluator],
+                    run_llm_judges=False,
+                )
+
+            self.assertEqual(result["status"], "completed")
+            # Scored in results.csv order (row_c first), each row's arguments
+            # still carrying its own reference text.
+            self.assertEqual(
+                seen["pairs"],
+                [
+                    (
+                        texts[i],
+                        texts[i],
+                        {"semantic_match": {"reference": texts[i]}},
+                    )
+                    for i in ["row_c", "row_a", "row_b"]
+                ],
+            )
+
 
 class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
@@ -692,7 +1010,9 @@ class TestSTTRunEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_runs_evaluator_on_dataset(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        async def fake_judge(refs, preds, evaluators=None, fallback_model=None):
+        async def fake_judge(
+            refs, preds, evaluators=None, fallback_model=None, arguments_list=None
+        ):
             return {
                 "scores": {"semantic_match": {"type": "binary", "mean": 0.5}},
                 "score": 0.5,

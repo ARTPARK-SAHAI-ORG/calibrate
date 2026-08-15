@@ -65,10 +65,11 @@ An array of user personas that simulate different types of users interacting wit
 
 An array of scenarios that define different conversation patterns to test. For a primer on scenarios, refer to [Scenarios](/core-concepts/scenarios). Each scenario has:
 
-| Key           | Type   | Description                                            |
-| ------------- | ------ | ------------------------------------------------------ |
-| `name`        | string | A short name for the scenario                          |
-| `description` | string | Instructions for **what** the simulated user should do |
+| Key           | Type   | Description                                                                                                                                             |
+| ------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`        | string | A short name for the scenario                                                                                                                           |
+| `description` | string | Instructions for **what** the simulated user should do                                                                                                  |
+| `arguments`   | object | Optional. Keyed by evaluator name, it fills the `{{variable}}` placeholders in that evaluator's `system_prompt` for every simulation using this scenario |
 
 ```json
 {
@@ -79,11 +80,19 @@ An array of scenarios that define different conversation patterns to test. For a
     },
     {
       "name": "vague inquiry",
-      "description": "Start by asking about your order without providing the order ID. Only provide it after being asked."
+      "description": "Start by asking about your order without providing the order ID. Only provide it after being asked.",
+      "arguments": {
+        "goal_met": {
+          "order_id": "ORD-67890",
+          "expected": "the agent asks for the order ID"
+        }
+      }
     }
   ]
 }
 ```
+
+See [Variable substitution](#variable-substitution) for the details.
 
 ## Evaluators
 
@@ -100,7 +109,7 @@ You can also set the **`judge_model`** on an evaluator to use a different model.
 | --------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------- |
 | `id`            | string  | Optional unique id. Result rows echo it as `evaluator_id`; output `config.json` includes raw `evaluators` and an `evaluators_map`. |
 | `name`          | string  | A short name (used in results and leaderboard columns)                                                                             |
-| `system_prompt` | string  | Full system prompt for this evaluator's LLM judge call. Include any agent-context the judge needs to score correctly.              |
+| `system_prompt` | string  | Full system prompt for this evaluator's LLM judge call. Include any agent-context the judge needs to score correctly. Supports `{{variable}}` placeholders that are filled from the scenario's `arguments`. |
 | `judge_model`   | string  | OpenRouter model id for this evaluator (default: `openai/gpt-5.4-mini`)                                                            |
 | `type`          | string  | `"binary"` (default) or `"rating"`                                                                                                 |
 | `scale_min`     | integer | Required when `type` is `"rating"`. Lowest allowed score.                                                                          |
@@ -149,6 +158,29 @@ You can also set the **`judge_model`** on an evaluator to use a different model.
 Paste the `evaluators` array next to `system_prompt`, `personas`, `scenarios`, and your other top-level keys in your simulation config JSON.
 
 Binary evaluators produce pass/fail and appear as pass-rate percentages in the leaderboard. Rating evaluators produce an integer score on the scale you define and appear as mean scores in the leaderboard.
+
+### Variable substitution
+
+A simulation pairs one persona with one scenario. The scenario can pass `arguments` to an evaluator. Each `{{variable}}` placeholder in that evaluator's `system_prompt` is replaced with the matching value before the judge call, so one evaluator can be reused across scenarios that differ only in their details.
+
+`arguments` is an object keyed by evaluator name. Each value is an object of variable names to values:
+
+```json
+{
+  "name": "vague inquiry",
+  "description": "Start by asking about your order without providing the order ID.",
+  "arguments": {
+    "goal_met": {
+      "order_id": "ORD-67890",
+      "expected": "the agent asks for the order ID"
+    }
+  }
+}
+```
+
+With an evaluator named `goal_met` whose `system_prompt` reads `The customer's order is {{order_id}}. Mark True if {{expected}}.`, every simulation using this scenario is judged against `The customer's order is ORD-67890. Mark True if the agent asks for the order ID.`
+
+An `arguments` key that matches no evaluator name is an error and the run stops before any judge call. A `{{variable}}` placeholder with no matching value in `arguments` is left in the prompt exactly as written.
 
 ## Settings
 

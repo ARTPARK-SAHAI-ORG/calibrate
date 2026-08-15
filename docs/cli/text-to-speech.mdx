@@ -31,6 +31,15 @@ The **input CSV** should have this format:
 | row_2 | this is a test          |
 | row_3 | how are you doing today |
 
+An optional third column, `arguments`, holds a JSON object written as text, keyed by evaluator name, that fills the `{{variable}}` placeholders in that evaluator's `system_prompt` for this row:
+
+```csv
+id,text,arguments
+row_1,hello world,"{""pronunciation"": {""dialect"": ""Indian English""}}"
+```
+
+Leave the cell blank for a row that passes no arguments. See [Variable substitution](#variable-substitution) for the details.
+
 Refer to [this sample](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/sample.csv) for a template.
 
 4. **Output directory** — where results will be saved (defaults to `./out`)
@@ -74,7 +83,7 @@ The config file supports:
 | `evaluators`                 | array  | List of evaluators. Each one becomes its own audio LLM call per row.                                                                                                                                                                                                                                                                                                                |
 | `evaluators[].id`            | string | Optional unique id. Output `config.json` includes the raw `evaluators` list and an `evaluators_map` from id to name.                                                                                                                                                                                                                                                                |
 | `evaluators[].name`          | string | Unique evaluator name. Becomes the column name in the leaderboard.                                                                                                                                                                                                                                                                                                                  |
-| `evaluators[].system_prompt` | string | Full system prompt used for this evaluator's audio LLM judge call.                                                                                                                                                                                                                                                                                                                  |
+| `evaluators[].system_prompt` | string | Full system prompt used for this evaluator's audio LLM judge call. Supports `{{variable}}` placeholders that are filled from the row's `arguments` column.                                                                                                                                                                                                                                                                                                                  |
 | `evaluators[].judge_model`   | string | OpenRouter model id for this evaluator (default: `openai/gpt-audio`). Must be an audio-capable model in the [OpenRouter catalog](https://openrouter.ai/models) — for example OpenAI’s audio models or Google’s Gemini audio-capable entries; the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) uses `google/gemini-2.5-flash`. |
 
 Each evaluator also accepts:
@@ -88,6 +97,22 @@ Each evaluator also accepts:
 Binary evaluators produce per-row pass/fail and a mean pass-rate. Rating evaluators produce an integer score on your scale and a mean score in the leaderboard.
 
 When multiple evaluators are defined, each is scored independently — one audio LLM call per evaluator per row, all run in parallel — and appears as a separate column in the results and leaderboard.
+
+### Variable substitution
+
+A row can pass `arguments` to an evaluator. Each `{{variable}}` placeholder in that evaluator's `system_prompt` is replaced with the matching value before the judge call, so one evaluator can be reused with per-row details.
+
+The `arguments` column holds a JSON object keyed by evaluator name. Each value is an object of variable names to values:
+
+```csv
+id,text,arguments
+row_1,hello world,"{""pronunciation"": {""dialect"": ""Indian English""}}"
+row_2,this is a test,
+```
+
+With an evaluator whose `system_prompt` reads `Mark True only if the audio is pronounced in {{dialect}}.`, row_1 is judged against `Mark True only if the audio is pronounced in Indian English.`
+
+An `arguments` key that matches no evaluator name is an error and the run stops before any judge call. A `{{variable}}` placeholder with no matching value in `arguments` is left in the prompt exactly as written.
 
 Refer to the [sample config](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/tts/config.json) for a template.
 

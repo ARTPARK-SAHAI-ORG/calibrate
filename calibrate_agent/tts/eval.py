@@ -40,6 +40,7 @@ from calibrate_agent.tts.metrics import get_tts_llm_judge_score
 from calibrate_agent.llm._metrics_utils import _latency_percentiles
 from calibrate_agent.judges import (
     is_rating,
+    parse_arguments_column,
     DEFAULT_TTS_EVALUATOR,
     require_unique_evaluator_names,
     write_evaluator_config,
@@ -654,7 +655,11 @@ async def run_tts_eval(
     """Process texts and synthesize speech, saving results immediately to CSV.
 
     Args:
-        gt_data: List of {"id": ..., "text": ...} for each text to process
+        gt_data: List of {"id": ..., "text": ...} for each text to process. A row
+            may also carry ``arguments``, the raw JSON text of that row's
+            evaluator arguments; when any row has one, the value is written to an
+            ``arguments`` column in the results CSV so a later eval-only run can
+            read it back.
         provider: TTS provider name
         language: Language code
         output_dir: Directory to save audio files
@@ -665,6 +670,7 @@ async def run_tts_eval(
         Number of texts successfully synthesized in this run.
     """
     # Load existing results to skip already processed texts (unless overwrite is True)
+    existing_df = None
     if overwrite:
         processed_ids = set()
         # Remove existing results file if overwriting
@@ -681,6 +687,24 @@ async def run_tts_eval(
 
     success_count = 0
     ttfb_values = []
+
+    # Decided once over the whole dataset so appended rows keep a stable column
+    # set across resumes, and matched to the file being appended to so the two
+    # never disagree on how many values a row has.
+    write_arguments = any(item.get("arguments") for item in gt_data)
+    if existing_df is not None:
+        if "arguments" in existing_df.columns:
+            write_arguments = True
+        elif write_arguments:
+            # Appended rows put arguments straight after ttfb, so place the new
+            # column there too.
+            position = (
+                existing_df.columns.get_loc("ttfb") + 1
+                if "ttfb" in existing_df.columns
+                else len(existing_df.columns)
+            )
+            existing_df.insert(position, "arguments", None)
+            existing_df.to_csv(results_csv_path, index=False)
 
     for i, item in enumerate(gt_data):
         _id = item["id"]
@@ -712,6 +736,8 @@ async def run_tts_eval(
             "audio_path": audio_path,
             "ttfb": ttfb,
         }
+        if write_arguments:
+            row_data["arguments"] = item.get("arguments")
 
         # Append to CSV immediately for crash recovery
         row_df = pd.DataFrame([row_data])
@@ -737,6 +763,11 @@ def validate_tts_input_file(input_path: str) -> tuple[bool, str]:
         id,text
         row_1,hello world
         row_2,this is a test
+
+    An optional ``arguments`` column may carry, per row, a JSON object keyed by
+    evaluator ``name`` → that evaluator's variable dict, used to fill the
+    ``{{var}}`` placeholders in that evaluator's ``system_prompt``. A blank cell
+    means no arguments for that row.
 
     Returns:
         tuple[bool, str]: (is_valid, error_message)
@@ -780,6 +811,11 @@ def validate_tts_input_file(input_path: str) -> tuple[bool, str]:
                 False,
                 f"CSV has {len(empty_texts)} rows with empty text. First 5 IDs: {empty_ids}",
             )
+
+    try:
+        parse_arguments_column(df)
+    except ValueError as e:
+        return False, str(e)
 
     return True, ""
 
@@ -867,6 +903,7 @@ async def _score_and_write_results(
     judge_evaluators: list[dict] = None,
     ttfb_values: list = None,
     cost_metrics: dict = None,
+    arguments_list: list = None,
 ) -> dict:
     """Run the TTS audio judge over (audio_path, text) pairs and write outputs.
 
@@ -878,6 +915,12 @@ async def _score_and_write_results(
     and TTFB percentile metrics are included; when None (eval-only, where
     nothing is synthesized) both are omitted. When ``cost_metrics`` is provided
     it is attached under the ``cost`` key.
+
+    ``arguments_list`` holds one entry per row (``None`` for rows without),
+    each a dict keyed by evaluator ``name`` → that evaluator's variable dict,
+    used to fill the ``{{var}}`` placeholders in that evaluator's
+    ``system_prompt``. When any row has arguments they are written back as JSON
+    text in an ``arguments`` column so a later eval-only run can read them.
     """
     _log("Running evaluators...")
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
@@ -887,6 +930,7 @@ async def _score_and_write_results(
         audio_paths,
         texts,
         evaluators=_evaluators,
+        arguments_list=arguments_list,
     )
     for name, score_dict in llm_judge_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
@@ -928,13 +972,19 @@ async def _score_and_write_results(
     _log(f"Metrics saved to: {metrics_save_path}")
 
     ttfb_iter = ttfb_values if ttfb_values is not None else [None] * len(ids)
+    args_iter = arguments_list if arguments_list is not None else [None] * len(ids)
+    write_arguments = any(args_iter)
     data = []
-    for _id, text, audio_path, ttfb, llm_row in zip(
-        ids, texts, audio_paths, ttfb_iter, llm_judge_results["per_row"]
+    for _id, text, audio_path, ttfb, row_arguments, llm_row in zip(
+        ids, texts, audio_paths, ttfb_iter, args_iter, llm_judge_results["per_row"]
     ):
         row = {"id": _id, "text": text, "audio_path": audio_path}
         if ttfb_values is not None:
             row["ttfb"] = ttfb
+        if write_arguments:
+            row["arguments"] = (
+                json.dumps(row_arguments) if row_arguments else None
+            )
         for name, ev in _evaluators_by_name.items():
             ev_result = llm_row[name]
             if is_rating(ev):
@@ -986,12 +1036,22 @@ async def run_single_provider_eval(
 
         ids = df["id"].tolist()
         texts = df["text"].astype(str).tolist()
+        if "arguments" in df.columns:
+            raw_arguments = [
+                None if pd.isna(v) else str(v) for v in df["arguments"].tolist()
+            ]
+        else:
+            raw_arguments = [None] * len(ids)
 
         if debug:
             ids = ids[:debug_count]
             texts = texts[:debug_count]
+            raw_arguments = raw_arguments[:debug_count]
 
-        gt_data = [{"id": _id, "text": text} for _id, text in zip(ids, texts)]
+        gt_data = [
+            {"id": _id, "text": text, "arguments": arguments}
+            for _id, text, arguments in zip(ids, texts, raw_arguments)
+        ]
 
         results_csv_path = join(provider_output_dir, "results.csv")
 
@@ -1025,6 +1085,11 @@ async def run_single_provider_eval(
             all_texts = final_df["text"].astype(str).tolist()
             all_audio_paths = final_df["audio_path"].tolist()
             all_ttfb = final_df["ttfb"].tolist()
+            try:
+                all_arguments = parse_arguments_column(final_df)
+            except ValueError as e:
+                _log(f"\033[31mError: {e}\033[0m")
+                return {"provider": provider, "status": "error", "error": str(e)}
         else:
             _log("No results found")
             return {
@@ -1050,6 +1115,7 @@ async def run_single_provider_eval(
             judge_evaluators=judge_evaluators,
             ttfb_values=all_ttfb,
             cost_metrics=cost_metrics,
+            arguments_list=all_arguments,
         )
 
         return {
@@ -1072,6 +1138,12 @@ def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]
     tried as given (relative to the CWD) and, as a fallback, under
     ``{run_dir}/audios/{basename}`` (the fixed run layout) so it resolves
     regardless of the CWD.
+
+    An ``arguments`` column, if present, holds per row a JSON object keyed by
+    evaluator ``name`` → that evaluator's variable dict, used to fill the
+    ``{{var}}`` placeholders in that evaluator's ``system_prompt``. Each returned
+    row carries the parsed object under ``arguments`` (``None`` when the cell is
+    blank or the column is absent).
 
     Returns:
         tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
@@ -1102,8 +1174,15 @@ def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]
     if len(df) == 0:
         return False, f"results.csv is empty: {csv_path}", []
 
+    try:
+        parsed_arguments = parse_arguments_column(df)
+    except ValueError as e:
+        return False, str(e), []
+
     rows = []
-    for i, r in df[["id", "text", "audio_path"]].iterrows():
+    for (i, r), row_arguments in zip(
+        df[["id", "text", "audio_path"]].iterrows(), parsed_arguments
+    ):
         audio_path = str(r["audio_path"])
         candidates = [audio_path]
         if not os.path.isabs(audio_path):
@@ -1113,7 +1192,14 @@ def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]
         resolved = next((os.path.abspath(c) for c in candidates if exists(c)), None)
         if resolved is None:
             return False, f"Row {i} audio file does not exist: {audio_path}", []
-        rows.append({"id": r["id"], "text": r["text"], "audio_path": resolved})
+        rows.append(
+            {
+                "id": r["id"],
+                "text": r["text"],
+                "audio_path": resolved,
+                "arguments": row_arguments,
+            }
+        )
 
     return True, "", rows
 
@@ -1169,6 +1255,7 @@ async def run_eval_only(
         ids = [r["id"] for r in rows]
         texts = [str(r["text"]) for r in rows]
         audio_paths = [r["audio_path"] for r in rows]
+        arguments_list = [r.get("arguments") for r in rows]
 
         # No synthesis here, so no TTFB: ttfb_values=None omits the column and
         # the percentile metrics. Metrics + results + evaluator config all land
@@ -1181,6 +1268,7 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             ttfb_values=None,
+            arguments_list=arguments_list,
         )
 
         return {

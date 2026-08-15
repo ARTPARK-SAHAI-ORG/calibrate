@@ -40,6 +40,7 @@ Simulation has no implicit default — callers must supply evaluators.
 import asyncio
 import base64
 import json
+import math
 import os
 import re
 from typing import Optional
@@ -428,6 +429,96 @@ def ensure_known_evaluator_names(referenced, known, context: str = "") -> None:
         raise ValueError(
             f"{prefix}unknown evaluator(s) {unknown} referenced. Define them "
             f"under config.evaluators (known: {sorted(known)})."
+        )
+
+
+def render_evaluators(
+    evaluators: list, arguments: Optional[dict], context: str = ""
+) -> list:
+    """Return ``evaluators`` with each one's ``system_prompt`` placeholders filled in.
+
+    ``arguments`` is an object keyed by evaluator ``name`` → that evaluator's
+    variable dict, the shape used by ``llm`` test-case criteria, ``general`` /
+    ``stt`` / ``tts`` dataset rows and simulation scenarios. Evaluators with no
+    entry are returned unchanged. A name matching no evaluator raises
+    ``ValueError`` via :func:`ensure_known_evaluator_names`.
+
+    Args:
+        evaluators: The configured evaluator dicts.
+        arguments: Evaluator name → variable dict, or a falsy value for none.
+        context: Optional prefix for the unknown-name error (e.g. ``"Row 3 arguments"``).
+    """
+    if not arguments:
+        return evaluators
+    ensure_known_evaluator_names(
+        arguments, {ev["name"] for ev in evaluators}, context=context
+    )
+    return [render_evaluator(ev, arguments.get(ev["name"])) for ev in evaluators]
+
+
+def arguments_shape_error(value) -> Optional[str]:
+    """Return an error message if ``value`` is not an evaluator-name → variables map.
+
+    Returns ``None`` when the shape is valid. Callers prefix the message with
+    their own row / item locator (e.g. ``f"Row {i} {err}"``).
+    """
+    if not isinstance(value, dict):
+        return "field 'arguments' must be an object"
+    for ev_name, ev_args in value.items():
+        if not isinstance(ev_args, dict):
+            return (
+                f"field 'arguments[{ev_name!r}]' must be an object mapping "
+                f"variable names to values"
+            )
+    return None
+
+
+def parse_arguments_column(df) -> list:
+    """Return one parsed ``arguments`` entry per dataframe row.
+
+    Each cell holds the JSON text of that row's arguments. Entries are ``None``
+    for blank cells, and every entry is ``None`` when the dataframe has no
+    ``arguments`` column. Raises ``ValueError`` prefixed with the row number
+    when a cell is not valid JSON or does not have the arguments shape.
+    """
+    if "arguments" not in df.columns:
+        return [None] * len(df)
+    parsed = []
+    for i, value in enumerate(df["arguments"].tolist()):
+        blank = value is None or (isinstance(value, float) and math.isnan(value))
+        text = "" if blank else str(value).strip()
+        if not text:
+            parsed.append(None)
+            continue
+        try:
+            entry = json.loads(text)
+        except Exception as e:
+            raise ValueError(f"Row {i} field 'arguments' is not valid JSON: {e}")
+        error = arguments_shape_error(entry)
+        if error:
+            raise ValueError(f"Row {i} {error}")
+        parsed.append(entry)
+    return parsed
+
+
+def validate_scenario_arguments(scenarios, evaluators) -> None:
+    """Raise ``ValueError`` if a scenario's ``arguments`` is malformed or names no evaluator.
+
+    A scenario's ``arguments`` is an object keyed by evaluator name, each value
+    an object mapping variable names to the values that fill that evaluator's
+    ``{{variable}}`` placeholders. Both checks run before any simulation starts,
+    so a wrong shape or a misspelled evaluator name costs nothing to discover.
+    """
+    known = {ev["name"] for ev in evaluators or []}
+    for index, scenario in enumerate(scenarios or []):
+        arguments = scenario.get("arguments")
+        if arguments is None:
+            continue
+        error = arguments_shape_error(arguments)
+        if error:
+            raise ValueError(f"scenario {index + 1}: {error}")
+        ensure_known_evaluator_names(
+            arguments, known, context=f"scenario {index + 1} arguments"
         )
 
 

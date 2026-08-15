@@ -12,6 +12,7 @@ from calibrate_agent.judges import (
     audio_judge,
     is_rating,
     evaluator_result_value,
+    render_evaluators,
     DEFAULT_AUDIO_JUDGE_MODEL,
     DEFAULT_TTS_EVALUATOR,
 )
@@ -68,8 +69,20 @@ async def get_tts_llm_judge_score(
     reference_texts: List[str],
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_TTS_JUDGE_MODEL,
+    arguments_list: Optional[List[Optional[dict]]] = None,
 ) -> dict:
     """Run TTS judge across all rows and aggregate per-evaluator scores.
+
+    ``arguments_list`` optionally supplies per-row, per-evaluator template
+    variables. When provided it must have the same length as ``audio_paths``.
+    Each entry is a dict keyed by evaluator ``name`` → that evaluator's argument
+    dict. For row ``i`` and evaluator ``ev``, ``ev``'s ``system_prompt`` is
+    rendered against ``arguments_list[i][ev["name"]]`` before being passed to the
+    judge; evaluators with no entry — and rows with ``None``/empty arguments —
+    are left unchanged. An ``arguments`` key that names no known evaluator raises
+    ``ValueError``. Rendering only changes ``system_prompt`` —
+    ``name``/``type``/``scale_*`` are untouched, so aggregation remains keyed off
+    the base ``evaluators`` list.
 
     Returns:
         {
@@ -86,15 +99,27 @@ async def get_tts_llm_judge_score(
     """
     evaluators = _resolve_evaluators(evaluators)
 
-    coroutines = [
-        tts_llm_judge(
-            audio_path,
-            reference_text,
-            evaluators=evaluators,
-            fallback_model=fallback_model,
+    if arguments_list is not None and len(arguments_list) != len(audio_paths):
+        raise ValueError(
+            f"arguments_list must be the same length as audio_paths "
+            f"(got {len(arguments_list)} arguments, {len(audio_paths)} audio paths)."
         )
-        for audio_path, reference_text in zip(audio_paths, reference_texts)
-    ]
+
+    coroutines = []
+    for i, (audio_path, reference_text) in enumerate(
+        zip(audio_paths, reference_texts)
+    ):
+        row_arguments = arguments_list[i] if arguments_list is not None else None
+        coroutines.append(
+            tts_llm_judge(
+                audio_path,
+                reference_text,
+                evaluators=render_evaluators(
+                    evaluators, row_arguments, context=f"Row {i} arguments"
+                ),
+                fallback_model=fallback_model,
+            )
+        )
 
     results = await tqdm_asyncio.gather(
         *coroutines,

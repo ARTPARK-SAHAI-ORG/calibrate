@@ -69,40 +69,40 @@ class TestValidateSimulationEvalOnlyDataset(unittest.TestCase):
     def test_valid(self):
         from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
-        ok, _ = validate_simulation_eval_only_dataset([
-            {"conversation_history": [{"role": "user", "content": "hi"}]}
-        ])
+        ok, _ = validate_simulation_eval_only_dataset(
+            [{"conversation_history": [{"role": "user", "content": "hi"}]}], []
+        )
         self.assertTrue(ok)
 
     def test_not_list(self):
         from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
-        ok, _ = validate_simulation_eval_only_dataset({})
+        ok, _ = validate_simulation_eval_only_dataset({}, [])
         self.assertFalse(ok)
 
     def test_item_not_dict(self):
         from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
-        ok, _ = validate_simulation_eval_only_dataset(["x"])
+        ok, _ = validate_simulation_eval_only_dataset(["x"], [])
         self.assertFalse(ok)
 
     def test_missing_history(self):
         from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
-        ok, _ = validate_simulation_eval_only_dataset([{}])
+        ok, _ = validate_simulation_eval_only_dataset([{}], [])
         self.assertFalse(ok)
 
     def test_history_not_list(self):
         from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
-        ok, _ = validate_simulation_eval_only_dataset([{"conversation_history": "no"}])
+        ok, _ = validate_simulation_eval_only_dataset([{"conversation_history": "no"}], [])
         self.assertFalse(ok)
 
     def test_invalid_name(self):
         from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset(
-            [{"conversation_history": [], "name": 5}]
+            [{"conversation_history": [], "name": 5}], []
         )
         self.assertFalse(ok)
 

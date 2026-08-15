@@ -551,5 +551,165 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(adapter._spoken_text_buffer, "")
 
 
+TEMPLATED_EV = {
+    "name": "goal_met",
+    "system_prompt": "did the agent handle {{order_id}}",
+    "judge_model": "openai/gpt-4.1",
+}
+
+
+class TestScenarioArguments(unittest.IsolatedAsyncioTestCase):
+    """A scenario's ``arguments`` fill placeholders in the evaluator prompts."""
+
+    def _config(self, evaluators):
+        return {
+            "agent_url": "wss://agent.example",
+            "evaluators": evaluators,
+            "stt": {"provider": "google"},
+            "tts": {"provider": "google"},
+            "llm": {"provider": "openrouter", "model": "some/model"},
+            "settings": {"agent_speaks_first": True, "max_turns": 1},
+        }
+
+    PERSONA = {
+        "characteristics": "polite",
+        "gender": "neutral",
+        "language": "english",
+        "interruption_sensitivity": "none",
+    }
+
+    async def _run(self, config, scenario):
+        """Run one simulation with the judging pipeline mocked out.
+
+        Returns the evaluator list handed to ``run_simulation``, which passes it
+        straight through to the judge call.
+        """
+        import tempfile
+        from calibrate_agent.agent import run_simulation as RS
+
+        seen = []
+
+        async def fake_run_simulation(*args, **kwargs):
+            seen.append(args[3])
+            return {}
+
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            RS, "run_simulation", AsyncMock(side_effect=fake_run_simulation)
+        ), patch.object(RS, "find_available_port", return_value=54321):
+            await RS.run_single_simulation_task(
+                asyncio.Semaphore(1),
+                config,
+                0,
+                self.PERSONA,
+                0,
+                scenario,
+                tmp,
+                {"none": 0.0},
+            )
+        return seen[0]
+
+    async def test_arguments_render_prompt_reaching_judge(self):
+        evaluators = await self._run(
+            self._config([TEMPLATED_EV]),
+            {
+                "name": "s",
+                "description": "d",
+                "arguments": {"goal_met": {"order_id": "ORD-67890"}},
+            },
+        )
+        self.assertEqual(
+            evaluators[0]["system_prompt"], "did the agent handle ORD-67890"
+        )
+
+    async def test_no_arguments_leaves_placeholder(self):
+        evaluators = await self._run(
+            self._config([TEMPLATED_EV]), {"name": "s", "description": "d"}
+        )
+        self.assertEqual(
+            evaluators[0]["system_prompt"], "did the agent handle {{order_id}}"
+        )
+
+    async def test_only_named_evaluator_rendered(self):
+        other_ev = {
+            "name": "politeness",
+            "system_prompt": "was the agent polite about {{order_id}}",
+            "judge_model": "openai/gpt-4.1",
+        }
+        evaluators = await self._run(
+            self._config([TEMPLATED_EV, other_ev]),
+            {
+                "name": "s",
+                "description": "d",
+                "arguments": {"goal_met": {"order_id": "ORD-67890"}},
+            },
+        )
+        by_name = {ev["name"]: ev["system_prompt"] for ev in evaluators}
+        self.assertEqual(by_name["goal_met"], "did the agent handle ORD-67890")
+        self.assertEqual(
+            by_name["politeness"], "was the agent polite about {{order_id}}"
+        )
+
+    async def test_unknown_evaluator_name_raises(self):
+        with self.assertRaises(ValueError) as ctx:
+            await self._run(
+                self._config([TEMPLATED_EV]),
+                {
+                    "name": "s",
+                    "description": "d",
+                    "arguments": {"goal_mett": {"order_id": "ORD-67890"}},
+                },
+            )
+        self.assertIn("goal_mett", str(ctx.exception))
+
+
+GOAL_MET_EV = [{"name": "goal_met", "system_prompt": "check {{order_id}}"}]
+
+
+class TestValidateScenarioArguments(unittest.TestCase):
+    def test_valid_shapes_pass(self):
+        from calibrate_agent.agent.run_simulation import validate_scenario_arguments
+
+        validate_scenario_arguments(
+            [
+                {"name": "a", "description": "d"},
+                {"name": "b", "arguments": {"goal_met": {"order_id": "1"}}},
+            ],
+            GOAL_MET_EV,
+        )
+
+    def test_arguments_not_an_object_rejected(self):
+        from calibrate_agent.agent.run_simulation import validate_scenario_arguments
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_scenario_arguments(
+                [{"name": "a"}, {"name": "b", "arguments": ["order_id"]}],
+                GOAL_MET_EV,
+            )
+        self.assertIn("scenario 2", str(ctx.exception))
+
+    def test_evaluator_entry_not_an_object_rejected(self):
+        from calibrate_agent.agent.run_simulation import validate_scenario_arguments
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_scenario_arguments(
+                [{"name": "a", "arguments": {"goal_met": "ORD-1"}}],
+                GOAL_MET_EV,
+            )
+        self.assertIn("goal_met", str(ctx.exception))
+
+    def test_unknown_evaluator_name_rejected_before_any_simulation(self):
+        # A misspelled evaluator name is caught while validating the config,
+        # so it costs nothing to discover.
+        from calibrate_agent.agent.run_simulation import validate_scenario_arguments
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_scenario_arguments(
+                [{"name": "a", "arguments": {"goal_mett": {"order_id": "1"}}}],
+                GOAL_MET_EV,
+            )
+        self.assertIn("goal_mett", str(ctx.exception))
+        self.assertIn("scenario 1", str(ctx.exception))
+
+
 if __name__ == "__main__":
     unittest.main()
