@@ -1835,6 +1835,65 @@
         ],
         "title": "EvaluatorDetailResponseCompact"
       },
+      "EvaluatorLinkRequest": {
+        "properties": {
+          "evaluator_ids": {
+            "items": {
+              "type": "string",
+              "maxLength": 36,
+              "minLength": 36
+            },
+            "type": "array",
+            "title": "Evaluator Ids",
+            "description": "The evaluators to link to the agent. Ones that are already linked are skipped. Each must be one you created or a built-in default",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_ids"
+        ],
+        "title": "EvaluatorLinkRequest"
+      },
+      "EvaluatorLinkResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation that the evaluators were linked",
+            "examples": [
+              "Evaluators linked to agent"
+            ]
+          },
+          "linked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Linked",
+            "description": "Evaluator IDs newly linked by this request"
+          },
+          "already_linked": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Already Linked",
+            "description": "Evaluator IDs skipped because they were already linked"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "linked",
+          "already_linked"
+        ],
+        "title": "EvaluatorLinkResponse"
+      },
       "EvaluatorLiveVersionSummary": {
         "properties": {
           "uuid": {
@@ -4500,65 +4559,6 @@
         ],
         "title": "VersionCreateResponse"
       },
-      "routers__agents__EvaluatorLinkRequest": {
-        "properties": {
-          "evaluator_ids": {
-            "items": {
-              "type": "string",
-              "maxLength": 36,
-              "minLength": 36
-            },
-            "type": "array",
-            "title": "Evaluator Ids",
-            "description": "The evaluators to link to the agent. Ones that are already linked are skipped. Each must be one you created or a built-in default",
-            "examples": [
-              [
-                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-              ]
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "evaluator_ids"
-        ],
-        "title": "EvaluatorLinkRequest"
-      },
-      "routers__agents__EvaluatorLinkResponse": {
-        "properties": {
-          "message": {
-            "type": "string",
-            "title": "Message",
-            "description": "Confirmation that the evaluators were linked",
-            "examples": [
-              "Evaluators linked to agent"
-            ]
-          },
-          "linked": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Linked",
-            "description": "Evaluator IDs newly linked by this request"
-          },
-          "already_linked": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Already Linked",
-            "description": "Evaluator IDs skipped because they were already linked"
-          }
-        },
-        "type": "object",
-        "required": [
-          "message",
-          "linked",
-          "already_linked"
-        ],
-        "title": "EvaluatorLinkResponse"
-      },
       "routers__evaluators__EvaluatorResponse": {
         "properties": {
           "uuid": {
@@ -5295,7 +5295,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/routers__agents__EvaluatorLinkRequest"
+                "$ref": "#/components/schemas/EvaluatorLinkRequest"
               }
             }
           }
@@ -5306,7 +5306,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/routers__agents__EvaluatorLinkResponse"
+                  "$ref": "#/components/schemas/EvaluatorLinkResponse"
                 }
               }
             }
