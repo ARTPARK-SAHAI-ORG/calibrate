@@ -50,6 +50,7 @@ from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate_agent.llm.metrics import test_response_llm_judge, evaluate_simuation
+from calibrate_agent.general.metrics import general_judge
 from calibrate_agent.llm._metrics_utils import _numeric_or_none, _latency_percentiles
 from calibrate_agent.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
@@ -1376,6 +1377,38 @@ async def _evaluate_conversation(
     return _metrics_from_judge_results(evaluators, result)
 
 
+async def _evaluate_general(
+    chat_history: List[dict],
+    evaluators: List[dict],
+    output: dict,
+    no_response_reasoning: str,
+) -> dict:
+    """Judge the agent's reply as a plain input/output pair, not a transcript.
+
+    The input is the last user message in ``chat_history``; tool calls play no
+    part, since a general test case grades only the text the agent produced.
+    """
+    response = output.get("response")
+    if not response:
+        return {
+            "passed": False,
+            "reasoning": no_response_reasoning,
+            "judge_results": _no_response_judge_results(
+                evaluators, no_response_reasoning
+            ),
+        }
+    input_text = next(
+        (
+            message.get("content")
+            for message in reversed(chat_history or [])
+            if message.get("role") == "user"
+        ),
+        None,
+    )
+    result = await general_judge(input_text, response, evaluators=evaluators)
+    return _metrics_from_judge_results(evaluators, result)
+
+
 async def evaluate_test_case_output(
     chat_history: List[dict],
     evaluation: dict,
@@ -1397,6 +1430,15 @@ async def evaluate_test_case_output(
             evaluators=evaluators or [],
             output=output,
             no_response_reasoning_no_tool_calls=(
+                no_response_reasoning_no_tool_calls or "No reply was returned"
+            ),
+        )
+    if evaluation["type"] == "general":
+        return await _evaluate_general(
+            chat_history=chat_history,
+            evaluators=evaluators or [],
+            output=output,
+            no_response_reasoning=(
                 no_response_reasoning_no_tool_calls or "No reply was returned"
             ),
         )
@@ -1598,7 +1640,7 @@ def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
         metrics = result.get("metrics", {})
         evaluation = result.get("test_case", {}).get("evaluation", {})
 
-        if evaluation.get("type") not in ("response", "conversation"):
+        if evaluation.get("type") not in ("response", "conversation", "general"):
             continue
 
         judge_results = metrics.get("judge_results")
@@ -1915,7 +1957,7 @@ async def run_model_tests(
                     include_default=(evaluation.get("type") == "response"),
                 ),
             )
-            if evaluation.get("type") in ("response", "conversation")
+            if evaluation.get("type") in ("response", "conversation", "general")
             else None
         )
 
@@ -2105,11 +2147,11 @@ def validate_llm_eval_only_dataset(
         if not isinstance(tc["evaluation"], dict):
             return False, f"Item {i}: 'test_case.evaluation' must be an object"
         ev_type = tc["evaluation"].get("type")
-        if ev_type not in ("response", "tool_call", "conversation"):
+        if ev_type not in ("response", "tool_call", "conversation", "general"):
             return (
                 False,
                 f"Item {i}: 'test_case.evaluation.type' must be 'response', "
-                f"'tool_call', or 'conversation' (got {ev_type!r})",
+                f"'tool_call', 'conversation', or 'general' (got {ev_type!r})",
             )
         if "response" not in out or "tool_calls" not in out:
             return (
@@ -2168,7 +2210,7 @@ async def run_eval_only_tests(
                     include_default=(evaluation.get("type") == "response"),
                 ),
             )
-            if evaluation.get("type") in ("response", "conversation")
+            if evaluation.get("type") in ("response", "conversation", "general")
             else None
         )
 

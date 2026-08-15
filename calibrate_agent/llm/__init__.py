@@ -159,7 +159,7 @@ class _Tests:
                         include_default=(evaluation.get("type") == "response"),
                     ),
                 )
-                if evaluation.get("type") in ("response", "conversation")
+                if evaluation.get("type") in ("response", "conversation", "general")
                 else None
             )
             if agent is not None:
@@ -547,7 +547,7 @@ class _Tests:
                     include_default=(evaluation.get("type") == "response"),
                 ),
             )
-            if evaluation.get("type") in ("response", "conversation")
+            if evaluation.get("type") in ("response", "conversation", "general")
             else None
         )
 

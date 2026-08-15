@@ -1374,6 +1374,63 @@ class TestEvaluateTestCaseOutput(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Tool calls were generated", result["reasoning"])
 
 
+class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
+    async def test_judges_last_user_message_against_response(self):
+        from calibrate_agent.llm.run_tests import evaluate_test_case_output
+
+        judge = AsyncMock(
+            return_value={"helpful": {"reasoning": "good", "match": True}}
+        )
+        with patch("calibrate_agent.llm.run_tests.general_judge", judge):
+            result = await evaluate_test_case_output(
+                chat_history=[{"role": "user", "content": "summarize this"}],
+                evaluation={"type": "general", "criteria": [{"name": "helpful"}]},
+                output={"response": "a summary", "tool_calls": []},
+                evaluators=[_bin_ev("helpful")],
+            )
+
+        self.assertTrue(result["passed"])
+        self.assertEqual(judge.await_args.args, ("summarize this", "a summary"))
+        self.assertEqual(judge.await_args.kwargs["evaluators"][0]["name"], "helpful")
+
+    async def test_no_response_fails_without_calling_judge(self):
+        from calibrate_agent.llm.run_tests import evaluate_test_case_output
+
+        judge = AsyncMock()
+        with patch("calibrate_agent.llm.run_tests.general_judge", judge):
+            result = await evaluate_test_case_output(
+                chat_history=[{"role": "user", "content": "hi"}],
+                evaluation={"type": "general", "criteria": [{"name": "helpful"}]},
+                output={"response": "", "tool_calls": []},
+                evaluators=[_bin_ev("helpful")],
+                no_response_reasoning_no_tool_calls="NONE",
+            )
+
+        judge.assert_not_awaited()
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["reasoning"], "NONE")
+        self.assertFalse(result["judge_results"]["helpful"]["match"])
+
+    def test_scores_reach_metrics_aggregation(self):
+        from calibrate_agent.llm.run_tests import _aggregate_criteria
+
+        results = [
+            {
+                "metrics": {
+                    "judge_results": {"helpful": {"reasoning": "r", "match": True}}
+                },
+                "test_case": {
+                    "evaluation": {
+                        "type": "general",
+                        "criteria": [{"name": "helpful"}],
+                    }
+                },
+            }
+        ]
+        aggregated = _aggregate_criteria(results, {"helpful": _bin_ev("helpful")})
+        self.assertEqual(aggregated["helpful"]["pass_rate"], 100.0)
+
+
 class TestAggregateCriteria(unittest.TestCase):
     def test_binary_aggregation(self):
         from calibrate_agent.llm.run_tests import _aggregate_criteria
