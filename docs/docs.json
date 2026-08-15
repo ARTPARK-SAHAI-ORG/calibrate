@@ -145,6 +145,13 @@
               "GET /tests/{test_uuid}",
               "PUT /tests/{test_uuid}"
             ]
+          },
+          {
+            "group": "Traces",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /traces"
+            ]
           }
         ]
       },
@@ -166,7 +173,8 @@
               "cli/calibrate/annotation-tasks",
               "cli/calibrate/annotators",
               "cli/calibrate/evaluators",
-              "cli/calibrate/tests"
+              "cli/calibrate/tests",
+              "cli/calibrate/traces"
             ]
           }
         ]
@@ -246,6 +254,12 @@
               "sdk/tests/bulk_create",
               "sdk/tests/get",
               "sdk/tests/update"
+            ]
+          },
+          {
+            "group": "Traces",
+            "pages": [
+              "sdk/traces/create"
             ]
           }
         ]

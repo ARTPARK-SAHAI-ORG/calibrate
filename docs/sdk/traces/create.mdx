@@ -1,0 +1,30 @@
+---
+title: "Create trace"
+description: "Store a production agent turn and its conversation history for later review"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate, TraceTurn, TraceOutput
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.traces.create(
+    agent_id="agent_id",
+    input=[
+        TraceTurn(
+            role="role",
+        )
+    ],
+    output=TraceOutput(),
+)
+```
+
+## API endpoint
+
+See **POST /traces** in the [API reference](/api-reference/introduction) tab.

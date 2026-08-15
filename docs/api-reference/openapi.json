@@ -4101,6 +4101,251 @@
         ],
         "title": "ToolCallOutput"
       },
+      "TraceIngest": {
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 1,
+            "title": "Agent Id",
+            "description": "ID of the agent that produced the turn. Must be an agent in your workspace"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id",
+            "description": "Your own ID for the last user message in `input`, stored for reference only. Omit if you have none"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id",
+            "description": "Your own ID for the conversation this turn belongs to, stored for reference only. Omit if you have none"
+          },
+          "input": {
+            "items": {
+              "$ref": "#/components/schemas/TraceTurn"
+            },
+            "type": "array",
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Input",
+            "description": "Conversation history up to the reported output, oldest turn first, in OpenAI chat format"
+          },
+          "output": {
+            "$ref": "#/components/schemas/TraceOutput",
+            "description": "What the agent produced for this turn"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceMetadataEntry"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Key-value pairs stored with the trace. Prefer OTel `gen_ai.*` key names where they fit. Omit if you have none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "agent_id",
+          "input",
+          "output"
+        ],
+        "title": "TraceIngest"
+      },
+      "TraceIngestResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Unique ID for the trace",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id",
+            "description": "The message ID you sent, if any"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id",
+            "description": "The conversation ID you sent, if any"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the trace was created (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "created_at"
+        ],
+        "title": "TraceIngestResponse"
+      },
+      "TraceMetadataEntry": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Key",
+            "description": "Name of the metadata entry"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 8192,
+            "title": "Value",
+            "description": "Value of the metadata entry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "TraceMetadataEntry"
+      },
+      "TraceOutput": {
+        "properties": {
+          "response": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response",
+            "description": "The assistant reply text for this turn. Omit for turns that only issued tool calls"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceToolCall"
+                },
+                "type": "array",
+                "maxItems": 50
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls",
+            "description": "Tool calls the agent issued for this turn. Omit for plain text replies"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "TraceOutput"
+      },
+      "TraceToolCall": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Tool",
+            "description": "Name of the tool the agent called"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Argument values the agent passed to the tool. Omit when the call had none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tool"
+        ],
+        "title": "TraceToolCall"
+      },
+      "TraceTurn": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Role",
+            "description": "Message author role in the conversation history"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "Message text. Omit for turns that only carry tool calls"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "TraceTurn"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -7207,6 +7452,53 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AnnotatorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces": {
+      "post": {
+        "tags": [
+          "traces"
+        ],
+        "summary": "Create trace",
+        "description": "Store a production agent turn and its conversation history for later review",
+        "operationId": "ingest_trace_traces_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TraceIngest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceIngestResponse"
                 }
               }
             }

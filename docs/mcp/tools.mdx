@@ -722,3 +722,28 @@ fields to change (name, config). Returns the updated test. Fails with
 | `evaluators` | array of routers__tests__EvaluatorRef | No | New evaluator links for the test. Omit to leave unchanged. An empty list clears them, except on `conversation` tests, which must keep at least one |
 
 See **PUT /tests/&#123;test_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## Traces
+
+### create-trace
+
+Store one production agent turn against an agent in the caller's org:
+the conversation history as input, what the agent produced as output,
+and optional metadata. Use this to capture live traffic for later
+review and conversion into tests. Fails with 429 once the workspace
+hits its trace limit.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_id` | string | Yes | ID of the agent that produced the turn. Must be an agent in your workspace |
+| `message_id` | string | No | Your own ID for the last user message in `input`, stored for reference only. Omit if you have none |
+| `conversation_id` | string | No | Your own ID for the conversation this turn belongs to, stored for reference only. Omit if you have none |
+| `input` | array of TraceTurn | Yes | Conversation history up to the reported output, oldest turn first, in OpenAI chat format |
+| `output` | TraceOutput | Yes | What the agent produced for this turn |
+| `metadata` | array of TraceMetadataEntry | No | Key-value pairs stored with the trace. Prefer OTel `gen_ai.*` key names where they fit. Omit if you have none |
+
+See **POST /traces** in the [API reference](/api-reference/introduction) tab for the full schema.

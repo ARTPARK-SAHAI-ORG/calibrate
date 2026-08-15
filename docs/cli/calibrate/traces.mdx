@@ -1,0 +1,31 @@
+---
+title: "Traces"
+description: "Operations for traces"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Create trace
+
+Store a production agent turn and its conversation history for later review
+
+```bash
+calibrate traces create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-id` | string | **Required.** ID of the agent that produced the turn. Must be an agent in your workspace |
+| `-c, --conversation-id` | string | Your own ID for the conversation this turn belongs to, stored for reference only. Omit if you have none |
+| `-i, --input` | string | **Required.** Conversation history up to the reported output, oldest turn first, in OpenAI chat format |
+| `--message-id` | input | Your own ID for the last user message in input, stored for reference only. Omit if you have none |
+| `--metadata` | gen_ai.* | Key-value pairs stored with the trace. Prefer OTel gen_ai.* key names where they fit. Omit if you have none |
+| `--output-param` | string | **Required.** |
+
+**Examples**
+
+```bash
+calibrate traces create --agent-id <id> --input '[{"role":"<value>"}]' --output-param '{}'
+```
