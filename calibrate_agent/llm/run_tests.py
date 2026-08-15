@@ -67,6 +67,38 @@ from calibrate_agent.judges import (
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 
 
+# The four kinds of LLM test case. ``EVALUATOR_TEST_TYPES`` are the ones graded
+# by evaluators the test case names in ``evaluation.criteria``; ``tool_call``
+# cases are graded against an expected tool-call list instead.
+EVALUATOR_TEST_TYPES = ("response", "conversation", "general")
+TEST_TYPES = ("tool_call",) + EVALUATOR_TEST_TYPES
+
+
+def test_case_history(test_case: dict) -> List[dict]:
+    """Return the messages to send to the agent for ``test_case``.
+
+    A ``general`` test case is single-shot: it carries a plain ``input`` string
+    and no conversation, so its one user message is built here. Every other kind
+    carries its own ``history``.
+    """
+    evaluation = test_case.get("evaluation") or {}
+    if evaluation.get("type") != "general":
+        return test_case["history"]
+
+    if "history" in test_case:
+        raise ValueError(
+            "A 'general' test case is single-shot: it takes a plain 'input' "
+            "string and must not carry a 'history'."
+        )
+    input_text = test_case.get("input")
+    if not isinstance(input_text, str) or not input_text.strip():
+        raise ValueError(
+            "A 'general' test case requires a non-empty 'input' string "
+            f"(got: {input_text!r})."
+        )
+    return [{"role": "user", "content": input_text}]
+
+
 # ── Evaluator resolution helpers (LLM-test-specific) ────────────────────────
 
 
@@ -157,7 +189,15 @@ def _resolve_evaluators_for_test_case(
     evaluation: dict, name_to_evaluator: dict
 ) -> list[dict]:
     """Resolve a test case's ``evaluation.criteria`` to rendered evaluator dicts."""
-    refs = _normalize_criteria_refs(evaluation.get("criteria"))
+    criteria = evaluation.get("criteria")
+    if evaluation.get("type") == "general" and isinstance(criteria, str):
+        raise ValueError(
+            "A 'general' test case must list its evaluators by name, e.g. "
+            '"criteria": [{"name": "helpful"}]. A plain criteria string selects '
+            f"the built-in '{DEFAULT_LLM_TEST_EVALUATOR['name']}' evaluator, "
+            "which general test cases do not use."
+        )
+    refs = _normalize_criteria_refs(criteria)
     ensure_known_evaluator_names(
         [ref["name"] for ref in refs], name_to_evaluator, context="test case criteria"
     )
@@ -1292,6 +1332,13 @@ def _evaluator_passed(evaluator: dict, ev_result: dict) -> bool:
 
 
 def _metrics_from_judge_results(evaluators: List[dict], result: dict) -> dict:
+    # Nothing to object to means nothing was graded — report that instead of a
+    # pass, which is what an empty `evaluation.criteria` would otherwise produce.
+    if not evaluators:
+        raise ValueError(
+            "This test case names no evaluators, so nothing would be graded. "
+            "List at least one evaluator under 'evaluation.criteria'."
+        )
     failing = [ev for ev in evaluators if not _evaluator_passed(ev, result[ev["name"]])]
     return {
         "passed": not failing,
@@ -1326,25 +1373,29 @@ async def _evaluate_response(
 
     Returns a dict with ``passed``, ``reasoning``, and ``judge_results``.
     """
-    metrics: dict = {"passed": False}
-    if response:
-        evaluators = evaluators or []
-        result = await test_response_llm_judge(
-            conversation=chat_history,
-            response=response,
-            evaluators=evaluators,
+    evaluators = evaluators or []
+    if not response:
+        return _no_response_metrics(
+            evaluators,
+            no_response_reasoning_with_tool_calls
+            if tool_calls
+            else no_response_reasoning_no_tool_calls,
         )
-        metrics.update(_metrics_from_judge_results(evaluators, result))
-    else:
-        if tool_calls:
-            metrics["reasoning"] = no_response_reasoning_with_tool_calls
-        else:
-            metrics["reasoning"] = no_response_reasoning_no_tool_calls
+    result = await test_response_llm_judge(
+        conversation=chat_history,
+        response=response,
+        evaluators=evaluators,
+    )
+    return _metrics_from_judge_results(evaluators, result)
 
-        metrics["judge_results"] = _no_response_judge_results(
-            evaluators or [], metrics["reasoning"]
-        )
-    return metrics
+
+def _no_response_metrics(evaluators: List[dict], reasoning: str) -> dict:
+    """Build the failed-with-no-reply metrics dict for a judged test case."""
+    return {
+        "passed": False,
+        "reasoning": reasoning,
+        "judge_results": _no_response_judge_results(evaluators or [], reasoning),
+    }
 
 
 async def _evaluate_conversation(
@@ -1357,13 +1408,7 @@ async def _evaluate_conversation(
     response = output.get("response")
     tool_calls = output.get("tool_calls") or []
     if not response and not tool_calls:
-        return {
-            "passed": False,
-            "reasoning": no_response_reasoning_no_tool_calls,
-            "judge_results": _no_response_judge_results(
-                evaluators or [], no_response_reasoning_no_tool_calls
-            ),
-        }
+        return _no_response_metrics(evaluators, no_response_reasoning_no_tool_calls)
     turn: dict = {"role": "assistant", "content": response or ""}
     if tool_calls:
         turn["tool_calls"] = [
@@ -1385,26 +1430,26 @@ async def _evaluate_general(
 ) -> dict:
     """Judge the agent's reply as a plain input/output pair, not a transcript.
 
-    The input is the last user message in ``chat_history``; tool calls play no
-    part, since a general test case grades only the text the agent produced.
+    ``chat_history`` holds the single user message built from the test case's
+    ``input``. Tool calls play no part: a general test case grades only the text
+    the agent produced.
     """
     response = output.get("response")
     if not response:
-        return {
-            "passed": False,
-            "reasoning": no_response_reasoning,
-            "judge_results": _no_response_judge_results(
-                evaluators, no_response_reasoning
-            ),
-        }
+        return _no_response_metrics(evaluators, no_response_reasoning)
     input_text = next(
         (
             message.get("content")
-            for message in reversed(chat_history or [])
+            for message in reversed(chat_history)
             if message.get("role") == "user"
         ),
         None,
     )
+    if input_text is None:
+        raise ValueError(
+            "A 'general' test case needs a user message to judge the reply "
+            "against; none was found."
+        )
     result = await general_judge(input_text, response, evaluators=evaluators)
     return _metrics_from_judge_results(evaluators, result)
 
@@ -1640,7 +1685,7 @@ def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
         metrics = result.get("metrics", {})
         evaluation = result.get("test_case", {}).get("evaluation", {})
 
-        if evaluation.get("type") not in ("response", "conversation", "general"):
+        if evaluation.get("type") not in EVALUATOR_TEST_TYPES:
             continue
 
         judge_results = metrics.get("judge_results")
@@ -1947,7 +1992,7 @@ async def run_model_tests(
     async def process(test_case_index: int, test_case: dict) -> dict:
         evaluation = test_case["evaluation"]
         preprocessed_history = preprocess_conversation_history(
-            test_case["history"], tools
+            test_case_history(test_case), tools
         )
         resolved_evaluators = (
             _resolve_evaluators_for_test_case(
@@ -1957,7 +2002,7 @@ async def run_model_tests(
                     include_default=(evaluation.get("type") == "response"),
                 ),
             )
-            if evaluation.get("type") in ("response", "conversation", "general")
+            if evaluation.get("type") in EVALUATOR_TEST_TYPES
             else None
         )
 
@@ -2137,29 +2182,46 @@ def validate_llm_eval_only_dataset(
             return False, f"Item {i}: 'test_case' must be an object"
         if not isinstance(out, dict):
             return False, f"Item {i}: 'output' must be an object"
-        if "history" not in tc or "evaluation" not in tc:
+        if "evaluation" not in tc:
             return (
                 False,
-                f"Item {i}: 'test_case' missing required fields 'history' and/or 'evaluation'",
+                f"Item {i}: 'test_case' missing required field 'evaluation'",
             )
-        if not isinstance(tc["history"], list):
-            return False, f"Item {i}: 'test_case.history' must be a list"
         if not isinstance(tc["evaluation"], dict):
             return False, f"Item {i}: 'test_case.evaluation' must be an object"
         ev_type = tc["evaluation"].get("type")
-        if ev_type not in ("response", "tool_call", "conversation", "general"):
+        if ev_type not in TEST_TYPES:
             return (
                 False,
-                f"Item {i}: 'test_case.evaluation.type' must be 'response', "
-                f"'tool_call', 'conversation', or 'general' (got {ev_type!r})",
+                f"Item {i}: 'test_case.evaluation.type' must be one of "
+                f"{', '.join(repr(t) for t in TEST_TYPES)} (got {ev_type!r})",
             )
-        if "response" not in out or "tool_calls" not in out:
-            return (
-                False,
-                f"Item {i}: 'output' must include 'response' (str) and 'tool_calls' (list)",
-            )
-        if not isinstance(out.get("tool_calls", []), list):
-            return False, f"Item {i}: 'output.tool_calls' must be a list"
+
+        if ev_type == "general":
+            try:
+                test_case_history(tc)
+            except ValueError as exc:
+                return False, f"Item {i}: {exc}"
+            if "response" not in out:
+                return (
+                    False,
+                    f"Item {i}: 'output' must include 'response' (str)",
+                )
+        else:
+            if "history" not in tc:
+                return (
+                    False,
+                    f"Item {i}: 'test_case' missing required field 'history'",
+                )
+            if not isinstance(tc["history"], list):
+                return False, f"Item {i}: 'test_case.history' must be a list"
+            if "response" not in out or "tool_calls" not in out:
+                return (
+                    False,
+                    f"Item {i}: 'output' must include 'response' (str) and 'tool_calls' (list)",
+                )
+            if not isinstance(out.get("tool_calls", []), list):
+                return False, f"Item {i}: 'output.tool_calls' must be a list"
 
     return True, ""
 
@@ -2210,12 +2272,12 @@ async def run_eval_only_tests(
                     include_default=(evaluation.get("type") == "response"),
                 ),
             )
-            if evaluation.get("type") in ("response", "conversation", "general")
+            if evaluation.get("type") in EVALUATOR_TEST_TYPES
             else None
         )
 
         preprocessed_history = preprocess_conversation_history(
-            test_case["history"], tools
+            test_case_history(test_case), tools
         )
         output = item["output"]
         metrics = await evaluate_test_case_output(

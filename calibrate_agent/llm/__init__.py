@@ -101,6 +101,8 @@ class _Tests:
             _get_name_to_evaluator_dict,
             _evaluators_for_config_output,
             _resolve_evaluators_for_test_case,
+            test_case_history,
+            EVALUATOR_TEST_TYPES,
             _run_items_parallel,
             _load_resumable_results,
         )
@@ -159,12 +161,12 @@ class _Tests:
                         include_default=(evaluation.get("type") == "response"),
                     ),
                 )
-                if evaluation.get("type") in ("response", "conversation", "general")
+                if evaluation.get("type") in EVALUATOR_TEST_TYPES
                 else None
             )
             if agent is not None:
                 result = await _run_test_external(
-                    chat_history=test_case["history"],
+                    chat_history=test_case_history(test_case),
                     evaluation=evaluation,
                     agent=agent,
                     model=agent_model_hint,
@@ -173,7 +175,7 @@ class _Tests:
                 )
             else:
                 result = await _run_test(
-                    chat_history=test_case["history"],
+                    chat_history=test_case_history(test_case),
                     evaluation=evaluation,
                     system_prompt=system_prompt,
                     model=model,
@@ -536,6 +538,7 @@ class _Tests:
             run_test as _run_test,
             _get_name_to_evaluator_dict,
             _resolve_evaluators_for_test_case,
+            EVALUATOR_TEST_TYPES,
         )
 
         evaluator_config = {"evaluators": evaluators or []}
@@ -547,7 +550,7 @@ class _Tests:
                     include_default=(evaluation.get("type") == "response"),
                 ),
             )
-            if evaluation.get("type") in ("response", "conversation", "general")
+            if evaluation.get("type") in EVALUATOR_TEST_TYPES
             else None
         )
 

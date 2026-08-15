@@ -36,9 +36,10 @@ An array of test cases to evaluate your agent on. Each test case has:
 
 | Key          | Type   | Description                                                                              |
 | ------------ | ------ | ---------------------------------------------------------------------------------------- |
-| `id`         | string | Optional unique test-case id. When provided, results include `test_case_id`.             |
-| `history`    | array  | Conversation history as context for the agent to generate the next output                |
-| `evaluation` | object | The criteria for evaluating the agent — a tool call, a response, or a whole conversation |
+| `id`         | string | Optional unique test-case id. When provided, results include `test_case_id`.              |
+| `history`    | array  | Conversation history as context for the agent to generate the next output. Used by every test type except `general`. |
+| `input`      | string | The single user message for a `general` test case. Used only by that type, which takes no `history`. |
+| `evaluation` | object | The criteria for evaluating the agent: a tool call, a response, a whole conversation, or a single-shot task |
 
 ### Tool call test
 
@@ -186,13 +187,35 @@ Like a [response test](#response-test), the agent is run on the `history` to pro
 
 See [`examples/llm/config-conversation.json`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-conversation.json) for a full template.
 
+### General test
+
+A single-shot task with no conversation. The agent receives one user message, taken from `input`, and its reply is graded as a plain input and output pair rather than as a turn in a chat. Use this for summarization, extraction, classification, rewriting, and similar tasks.
+
+```jsonc
+{
+  // general test — one input, the reply graded on its own
+  "id": "test-id-1",
+  "input": "Summarize this in one line: the order shipped on Monday and arrives Thursday.",
+  "evaluation": {
+    "type": "general",
+    "criteria": [{ "name": "faithful" }, { "name": "concise" }],
+  },
+}
+```
+
+A general test case carries `input` and no `history`. Supplying `history` is an error, as is an empty `input`.
+
+Its evaluators must be listed by name. There is no built-in evaluator for this type, so the plain criteria string that a [response test](#response-test) accepts is rejected here.
+
 ---
 
 ## Evaluators
 
-**Response** test cases can be evaluated by one or more text LLM judges (routed through [OpenRouter](https://openrouter.ai/), set `OPENROUTER_API_KEY` in your environment).
+**Response**, **conversation**, and **general** test cases are evaluated by one or more text LLM judges (routed through [OpenRouter](https://openrouter.ai/), set `OPENROUTER_API_KEY` in your environment).
 
-Each evaluator's `system_prompt` is sent to its own dedicated LLM judge call (one call per evaluator, run in parallel) with the conversation history and the agent's last response as the inputs.
+Each evaluator's `system_prompt` is sent to its own dedicated LLM judge call (one call per evaluator, run in parallel). Response tests pass the conversation history and the agent's last response as the inputs; general tests pass the `input` and the agent's reply.
+
+A test case that names no evaluators is rejected, since nothing would be graded.
 
 ### Defining custom evaluators
 

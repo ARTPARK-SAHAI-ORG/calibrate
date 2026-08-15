@@ -1375,6 +1375,58 @@ class TestEvaluateTestCaseOutput(unittest.IsolatedAsyncioTestCase):
 
 
 class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
+    def test_history_built_from_plain_input(self):
+        from calibrate_agent.llm.run_tests import test_case_history
+
+        self.assertEqual(
+            test_case_history(
+                {"input": "summarize this", "evaluation": {"type": "general"}}
+            ),
+            [{"role": "user", "content": "summarize this"}],
+        )
+
+    def test_history_field_rejected(self):
+        from calibrate_agent.llm.run_tests import test_case_history
+
+        with self.assertRaisesRegex(ValueError, "must not carry a 'history'"):
+            test_case_history(
+                {
+                    "input": "hi",
+                    "history": [{"role": "user", "content": "hi"}],
+                    "evaluation": {"type": "general"},
+                }
+            )
+
+    def test_blank_input_rejected(self):
+        from calibrate_agent.llm.run_tests import test_case_history
+
+        for bad in ("", "   ", None, ["hi"]):
+            with self.subTest(input=bad):
+                with self.assertRaisesRegex(ValueError, "non-empty 'input' string"):
+                    test_case_history(
+                        {"input": bad, "evaluation": {"type": "general"}}
+                    )
+
+    def test_other_types_keep_their_history(self):
+        from calibrate_agent.llm.run_tests import test_case_history
+
+        history = [{"role": "user", "content": "hi"}]
+        self.assertEqual(
+            test_case_history(
+                {"history": history, "evaluation": {"type": "response"}}
+            ),
+            history,
+        )
+
+    def test_plain_criteria_string_rejected(self):
+        from calibrate_agent.llm.run_tests import _resolve_evaluators_for_test_case
+
+        with self.assertRaisesRegex(ValueError, "must list its evaluators by name"):
+            _resolve_evaluators_for_test_case(
+                {"type": "general", "criteria": "be helpful"},
+                {"helpful": _bin_ev("helpful")},
+            )
+
     async def test_judges_last_user_message_against_response(self):
         from calibrate_agent.llm.run_tests import evaluate_test_case_output
 
@@ -1429,6 +1481,58 @@ class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
         ]
         aggregated = _aggregate_criteria(results, {"helpful": _bin_ev("helpful")})
         self.assertEqual(aggregated["helpful"]["pass_rate"], 100.0)
+
+    async def test_no_evaluators_raises_instead_of_passing(self):
+        from calibrate_agent.llm.run_tests import evaluate_test_case_output
+
+        with patch("calibrate_agent.llm.run_tests.general_judge", AsyncMock(return_value={})):
+            with self.assertRaisesRegex(ValueError, "names no evaluators"):
+                await evaluate_test_case_output(
+                    chat_history=[{"role": "user", "content": "hi"}],
+                    evaluation={"type": "general", "criteria": []},
+                    output={"response": "anything", "tool_calls": []},
+                    evaluators=[],
+                )
+
+    async def test_external_agent_path_resolves_evaluators(self):
+        """The SDK path a customer's own agent runs through."""
+        from calibrate_agent.llm import _Tests
+
+        agent = MagicMock()
+        agent.call = AsyncMock(
+            return_value={"response": "a summary", "tool_calls": []}
+        )
+        judge = AsyncMock(
+            return_value={"helpful": {"reasoning": "good", "match": True}}
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("calibrate_agent.llm.run_tests.general_judge", judge):
+                await _Tests._run_single_model(
+                    test_cases=[
+                        {
+                            "id": "row_a",
+                            "input": "summarize this",
+                            "evaluation": {
+                                "type": "general",
+                                "criteria": [{"name": "helpful"}],
+                            },
+                        }
+                    ],
+                    system_prompt="",
+                    tools=[],
+                    output_dir=tmp,
+                    model="",
+                    provider="",
+                    agent=agent,
+                    evaluators=[_bin_ev("helpful")],
+                )
+
+        self.assertEqual(
+            agent.call.await_args.args[0],
+            [{"role": "user", "content": "summarize this"}],
+        )
+        self.assertEqual(judge.await_args.args, ("summarize this", "a summary"))
+        self.assertEqual(judge.await_args.kwargs["evaluators"][0]["name"], "helpful")
 
 
 class TestAggregateCriteria(unittest.TestCase):
