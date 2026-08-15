@@ -13,6 +13,8 @@ Run with:
     python -m pytest tests/test_judges.py -v
 """
 
+import os
+import tempfile
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -26,6 +28,14 @@ from calibrate_agent.judges import (
     audio_judge,
     is_rating,
     evaluator_result_value,
+    evaluator_row_columns,
+    evaluator_row_from_columns,
+    read_existing_rows,
+    stored_bool,
+    stored_cell,
+    stored_scores_are_comparable,
+    write_evaluator_config,
+    PartialResultsWriter,
     render_template,
     render_evaluator,
     ensure_known_evaluator_names,
@@ -889,6 +899,249 @@ class TestDefaultEvaluators(unittest.TestCase):
         self.assertEqual(
             DEFAULT_TTS_EVALUATOR["judge_model"], DEFAULT_AUDIO_JUDGE_MODEL
         )
+
+
+class TestReadExistingRows(unittest.TestCase):
+    def _write(self, directory, text):
+        path = os.path.join(directory, "results.csv")
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            f.write(text)
+        return path
+
+    def test_numeric_looking_ids_stay_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "id,gt,q\n1,a,True\n02,b,False\n")
+            rows = read_existing_rows(path)
+        self.assertEqual(set(rows), {"1", "02"})
+
+    def test_missing_file_reads_as_no_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(
+                read_existing_rows(os.path.join(tmp, "absent.csv")), {}
+            )
+
+    def test_rows_without_an_id_are_skipped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(tmp, "id,q\n,True\nrow_a,False\n")
+            self.assertEqual(set(read_existing_rows(path)), {"row_a"})
+
+
+class TestStoredCell(unittest.TestCase):
+    def test_blank_and_missing_read_as_nothing(self):
+        row = {"a": "", "b": "   ", "c": float("nan"), "d": None}
+        for column in ("a", "b", "c", "d", "absent"):
+            self.assertIsNone(stored_cell(row, column), column)
+
+    def test_zero_is_a_real_value(self):
+        self.assertEqual(stored_cell({"a": 0}, "a"), 0)
+        self.assertEqual(stored_cell({"a": "0"}, "a"), "0")
+
+    def test_no_row_reads_as_nothing(self):
+        self.assertIsNone(stored_cell(None, "a"))
+
+
+class TestStoredBool(unittest.TestCase):
+    def test_recognised_values(self):
+        for value in (True, "True", "true", "1", "1.0"):
+            self.assertIs(stored_bool(value), True, value)
+        for value in (False, "False", "false", "0", "0.0"):
+            self.assertIs(stored_bool(value), False, value)
+
+    def test_unrecognised_value(self):
+        self.assertIsNone(stored_bool("maybe"))
+
+
+class TestEvaluatorRowFromColumns(unittest.TestCase):
+    BINARY = {"q": {"name": "q"}}
+    RATING = {"r": {"name": "r", "type": "rating", "scale_min": 1, "scale_max": 5}}
+
+    def test_round_trips_what_evaluator_row_columns_wrote(self):
+        judge_row = {"q": {"match": True, "reasoning": "ok"}}
+        columns = evaluator_row_columns(self.BINARY, judge_row)
+        self.assertEqual(evaluator_row_from_columns(self.BINARY, columns), judge_row)
+
+    def test_whole_number_ratings_stay_whole(self):
+        rebuilt = evaluator_row_from_columns(
+            self.RATING, {"r": "4.0", "r_reasoning": "good"}
+        )
+        self.assertEqual(rebuilt, {"r": {"score": 4, "reasoning": "good"}})
+        self.assertIsInstance(rebuilt["r"]["score"], int)
+
+    def test_a_different_evaluator_set_is_not_reused(self):
+        columns = evaluator_row_columns(
+            self.BINARY, {"q": {"match": True, "reasoning": "ok"}}
+        )
+        self.assertIsNone(
+            evaluator_row_from_columns({"other": {"name": "other"}}, columns)
+        )
+
+    def test_a_blank_score_counts_as_unjudged(self):
+        self.assertIsNone(
+            evaluator_row_from_columns(self.BINARY, {"q": "", "q_reasoning": ""})
+        )
+
+    def test_an_unreadable_score_counts_as_unjudged(self):
+        self.assertIsNone(
+            evaluator_row_from_columns(self.RATING, {"r": "high", "r_reasoning": ""})
+        )
+        self.assertIsNone(
+            evaluator_row_from_columns(self.BINARY, {"q": "maybe", "q_reasoning": ""})
+        )
+
+    def test_missing_reasoning_reads_as_empty(self):
+        self.assertEqual(
+            evaluator_row_from_columns(self.BINARY, {"q": "True"}),
+            {"q": {"match": True, "reasoning": ""}},
+        )
+
+
+class TestStoredScoresAreComparable(unittest.TestCase):
+    BINARY = {"name": "q", "system_prompt": "p"}
+    RATING = {
+        "name": "q",
+        "system_prompt": "p",
+        "type": "rating",
+        "scale_min": 1,
+        "scale_max": 5,
+    }
+
+    def _run_dir(self, tmp, evaluators):
+        write_evaluator_config(tmp, evaluators)
+        return tmp
+
+    def test_an_unchanged_evaluator_is_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_dir(tmp, [self.BINARY])
+            self.assertTrue(stored_scores_are_comparable(tmp, [self.BINARY]))
+
+    def test_a_reworded_prompt_is_still_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_dir(tmp, [self.BINARY])
+            reworded = {**self.BINARY, "system_prompt": "something else"}
+            self.assertTrue(stored_scores_are_comparable(tmp, [reworded]))
+
+    def test_a_different_judge_model_is_still_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_dir(tmp, [{**self.BINARY, "judge_model": "a"}])
+            self.assertTrue(
+                stored_scores_are_comparable(tmp, [{**self.BINARY, "judge_model": "b"}])
+            )
+
+    def test_pass_fail_turned_into_a_rating_is_not_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_dir(tmp, [self.BINARY])
+            self.assertFalse(stored_scores_are_comparable(tmp, [self.RATING]))
+
+    def test_a_widened_rating_range_is_not_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_dir(tmp, [self.RATING])
+            widened = {**self.RATING, "scale_max": 10}
+            self.assertFalse(stored_scores_are_comparable(tmp, [widened]))
+
+    def test_an_evaluator_the_prior_run_did_not_have_is_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._run_dir(tmp, [self.BINARY])
+            added = {"name": "extra", "system_prompt": "p"}
+            self.assertTrue(stored_scores_are_comparable(tmp, [self.BINARY, added]))
+
+    def test_no_prior_config_is_not_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertFalse(stored_scores_are_comparable(tmp, [self.BINARY]))
+
+    def test_an_unreadable_config_is_not_comparable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "config.json"), "w") as f:
+                f.write("{not json")
+            self.assertFalse(stored_scores_are_comparable(tmp, [self.BINARY]))
+
+
+class TestPartialResultsWriter(unittest.TestCase):
+    EVALUATORS = {"q": {"name": "q"}}
+    BASE = [{"id": "1", "gt": "a"}, {"id": "row_b", "gt": "b"}]
+
+    def _judged(self, match, reasoning):
+        return evaluator_row_columns(
+            self.EVALUATORS, {"q": {"match": match, "reasoning": reasoning}}
+        )
+
+    def test_only_judged_rows_are_written(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            writer = PartialResultsWriter(path, self.BASE)
+            writer.update(1, self._judged(True, "ok"))
+            rows = read_existing_rows(path)
+            self.assertEqual(set(rows), {"row_b"})
+            writer.update(0, self._judged(False, "no"))
+            self.assertEqual(set(read_existing_rows(path)), {"1", "row_b"})
+
+    def test_rows_are_written_in_dataset_order(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            writer = PartialResultsWriter(path, self.BASE)
+            writer.update(1, self._judged(True, "ok"))
+            writer.update(0, self._judged(False, "no"))
+            self.assertEqual(list(read_existing_rows(path)), ["1", "row_b"])
+
+    def test_several_judges_fill_one_row(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            writer = PartialResultsWriter(path, self.BASE)
+            writer.update(0, {"semantic_wer": 0.1})
+            writer.update(0, self._judged(True, "ok"))
+            row = read_existing_rows(path)["1"]
+            self.assertEqual(row["semantic_wer"], "0.1")
+            self.assertEqual(row["q"], "True")
+
+    def test_a_resumed_run_keeps_the_rows_it_started_with(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            first = PartialResultsWriter(path, self.BASE)
+            first.update(0, self._judged(False, "no"))
+
+            second = PartialResultsWriter(path, self.BASE, read_existing_rows(path))
+            second.update(1, self._judged(True, "ok"))
+
+            rows = read_existing_rows(path)
+            self.assertEqual(set(rows), {"1", "row_b"})
+            self.assertEqual(rows["1"]["q"], "False")
+            self.assertEqual(rows["1"]["q_reasoning"], "no")
+
+    def test_a_row_not_in_the_dataset_is_dropped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            writer = PartialResultsWriter(
+                path, self.BASE, {"ghost": {"id": "ghost", "q": "True"}}
+            )
+            writer.update(0, self._judged(True, "ok"))
+            self.assertEqual(set(read_existing_rows(path)), {"1"})
+
+    def test_the_dataset_owns_its_own_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            stale = {"1": {"id": "1", "gt": "stale", "q": "True"}}
+            writer = PartialResultsWriter(path, self.BASE, stale)
+            writer.update(1, self._judged(True, "ok"))
+            self.assertEqual(read_existing_rows(path)["1"]["gt"], "a")
+
+    def test_a_blank_stored_value_is_not_carried_over(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            stale = {"1": {"id": "1", "gt": "a", "q": "", "q_reasoning": ""}}
+            writer = PartialResultsWriter(path, self.BASE, stale)
+            writer.update(1, self._judged(True, "ok"))
+            self.assertIsNone(stored_cell(read_existing_rows(path)["1"], "q"))
+
+    def test_nothing_is_written_before_the_first_result(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "results.csv")
+            PartialResultsWriter(path, self.BASE)
+            self.assertFalse(os.path.exists(path))
+
+    def test_a_write_failure_does_not_take_down_the_run(self):
+        writer = PartialResultsWriter(
+            os.path.join("no", "such", "dir", "results.csv"), self.BASE
+        )
+        writer.update(0, self._judged(True, "ok"))
 
 
 if __name__ == "__main__":

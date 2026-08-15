@@ -6,6 +6,7 @@ Run with:
 """
 
 import asyncio
+import json
 import os
 import tempfile
 import unittest
@@ -719,6 +720,496 @@ class TestTTSPartialResults(unittest.IsolatedAsyncioTestCase):
                 )
 
             self.assertEqual(seen["mid_run"], synthesis_csv)
+
+
+QUALITY_EVALUATOR = {
+    "name": "quality",
+    "system_prompt": "judge quality",
+    "judge_model": "openai/gpt-audio",
+    "type": "binary",
+}
+
+
+def _make_eval_only_run_dir(tmp: str, rows: list[dict]) -> str:
+    """Create a run dir whose results.csv holds ``rows`` (id + text), one WAV each."""
+    run_dir = os.path.join(tmp, "openai")
+    os.makedirs(os.path.join(run_dir, "audios"), exist_ok=True)
+    records = []
+    for row in rows:
+        name = f"{row['id']}.wav"
+        _write_wav(os.path.join(run_dir, "audios", name))
+        records.append(
+            {"id": row["id"], "text": row["text"], "audio_path": f"audios/{name}"}
+        )
+    pd.DataFrame(records).to_csv(os.path.join(run_dir, "results.csv"), index=False)
+    return run_dir
+
+
+def _audio(run_dir: str, row_id: str) -> str:
+    """The audio path an eval-only run stores for a row: resolved and absolute."""
+    return os.path.abspath(os.path.join(run_dir, "audios", f"{row_id}.wav"))
+
+
+def _write_prior_eval(out: str, rows: list[dict], evaluators=None) -> None:
+    """Stand in for an eval-only run that was killed part-way.
+
+    Writes both files such a run leaves behind: the config.json recording how
+    its scores were produced, and the results.csv holding them.
+    """
+    from calibrate_agent.judges import write_evaluator_config
+
+    os.makedirs(out, exist_ok=True)
+    write_evaluator_config(out, evaluators or [QUALITY_EVALUATOR])
+    pd.DataFrame(rows).to_csv(os.path.join(out, "results.csv"), index=False)
+
+
+class TestTTSEvalOnlyResume(unittest.IsolatedAsyncioTestCase):
+    """Eval-only picks up where a killed run stopped, and --overwrite starts over."""
+
+    def setUp(self):
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        self.tts_metrics = tts_metrics
+
+    async def _run(self, run_dir, out, judge, evaluators=None, overwrite=False):
+        from calibrate_agent.tts import eval as tts_eval
+
+        with patch.object(self.tts_metrics, "tts_llm_judge", judge):
+            return await tts_eval.run_eval_only(
+                dataset_path=run_dir,
+                output_dir=out,
+                judge_evaluators=evaluators or [QUALITY_EVALUATOR],
+                overwrite=overwrite,
+            )
+
+    @staticmethod
+    def _judge(name="quality"):
+        async def fake_judge(audio_path, reference_text, **kwargs):
+            return {
+                name: {
+                    "match": reference_text == "first",
+                    "reasoning": f"{name}:{reference_text}",
+                }
+            }
+
+        return AsyncMock(side_effect=fake_judge)
+
+    async def test_only_missing_rows_are_judged_and_all_rows_land_in_results(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(
+                tmp,
+                [
+                    {"id": "row_a", "text": "first"},
+                    {"id": "row_b", "text": "second"},
+                ],
+            )
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": True,
+                        "quality_reasoning": "kept",
+                    }
+                ],
+            )
+
+            judge = self._judge()
+            result = await self._run(run_dir, out, judge)
+
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["id"]), ["row_a", "row_b"])
+            self.assertEqual(list(df["quality_reasoning"]), ["kept", "quality:second"])
+            self.assertTrue(df.iloc[0]["audio_path"].endswith("audios/row_a.wav"))
+
+    async def test_row_whose_audio_file_changed_is_judged_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": os.path.join(tmp, "older", "row_a.wav"),
+                        "quality": True,
+                        "quality_reasoning": "scored the older audio",
+                    }
+                ],
+            )
+
+            judge = self._judge()
+            await self._run(run_dir, out, judge)
+
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["quality_reasoning"]), ["quality:first"])
+
+    async def test_row_whose_text_changed_is_judged_again(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "an older line",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": True,
+                        "quality_reasoning": "scored the older line",
+                    }
+                ],
+            )
+
+            judge = self._judge()
+            await self._run(run_dir, out, judge)
+
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["quality_reasoning"]), ["quality:first"])
+
+    async def test_rows_to_be_judged_again_are_left_out_of_the_partial_file(self):
+        """A row that must be judged again shows no score until it is judged."""
+        seen = {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(
+                tmp,
+                [
+                    {"id": "row_a", "text": "first"},
+                    {"id": "row_b", "text": "second"},
+                ],
+            )
+            out = os.path.join(tmp, "eval")
+            results_path = os.path.join(out, "results.csv")
+            # Prior run scored both rows on ``quality`` only. Adding a second
+            # evaluator means every row has to be judged again.
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": row_id,
+                        "text": text,
+                        "audio_path": _audio(run_dir, row_id),
+                        "quality": True,
+                        "quality_reasoning": "from the old run",
+                    }
+                    for row_id, text in (("row_a", "first"), ("row_b", "second"))
+                ],
+            )
+
+            async def fake_judge(audio_path, reference_text, **kwargs):
+                if reference_text == "second":
+                    await asyncio.sleep(0.05)
+                    seen["partial"] = pd.read_csv(results_path)
+                return {
+                    "quality": {"match": True, "reasoning": "new"},
+                    "clarity": {"match": True, "reasoning": "new"},
+                }
+
+            await self._run(
+                run_dir,
+                out,
+                AsyncMock(side_effect=fake_judge),
+                evaluators=[
+                    QUALITY_EVALUATOR,
+                    dict(QUALITY_EVALUATOR, name="clarity"),
+                ],
+            )
+
+            self.assertEqual(list(seen["partial"]["id"]), ["row_a"])
+            self.assertEqual(list(seen["partial"]["quality_reasoning"]), ["new"])
+
+    async def test_resumed_metrics_match_a_single_run(self):
+        rows = [
+            {"id": "row_a", "text": "first"},
+            {"id": "row_b", "text": "second"},
+            {"id": "row_c", "text": "third"},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, rows)
+
+            whole = os.path.join(tmp, "whole")
+            await self._run(run_dir, whole, self._judge())
+            with open(os.path.join(whole, "metrics.json")) as f:
+                whole_metrics = json.load(f)
+
+            partial = os.path.join(tmp, "partial")
+            _write_prior_eval(
+                partial,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": True,
+                        "quality_reasoning": "quality:first",
+                    }
+                ],
+            )
+            judge = self._judge()
+            await self._run(run_dir, partial, judge)
+            with open(os.path.join(partial, "metrics.json")) as f:
+                partial_metrics = json.load(f)
+
+            self.assertEqual(judge.await_count, 2)
+            self.assertEqual(partial_metrics, whole_metrics)
+            self.assertAlmostEqual(partial_metrics["quality"]["mean"], 1 / 3)
+
+    async def test_overwrite_starts_clean(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(
+                tmp,
+                [{"id": "row_a", "text": "first"}, {"id": "row_b", "text": "second"}],
+            )
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": True,
+                        "quality_reasoning": "stale",
+                    }
+                ],
+            )
+            with open(os.path.join(out, "metrics.json"), "w") as f:
+                json.dump({"quality": {"type": "binary", "mean": 0.0}}, f)
+
+            judge = self._judge()
+            await self._run(run_dir, out, judge, overwrite=True)
+
+            self.assertEqual(judge.await_count, 2)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(
+                list(df["quality_reasoning"]), ["quality:first", "quality:second"]
+            )
+            with open(os.path.join(out, "metrics.json")) as f:
+                self.assertAlmostEqual(json.load(f)["quality"]["mean"], 0.5)
+
+    async def test_changed_evaluator_set_is_rejudged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": True,
+                        "quality_reasoning": "old evaluator",
+                    }
+                ],
+            )
+
+            judge = self._judge(name="clarity")
+            await self._run(
+                run_dir,
+                out,
+                judge,
+                evaluators=[dict(QUALITY_EVALUATOR, name="clarity")],
+            )
+
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["clarity_reasoning"]), ["clarity:first"])
+
+    async def test_numeric_looking_id_resumes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(
+                tmp, [{"id": "1", "text": "first"}, {"id": "2", "text": "second"}]
+            )
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "1",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "1"),
+                        "quality": True,
+                        "quality_reasoning": "kept",
+                    }
+                ],
+            )
+
+            judge = self._judge()
+            await self._run(run_dir, out, judge)
+
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["quality_reasoning"]), ["kept", "quality:second"])
+
+    async def test_blank_score_cell_is_rejudged(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": "",
+                        "quality_reasoning": "",
+                    }
+                ],
+            )
+
+            judge = self._judge()
+            await self._run(run_dir, out, judge)
+
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["quality_reasoning"]), ["quality:first"])
+
+    async def test_row_missing_from_dataset_is_dropped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_gone",
+                        "text": "removed",
+                        "audio_path": _audio(run_dir, "row_gone"),
+                        "quality": True,
+                        "quality_reasoning": "old",
+                    }
+                ],
+            )
+
+            await self._run(run_dir, out, self._judge())
+
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["id"]), ["row_a"])
+
+    async def test_evaluator_that_became_a_rating_rejudges_every_row(self):
+        rating_ev = dict(
+            QUALITY_EVALUATOR, type="rating", scale_min=1, scale_max=5
+        )
+
+        async def fake_judge(audio_path, reference_text, **kwargs):
+            return {"quality": {"score": 4, "reasoning": "rated"}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": True,
+                        "quality_reasoning": "pass/fail from the old run",
+                    }
+                ],
+            )
+
+            judge = AsyncMock(side_effect=fake_judge)
+            await self._run(run_dir, out, judge, evaluators=[rating_ev])
+
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["quality"]), [4])
+            with open(os.path.join(out, "metrics.json")) as f:
+                metrics = json.load(f)
+            self.assertEqual(metrics["quality"]["mean"], 4.0)
+
+    async def test_widened_rating_range_rejudges_every_row(self):
+        def rating(scale_max):
+            return dict(
+                QUALITY_EVALUATOR, type="rating", scale_min=1, scale_max=scale_max
+            )
+
+        async def fake_judge(audio_path, reference_text, **kwargs):
+            return {"quality": {"score": 9, "reasoning": "rated"}}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": 5,
+                        "quality_reasoning": "top of the old range",
+                    }
+                ],
+                evaluators=[rating(5)],
+            )
+
+            judge = AsyncMock(side_effect=fake_judge)
+            await self._run(run_dir, out, judge, evaluators=[rating(10)])
+
+            self.assertEqual(judge.await_count, 1)
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["quality"]), [9])
+
+    async def test_reworded_prompt_still_reuses_stored_scores(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(tmp, [{"id": "row_a", "text": "first"}])
+            out = os.path.join(tmp, "eval")
+            _write_prior_eval(
+                out,
+                [
+                    {
+                        "id": "row_a",
+                        "text": "first",
+                        "audio_path": _audio(run_dir, "row_a"),
+                        "quality": True,
+                        "quality_reasoning": "kept",
+                    }
+                ],
+            )
+
+            judge = self._judge()
+            await self._run(
+                run_dir,
+                out,
+                judge,
+                evaluators=[
+                    dict(QUALITY_EVALUATOR, system_prompt="judge quality, carefully")
+                ],
+            )
+
+            judge.assert_not_awaited()
+            df = pd.read_csv(os.path.join(out, "results.csv"))
+            self.assertEqual(list(df["quality_reasoning"]), ["kept"])
+
+    async def test_duplicate_ids_rejected(self):
+        from calibrate_agent.tts import eval as tts_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = _make_eval_only_run_dir(
+                tmp, [{"id": "row_a", "text": "first"}, {"id": "row_a", "text": "again"}]
+            )
+            result = await tts_eval.run_eval_only(
+                dataset_path=run_dir,
+                output_dir=os.path.join(tmp, "eval"),
+                judge_evaluators=[QUALITY_EVALUATOR],
+            )
+            self.assertEqual(result["status"], "error")
+            self.assertIn("Duplicate row id", result["error"])
+            self.assertIn("row_a", result["error"])
 
 
 if __name__ == "__main__":

@@ -300,5 +300,117 @@ class TestGeneralJudgeOnRow(unittest.IsolatedAsyncioTestCase):
         )
 
 
+class TestGetGeneralJudgeScoreKnown(unittest.IsolatedAsyncioTestCase):
+    """``known`` rows are carried through without being judged again."""
+
+    @staticmethod
+    async def _fake(_input, output, **kwargs):
+        return {"faithful": {"reasoning": output, "match": output == "o3"}}
+
+    async def test_known_rows_are_not_judged_again(self):
+        judge = AsyncMock(side_effect=self._fake)
+        carried = {"faithful": {"reasoning": "from disk", "match": True}}
+        with patch("calibrate_agent.general.metrics.general_judge", judge):
+            result = await get_general_judge_score(
+                inputs=["i1", "i2", "i3"],
+                outputs=["o1", "o2", "o3"],
+                evaluators=[BINARY_EV],
+                known=[carried, None, None],
+            )
+        self.assertEqual(judge.await_count, 2)
+        self.assertEqual(
+            [row["faithful"]["reasoning"] for row in result["per_row"]],
+            ["from disk", "o2", "o3"],
+        )
+        # Mean covers every row: True, False, True.
+        self.assertAlmostEqual(result["scores"]["faithful"]["mean"], 2 / 3)
+
+    async def test_all_rows_known_skips_the_judge(self):
+        judge = AsyncMock(side_effect=self._fake)
+        rows = [
+            {"faithful": {"reasoning": "a", "match": True}},
+            {"faithful": {"reasoning": "b", "match": False}},
+        ]
+        with patch("calibrate_agent.general.metrics.general_judge", judge):
+            result = await get_general_judge_score(
+                inputs=["i1", "i2"],
+                outputs=["o1", "o2"],
+                evaluators=[BINARY_EV],
+                known=list(rows),
+            )
+        judge.assert_not_awaited()
+        self.assertEqual(result["per_row"], rows)
+        self.assertAlmostEqual(result["scores"]["faithful"]["mean"], 0.5)
+
+    async def test_on_row_uses_the_dataset_index(self):
+        seen = []
+        with patch(
+            "calibrate_agent.general.metrics.general_judge",
+            AsyncMock(side_effect=self._fake),
+        ):
+            await get_general_judge_score(
+                inputs=["i1", "i2", "i3"],
+                outputs=["o1", "o2", "o3"],
+                evaluators=[BINARY_EV],
+                known=[{"faithful": {"reasoning": "x", "match": True}}, None, None],
+                on_row=lambda index, row: seen.append(
+                    (index, row["faithful"]["reasoning"])
+                ),
+            )
+        self.assertEqual(sorted(seen), [(1, "o2"), (2, "o3")])
+
+    async def test_arguments_stay_with_their_row_when_rows_are_skipped(self):
+        seen_by_output = {}
+
+        async def fake(_input, output, evaluators, **kwargs):
+            seen_by_output[output] = evaluators[0]["system_prompt"]
+            return {"faithful": {"reasoning": output, "match": True}}
+
+        with patch(
+            "calibrate_agent.general.metrics.general_judge", AsyncMock(side_effect=fake)
+        ):
+            await get_general_judge_score(
+                inputs=["i1", "i2", "i3"],
+                outputs=["o1", "o2", "o3"],
+                evaluators=[TEMPLATED_EV],
+                arguments_list=[
+                    {"faithful": {"reference": "gold-A"}},
+                    {"faithful": {"reference": "gold-B"}},
+                    {"faithful": {"reference": "gold-C"}},
+                ],
+                known=[{"faithful": {"reasoning": "x", "match": True}}, None, None],
+            )
+        self.assertEqual(
+            seen_by_output,
+            {"o2": "judge against gold-B", "o3": "judge against gold-C"},
+        )
+
+    async def test_unknown_evaluator_name_is_caught_on_an_already_judged_row(self):
+        """A misspelled name stops the run whether or not that row is judged."""
+        judge = AsyncMock(side_effect=self._fake)
+        with patch("calibrate_agent.general.metrics.general_judge", judge):
+            with self.assertRaises(ValueError) as ctx:
+                await get_general_judge_score(
+                    inputs=["i1", "i2"],
+                    outputs=["o1", "o2"],
+                    evaluators=[TEMPLATED_EV],
+                    arguments_list=[
+                        {"fathful": {"reference": "gold-A"}},
+                        {"faithful": {"reference": "gold-B"}},
+                    ],
+                    known=[{"faithful": {"reasoning": "x", "match": True}}, None],
+                )
+        self.assertIn("fathful", str(ctx.exception))
+
+    async def test_known_length_mismatch_raises(self):
+        with self.assertRaises(ValueError):
+            await get_general_judge_score(
+                inputs=["i1", "i2"],
+                outputs=["o1", "o2"],
+                evaluators=[BINARY_EV],
+                known=[None],
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

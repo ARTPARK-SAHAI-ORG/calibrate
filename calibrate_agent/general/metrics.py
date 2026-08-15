@@ -95,11 +95,17 @@ async def get_general_judge_score(
     fallback_model: str = DEFAULT_GENERAL_JUDGE_MODEL,
     arguments_list: Optional[List[Optional[dict]]] = None,
     on_row: Optional[Callable] = None,
+    known: Optional[List[Optional[dict]]] = None,
 ) -> dict:
     """Run the general judge across all rows and aggregate per-evaluator scores.
 
     ``on_row`` is called with ``(row_index, row_result)`` as each row's judge
     finishes, so a caller can persist results as they arrive.
+
+    ``known`` optionally supplies an already-judged result per row (``None``
+    where the row still needs judging), so a resumed run only pays for the rows
+    it is missing. It must be the same length as ``inputs``; aggregation covers
+    every row either way, so the means match a single run over all rows.
 
     ``inputs`` and ``outputs`` are positionally paired; ``inputs[i]`` may be
     ``None`` to judge ``outputs[i]`` on its own.
@@ -150,15 +156,28 @@ async def get_general_judge_score(
             f"(got {len(arguments_list)} arguments, {len(inputs)} inputs)."
         )
 
+    if known is not None and len(known) != len(inputs):
+        raise ValueError(
+            f"known must be the same length as inputs "
+            f"(got {len(known)} known, {len(inputs)} inputs)."
+        )
+
     evaluator_names = {ev["name"] for ev in evaluators}
 
     coroutines = []
+    pending_indices = []
     for i, (input_text, output) in enumerate(zip(inputs, outputs)):
         row_arguments = arguments_list[i] if arguments_list is not None else None
         if row_arguments:
+            # Checked for every row, judged or not, so a misspelled evaluator
+            # name is caught the same way whether or not the row is being
+            # judged this time.
             ensure_known_evaluator_names(
                 row_arguments, evaluator_names, context=f"Row {i} arguments"
             )
+        if known is not None and known[i] is not None:
+            continue
+        if row_arguments:
             row_evaluators = [
                 render_evaluator(ev, row_arguments.get(ev["name"]))
                 for ev in evaluators
@@ -173,11 +192,23 @@ async def get_general_judge_score(
                 fallback_model=fallback_model,
             )
         )
+        pending_indices.append(i)
 
-    results = await tqdm_asyncio.gather(
-        *with_row_callback(coroutines, on_row),
+    # ``with_row_callback`` numbers coroutines by their position in the list it
+    # is given, which is not the dataset row once judged rows are skipped.
+    row_callback = (
+        (lambda position, result: on_row(pending_indices[position], result))
+        if on_row
+        else None
+    )
+    judged = await tqdm_asyncio.gather(
+        *with_row_callback(coroutines, row_callback),
         desc="Running general evaluators",
     )
+
+    results = list(known) if known is not None else [None] * len(inputs)
+    for i, result in zip(pending_indices, judged):
+        results[i] = result
 
     scores: dict = {}
     for ev in evaluators:

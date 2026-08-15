@@ -250,6 +250,7 @@ async def main():
             dataset_path=args.dataset,
             output_dir=args.output_dir,
             judge_evaluators=judge_evaluators,
+            overwrite=args.overwrite,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")

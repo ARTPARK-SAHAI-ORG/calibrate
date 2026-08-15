@@ -2127,6 +2127,7 @@ async def run_eval_only_tests(
     dataset: list[dict],
     output_dir: str,
     test_parallel: Optional[int] = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run evaluators on a pre-existing dataset of (test_case, output) pairs.
 
@@ -2134,8 +2135,13 @@ async def run_eval_only_tests(
     dataset item must have a ``test_case`` (with ``history`` and
     ``evaluation``) and an ``output`` (with ``response`` and ``tool_calls``).
 
-    Writes ``results.json`` and ``metrics.json`` to ``output_dir``.
+    Writes ``results.json`` and ``metrics.json`` to ``output_dir``. When
+    ``overwrite`` is False, test cases already completed in a prior
+    ``results.json`` are reused instead of being evaluated again.
     """
+    test_cases = [item["test_case"] for item in dataset]
+    require_unique_test_case_ids(test_cases)
+
     os.makedirs(output_dir, exist_ok=True)
 
     name_to_evaluator = _get_name_to_evaluator_dict(config)
@@ -2154,6 +2160,11 @@ async def run_eval_only_tests(
     _print_and_log("\n\033[94mEval-only\033[0m\n", print_log_save_path)
 
     results_file_path = join(output_dir, "results.json")
+
+    if overwrite:
+        for stale in (results_file_path, join(output_dir, "metrics.json")):
+            if exists(stale):
+                os.remove(stale)
 
     tools = config.get("tools", []) or []
 
@@ -2199,8 +2210,30 @@ async def run_eval_only_tests(
             result["test_case_id"] = test_case["id"]
         return result
 
+    initial_results = _load_resumable_results(
+        results_file_path, test_cases, overwrite
+    )
+    # The graded answer is supplied by the dataset, not produced by a model, so
+    # a stored verdict is only valid while the answer it was judged against is
+    # unchanged. Edit the answer under the same id and that case is re-judged.
+    initial_results = [
+        prior if prior is not None and prior.get("output") == item["output"] else None
+        for prior, item in zip(initial_results, dataset)
+    ]
+    resumed_count = sum(1 for r in initial_results if r is not None)
+    if resumed_count:
+        _print_and_log(
+            f"↻ Resuming: {resumed_count}/{len(dataset)} "
+            f"test case(s) already completed; re-running the rest",
+            print_log_save_path,
+        )
+
     results = await _run_items_parallel(
-        dataset, process, results_file_path, test_parallel
+        dataset,
+        process,
+        results_file_path,
+        test_parallel,
+        initial_results=initial_results,
     )
 
     passed, total = _write_test_results_outputs(results, output_dir, name_to_evaluator)
@@ -2272,6 +2305,11 @@ async def main():
         help="Number of test cases to evaluate in debug mode (default: 5)",
     )
     parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Force a clean run instead of resuming completed test cases from a prior results.json",
+    )
+    parser.add_argument(
         "--eval-only",
         action="store_true",
         help="Skip LLM inference and run evaluators on a dataset of (test_case, output) pairs",
@@ -2313,12 +2351,17 @@ async def main():
         print("")
 
         os.makedirs(args.output_dir, exist_ok=True)
-        result = await run_eval_only_tests(
-            config=config,
-            dataset=dataset,
-            output_dir=args.output_dir,
-            test_parallel=args.parallel,
-        )
+        try:
+            result = await run_eval_only_tests(
+                config=config,
+                dataset=dataset,
+                output_dir=args.output_dir,
+                test_parallel=args.parallel,
+                overwrite=args.overwrite,
+            )
+        except ValueError as e:
+            print(f"\033[31mDataset validation error: {e}\033[0m")
+            sys.exit(1)
         passed = result["passed"]
         total = result["total"]
         pct = (passed / total * 100) if total else 0.0
@@ -2352,6 +2395,7 @@ async def main():
         config=config,
         output_dir=args.output_dir,
         test_parallel=args.parallel,
+        overwrite=args.overwrite,
     )
 
     # Print summary

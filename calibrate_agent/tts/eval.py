@@ -42,7 +42,10 @@ from calibrate_agent.judges import (
     DEFAULT_TTS_EVALUATOR,
     PartialResultsWriter,
     evaluator_row_columns,
+    evaluator_row_from_columns,
+    read_existing_rows,
     require_unique_evaluator_names,
+    stored_scores_are_comparable,
     write_evaluator_config,
 )
 from calibrate_agent.langfuse import (
@@ -859,6 +862,23 @@ TTS_LANGUAGES = [
 ]
 
 
+def _matching_stored_row(stored: dict, text: str, audio_path: str) -> dict:
+    """Return the stored row only when the judge would hear and read the same
+    thing again.
+
+    The stored score describes the ``text`` and the audio file the row carried
+    when it was judged. If either has changed, that score no longer describes
+    this row, so it counts as unjudged.
+    """
+    if not stored:
+        return None
+    if str(stored.get("text", "")) != str(text):
+        return None
+    if str(stored.get("audio_path", "")) != str(audio_path):
+        return None
+    return stored
+
+
 async def _score_and_write_results(
     ids: list,
     texts: list[str],
@@ -869,6 +889,7 @@ async def _score_and_write_results(
     ttfb_values: list = None,
     cost_metrics: dict = None,
     stream_rows: bool = False,
+    existing_rows: dict = None,
 ) -> dict:
     """Run the TTS audio judge over (audio_path, text) pairs and write outputs.
 
@@ -888,6 +909,12 @@ async def _score_and_write_results(
     carries no ``ttfb``, so replacing that file mid-judge leaves it missing a
     column ``validate_existing_results_csv`` requires — the next run stops with
     an error until ``--overwrite``, which re-synthesizes every row.
+
+    ``existing_rows`` maps an id to its row from a prior run's ``results.csv``.
+    A row whose every configured evaluator already has a value, and whose
+    ``text`` and ``audio_path`` still match the dataset, is carried over
+    instead of being judged again. Rows in ``existing_rows`` that are not in
+    ``ids``, and rows that have to be judged again, are left out of the output.
     """
     _log("Running evaluators...")
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
@@ -895,28 +922,46 @@ async def _score_and_write_results(
     write_evaluator_config(evaluator_config_dir, _evaluators)
     # Map evaluator name → evaluator dict (for per-row value extraction).
     _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
+    existing_rows = existing_rows or {}
+    matched = [
+        _matching_stored_row(existing_rows.get(str(_id)), text, audio_path)
+        for _id, text, audio_path in zip(ids, texts, audio_paths)
+    ]
+    known = [
+        evaluator_row_from_columns(_evaluators_by_name, stored) for stored in matched
+    ]
     partial_writer = (
         PartialResultsWriter(
             join(output_dir, "results.csv"),
-            _evaluators_by_name,
             [
                 {"id": _id, "text": text, "audio_path": audio_path}
                 for _id, text, audio_path in zip(ids, texts, audio_paths)
             ],
+            # Only rows this run carries over as they are. A row that has to be
+            # judged again would otherwise show its old scores in results.csv
+            # before any judging has happened.
+            {
+                str(_id): stored
+                for _id, stored, row in zip(ids, matched, known)
+                if row is not None and stored is not None
+            },
         )
         if stream_rows
         else None
     )
-    try:
-        llm_judge_results = await get_tts_llm_judge_score(
-            audio_paths,
-            texts,
-            evaluators=_evaluators,
-            on_row=partial_writer.write if partial_writer else None,
+
+    def _on_row(index: int, judge_row: dict) -> None:
+        partial_writer.update(
+            index, evaluator_row_columns(_evaluators_by_name, judge_row)
         )
-    finally:
-        if partial_writer:
-            partial_writer.close()
+
+    llm_judge_results = await get_tts_llm_judge_score(
+        audio_paths,
+        texts,
+        evaluators=_evaluators,
+        on_row=_on_row if partial_writer else None,
+        known=known,
+    )
     for name, score_dict in llm_judge_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
 
@@ -1091,7 +1136,8 @@ def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]
     ignored. Each ``audio_path`` is resolved to an existing absolute path,
     tried as given (relative to the CWD) and, as a fallback, under
     ``{run_dir}/audios/{basename}`` (the fixed run layout) so it resolves
-    regardless of the CWD.
+    regardless of the CWD. Ids must be unique — a resumed run matches its
+    stored results by id.
 
     Returns:
         tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
@@ -1123,7 +1169,17 @@ def validate_tts_eval_only_dataset(run_dir: str) -> tuple[bool, str, list[dict]]
         return False, f"results.csv is empty: {csv_path}", []
 
     rows = []
+    seen_ids: set = set()
     for i, r in df[["id", "text", "audio_path"]].iterrows():
+        row_id = str(r["id"])
+        if row_id in seen_ids:
+            return (
+                False,
+                f"Duplicate row id: {row_id!r}. Ids must be unique so a "
+                f"resumed run can tell the rows apart.",
+                [],
+            )
+        seen_ids.add(row_id)
         audio_path = str(r["audio_path"])
         candidates = [audio_path]
         if not os.path.isabs(audio_path):
@@ -1142,6 +1198,7 @@ async def run_eval_only(
     dataset_path: str,
     output_dir: str,
     judge_evaluators: list[dict] = None,
+    overwrite: bool = False,
 ) -> dict:
     """Run the TTS audio judge only, on a prior run's audio. Skips synthesis
     and reads the run directory's ``results.csv`` directly. Writes
@@ -1154,6 +1211,9 @@ async def run_eval_only(
         output_dir: Directory to write results and metrics.
         judge_evaluators: Optional list of evaluator dicts. Defaults to the
             built-in TTS evaluator (``DEFAULT_TTS_EVALUATOR``) when omitted.
+        overwrite: Delete ``output_dir``'s ``results.csv`` and ``metrics.json``
+            first, so every row is judged again. Without it, rows already
+            scored by every configured evaluator are carried over.
 
     Returns:
         dict with status, metrics, and output_dir.
@@ -1170,6 +1230,12 @@ async def run_eval_only(
         }
 
     os.makedirs(output_dir, exist_ok=True)
+
+    results_csv_path = join(output_dir, "results.csv")
+    if overwrite:
+        for path in (results_csv_path, join(output_dir, "metrics.json")):
+            if exists(path):
+                os.remove(path)
 
     log_save_path = join(output_dir, "logs")
     if exists(log_save_path):
@@ -1190,6 +1256,19 @@ async def run_eval_only(
         texts = [str(r["text"]) for r in rows]
         audio_paths = [r["audio_path"] for r in rows]
 
+        # Asked before ``_score_and_write_results`` writes the new config.json
+        # over the prior run's. An evaluator that kept its name but changed
+        # from pass/fail to a rating, or changed its rating range, makes every
+        # stored score unusable: they would be averaged with scores that mean
+        # something else.
+        existing_rows = (
+            read_existing_rows(results_csv_path)
+            if stored_scores_are_comparable(
+                output_dir, judge_evaluators or [DEFAULT_TTS_EVALUATOR]
+            )
+            else {}
+        )
+
         # No synthesis here, so no TTFB: ttfb_values=None omits the column and
         # the percentile metrics. Metrics + results + evaluator config all land
         # in ``output_dir``.
@@ -1202,6 +1281,7 @@ async def run_eval_only(
             judge_evaluators=judge_evaluators,
             ttfb_values=None,
             stream_rows=True,
+            existing_rows=existing_rows,
         )
 
         return {

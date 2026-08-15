@@ -70,7 +70,7 @@ class TestValidateSimulationEvalOnlyDataset(unittest.TestCase):
         from calibrate_agent.llm.run_simulation import validate_simulation_eval_only_dataset
 
         ok, _ = validate_simulation_eval_only_dataset([
-            {"conversation_history": [{"role": "user", "content": "hi"}]}
+            {"id": "row_a", "conversation_history": [{"role": "user", "content": "hi"}]}
         ])
         self.assertTrue(ok)
 
@@ -153,8 +153,15 @@ class TestRunEvalOnlySimulations(unittest.IsolatedAsyncioTestCase):
                 failed = await run_eval_only_simulations(
                     config={"evaluators": [_bin_ev("x")]},
                     dataset=[
-                        {"conversation_history": [{"role": "user", "content": "hi"}], "name": "a"},
-                        {"conversation_history": [{"role": "user", "content": "hi2"}]},
+                        {
+                            "id": "row_a",
+                            "conversation_history": [{"role": "user", "content": "hi"}],
+                            "name": "a",
+                        },
+                        {
+                            "id": "row_b",
+                            "conversation_history": [{"role": "user", "content": "hi2"}],
+                        },
                     ],
                     output_dir=str(out),
                     parallel=2,
@@ -270,7 +277,7 @@ class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):
             cfg.write_text(json.dumps({"evaluators": [_bin_ev("x")]}))
             ds = Path(tmp) / "ds.json"
             ds.write_text(json.dumps([
-                {"conversation_history": [{"role": "user", "content": "hi"}]}
+                {"id": "row_a", "conversation_history": [{"role": "user", "content": "hi"}]}
             ]))
             argv = ["sim.py", "-c", str(cfg), "-o", str(Path(tmp) / "out"),
                     "--eval-only", "--dataset", str(ds)]

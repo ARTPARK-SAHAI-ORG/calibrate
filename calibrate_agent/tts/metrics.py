@@ -70,11 +70,17 @@ async def get_tts_llm_judge_score(
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_TTS_JUDGE_MODEL,
     on_row: Optional[Callable] = None,
+    known: Optional[List] = None,
 ) -> dict:
     """Run TTS judge across all rows and aggregate per-evaluator scores.
 
     ``on_row`` is called with ``(row_index, row_result)`` as each row's judge
     finishes, so a caller can persist results as they arrive.
+
+    ``known`` holds one entry per row: the judge result a previous run already
+    produced for it, or None when the row still has to be judged. Only the None
+    rows cost a judge call; the rest are slotted back into dataset order so the
+    aggregated means match a single run over every row.
 
     Returns:
         {
@@ -91,20 +97,33 @@ async def get_tts_llm_judge_score(
     """
     evaluators = _resolve_evaluators(evaluators)
 
+    known = list(known) if known else [None] * len(audio_paths)
+    pending = [index for index, row in enumerate(known) if row is None]
+
     coroutines = [
         tts_llm_judge(
-            audio_path,
-            reference_text,
+            audio_paths[index],
+            reference_texts[index],
             evaluators=evaluators,
             fallback_model=fallback_model,
         )
-        for audio_path, reference_text in zip(audio_paths, reference_texts)
+        for index in pending
     ]
 
-    results = await tqdm_asyncio.gather(
-        *with_row_callback(coroutines, on_row),
+    # ``with_row_callback`` counts the coroutines it is given; map that count
+    # back to the row it came from so callers always see dataset positions.
+    row_callback = (
+        (lambda position, row: on_row(pending[position], row)) if on_row else None
+    )
+
+    judged = await tqdm_asyncio.gather(
+        *with_row_callback(coroutines, row_callback),
         desc="Running TTS evaluators",
     )
+
+    results = list(known)
+    for index, row in zip(pending, judged):
+        results[index] = row
 
     # Aggregate per-evaluator scores — binary: mean 0/1, rating: mean score
     scores: dict = {}

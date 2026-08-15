@@ -490,7 +490,12 @@ Examples:
         "--dataset",
         type=str,
         default=None,
-        help="Path to dataset JSON for --eval-only (list of {conversation_history, name?})",
+        help="Path to dataset JSON for --eval-only (list of {id, conversation_history, name?})",
+    )
+    sim_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Force a clean run instead of resuming completed simulations from a prior run (text simulations only)",
     )
 
     # Hidden internal subcommand for simulation leaderboard
@@ -526,6 +531,11 @@ Examples:
         type=str,
         default="./out",
         help="Output directory",
+    )
+    general_parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Force a clean run instead of resuming completed rows from a prior run",
     )
 
     # ── Status ────────────────────────────────────────────────────
@@ -577,6 +587,8 @@ Examples:
                 argv.extend(["--config", args.config])
             if args.skip_llm_judges:
                 argv.append("--skip-llm-judges")
+            if args.overwrite:
+                argv.append("--overwrite")
 
             sys.argv = argv
             asyncio.run(stt_benchmark_main())
@@ -631,6 +643,8 @@ Examples:
             argv.extend(["-o", args.output_dir])
             if args.config:
                 argv.extend(["--config", args.config])
+            if args.overwrite:
+                argv.append("--overwrite")
 
             sys.argv = argv
             asyncio.run(tts_benchmark_main())
@@ -682,6 +696,8 @@ Examples:
             if getattr(args, "debug", False):
                 argv.append("-d")
                 argv.extend(["-dc", str(args.debug_count)])
+            if getattr(args, "overwrite", False):
+                argv.append("--overwrite")
             sys.argv = argv
             asyncio.run(llm_run_tests_main())
         elif getattr(args, "verify", False):
@@ -830,6 +846,7 @@ Examples:
                     "provider",
                     "parallel",
                     "port",
+                    "overwrite",
                 },
             )
             leaderboard_main()
@@ -896,6 +913,14 @@ Examples:
         elif args.type == "voice":
             from calibrate_agent.agent.run_simulation import main as agent_main
 
+            if getattr(args, "overwrite", False):
+                print(
+                    "\033[31mError: --overwrite is only supported for "
+                    "--type text. Voice simulations always run from the "
+                    "start.\033[0m"
+                )
+                sys.exit(1)
+
             # Pre-verify external WebSocket voice agent if config has a
             # ws:// or wss:// agent_url.
             if args.config:
@@ -935,6 +960,7 @@ Examples:
                     "agent_headers",
                     "eval_only",
                     "dataset",
+                    "overwrite",
                 },
             )
             asyncio.run(agent_main())
@@ -951,6 +977,8 @@ Examples:
 
         argv = ["calibrate-agent", "--dataset", args.dataset, "-c", args.config]
         argv.extend(["-o", args.output_dir])
+        if args.overwrite:
+            argv.append("--overwrite")
         sys.argv = argv
         asyncio.run(general_eval_main())
 

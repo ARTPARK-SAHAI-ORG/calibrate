@@ -162,6 +162,36 @@ class TestTTSJudgeOnRow(unittest.IsolatedAsyncioTestCase):
             [row["quality"]["reasoning"] for row in result["per_row"]], ["hi", "bye"]
         )
 
+    async def test_known_rows_skip_the_judge_and_keep_dataset_positions(self):
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        judge = AsyncMock(
+            side_effect=lambda audio_path, reference_text, **kwargs: {
+                "quality": {"match": False, "reasoning": reference_text}
+            }
+        )
+        seen = []
+        with patch.object(tts_metrics, "tts_llm_judge", judge):
+            result = await tts_metrics.get_tts_llm_judge_score(
+                audio_paths=["/tmp/a.wav", "/tmp/b.wav", "/tmp/c.wav"],
+                reference_texts=["hi", "bye", "ciao"],
+                evaluators=self.EVALUATORS,
+                on_row=lambda index, row: seen.append(index),
+                known=[
+                    None,
+                    {"quality": {"match": True, "reasoning": "from a prior run"}},
+                    None,
+                ],
+            )
+
+        self.assertEqual(judge.await_count, 2)
+        self.assertEqual(sorted(seen), [0, 2])
+        self.assertEqual(
+            [row["quality"]["reasoning"] for row in result["per_row"]],
+            ["hi", "from a prior run", "ciao"],
+        )
+        self.assertAlmostEqual(result["scores"]["quality"]["mean"], 1 / 3)
+
 
 if __name__ == "__main__":
     unittest.main()
