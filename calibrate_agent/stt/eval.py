@@ -47,7 +47,10 @@ from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
 from calibrate_agent._env import resolve_stt_max_concurrency
 from calibrate_agent._cli_args import add_stt_eval_args
 from calibrate_agent.judges import (
+    arguments_shape_error,
+    ensure_known_evaluator_names,
     is_rating,
+    parse_arguments_column,
     require_unique_evaluator_names,
     write_evaluator_config,
 )
@@ -1161,6 +1164,11 @@ def validate_stt_input_dir(input_dir: str, input_file_name: str) -> tuple[bool, 
             f"CSV file missing required column 'text'. Found columns: {list(df.columns)}",
         )
 
+    try:
+        parse_arguments_column(df)
+    except ValueError as e:
+        return False, str(e)
+
     # Check if all audio files referenced in CSV exist
     missing_files = []
     for row_id in df["id"]:
@@ -1325,6 +1333,10 @@ async def run_single_provider_eval(
 
         total_expected = len(gt)
         gt_data = [{"id": row["id"], "gt": row["text"]} for _, row in gt.iterrows()]
+        # Rows are scored in results.csv order, which the resume path can
+        # reorder against the input CSV, so per-row arguments are looked up by
+        # id rather than by position.
+        arguments_by_id = dict(zip(gt["id"], parse_arguments_column(gt)))
 
         # Process with retry loop
         previous_processed_count = -1
@@ -1432,6 +1444,7 @@ async def run_single_provider_eval(
             audio_durations=audio_durations,
             cost_metrics=cost_metrics,
             ttfs_values=all_ttfs,
+            arguments_list=[arguments_by_id.get(row_id) for row_id in all_ids],
         )
 
         return {
@@ -1464,7 +1477,11 @@ def validate_stt_eval_only_dataset(dataset_path: str) -> tuple[bool, str, list[d
     if not isinstance(data, list):
         return False, "Dataset must be a JSON list of objects", []
 
+    if not data:
+        return False, "Dataset is empty \u2014 provide at least one row", []
+
     required = {"id", "gt", "pred"}
+    seen_ids: set = set()
     for i, row in enumerate(data):
         if not isinstance(row, dict):
             return False, f"Row {i} is not an object", []
@@ -1475,6 +1492,16 @@ def validate_stt_eval_only_dataset(dataset_path: str) -> tuple[bool, str, list[d
                 f"Row {i} missing required fields: {sorted(missing)}. Each row needs 'id', 'gt', 'pred'.",
                 [],
             )
+        if "arguments" in row:
+            err = arguments_shape_error(row["arguments"])
+            if err:
+                return False, f"Row {i} {err}", []
+        row_id = row["id"]
+        if not isinstance(row_id, (str, int, float, bool)):
+            return False, f"Row {i} field 'id' must be a string or number", []
+        if row_id in seen_ids:
+            return False, f"Duplicate row id: {row_id!r}", []
+        seen_ids.add(row_id)
 
     return True, "", data
 
@@ -1491,6 +1518,7 @@ async def _score_and_write_results(
     cost_metrics: dict | None = None,
     audio_durations: list[float | None] | None = None,
     ttfs_values: list = None,
+    arguments_list: list[dict | None] | None = None,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1571,11 +1599,28 @@ async def _score_and_write_results(
     if _evaluators:
         require_unique_evaluator_names(_evaluators)
         write_evaluator_config(evaluator_config_dir, _evaluators)
+        # A wrong row count, or a row naming an evaluator that does not exist,
+        # is a config mistake rather than a judge failure, so it stops the run
+        # instead of being caught below and dropping the evaluator columns.
+        if arguments_list is not None:
+            if len(arguments_list) != len(gt_transcripts):
+                raise ValueError(
+                    f"arguments_list must be the same length as references "
+                    f"(got {len(arguments_list)} arguments, "
+                    f"{len(gt_transcripts)} references)."
+                )
+            known = {ev["name"] for ev in _evaluators}
+            for i, row_arguments in enumerate(arguments_list):
+                if row_arguments:
+                    ensure_known_evaluator_names(
+                        row_arguments, known, context=f"Row {i} arguments"
+                    )
         try:
             llm_results = await get_llm_judge_score(
                 gt_transcripts,
                 pred_transcripts,
                 evaluators=_evaluators,
+                arguments_list=arguments_list,
             )
             for name, score_dict in llm_results["scores"].items():
                 _log(f"  {name}: {score_dict['mean']:.4f}")
@@ -1779,6 +1824,7 @@ async def run_eval_only(
             judge_evaluators=judge_evaluators,
             language=language,
             run_llm_judges=run_llm_judges,
+            arguments_list=[r.get("arguments") for r in rows],
         )
 
         return {
