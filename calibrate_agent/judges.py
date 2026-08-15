@@ -39,16 +39,17 @@ Simulation has no implicit default — callers must supply evaluators.
 
 import asyncio
 import base64
+import csv
 import json
 import os
 import re
-from typing import Optional
+from typing import Callable, Optional
 
 import instructor
 from pydantic import BaseModel, Field, create_model
 
 from calibrate_agent.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
-from calibrate_agent.utils import log_judge_io
+from calibrate_agent.utils import log_judge_io, provider_log
 
 
 # ── OpenRouter configuration ────────────────────────────────────────────────
@@ -191,6 +192,89 @@ def evaluator_result_value(evaluator: dict, result: dict) -> float:
     if is_rating(evaluator):
         return float(result["score"])
     return float(int(bool(result["match"])))
+
+
+def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:
+    """Flatten one row's judge result into its ``results.csv`` columns.
+
+    Produces ``{name: value, f"{name}_reasoning": str}`` per evaluator — the
+    score for rating evaluators, a bool for binary ones.
+    """
+    columns: dict = {}
+    for name, evaluator in evaluators_by_name.items():
+        result = judge_row[name]
+        if is_rating(evaluator):
+            columns[name] = result["score"]
+        else:
+            columns[name] = bool(result["match"])
+        columns[f"{name}_reasoning"] = result["reasoning"]
+    return columns
+
+
+def with_row_callback(coroutines: list, on_row: Optional[Callable]) -> list:
+    """Wrap judge coroutines so ``on_row(index, result)`` fires as each finishes.
+
+    Returns the coroutines unchanged when ``on_row`` is None, so callers can
+    pass it through without branching.
+    """
+    if on_row is None:
+        return coroutines
+
+    async def _run(index: int, coroutine):
+        result = await coroutine
+        on_row(index, result)
+        return result
+
+    return [_run(index, coroutine) for index, coroutine in enumerate(coroutines)]
+
+
+class PartialResultsWriter:
+    """Append each row to ``results.csv`` as its judge result arrives.
+
+    A run that is killed part-way then leaves the rows already graded on disk
+    instead of an empty directory, and a reader watching the file sees results
+    accumulate. The full-table write at the end of a run replaces the file, so
+    this only ever holds a prefix of the final columns (no WER, latency, or
+    other post-judge columns).
+
+    ``base_rows`` supplies the non-evaluator columns per row index, in dataset
+    order. Rows are appended in completion order, which need not match dataset
+    order; the ``id`` column identifies each one.
+    """
+
+    def __init__(
+        self, path: str, evaluators_by_name: dict, base_rows: list[dict]
+    ):
+        self._path = path
+        self._evaluators_by_name = evaluators_by_name
+        self._base_rows = base_rows
+        self._file = None
+        self._writer = None
+
+    def write(self, index: int, judge_row: dict) -> None:
+        """Append one judged row. Never raises: a failure here must not take
+        down the run whose results it is only mirroring."""
+        try:
+            row = {
+                **self._base_rows[index],
+                **evaluator_row_columns(self._evaluators_by_name, judge_row),
+            }
+            if self._writer is None:
+                self._file = open(self._path, "w", newline="", encoding="utf-8")
+                self._writer = csv.DictWriter(self._file, fieldnames=list(row))
+                self._writer.writeheader()
+            self._writer.writerow(row)
+            self._file.flush()
+        except Exception as e:
+            provider_log(f"Failed to append partial result row {index}: {e}")
+
+    def close(self) -> None:
+        if self._file is not None:
+            try:
+                self._file.close()
+            finally:
+                self._file = None
+                self._writer = None
 
 
 def attach_evaluator_id(evaluator: dict, result: dict) -> dict:

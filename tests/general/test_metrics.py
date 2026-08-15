@@ -7,6 +7,7 @@ Covers the general (non-conversational) task scoring path:
   scores into the {scores, score, per_row} shape
 """
 
+import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -266,6 +267,37 @@ class TestGetGeneralJudgeScoreArguments(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(seen_by_output["o1"], "judge against {{reference}}")
         self.assertEqual(seen_by_output["o2"], "judge against gold-B")
+
+
+class TestGeneralJudgeOnRow(unittest.IsolatedAsyncioTestCase):
+    """``on_row`` fires per row as its judge finishes, without reordering results."""
+
+    @staticmethod
+    async def _slow_first(_input, output, **kwargs):
+        # Row 0 finishes last, so completion order differs from dataset order.
+        if output == "o1":
+            await asyncio.sleep(0.05)
+        return {"faithful": {"reasoning": output, "match": True}}
+
+    async def test_on_row_called_per_row_and_order_preserved(self):
+        seen = []
+        with patch(
+            "calibrate_agent.general.metrics.general_judge",
+            AsyncMock(side_effect=self._slow_first),
+        ):
+            result = await get_general_judge_score(
+                inputs=["i1", "i2"],
+                outputs=["o1", "o2"],
+                evaluators=[BINARY_EV],
+                on_row=lambda index, row: seen.append((index, row)),
+            )
+
+        self.assertEqual([index for index, _ in seen], [1, 0])
+        self.assertEqual(seen[0][1]["faithful"]["reasoning"], "o2")
+        self.assertEqual(seen[1][1]["faithful"]["reasoning"], "o1")
+        self.assertEqual(
+            [row["faithful"]["reasoning"] for row in result["per_row"]], ["o1", "o2"]
+        )
 
 
 if __name__ == "__main__":

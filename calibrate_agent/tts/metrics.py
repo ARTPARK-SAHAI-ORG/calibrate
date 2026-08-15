@@ -2,7 +2,7 @@
 TTS evaluation metrics.
 """
 
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 from tqdm.asyncio import tqdm_asyncio
@@ -12,6 +12,7 @@ from calibrate_agent.judges import (
     audio_judge,
     is_rating,
     evaluator_result_value,
+    with_row_callback,
     DEFAULT_AUDIO_JUDGE_MODEL,
     DEFAULT_TTS_EVALUATOR,
 )
@@ -68,8 +69,12 @@ async def get_tts_llm_judge_score(
     reference_texts: List[str],
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_TTS_JUDGE_MODEL,
+    on_row: Optional[Callable] = None,
 ) -> dict:
     """Run TTS judge across all rows and aggregate per-evaluator scores.
+
+    ``on_row`` is called with ``(row_index, row_result)`` as each row's judge
+    finishes, so a caller can persist results as they arrive.
 
     Returns:
         {
@@ -97,7 +102,7 @@ async def get_tts_llm_judge_score(
     ]
 
     results = await tqdm_asyncio.gather(
-        *coroutines,
+        *with_row_callback(coroutines, on_row),
         desc="Running TTS evaluators",
     )
 

@@ -302,6 +302,18 @@ pandas coerces numeric `id` values to int on read — if your dataset uses
 string-looking ids like `"1"`, they round-trip as `1` and string comparisons
 break. Tests use non-numeric ids (`"row_a"`) for this reason.
 
+`results.csv` belongs to that resume logic: the full run owns the file and
+reads it back on retry. Only the `--eval-only` paths pass `stream_rows=True` to
+`_score_and_write_results`, which appends each row as its judge result arrives
+(`PartialResultsWriter` in `judges.py`). Turning that on for a full run would
+replace the transcription/synthesis rows mid-judge with only the rows judged so
+far, minus the columns the run itself produced (`ttfs` /
+`audio_duration_seconds` for STT, `ttfb` for TTS): STT resumes off the surviving
+`id`s and re-transcribes everything else, while TTS fails
+`validate_existing_results_csv` (no `ttfb` column) and stops the next run until
+`--overwrite`, which re-synthesizes every row. `general` has no resume file, so
+it always streams.
+
 ### Logging
 `provider_log` (alias `_log` in eval modules) writes to both stdout and a
 per-provider `logs` file under the output dir. Set `to_terminal=False` to
@@ -400,6 +412,11 @@ This is not optional — every PR is gated by the test suite in CI and by the
 pre-commit hook on `main`.
 
 ### When the user asks "how do I test this?"
+
+This is always about running the real thing by hand — a `calibrate-agent …`
+invocation against a real dataset and real API keys. It is never `uv run
+pytest`, never a test file, never "the suite passes". Say what the output should
+look like when it worked.
 
 Answer with the **single specific command they should run locally** for the
 change at hand — the exact `uv run …` / `calibrate-agent …` invocation, with the

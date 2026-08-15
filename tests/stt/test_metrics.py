@@ -243,6 +243,55 @@ class TestSTTGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["scores"]["semantic_accuracy"]["scale_min"], 1)
         self.assertEqual(result["scores"]["semantic_accuracy"]["scale_max"], 5)
 
+    async def test_on_row_fires_per_row_and_results_stay_in_order(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        async def fake_judge(reference, prediction, evaluators=None, fallback_model=None):
+            return {"semantic_match": {"match": True, "reasoning": reference}}
+
+        seen = []
+
+        with patch.object(
+            stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_judge)
+        ):
+            result = await stt_metrics.get_llm_judge_score(
+                references=["a", "b", "c"],
+                predictions=["a", "b", "c"],
+                on_row=lambda index, row: seen.append((index, row)),
+            )
+
+        # One callback per row, each carrying that row's own index and result.
+        # Rows finish in whatever order the judge completes them.
+        self.assertEqual(sorted(index for index, _ in seen), [0, 1, 2])
+        self.assertEqual(
+            {index: row["semantic_match"]["reasoning"] for index, row in seen},
+            {0: "a", 1: "b", 2: "c"},
+        )
+        self.assertEqual(
+            [row["semantic_match"]["reasoning"] for row in result["per_row"]],
+            ["a", "b", "c"],
+        )
+
+    async def test_without_on_row_results_unchanged(self):
+        from calibrate_agent.stt import metrics as stt_metrics
+
+        async def fake_judge(reference, prediction, evaluators=None, fallback_model=None):
+            return {"semantic_match": {"match": True, "reasoning": reference}}
+
+        with patch.object(
+            stt_metrics, "stt_llm_judge", AsyncMock(side_effect=fake_judge)
+        ):
+            result = await stt_metrics.get_llm_judge_score(
+                references=["a", "b"],
+                predictions=["a", "b"],
+            )
+
+        self.assertEqual(
+            [row["semantic_match"]["reasoning"] for row in result["per_row"]],
+            ["a", "b"],
+        )
+        self.assertEqual(result["scores"]["semantic_match"]["mean"], 1.0)
+
     async def test_custom_evaluators_passed_through(self):
         from calibrate_agent.stt import metrics as stt_metrics
 

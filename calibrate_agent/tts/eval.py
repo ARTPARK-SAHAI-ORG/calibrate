@@ -39,8 +39,9 @@ from calibrate_agent.pricing import TTS_DEFAULT_MODELS, cost_breakdown, resolve_
 from calibrate_agent.tts.metrics import get_tts_llm_judge_score
 from calibrate_agent.llm._metrics_utils import _latency_percentiles
 from calibrate_agent.judges import (
-    is_rating,
     DEFAULT_TTS_EVALUATOR,
+    PartialResultsWriter,
+    evaluator_row_columns,
     require_unique_evaluator_names,
     write_evaluator_config,
 )
@@ -867,6 +868,7 @@ async def _score_and_write_results(
     judge_evaluators: list[dict] = None,
     ttfb_values: list = None,
     cost_metrics: dict = None,
+    stream_rows: bool = False,
 ) -> dict:
     """Run the TTS audio judge over (audio_path, text) pairs and write outputs.
 
@@ -878,21 +880,45 @@ async def _score_and_write_results(
     and TTFB percentile metrics are included; when None (eval-only, where
     nothing is synthesized) both are omitted. When ``cost_metrics`` is provided
     it is attached under the ``cost`` key.
+
+    ``stream_rows`` appends each row to ``results.csv`` as its judge result
+    arrives, so a run killed part-way still leaves the graded rows on disk.
+    Only safe when nothing else owns that file: the full evaluation writes its
+    synthesis results there as it goes and resumes from them. A judged row
+    carries no ``ttfb``, so replacing that file mid-judge leaves it missing a
+    column ``validate_existing_results_csv`` requires — the next run stops with
+    an error until ``--overwrite``, which re-synthesizes every row.
     """
     _log("Running evaluators...")
     _evaluators = judge_evaluators if judge_evaluators else [DEFAULT_TTS_EVALUATOR]
     require_unique_evaluator_names(_evaluators)
     write_evaluator_config(evaluator_config_dir, _evaluators)
-    llm_judge_results = await get_tts_llm_judge_score(
-        audio_paths,
-        texts,
-        evaluators=_evaluators,
-    )
-    for name, score_dict in llm_judge_results["scores"].items():
-        _log(f"  {name}: {score_dict['mean']:.4f}")
-
     # Map evaluator name → evaluator dict (for per-row value extraction).
     _evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
+    partial_writer = (
+        PartialResultsWriter(
+            join(output_dir, "results.csv"),
+            _evaluators_by_name,
+            [
+                {"id": _id, "text": text, "audio_path": audio_path}
+                for _id, text, audio_path in zip(ids, texts, audio_paths)
+            ],
+        )
+        if stream_rows
+        else None
+    )
+    try:
+        llm_judge_results = await get_tts_llm_judge_score(
+            audio_paths,
+            texts,
+            evaluators=_evaluators,
+            on_row=partial_writer.write if partial_writer else None,
+        )
+    finally:
+        if partial_writer:
+            partial_writer.close()
+    for name, score_dict in llm_judge_results["scores"].items():
+        _log(f"  {name}: {score_dict['mean']:.4f}")
 
     # Each evaluator gets one entry keyed by its name. The value is the full
     # per-criterion dict (``type``, ``mean``, plus ``scale_min``/``scale_max``
@@ -935,13 +961,7 @@ async def _score_and_write_results(
         row = {"id": _id, "text": text, "audio_path": audio_path}
         if ttfb_values is not None:
             row["ttfb"] = ttfb
-        for name, ev in _evaluators_by_name.items():
-            ev_result = llm_row[name]
-            if is_rating(ev):
-                row[name] = ev_result["score"]
-            else:
-                row[name] = bool(ev_result["match"])
-            row[f"{name}_reasoning"] = ev_result["reasoning"]
+        row.update(evaluator_row_columns(_evaluators_by_name, llm_row))
         data.append(row)
 
     results_csv_path = join(output_dir, "results.csv")
@@ -1181,6 +1201,7 @@ async def run_eval_only(
             evaluator_config_dir=output_dir,
             judge_evaluators=judge_evaluators,
             ttfb_values=None,
+            stream_rows=True,
         )
 
         return {

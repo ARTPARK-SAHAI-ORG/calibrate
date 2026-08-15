@@ -5,6 +5,7 @@ Run with:
     python -m unittest tests.tts.test_metrics -v
 """
 
+import asyncio
 import unittest
 from unittest.mock import patch, AsyncMock
 
@@ -123,6 +124,43 @@ class TestTTSGetLLMJudgeScore(unittest.IsolatedAsyncioTestCase):
         call_kwargs = mock_tts_judge.call_args.kwargs
         self.assertEqual(call_kwargs["evaluators"], custom_evaluators)
         self.assertEqual(call_kwargs["fallback_model"], "custom-audio-model")
+
+
+class TestTTSJudgeOnRow(unittest.IsolatedAsyncioTestCase):
+    """``on_row`` fires per row as its judge finishes, without reordering results."""
+
+    EVALUATORS = [
+        {"name": "quality", "system_prompt": "q", "judge_model": "openai/gpt-audio"}
+    ]
+
+    @staticmethod
+    async def _slow_first(audio_path, reference_text, **kwargs):
+        # Row 0 finishes last, so completion order differs from dataset order.
+        if audio_path.endswith("a.wav"):
+            await asyncio.sleep(0.05)
+        return {"quality": {"match": True, "reasoning": reference_text}}
+
+    async def test_on_row_called_per_row_and_order_preserved(self):
+        from calibrate_agent.tts import metrics as tts_metrics
+
+        seen = []
+        with patch.object(
+            tts_metrics, "tts_llm_judge", AsyncMock(side_effect=self._slow_first)
+        ):
+            result = await tts_metrics.get_tts_llm_judge_score(
+                audio_paths=["/tmp/a.wav", "/tmp/b.wav"],
+                reference_texts=["hi", "bye"],
+                evaluators=self.EVALUATORS,
+                on_row=lambda index, row: seen.append((index, row)),
+            )
+
+        # Row 1 completes first; each callback carries its own dataset index.
+        self.assertEqual([index for index, _ in seen], [1, 0])
+        self.assertEqual(seen[0][1]["quality"]["reasoning"], "bye")
+        self.assertEqual(seen[1][1]["quality"]["reasoning"], "hi")
+        self.assertEqual(
+            [row["quality"]["reasoning"] for row in result["per_row"]], ["hi", "bye"]
+        )
 
 
 if __name__ == "__main__":

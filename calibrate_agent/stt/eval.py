@@ -47,7 +47,8 @@ from calibrate_agent.stt.pipeline_eval import transcribe_via_pipeline
 from calibrate_agent._env import resolve_stt_max_concurrency
 from calibrate_agent._cli_args import add_stt_eval_args
 from calibrate_agent.judges import (
-    is_rating,
+    PartialResultsWriter,
+    evaluator_row_columns,
     require_unique_evaluator_names,
     write_evaluator_config,
 )
@@ -1491,6 +1492,7 @@ async def _score_and_write_results(
     cost_metrics: dict | None = None,
     audio_durations: list[float | None] | None = None,
     ttfs_values: list = None,
+    stream_rows: bool = False,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1507,6 +1509,12 @@ async def _score_and_write_results(
     Each judge is isolated: if any judge raises, the failure is logged and that
     judge's columns/metrics are dropped, but WER/CER and any judges that
     succeeded are still written.
+
+    ``stream_rows`` appends each row to ``results.csv`` as its judge result
+    arrives, so a run killed part-way still leaves the graded rows on disk.
+    Only safe when nothing else owns that file: the full evaluation writes its
+    transcriptions there as it goes and resumes from them, and overwriting it
+    mid-judge would cost a re-transcription of every row not yet graded.
     """
     wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
@@ -1568,25 +1576,43 @@ async def _score_and_write_results(
     # calls, no evaluator columns/metrics).
     _evaluators = judge_evaluators or []
     llm_results = None
+    evaluators_by_name: dict = {}
     if _evaluators:
         require_unique_evaluator_names(_evaluators)
         write_evaluator_config(evaluator_config_dir, _evaluators)
+        evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
+        partial_writer = (
+            PartialResultsWriter(
+                join(output_dir, "results.csv"),
+                evaluators_by_name,
+                [
+                    {"id": _id, "gt": gt_text, "pred": pred_text}
+                    for _id, gt_text, pred_text in zip(
+                        ids, gt_transcripts, pred_transcripts
+                    )
+                ],
+            )
+            if stream_rows
+            else None
+        )
         try:
             llm_results = await get_llm_judge_score(
                 gt_transcripts,
                 pred_transcripts,
                 evaluators=_evaluators,
+                on_row=partial_writer.write if partial_writer else None,
             )
             for name, score_dict in llm_results["scores"].items():
                 _log(f"  {name}: {score_dict['mean']:.4f}")
         except Exception as e:
             llm_results = None
             _log(f"LLM judge failed, skipping evaluator columns: {e}")
+        finally:
+            if partial_writer:
+                partial_writer.close()
 
     # Only surface evaluator columns for judges that actually produced results.
-    _evaluators_by_name = (
-        {ev["name"]: ev for ev in _evaluators} if llm_results is not None else {}
-    )
+    _evaluators_by_name = evaluators_by_name if llm_results is not None else {}
 
     metrics_data = {
         "wer": wer_results["score"],
@@ -1706,13 +1732,7 @@ async def _score_and_write_results(
                 ensure_ascii=False,
             )
             row["semantic_wer_reasoning"] = semantic_wer_row["reasoning"]
-        for name, ev in _evaluators_by_name.items():
-            ev_result = llm_row[name]
-            if is_rating(ev):
-                row[name] = ev_result["score"]
-            else:
-                row[name] = bool(ev_result["match"])
-            row[f"{name}_reasoning"] = ev_result["reasoning"]
+        row.update(evaluator_row_columns(_evaluators_by_name, llm_row))
         data.append(row)
 
     with open(join(output_dir, "metrics.json"), "w") as f:
@@ -1779,6 +1799,7 @@ async def run_eval_only(
             judge_evaluators=judge_evaluators,
             language=language,
             run_llm_judges=run_llm_judges,
+            stream_rows=True,
         )
 
         return {

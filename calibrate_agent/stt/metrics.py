@@ -5,7 +5,7 @@ STT evaluation metrics.
 import asyncio
 import unicodedata
 from functools import lru_cache
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import jiwer
@@ -14,6 +14,7 @@ import backoff
 
 from calibrate_agent.judges import (
     text_judge,
+    with_row_callback,
     is_rating,
     evaluator_result_value,
     DEFAULT_TEXT_JUDGE_MODEL,
@@ -441,8 +442,12 @@ async def get_llm_judge_score(
     predictions: List[str],
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_STT_JUDGE_MODEL,
+    on_row: Optional[Callable] = None,
 ) -> dict:
     """Run STT judge across all rows and aggregate per-evaluator scores.
+
+    ``on_row`` is called with ``(row_index, row_result)`` as each row's judge
+    finishes, so callers can persist results while the run is still going.
 
     Returns:
         {
@@ -474,7 +479,7 @@ async def get_llm_judge_score(
     ]
 
     results = await tqdm_asyncio.gather(
-        *coroutines,
+        *with_row_callback(coroutines, on_row),
         desc="Running STT evaluators",
     )
 

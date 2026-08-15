@@ -5,7 +5,7 @@ Thin, non-conversational counterpart to ``calibrate_agent.stt.metrics`` /
 against a list of evaluators and aggregate per-evaluator scores.
 """
 
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import backoff
@@ -18,6 +18,7 @@ from calibrate_agent.judges import (
     ensure_known_evaluator_names,
     render_evaluator,
     require_unique_evaluator_names,
+    with_row_callback,
     DEFAULT_TEXT_JUDGE_MODEL,
 )
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
@@ -93,8 +94,12 @@ async def get_general_judge_score(
     evaluators: List[dict],
     fallback_model: str = DEFAULT_GENERAL_JUDGE_MODEL,
     arguments_list: Optional[List[Optional[dict]]] = None,
+    on_row: Optional[Callable] = None,
 ) -> dict:
     """Run the general judge across all rows and aggregate per-evaluator scores.
+
+    ``on_row`` is called with ``(row_index, row_result)`` as each row's judge
+    finishes, so a caller can persist results as they arrive.
 
     ``inputs`` and ``outputs`` are positionally paired; ``inputs[i]`` may be
     ``None`` to judge ``outputs[i]`` on its own.
@@ -170,7 +175,7 @@ async def get_general_judge_score(
         )
 
     results = await tqdm_asyncio.gather(
-        *coroutines,
+        *with_row_callback(coroutines, on_row),
         desc="Running general evaluators",
     )
 

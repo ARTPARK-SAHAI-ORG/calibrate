@@ -19,7 +19,8 @@ import pandas as pd
 
 from calibrate_agent.general.metrics import get_general_judge_score
 from calibrate_agent.judges import (
-    is_rating,
+    PartialResultsWriter,
+    evaluator_row_columns,
     require_unique_evaluator_names,
     write_evaluator_config,
 )
@@ -132,6 +133,11 @@ async def _score_and_write_results(
     Writes ``results.csv`` and ``metrics.json`` plus the resolved evaluator
     ``config.json`` under ``output_dir``. Returns the metrics_data dict.
 
+    Each row is appended to ``results.csv`` as its judge result arrives, so a
+    run killed part-way still leaves the graded rows on disk. Nothing else owns
+    that file here — the general task has no inference step and no resume, so
+    the judge is free to write it from the first row onwards.
+
     Args:
         arguments_list: Optional per-row ``arguments`` dicts (one entry per
             row, ``None`` for rows with no injection) forwarded to the judge to
@@ -139,16 +145,27 @@ async def _score_and_write_results(
     """
     write_evaluator_config(output_dir, evaluators)
 
-    llm_results = await get_general_judge_score(
-        inputs,
-        outputs,
-        evaluators=evaluators,
-        arguments_list=arguments_list,
+    evaluators_by_name = {ev["name"]: ev for ev in evaluators}
+    partial_writer = PartialResultsWriter(
+        join(output_dir, "results.csv"),
+        evaluators_by_name,
+        [
+            {"id": _id, "input": input_text, "output": output_text}
+            for _id, input_text, output_text in zip(ids, inputs, outputs)
+        ],
     )
+    try:
+        llm_results = await get_general_judge_score(
+            inputs,
+            outputs,
+            evaluators=evaluators,
+            arguments_list=arguments_list,
+            on_row=partial_writer.write,
+        )
+    finally:
+        partial_writer.close()
     for name, score_dict in llm_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
-
-    evaluators_by_name = {ev["name"]: ev for ev in evaluators}
 
     metrics_data: dict = {}
     for name, score_dict in llm_results["scores"].items():
@@ -163,13 +180,7 @@ async def _score_and_write_results(
             "input": input_text,
             "output": output_text,
         }
-        for name, ev in evaluators_by_name.items():
-            ev_result = llm_row[name]
-            if is_rating(ev):
-                row[name] = ev_result["score"]
-            else:
-                row[name] = bool(ev_result["match"])
-            row[f"{name}_reasoning"] = ev_result["reasoning"]
+        row.update(evaluator_row_columns(evaluators_by_name, llm_row))
         data.append(row)
 
     with open(join(output_dir, "metrics.json"), "w") as f:
