@@ -2136,6 +2136,26 @@
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ]
             ]
+          },
+          "optional_evaluator_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Optional Evaluator Ids",
+            "description": "Which of `evaluator_ids` annotators may leave blank. Applied as a whole set, so an ID left out becomes required again. Optional evaluators do not hold a labelling job back from completing. Omit to leave every evaluator as it is",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
           }
         },
         "type": "object",

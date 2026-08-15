@@ -513,6 +513,7 @@ must be in your workspace.
 | --- | --- | --- | --- |
 | `task_uuid` | string | Yes | Annotation task to act on |
 | `evaluator_ids` | array of string | Yes | The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. Each must be one you created or a built-in default |
+| `optional_evaluator_ids` | array of string | No | Which of `evaluator_ids` annotators may leave blank. Applied as a whole set, so an ID left out becomes required again. Optional evaluators do not hold a labelling job back from completing. Omit to leave every evaluator as it is |
 
 See **PUT /annotation-tasks/&#123;task_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
 
