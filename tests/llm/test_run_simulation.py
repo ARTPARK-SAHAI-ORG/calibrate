@@ -306,14 +306,15 @@ def test_eval_only_item_unknown_evaluator_name_raises():
 
 def test_eval_only_dataset_accepts_valid_arguments():
     ok, err = validate_simulation_eval_only_dataset(
-        [{"conversation_history": [], "arguments": {"goal_met": {"order_id": "1"}}}]
+        [{"conversation_history": [], "arguments": {"goal_met": {"order_id": "1"}}}],
+        [TEMPLATED_EV],
     )
     assert ok, err
 
 
 def test_eval_only_dataset_rejects_non_object_arguments():
     ok, err = validate_simulation_eval_only_dataset(
-        [{"conversation_history": [], "arguments": "nope"}]
+        [{"conversation_history": [], "arguments": "nope"}], [TEMPLATED_EV]
     )
     assert not ok
     assert "Item 0" in err
@@ -321,7 +322,7 @@ def test_eval_only_dataset_rejects_non_object_arguments():
 
 def test_eval_only_dataset_rejects_non_object_evaluator_arguments():
     ok, err = validate_simulation_eval_only_dataset(
-        [{"conversation_history": [], "arguments": {"goal_met": "nope"}}]
+        [{"conversation_history": [], "arguments": {"goal_met": "nope"}}], [TEMPLATED_EV]
     )
     assert not ok
     assert "goal_met" in err
