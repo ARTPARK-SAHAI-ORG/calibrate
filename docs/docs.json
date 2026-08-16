@@ -345,6 +345,11 @@
           "anchor": "WhatsApp",
           "href": "https://chat.whatsapp.com/JygDNcZ943a3VmZDXYMg5Z",
           "icon": "whatsapp"
+        },
+        {
+          "anchor": "Changelog",
+          "href": "https://calibrate.artpark.ai/changelog",
+          "icon": "clock-rotate-left"
         }
       ]
     }
