@@ -1663,6 +1663,23 @@
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
               ]
             ]
+          },
+          "comments_enabled": {
+            "type": "boolean",
+            "title": "Comments Enabled",
+            "description": "When `true`, the labelling form lets the annotator leave a comment on each item",
+            "default": true
+          },
+          "reasoning_mode": {
+            "type": "string",
+            "enum": [
+              "optional",
+              "required",
+              "hidden"
+            ],
+            "title": "Reasoning Mode",
+            "description": "How the labelling form treats the reasoning box on each judgement. `optional` shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out",
+            "default": "optional"
           }
         },
         "type": "object",

@@ -464,6 +464,8 @@ Assign items to annotators, creating one labelling job per annotator. Each job c
 | `select_all` | boolean | No | When `true`, assign every item in the task and ignore `item_ids`. Set `q` to assign only items whose name matches it |
 | `q` | string | No | Case-insensitive substring filter on `payload.name`. Applies only when `select_all=true` |
 | `evaluator_ids` | array of string | No | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (`None`) to snapshot every linked evaluator |
+| `comments_enabled` | boolean | No | When `true`, the labelling form lets the annotator leave a comment on each item |
+| `reasoning_mode` | string | No | How the labelling form treats the reasoning box on each judgement. `optional` shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out |
 
 See **POST /annotation-tasks/&#123;task_uuid&#125;/jobs** in the [API reference](/api-reference/introduction) tab for the full schema.
 
