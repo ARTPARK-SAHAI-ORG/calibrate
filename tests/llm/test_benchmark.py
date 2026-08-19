@@ -97,6 +97,14 @@ class TestCallTextAgentModelParams(unittest.IsolatedAsyncioTestCase):
 # Tests for run_test_external — model threaded through
 # ---------------------------------------------------------------------------
 
+def _correctness_evaluator():
+    return {
+        "name": "correctness",
+        "system_prompt": "Grade the reply.",
+        "judge_model": "openai/gpt-4.1",
+    }
+
+
 class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
 
     async def test_model_passed_to_agent_call(self):
@@ -117,6 +125,7 @@ class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
                 evaluation=evaluation,
                 agent=agent,
                 model="gemma-4-26b-a4b-it",
+                evaluators=[_correctness_evaluator()],
             )
 
         body = mock_client.post.call_args.kwargs["json"]
@@ -138,6 +147,7 @@ class TestRunTestExternalModelParams(unittest.IsolatedAsyncioTestCase):
                 chat_history=[{"role": "user", "content": "Hi"}],
                 evaluation={"type": "response", "criteria": "greet"},
                 agent=agent,
+                evaluators=[_correctness_evaluator()],
             )
 
         body = mock_client.post.call_args.kwargs["json"]
