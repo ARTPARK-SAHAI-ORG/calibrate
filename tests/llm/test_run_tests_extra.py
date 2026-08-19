@@ -1494,6 +1494,77 @@ class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
                     evaluators=[],
                 )
 
+    async def test_history_without_user_message_raises(self):
+        from calibrate_agent.llm.run_tests import evaluate_test_case_output
+
+        with patch("calibrate_agent.llm.run_tests.general_judge", AsyncMock()):
+            with self.assertRaisesRegex(ValueError, "needs a user message"):
+                await evaluate_test_case_output(
+                    chat_history=[{"role": "assistant", "content": "hello"}],
+                    evaluation={"type": "general", "criteria": [{"name": "helpful"}]},
+                    output={"response": "a summary", "tool_calls": []},
+                    evaluators=[_bin_ev("helpful")],
+                )
+
+    def test_saved_dataset_accepts_input_without_tool_calls(self):
+        from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
+
+        is_valid, err = validate_llm_eval_only_dataset([
+            {
+                "test_case": {
+                    "input": "summarize this",
+                    "evaluation": {
+                        "type": "general",
+                        "criteria": [{"name": "helpful"}],
+                    },
+                },
+                "output": {"response": "a summary"},
+            }
+        ])
+        self.assertTrue(is_valid, err)
+
+    def test_saved_dataset_rejects_history_and_blank_input(self):
+        from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
+
+        evaluation = {"type": "general", "criteria": [{"name": "helpful"}]}
+        with_history = {
+            "test_case": {
+                "input": "hi",
+                "history": [{"role": "user", "content": "hi"}],
+                "evaluation": evaluation,
+            },
+            "output": {"response": "a summary"},
+        }
+        is_valid, err = validate_llm_eval_only_dataset([with_history])
+        self.assertFalse(is_valid)
+        self.assertIn("must not carry a 'history'", err)
+
+        no_input = {
+            "test_case": {"evaluation": evaluation},
+            "output": {"response": "a summary"},
+        }
+        is_valid, err = validate_llm_eval_only_dataset([no_input])
+        self.assertFalse(is_valid)
+        self.assertIn("non-empty 'input' string", err)
+
+    def test_saved_dataset_requires_a_response(self):
+        from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
+
+        is_valid, err = validate_llm_eval_only_dataset([
+            {
+                "test_case": {
+                    "input": "summarize this",
+                    "evaluation": {
+                        "type": "general",
+                        "criteria": [{"name": "helpful"}],
+                    },
+                },
+                "output": {"tool_calls": []},
+            }
+        ])
+        self.assertFalse(is_valid)
+        self.assertIn("must include 'response'", err)
+
     async def test_external_agent_path_resolves_evaluators(self):
         """The SDK path a customer's own agent runs through."""
         from calibrate_agent.llm import _Tests
