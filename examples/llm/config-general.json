@@ -1,0 +1,33 @@
+{
+  "system_prompt": "You summarize customer support notes. Reply with a single sentence and nothing else.",
+  "evaluators": [
+    {
+      "name": "faithful",
+      "system_prompt": "You are a strict evaluator. You will be given an input note and a summary of it.\n\nMark True only if every fact in the summary appears in the input, with no invented details.",
+      "judge_model": "openai/gpt-4.1"
+    },
+    {
+      "name": "one_sentence",
+      "system_prompt": "You are a strict evaluator. You will be given an input note and a summary of it.\n\nMark True only if the summary is a single sentence.",
+      "judge_model": "openai/gpt-4.1"
+    }
+  ],
+  "test_cases": [
+    {
+      "id": "shipping-note",
+      "input": "Summarize this note: order ORD-12345 shipped on Monday from the Pune warehouse and is due to arrive on Thursday.",
+      "evaluation": {
+        "type": "general",
+        "criteria": [{ "name": "faithful" }, { "name": "one_sentence" }]
+      }
+    },
+    {
+      "id": "return-note",
+      "input": "Summarize this note: the customer returned a pair of headphones because the left earcup was silent, and a replacement was posted the same day.",
+      "evaluation": {
+        "type": "general",
+        "criteria": [{ "name": "faithful" }, { "name": "one_sentence" }]
+      }
+    }
+  ]
+}
