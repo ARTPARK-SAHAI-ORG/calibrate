@@ -1,0 +1,27 @@
+---
+title: "Create labelling jobs"
+description: "Assign items to annotators, creating one labelling job per annotator"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.annotation_tasks.create_labelling_jobs(
+    task_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    annotator_ids=[
+        "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /annotation-tasks/\{task_uuid}/jobs** in the [API reference](/api-reference/introduction) tab.

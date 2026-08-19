@@ -113,6 +113,7 @@
               "PUT /annotation-tasks/{task_uuid}/evaluators",
               "POST /annotation-tasks/{task_uuid}/items",
               "PUT /annotation-tasks/{task_uuid}/items",
+              "POST /annotation-tasks/{task_uuid}/jobs",
               "GET /annotation-tasks/{task_uuid}/summary"
             ]
           },
@@ -226,6 +227,7 @@
               "sdk/annotation-tasks/set_evaluators",
               "sdk/annotation-tasks/add_items",
               "sdk/annotation-tasks/update_items",
+              "sdk/annotation-tasks/create_labelling_jobs",
               "sdk/annotation-tasks/get_summary"
             ]
           },

@@ -1602,6 +1602,98 @@
         ],
         "title": "ChatMessage"
       },
+      "CreateJobsRequest": {
+        "properties": {
+          "annotator_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Annotator Ids",
+            "description": "Annotator IDs to assign, creating one labelling job for each annotator. Must be in your workspace",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          },
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "Item IDs to assign. **Required when `select_all=false`**. Ignored when `select_all=true`",
+            "default": []
+          },
+          "select_all": {
+            "type": "boolean",
+            "title": "Select All",
+            "description": "When `true`, assign every item in the task and ignore `item_ids`. Set `q` to assign only items whose name matches it",
+            "default": false
+          },
+          "q": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Q",
+            "description": "Case-insensitive substring filter on `payload.name`. Applies only when `select_all=true`"
+          },
+          "evaluator_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator Ids",
+            "description": "Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (`None`) to snapshot every linked evaluator",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "annotator_ids"
+        ],
+        "title": "CreateJobsRequest"
+      },
+      "CreateJobsResponse": {
+        "properties": {
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/LabellingJobCreated"
+            },
+            "type": "array",
+            "title": "Jobs",
+            "description": "The jobs created, one for each annotator"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "How many jobs were created"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobs",
+          "count"
+        ],
+        "title": "CreateJobsResponse"
+      },
       "EvaluatorCreate": {
         "properties": {
           "name": {
@@ -2632,6 +2724,88 @@
         },
         "type": "object",
         "title": "JudgeResult"
+      },
+      "LabellingJobCreated": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "title": "Uuid",
+            "description": "ID of the labelling job",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "public_token": {
+            "type": "string",
+            "title": "Public Token",
+            "description": "Token that opens the annotator's labelling page without signing in",
+            "examples": [
+              "kO3n1xPq7sVbYcT2mA9eR4wZ1jD5hL8f"
+            ]
+          },
+          "annotator_id": {
+            "type": "string",
+            "title": "Annotator Id",
+            "description": "ID of the annotator the job is assigned to",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "annotator_name": {
+            "type": "string",
+            "title": "Annotator Name",
+            "description": "Name of the annotator the job is assigned to"
+          },
+          "item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "IDs of the items assigned to the annotator",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "How many items the annotator has to label"
+          },
+          "evaluator_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluator Ids",
+            "description": "IDs of the evaluators the annotator scores each item on, in the order they are shown",
+            "examples": [
+              [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ]
+            ]
+          },
+          "status": {
+            "type": "string",
+            "const": "pending",
+            "title": "Status",
+            "description": "Status of the job right after you create it"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "public_token",
+          "annotator_id",
+          "annotator_name",
+          "item_ids",
+          "item_count",
+          "evaluator_ids",
+          "status"
+        ],
+        "title": "LabellingJobCreated"
       },
       "ModelResult": {
         "properties": {
@@ -6929,6 +7103,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/BulkUpdateItemsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/annotation-tasks/{task_uuid}/jobs": {
+      "post": {
+        "tags": [
+          "annotation-tasks"
+        ],
+        "summary": "Create labelling jobs",
+        "description": "Assign items to annotators, creating one labelling job per annotator",
+        "operationId": "create_jobs_annotation_tasks__task_uuid__jobs_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Annotation task to act on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Task Uuid"
+            },
+            "description": "Annotation task to act on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJobsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateJobsResponse"
                 }
               }
             }

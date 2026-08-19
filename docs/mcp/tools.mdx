@@ -448,6 +448,25 @@ Create an annotation task for labelling items against evaluators. Optionally lin
 
 See **POST /annotation-tasks** in the [API reference](/api-reference/introduction) tab for the full schema.
 
+### create-labelling-jobs
+
+Assign items to annotators, creating one labelling job per annotator. Each job comes back with a public_token for the annotator's labelling link.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `task_uuid` | string | Yes | Annotation task to act on |
+| `annotator_ids` | array of string | Yes | Annotator IDs to assign, creating one labelling job for each annotator. Must be in your workspace |
+| `item_ids` | array of string | No | Item IDs to assign. **Required when `select_all=false`**. Ignored when `select_all=true` |
+| `select_all` | boolean | No | When `true`, assign every item in the task and ignore `item_ids`. Set `q` to assign only items whose name matches it |
+| `q` | string | No | Case-insensitive substring filter on `payload.name`. Applies only when `select_all=true` |
+| `evaluator_ids` | array of string | No | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (`None`) to snapshot every linked evaluator |
+
+See **POST /annotation-tasks/&#123;task_uuid&#125;/jobs** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ### run-annotation-evaluators
 
 Run one or more of a task's evaluators over its items as a background job. Returns a job_uuid to poll with get-annotation-evaluator-run.

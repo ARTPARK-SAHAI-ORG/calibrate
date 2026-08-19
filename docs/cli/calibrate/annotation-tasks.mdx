@@ -74,6 +74,31 @@ calibrate annotation-tasks create-evaluator-run [flags]
 calibrate annotation-tasks create-evaluator-run --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --evaluators '[]'
 ```
 
+## Create labelling jobs
+
+Assign items to annotators, creating one labelling job per annotator
+
+```bash
+calibrate annotation-tasks create-labelling-jobs [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --annotator-ids` | stringArray | **Required.** Annotator IDs to assign, creating one labelling job for each annotator. Must be in your workspace |
+| `-e, --evaluator-ids` | None | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (None) to snapshot every linked evaluator |
+| `-i, --item-ids` | select_all=false | Item IDs to assign. **Required when select_all=false**. Ignored when `select_all=true` |
+| `--q` | payload.name | Case-insensitive substring filter on payload.name. Applies only when `select_all=true` |
+| `-s, --select-all` | true | When true, assign every item in the task and ignore `item_ids`. Set `q` to assign only items whose name matches it |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
+
+**Examples**
+
+```bash
+calibrate annotation-tasks create-labelling-jobs --task-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --annotator-ids '["f47ac10b-58cc-4372-a567-0e02b2c3d479"]'
+```
+
 ## Get annotation task
 
 Get one annotation task with linked evaluators, items, and labelling jobs
