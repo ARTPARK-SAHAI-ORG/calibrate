@@ -177,6 +177,8 @@ def _run_agent_verify(
 
 def main():
     """Main CLI entry point that dispatches to component-specific scripts."""
+    from calibrate_agent.connections import AGENT_TYPES
+
     # Load environment variables from .env file
     _load_cli_dotenv()
 
@@ -410,7 +412,7 @@ Examples:
         "--agent-type",
         type=str,
         default="conversation",
-        choices=["conversation", "general"],
+        choices=list(AGENT_TYPES),
         help="What the agent expects in the request body: 'conversation' sends the exchange so far as {\"messages\": [...]}, 'general' sends only the latest user text as {\"input\": \"...\"}",
     )
     llm_parser.add_argument(
@@ -879,6 +881,14 @@ Examples:
 
                 with open(args.config) as _f:
                     _sim_config = _json.load(_f)
+                if _sim_config.get("agent_type", "conversation") != "conversation":
+                    print(
+                        "✗ Text simulation is not supported for an agent of type "
+                        f"'{_sim_config['agent_type']}'. The simulator sends the "
+                        "conversation so far each turn, so the agent must be of "
+                        "type 'conversation'."
+                    )
+                    sys.exit(1)
                 if _sim_config.get("agent_default_inputs"):
                     print(
                         "✗ Text simulation is not supported for an agent configured "

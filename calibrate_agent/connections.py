@@ -144,7 +144,7 @@ class TextAgentConnection:
 
     def _build_body(self, messages, inputs=None, model=None) -> dict:
         if self.type == "general":
-            body = {"input": messages[-1]["content"] if messages else ""}
+            body = {"input": messages[-1]["content"]}
         else:
             body = {"messages": messages}
         if self.default_inputs:
