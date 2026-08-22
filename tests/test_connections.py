@@ -751,6 +751,32 @@ class TestAgentType(unittest.IsolatedAsyncioTestCase):
             {"input": "Hi", "lang": "hi", "model": "openai/gpt-4.1"},
         )
 
+    async def test_general_rejects_a_multi_turn_conversation(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat", type="general")
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            with self.assertRaises(ValueError) as cm:
+                await agent.call(
+                    [
+                        {"role": "user", "content": "Hi"},
+                        {"role": "assistant", "content": "Hello"},
+                    ]
+                )
+
+        self.assertIn("single user message", str(cm.exception))
+        mock_client.post.assert_not_awaited()
+
+    def test_general_rejects_a_non_user_message(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat", type="general")
+
+        with self.assertRaises(ValueError):
+            agent.build_body([{"role": "assistant", "content": "Hello"}])
+
     def test_unknown_type_is_rejected(self):
         from calibrate_agent.connections import TextAgentConnection
 

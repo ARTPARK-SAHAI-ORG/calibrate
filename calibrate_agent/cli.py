@@ -119,10 +119,10 @@ def _run_agent_verify(
     agent_headers_raw: str | None,
     models: list[str] | None = None,
     agent_inputs_raw: str | None = None,
-    agent_type: str = "conversation",
+    agent_type: str | None = None,
 ) -> None:
     """Verify an external agent connection and print the result."""
-    from calibrate_agent.connections import TextAgentConnection
+    from calibrate_agent.connections import DEFAULT_AGENT_TYPE, TextAgentConnection
 
     headers = None
     if agent_headers_raw:
@@ -145,7 +145,7 @@ def _run_agent_verify(
             url=agent_url,
             headers=headers,
             default_inputs=default_inputs,
-            type=agent_type,
+            type=agent_type or DEFAULT_AGENT_TYPE,
         )
     except ValueError as e:
         print(f"✗ --agent-type: {e}")
@@ -155,7 +155,7 @@ def _run_agent_verify(
     model_hint: str | None = models[0] if models else None
 
     body_preview = json.dumps(
-        agent._build_body(
+        agent.build_body(
             [{"role": "user", "content": "Hi"}], model=model_hint
         )
     )
@@ -177,7 +177,7 @@ def _run_agent_verify(
 
 def main():
     """Main CLI entry point that dispatches to component-specific scripts."""
-    from calibrate_agent.connections import AGENT_TYPES
+    from calibrate_agent.connections import AGENT_TYPES, DEFAULT_AGENT_TYPE
 
     # Load environment variables from .env file
     _load_cli_dotenv()
@@ -411,7 +411,7 @@ Examples:
     llm_parser.add_argument(
         "--agent-type",
         type=str,
-        default="conversation",
+        default=DEFAULT_AGENT_TYPE,
         choices=list(AGENT_TYPES),
         help="What the agent expects in the request body: 'conversation' sends the exchange so far as {\"messages\": [...]}, 'general' sends only the latest user text as {\"input\": \"...\"}",
     )
@@ -709,7 +709,7 @@ Examples:
                 args.agent_headers,
                 models=args.model,
                 agent_inputs_raw=args.agent_inputs,
-                agent_type=getattr(args, "agent_type", "conversation"),
+                agent_type=args.agent_type,
             )
         elif args.config is None:
             # No config → interactive mode
@@ -732,12 +732,16 @@ Examples:
                 from calibrate_agent.connections import TextAgentConnection
                 from calibrate_agent.llm import tests as _tests
 
-                _agent = TextAgentConnection(
-                    url=_config["agent_url"],
-                    headers=_config.get("agent_headers"),
-                    default_inputs=_config.get("agent_default_inputs"),
-                    type=_config.get("agent_type", "conversation"),
-                )
+                try:
+                    _agent = TextAgentConnection(
+                        url=_config["agent_url"],
+                        headers=_config.get("agent_headers"),
+                        default_inputs=_config.get("agent_default_inputs"),
+                        type=_config.get("agent_type", DEFAULT_AGENT_TYPE),
+                    )
+                except ValueError as _e:
+                    print(f"✗ config agent_type: {_e}")
+                    sys.exit(1)
                 _models = args.model if args.model else []
 
                 # Verify once per model (skip if already verified upstream e.g. interactive UI)
@@ -881,7 +885,7 @@ Examples:
 
                 with open(args.config) as _f:
                     _sim_config = _json.load(_f)
-                if _sim_config.get("agent_type", "conversation") != "conversation":
+                if _sim_config.get("agent_type", DEFAULT_AGENT_TYPE) != DEFAULT_AGENT_TYPE:
                     print(
                         "✗ Text simulation is not supported for an agent of type "
                         f"'{_sim_config['agent_type']}'. The simulator sends the "

@@ -145,7 +145,7 @@ class TestRunAgentVerify(unittest.TestCase):
         fake_result = {"ok": True, "sample_output": {"response": "Hi", "tool_calls": []}}
         with patch("calibrate_agent.connections.TextAgentConnection") as MockConn:
             MockConn.return_value.verify = AsyncMock(return_value=fake_result)
-            MockConn.return_value._build_body.return_value = {}
+            MockConn.return_value.build_body.return_value = {}
             cli._run_agent_verify(
                 "http://x", None, agent_inputs_raw='{"condition_area": "cardiology"}'
             )
@@ -624,6 +624,19 @@ class TestMainDispatch(unittest.TestCase):
                 self._run_with_argv([
                     "calibrate_agent", "simulations", "--type", "text",
                     "-c", str(cfg), "-o", tmp,
+                ])
+
+    def test_llm_config_rejects_unknown_agent_type(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "agent_type": "genral",
+                "test_cases": [],
+            }))
+            with self.assertRaises(SystemExit):
+                self._run_with_argv([
+                    "calibrate_agent", "llm", "-c", str(cfg), "-o", tmp,
                 ])
 
     def test_simulations_leaderboard(self):

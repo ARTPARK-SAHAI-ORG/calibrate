@@ -44,6 +44,7 @@ _BACKOFF_BASE_SECONDS = 1.0
 
 # What a text agent accepts in its request body. See TextAgentConnection.type.
 AGENT_TYPES = ("conversation", "general")
+DEFAULT_AGENT_TYPE = "conversation"
 
 
 class _AgentRequestError(Exception):
@@ -127,7 +128,7 @@ class TextAgentConnection:
     default_inputs: Optional[dict] = field(default=None)
     """Inputs merged into every request body to this agent (e.g. ``{"condition_area": "cardiology"}``)."""
 
-    type: str = field(default="conversation")
+    type: str = field(default=DEFAULT_AGENT_TYPE)
     """What the agent expects in the request body.
 
     ``"conversation"`` (default) sends the whole exchange so far as
@@ -142,9 +143,24 @@ class TextAgentConnection:
                 f"got {self.type!r}"
             )
 
-    def _build_body(self, messages, inputs=None, model=None) -> dict:
+    def build_body(self, messages, inputs=None, model=None) -> dict:
+        """Return the JSON body this agent is sent for ``messages``.
+
+        Raises:
+            ValueError: For a ``general`` agent, when ``messages`` is not a
+                single user message — that agent takes one instruction per call
+                and cannot be given a conversation.
+        """
         if self.type == "general":
-            body = {"input": messages[-1]["content"]}
+            if len(messages) != 1 or messages[0].get("role") != "user":
+                raise ValueError(
+                    f"An agent of type 'general' takes a single user message, "
+                    f"but it was given {len(messages)} message(s) "
+                    f"({', '.join(repr(m.get('role')) for m in messages)}). "
+                    f"Use an agent of type 'conversation' for multi-turn test "
+                    f"cases and simulations."
+                )
+            body = {"input": messages[0]["content"]}
         else:
             body = {"messages": messages}
         if self.default_inputs:
@@ -194,7 +210,7 @@ class TextAgentConnection:
         """
         input_messages = messages if messages is not None else _DEFAULT_VERIFY_MESSAGES
 
-        body = self._build_body(input_messages, inputs=inputs, model=model)
+        body = self.build_body(input_messages, inputs=inputs, model=model)
 
         # ── 1. POST to endpoint (retry transient failures) ───────────────
         try:
@@ -316,7 +332,7 @@ class TextAgentConnection:
                 timeouts, and HTTP 429/502/503/504) are retried with
                 exponential backoff before giving up.
         """
-        body = self._build_body(messages, inputs=inputs, model=model)
+        body = self.build_body(messages, inputs=inputs, model=model)
 
         try:
             resp = await self._post_with_retry(body, timeout=60.0)
@@ -477,4 +493,4 @@ class WebSocketAgentConnection:
         return {"ok": True, "error": None}
 
 
-__all__ = ["AGENT_TYPES", "TextAgentConnection", "WebSocketAgentConnection"]
+__all__ = ["AGENT_TYPES", "DEFAULT_AGENT_TYPE", "TextAgentConnection", "WebSocketAgentConnection"]
