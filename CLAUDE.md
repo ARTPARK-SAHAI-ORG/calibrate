@@ -373,8 +373,9 @@ feature/fix work on a branch:
 `.githooks/pre-commit` runs `uv run --extra dev pytest tests/` **only when
 HEAD is on `main`**. Other branches commit instantly.
 
-`.githooks/pre-push` runs `scripts/check_patch_coverage.py` whenever the branch
-touches `calibrate_agent/`. `SKIP_COVERAGE=1 git push` bypasses it.
+`.githooks/pre-push` runs `scripts/check_patch_coverage.py` when a push carries
+commits, and the script itself does nothing unless the branch touches
+`calibrate_agent/`. `SKIP_COVERAGE=1 git push` bypasses it.
 
 Both are activated per-clone with `git config core.hooksPath .githooks` (also in
 the README).

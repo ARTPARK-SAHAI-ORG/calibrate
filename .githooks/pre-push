@@ -7,13 +7,17 @@ if [ -n "$SKIP_COVERAGE" ]; then
     exit 0
 fi
 
-base=$(git merge-base origin/main HEAD 2>/dev/null || git merge-base main HEAD 2>/dev/null)
-if [ -z "$base" ]; then
-    exit 0
-fi
-
-if [ -z "$(git diff --name-only "$base"...HEAD -- calibrate_agent)" ]; then
-    echo "→ pre-push: no calibrate_agent/ changes — skipping the patch coverage check."
+# Deleting a remote branch or pushing tags pushes no commits worth checking.
+while read -r local_ref local_sha _remote_ref _remote_sha; do
+    case "$local_ref" in
+        refs/heads/*)
+            case "$local_sha" in
+                *[!0]*) has_commits=1 ;;
+            esac
+            ;;
+    esac
+done
+if [ -z "$has_commits" ]; then
     exit 0
 fi
 
