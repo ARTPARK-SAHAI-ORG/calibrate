@@ -30,6 +30,15 @@ calibrate-agent simulations --verify --agent-url https://your-agent.example.com/
   --agent-headers '{"Authorization": "Bearer YOUR_API_KEY"}'
 ```
 
+The sample request carries the conversation as `{"messages": [...]}`. For an agent that takes a plain `{"input": "..."}` instead, verify it with `calibrate-agent llm --verify` and pass `--agent-type general`:
+
+```bash
+calibrate-agent llm --verify --agent-url https://your-agent.example.com/chat \
+  --agent-type general
+```
+
+`--agent-type` is available on `calibrate-agent llm --verify` only. Simulations always send the conversation, so they verify a `conversation` agent. See [Chat agent](/cli/agent-connections/chat#request-format) for both request formats.
+
 **Outbound voice agent** — Calibrate opens the WebSocket and confirms the handshake automatically before each voice run. This is a reachability check only and does not confirm whether the frame protocol or serializer is compatible.
 
 <Note>
