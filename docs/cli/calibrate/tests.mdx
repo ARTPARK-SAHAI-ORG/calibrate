@@ -25,7 +25,7 @@ calibrate tests bulk-create [flags]
 **Examples**
 
 ```bash
-calibrate tests bulk-create --type tool_call --tests '[{"name":"<value>","conversation_history":[{"role":"tool"}],"evaluators":[{"evaluator_uuid":"f47ac10b-58cc-4372-a567-0e02b2c3d479","variable_values":{"criteria":"The reply must cite the refund window"} }]}]'
+calibrate tests bulk-create --type tool_call --tests '[{"name":"<value>","evaluators":[{"evaluator_uuid":"f47ac10b-58cc-4372-a567-0e02b2c3d479","variable_values":{"criteria":"The reply must cite the refund window"} }]}]'
 ```
 
 ## Create test
@@ -40,7 +40,7 @@ calibrate tests create [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `-c, --config-param` | history | The calibrate test config. Three top-level keys. |
+| `-c, --config-param` | history | The calibrate test config. |
 
 **Examples**
 
@@ -102,7 +102,7 @@ calibrate tests update [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `-c, --config-param` | history | The calibrate test config. Three top-level keys. |
+| `-c, --config-param` | history | The calibrate test config. |
 
 **Examples**
 

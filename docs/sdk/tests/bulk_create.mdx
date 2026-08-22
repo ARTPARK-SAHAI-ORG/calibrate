@@ -8,7 +8,7 @@ description: "Create many test cases at once and link them to your agents"
 ## Usage
 
 ```python
-from calibrate import Calibrate, BulkTestItem, ChatMessage
+from calibrate import Calibrate, BulkTestItem
 
 client = Calibrate(
     api_key="your_api_key",
@@ -19,11 +19,6 @@ client.tests.bulk_create(
     tests=[
         BulkTestItem(
             name="name",
-            conversation_history=[
-                ChatMessage(
-                    role="user",
-                )
-            ],
         )
     ],
 )

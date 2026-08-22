@@ -23,6 +23,7 @@ List an agent's test and benchmark runs, most recently created first, with their
 | `type` | string | No | Filter by run type. Omit to return both: |
 | `status` | TaskStatus | No | Filter by run status. Omit for all statuses |
 | `has_failures` | boolean | No | Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both |
+| `around` | string | No | ID of a run to jump to, returning the page that contains it instead of the page at `offset` |
 | `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
 | `offset` | integer | No | Number of items to skip before returning results |
 
@@ -235,6 +236,7 @@ Requires a Calibrate API key (CALIBRATE_API_KEY).
 | --- | --- | --- | --- |
 | `name` | string | Yes | Agent name, unique within the workspace |
 | `type` | string | No | - `agent`: built inside Calibrate |
+| `interaction_type` | string | No | What the agent expects in the request body: |
 | `config` | object | No | Agent behavioral config. The keys depend on `type`. |
 
 **Examples**
@@ -701,7 +703,7 @@ Requires a Calibrate API key (CALIBRATE_API_KEY).
 | --- | --- | --- | --- |
 | `name` | string | Yes | Name of the test, unique within the workspace |
 | `type` | string | Yes | What the test judges: |
-| `config` | object | No | The calibrate test config. Three top-level keys. |
+| `config` | object | No | The calibrate test config. |
 | `evaluators` | array of routers__tests__EvaluatorRef | No | Evaluators to link. Used by `response` and `conversation` tests |
 
 See **POST /tests** in the [API reference](/api-reference/introduction) tab for the full schema.
@@ -740,7 +742,7 @@ fields to change (name, config). Returns the updated test. Fails with
 | `test_uuid` | string | Yes | Test to update |
 | `name` | string | No | New test name. Omit to leave unchanged |
 | `type` | string | No | What the test judges: |
-| `config` | object | No | The calibrate test config. Three top-level keys. |
+| `config` | object | No | The calibrate test config. |
 | `evaluators` | array of routers__tests__EvaluatorRef | No | New evaluator links for the test. Omit to leave unchanged. An empty list clears them, except on `conversation` tests, which must keep at least one |
 
 See **PUT /tests/&#123;test_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
@@ -764,7 +766,7 @@ hits its trace limit.
 | `agent_id` | string | Yes | ID of the agent that produced the turn. Must be an agent in your workspace |
 | `message_id` | string | No | Your own ID for the last user message in `input`, stored for reference only. Omit if you have none |
 | `conversation_id` | string | No | Your own ID for the conversation this turn belongs to, stored for reference only. Omit if you have none |
-| `input` | array of TraceTurn | Yes | Conversation history up to the reported output, oldest turn first, in OpenAI chat format |
+| `input` | string | Yes | What the agent was given for this turn. For a `general` agent, the standalone prompt as a string. For a `conversation` agent, the history up to the reported output, oldest turn first, in OpenAI chat format |
 | `output` | TraceOutput | Yes | What the agent produced for this turn |
 | `metadata` | array of TraceMetadataEntry | No | Key-value pairs stored with the trace. Prefer OTel `gen_ai.*` key names where they fit. Omit if you have none |
 

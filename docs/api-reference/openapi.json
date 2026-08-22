@@ -30,6 +30,16 @@
             "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate",
             "default": "agent"
           },
+          "interaction_type": {
+            "type": "string",
+            "enum": [
+              "conversation",
+              "general"
+            ],
+            "title": "Interaction Type",
+            "description": "What the agent expects in the request body:\n\n- `conversation`: a normal back-and-forth agent, answers within an ongoing conversation. Receives `{\"messages\": [...]}`\n- `general`: a one-shot agent, takes a single plain input and produces a single plain output, no conversation. Receives `{\"input\": \"...\"}`",
+            "default": "conversation"
+          },
           "config": {
             "anyOf": [
               {
@@ -100,6 +110,15 @@
             "title": "Type",
             "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate"
           },
+          "interaction_type": {
+            "type": "string",
+            "enum": [
+              "conversation",
+              "general"
+            ],
+            "title": "Interaction Type",
+            "description": "What the agent expects in the request body:\n\n- `conversation`: a normal back-and-forth agent, answers within an ongoing conversation. Receives `{\"messages\": [...]}`\n- `general`: a one-shot agent, takes a single plain input and produces a single plain output, no conversation. Receives `{\"input\": \"...\"}`"
+          },
           "config": {
             "anyOf": [
               {
@@ -128,6 +147,7 @@
           "uuid",
           "name",
           "type",
+          "interaction_type",
           "created_at",
           "updated_at"
         ],
@@ -158,6 +178,15 @@
             ],
             "title": "Type",
             "description": "- `agent`: built inside Calibrate\n- `connection`: your existing agent connected to Calibrate"
+          },
+          "interaction_type": {
+            "type": "string",
+            "enum": [
+              "conversation",
+              "general"
+            ],
+            "title": "Interaction Type",
+            "description": "What the agent expects in the request body:\n\n- `conversation`: a normal back-and-forth agent, answers within an ongoing conversation. Receives `{\"messages\": [...]}`\n- `general`: a one-shot agent, takes a single plain input and produces a single plain output, no conversation. Receives `{\"input\": \"...\"}`"
           },
           "created_at": {
             "type": "string",
@@ -192,6 +221,7 @@
           "uuid",
           "name",
           "type",
+          "interaction_type",
           "created_at",
           "updated_at",
           "has_default_inputs"
@@ -257,6 +287,11 @@
             "title": "Type",
             "description": "What kind of run this is:\n- `llm-unit-test`: a single run of the agent's tests\n- `llm-benchmark`: a multi-model comparison"
           },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the run was created (ISO 8601 UTC)"
+          },
           "updated_at": {
             "type": "string",
             "title": "Updated At",
@@ -297,6 +332,14 @@
             ],
             "title": "Failed",
             "description": "Number of test cases that failed"
+          },
+          "evaluators": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evaluators",
+            "description": "Names of the evaluators that judged this run, deduplicated and in display order. `Tool call` is appended when any test in the run was a tool-call test. Empty when the run had no evaluators"
           },
           "results": {
             "anyOf": [
@@ -395,6 +438,7 @@
           "name",
           "status",
           "type",
+          "created_at",
           "updated_at"
         ],
         "title": "AgentTestRunListItem"
@@ -1335,12 +1379,31 @@
             "description": "Name of the test, unique within the workspace and within the batch"
           },
           "conversation_history": {
-            "items": {
-              "$ref": "#/components/schemas/ChatMessage"
-            },
-            "type": "array",
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatMessage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Conversation History",
-            "description": "Ordered messages ending at the user turn the agent should answer"
+            "description": "Ordered messages ending at the user turn the agent should answer. **Required for `response` and `conversation` batches**, and for `tool_call` batches aimed at a conversational agent"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input",
+            "description": "Standalone prompt with no conversation around it. **Required for `general` batches**, and for `tool_call` batches aimed at a general agent"
           },
           "evaluators": {
             "anyOf": [
@@ -1355,7 +1418,7 @@
               }
             ],
             "title": "Evaluators",
-            "description": "Evaluators to link. Used by `response` and `conversation` tests"
+            "description": "Evaluators to link. Used by `response`, `conversation`, and `general` tests"
           },
           "tool_calls": {
             "anyOf": [
@@ -1387,8 +1450,7 @@
         },
         "type": "object",
         "required": [
-          "name",
-          "conversation_history"
+          "name"
         ],
         "title": "BulkTestItem"
       },
@@ -1399,10 +1461,11 @@
             "enum": [
               "response",
               "tool_call",
-              "conversation"
+              "conversation",
+              "general"
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\n\nApplied to every test in the batch"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n- `general`: judges a single plain-text input/output pair with no conversation involved (e.g. summarization, extraction, classification)\n\n\nApplied to every test in the batch"
           },
           "tests": {
             "items": {
@@ -3673,10 +3736,11 @@
             "enum": [
               "response",
               "tool_call",
-              "conversation"
+              "conversation",
+              "general"
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n- `general`: judges a single plain-text input/output pair with no conversation involved (e.g. summarization, extraction, classification)\n"
           },
           "config": {
             "anyOf": [
@@ -3688,7 +3752,7 @@
                 "type": "null"
               }
             ],
-            "description": "The calibrate test config. Three top-level keys.\n\n- `history`: the required conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation`: the required `{type, ...}`, where `type` matches the test's `type` below.\n- `settings`: an optional object, e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nOmit to create the test with no config and fill it in later via update",
+            "description": "The calibrate test config.\n\n- `history`: the conversation up to the agent's turn, required for `response` and `conversation` tests and for a `tool_call` test aimed at a conversational agent. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `input`: a standalone prompt with no conversation around it, required for `general` tests and for a `tool_call` test aimed at a `general` agent. A string, not a conversation.\n- `evaluation`: the required `{type, ...}`, where `type` matches the test's `type` below.\n- `settings`: an optional object, e.g. `{\"language\": \"en\"}`.\n\nA `tool_call` test carries exactly one of `history` or `input`, and which one it carries decides the agent it can be linked to.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n- `general`: judge a standalone, non-conversational input/output pair, graded by the linked evaluators. `{\"type\": \"general\"}`\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example, for a conversational agent. Swap `history` for `input` to aim it at a `general` agent:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\n`general` example:\n```json\n{\n  \"input\": \"Summarize this article: ...\",\n  \"evaluation\": {\"type\": \"general\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nOmit to create the test with no config and fill it in later via update",
             "examples": [
               {
                 "evaluation": {
@@ -3794,10 +3858,11 @@
             "enum": [
               "response",
               "tool_call",
-              "conversation"
+              "conversation",
+              "general"
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n- `general`: judges a single plain-text input/output pair with no conversation involved (e.g. summarization, extraction, classification)\n"
           },
           "config": {
             "anyOf": [
@@ -3887,10 +3952,11 @@
             "enum": [
               "response",
               "tool_call",
-              "conversation"
+              "conversation",
+              "general"
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n- `general`: judges a single plain-text input/output pair with no conversation involved (e.g. summarization, extraction, classification)\n"
           },
           "config": {
             "anyOf": [
@@ -4273,7 +4339,8 @@
                 "enum": [
                   "response",
                   "tool_call",
-                  "conversation"
+                  "conversation",
+                  "general"
                 ]
               },
               {
@@ -4281,7 +4348,7 @@
               }
             ],
             "title": "Type",
-            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n\n\nImmutable. Omit it, or send the current value"
+            "description": "What the test judges:\n\n- `response`: judges the generated reply\n- `tool_call`: diffs the generated tool calls\n- `conversation`: judges the full conversation\n- `general`: judges a single plain-text input/output pair with no conversation involved (e.g. summarization, extraction, classification)\n\n\nImmutable. Omit it, or send the current value"
           },
           "config": {
             "anyOf": [
@@ -4293,7 +4360,7 @@
                 "type": "null"
               }
             ],
-            "description": "The calibrate test config. Three top-level keys.\n\n- `history`: the required conversation up to the agent's turn. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `evaluation`: the required `{type, ...}`, where `type` matches the test's `type` below.\n- `settings`: an optional object, e.g. `{\"language\": \"en\"}`.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nReplaces the stored config. Omit to leave unchanged",
+            "description": "The calibrate test config.\n\n- `history`: the conversation up to the agent's turn, required for `response` and `conversation` tests and for a `tool_call` test aimed at a conversational agent. Each item is `{role, content}` with `role` one of `user`, `assistant`, `tool`. A `tool` message also carries `tool_call_id` and `name`.\n- `input`: a standalone prompt with no conversation around it, required for `general` tests and for a `tool_call` test aimed at a `general` agent. A string, not a conversation.\n- `evaluation`: the required `{type, ...}`, where `type` matches the test's `type` below.\n- `settings`: an optional object, e.g. `{\"language\": \"en\"}`.\n\nA `tool_call` test carries exactly one of `history` or `input`, and which one it carries decides the agent it can be linked to.\n\n`evaluation` by test type:\n- `response`: judge the agent's reply, graded by the linked evaluators. `{\"type\": \"response\"}`\n- `conversation`: append the reply and judge the whole conversation. `{\"type\": \"conversation\"}`\n- `tool_call`: diff the agent's tool calls against expected ones. Add `tool_calls`, a list of `{tool, arguments, accept_any_arguments?}`.\n- `general`: judge a standalone, non-conversational input/output pair, graded by the linked evaluators. `{\"type\": \"general\"}`\n\nFor `tool_call`, each expected argument value is one of:\n- `{\"match_type\": \"exact\", \"value\": <any>}`: must equal `value`\n- `{\"match_type\": \"llm_judge\", \"criteria\": \"...\"}`: judged against the criteria\n- `{\"match_type\": \"any\"}`: any value, only checks the argument was passed\n\n`response` / `conversation` example:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"What is your return policy?\"}],\n  \"evaluation\": {\"type\": \"response\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\n`tool_call` example, for a conversational agent. Swap `history` for `input` to aim it at a `general` agent:\n```json\n{\n  \"history\": [{\"role\": \"user\", \"content\": \"Book room 101 for tomorrow\"}],\n  \"evaluation\": {\n    \"type\": \"tool_call\",\n    \"tool_calls\": [\n      {\n        \"tool\": \"book_room\",\n        \"arguments\": {\n          \"room\": {\"match_type\": \"exact\", \"value\": \"101\"},\n          \"date\": {\"match_type\": \"llm_judge\", \"criteria\": \"tomorrow's date\"}\n        },\n        \"accept_any_arguments\": false\n      }\n    ]\n  }\n}\n```\n\n`general` example:\n```json\n{\n  \"input\": \"Summarize this article: ...\",\n  \"evaluation\": {\"type\": \"general\"},\n  \"settings\": {\"language\": \"en\"}\n}\n```\n\nEvaluators are linked via the separate `evaluators` field, not inside `config`.\n\nReplaces the stored config. Omit to leave unchanged",
             "examples": [
               {
                 "evaluation": {
@@ -4409,14 +4476,23 @@
             "description": "Your own ID for the conversation this turn belongs to, stored for reference only. Omit if you have none"
           },
           "input": {
-            "items": {
-              "$ref": "#/components/schemas/TraceTurn"
-            },
-            "type": "array",
-            "maxItems": 500,
-            "minItems": 1,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000,
+                "minLength": 1
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceTurn"
+                },
+                "type": "array",
+                "maxItems": 500,
+                "minItems": 1
+              }
+            ],
             "title": "Input",
-            "description": "Conversation history up to the reported output, oldest turn first, in OpenAI chat format"
+            "description": "What the agent was given for this turn. For a `general` agent, the standalone prompt as a string. For a `conversation` agent, the history up to the reported output, oldest turn first, in OpenAI chat format"
           },
           "output": {
             "$ref": "#/components/schemas/TraceOutput",
@@ -4577,6 +4653,10 @@
               }
             ],
             "description": "Argument values the agent passed to the tool. Omit when the call had none"
+          },
+          "output": {
+            "title": "Output",
+            "description": "What the tool returned for this call. Any JSON value. Omit when you do not record it"
           }
         },
         "additionalProperties": false,
@@ -6047,6 +6127,24 @@
               "title": "Has Failures"
             },
             "description": "Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both"
+          },
+          {
+            "name": "around",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "ID of a run to jump to, returning the page that contains it instead of the page at `offset`",
+              "title": "Around"
+            },
+            "description": "ID of a run to jump to, returning the page that contains it instead of the page at `offset`"
           },
           {
             "name": "limit",

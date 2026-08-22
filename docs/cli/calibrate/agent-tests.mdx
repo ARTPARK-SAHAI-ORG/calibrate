@@ -127,7 +127,8 @@ calibrate agent-tests list-runs-for-agent [flags]
 
 | Option | Type | Description |
 | --- | --- | --- |
-| `-a, --agent-uuid` | string | **Required.** Agent whose test runs to list |
+| `--agent-uuid` | string | **Required.** Agent whose test runs to list |
+| `--around` | offset | ID of a run to jump to, returning the page that contains it instead of the page at offset |
 | `--has-failures` | true | Filter by whether the run has any failing test case or model. true returns only runs with failures (or errors), `false` only clean runs. Omit for both |
 | `-l, --limit` | string | Maximum number of items to return. Omit for no limit (all items) |
 | `--offset` | int | Number of items to skip before returning results |

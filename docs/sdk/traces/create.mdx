@@ -8,7 +8,7 @@ description: "Store a production agent turn and its conversation history for lat
 ## Usage
 
 ```python
-from calibrate import Calibrate, TraceTurn, TraceOutput
+from calibrate import Calibrate, TraceOutput
 
 client = Calibrate(
     api_key="your_api_key",
@@ -16,11 +16,7 @@ client = Calibrate(
 
 client.traces.create(
     agent_id="agent_id",
-    input=[
-        TraceTurn(
-            role="role",
-        )
-    ],
+    input="input",
     output=TraceOutput(),
 )
 ```
