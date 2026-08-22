@@ -119,6 +119,7 @@ def _run_agent_verify(
     agent_headers_raw: str | None,
     models: list[str] | None = None,
     agent_inputs_raw: str | None = None,
+    agent_type: str = "conversation",
 ) -> None:
     """Verify an external agent connection and print the result."""
     from calibrate_agent.connections import TextAgentConnection
@@ -139,19 +140,25 @@ def _run_agent_verify(
             print("✗ --agent-inputs is not valid JSON")
             sys.exit(1)
 
-    agent = TextAgentConnection(
-        url=agent_url, headers=headers, default_inputs=default_inputs
-    )
+    try:
+        agent = TextAgentConnection(
+            url=agent_url,
+            headers=headers,
+            default_inputs=default_inputs,
+            type=agent_type,
+        )
+    except ValueError as e:
+        print(f"✗ --agent-type: {e}")
+        sys.exit(1)
 
     # If models provided, send the first model name in the verify request
     model_hint: str | None = models[0] if models else None
 
-    _preview_body: dict = {"messages": [{"role": "user", "content": "Hi"}]}
-    if default_inputs:
-        _preview_body.update(default_inputs)
-    if model_hint:
-        _preview_body["model"] = model_hint
-    body_preview = json.dumps(_preview_body)
+    body_preview = json.dumps(
+        agent._build_body(
+            [{"role": "user", "content": "Hi"}], model=model_hint
+        )
+    )
 
     print(f"\nVerifying agent connection: {agent_url}")
     print(f"Sending: {body_preview}")
@@ -398,6 +405,13 @@ Examples:
         type=str,
         default=None,
         help='Extra input fields sent with the verify request as a JSON string, e.g. \'{"condition_area": "cardiology"}\'',
+    )
+    llm_parser.add_argument(
+        "--agent-type",
+        type=str,
+        default="conversation",
+        choices=["conversation", "general"],
+        help="What the agent expects in the request body: 'conversation' sends the exchange so far as {\"messages\": [...]}, 'general' sends only the latest user text as {\"input\": \"...\"}",
     )
     llm_parser.add_argument(
         "--skip-verify",
@@ -693,6 +707,7 @@ Examples:
                 args.agent_headers,
                 models=args.model,
                 agent_inputs_raw=args.agent_inputs,
+                agent_type=getattr(args, "agent_type", "conversation"),
             )
         elif args.config is None:
             # No config → interactive mode
@@ -719,6 +734,7 @@ Examples:
                     url=_config["agent_url"],
                     headers=_config.get("agent_headers"),
                     default_inputs=_config.get("agent_default_inputs"),
+                    type=_config.get("agent_type", "conversation"),
                 )
                 _models = args.model if args.model else []
 

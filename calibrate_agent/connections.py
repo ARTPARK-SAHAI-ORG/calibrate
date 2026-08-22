@@ -42,6 +42,10 @@ _MAX_ATTEMPTS = 4
 _BACKOFF_BASE_SECONDS = 1.0
 
 
+# What a text agent accepts in its request body. See TextAgentConnection.type.
+AGENT_TYPES = ("conversation", "general")
+
+
 class _AgentRequestError(Exception):
     """A transient request failure that exhausted all retry attempts."""
 
@@ -54,6 +58,8 @@ class TextAgentConnection:
     Calibrate sends a fixed request and expects a fixed response format.
 
     ── Request (POST to ``url``) ────────────────────────────────────────────
+    A ``conversation`` agent (the default) receives the whole exchange so far::
+
         {
             "messages": [
                 {"role": "user",      "content": "Hello"},
@@ -61,6 +67,10 @@ class TextAgentConnection:
                 {"role": "user",      "content": "What can you do?"}
             ]
         }
+
+    A ``general`` agent receives only the latest user text::
+
+        {"input": "What can you do?"}
 
     ── Response (agent must return) ────────────────────────────────────────
         {
@@ -117,8 +127,26 @@ class TextAgentConnection:
     default_inputs: Optional[dict] = field(default=None)
     """Inputs merged into every request body to this agent (e.g. ``{"condition_area": "cardiology"}``)."""
 
+    type: str = field(default="conversation")
+    """What the agent expects in the request body.
+
+    ``"conversation"`` (default) sends the whole exchange so far as
+    ``{"messages": [...]}``. ``"general"`` sends only the latest user text as
+    ``{"input": "..."}``, for agents that take one instruction per call.
+    """
+
+    def __post_init__(self) -> None:
+        if self.type not in AGENT_TYPES:
+            raise ValueError(
+                f"type must be one of {', '.join(repr(t) for t in AGENT_TYPES)}; "
+                f"got {self.type!r}"
+            )
+
     def _build_body(self, messages, inputs=None, model=None) -> dict:
-        body = {"messages": messages}
+        if self.type == "general":
+            body = {"input": messages[-1]["content"] if messages else ""}
+        else:
+            body = {"messages": messages}
         if self.default_inputs:
             body.update(self.default_inputs)
         if inputs:
@@ -449,4 +477,4 @@ class WebSocketAgentConnection:
         return {"ok": True, "error": None}
 
 
-__all__ = ["TextAgentConnection", "WebSocketAgentConnection"]
+__all__ = ["AGENT_TYPES", "TextAgentConnection", "WebSocketAgentConnection"]
