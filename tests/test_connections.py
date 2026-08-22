@@ -674,6 +674,117 @@ class TestTextAgentConnectionVerify(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Tests for the agent type (conversation vs general request body)
+# ---------------------------------------------------------------------------
+
+class TestAgentType(unittest.IsolatedAsyncioTestCase):
+
+    @staticmethod
+    def _sent_body(mock_client):
+        return mock_client.post.call_args.kwargs["json"]
+
+    async def test_conversation_is_the_default_and_sends_messages(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        self.assertEqual(agent.type, "conversation")
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            await agent.call(
+                [
+                    {"role": "user", "content": "Hi"},
+                    {"role": "assistant", "content": "Hello"},
+                    {"role": "user", "content": "Bye"},
+                ]
+            )
+
+        body = self._sent_body(mock_client)
+        self.assertEqual(len(body["messages"]), 3)
+        self.assertNotIn("input", body)
+
+    async def test_general_sends_latest_user_text_as_input(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat", type="general")
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            await agent.call([{"role": "user", "content": "Summarize this"}])
+
+        body = self._sent_body(mock_client)
+        self.assertEqual(body, {"input": "Summarize this"})
+
+    async def test_general_verify_sends_input(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat", type="general")
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            result = await agent.verify()
+
+        self.assertTrue(result["ok"])
+        body = self._sent_body(mock_client)
+        self.assertNotIn("messages", body)
+        self.assertIsInstance(body["input"], str)
+
+    async def test_general_still_merges_inputs_and_model(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(
+            url="http://fake-agent/chat",
+            type="general",
+            default_inputs={"lang": "en"},
+        )
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            await agent.call(
+                [{"role": "user", "content": "Hi"}],
+                model="openai/gpt-4.1",
+                inputs={"lang": "hi"},
+            )
+
+        self.assertEqual(
+            self._sent_body(mock_client),
+            {"input": "Hi", "lang": "hi", "model": "openai/gpt-4.1"},
+        )
+
+    async def test_general_rejects_a_multi_turn_conversation(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat", type="general")
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            with self.assertRaises(ValueError) as cm:
+                await agent.call(
+                    [
+                        {"role": "user", "content": "Hi"},
+                        {"role": "assistant", "content": "Hello"},
+                    ]
+                )
+
+        self.assertIn("single user message", str(cm.exception))
+        mock_client.post.assert_not_awaited()
+
+    def test_general_rejects_a_non_user_message(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat", type="general")
+
+        with self.assertRaises(ValueError):
+            agent.build_body([{"role": "assistant", "content": "Hello"}])
+
+    def test_unknown_type_is_rejected(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        with self.assertRaises(ValueError):
+            TextAgentConnection(url="http://fake-agent/chat", type="chat")
+
+
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

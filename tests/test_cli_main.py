@@ -145,6 +145,7 @@ class TestRunAgentVerify(unittest.TestCase):
         fake_result = {"ok": True, "sample_output": {"response": "Hi", "tool_calls": []}}
         with patch("calibrate_agent.connections.TextAgentConnection") as MockConn:
             MockConn.return_value.verify = AsyncMock(return_value=fake_result)
+            MockConn.return_value.build_body.return_value = {}
             cli._run_agent_verify(
                 "http://x", None, agent_inputs_raw='{"condition_area": "cardiology"}'
             )
@@ -152,6 +153,24 @@ class TestRunAgentVerify(unittest.TestCase):
             self.assertEqual(
                 kwargs.get("default_inputs"), {"condition_area": "cardiology"}
             )
+
+    def test_general_type_previews_input_body(self):
+        from calibrate_agent import cli
+
+        fake_result = {"ok": True, "sample_output": {"response": "Hi", "tool_calls": []}}
+        with patch("calibrate_agent.connections.TextAgentConnection.verify",
+                   AsyncMock(return_value=fake_result)):
+            with patch("builtins.print") as mock_print:
+                cli._run_agent_verify("http://x", None, agent_type="general")
+
+        printed = " ".join(str(c.args[0]) for c in mock_print.call_args_list if c.args)
+        self.assertIn('{"input": "Hi"}', printed)
+
+    def test_unknown_type_exits(self):
+        from calibrate_agent import cli
+
+        with self.assertRaises(SystemExit):
+            cli._run_agent_verify("http://x", None, agent_type="chat")
 
 
 class TestMainDispatch(unittest.TestCase):
@@ -592,6 +611,32 @@ class TestMainDispatch(unittest.TestCase):
                 self._run_with_argv([
                     "calibrate_agent", "simulations", "--type", "text",
                     "-c", str(cfg), "-o", tmp,
+                ])
+
+    def test_simulations_text_rejects_general_agent_type(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "agent_type": "general",
+            }))
+            with self.assertRaises(SystemExit):
+                self._run_with_argv([
+                    "calibrate_agent", "simulations", "--type", "text",
+                    "-c", str(cfg), "-o", tmp,
+                ])
+
+    def test_llm_config_rejects_unknown_agent_type(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "agent_type": "genral",
+                "test_cases": [],
+            }))
+            with self.assertRaises(SystemExit):
+                self._run_with_argv([
+                    "calibrate_agent", "llm", "-c", str(cfg), "-o", tmp,
                 ])
 
     def test_simulations_leaderboard(self):
