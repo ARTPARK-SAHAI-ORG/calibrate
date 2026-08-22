@@ -242,8 +242,11 @@ reply before returning it and that rebuild drops OpenRouter's `cost`, so
 `openrouter_client_recording_usage()` reads the usage block off the reply on its
 way through; a judge call must go through that client or its cost is lost. A
 model that reports no usage contributes only `latency_seconds`.
-`evaluator_row_columns` turns the fields into `<evaluator>_<field>` columns in
-`results.csv`.
+`write_judge_usage` writes them to `judge_usage.csv`, one row per judge call
+with columns `id`, `evaluator`, then the usage fields. The evaluator name is a
+value there rather than part of a column name, so two evaluators whose names
+differ only by one of these suffixes cannot overwrite each other's numbers.
+`results.csv` keeps only the score and the reasoning per evaluator.
 
 ### Aggregation shape
 `get_llm_judge_score` / `get_tts_llm_judge_score` return:

@@ -13,6 +13,7 @@ Run with:
     python -m pytest tests/test_judges.py -v
 """
 
+import csv
 import os
 import unittest
 from typing import Optional
@@ -25,6 +26,7 @@ from calibrate_agent.judges import (
     call_usage,
     openrouter_client_recording_usage,
     evaluator_row_columns,
+    write_judge_usage,
     text_judge,
     simulation_judge,
     general_task_judge,
@@ -635,52 +637,118 @@ class TestUsageOnJudgeResults(unittest.IsolatedAsyncioTestCase):
 
 
 class TestEvaluatorRowColumns(unittest.TestCase):
-    """results.csv carries one cost/token/latency column per evaluator."""
+    """results.csv keeps the score and the reasoning; usage goes elsewhere."""
 
-    _EVALUATORS = {"accuracy": {"name": "accuracy"}}
-
-    def test_usage_columns_follow_the_score_and_reasoning(self):
+    def test_usage_fields_do_not_become_columns(self):
         columns = evaluator_row_columns(
-            self._EVALUATORS,
+            {"accuracy": {"name": "accuracy"}},
             {
                 "accuracy": {
                     "reasoning": "good",
                     "match": True,
                     "cost_usd": 0.002,
-                    "input_tokens": 300,
-                    "output_tokens": 12,
-                    "cached_input_tokens": 128,
                     "latency_seconds": 0.9,
                 }
             },
         )
         self.assertEqual(
-            columns,
+            columns, {"accuracy": True, "accuracy_reasoning": "good"}
+        )
+
+
+class TestWriteJudgeUsage(unittest.TestCase):
+    """judge_usage.csv holds one row per judge call, evaluator name as a value."""
+
+    def _read(self, output_dir):
+        with open(os.path.join(output_dir, "judge_usage.csv"), newline="") as f:
+            return list(csv.DictReader(f))
+
+    def test_one_row_per_row_and_evaluator(self):
+        import tempfile
+
+        judge_rows = [
             {
-                "accuracy": True,
-                "accuracy_reasoning": "good",
-                "accuracy_cost_usd": 0.002,
-                "accuracy_input_tokens": 300,
-                "accuracy_output_tokens": 12,
-                "accuracy_cached_input_tokens": 128,
-                "accuracy_latency_seconds": 0.9,
-            },
+                "accuracy": {
+                    "reasoning": "a",
+                    "match": True,
+                    "cost_usd": 0.001,
+                    "input_tokens": 100,
+                    "output_tokens": 10,
+                    "cached_input_tokens": 0,
+                    "latency_seconds": 1.5,
+                },
+                "tone": {"reasoning": "b", "match": False, "cost_usd": 0.002},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            write_judge_usage(d, ["row_a"], judge_rows, ["accuracy", "tone"])
+            rows = self._read(d)
+
+        self.assertEqual([r["evaluator"] for r in rows], ["accuracy", "tone"])
+        self.assertEqual(rows[0]["id"], "row_a")
+        self.assertEqual(rows[0]["cost_usd"], "0.001")
+        self.assertEqual(rows[0]["input_tokens"], "100")
+        self.assertEqual(rows[0]["latency_seconds"], "1.5")
+        self.assertEqual(rows[1]["cost_usd"], "0.002")
+        self.assertEqual(rows[1]["input_tokens"], "")
+
+    def test_evaluator_names_that_look_like_columns_stay_separate(self):
+        import tempfile
+
+        judge_rows = [
+            {
+                "faithful": {"reasoning": "a", "match": True, "cost_usd": 0.001},
+                "faithful_cost_usd": {
+                    "reasoning": "b",
+                    "match": False,
+                    "cost_usd": 0.002,
+                },
+            }
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            write_judge_usage(
+                d, [1], judge_rows, ["faithful", "faithful_cost_usd"]
+            )
+            rows = self._read(d)
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual(
+            {r["evaluator"]: r["cost_usd"] for r in rows},
+            {"faithful": "0.001", "faithful_cost_usd": "0.002"},
         )
 
-    def test_missing_usage_leaves_the_cells_empty(self):
-        columns = evaluator_row_columns(
-            self._EVALUATORS, {"accuracy": {"reasoning": "good", "match": False}}
-        )
-        for field in USAGE_FIELDS:
-            self.assertIsNone(columns[f"accuracy_{field}"])
+    def test_header_is_written_even_with_no_rows(self):
+        import tempfile
 
-    def test_rating_evaluator_gets_the_same_columns(self):
-        columns = evaluator_row_columns(
-            {"empathy": {"name": "empathy", "type": "rating", "scale_min": 1, "scale_max": 5}},
-            {"empathy": {"reasoning": "warm", "score": 4, "cost_usd": 0.003}},
+        with tempfile.TemporaryDirectory() as d:
+            path = write_judge_usage(d, [], [], ["accuracy"])
+            with open(path, newline="") as f:
+                header = f.readline().strip()
+
+        self.assertEqual(
+            header,
+            "id,evaluator," + ",".join(USAGE_FIELDS),
         )
-        self.assertEqual(columns["empathy"], 4)
-        self.assertEqual(columns["empathy_cost_usd"], 0.003)
+
+    def test_rows_a_judge_never_reached_are_skipped(self):
+        import tempfile
+
+        judge_rows = [None, {"accuracy": {"reasoning": "a", "match": True}}]
+        with tempfile.TemporaryDirectory() as d:
+            write_judge_usage(d, ["row_a", "row_b"], judge_rows, ["accuracy"])
+            rows = self._read(d)
+
+        self.assertEqual([r["id"] for r in rows], ["row_b"])
+
+    def test_an_evaluator_missing_from_a_row_is_skipped(self):
+        import tempfile
+
+        judge_rows = [{"accuracy": {"reasoning": "a", "match": True}}]
+        with tempfile.TemporaryDirectory() as d:
+            write_judge_usage(d, ["row_a"], judge_rows, ["accuracy", "tone"])
+            rows = self._read(d)
+
+        self.assertEqual([r["evaluator"] for r in rows], ["accuracy"])
 
 
 class TestTextJudge(unittest.IsolatedAsyncioTestCase):

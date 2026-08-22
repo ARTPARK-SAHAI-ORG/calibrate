@@ -89,18 +89,11 @@ async def _judge_and_emit(
 def _simulation_metric_columns(evaluation_results: list) -> dict:
     """Flatten one simulation's evaluation results into ``results.csv`` columns.
 
-    Each evaluator contributes its score under the evaluator's own name, plus
-    one ``<evaluator>_<field>`` column per :data:`USAGE_FIELDS` entry holding
-    what that judge call cost, used, and took.
+    Each evaluator contributes its score under the evaluator's own name. What
+    each judge call cost, used, and took stays in the per-simulation
+    ``evaluation_results.csv``, which carries one row per evaluator.
     """
-    columns: dict = {}
-    for metric_dict in evaluation_results:
-        name = metric_dict["name"]
-        columns[name] = float(metric_dict["value"])
-        for field in USAGE_FIELDS:
-            if field in metric_dict:
-                columns[f"{name}_{field}"] = metric_dict[field]
-    return columns
+    return {m["name"]: float(m["value"]) for m in evaluation_results}
 
 
 def _build_evaluation_result(evaluator: dict, judge_row: dict) -> dict:

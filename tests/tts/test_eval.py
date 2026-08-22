@@ -673,18 +673,7 @@ class TestTTSPartialResults(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(list(df["id"]), ["row_a", "row_b"])
             self.assertEqual(
                 list(df.columns),
-                [
-                    "id",
-                    "text",
-                    "audio_path",
-                    "quality",
-                    "quality_reasoning",
-                    "quality_cost_usd",
-                    "quality_input_tokens",
-                    "quality_output_tokens",
-                    "quality_cached_input_tokens",
-                    "quality_latency_seconds",
-                ],
+                ["id", "text", "audio_path", "quality", "quality_reasoning"],
             )
             self.assertEqual([bool(v) for v in df["quality"]], [True, False])
 

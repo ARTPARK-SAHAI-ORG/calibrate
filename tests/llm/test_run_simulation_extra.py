@@ -80,7 +80,7 @@ class TestSimulationUsageColumns(unittest.TestCase):
         self.assertNotIn("cost_usd", result)
         self.assertNotIn("latency_seconds", result)
 
-    def test_run_level_columns_are_named_per_evaluator(self):
+    def test_run_level_columns_hold_scores_only(self):
         from calibrate_agent.llm.run_simulation import (
             _build_evaluation_result,
             _simulation_metric_columns,
@@ -94,18 +94,7 @@ class TestSimulationUsageColumns(unittest.TestCase):
                 ),
             ]
         )
-        self.assertEqual(columns["accuracy"], 1.0)
-        self.assertEqual(columns["accuracy_cost_usd"], 0.004)
-        self.assertEqual(columns["empathy"], 4.0)
-        self.assertEqual(columns["empathy_latency_seconds"], 1.5)
-
-    def test_run_level_columns_skip_missing_usage(self):
-        from calibrate_agent.llm.run_simulation import _simulation_metric_columns
-
-        columns = _simulation_metric_columns(
-            [{"name": "accuracy", "type": "binary", "value": 1.0, "reasoning": "ok"}]
-        )
-        self.assertEqual(columns, {"accuracy": 1.0})
+        self.assertEqual(columns, {"accuracy": 1.0, "empathy": 4.0})
 
 
 class TestJudgeAndEmit(unittest.IsolatedAsyncioTestCase):

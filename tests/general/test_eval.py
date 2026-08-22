@@ -348,18 +348,7 @@ class TestGeneralPartialResults(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(list(df["id"]), ["row_a", "row_b"])
             self.assertEqual(
                 list(df.columns),
-                [
-                    "id",
-                    "input",
-                    "output",
-                    "faithful",
-                    "faithful_reasoning",
-                    "faithful_cost_usd",
-                    "faithful_input_tokens",
-                    "faithful_output_tokens",
-                    "faithful_cached_input_tokens",
-                    "faithful_latency_seconds",
-                ],
+                ["id", "input", "output", "faithful", "faithful_reasoning"],
             )
             self.assertEqual([bool(v) for v in df["faithful"]], [True, False])
 

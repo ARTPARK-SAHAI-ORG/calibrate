@@ -291,11 +291,9 @@ def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:
     """Flatten one row's judge result into its ``results.csv`` columns.
 
     Produces ``{name: value, f"{name}_reasoning": str}`` per evaluator — the
-    score for rating evaluators, a bool for binary ones, followed by one
-    ``f"{name}_{field}"`` column per :data:`USAGE_FIELDS` entry holding what
-    that evaluator's judge call cost, used, and took. Latency is always
-    recorded; the cost and token cells are empty for a judge model that
-    reported no usage.
+    score for rating evaluators, a bool for binary ones. What each judge call
+    cost, used, and took goes to ``judge_usage.csv`` instead, keyed by
+    evaluator name rather than folded into column names.
     """
     columns: dict = {}
     for name, evaluator in evaluators_by_name.items():
@@ -305,9 +303,36 @@ def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:
         else:
             columns[name] = bool(result["match"])
         columns[f"{name}_reasoning"] = result["reasoning"]
-        for field in USAGE_FIELDS:
-            columns[f"{name}_{field}"] = result.get(field)
     return columns
+
+
+def write_judge_usage(output_dir: str, ids: list, judge_rows: list, evaluator_names: list) -> str:
+    """Write ``judge_usage.csv``: one row per judge call under ``output_dir``.
+
+    Columns are ``id``, ``evaluator``, then :data:`USAGE_FIELDS`. The evaluator
+    name is a value rather than part of a column name, so two evaluators whose
+    names differ only by one of these suffixes cannot overwrite each other.
+    Rows a judge never reached are skipped.
+    """
+    path = os.path.join(output_dir, "judge_usage.csv")
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["id", "evaluator", *USAGE_FIELDS])
+        writer.writeheader()
+        for row_id, judge_row in zip(ids, judge_rows):
+            if not isinstance(judge_row, dict):
+                continue
+            for name in evaluator_names:
+                result = judge_row.get(name)
+                if not isinstance(result, dict):
+                    continue
+                writer.writerow(
+                    {
+                        "id": row_id,
+                        "evaluator": name,
+                        **{field: result.get(field) for field in USAGE_FIELDS},
+                    }
+                )
+    return path
 
 
 def with_row_callback(coroutines: list, on_row: Optional[Callable]) -> list:

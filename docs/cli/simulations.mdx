@@ -436,7 +436,7 @@ Every LLM judge call records what it cost and how long it took, alongside the sc
 | `cached_input_tokens` | Input tokens the model served from its cache, included in `input_tokens`. |
 | `latency_seconds`     | Wall-clock time for the call.                                          |
 
-Each simulation's `evaluation_results.csv` carries these as columns next to `value` and `reasoning`, one row per evaluator. The run-level `results.csv` repeats them as `<evaluator>_<field>` columns, one row per simulation. A judge model that reports no usage leaves the fields out, and only `latency_seconds` is recorded.
+Each simulation's `evaluation_results.csv` carries these as columns next to `value` and `reasoning`, one row per evaluator. Latency is always recorded; the cost and token cells are empty for a judge model that reports no usage.
 
 ## Resources
 

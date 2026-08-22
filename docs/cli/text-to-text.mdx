@@ -753,7 +753,7 @@ Every LLM judge call records what it cost and how long it took, alongside the gr
 
 Tool call parameters graded with `llm_judge` criteria record the same fields on each entry under `param_judgments`.
 
-The numbers describe a single judge call, so a test case graded by three evaluators has three separate sets. A judge model that reports no usage leaves the fields out, and only `latency_seconds` is recorded.
+The numbers describe a single judge call, so a test case graded by three evaluators has three separate sets. Latency is always recorded; the cost and token fields are left out for a judge model that reports no usage.
 
 ## Resources
 
