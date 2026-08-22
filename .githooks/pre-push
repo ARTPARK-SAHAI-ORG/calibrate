@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Codecov's patch check is blocking on PRs: changed lines must be covered by
+# tests. Catch that here instead of after the PR is opened.
+
+if [ -n "$SKIP_COVERAGE" ]; then
+    echo "→ pre-push: SKIP_COVERAGE set — skipping the patch coverage check."
+    exit 0
+fi
+
+# Deleting a remote branch (all-zero local sha) or pushing tags carries no
+# commits worth checking. The local ref is "HEAD" for `git push origin HEAD`,
+# so the remote ref is what tells a tag apart from a branch.
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+    case "$remote_ref" in
+        refs/tags/*) continue ;;
+    esac
+    case "$local_sha" in
+        *[!0]*) has_commits=1 ;;
+    esac
+done
+if [ -z "$has_commits" ]; then
+    exit 0
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "✗ uv not found on PATH — install uv or run 'pytest tests/' manually." >&2
+    exit 1
+fi
+
+echo "→ pre-push: checking that the lines this branch adds are covered..."
+exec uv run --extra dev python scripts/check_patch_coverage.py

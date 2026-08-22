@@ -50,6 +50,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    "diff-cover>=9.0",
     "ipdb>=0.13.13",
     "ipython>=8.37.0",
     "pytest>=7.0",
