@@ -739,6 +739,22 @@ You can drill into each model to view the results for each test with the reasoni
   />
 </Frame>
 
+### What each judge call cost
+
+Every LLM judge call records what it cost and how long it took, alongside the grade it produced. In `results.json`, each evaluator's entry carries:
+
+| Field                 | Meaning                                                              |
+| --------------------- | -------------------------------------------------------------------- |
+| `cost_usd`            | What OpenRouter charged for that single judge call, in US dollars.     |
+| `input_tokens`        | Tokens sent to the judge model.                                        |
+| `output_tokens`       | Tokens the judge model produced.                                       |
+| `cached_input_tokens` | Input tokens the model served from its cache, included in `input_tokens`. |
+| `latency_seconds`     | Wall-clock time for the call.                                          |
+
+Tool call parameters graded with `llm_judge` criteria record the same fields on each entry under `param_judgments`.
+
+The numbers describe a single judge call, so a test case graded by three evaluators has three separate sets. A judge model that reports no usage leaves the fields out, and only `latency_seconds` is recorded.
+
 ## Resources
 
 <Card title="Integrations" icon="volume-high" href="/integrations/llm">

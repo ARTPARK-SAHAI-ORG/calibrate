@@ -424,6 +424,20 @@ and review the reasoning for each evaluation criterion:
   <img src="./images/simulation_eval.png" alt="Simulation evaluation" />
 </Frame>
 
+### What each judge call cost
+
+Every LLM judge call records what it cost and how long it took, alongside the score it produced:
+
+| Field                 | Meaning                                                              |
+| --------------------- | -------------------------------------------------------------------- |
+| `cost_usd`            | What OpenRouter charged for that single judge call, in US dollars.     |
+| `input_tokens`        | Tokens sent to the judge model.                                        |
+| `output_tokens`       | Tokens the judge model produced.                                       |
+| `cached_input_tokens` | Input tokens the model served from its cache, included in `input_tokens`. |
+| `latency_seconds`     | Wall-clock time for the call.                                          |
+
+Each simulation's `evaluation_results.csv` carries these as columns next to `value` and `reasoning`, one row per evaluator. The run-level `results.csv` repeats them as `<evaluator>_<field>` columns, one row per simulation. A judge model that reports no usage leaves the fields out, and only `latency_seconds` is recorded.
+
 ## Resources
 
 <CardGroup cols={2}>

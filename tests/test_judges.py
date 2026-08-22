@@ -13,12 +13,18 @@ Run with:
     python -m pytest tests/test_judges.py -v
 """
 
+import os
 import unittest
+from typing import Optional
 from unittest.mock import patch, AsyncMock, MagicMock
 
 from pydantic import BaseModel
 
 from calibrate_agent.judges import (
+    USAGE_FIELDS,
+    call_usage,
+    openrouter_client_recording_usage,
+    evaluator_row_columns,
     text_judge,
     simulation_judge,
     general_task_judge,
@@ -322,6 +328,69 @@ def _mock_instructor_chat_completions(return_values):
     return client
 
 
+def _usage_block(usage: Optional[dict]):
+    """Build a reply's usage object, or None for a model that reports none."""
+    if usage is None:
+        return None
+    usage_obj = MagicMock()
+    usage_obj.model_dump.return_value = usage
+    return usage_obj
+
+
+def _mock_openrouter(return_values, usage=None):
+    """Stand in for the OpenRouter client and instructor together.
+
+    Returns ``(openrouter_client, apatch)`` to patch over
+    ``_build_openrouter_client`` and ``instructor.apatch``. The instructor
+    stand-in calls through whatever client it is handed, so the usage recording
+    a live run relies on is exercised rather than bypassed.
+    """
+    if isinstance(return_values, dict):
+        return_values = [return_values]
+
+    parsed_objs = []
+    replies = []
+    for v in return_values:
+        parsed = MagicMock()
+        parsed.model_dump.return_value = v
+        parsed_objs.append(parsed)
+        reply = MagicMock()
+        reply.usage = _usage_block(usage)
+        replies.append(reply)
+
+    openrouter_client = MagicMock()
+    send = AsyncMock(side_effect=replies)
+    openrouter_client.chat.completions.create = send
+    # The recording wrapper replaces ``create``, so hold on to the mock the
+    # request actually reaches for tests that assert on what was sent.
+    openrouter_client.sent = send
+
+    parsed_iter = iter(parsed_objs)
+    patched = MagicMock()
+
+    def apatch(recording_client):
+        async def create(**kwargs):
+            await recording_client.chat.completions.create(**kwargs)
+            return next(parsed_iter)
+
+        patched.chat.completions.create = AsyncMock(side_effect=create)
+        return patched
+
+    return openrouter_client, apatch
+
+
+def _drop_usage(judge_result: dict) -> dict:
+    """Strip the per-call cost/token/latency fields from a judge result.
+
+    Lets a test assert on the graded answer alone; the usage fields have their
+    own tests.
+    """
+    return {
+        name: {k: v for k, v in payload.items() if k not in USAGE_FIELDS}
+        for name, payload in judge_result.items()
+    }
+
+
 class TestJudgeIOLogging(unittest.IsolatedAsyncioTestCase):
     """The judge writes its prompt/response into the bound run log file."""
 
@@ -382,7 +451,236 @@ class TestJudgeIOLogging(unittest.IsolatedAsyncioTestCase):
                 ],
                 user_prompt="ctx",
             )
-        self.assertEqual(result, {"x": {"reasoning": "ok", "match": True}})
+        self.assertEqual(_drop_usage(result), {"x": {"reasoning": "ok", "match": True}})
+
+
+class TestCallUsage(unittest.TestCase):
+    """What one judge call cost, used, and took is read off its usage block."""
+
+    def test_reads_cost_tokens_and_cached_tokens(self):
+        usage = _usage_block(
+            {
+                "cost": 0.00042,
+                "prompt_tokens": 1200,
+                "completion_tokens": 85,
+                "prompt_tokens_details": {"cached_tokens": 1024},
+            }
+        )
+        self.assertEqual(
+            call_usage(usage, 1.2345678),
+            {
+                "cost_usd": 0.00042,
+                "input_tokens": 1200,
+                "output_tokens": 85,
+                "cached_input_tokens": 1024,
+                "latency_seconds": 1.2346,
+            },
+        )
+
+    def test_token_counts_are_whole_numbers(self):
+        usage = call_usage(
+            _usage_block({"prompt_tokens": 10.0, "completion_tokens": 3.0}), 0.5
+        )
+        self.assertIsInstance(usage["input_tokens"], int)
+        self.assertIsInstance(usage["output_tokens"], int)
+
+    def test_model_reporting_no_usage_still_reports_latency(self):
+        self.assertEqual(call_usage(None, 0.25), {"latency_seconds": 0.25})
+
+    def test_non_numeric_usage_values_are_dropped(self):
+        usage = _usage_block(
+            {"cost": None, "prompt_tokens": "many", "completion_tokens": True}
+        )
+        self.assertEqual(call_usage(usage, 0.5), {"latency_seconds": 0.5})
+
+    def test_partial_usage_keeps_what_it_has(self):
+        self.assertEqual(
+            call_usage(_usage_block({"prompt_tokens": 40}), 0.5),
+            {"input_tokens": 40, "latency_seconds": 0.5},
+        )
+
+    def test_usage_that_cannot_be_dumped_is_ignored(self):
+        usage = MagicMock()
+        usage.model_dump.side_effect = RuntimeError("boom")
+        self.assertEqual(call_usage(usage, 0.5), {"latency_seconds": 0.5})
+
+    def test_usage_that_dumps_to_something_other_than_a_dict_is_ignored(self):
+        usage = MagicMock()
+        usage.model_dump.return_value = "not a usage block"
+        self.assertEqual(call_usage(usage, 0.5), {"latency_seconds": 0.5})
+
+    def test_usage_already_a_plain_dict_is_read_directly(self):
+        self.assertEqual(
+            call_usage({"prompt_tokens": 7}, 0.5),
+            {"input_tokens": 7, "latency_seconds": 0.5},
+        )
+
+
+class TestUsageRecording(unittest.IsolatedAsyncioTestCase):
+    """The usage block is read off the reply before instructor rebuilds it."""
+
+    async def test_records_the_usage_of_the_reply_it_passes_through(self):
+        client = MagicMock()
+        reply = MagicMock()
+        reply.usage = _usage_block({"cost": 0.5})
+        client.chat.completions.create = AsyncMock(return_value=reply)
+
+        with patch(
+            "calibrate_agent.judges._build_openrouter_client", return_value=client
+        ):
+            recording_client, box = openrouter_client_recording_usage()
+            self.assertEqual(box, {})
+            returned = await recording_client.chat.completions.create(model="m")
+
+        self.assertIs(returned, reply)
+        self.assertIs(box["usage"], reply.usage)
+
+    async def test_a_retry_leaves_the_usage_of_the_last_call(self):
+        client = MagicMock()
+        first, second = MagicMock(), MagicMock()
+        first.usage = _usage_block({"cost": 0.1})
+        second.usage = _usage_block({"cost": 0.9})
+        client.chat.completions.create = AsyncMock(side_effect=[first, second])
+
+        with patch(
+            "calibrate_agent.judges._build_openrouter_client", return_value=client
+        ):
+            recording_client, box = openrouter_client_recording_usage()
+            await recording_client.chat.completions.create(model="m")
+            await recording_client.chat.completions.create(model="m")
+
+        self.assertIs(box["usage"], second.usage)
+
+
+class TestUsageOnJudgeResults(unittest.IsolatedAsyncioTestCase):
+    """Every judge result carries what its own call cost, used, and took."""
+
+    _USAGE = {"cost": 0.001, "prompt_tokens": 500, "completion_tokens": 20}
+
+    async def _run_text_judge(self, openrouter_client, apatch):
+        with patch(
+            "calibrate_agent.judges.instructor.apatch", side_effect=apatch
+        ), patch(
+            "calibrate_agent.judges._build_openrouter_client",
+            return_value=openrouter_client,
+        ):
+            return await text_judge(
+                evaluators=[{"name": "accuracy", "system_prompt": "p"}],
+                user_prompt="ctx",
+            )
+
+    async def test_text_judge_attaches_usage_per_evaluator(self):
+        result = await self._run_text_judge(
+            *_mock_openrouter(
+                [{"reasoning": "good", "match": True}], usage=self._USAGE
+            )
+        )
+        self.assertEqual(result["accuracy"]["cost_usd"], 0.001)
+        self.assertEqual(result["accuracy"]["input_tokens"], 500)
+        self.assertEqual(result["accuracy"]["output_tokens"], 20)
+        self.assertGreaterEqual(result["accuracy"]["latency_seconds"], 0.0)
+        self.assertEqual(result["accuracy"]["match"], True)
+
+    async def test_request_asks_openrouter_for_cost(self):
+        openrouter_client, apatch = _mock_openrouter(
+            [{"reasoning": "good", "match": True}], usage=self._USAGE
+        )
+        await self._run_text_judge(openrouter_client, apatch)
+        kwargs = openrouter_client.sent.await_args.kwargs
+        self.assertEqual(kwargs["extra_body"], {"usage": {"include": True}})
+
+    async def test_model_reporting_no_usage_still_grades_the_row(self):
+        result = await self._run_text_judge(
+            *_mock_openrouter([{"reasoning": "good", "match": True}], usage=None)
+        )
+        self.assertEqual(result["accuracy"]["match"], True)
+        self.assertNotIn("cost_usd", result["accuracy"])
+        self.assertIn("latency_seconds", result["accuracy"])
+
+    async def test_usage_survives_a_nested_payload(self):
+        result = await self._run_text_judge(
+            *_mock_openrouter(
+                [{"CriterionResult": {"reasoning": "good", "match": True}}],
+                usage=self._USAGE,
+            )
+        )
+        self.assertEqual(result["accuracy"]["reasoning"], "good")
+        self.assertEqual(result["accuracy"]["cost_usd"], 0.001)
+
+    async def test_audio_judge_attaches_usage_per_evaluator(self):
+        import tempfile
+
+        openrouter_client, apatch = _mock_openrouter(
+            [{"reasoning": "clear", "match": True}], usage=self._USAGE
+        )
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(b"RIFFfake")
+            audio_path = f.name
+        with patch(
+            "calibrate_agent.judges.instructor.apatch", side_effect=apatch
+        ), patch(
+            "calibrate_agent.judges._build_openrouter_client",
+            return_value=openrouter_client,
+        ):
+            result = await audio_judge(
+                evaluators=[{"name": "intelligibility", "system_prompt": "p"}],
+                audio_path=audio_path,
+                reference_text="hello",
+            )
+        os.unlink(audio_path)
+        self.assertEqual(result["intelligibility"]["cost_usd"], 0.001)
+        self.assertEqual(result["intelligibility"]["input_tokens"], 500)
+        kwargs = openrouter_client.sent.await_args.kwargs
+        self.assertEqual(kwargs["extra_body"], {"usage": {"include": True}})
+
+
+class TestEvaluatorRowColumns(unittest.TestCase):
+    """results.csv carries one cost/token/latency column per evaluator."""
+
+    _EVALUATORS = {"accuracy": {"name": "accuracy"}}
+
+    def test_usage_columns_follow_the_score_and_reasoning(self):
+        columns = evaluator_row_columns(
+            self._EVALUATORS,
+            {
+                "accuracy": {
+                    "reasoning": "good",
+                    "match": True,
+                    "cost_usd": 0.002,
+                    "input_tokens": 300,
+                    "output_tokens": 12,
+                    "cached_input_tokens": 128,
+                    "latency_seconds": 0.9,
+                }
+            },
+        )
+        self.assertEqual(
+            columns,
+            {
+                "accuracy": True,
+                "accuracy_reasoning": "good",
+                "accuracy_cost_usd": 0.002,
+                "accuracy_input_tokens": 300,
+                "accuracy_output_tokens": 12,
+                "accuracy_cached_input_tokens": 128,
+                "accuracy_latency_seconds": 0.9,
+            },
+        )
+
+    def test_missing_usage_leaves_the_cells_empty(self):
+        columns = evaluator_row_columns(
+            self._EVALUATORS, {"accuracy": {"reasoning": "good", "match": False}}
+        )
+        for field in USAGE_FIELDS:
+            self.assertIsNone(columns[f"accuracy_{field}"])
+
+    def test_rating_evaluator_gets_the_same_columns(self):
+        columns = evaluator_row_columns(
+            {"empathy": {"name": "empathy", "type": "rating", "scale_min": 1, "scale_max": 5}},
+            {"empathy": {"reasoning": "warm", "score": 4, "cost_usd": 0.003}},
+        )
+        self.assertEqual(columns["empathy"], 4)
+        self.assertEqual(columns["empathy_cost_usd"], 0.003)
 
 
 class TestTextJudge(unittest.IsolatedAsyncioTestCase):
@@ -420,7 +718,7 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(
-            result,
+            _drop_usage(result),
             {
                 "accuracy": {"reasoning": "good", "match": True},
                 "tone": {"reasoning": "rude", "match": False},
@@ -460,7 +758,7 @@ class TestTextJudge(unittest.IsolatedAsyncioTestCase):
                 user_prompt="ctx",
             )
         self.assertEqual(
-            result,
+            _drop_usage(result),
             {"Empathy & Tone": {"reasoning": "warm", "score": 4}},
         )
 
@@ -735,7 +1033,8 @@ class TestGeneralTaskJudge(unittest.IsolatedAsyncioTestCase):
                 input_text="a document",
             )
         self.assertEqual(
-            result, {"task_quality": {"reasoning": "faithful", "match": True}}
+            _drop_usage(result),
+            {"task_quality": {"reasoning": "faithful", "match": True}},
         )
 
 
@@ -793,7 +1092,7 @@ class TestAudioJudge(unittest.IsolatedAsyncioTestCase):
                 )
 
             self.assertEqual(
-                result,
+                _drop_usage(result),
                 {
                     "intelligibility": {"reasoning": "clear", "match": True},
                     "pronunciation": {"reasoning": "good", "match": True},

@@ -54,6 +54,7 @@ from calibrate_agent.general.metrics import general_judge
 from calibrate_agent.llm._metrics_utils import _numeric_or_none, _latency_percentiles
 from calibrate_agent.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
+    USAGE_FIELDS,
     attach_evaluator_id,
     ensure_known_evaluator_names,
     is_rating,
@@ -1099,6 +1100,9 @@ async def _tool_call_arguments_eval_async(
             if record is not None:
                 record["match"] = bool(result.get("match"))
                 record["reasoning"] = result.get("reasoning", "")
+                for field in USAGE_FIELDS:
+                    if field in result:
+                        record[field] = result[field]
 
     had_llm = any(r["match_type"] == "llm_judge" for r in records)
     failures = [r for r in records if not r.get("match")]

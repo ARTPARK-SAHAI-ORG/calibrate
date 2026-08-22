@@ -43,6 +43,7 @@ import csv
 import json
 import os
 import re
+import time
 from typing import Callable, Optional
 
 import instructor
@@ -181,6 +182,98 @@ def is_rating(evaluator: dict) -> bool:
     return evaluator.get("type") == RATING
 
 
+# ── Per-call usage accounting ───────────────────────────────────────────────
+# OpenRouter reports what a call actually cost and how many tokens it used, but
+# only when the request asks for it. The block below is merged into every judge
+# request; the reply's ``usage`` then carries a ``cost`` field in USD alongside
+# the standard token counts.
+USAGE_ACCOUNTING_BODY = {"usage": {"include": True}}
+
+# Field names attached to each evaluator's judge result, and the order they
+# appear as ``<evaluator>_<field>`` columns in results.csv.
+USAGE_FIELDS = (
+    "cost_usd",
+    "input_tokens",
+    "output_tokens",
+    "cached_input_tokens",
+    "latency_seconds",
+)
+
+
+def _numeric_or_none(value) -> Optional[float]:
+    """Return ``value`` as a float, or None when it is not a real number.
+
+    A model that reports no usage, or reports it in an unexpected shape, must
+    leave the fields empty rather than fail the run. Booleans are excluded even
+    though ``bool`` subclasses ``int``: a cost or a token count is never
+    true/false, so ``True`` must not be read as ``1``.
+
+    ``calibrate_agent.llm._metrics_utils`` defines the same check for LLM test
+    aggregation; importing it here would pull in the whole ``llm`` package,
+    which loads pipecat.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def openrouter_client_recording_usage() -> tuple["AsyncOpenAI", dict]:
+    """Return an OpenRouter client plus a box holding each reply's usage block.
+
+    instructor rebuilds the reply before handing it back, and the rebuild keeps
+    only the fields the OpenAI schema declares, which loses OpenRouter's
+    ``cost``. Reading the usage off the reply as it passes through is what keeps
+    it. The box holds the most recent reply's usage, so when instructor retries
+    a badly shaped answer the numbers describe the call that succeeded.
+    """
+    client = _build_openrouter_client()
+    box: dict = {}
+    send = client.chat.completions.create
+
+    async def record(*args, **kwargs):
+        response = await send(*args, **kwargs)
+        box["usage"] = getattr(response, "usage", None)
+        return response
+
+    client.chat.completions.create = record
+    return client, box
+
+
+def call_usage(usage, latency_seconds: float) -> dict:
+    """Turn one reply's usage block into what that judge call cost, used, and took.
+
+    ``usage`` is the block recorded by :func:`openrouter_client_recording_usage`,
+    or None when the model reported none. Only fields that come back as real
+    numbers are included, so a model that reports part of the picture
+    contributes the part it has.
+    """
+    raw = {}
+    if usage is not None:
+        try:
+            raw = usage.model_dump()
+        except Exception:
+            raw = usage
+        if not isinstance(raw, dict):
+            raw = {}
+
+    prompt_details = raw.get("prompt_tokens_details")
+    cached = (
+        prompt_details.get("cached_tokens") if isinstance(prompt_details, dict) else None
+    )
+
+    counts = {
+        "input_tokens": _numeric_or_none(raw.get("prompt_tokens")),
+        "output_tokens": _numeric_or_none(raw.get("completion_tokens")),
+        "cached_input_tokens": _numeric_or_none(cached),
+    }
+    fields = {
+        "cost_usd": _numeric_or_none(raw.get("cost")),
+        **{k: int(v) for k, v in counts.items() if v is not None},
+        "latency_seconds": round(latency_seconds, 4),
+    }
+    return {k: v for k, v in fields.items() if v is not None}
+
+
 def evaluator_result_value(evaluator: dict, result: dict) -> float:
     """Extract the numeric value from a single evaluator's judge result.
 
@@ -198,7 +291,11 @@ def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:
     """Flatten one row's judge result into its ``results.csv`` columns.
 
     Produces ``{name: value, f"{name}_reasoning": str}`` per evaluator — the
-    score for rating evaluators, a bool for binary ones.
+    score for rating evaluators, a bool for binary ones, followed by one
+    ``f"{name}_{field}"`` column per :data:`USAGE_FIELDS` entry holding what
+    that evaluator's judge call cost, used, and took. Latency is always
+    recorded; the cost and token cells are empty for a judge model that
+    reported no usage.
     """
     columns: dict = {}
     for name, evaluator in evaluators_by_name.items():
@@ -208,6 +305,8 @@ def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:
         else:
             columns[name] = bool(result["match"])
         columns[f"{name}_reasoning"] = result["reasoning"]
+        for field in USAGE_FIELDS:
+            columns[f"{name}_{field}"] = result.get(field)
     return columns
 
 
@@ -530,11 +629,13 @@ async def _judge_one_text(
     fallback_model: str,
 ) -> dict:
     """Issue one chat-completion call for a single text evaluator."""
-    client = instructor.apatch(_build_openrouter_client())
+    base_client, usage_box = openrouter_client_recording_usage()
+    client = instructor.apatch(base_client)
     Output = _result_model_for_evaluator(evaluator)
     model = _model_for(evaluator, fallback_model)
     system_prompt = evaluator.get("system_prompt", "")
 
+    started = time.perf_counter()
     response = await client.chat.completions.create(
         model=model,
         messages=[
@@ -544,9 +645,12 @@ async def _judge_one_text(
         response_model=Output,
         temperature=0,
         max_completion_tokens=8192,
+        extra_body=USAGE_ACCOUNTING_BODY,
     )
+    elapsed = time.perf_counter() - started
 
     result = _normalize_judge_api_result(response.model_dump(), Output.__name__)
+    result.update(call_usage(usage_box.get("usage"), elapsed))
 
     log_judge_io(
         evaluator=evaluator.get("name", ""),
@@ -580,11 +684,13 @@ async def _judge_one_audio(
     fallback_model: str,
 ) -> dict:
     """Issue one chat-completion call for a single audio evaluator."""
-    client = instructor.apatch(_build_openrouter_client())
+    base_client, usage_box = openrouter_client_recording_usage()
+    client = instructor.apatch(base_client)
     Output = _result_model_for_evaluator(evaluator)
     model = _model_for(evaluator, fallback_model)
     system_prompt = evaluator.get("system_prompt", "")
 
+    started = time.perf_counter()
     response = await client.chat.completions.create(
         model=model,
         messages=[
@@ -609,9 +715,12 @@ async def _judge_one_audio(
         response_model=Output,
         temperature=0,
         max_completion_tokens=8192,
+        extra_body=USAGE_ACCOUNTING_BODY,
     )
+    elapsed = time.perf_counter() - started
 
     result = _normalize_judge_api_result(response.model_dump(), Output.__name__)
+    result.update(call_usage(usage_box.get("usage"), elapsed))
 
     log_judge_io(
         evaluator=evaluator.get("name", ""),
@@ -665,8 +774,9 @@ async def text_judge(
     Returns:
         Dict keyed by ``evaluator["name"]``. Binary evaluators give
         ``{"reasoning": str, "match": bool}``; rating evaluators give
-        ``{"reasoning": str, "score": int}``. If the evaluator has ``id``,
-        the payload also includes ``evaluator_id``.
+        ``{"reasoning": str, "score": int}``. Each payload also carries the
+        :data:`USAGE_FIELDS` the model reported for that call. If the
+        evaluator has ``id``, the payload also includes ``evaluator_id``.
     """
     if not evaluators:
         return {}
@@ -698,8 +808,9 @@ async def audio_judge(
             should be an audio-capable model.
 
     Returns:
-        Dict keyed by ``evaluator["name"]``. If the evaluator has ``id``, the
-        payload also includes ``evaluator_id``.
+        Dict keyed by ``evaluator["name"]``, each payload also carrying the
+        :data:`USAGE_FIELDS` the model reported for that call. If the
+        evaluator has ``id``, the payload also includes ``evaluator_id``.
     """
     if not evaluators:
         return {}
