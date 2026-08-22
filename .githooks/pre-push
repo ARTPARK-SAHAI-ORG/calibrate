@@ -7,14 +7,15 @@ if [ -n "$SKIP_COVERAGE" ]; then
     exit 0
 fi
 
-# Deleting a remote branch or pushing tags pushes no commits worth checking.
-while read -r local_ref local_sha _remote_ref _remote_sha; do
-    case "$local_ref" in
-        refs/heads/*)
-            case "$local_sha" in
-                *[!0]*) has_commits=1 ;;
-            esac
-            ;;
+# Deleting a remote branch (all-zero local sha) or pushing tags carries no
+# commits worth checking. The local ref is "HEAD" for `git push origin HEAD`,
+# so the remote ref is what tells a tag apart from a branch.
+while read -r _local_ref local_sha remote_ref _remote_sha; do
+    case "$remote_ref" in
+        refs/tags/*) continue ;;
+    esac
+    case "$local_sha" in
+        *[!0]*) has_commits=1 ;;
     esac
 done
 if [ -z "$has_commits" ]; then
