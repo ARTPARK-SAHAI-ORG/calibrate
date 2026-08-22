@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Codecov's patch check is blocking on PRs: changed lines must be covered by
+# tests. Catch that here instead of after the PR is opened.
+
+if [ -n "$SKIP_COVERAGE" ]; then
+    echo "→ pre-push: SKIP_COVERAGE set — skipping the patch coverage check."
+    exit 0
+fi
+
+base=$(git merge-base origin/main HEAD 2>/dev/null || git merge-base main HEAD 2>/dev/null)
+if [ -z "$base" ]; then
+    exit 0
+fi
+
+if [ -z "$(git diff --name-only "$base"...HEAD -- calibrate_agent)" ]; then
+    echo "→ pre-push: no calibrate_agent/ changes — skipping the patch coverage check."
+    exit 0
+fi
+
+if ! command -v uv >/dev/null 2>&1; then
+    echo "✗ uv not found on PATH — install uv or run 'pytest tests/' manually." >&2
+    exit 1
+fi
+
+echo "→ pre-push: checking that the lines this branch adds are covered..."
+exec uv run --extra dev python scripts/check_patch_coverage.py

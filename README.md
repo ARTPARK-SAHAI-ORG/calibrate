@@ -49,16 +49,24 @@ Run the full test suite:
 uv run pytest tests/
 ```
 
-### Pre-commit
+### Git hooks
 
-Enable the project's git hooks so the pre-commit test
-runner fires on commits to `main`:
+Enable the project's git hooks so the pre-commit test runner fires on commits to
+`main`, and the pre-push check confirms the lines your branch adds are covered
+by tests:
 
 ```bash
 git config core.hooksPath .githooks
 ```
 
-Every contributor needs to run it once.
+Every contributor needs to run it once. To run the coverage check by hand:
+
+```bash
+uv run --extra dev python scripts/check_patch_coverage.py
+```
+
+Pass `--no-tests` to reuse an existing `coverage.xml` instead of re-running the
+suite, or set `SKIP_COVERAGE=1` to let a push through without the check.
 
 ## License
 
