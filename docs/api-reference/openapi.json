@@ -807,7 +807,7 @@
               "type": "object"
             },
             "type": "array",
-            "description": "The task's items, each with its agreement stats. You get these when you fetch one task by ID, not when you list tasks",
+            "description": "The task's items, each with its agreement stats and an `is_tool_call` flag marking the rows a person labels on the tool call rather than a text reply. You get these when you fetch one task by ID, not when you list tasks",
             "default": []
           },
           "jobs": {
@@ -1801,10 +1801,11 @@
               "stt",
               "llm",
               "llm-general",
-              "conversation"
+              "conversation",
+              "tool-call"
             ],
             "title": "Evaluator Type",
-            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n",
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n",
             "default": "llm"
           },
           "data_type": {
@@ -1905,10 +1906,11 @@
               "stt",
               "llm",
               "llm-general",
-              "conversation"
+              "conversation",
+              "tool-call"
             ],
             "title": "Evaluator Type",
-            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n"
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n"
           },
           "data_type": {
             "type": "string",
@@ -1932,6 +1934,11 @@
             "type": "boolean",
             "title": "Is Default",
             "description": "True when the evaluator is a built-in default or your workspace's editable copy of one. False for an evaluator you created yourself"
+          },
+          "is_protected": {
+            "type": "boolean",
+            "title": "Is Protected",
+            "description": "True when the evaluator is locked. A locked evaluator cannot be deleted, and only its name, description and rubric can change"
           },
           "slug": {
             "anyOf": [
@@ -2001,6 +2008,7 @@
           "data_type",
           "output_type",
           "is_default",
+          "is_protected",
           "created_at",
           "updated_at",
           "versions"
@@ -4866,10 +4874,11 @@
               "stt",
               "llm",
               "llm-general",
-              "conversation"
+              "conversation",
+              "tool-call"
             ],
             "title": "Evaluator Type",
-            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n"
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n"
           },
           "data_type": {
             "type": "string",
@@ -4893,6 +4902,11 @@
             "type": "boolean",
             "title": "Is Default",
             "description": "True when the evaluator is a built-in default or your workspace's editable copy of one. False for an evaluator you created yourself"
+          },
+          "is_protected": {
+            "type": "boolean",
+            "title": "Is Protected",
+            "description": "True when the evaluator is locked. A locked evaluator cannot be deleted, and only its name, description and rubric can change"
           },
           "slug": {
             "anyOf": [
@@ -4965,6 +4979,7 @@
           "data_type",
           "output_type",
           "is_default",
+          "is_protected",
           "created_at",
           "updated_at"
         ],
@@ -6609,7 +6624,8 @@
                     "stt",
                     "llm",
                     "llm-general",
-                    "conversation"
+                    "conversation",
+                    "tool-call"
                   ],
                   "type": "string"
                 },
