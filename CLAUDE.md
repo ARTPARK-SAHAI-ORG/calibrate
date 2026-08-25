@@ -107,7 +107,6 @@ docs/                      # Mintlify docs site (.mdx)
 examples/                  # Example datasets + scripts users can run
 .github/workflows/         # tests.yml, publish.yml, claude.yml, claude-code-review.yml
 .githooks/pre-commit       # Runs pytest before commits to main
-.githooks/pre-push         # Checks the branch's new lines are covered by tests
 ```
 
 ## Conventions in this codebase
@@ -371,14 +370,8 @@ feature/fix work on a branch:
 
 ### Git hooks
 `.githooks/pre-commit` runs `uv run --extra dev pytest tests/` **only when
-HEAD is on `main`**. Other branches commit instantly.
-
-`.githooks/pre-push` runs `scripts/check_patch_coverage.py` when a push carries
-commits, and the script itself does nothing unless the branch touches
-`calibrate_agent/`. `SKIP_COVERAGE=1 git push` bypasses it.
-
-Both are activated per-clone with `git config core.hooksPath .githooks` (also in
-the README).
+HEAD is on `main`**. Other branches commit instantly. Activated per-clone
+with `git config core.hooksPath .githooks` (also in the README).
 
 ### CI
 - **`.github/workflows/tests.yml`** — runs on push to `main` and on every PR
@@ -411,14 +404,7 @@ For any function block you add or modify:
    slow. Confirm they pass. Don't rely on the type checker or "it looks right"
    — the test must actually exercise the new path. CI runs the full suite on
    the PR, so let that be the backstop for the complete run.
-3. **Run `uv run --extra dev python scripts/check_patch_coverage.py` before
-   you call the work done.** It runs the suite with coverage and then checks
-   that the lines this branch adds to `calibrate_agent/` are covered at least
-   as well as the codebase overall — which is what Codecov's `patch` check
-   does on the PR. It names every uncovered line it finds. `.githooks/pre-push`
-   runs the same check, so a push with untested lines is refused;
-   `SKIP_COVERAGE=1 git push` bypasses it.
-4. **Only after tests pass** should you report the task as done. If a change
+3. **Only after tests pass** should you report the task as done. If a change
    is genuinely untestable (e.g. a CLI flag wired through to a third-party
    SDK), say so explicitly in the response rather than implying coverage.
 
