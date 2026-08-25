@@ -1012,7 +1012,7 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
                   if (hasAgentUrl && config.type === "voice") {
                     setConfigInput("");
                     setInitError(
-                      "Agent connection is not supported for voice simulations. Use a calibrate agent config instead (https://calibrate.artpark.ai/docs/cli/simulations#set-up-your-agent) with the system prompts, tools, etc. defined in the config itself.",
+                      "Agent connection is not supported for voice simulations. Use a calibrate agent config instead (https://docs.calibrate.artpark.ai/cli/simulations#set-up-your-agent) with the system prompts, tools, etc. defined in the config itself.",
                     );
                     return;
                   }

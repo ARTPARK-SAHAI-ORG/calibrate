@@ -29,7 +29,7 @@ calibrate-agent llm          # Interactive LLM evaluation
 calibrate-agent simulations  # Interactive text or voice simulations
 ```
 
-- [CLI Documentation](https://calibrate.artpark.ai/docs/cli/overview)
+- [CLI Documentation](https://docs.calibrate.artpark.ai/cli/overview)
 
 ## Contributing
 

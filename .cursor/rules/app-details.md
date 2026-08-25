@@ -958,7 +958,7 @@ cd docs
 mintlify dev
 ```
 
-**README.md** is intentionally minimal — it provides installation, links to the CLI docs on the docs site, and local docs setup instructions. All detailed usage documentation lives in `docs/` and on [docs.calibrate.dev](https://docs.calibrate.dev).
+**README.md** is intentionally minimal — it provides installation, links to the CLI docs on the docs site, and local docs setup instructions. All detailed usage documentation lives in `docs/` and on [docs.calibrate.artpark.ai](https://docs.calibrate.artpark.ai).
 
 ---
 
@@ -1045,7 +1045,7 @@ When resuming an evaluation (not using `--overwrite`), the eval scripts validate
 
 1. **Language selection** — user picks a language first
 2. **Provider selection** — only providers that support the chosen language are shown (filtered using `languages` in `providers.ts`, derived from the STT/TTS language dictionaries in `calibrate_agent/utils.py`). Uses `STT_PROVIDERS` or `TTS_PROVIDERS` based on mode.
-3. **Input path** — for TTS: path to `id,text` CSV file; for STT: path to directory containing `stt.csv` and `audios/`. **Full validation** runs before proceeding (CSV columns, audio file existence). A documentation link is displayed below the input prompt pointing to the relevant docs page (`https://calibrate.artpark.ai/cli/speech-to-text` or `https://calibrate.artpark.ai/cli/text-to-speech`).
+3. **Input path** — for TTS: path to `id,text` CSV file; for STT: path to directory containing `stt.csv` and `audios/`. **Full validation** runs before proceeding (CSV columns, audio file existence). A documentation link is displayed below the input prompt pointing to the relevant docs page (`https://docs.calibrate.artpark.ai/cli/speech-to-text` or `https://docs.calibrate.artpark.ai/cli/text-to-speech`).
 4. **Output directory** — optional, defaults to `./out`. **Prompts for overwrite confirmation** if provider directories already contain data. If confirmed, `--overwrite` is passed to the eval CLI.
 5. **API key setup** — checks `~/.calibrate_agent/credentials.json` and env vars; only prompts for missing keys; always requires `OPENAI_API_KEY` for the LLM judge
 6. **Evaluation** — The Ink UI's `RunStep` component spawns `calibrate <mode> -p <provider> ...` for each provider individually via `child_process.spawn`. **Max 2 providers run in parallel** to balance speed vs resource usage. Port availability is checked before starting each provider. The last provider's eval includes `--leaderboard` flag to generate the leaderboard. **Parallel provider logs are displayed side-by-side in vertical columns** (not stacked rows) for easy comparison. Real-time log streaming is enabled via `PYTHONUNBUFFERED=1` environment variable.
