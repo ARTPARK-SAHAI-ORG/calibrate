@@ -49226,7 +49226,7 @@ function SimulationsApp({ onBack }) {
                   if (hasAgentUrl && config.type === "voice") {
                     setConfigInput("");
                     setInitError(
-                      "Agent connection is not supported for voice simulations. Use a calibrate agent config instead (https://calibrate.artpark.ai/docs/cli/simulations#set-up-your-agent) with the system prompts, tools, etc. defined in the config itself."
+                      "Agent connection is not supported for voice simulations. Use a calibrate agent config instead (https://docs.calibrate.artpark.ai/cli/simulations#set-up-your-agent) with the system prompts, tools, etc. defined in the config itself."
                     );
                     return;
                   }
@@ -50111,7 +50111,7 @@ function ConfigInputStep({
   };
   const label = mode2 === "tts" ? "Input CSV" : "Input directory";
   const hint = mode2 === "tts" ? "CSV file with id and text columns. Press enter to confirm." : "Directory containing audio files and stt.csv. Press enter to confirm.";
-  const docsUrl = mode2 === "tts" ? "https://calibrate.artpark.ai/docs/cli/text-to-speech" : "https://calibrate.artpark.ai/docs/cli/speech-to-text";
+  const docsUrl = mode2 === "tts" ? "https://docs.calibrate.artpark.ai/cli/text-to-speech" : "https://docs.calibrate.artpark.ai/cli/speech-to-text";
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Text, { bold: true, color: "cyan", children: "Configuration" }) }),
     /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(Box_default, { children: [
@@ -50251,7 +50251,7 @@ function ConfigFileStep({
     }
     onComplete(trimmed);
   };
-  const docsUrl = mode2 === "tts" ? "https://calibrate.artpark.ai/docs/cli/text-to-speech" : "https://calibrate.artpark.ai/docs/cli/speech-to-text";
+  const docsUrl = mode2 === "tts" ? "https://docs.calibrate.artpark.ai/cli/text-to-speech" : "https://docs.calibrate.artpark.ai/cli/speech-to-text";
   return /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(Box_default, { flexDirection: "column", padding: 1, children: [
     /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Box_default, { marginBottom: 1, children: /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(Text, { bold: true, color: "cyan", children: "Evaluator config (optional)" }) }),
     /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)(Box_default, { children: [

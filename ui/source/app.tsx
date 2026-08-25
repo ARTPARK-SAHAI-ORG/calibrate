@@ -460,8 +460,8 @@ function ConfigInputStep({
       : "Directory containing audio files and stt.csv. Press enter to confirm.";
   const docsUrl =
     mode === "tts"
-      ? "https://calibrate.artpark.ai/docs/cli/text-to-speech"
-      : "https://calibrate.artpark.ai/docs/cli/speech-to-text";
+      ? "https://docs.calibrate.artpark.ai/cli/text-to-speech"
+      : "https://docs.calibrate.artpark.ai/cli/speech-to-text";
 
   return (
     <Box flexDirection="column" padding={1}>
@@ -663,8 +663,8 @@ function ConfigFileStep({
 
   const docsUrl =
     mode === "tts"
-      ? "https://calibrate.artpark.ai/docs/cli/text-to-speech"
-      : "https://calibrate.artpark.ai/docs/cli/speech-to-text";
+      ? "https://docs.calibrate.artpark.ai/cli/text-to-speech"
+      : "https://docs.calibrate.artpark.ai/cli/speech-to-text";
 
   return (
     <Box flexDirection="column" padding={1}>

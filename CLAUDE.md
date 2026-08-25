@@ -22,7 +22,8 @@ Guidance for Claude Code when working in this repository.
 for voice agents. It benchmarks LLMs, STT providers, TTS providers, and runs
 agent simulations — all from a single CLI / Python library.
 
-- Website / docs: https://calibrate.artpark.ai
+- Website: https://calibrate.artpark.ai
+- Docs: https://docs.calibrate.artpark.ai
 - Built on top of [pipecat](https://github.com/pipecat-ai/pipecat).
 - The CLI entry point is `calibrate-agent` (defined in `pyproject.toml:scripts` →
   `calibrate_agent.cli:main`).
