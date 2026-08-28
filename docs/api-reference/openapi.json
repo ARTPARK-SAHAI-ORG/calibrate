@@ -688,6 +688,27 @@
                 }
               }
             ]
+          },
+          "evaluator_results": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Evaluator scores to record, keyed by evaluator ID. Each evaluator ID must be linked to the task. Put the score in `value`, a bool for binary or a number within the scale for rating, with optional `reasoning` and `version_number`. Omit `version_number` to record against the evaluator's live version. An item recording a tool call takes the tool-call evaluator and no other, and every other item takes any evaluator except that one",
+            "examples": [
+              {
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
+                  "reasoning": "meets the bar",
+                  "value": true,
+                  "version_number": 2
+                }
+              }
+            ]
           }
         },
         "type": "object",
@@ -1387,6 +1408,30 @@
             ],
             "title": "Annotation Job Id",
             "description": "ID of the labelling job that holds the annotations you provided, present only when you send annotations with the items"
+          },
+          "evaluator_result_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator Result Count",
+            "description": "How many evaluator scores were stored, present only when you send `evaluator_results` with the items"
+          },
+          "evaluator_run_job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator Run Job Id",
+            "description": "ID of the evaluator-run job that holds the scores you provided, present only when you send `evaluator_results` with the items"
           }
         },
         "type": "object",
