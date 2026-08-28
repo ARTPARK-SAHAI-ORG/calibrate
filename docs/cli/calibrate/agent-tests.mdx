@@ -27,6 +27,27 @@ calibrate agent-tests benchmark [flags]
 calibrate agent-tests benchmark --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --models '["openai/gpt-4.1","anthropic/claude-sonnet-4"]'
 ```
 
+## Bulk unlink tests from agent
+
+Unlink one or more tests from an agent. Tests that are not linked are skipped.
+
+```bash
+calibrate agent-tests bulk-unlink [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --agent-uuid` | string | **Required.** Agent to unlink tests from |
+| `-t, --test-uuids` | stringArray | **Required.** Tests to unlink from the agent |
+
+**Examples**
+
+```bash
+calibrate agent-tests bulk-unlink --agent-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --test-uuids '["b1c2d3e4-f5a6-7890-bcde-f12345678901"]'
+```
+
 ## Get benchmark status
 
 Get the results of a benchmark run
@@ -102,12 +123,14 @@ calibrate agent-tests list-for-agent [flags]
 
 **Options**
 
-| Option | Type | Description |
-| --- | --- | --- |
-| `-a, --agent-uuid` | string | **Required.** Agent whose linked tests to list |
-| `-l, --limit` | string | Maximum number of items to return. Omit for no limit (all items) |
-| `--offset` | int | Number of items to skip before returning results |
-| `--q` | name | Case-insensitive substring search on name. Blank is a no-op |
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-a, --agent-uuid` | string | — | **Required.** Agent whose linked tests to list |
+| `-l, --limit` | string | — | Maximum number of items to return. Omit for no limit (all items) |
+| `--offset` | int | — | Number of items to skip before returning results |
+| `--q` | name | — | Case-insensitive search on name. Blank is a no-op |
+| `--q-mode` | q | `contains` | How to match q against the searched fields (options: contains, starts_with, ends_with, exact) |
+| `-t, --type` | response | — | Keep only tests of these types. Repeat the parameter or pass one comma-separated value. Accepts response, `tool_call`, `conversation`, `general` |
 
 **Examples**
 

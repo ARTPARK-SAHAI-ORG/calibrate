@@ -1,0 +1,27 @@
+---
+title: "Bulk unlink tests from agent"
+description: "Unlink one or more tests from an agent. Tests that are not linked are skipped."
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.agent_tests.bulk_unlink(
+    agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    test_uuids=[
+        "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+    ],
+)
+```
+
+## API endpoint
+
+See **POST /agent-tests/bulk-unlink** in the [API reference](/api-reference/introduction) tab.

@@ -228,6 +228,41 @@
         ],
         "title": "AgentSummary"
       },
+      "AgentTestBulkDelete": {
+        "properties": {
+          "agent_uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Agent Uuid",
+            "description": "Agent to unlink tests from",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "test_uuids": {
+            "items": {
+              "type": "string",
+              "maxLength": 36,
+              "minLength": 36
+            },
+            "type": "array",
+            "title": "Test Uuids",
+            "description": "Tests to unlink from the agent",
+            "examples": [
+              [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ]
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "agent_uuid",
+          "test_uuids"
+        ],
+        "title": "AgentTestBulkDelete"
+      },
       "AgentTestRunCreateResponse": {
         "properties": {
           "task_id": {
@@ -443,6 +478,26 @@
         ],
         "title": "AgentTestRunListItem"
       },
+      "AgentTestsBulkUnlinkResponse": {
+        "properties": {
+          "deleted_count": {
+            "type": "integer",
+            "title": "Deleted Count",
+            "description": "Number of links removed. Tests that were not linked are excluded"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Confirmation message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "deleted_count",
+          "message"
+        ],
+        "title": "AgentTestsBulkUnlinkResponse"
+      },
       "AgentTestsCreate": {
         "properties": {
           "agent_uuid": {
@@ -457,7 +512,9 @@
           },
           "test_uuids": {
             "items": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 36,
+              "minLength": 36
             },
             "type": "array",
             "title": "Test Uuids",
@@ -1114,7 +1171,9 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 36,
+                  "minLength": 36
                 },
                 "type": "array"
               },
@@ -3481,7 +3540,9 @@
             "anyOf": [
               {
                 "items": {
-                  "type": "string"
+                  "type": "string",
+                  "maxLength": 36,
+                  "minLength": 36
                 },
                 "type": "array"
               },
@@ -6009,6 +6070,27 @@
             "description": "Agent whose linked tests to list"
           },
           {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Keep only tests of these types. Repeat the parameter or pass one comma-separated value. Accepts `response`, `tool_call`, `conversation`, `general`",
+              "title": "Type"
+            },
+            "description": "Keep only tests of these types. Repeat the parameter or pass one comma-separated value. Accepts `response`, `tool_call`, `conversation`, `general`"
+          },
+          {
             "name": "q",
             "in": "query",
             "required": false,
@@ -6021,10 +6103,28 @@
                   "type": "null"
                 }
               ],
-              "description": "Case-insensitive substring search on `name`. Blank is a no-op",
+              "description": "Case-insensitive search on `name`. Blank is a no-op",
               "title": "Q"
             },
-            "description": "Case-insensitive substring search on `name`. Blank is a no-op"
+            "description": "Case-insensitive search on `name`. Blank is a no-op"
+          },
+          {
+            "name": "q_mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "contains",
+                "starts_with",
+                "ends_with",
+                "exact"
+              ],
+              "type": "string",
+              "description": "How to match `q` against the searched fields",
+              "default": "contains",
+              "title": "Q Mode"
+            },
+            "description": "How to match `q` against the searched fields"
           },
           {
             "name": "limit",
@@ -6229,6 +6329,53 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/PaginatedResponse_AgentTestRunListItem_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-tests/bulk-unlink": {
+      "post": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Bulk unlink tests from agent",
+        "description": "Unlink one or more tests from an agent. Tests that are not linked are skipped.",
+        "operationId": "bulk_delete_agent_test_links_agent_tests_bulk_unlink_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTestBulkDelete"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTestsBulkUnlinkResponse"
                 }
               }
             }
