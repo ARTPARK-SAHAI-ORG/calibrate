@@ -335,11 +335,11 @@
           },
           "evaluators": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/RunListEvaluator"
             },
             "type": "array",
             "title": "Evaluators",
-            "description": "Names of the evaluators that judged this run, deduplicated and in display order. `Tool call` is appended when any test in the run was a tool-call test. Empty when the run had no evaluators"
+            "description": "The evaluators that judged this run, deduplicated and in display order. A `Tool call` entry is appended when any test in the run was a tool-call test. That entry has no `uuid`, because it is not an evaluator in the library. Empty when the run had no evaluators"
           },
           "results": {
             "anyOf": [
@@ -3447,6 +3447,33 @@
           "not_found"
         ],
         "title": "ResolveAgentNamesResponse"
+      },
+      "RunListEvaluator": {
+        "properties": {
+          "uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uuid",
+            "description": "ID of the evaluator. Absent for the `Tool call` entry, which is not an evaluator in the library"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the evaluator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "RunListEvaluator",
+        "description": "One evaluator on a run-LIST row: just enough to name it and open it.\nThe rubric, prompt and version live on the run-DETAIL endpoint."
       },
       "RunTestRequest": {
         "properties": {
