@@ -369,6 +369,21 @@ feature/fix work on a branch:
   (e.g. `git reset --hard` over uncommitted work, deleting remote branches,
   history rewrites beyond your own un-merged branch, publishing a release).
 
+### Every PR links to an issue
+Issues for this work live in the **`ARTPARK-SAHAI-ORG/calibrate-frontend`**
+repository, not in this one. Before opening a PR:
+
+1. Search that repo for an issue the PR resolves:
+   `gh issue list --repo ARTPARK-SAHAI-ORG/calibrate-frontend --search "<keywords>" --state open`
+2. If none fits, create one describing the problem the PR solves:
+   `gh issue create --repo ARTPARK-SAHAI-ORG/calibrate-frontend --title "..." --body "..."`
+3. Start the PR description with the closing keyword on its own first line:
+   `Fixes ARTPARK-SAHAI-ORG/calibrate-frontend#<number>`, then a blank line, then
+   the rest of the description.
+
+The `ARTPARK-SAHAI-ORG/calibrate-frontend` prefix is required: a bare
+`Fixes #<number>` points at an issue in this repo instead.
+
 ### Git hooks
 `.githooks/pre-commit` runs `uv run --extra dev pytest tests/` **only when
 HEAD is on `main`**. Other branches commit instantly. Activated per-clone
