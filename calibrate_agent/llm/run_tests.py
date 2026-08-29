@@ -388,6 +388,7 @@ async def _run_items_parallel(
     results_file_path: str,
     test_parallel: Optional[int] = None,
     initial_results: Optional[List[Optional[dict]]] = None,
+    log: "Callable[[str], None]" = log_and_print,
 ) -> List[dict]:
     """Run ``process(index, item)`` over ``items`` with bounded concurrency.
 
@@ -403,7 +404,10 @@ async def _run_items_parallel(
     An item whose ``process`` raises becomes a failed result (see
     :func:`_error_result`) instead of ending the run. After
     ``MAX_CONSECUTIVE_ERRORS`` failures in a row the remaining items are not
-    started and are recorded as failures too.
+    started and are recorded as failures too, carrying the last error seen.
+
+    ``log`` writes the per-error line; callers that keep a per-model
+    ``results.log`` pass a writer bound to that file.
     """
     if initial_results is not None:
         results: List[Optional[dict]] = list(initial_results)
@@ -412,16 +416,17 @@ async def _run_items_parallel(
     semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
     write_lock = asyncio.Lock()
     consecutive_errors = 0
+    last_error = ""
 
     async def run_one(index: int, item: Any) -> None:
-        nonlocal consecutive_errors
+        nonlocal consecutive_errors, last_error
         async with semaphore:
             if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
                 results[index] = _error_result(
                     item,
                     RuntimeError(
-                        f"Not run: {consecutive_errors} test cases in a row "
-                        f"failed to reach the agent"
+                        f"Not run: the run stopped after {consecutive_errors} "
+                        f"test cases in a row failed. Last error: {last_error}"
                     ),
                 )
             else:
@@ -430,7 +435,8 @@ async def _run_items_parallel(
                     consecutive_errors = 0
                 except Exception as e:
                     consecutive_errors += 1
-                    log_and_print(f"❌ Test case {index + 1} errored: {e}")
+                    last_error = str(e)
+                    log(f"❌ Test case {index + 1} errored: {e}")
                     results[index] = _error_result(item, e)
             # Save intermediate results as each item completes (in order).
             async with write_lock:
@@ -2117,6 +2123,7 @@ async def run_model_tests(
         results_file_path,
         test_parallel,
         initial_results=initial_results,
+        log=lambda text: _print_and_log(text, print_log_save_path),
     )
 
     total_passed = sum(1 for result in results if result["metrics"]["passed"])
@@ -2373,7 +2380,11 @@ async def run_eval_only_tests(
         return result
 
     results = await _run_items_parallel(
-        dataset, process, results_file_path, test_parallel
+        dataset,
+        process,
+        results_file_path,
+        test_parallel,
+        log=lambda text: _print_and_log(text, print_log_save_path),
     )
 
     passed, total = _write_test_results_outputs(results, output_dir, name_to_evaluator)

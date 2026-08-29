@@ -3181,6 +3181,41 @@ class TestRunItemsParallelErrors(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(results[1]["test_case_id"], "t1")
         self.assertTrue(all(results[i]["metrics"]["passed"] for i in (0, 2, 3)))
 
+    async def test_skipped_message_carries_the_last_error(self):
+        from calibrate_agent.llm.run_tests import (
+            MAX_CONSECUTIVE_ERRORS,
+            _run_items_parallel,
+        )
+
+        async def process(index, item):
+            raise RuntimeError("Judge request failed: 503")
+
+        items = [{"id": f"t{i}"} for i in range(MAX_CONSECUTIVE_ERRORS + 2)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            results = await _run_items_parallel(items, process, path, test_parallel=1)
+
+        skipped = results[-1]["metrics"]["reasoning"]
+        self.assertIn("Judge request failed: 503", skipped)
+        self.assertNotIn("agent", skipped)
+
+    async def test_error_line_goes_to_the_given_log(self):
+        from calibrate_agent.llm.run_tests import _run_items_parallel
+
+        lines = []
+
+        async def process(index, item):
+            raise RuntimeError("boom")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            await _run_items_parallel(
+                [{"id": "t0"}], process, path, test_parallel=1, log=lines.append
+            )
+
+        self.assertEqual(len(lines), 1)
+        self.assertIn("boom", lines[0])
+
     async def test_stops_after_consecutive_failures(self):
         from calibrate_agent.llm.run_tests import (
             MAX_CONSECUTIVE_ERRORS,
