@@ -1,5 +1,6 @@
 import asyncio
 import argparse
+import hashlib
 import json
 import sys
 import uuid
@@ -911,7 +912,12 @@ async def main():
         "--dataset",
         type=str,
         default=None,
-        help="Path to dataset JSON for --eval-only (list of {conversation_history, name?})",
+        help="Path to dataset JSON for --eval-only (list of {id, conversation_history, name?})",
+    )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Judge every conversation again instead of reusing scores already in the output directory",
     )
 
     args = parser.parse_args()
@@ -956,6 +962,7 @@ async def main():
             dataset=dataset,
             output_dir=output_dir,
             parallel=args.parallel,
+            overwrite=args.overwrite,
         )
         if failed_count:
             print(f"\n\033[31m{failed_count} simulation(s) failed\033[0m")
@@ -1066,18 +1073,41 @@ def _aggregate_and_write_simulation_results(results: list, output_dir: str) -> l
 def validate_simulation_eval_only_dataset(dataset: object) -> tuple[bool, str]:
     """Validate the shape of a text-simulation eval-only dataset.
 
-    Each item must be ``{"conversation_history": list, "name"?: str}``.
-    Returns ``(is_valid, error_message)``.
+    Each item must be ``{"id": str|int, "conversation_history": list,
+    "name"?: str}``. ``id`` identifies a conversation across runs — a rerun
+    reuses the scores already stored for that id — so it has to be unique
+    within the dataset. Returns ``(is_valid, error_message)``.
     """
     if not isinstance(dataset, list):
         return (
             False,
-            "Dataset must be a JSON list of {conversation_history, name?} items",
+            "Dataset must be a JSON list of {id, conversation_history, name?} items",
         )
 
+    if not dataset:
+        return False, "Dataset is empty — provide at least one conversation"
+
+    seen_ids: set = set()
     for i, item in enumerate(dataset):
         if not isinstance(item, dict):
             return False, f"Item {i}: must be an object"
+        if "id" not in item:
+            return (
+                False,
+                f"Item {i}: missing required field 'id'. Add an 'id' to each "
+                f"conversation in the dataset: a string or number that is "
+                f"unique within the dataset.",
+            )
+        if not isinstance(item["id"], (str, int)) or isinstance(item["id"], bool):
+            return False, f"Item {i}: 'id' must be a string or a number"
+        item_id = str(item["id"])
+        if item_id in seen_ids:
+            return (
+                False,
+                f"Item {i}: duplicate id {item_id!r}. Each conversation needs "
+                f"an 'id' that no other conversation in the dataset uses.",
+            )
+        seen_ids.add(item_id)
         if "conversation_history" not in item:
             return False, f"Item {i}: missing required field 'conversation_history'"
         if not isinstance(item["conversation_history"], list):
@@ -1096,38 +1126,26 @@ async def run_eval_only_simulation_task(
     output_dir: str,
     fallback_judge_model: str = DEFAULT_SIMULATION_JUDGE_MODEL,
 ):
-    """Evaluate a single pre-existing transcript and write per-simulation files.
+    """Evaluate a single pre-existing transcript.
 
-    ``item`` schema: ``{"conversation_history": [...], "name": str?}``. Only
-    ``conversation_history`` is required — it's the sole input to the
+    ``item`` schema: ``{"id": str|int, "conversation_history": [...],
+    "name": str?}``. ``conversation_history`` is the sole input to the
     evaluators. ``name`` is optional metadata preserved into the aggregated
     outputs and ``dataset_map.json`` for traceability.
 
-    The per-simulation output subdirectory is derived from a stable internal
-    ``row_id`` (``row_<1-based-index>``), not from the user-provided ``name``,
-    so duplicate or empty names cannot collide on disk.
+    Returns ``(simulation_metrics, evaluation_results)``; the caller writes the
+    per-conversation output folder.
     """
     async with semaphore:
         transcript = item["conversation_history"]
         row_id = f"row_{item_index + 1}"
         display_name = item.get("name") or row_id
 
-        simulation_output_dir = join(output_dir, row_id)
-        if exists(simulation_output_dir):
-            shutil.rmtree(simulation_output_dir)
-        os.makedirs(simulation_output_dir)
-
         evaluation_results = await _judge_and_emit(
             transcript,
             evaluators,
             fallback_judge_model,
             emit=lambda line: print(f"[{display_name}] {line}"),
-        )
-
-        save_transcript(simulation_output_dir, transcript)
-
-        pd.DataFrame(evaluation_results).to_csv(
-            join(simulation_output_dir, "evaluation_results.csv"), index=False
         )
 
         simulation_metrics = {"row_id": row_id, "name": display_name}
@@ -1137,27 +1155,231 @@ async def run_eval_only_simulation_task(
         return simulation_metrics, evaluation_results
 
 
+EVAL_ONLY_ROW_FILE_NAME = "row.json"
+
+
+def _eval_only_row_dirs(output_dir: str) -> list[str]:
+    """Every per-conversation folder under ``output_dir``, path-sorted."""
+    if not exists(output_dir):
+        return []
+    return sorted(
+        join(output_dir, name)
+        for name in os.listdir(output_dir)
+        if name.startswith("row_") and os.path.isdir(join(output_dir, name))
+    )
+
+
+def _score_signature(rows) -> set:
+    """``(name, type, scale_min, scale_max)`` for each score row.
+
+    Two sets of scores are comparable only when this matches: a rubric that
+    keeps an evaluator's name but turns it from pass/fail into a 1-5 rating
+    produces different numbers that must not be averaged together.
+    """
+
+    def as_int(value):
+        return None if value is None else int(value)
+
+    return {
+        (
+            row["name"],
+            row.get("type", "binary"),
+            as_int(row.get("scale_min")),
+            as_int(row.get("scale_max")),
+        )
+        for row in rows
+    }
+
+
+def _evaluator_signature(evaluators: list[dict]) -> set:
+    """The score signature the configured evaluators produce."""
+    return _score_signature(
+        {
+            "name": ev["name"],
+            "type": "rating" if is_rating(ev) else "binary",
+            "scale_min": ev.get("scale_min") if is_rating(ev) else None,
+            "scale_max": ev.get("scale_max") if is_rating(ev) else None,
+        }
+        for ev in evaluators
+    )
+
+
+def _transcript_fingerprint(conversation_history: list) -> str:
+    """A fingerprint of a conversation's text, so an edited one is spotted."""
+    return hashlib.sha256(
+        json.dumps(conversation_history, sort_keys=True, ensure_ascii=False).encode()
+    ).hexdigest()
+
+
+def _load_eval_only_rows(output_dir: str, evaluator_signature: set) -> dict:
+    """Read already-judged conversations as ``{id: stored row}``.
+
+    A folder is kept only when its stored scores match the configured
+    evaluators by name, type and rating scale, so scores from a different
+    rubric are judged again instead of being mixed with the current ones.
+    """
+    stored_rows: dict = {}
+    for row_dir in _eval_only_row_dirs(output_dir):
+        try:
+            with open(join(row_dir, EVAL_ONLY_ROW_FILE_NAME)) as f:
+                stored = json.load(f)
+            row_id = str(stored["id"])
+            signature = _score_signature(stored["evaluation_results"])
+            has_fingerprint = isinstance(stored.get("fingerprint"), str)
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        if has_fingerprint and signature == evaluator_signature:
+            stored_rows[row_id] = stored
+    return stored_rows
+
+
+def _write_eval_only_row(
+    row_dir: str,
+    item: dict,
+    evaluation_results: Optional[list[dict]] = None,
+    error: Optional[str] = None,
+) -> None:
+    """Write one conversation's folder: transcript, scores, and its id.
+
+    With ``error`` set the folder records the failure instead of scores, so a
+    conversation the judge could not score is visible on disk and is judged
+    again on the next run.
+    """
+    os.makedirs(row_dir, exist_ok=True)
+    save_transcript(row_dir, item["conversation_history"])
+    stored = {
+        "id": str(item["id"]),
+        "name": item.get("name"),
+        "fingerprint": _transcript_fingerprint(item["conversation_history"]),
+    }
+    if error is None:
+        pd.DataFrame(evaluation_results).to_csv(
+            join(row_dir, "evaluation_results.csv"), index=False
+        )
+        stored["evaluation_results"] = evaluation_results
+    else:
+        stored["error"] = error
+    with open(join(row_dir, EVAL_ONLY_ROW_FILE_NAME), "w") as f:
+        json.dump(stored, f, indent=4, ensure_ascii=False)
+
+
 async def run_eval_only_simulations(
     config: dict,
     dataset: list[dict],
     output_dir: str,
     parallel: Optional[int] = None,
+    overwrite: bool = False,
 ) -> int:
     """Run evaluators on a pre-existing dataset of simulation transcripts.
+
+    A conversation whose ``id`` already has scores under ``output_dir`` keeps
+    them and is not judged again, as long as its text and the configured
+    evaluators are unchanged; pass ``overwrite=True`` to clear the output
+    directory and judge every conversation. Every conversation's folder is
+    written from the merged scores, so folder positions always match the
+    dataset order.
 
     Returns the number of failed simulations.
     """
     evaluators = config.get("evaluators") or []
     require_simulation_evaluators(evaluators)
 
+    is_valid, error = validate_simulation_eval_only_dataset(dataset)
+    if not is_valid:
+        raise ValueError(error)
+
     os.makedirs(output_dir, exist_ok=True)
     write_evaluator_config(output_dir, evaluators)
 
+    if overwrite:
+        for row_dir in _eval_only_row_dirs(output_dir):
+            shutil.rmtree(row_dir)
+        for name in ("results.csv", "metrics.json"):
+            if exists(join(output_dir, name)):
+                os.remove(join(output_dir, name))
+
+    stored_rows = _load_eval_only_rows(output_dir, _evaluator_signature(evaluators))
+
+    def reusable(item: dict) -> Optional[list[dict]]:
+        """The stored scores for ``item``, if they were given to this same text."""
+        stored = stored_rows.get(str(item["id"]))
+        if stored is None or stored["fingerprint"] != _transcript_fingerprint(
+            item["conversation_history"]
+        ):
+            return None
+        return stored["evaluation_results"]
+
+    semaphore = asyncio.Semaphore(_resolve_simulation_parallel(parallel))
+    reused = {i: reusable(item) for i, item in enumerate(dataset)}
+    pending = [(i, item) for i, item in enumerate(dataset) if reused[i] is None]
+    judged = dict(
+        zip(
+            [i for i, _ in pending],
+            await asyncio.gather(
+                *[
+                    run_eval_only_simulation_task(
+                        semaphore=semaphore,
+                        item=item,
+                        item_index=i,
+                        evaluators=evaluators,
+                        output_dir=output_dir,
+                    )
+                    for i, item in pending
+                ],
+                return_exceptions=True,
+            ),
+        )
+    )
+
+    # Each folder is built beside its final name first and only then swapped in,
+    # so an interrupted run never leaves a conversation's scores nowhere on
+    # disk, and a reordered dataset cannot leave a folder holding another
+    # conversation's transcript.
+    results: list = []
+    staged: list[tuple[str, str]] = []
+    for i, item in enumerate(dataset):
+        staging_dir = join(output_dir, f"row_{i + 1}.new")
+        if exists(staging_dir):
+            shutil.rmtree(staging_dir)
+        outcome = judged.get(i)
+        if isinstance(outcome, BaseException):
+            _write_eval_only_row(staging_dir, item, error=str(outcome))
+            results.append(outcome)
+            staged.append((staging_dir, join(output_dir, f"row_{i + 1}")))
+            continue
+        if outcome is not None:
+            simulation_metrics, evaluation_results = outcome
+        else:
+            evaluation_results = reused[i]
+            simulation_metrics = {
+                "row_id": f"row_{i + 1}",
+                "name": item.get("name") or f"row_{i + 1}",
+            }
+            for metric_dict in evaluation_results:
+                simulation_metrics[metric_dict["name"]] = float(metric_dict["value"])
+        simulation_metrics["id"] = str(item["id"])
+        _write_eval_only_row(staging_dir, item, evaluation_results)
+        staged.append((staging_dir, join(output_dir, f"row_{i + 1}")))
+        results.append((simulation_metrics, evaluation_results))
+
+    for staging_dir, final_dir in staged:
+        if exists(final_dir):
+            shutil.rmtree(final_dir)
+        os.rename(staging_dir, final_dir)
+
+    kept = {basename(final_dir) for _, final_dir in staged}
+    for row_dir in _eval_only_row_dirs(output_dir):
+        if basename(row_dir) not in kept:
+            shutil.rmtree(row_dir)
+
     # Map internal row_id ↔ original dataset row, so the caller can correlate
-    # per-simulation subdirectories back to whatever name/index they passed in.
+    # per-simulation subdirectories back to whatever id/name they passed in.
+    # Written after the folders so it can never describe folders that a killed
+    # run had not written yet.
     dataset_map = {
         f"row_{i + 1}": {
             "index": i,
+            "id": str(item["id"]),
             "name": item.get("name"),
         }
         for i, item in enumerate(dataset)
@@ -1165,19 +1387,6 @@ async def run_eval_only_simulations(
     with open(join(output_dir, "dataset_map.json"), "w") as f:
         json.dump(dataset_map, f, indent=4)
 
-    semaphore = asyncio.Semaphore(_resolve_simulation_parallel(parallel))
-    tasks = [
-        run_eval_only_simulation_task(
-            semaphore=semaphore,
-            item=item,
-            item_index=i,
-            evaluators=evaluators,
-            output_dir=output_dir,
-        )
-        for i, item in enumerate(dataset)
-    ]
-
-    results = await asyncio.gather(*tasks, return_exceptions=True)
     failed = _aggregate_and_write_simulation_results(results, output_dir)
     return len(failed)
 

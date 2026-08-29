@@ -667,6 +667,156 @@ class TestMainDispatch(unittest.TestCase):
                    AsyncMock(return_value={"openai": {"status": "pass"}})):
             self._run_with_argv(["calibrate_agent", "status", "--table"])
 
+    def _capture_argv(self):
+        captured = {}
+
+        async def fake_main():
+            captured["argv"] = list(sys.argv)
+
+        return captured, fake_main
+
+    def _run_stt_eval_only(self, extra):
+        captured, fake_main = self._capture_argv()
+        with tempfile.TemporaryDirectory() as tmp:
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate_agent.stt.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "stt", "--eval-only", "--dataset", str(ds),
+                    "-o", tmp,
+                ] + extra)
+        return captured["argv"]
+
+    def test_stt_eval_only_forwards_overwrite(self):
+        self.assertIn("--overwrite", self._run_stt_eval_only(["--overwrite"]))
+
+    def test_stt_eval_only_omits_overwrite_by_default(self):
+        self.assertNotIn("--overwrite", self._run_stt_eval_only([]))
+
+    def _run_tts_eval_only(self, extra):
+        captured, fake_main = self._capture_argv()
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("calibrate_agent.tts.benchmark.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "tts", "--eval-only", "--dataset", tmp,
+                    "-o", str(Path(tmp) / "out"),
+                ] + extra)
+        return captured["argv"]
+
+    def test_tts_eval_only_forwards_overwrite(self):
+        self.assertIn("--overwrite", self._run_tts_eval_only(["--overwrite"]))
+
+    def test_tts_eval_only_omits_overwrite_by_default(self):
+        self.assertNotIn("--overwrite", self._run_tts_eval_only([]))
+
+    def _run_llm_eval_only(self, extra):
+        captured, fake_main = self._capture_argv()
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text("{}")
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate_agent.llm.run_tests.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "llm", "--eval-only",
+                    "-c", str(cfg), "--dataset", str(ds), "-o", tmp,
+                ] + extra)
+        return captured["argv"]
+
+    def test_llm_eval_only_forwards_overwrite(self):
+        self.assertIn("--overwrite", self._run_llm_eval_only(["--overwrite"]))
+
+    def test_llm_eval_only_omits_overwrite_by_default(self):
+        self.assertNotIn("--overwrite", self._run_llm_eval_only([]))
+
+    def _run_general(self, extra):
+        captured, fake_main = self._capture_argv()
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text("{}")
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate_agent.general.eval.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "general",
+                    "--dataset", str(ds), "-c", str(cfg), "-o", tmp,
+                ] + extra)
+        return captured["argv"]
+
+    def test_general_forwards_overwrite(self):
+        self.assertIn("--overwrite", self._run_general(["--overwrite"]))
+
+    def test_general_omits_overwrite_by_default(self):
+        self.assertNotIn("--overwrite", self._run_general([]))
+
+    def _run_sim_text_eval_only(self, extra):
+        captured, fake_main = self._capture_argv()
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text("{}")
+            ds = Path(tmp) / "ds.json"
+            ds.write_text("[]")
+            with patch("calibrate_agent.llm.run_simulation.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "simulations", "--type", "text",
+                    "-c", str(cfg), "--eval-only", "--dataset", str(ds), "-o", tmp,
+                ] + extra)
+        return captured["argv"]
+
+    def test_simulations_text_eval_only_forwards_overwrite(self):
+        self.assertIn("--overwrite", self._run_sim_text_eval_only(["--overwrite"]))
+
+    def test_simulations_text_eval_only_omits_overwrite_by_default(self):
+        self.assertNotIn("--overwrite", self._run_sim_text_eval_only([]))
+
+    def test_simulations_voice_rejects_overwrite(self):
+        captured, fake_main = self._capture_argv()
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text("{}")
+            with patch("calibrate_agent.agent.run_simulation.main",
+                       AsyncMock(side_effect=fake_main)):
+                with self.assertRaises(SystemExit) as ctx:
+                    self._run_with_argv([
+                        "calibrate_agent", "simulations", "--type", "voice",
+                        "-c", str(cfg), "-o", tmp, "--overwrite",
+                    ])
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertNotIn("argv", captured)
+
+    def test_simulations_voice_runs_without_overwrite(self):
+        captured, fake_main = self._capture_argv()
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "cfg.json"
+            cfg.write_text("{}")
+            with patch("calibrate_agent.agent.run_simulation.main",
+                       AsyncMock(side_effect=fake_main)):
+                self._run_with_argv([
+                    "calibrate_agent", "simulations", "--type", "voice",
+                    "-c", str(cfg), "-o", tmp,
+                ])
+        self.assertNotIn("--overwrite", captured["argv"])
+
+    def test_simulations_leaderboard_ignores_overwrite(self):
+        seen = {}
+
+        def fake_leaderboard(output_dir, save_dir):
+            seen["dirs"] = (output_dir, save_dir)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch("calibrate_agent.llm.simulation_leaderboard.generate_leaderboard",
+                       fake_leaderboard):
+                self._run_with_argv([
+                    "calibrate_agent", "simulations", "--overwrite", "leaderboard",
+                    "-o", tmp, "-s", tmp,
+                ])
+        self.assertIn("dirs", seen)
+
     def test_agent_test_runs(self):
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "cfg.json"

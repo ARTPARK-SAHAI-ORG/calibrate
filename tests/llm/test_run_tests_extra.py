@@ -1,6 +1,8 @@
 """Extra coverage for calibrate_agent/llm/run_tests.py — helpers, aggregation, eval-only flow."""
 
 import asyncio
+import contextlib
+import io
 import json
 import sys
 import tempfile
@@ -3141,6 +3143,267 @@ class TestRunItemsParallelResume(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(sorted(processed), [0, 1])
         self.assertEqual(len(results), 2)
+
+
+def _eval_only_item(tc_id, response="Hi!"):
+    test_case = {
+        "history": [{"role": "user", "content": "hi"}],
+        "evaluation": {"type": "response", "criteria": "polite"},
+    }
+    if tc_id is not None:
+        test_case["id"] = tc_id
+    return {"test_case": test_case, "output": {"response": response, "tool_calls": []}}
+
+
+class TestRunEvalOnlyResume(unittest.IsolatedAsyncioTestCase):
+    def _judge(self):
+        return AsyncMock(
+            return_value={"correctness": {"reasoning": "ok", "match": True}}
+        )
+
+    async def _run(self, tmp, dataset, judge, **kwargs):
+        from calibrate_agent.llm.run_tests import run_eval_only_tests
+
+        with patch(
+            "calibrate_agent.llm.run_tests.test_response_llm_judge", judge
+        ):
+            return await run_eval_only_tests(
+                config={"evaluators": []},
+                dataset=dataset,
+                output_dir=tmp,
+                **kwargs,
+            )
+
+    async def test_resume_only_evaluates_missing_test_cases(self):
+        dataset = [_eval_only_item("tc1"), _eval_only_item("tc2")]
+        judge = self._judge()
+        with tempfile.TemporaryDirectory() as tmp:
+            prior = [{
+                "test_case_id": "tc1",
+                "output": dataset[0]["output"],
+                "metrics": {"passed": True, "judge_results": {}},
+                "test_case": dataset[0]["test_case"],
+            }]
+            (Path(tmp) / "results.json").write_text(json.dumps(prior))
+
+            result = await self._run(tmp, dataset, judge)
+
+            written = json.loads((Path(tmp) / "results.json").read_text())
+
+        self.assertEqual(judge.await_count, 1)
+        self.assertEqual(result["total"], 2)
+        self.assertEqual(
+            [r["test_case_id"] for r in written], ["tc1", "tc2"]
+        )
+        self.assertEqual(written[0]["metrics"], prior[0]["metrics"])
+
+    async def test_resumed_metrics_match_single_full_run(self):
+        dataset = [
+            _eval_only_item("tc1", response="good"),
+            _eval_only_item("tc2", response="bad"),
+        ]
+
+        async def judge_by_response(**kwargs):
+            match = kwargs["response"] == "good"
+            return {"correctness": {"reasoning": "r", "match": match}}
+
+        # The resumed run judges only tc2; a fail-always judge here proves the
+        # tc1 pass came off disk rather than from a fresh evaluation.
+        fail_judge = AsyncMock(
+            return_value={"correctness": {"reasoning": "r", "match": False}}
+        )
+
+        with tempfile.TemporaryDirectory() as full_dir, \
+             tempfile.TemporaryDirectory() as resume_dir:
+            await self._run(full_dir, dataset, AsyncMock(side_effect=judge_by_response))
+            full_metrics = json.loads((Path(full_dir) / "metrics.json").read_text())
+            full_results = json.loads((Path(full_dir) / "results.json").read_text())
+
+            (Path(resume_dir) / "results.json").write_text(
+                json.dumps(full_results[:1])
+            )
+            await self._run(resume_dir, dataset, fail_judge)
+            resumed_metrics = json.loads(
+                (Path(resume_dir) / "metrics.json").read_text()
+            )
+
+        self.assertEqual(full_metrics["passed"], 1)
+
+        self.assertEqual(resumed_metrics["passed"], full_metrics["passed"])
+        self.assertEqual(resumed_metrics["total"], full_metrics["total"])
+        self.assertEqual(resumed_metrics["criteria"], full_metrics["criteria"])
+
+    async def test_overwrite_reruns_everything_and_clears_stale_files(self):
+        dataset = [_eval_only_item("tc1"), _eval_only_item("tc2")]
+        judge = self._judge()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "results.json").write_text(json.dumps([{
+                "test_case_id": "tc1",
+                "output": {"response": "stale", "tool_calls": []},
+                "metrics": {"passed": True, "judge_results": {}},
+            }]))
+            (Path(tmp) / "metrics.json").write_text(json.dumps({"total": 99}))
+
+            await self._run(tmp, dataset, judge, overwrite=True)
+
+            written = json.loads((Path(tmp) / "results.json").read_text())
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+
+        self.assertEqual(judge.await_count, 2)
+        self.assertEqual(metrics["total"], 2)
+        self.assertNotIn("stale", json.dumps(written))
+
+    async def test_test_cases_without_ids_do_not_resume(self):
+        dataset = [_eval_only_item(None), _eval_only_item(None)]
+        judge = self._judge()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "results.json").write_text(json.dumps([{
+                "output": {"response": "Hi!", "tool_calls": []},
+                "metrics": {"passed": True, "judge_results": {}},
+                "test_case": dataset[0]["test_case"],
+            }]))
+            await self._run(tmp, dataset, judge)
+        self.assertEqual(judge.await_count, 2)
+
+    async def test_duplicate_ids_raise(self):
+        dataset = [_eval_only_item("tc1"), _eval_only_item("tc1")]
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError) as ctx:
+                await self._run(tmp, dataset, self._judge())
+        self.assertIn("Duplicate test case id 'tc1'", str(ctx.exception))
+
+    async def test_duplicate_ids_leave_previous_files_intact(self):
+        dataset = [_eval_only_item("tc1"), _eval_only_item("tc1")]
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "logs").write_text("old logs")
+            (Path(tmp) / "results.log").write_text("old results log")
+            with self.assertRaises(ValueError):
+                await self._run(tmp, dataset, self._judge())
+
+            self.assertEqual((Path(tmp) / "logs").read_text(), "old logs")
+            self.assertEqual(
+                (Path(tmp) / "results.log").read_text(), "old results log"
+            )
+            self.assertFalse((Path(tmp) / "config.json").exists())
+
+    async def test_changed_answer_is_rejudged_unchanged_answer_resumes(self):
+        dataset = [
+            _eval_only_item("tc1", response="corrected"),
+            _eval_only_item("tc2", response="Hi!"),
+        ]
+
+        async def judge_by_response(**kwargs):
+            return {
+                "correctness": {
+                    "reasoning": "r",
+                    "match": kwargs["response"] == "corrected",
+                }
+            }
+
+        judge = AsyncMock(side_effect=judge_by_response)
+        with tempfile.TemporaryDirectory() as tmp:
+            prior = [
+                {
+                    "test_case_id": "tc1",
+                    "output": {"response": "wrong", "tool_calls": []},
+                    "metrics": {"passed": False, "judge_results": {}},
+                    "test_case": dataset[0]["test_case"],
+                },
+                {
+                    "test_case_id": "tc2",
+                    "output": dataset[1]["output"],
+                    "metrics": {"passed": False, "judge_results": {}},
+                    "test_case": dataset[1]["test_case"],
+                },
+            ]
+            (Path(tmp) / "results.json").write_text(json.dumps(prior))
+
+            await self._run(tmp, dataset, judge)
+            written = json.loads((Path(tmp) / "results.json").read_text())
+
+        by_id = {r["test_case_id"]: r for r in written}
+        # Only the changed answer is judged again.
+        self.assertEqual(judge.await_count, 1)
+        self.assertEqual(by_id["tc1"]["output"]["response"], "corrected")
+        self.assertTrue(by_id["tc1"]["metrics"]["passed"])
+        # The untouched answer keeps its stored verdict.
+        self.assertFalse(by_id["tc2"]["metrics"]["passed"])
+
+    async def test_numeric_looking_id_resumes(self):
+        dataset = [_eval_only_item("1"), _eval_only_item("2")]
+        judge = self._judge()
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "results.json").write_text(json.dumps([{
+                "test_case_id": "1",
+                "output": dataset[0]["output"],
+                "metrics": {"passed": True, "judge_results": {}},
+                "test_case": dataset[0]["test_case"],
+            }]))
+            await self._run(tmp, dataset, judge)
+            written = json.loads((Path(tmp) / "results.json").read_text())
+
+        self.assertEqual(judge.await_count, 1)
+        self.assertEqual([r["test_case_id"] for r in written], ["1", "2"])
+
+
+class TestRunTestsMainOverwriteFlag(unittest.IsolatedAsyncioTestCase):
+    async def _run_main(self, argv_extra):
+        from calibrate_agent.llm import run_tests
+
+        captured = {}
+
+        async def fake_eval(**kwargs):
+            captured.update(kwargs)
+            return {"passed": 1, "total": 1}
+
+        dataset = [{
+            "test_case": {"history": [], "evaluation": {}},
+            "output": {"response": "x", "tool_calls": []},
+        }]
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "c.json"
+            cfg.write_text("{}")
+            ds = Path(tmp) / "d.json"
+            ds.write_text(json.dumps(dataset))
+            argv = [
+                "calibrate_agent", "-c", str(cfg), "-o", tmp,
+                "--eval-only", "--dataset", str(ds),
+            ] + argv_extra
+            with patch.object(sys, "argv", argv), \
+                patch("calibrate_agent.llm.run_tests.run_eval_only_tests",
+                      side_effect=fake_eval), \
+                patch("calibrate_agent.llm.run_tests.validate_llm_eval_only_dataset",
+                      return_value=(True, "")):
+                await run_tests.main()
+        return captured
+
+    async def test_overwrite_flag_forwarded(self):
+        self.assertTrue((await self._run_main(["--overwrite"]))["overwrite"])
+
+    async def test_overwrite_defaults_false(self):
+        self.assertFalse((await self._run_main([]))["overwrite"])
+
+    async def test_duplicate_ids_exit_with_message(self):
+        from calibrate_agent.llm import run_tests
+
+        dataset = [_eval_only_item("tc1"), _eval_only_item("tc1")]
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "c.json"
+            cfg.write_text("{}")
+            ds = Path(tmp) / "d.json"
+            ds.write_text(json.dumps(dataset))
+            argv = [
+                "calibrate_agent", "-c", str(cfg), "-o", tmp,
+                "--eval-only", "--dataset", str(ds),
+            ]
+            out = io.StringIO()
+            with patch.object(sys, "argv", argv), \
+                    contextlib.redirect_stdout(out), \
+                    self.assertRaises(SystemExit) as ctx:
+                await run_tests.main()
+
+        self.assertEqual(ctx.exception.code, 1)
+        self.assertIn("Duplicate test case id 'tc1'", out.getvalue())
 
 
 if __name__ == "__main__":

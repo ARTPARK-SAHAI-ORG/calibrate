@@ -41,6 +41,7 @@ import asyncio
 import base64
 import csv
 import json
+import math
 import os
 import re
 from typing import Callable, Optional
@@ -228,53 +229,156 @@ def with_row_callback(coroutines: list, on_row: Optional[Callable]) -> list:
     return [_run(index, coroutine) for index, coroutine in enumerate(coroutines)]
 
 
+def read_existing_rows(path: str) -> dict:
+    """Read a prior ``results.csv`` into ``{id: row}``.
+
+    Values come back as text, which is what keeps an id like ``"1"`` from
+    turning into the number ``1`` and failing to match the dataset it came
+    from. A missing or unreadable file reads as no rows at all, so a run that
+    cannot resume simply starts over.
+    """
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, newline="", encoding="utf-8") as f:
+            records = list(csv.DictReader(f))
+    except (OSError, csv.Error, UnicodeDecodeError) as e:
+        provider_log(f"Could not read existing results at {path}: {e}")
+        return {}
+    return {str(record["id"]): record for record in records if record.get("id")}
+
+
+def stored_cell(row: Optional[dict], column: str):
+    """Return one stored value, or None when it is absent or blank.
+
+    A row written before a judge ran has an empty cell for that judge, which
+    counts as still needing to be judged rather than as a score of zero.
+    """
+    if not row:
+        return None
+    value = row.get(column)
+    if value is None:
+        return None
+    if isinstance(value, float) and math.isnan(value):
+        return None
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
+def stored_bool(value) -> Optional[bool]:
+    """Read back a stored pass/fail value, or None when it is not one."""
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in ("true", "1", "1.0"):
+        return True
+    if text in ("false", "0", "0.0"):
+        return False
+    return None
+
+
+def evaluator_row_from_columns(
+    evaluators_by_name: dict, row: Optional[dict]
+) -> Optional[dict]:
+    """Rebuild one row's judge result from its ``results.csv`` columns.
+
+    The inverse of :func:`evaluator_row_columns`. Returns None unless every
+    configured evaluator has a usable value in the row, so a row scored under a
+    different set of evaluators is judged again instead of being mixed with the
+    current set.
+    """
+    if not row:
+        return None
+    judge_row: dict = {}
+    for name, evaluator in evaluators_by_name.items():
+        value = stored_cell(row, name)
+        if value is None:
+            return None
+        reasoning = stored_cell(row, f"{name}_reasoning") or ""
+        if is_rating(evaluator):
+            try:
+                score = float(value)
+            except (TypeError, ValueError):
+                return None
+            # Keep whole numbers whole so a resumed run's file matches a
+            # single run's byte for byte.
+            judge_row[name] = {
+                "score": int(score) if score.is_integer() else score,
+                "reasoning": reasoning,
+            }
+        else:
+            match = stored_bool(value)
+            if match is None:
+                return None
+            judge_row[name] = {"match": match, "reasoning": reasoning}
+    return judge_row
+
+
 class PartialResultsWriter:
-    """Append each row to ``results.csv`` as its judge result arrives.
+    """Keep ``results.csv`` current as each judge result arrives.
 
-    A run that is killed part-way then leaves the rows already graded on disk
-    instead of an empty directory, and a reader watching the file sees results
-    accumulate. The full-table write at the end of a run replaces the file, so
-    this only ever holds a prefix of the final columns (no WER, latency, or
-    other post-judge columns).
+    Rows are held by dataset index and the whole file is rewritten whenever one
+    gains a value. That lets several judges fill different columns of the same
+    row, keeps rows in dataset order regardless of which judge finishes first,
+    and lets a resumed run carry forward the rows it started with instead of
+    emptying the file. A run that is killed part-way leaves the rows already
+    graded on disk instead of an empty directory.
 
-    ``base_rows`` supplies the non-evaluator columns per row index, in dataset
-    order. Rows are appended in completion order, which need not match dataset
-    order; the ``id`` column identifies each one.
+    ``base_rows`` supplies the non-judge columns per row index, in dataset
+    order. ``existing_rows`` maps an id to a row from a prior run; its judge
+    columns seed the matching row so they survive into the new file.
     """
 
     def __init__(
-        self, path: str, evaluators_by_name: dict, base_rows: list[dict]
+        self,
+        path: str,
+        base_rows: list[dict],
+        existing_rows: Optional[dict] = None,
     ):
         self._path = path
-        self._evaluators_by_name = evaluators_by_name
-        self._base_rows = base_rows
-        self._file = None
-        self._writer = None
+        self._rows: list[dict] = []
+        self._filled: set[int] = set()
+        self._columns: list[str] = []
+        existing_rows = existing_rows or {}
+        for index, base in enumerate(base_rows):
+            row = dict(base)
+            stored = existing_rows.get(str(base.get("id")))
+            if stored:
+                for column in stored:
+                    # The dataset owns its own columns; only judge results are
+                    # carried over.
+                    if column in base:
+                        continue
+                    if stored_cell(stored, column) is not None:
+                        row[column] = stored[column]
+                self._filled.add(index)
+            self._track(row)
+            self._rows.append(row)
 
-    def write(self, index: int, judge_row: dict) -> None:
-        """Append one judged row. Never raises: a failure here must not take
-        down the run whose results it is only mirroring."""
+    def _track(self, row: dict) -> None:
+        for column in row:
+            if column not in self._columns:
+                self._columns.append(column)
+
+    def update(self, index: int, columns: dict) -> None:
+        """Merge ``columns`` into one row and rewrite the file.
+
+        Never raises: a failure here must not take down the run whose results
+        it is only mirroring.
+        """
         try:
-            row = {
-                **self._base_rows[index],
-                **evaluator_row_columns(self._evaluators_by_name, judge_row),
-            }
-            if self._writer is None:
-                self._file = open(self._path, "w", newline="", encoding="utf-8")
-                self._writer = csv.DictWriter(self._file, fieldnames=list(row))
-                self._writer.writeheader()
-            self._writer.writerow(row)
-            self._file.flush()
+            self._rows[index].update(columns)
+            self._track(self._rows[index])
+            self._filled.add(index)
+            with open(self._path, "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(f, fieldnames=self._columns, restval="")
+                writer.writeheader()
+                for row_index, row in enumerate(self._rows):
+                    if row_index in self._filled:
+                        writer.writerow(row)
         except Exception as e:
-            provider_log(f"Failed to append partial result row {index}: {e}")
-
-    def close(self) -> None:
-        if self._file is not None:
-            try:
-                self._file.close()
-            finally:
-                self._file = None
-                self._writer = None
+            provider_log(f"Failed to write partial result row {index}: {e}")
 
 
 def attach_evaluator_id(evaluator: dict, result: dict) -> dict:
@@ -299,6 +403,55 @@ def evaluator_config_payload(
         if ev.get("id") is not None and ev.get("name")
     }
     return payload
+
+
+def evaluator_scoring_shape(evaluators: list[dict]) -> dict:
+    """Map each evaluator name to what its stored score means.
+
+    Two evaluators sharing a name still produce values that cannot be averaged
+    together when one is a pass/fail and the other a 1-to-5 rating, or when the
+    rating range differs.
+    """
+    shape = {}
+    for ev in evaluators or []:
+        if not isinstance(ev, dict) or not ev.get("name"):
+            continue
+        if is_rating(ev):
+            shape[ev["name"]] = ("rating", ev.get("scale_min"), ev.get("scale_max"))
+        else:
+            shape[ev["name"]] = ("binary", None, None)
+    return shape
+
+
+def stored_scores_are_comparable(output_dir: str, evaluators: list[dict]) -> bool:
+    """Report whether a prior run's evaluator scores can be reused as they are.
+
+    Compares the evaluators recorded in the prior run's ``config.json`` with the
+    ones about to run. Scores are only reusable when each shared name still
+    scores the same way, so a rating that changed range or became a pass/fail is
+    judged again rather than averaged into a number that means nothing. A
+    missing or unreadable config leaves the stored scores unusable, because
+    nothing proves what they measured.
+
+    Call before :func:`write_evaluator_config` replaces the file.
+    """
+    path = os.path.join(output_dir, "config.json")
+    if not os.path.exists(path):
+        return False
+    try:
+        with open(path) as f:
+            stored = json.load(f)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    if not isinstance(stored, dict):
+        return False
+    stored_shape = evaluator_scoring_shape(stored.get("evaluators") or [])
+    current_shape = evaluator_scoring_shape(evaluators)
+    return all(
+        stored_shape.get(name) == expected
+        for name, expected in current_shape.items()
+        if name in stored_shape
+    )
 
 
 def write_evaluator_config(

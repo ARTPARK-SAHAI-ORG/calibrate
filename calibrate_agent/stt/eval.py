@@ -49,7 +49,10 @@ from calibrate_agent._cli_args import add_stt_eval_args
 from calibrate_agent.judges import (
     PartialResultsWriter,
     evaluator_row_columns,
+    evaluator_row_from_columns,
+    read_existing_rows,
     require_unique_evaluator_names,
+    stored_cell,
     write_evaluator_config,
 )
 from calibrate_agent.langfuse import (
@@ -1311,9 +1314,13 @@ async def run_single_provider_eval(
                 return {"provider": provider, "status": "error", "error": error_msg}
 
         # Delete existing results if overwrite is set
-        if overwrite and exists(results_csv_path):
-            os.remove(results_csv_path)
-            _log("Overwrite enabled - deleted existing results.csv")
+        if overwrite:
+            if exists(results_csv_path):
+                os.remove(results_csv_path)
+                _log("Overwrite enabled - deleted existing results.csv")
+            verdicts_path = join(provider_output_dir, LLM_WER_VERDICTS_FILE)
+            if exists(verdicts_path):
+                os.remove(verdicts_path)
 
         gt = pd.read_csv(gt_file)
 
@@ -1466,6 +1473,7 @@ def validate_stt_eval_only_dataset(dataset_path: str) -> tuple[bool, str, list[d
         return False, "Dataset must be a JSON list of objects", []
 
     required = {"id", "gt", "pred"}
+    seen_ids: set = set()
     for i, row in enumerate(data):
         if not isinstance(row, dict):
             return False, f"Row {i} is not an object", []
@@ -1476,8 +1484,166 @@ def validate_stt_eval_only_dataset(dataset_path: str) -> tuple[bool, str, list[d
                 f"Row {i} missing required fields: {sorted(missing)}. Each row needs 'id', 'gt', 'pred'.",
                 [],
             )
+        row_id = row["id"]
+        if not isinstance(row_id, (str, int, float)):
+            return (
+                False,
+                f"Row {i} has an unusable id: {row_id!r}. An id must be text or "
+                f"a number.",
+                [],
+            )
+        # Everything downstream keys on the id as text, so ids that differ only
+        # by type (1 and "1") would read back as the same row on resume.
+        row_id = str(row_id)
+        if row_id in seen_ids:
+            return (
+                False,
+                f"Duplicate row id: {row_id!r}. Ids must be unique so a resumed "
+                f"run can tell the rows apart.",
+                [],
+            )
+        seen_ids.add(row_id)
 
     return True, "", data
+
+
+LLM_WER_VERDICTS_FILE = "llm_wer_verdicts.json"
+
+
+def intent_entity_columns(row: dict) -> dict:
+    """Flatten one intent/entity result into its ``results.csv`` columns."""
+    return {
+        "sarvam_intent_score": int(row["intent_score"]),
+        "sarvam_intent_reasoning": row["intent_explanation"],
+        "sarvam_entity_score": float(row["entity_score"]),
+        "sarvam_entity_reasoning": row["entity_explanation"],
+    }
+
+
+def intent_entity_row_from_columns(row: dict | None) -> dict | None:
+    """Rebuild one intent/entity result from its ``results.csv`` columns.
+
+    The inverse of :func:`intent_entity_columns`. Returns None when the row
+    holds no usable scores, which marks it as still needing the judge.
+    """
+    intent = stored_cell(row, "sarvam_intent_score")
+    entity = stored_cell(row, "sarvam_entity_score")
+    if intent is None or entity is None:
+        return None
+    try:
+        intent_score = int(float(intent))
+        entity_score = float(entity)
+    except (TypeError, ValueError):
+        return None
+    return {
+        "intent_score": intent_score,
+        "intent_explanation": stored_cell(row, "sarvam_intent_reasoning") or "",
+        "entity_score": entity_score,
+        "entity_explanation": stored_cell(row, "sarvam_entity_reasoning") or "",
+    }
+
+
+def llm_wer_columns(row: dict) -> dict:
+    """Flatten one LLM-WER/CER result into its ``results.csv`` columns."""
+    return {
+        "sarvam_llm_wer": float(row["llm_wer"]),
+        "sarvam_llm_cer": float(row["llm_cer"]),
+        "sarvam_llm_wer_reasoning": json.dumps(row["segments"], ensure_ascii=False),
+    }
+
+
+def llm_wer_row_from_columns(row: dict | None) -> dict | None:
+    """Rebuild one LLM-WER/CER result from its ``results.csv`` columns.
+
+    The inverse of :func:`llm_wer_columns`. Returns None when the row holds no
+    usable scores or its stored segment list cannot be read back.
+    """
+    llm_wer = stored_cell(row, "sarvam_llm_wer")
+    llm_cer = stored_cell(row, "sarvam_llm_cer")
+    segments = stored_cell(row, "sarvam_llm_wer_reasoning")
+    if llm_wer is None or llm_cer is None or segments is None:
+        return None
+    try:
+        segments = json.loads(segments) if isinstance(segments, str) else segments
+        scores = {"llm_wer": float(llm_wer), "llm_cer": float(llm_cer)}
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(segments, list) or any(
+        not isinstance(seg, dict)
+        or not {"reference", "prediction", "equivalent"} <= seg.keys()
+        for seg in segments
+    ):
+        return None
+    return {**scores, "segments": segments}
+
+
+def semantic_wer_columns(row: dict) -> dict:
+    """Flatten one semantic-WER result into its ``results.csv`` columns."""
+    return {
+        "semantic_wer": float(row["semantic_wer"]),
+        "semantic_wer_metadata": json.dumps(
+            {
+                "substitutions": row["substitutions"],
+                "deletions": row["deletions"],
+                "insertions": row["insertions"],
+                "reference_words": row["reference_words"],
+                "normalized_reference": row["normalized_reference"],
+                "normalized_hypothesis": row["normalized_hypothesis"],
+            },
+            ensure_ascii=False,
+        ),
+        "semantic_wer_reasoning": row["reasoning"],
+    }
+
+
+def semantic_wer_row_from_columns(row: dict | None) -> dict | None:
+    """Rebuild one semantic-WER result from its ``results.csv`` columns.
+
+    The inverse of :func:`semantic_wer_columns`. Returns None when the row holds
+    no score or its stored counts cannot be read back.
+    """
+    score = stored_cell(row, "semantic_wer")
+    metadata = stored_cell(row, "semantic_wer_metadata")
+    if score is None or metadata is None:
+        return None
+    try:
+        metadata = json.loads(metadata) if isinstance(metadata, str) else metadata
+        result = {
+            "semantic_wer": float(score),
+            "substitutions": int(metadata["substitutions"]),
+            "deletions": int(metadata["deletions"]),
+            "insertions": int(metadata["insertions"]),
+            "reference_words": int(metadata["reference_words"]),
+            "normalized_reference": metadata["normalized_reference"],
+            "normalized_hypothesis": metadata["normalized_hypothesis"],
+            "reasoning": stored_cell(row, "semantic_wer_reasoning") or "",
+        }
+    except (TypeError, ValueError, KeyError, AttributeError):
+        return None
+    return result
+
+
+def read_llm_wer_verdicts(path: str) -> dict:
+    """Read saved equivalence verdicts into ``{(reference, prediction): verdict}``.
+
+    A missing or unreadable file reads as no verdicts, so a run that cannot
+    reuse them simply judges those segments again.
+    """
+    if not exists(path):
+        return {}
+    try:
+        with open(path, encoding="utf-8") as f:
+            saved = json.load(f)
+        return {
+            (entry["reference"], entry["prediction"]): {
+                "equivalent": bool(entry["equivalent"]),
+                "reasoning": entry.get("reasoning", ""),
+            }
+            for entry in saved
+        }
+    except Exception as e:
+        _log(f"Could not read saved LLM-WER verdicts at {path}: {e}")
+        return {}
 
 
 async def _score_and_write_results(
@@ -1493,6 +1659,7 @@ async def _score_and_write_results(
     audio_durations: list[float | None] | None = None,
     ttfs_values: list = None,
     stream_rows: bool = False,
+    existing_rows: dict | None = None,
 ) -> dict:
     """Run WER/CER (and optional LLM-judge evaluators) over (gt, pred) pairs.
 
@@ -1515,12 +1682,73 @@ async def _score_and_write_results(
     Only safe when nothing else owns that file: the full evaluation writes its
     transcriptions there as it goes and resumes from them, and overwriting it
     mid-judge would cost a re-transcription of every row not yet graded.
+
+    ``existing_rows`` maps an id to that row's results from an earlier run.
+    Every judge reuses the results already stored for a row and only pays for
+    the rows still missing. WER and CER are computed locally for every row.
     """
     wer_results = get_wer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"WER: {wer_results['score']}", to_terminal=False)
 
     cer_results = get_cer_score(gt_transcripts, pred_transcripts, language=language)
     _log(f"CER: {cer_results['score']}", to_terminal=False)
+
+    existing_rows = existing_rows or {}
+
+    def _stored_row(_id, gt_text, pred_text):
+        """Return a prior run's row only when the judges saw the same text.
+
+        A row whose ``gt`` or ``pred`` was edited since it was scored counts as
+        never judged, so its scores are recomputed instead of showing the old
+        verdict beside the new text.
+        """
+        stored = existing_rows.get(str(_id))
+        if stored is None:
+            return None
+        if str(stored.get("gt", "")) != str(gt_text):
+            return None
+        if str(stored.get("pred", "")) != str(pred_text):
+            return None
+        return stored
+
+    stored_by_row = [
+        _stored_row(_id, gt_text, pred_text)
+        for _id, gt_text, pred_text in zip(ids, gt_transcripts, pred_transcripts)
+    ]
+    reusable_rows = {
+        str(_id): stored
+        for _id, stored in zip(ids, stored_by_row)
+        if stored is not None
+    }
+
+    known_intent_entity = [intent_entity_row_from_columns(r) for r in stored_by_row]
+    known_llm_wer = [llm_wer_row_from_columns(r) for r in stored_by_row]
+    known_semantic_wer = [semantic_wer_row_from_columns(r) for r in stored_by_row]
+    known_evaluator_rows: list = [None] * len(ids)
+
+    base_rows = [
+        {"id": _id, "gt": gt_text, "pred": pred_text, "wer": wer, "cer": cer}
+        for _id, gt_text, pred_text, wer, cer in zip(
+            ids,
+            gt_transcripts,
+            pred_transcripts,
+            wer_results["per_row"],
+            cer_results["per_row"],
+        )
+    ]
+    partial_writer = (
+        PartialResultsWriter(
+            join(output_dir, "results.csv"), base_rows, reusable_rows
+        )
+        if stream_rows
+        else None
+    )
+
+    def _row_writer(to_columns):
+        """Build an ``on_row`` callback that stores one judge's columns."""
+        if partial_writer is None:
+            return None
+        return lambda index, row: partial_writer.update(index, to_columns(row))
 
     # Each judge below runs independently and is isolated: a failure in one
     # (Sarvam intent/entity, Sarvam LLM-WER/CER, or the LLM judge) is logged and
@@ -1535,7 +1763,11 @@ async def _score_and_write_results(
     if run_llm_judges:
         try:
             intent_entity_results = await get_intent_entity_score(
-                gt_transcripts, pred_transcripts, language=language
+                gt_transcripts,
+                pred_transcripts,
+                language=language,
+                known=known_intent_entity,
+                on_row=_row_writer(intent_entity_columns),
             )
             _log(
                 f"Sarvam Intent Score: {intent_entity_results['intent']:.4f}  Sarvam Entity Score: {intent_entity_results['entity']:.4f}",
@@ -1545,8 +1777,36 @@ async def _score_and_write_results(
             intent_entity_results = None
             _log(f"Sarvam intent/entity judge failed, skipping: {e}")
         try:
+            verdicts_path = join(output_dir, LLM_WER_VERDICTS_FILE)
+            saved_verdicts = read_llm_wer_verdicts(verdicts_path)
+
+            def _save_verdict(reference, prediction, verdict):
+                saved_verdicts[(reference, prediction)] = verdict
+                try:
+                    with open(verdicts_path, "w", encoding="utf-8") as f:
+                        json.dump(
+                            [
+                                {
+                                    "reference": ref,
+                                    "prediction": pred,
+                                    "equivalent": saved["equivalent"],
+                                    "reasoning": saved["reasoning"],
+                                }
+                                for (ref, pred), saved in saved_verdicts.items()
+                            ],
+                            f,
+                            ensure_ascii=False,
+                        )
+                except OSError as e:
+                    _log(f"Could not save LLM-WER verdict: {e}")
+
             llm_wer_results = await get_llm_wer_cer_score(
-                gt_transcripts, pred_transcripts, language=language
+                gt_transcripts,
+                pred_transcripts,
+                language=language,
+                known=known_llm_wer,
+                verdicts=saved_verdicts,
+                on_verdict=_save_verdict,
             )
             _log(
                 f"Sarvam LLM WER: {llm_wer_results['llm_wer']:.4f}  Sarvam LLM CER: {llm_wer_results['llm_cer']:.4f}",
@@ -1561,7 +1821,10 @@ async def _score_and_write_results(
     if run_llm_judges:
         try:
             semantic_wer_results = await get_semantic_wer_score(
-                gt_transcripts, pred_transcripts
+                gt_transcripts,
+                pred_transcripts,
+                known=known_semantic_wer,
+                on_row=_row_writer(semantic_wer_columns),
             )
             _log(
                 f"Semantic WER: {semantic_wer_results['semantic_wer']:.4f}",
@@ -1581,38 +1844,32 @@ async def _score_and_write_results(
         require_unique_evaluator_names(_evaluators)
         write_evaluator_config(evaluator_config_dir, _evaluators)
         evaluators_by_name = {ev["name"]: ev for ev in _evaluators}
-        partial_writer = (
-            PartialResultsWriter(
-                join(output_dir, "results.csv"),
-                evaluators_by_name,
-                [
-                    {"id": _id, "gt": gt_text, "pred": pred_text}
-                    for _id, gt_text, pred_text in zip(
-                        ids, gt_transcripts, pred_transcripts
-                    )
-                ],
-            )
-            if stream_rows
-            else None
-        )
+        known_evaluator_rows = [
+            evaluator_row_from_columns(evaluators_by_name, r) for r in stored_by_row
+        ]
         try:
             llm_results = await get_llm_judge_score(
                 gt_transcripts,
                 pred_transcripts,
                 evaluators=_evaluators,
-                on_row=partial_writer.write if partial_writer else None,
+                known=known_evaluator_rows,
+                on_row=_row_writer(
+                    lambda row: evaluator_row_columns(evaluators_by_name, row)
+                ),
             )
             for name, score_dict in llm_results["scores"].items():
                 _log(f"  {name}: {score_dict['mean']:.4f}")
         except Exception as e:
             llm_results = None
             _log(f"LLM judge failed, skipping evaluator columns: {e}")
-        finally:
-            if partial_writer:
-                partial_writer.close()
 
-    # Only surface evaluator columns for judges that actually produced results.
-    _evaluators_by_name = evaluators_by_name if llm_results is not None else {}
+    # Surface evaluator columns when the judge produced results, and also when
+    # an earlier run's results are being carried forward.
+    _evaluators_by_name = (
+        evaluators_by_name
+        if llm_results is not None or any(r is not None for r in known_evaluator_rows)
+        else {}
+    )
 
     metrics_data = {
         "wer": wer_results["score"],
@@ -1645,23 +1902,24 @@ async def _score_and_write_results(
         if ttfs_stats is not None:
             metrics_data["ttfs"] = ttfs_stats
 
+    # A judge that failed or was skipped falls back to what an earlier run
+    # already stored, so results.csv keeps the scores already paid for. Rows
+    # that judge never scored stay blank.
     ie_per_row = (
         intent_entity_results["per_row"]
         if intent_entity_results is not None
-        else [None] * len(ids)
+        else known_intent_entity
     )
     llm_wer_per_row = (
-        llm_wer_results["per_row"]
-        if llm_wer_results is not None
-        else [None] * len(ids)
+        llm_wer_results["per_row"] if llm_wer_results is not None else known_llm_wer
     )
     llm_per_row = (
-        llm_results["per_row"] if llm_results is not None else [None] * len(ids)
+        llm_results["per_row"] if llm_results is not None else known_evaluator_rows
     )
     semantic_wer_per_row = (
         semantic_wer_results["per_row"]
         if semantic_wer_results is not None
-        else [None] * len(ids)
+        else known_semantic_wer
     )
 
     audio_durations = list(audio_durations or [])
@@ -1708,31 +1966,13 @@ async def _score_and_write_results(
         if has_ttfs:
             row["ttfs"] = ttfs_row
         if ie_row is not None:
-            row["sarvam_intent_score"] = int(ie_row["intent_score"])
-            row["sarvam_intent_reasoning"] = ie_row["intent_explanation"]
-            row["sarvam_entity_score"] = float(ie_row["entity_score"])
-            row["sarvam_entity_reasoning"] = ie_row["entity_explanation"]
+            row.update(intent_entity_columns(ie_row))
         if llm_wer_row is not None:
-            row["sarvam_llm_wer"] = float(llm_wer_row["llm_wer"])
-            row["sarvam_llm_cer"] = float(llm_wer_row["llm_cer"])
-            row["sarvam_llm_wer_reasoning"] = json.dumps(
-                llm_wer_row["segments"], ensure_ascii=False
-            )
+            row.update(llm_wer_columns(llm_wer_row))
         if semantic_wer_row is not None:
-            row["semantic_wer"] = float(semantic_wer_row["semantic_wer"])
-            row["semantic_wer_metadata"] = json.dumps(
-                {
-                    "substitutions": semantic_wer_row["substitutions"],
-                    "deletions": semantic_wer_row["deletions"],
-                    "insertions": semantic_wer_row["insertions"],
-                    "reference_words": semantic_wer_row["reference_words"],
-                    "normalized_reference": semantic_wer_row["normalized_reference"],
-                    "normalized_hypothesis": semantic_wer_row["normalized_hypothesis"],
-                },
-                ensure_ascii=False,
-            )
-            row["semantic_wer_reasoning"] = semantic_wer_row["reasoning"]
-        row.update(evaluator_row_columns(_evaluators_by_name, llm_row))
+            row.update(semantic_wer_columns(semantic_wer_row))
+        if llm_row is not None:
+            row.update(evaluator_row_columns(_evaluators_by_name, llm_row))
         data.append(row)
 
     with open(join(output_dir, "metrics.json"), "w") as f:
@@ -1749,11 +1989,17 @@ async def run_eval_only(
     judge_evaluators: list[dict] = None,
     language: str = "english",
     run_llm_judges: bool = True,
+    overwrite: bool = False,
 ) -> dict:
     """Run evaluators only on a pre-existing dataset of (gt, pred) pairs.
 
     Skips STT inference. Writes ``metrics.json`` and ``results.csv`` directly
     under ``output_dir``.
+
+    A run picks up where an earlier one stopped: every row already scored in
+    ``results.csv`` keeps its scores and only the rows still missing are sent to
+    the judges. ``overwrite`` clears those results first and scores every row
+    again.
 
     Args:
         dataset_path: Path to a JSON file with a list of {"id", "gt", "pred"} rows.
@@ -1765,11 +2011,23 @@ async def run_eval_only(
         run_llm_judges: Run the Sarvam intent/entity judge (default True).
             Setting it to False skips the normalizer model load and the judge
             calls entirely.
+        overwrite: Discard any results from an earlier run and score every row
+            again.
 
     Returns:
         dict with status, metrics, and output_dir.
     """
     os.makedirs(output_dir, exist_ok=True)
+
+    results_path = join(output_dir, "results.csv")
+    if overwrite:
+        for path in (
+            results_path,
+            join(output_dir, "metrics.json"),
+            join(output_dir, LLM_WER_VERDICTS_FILE),
+        ):
+            if exists(path):
+                os.remove(path)
 
     log_save_path = join(output_dir, "logs")
     if exists(log_save_path):
@@ -1800,6 +2058,7 @@ async def run_eval_only(
             language=language,
             run_llm_judges=run_llm_judges,
             stream_rows=True,
+            existing_rows=read_existing_rows(results_path),
         )
 
         return {

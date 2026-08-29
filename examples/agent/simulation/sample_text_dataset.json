@@ -1,5 +1,6 @@
 [
     {
+        "id": "simulation_1",
         "name": "simulation_1",
         "conversation_history": [
             {"role": "assistant", "content": "Hello! How can I help you today?"},
@@ -11,6 +12,7 @@
         ]
     },
     {
+        "id": "simulation_2",
         "name": "simulation_2",
         "conversation_history": [
             {"role": "assistant", "content": "Hello! How can I help you today?"},

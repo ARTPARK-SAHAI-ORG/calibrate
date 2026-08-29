@@ -13,7 +13,7 @@ import pandas as pd
 def _fake_intent_entity(intent=1, entity=1.0):
     """Adaptive ``get_intent_entity_score`` mock — one row per input pair."""
 
-    async def _fn(refs, preds, language="english", model=None):
+    async def _fn(refs, preds, language="english", model=None, **kwargs):
         return {
             "intent": float(intent),
             "entity": float(entity),

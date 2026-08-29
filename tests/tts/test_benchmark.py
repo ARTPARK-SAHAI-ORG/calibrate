@@ -29,10 +29,11 @@ class TestTTSBenchmarkEvalOnly(unittest.IsolatedAsyncioTestCase):
     async def test_success_calls_run_eval_only(self):
         captured = {}
 
-        async def fake_run_eval_only(*, dataset_path, output_dir, judge_evaluators):
+        async def fake_run_eval_only(*, dataset_path, output_dir, judge_evaluators, overwrite):
             captured["dataset_path"] = dataset_path
             captured["output_dir"] = output_dir
             captured["judge_evaluators"] = judge_evaluators
+            captured["overwrite"] = overwrite
             return {
                 "status": "completed",
                 "metrics": {"quality": {"type": "binary", "mean": 0.9}},
@@ -51,11 +52,32 @@ class TestTTSBenchmarkEvalOnly(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["output_dir"], out)
         # No config passed → evaluators default to None.
         self.assertIsNone(captured["judge_evaluators"])
+        self.assertFalse(captured["overwrite"])
+
+    async def test_overwrite_flag_forwarded(self):
+        captured = {}
+
+        async def fake_run_eval_only(
+            *, dataset_path, output_dir, judge_evaluators, overwrite
+        ):
+            captured["overwrite"] = overwrite
+            return {"status": "completed", "metrics": {}, "output_dir": output_dir}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch(
+                "calibrate_agent.tts.benchmark.run_eval_only",
+                AsyncMock(side_effect=fake_run_eval_only),
+            ):
+                await self._run_main(
+                    ["--dataset", tmp, "-o", os.path.join(tmp, "out"), "--overwrite"]
+                )
+
+        self.assertTrue(captured["overwrite"])
 
     async def test_config_forwards_evaluators(self):
         captured = {}
 
-        async def fake_run_eval_only(*, dataset_path, output_dir, judge_evaluators):
+        async def fake_run_eval_only(*, dataset_path, output_dir, judge_evaluators, overwrite):
             captured["judge_evaluators"] = judge_evaluators
             return {"status": "completed", "metrics": {}, "output_dir": output_dir}
 
@@ -73,7 +95,7 @@ class TestTTSBenchmarkEvalOnly(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(captured["judge_evaluators"], [{"name": "q", "system_prompt": "p"}])
 
     async def test_error_result_exits(self):
-        async def fake_run_eval_only(*, dataset_path, output_dir, judge_evaluators):
+        async def fake_run_eval_only(*, dataset_path, output_dir, judge_evaluators, overwrite):
             return {"status": "error", "error": "boom"}
 
         with tempfile.TemporaryDirectory() as tmp:

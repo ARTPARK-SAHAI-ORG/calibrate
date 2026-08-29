@@ -183,6 +183,26 @@ def _resolve_evaluators(evaluators: Optional[List[dict]]) -> List[dict]:
     return list(evaluators) if evaluators else [DEFAULT_STT_EVALUATOR]
 
 
+def _pending_indices(known: Optional[List], total: int) -> tuple[List[Optional[dict]], List[int]]:
+    """Split rows into what is already known and what still needs judging.
+
+    ``known`` holds one already-computed per-row result per row, or None where
+    the row has not been judged. Returns that list (padded to ``total``) plus
+    the indices still to judge, so a resumed run only pays for the rows it is
+    missing.
+    """
+    rows: List[Optional[dict]] = list(known) if known is not None else []
+    rows = (rows + [None] * total)[:total]
+    return rows, [i for i, row in enumerate(rows) if row is None]
+
+
+def _on_original_index(on_row: Optional[Callable], indices: List[int]) -> Optional[Callable]:
+    """Report a judged row under its dataset index rather than its judge order."""
+    if on_row is None:
+        return None
+    return lambda position, result: on_row(indices[position], result)
+
+
 def _edit_metric(
     metric_fn,
     transform,
@@ -255,12 +275,44 @@ def _score_edit_metric(
     return {"score": float(score), "per_row": per_row}
 
 
+def _semantic_wer_row(res: dict) -> dict:
+    """Turn one semantic-WER judge response into its per-row result."""
+    s = int(res.get("substitutions", 0))
+    d = int(res.get("deletions", 0))
+    i = int(res.get("insertions", 0))
+    # The judge always sets reference_words; default to 1 (not 0) only to
+    # stay consistent with its own default and pipecat's call site.
+    ref_words = int(res.get("reference_words", 1))
+    errors = s + d + i
+    if ref_words == 0:
+        row_wer = 0.0 if errors == 0 else float("inf")
+    else:
+        row_wer = errors / ref_words
+    return {
+        "semantic_wer": float(row_wer),
+        "substitutions": s,
+        "deletions": d,
+        "insertions": i,
+        "reference_words": ref_words,
+        "normalized_reference": res.get("normalized_reference", ""),
+        "normalized_hypothesis": res.get("normalized_hypothesis", ""),
+        "reasoning": res.get("reasoning", ""),
+    }
+
+
 async def get_semantic_wer_score(
     references: List[str],
     predictions: List[str],
     model: Optional[str] = None,
+    on_row: Optional[Callable] = None,
+    known: Optional[List] = None,
 ) -> dict:
     """Compute pipecat-style semantic WER over (reference, prediction) pairs.
+
+    ``on_row`` is called with ``(row_index, row_result)`` as each row finishes.
+    ``known`` carries one already-judged per-row dict per row (None where the
+    row still needs judging); those rows are pooled from their stored counts
+    without a judge call.
 
     One judge call per row via pipecat's reason-then-tool loop (see
     ``stt/semantic_wer``): the model normalizes, aligns, applies the semantic
@@ -304,47 +356,35 @@ async def get_semantic_wer_score(
     if model is None:
         model = DEFAULT_SEMANTIC_WER_MODEL
 
-    coroutines = [
-        _semantic_wer.semantic_wer_judge(str(reference), str(prediction), model=model)
-        for reference, prediction in zip(references, predictions)
-    ]
-    results = await tqdm_asyncio.gather(
-        *coroutines,
+    per_row, pending = _pending_indices(known, len(references))
+
+    async def _judge_row(index: int) -> dict:
+        res = await _semantic_wer.semantic_wer_judge(
+            str(references[index]), str(predictions[index]), model=model
+        )
+        return _semantic_wer_row(res)
+
+    judged = await tqdm_asyncio.gather(
+        *with_row_callback(
+            [_judge_row(i) for i in pending], _on_original_index(on_row, pending)
+        ),
         desc="Running semantic WER judge",
     )
+    for i, row in zip(pending, judged):
+        per_row[i] = row
 
     total_errors = 0
     total_ref_words = 0
-    per_row: List[dict] = []
-    for res in results:
-        s = int(res.get("substitutions", 0))
-        d = int(res.get("deletions", 0))
-        i = int(res.get("insertions", 0))
-        # The judge always sets reference_words; default to 1 (not 0) only to
-        # stay consistent with its own default and pipecat's call site.
-        ref_words = int(res.get("reference_words", 1))
-        errors = s + d + i
-        if ref_words == 0:
-            row_wer = 0.0 if errors == 0 else float("inf")
-        else:
-            row_wer = errors / ref_words
-        per_row.append(
-            {
-                "semantic_wer": float(row_wer),
-                "substitutions": s,
-                "deletions": d,
-                "insertions": i,
-                "reference_words": ref_words,
-                "normalized_reference": res.get("normalized_reference", ""),
-                "normalized_hypothesis": res.get("normalized_hypothesis", ""),
-                "reasoning": res.get("reasoning", ""),
-            }
+    for row in per_row:
+        errors = (
+            int(row["substitutions"]) + int(row["deletions"]) + int(row["insertions"])
         )
         # Pool only finite-WER rows, matching pipecat's compute_pooled_wer
         # (``valid = [m for m in metrics if m.wer < inf]``). A ``ref_words==0``
         # row with errors is ``inf`` and is excluded entirely — otherwise its
         # errors would inflate the numerator with nothing in the denominator.
-        if row_wer != float("inf"):
+        if float(row["semantic_wer"]) != float("inf"):
+            ref_words = int(row["reference_words"])
             total_errors += errors
             total_ref_words += ref_words
 
@@ -443,11 +483,15 @@ async def get_llm_judge_score(
     evaluators: Optional[List[dict]] = None,
     fallback_model: str = DEFAULT_STT_JUDGE_MODEL,
     on_row: Optional[Callable] = None,
+    known: Optional[List] = None,
 ) -> dict:
     """Run STT judge across all rows and aggregate per-evaluator scores.
 
     ``on_row`` is called with ``(row_index, row_result)`` as each row's judge
     finishes, so callers can persist results while the run is still going.
+
+    ``known`` carries one already-judged result per row (None where the row
+    still needs judging); those rows are aggregated without a judge call.
 
     Returns:
         {
@@ -468,20 +512,24 @@ async def get_llm_judge_score(
     """
     evaluators = _resolve_evaluators(evaluators)
 
+    results, pending = _pending_indices(known, len(references))
+
     coroutines = [
         stt_llm_judge(
-            str(reference),
-            str(prediction),
+            str(references[i]),
+            str(predictions[i]),
             evaluators=evaluators,
             fallback_model=fallback_model,
         )
-        for reference, prediction in zip(references, predictions)
+        for i in pending
     ]
 
-    results = await tqdm_asyncio.gather(
-        *with_row_callback(coroutines, on_row),
+    judged = await tqdm_asyncio.gather(
+        *with_row_callback(coroutines, _on_original_index(on_row, pending)),
         desc="Running STT evaluators",
     )
+    for i, row in zip(pending, judged):
+        results[i] = row
 
     # Aggregate per-evaluator scores — mean of 0/1 for binary, mean of scores for rating.
     scores: dict = {}
@@ -516,8 +564,14 @@ async def get_intent_entity_score(
     predictions: List[str],
     language: str = "english",
     model: Optional[str] = None,
+    on_row: Optional[Callable] = None,
+    known: Optional[List] = None,
 ) -> dict:
     """Normalize, judge, and aggregate intent/entity preservation.
+
+    ``on_row`` is called with ``(row_index, row_result)`` as each row finishes.
+    ``known`` carries one already-judged result per row (None where the row
+    still needs judging); those rows skip both normalization and the judge call.
 
     Mirrors Sarvam's flow: reference and prediction are first run through the
     vendored ``IndicNormalizer``, then each normalized pair is scored by the
@@ -551,23 +605,35 @@ async def get_intent_entity_score(
     if model is None:
         model = DEFAULT_INTENT_ENTITY_MODEL
 
-    norm_references, norm_predictions = await asyncio.to_thread(
-        _normalize_pairs, references, predictions, language
-    )
+    results, pending = _pending_indices(known, len(references))
+
+    # The vendored normalizer is expensive, so only the rows that still need
+    # judging are put through it.
+    if pending:
+        norm_references, norm_predictions = await asyncio.to_thread(
+            _normalize_pairs,
+            [references[i] for i in pending],
+            [predictions[i] for i in pending],
+            language,
+        )
+    else:
+        norm_references, norm_predictions = [], []
 
     coroutines = [
         sarvam_intent_entity.intent_entity_judge(
-            str(reference), str(prediction), model=model, index=i
+            str(reference), str(prediction), model=model, index=index
         )
-        for i, (reference, prediction) in enumerate(
-            zip(norm_references, norm_predictions)
+        for index, reference, prediction in zip(
+            pending, norm_references, norm_predictions
         )
     ]
 
-    results = await tqdm_asyncio.gather(
-        *coroutines,
+    judged = await tqdm_asyncio.gather(
+        *with_row_callback(coroutines, _on_original_index(on_row, pending)),
         desc="Running intent/entity judge",
     )
+    for i, row in zip(pending, judged):
+        results[i] = row
 
     intent_scores = [int(row["intent_score"]) for row in results]
     entity_scores = [float(row["entity_score"]) for row in results]
@@ -584,8 +650,19 @@ async def get_llm_wer_cer_score(
     predictions: List[str],
     language: str = "english",
     model: Optional[str] = None,
+    known: Optional[List] = None,
+    verdicts: Optional[dict] = None,
+    on_verdict: Optional[Callable] = None,
 ) -> dict:
     """Normalize, judge segment equivalence, forgive, and re-score WER/CER.
+
+    ``known`` carries one already-computed per-row dict per row (None where the
+    row has not been judged); its ``segments`` supply the verdicts that row
+    already paid for, so only the segment pairs with no verdict yet are sent to
+    the judge. ``verdicts`` seeds further ``(reference, prediction) -> verdict``
+    pairs from an earlier run. ``on_verdict(reference, prediction, verdict)``
+    fires as each new verdict arrives. Word alignment and the final WER/CER
+    scoring always run over every row, so the numbers match a single run.
 
     Reference and prediction are first normalized with the same Vistaar path as
     ``get_wer_score``/``get_cer_score`` (NFC + lightweight indic-nlp for Indic
@@ -663,23 +740,38 @@ async def get_llm_wer_cer_score(
             ):
                 unique_pairs.setdefault((seg["reference"], seg["prediction"]), None)
 
-    pair_list = list(unique_pairs.keys())
-    coroutines = [
-        sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
-        for ref, pred in pair_list
-    ]
-    judge_results = await tqdm_asyncio.gather(
-        *coroutines,
-        desc="Running LLM-WER equivalence judge",
-    )
+    # Verdicts already paid for: those handed in from an earlier run, plus the
+    # segments stored on the rows that were judged then.
+    seeded: dict = dict(verdicts or {})
+    for row in known or []:
+        for seg in (row or {}).get("segments", []):
+            seeded.setdefault(
+                (seg["reference"], seg["prediction"]),
+                {
+                    "equivalent": bool(seg["equivalent"]),
+                    "reasoning": seg.get("reasoning", ""),
+                },
+            )
 
-    verdicts = {
-        pair: {
+    pair_list = [pair for pair in unique_pairs if pair not in seeded]
+
+    async def _judge_pair(ref: str, pred: str) -> dict:
+        res = await sarvam_llm_wer.equivalence_judge(ref, pred, model=model)
+        verdict = {
             "equivalent": bool(res["equivalent"]),
             "reasoning": res["reasoning"],
         }
-        for pair, res in zip(pair_list, judge_results)
-    }
+        if on_verdict is not None:
+            on_verdict(ref, pred, verdict)
+        return verdict
+
+    judge_results = await tqdm_asyncio.gather(
+        *[_judge_pair(ref, pred) for ref, pred in pair_list],
+        desc="Running LLM-WER equivalence judge",
+    )
+
+    verdicts = dict(seeded)
+    verdicts.update(zip(pair_list, judge_results))
 
     # Reconstruct corrected reference/prediction per row: forgive equivalent
     # segments by rewriting the prediction side to the reference.

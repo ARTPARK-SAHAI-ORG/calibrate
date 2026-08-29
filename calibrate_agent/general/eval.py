@@ -21,7 +21,10 @@ from calibrate_agent.general.metrics import get_general_judge_score
 from calibrate_agent.judges import (
     PartialResultsWriter,
     evaluator_row_columns,
+    evaluator_row_from_columns,
+    read_existing_rows,
     require_unique_evaluator_names,
+    stored_scores_are_comparable,
     write_evaluator_config,
 )
 from calibrate_agent.utils import (
@@ -89,7 +92,9 @@ def validate_general_eval_dataset(
                         f"object mapping variable names to values",
                         [],
                     )
-        row_id = row["id"]
+        # Compared as text: ids are written to and read back from results.csv
+        # as text, so 1 and "1" are the same row there and must not both pass.
+        row_id = str(row["id"])
         if row_id in seen_ids:
             return False, f"Duplicate row id: {row_id!r}", []
         seen_ids.add(row_id)
@@ -120,6 +125,24 @@ def _resolve_evaluators(config: Optional[dict]) -> List[dict]:
     return evaluators
 
 
+def _matching_stored_row(
+    stored: Optional[dict], input_text: str, output_text: str
+) -> Optional[dict]:
+    """Return the stored row only when the judge would see the same text again.
+
+    The judge scored the ``input``/``output`` the stored row carries. If either
+    has changed in the dataset, that score describes text that is no longer
+    there, so the row counts as unjudged.
+    """
+    if not stored:
+        return None
+    if str(stored.get("input", "")) != input_text:
+        return None
+    if str(stored.get("output", "")) != output_text:
+        return None
+    return stored
+
+
 async def _score_and_write_results(
     ids: list,
     inputs: List[Optional[str]],
@@ -127,43 +150,60 @@ async def _score_and_write_results(
     evaluators: List[dict],
     output_dir: str,
     arguments_list: Optional[List[Optional[dict]]] = None,
+    existing_rows: Optional[dict] = None,
 ) -> dict:
     """Run the general judge over (input, output) pairs and write outputs.
 
     Writes ``results.csv`` and ``metrics.json`` plus the resolved evaluator
     ``config.json`` under ``output_dir``. Returns the metrics_data dict.
 
-    Each row is appended to ``results.csv`` as its judge result arrives, so a
+    Each row is written to ``results.csv`` as its judge result arrives, so a
     run killed part-way still leaves the graded rows on disk. Nothing else owns
-    that file here — the general task has no inference step and no resume, so
-    the judge is free to write it from the first row onwards.
+    that file here — the general task has no inference step, so the judge is
+    free to write it from the first row onwards.
 
     Args:
         arguments_list: Optional per-row ``arguments`` dicts (one entry per
             row, ``None`` for rows with no injection) forwarded to the judge to
             render evaluator ``{{var}}`` placeholders.
+        existing_rows: Rows from a prior run's ``results.csv``, keyed by id.
+            A row already scored on every configured evaluator, whose ``input``
+            and ``output`` still match the dataset, is carried over instead of
+            being judged again.
     """
     write_evaluator_config(output_dir, evaluators)
 
     evaluators_by_name = {ev["name"]: ev for ev in evaluators}
+    existing_rows = existing_rows or {}
+    matched = [
+        _matching_stored_row(existing_rows.get(str(_id)), input_text, output_text)
+        for _id, input_text, output_text in zip(ids, inputs, outputs)
+    ]
+    known = [
+        evaluator_row_from_columns(evaluators_by_name, stored) for stored in matched
+    ]
     partial_writer = PartialResultsWriter(
         join(output_dir, "results.csv"),
-        evaluators_by_name,
         [
             {"id": _id, "input": input_text, "output": output_text}
             for _id, input_text, output_text in zip(ids, inputs, outputs)
         ],
+        existing_rows={
+            str(_id): stored
+            for _id, stored, row in zip(ids, matched, known)
+            if row is not None and stored is not None
+        },
     )
-    try:
-        llm_results = await get_general_judge_score(
-            inputs,
-            outputs,
-            evaluators=evaluators,
-            arguments_list=arguments_list,
-            on_row=partial_writer.write,
-        )
-    finally:
-        partial_writer.close()
+    llm_results = await get_general_judge_score(
+        inputs,
+        outputs,
+        evaluators=evaluators,
+        arguments_list=arguments_list,
+        on_row=lambda index, row: partial_writer.update(
+            index, evaluator_row_columns(evaluators_by_name, row)
+        ),
+        known=known,
+    )
     for name, score_dict in llm_results["scores"].items():
         _log(f"  {name}: {score_dict['mean']:.4f}")
 
@@ -195,10 +235,13 @@ async def run_general_eval(
     dataset_path: str,
     output_dir: str,
     evaluators: List[dict],
+    overwrite: bool = False,
 ) -> dict:
     """Run general task evaluators on a dataset of ``{id, input, output}`` rows.
 
-    Writes ``metrics.json`` and ``results.csv`` under ``output_dir``.
+    Writes ``metrics.json`` and ``results.csv`` under ``output_dir``. A row
+    already scored in ``results.csv`` on every configured evaluator is carried
+    over rather than judged again.
 
     Args:
         dataset_path: Path to a JSON file with a list of {"id", "input",
@@ -206,11 +249,18 @@ async def run_general_eval(
         output_dir: Directory to write results and metrics.
         evaluators: List of evaluator dicts (each with ``name`` and
             ``system_prompt``).
+        overwrite: Discard any prior results and judge every row again.
 
     Returns:
         dict with ``status`` and, on success, ``metrics`` and ``output_dir``.
     """
     os.makedirs(output_dir, exist_ok=True)
+
+    results_path = join(output_dir, "results.csv")
+    if overwrite:
+        for path in (results_path, join(output_dir, "metrics.json")):
+            if exists(path):
+                os.remove(path)
 
     log_save_path = join(output_dir, "logs")
     if exists(log_save_path):
@@ -232,6 +282,17 @@ async def run_general_eval(
         outputs = [str(r["output"]) if r["output"] is not None else "" for r in rows]
         arguments_list = [r.get("arguments") for r in rows]
 
+        # Asked before ``_score_and_write_results`` writes the new config.json
+        # over the prior run's. An evaluator that kept its name but changed
+        # from pass/fail to a rating, or changed its rating range, makes every
+        # stored score unusable: they would be averaged with scores that mean
+        # something else.
+        existing_rows = (
+            read_existing_rows(results_path)
+            if stored_scores_are_comparable(output_dir, evaluators)
+            else {}
+        )
+
         metrics_data = await _score_and_write_results(
             ids=ids,
             inputs=inputs,
@@ -239,6 +300,7 @@ async def run_general_eval(
             evaluators=evaluators,
             output_dir=output_dir,
             arguments_list=arguments_list,
+            existing_rows=existing_rows,
         )
 
         return {
@@ -275,6 +337,11 @@ async def main():
         default="./out",
         help="Path to the output directory to save the results",
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Discard any prior results in the output directory and re-judge every row",
+    )
 
     args = parser.parse_args()
 
@@ -307,6 +374,7 @@ async def main():
         dataset_path=args.dataset,
         output_dir=args.output_dir,
         evaluators=evaluators,
+        overwrite=args.overwrite,
     )
 
     print(f"\n\033[92m{'='*60}\033[0m")

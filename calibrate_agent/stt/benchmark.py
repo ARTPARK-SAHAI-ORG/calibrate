@@ -316,6 +316,7 @@ async def main():
             judge_evaluators=judge_evaluators,
             language=args.language,
             run_llm_judges=not args.skip_llm_judges,
+            overwrite=args.overwrite,
         )
 
         print(f"\n\033[92m{'='*60}\033[0m")
