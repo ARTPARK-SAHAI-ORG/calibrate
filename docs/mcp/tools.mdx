@@ -791,5 +791,6 @@ hits its trace limit.
 | `input` | string | Yes | What the agent was given for this turn. For a `general` agent, the standalone prompt as a string. For a `conversation` agent, the history up to the reported output, oldest turn first, in OpenAI chat format |
 | `output` | TraceOutput | Yes | What the agent produced for this turn |
 | `metadata` | array of TraceMetadataEntry | No | Key-value pairs stored with the trace. Prefer OTel `gen_ai.*` key names where they fit. Omit if you have none |
+| `labels` | array of string | No | Your own tags for this turn, such as an environment or a release. Matched exactly when filtering, so keep the spelling stable. Omit if you have none |
 
 See **POST /traces** in the [API reference](/api-reference/introduction) tab for the full schema.
