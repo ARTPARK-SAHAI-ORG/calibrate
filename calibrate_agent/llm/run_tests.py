@@ -5,7 +5,7 @@ import sys
 import time
 import uuid
 from collections import defaultdict
-from typing import Any, Awaitable, Callable, List, Optional, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, Iterable, List, Optional, TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -338,13 +338,12 @@ MAX_CONSECUTIVE_ERRORS = 10
 # Shown, and used to exit non-zero, when a run finishes with test cases that
 # never produced an answer — the score is not a verdict on the agent.
 ERRORED_SUMMARY = (
-    "\033[31m❌ {errored}/{total} test cases could not be run — "
-    "the agent or the judge could not be reached. The score above is "
-    "not a fair result.\033[0m"
+    "❌ {errored}/{total} test cases could not be run — the agent or the "
+    "judge could not be reached. The score is not a fair result."
 )
 
 
-def _error_result(item: Any, exc: BaseException) -> dict:
+def _error_result(item: dict, exc: BaseException) -> dict:
     """Build a failed result for a test case whose run raised.
 
     Marked with ``error`` so :func:`_load_resumable_results` re-runs it instead
@@ -354,17 +353,28 @@ def _error_result(item: Any, exc: BaseException) -> dict:
         "output": {"response": None, "tool_calls": []},
         "metrics": {"passed": False, "reasoning": str(exc)},
         "error": True,
+        "test_case": item,
     }
-    if isinstance(item, dict):
-        result["test_case"] = item
-        if "id" in item:
-            result["test_case_id"] = item["id"]
+    if "id" in item:
+        result["test_case_id"] = item["id"]
     return result
 
 
 def errored_count(results: List[dict]) -> int:
     """Count results whose test case could not be run (see :func:`_error_result`)."""
-    return sum(1 for r in results if isinstance(r, dict) and r.get("error"))
+    return sum(1 for r in results if r.get("error"))
+
+
+def exit_if_errored(run_results: "Iterable[dict]") -> None:
+    """Exit non-zero when any run finished with test cases that never ran.
+
+    Each item is a run result carrying a ``metrics`` block. Called by every
+    command that starts a test run, so a broken agent or judge fails the
+    command instead of being reported as a low score.
+    """
+    errored = sum(r.get("metrics", {}).get("errored", 0) for r in run_results)
+    if errored:
+        sys.exit(1)
 
 
 def _resolve_test_parallel(cli_value: Optional[int] = None) -> int:
@@ -450,6 +460,9 @@ async def _run_items_parallel(
             if results[i] is None
         ]
     )
+    errored = errored_count(results)
+    if errored:
+        log(ERRORED_SUMMARY.format(errored=errored, total=len(results)))
     return results
 
 
@@ -2210,9 +2223,7 @@ def _write_test_results_outputs(
         "criteria": _aggregate_criteria(results, name_to_evaluator),
         "tool_calls": _aggregate_tool_calls(results),
     }
-    errored = errored_count(results)
-    if errored:
-        metrics["errored"] = errored
+    metrics["errored"] = errored_count(results)
     cost = _aggregate_cost(results)
     if cost is not None:
         metrics["cost"] = cost
@@ -2548,10 +2559,7 @@ async def main():
     pct = (passed / total * 100) if total > 0 else 0
     print(f"  {result['provider']}/{result['model']}: {passed}/{total} ({pct:.1f}%)")
 
-    errored = result["metrics"].get("errored", 0)
-    if errored:
-        print(ERRORED_SUMMARY.format(errored=errored, total=total))
-        sys.exit(1)
+    exit_if_errored([result])
 
 
 if __name__ == "__main__":

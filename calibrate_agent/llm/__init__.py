@@ -241,7 +241,6 @@ class _Tests:
             _aggregate_latency,
             _aggregate_total_tokens,
             errored_count,
-            ERRORED_SUMMARY,
         )
         metrics = {
             "total": total_tests,
@@ -249,12 +248,7 @@ class _Tests:
             "criteria": _aggregate_criteria(results, name_to_evaluator),
             "tool_calls": _aggregate_tool_calls(results),
         }
-        errored = errored_count(results)
-        if errored:
-            metrics["errored"] = errored
-            log_and_print(
-                ERRORED_SUMMARY.format(errored=errored, total=total_tests)
-            )
+        metrics["errored"] = errored_count(results)
         cost = _aggregate_cost(results)
         if cost is not None:
             metrics["cost"] = cost

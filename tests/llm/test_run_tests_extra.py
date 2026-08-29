@@ -3213,8 +3213,8 @@ class TestRunItemsParallelErrors(unittest.IsolatedAsyncioTestCase):
                 [{"id": "t0"}], process, path, test_parallel=1, log=lines.append
             )
 
-        self.assertEqual(len(lines), 1)
         self.assertIn("boom", lines[0])
+        self.assertIn("1/1 test cases could not be run", lines[1])
 
     async def test_stops_after_consecutive_failures(self):
         from calibrate_agent.llm.run_tests import (
@@ -3286,14 +3286,27 @@ class TestErroredCount(unittest.TestCase):
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
         self.assertEqual(metrics["errored"], 1)
 
-    def test_metrics_omits_errored_when_all_ran(self):
+    def test_metrics_records_zero_when_all_ran(self):
         from calibrate_agent.llm.run_tests import _write_test_results_outputs
 
         results = [{"metrics": {"passed": True}, "test_case": {"evaluation": {}}}]
         with tempfile.TemporaryDirectory() as tmp:
             _write_test_results_outputs(results, tmp, {})
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
-        self.assertNotIn("errored", metrics)
+        self.assertEqual(metrics["errored"], 0)
+
+    def test_exit_if_errored_exits_only_when_a_test_could_not_run(self):
+        from calibrate_agent.llm.run_tests import exit_if_errored
+
+        exit_if_errored([{"metrics": {"total": 2, "passed": 1, "errored": 0}}])
+        with self.assertRaises(SystemExit) as ctx:
+            exit_if_errored(
+                [
+                    {"metrics": {"total": 2, "passed": 2, "errored": 0}},
+                    {"metrics": {"total": 2, "passed": 0, "errored": 2}},
+                ]
+            )
+        self.assertEqual(ctx.exception.code, 1)
 
 
 if __name__ == "__main__":
