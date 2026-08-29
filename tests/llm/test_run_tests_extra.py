@@ -3224,5 +3224,42 @@ class TestRunItemsParallelErrors(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(attempted), len(items))
 
 
+class TestErroredCount(unittest.TestCase):
+    def test_counts_only_errored_results(self):
+        from calibrate_agent.llm.run_tests import errored_count
+
+        results = [
+            {"metrics": {"passed": True}},
+            {"metrics": {"passed": False}},
+            {"metrics": {"passed": False}, "error": True},
+        ]
+        self.assertEqual(errored_count(results), 1)
+
+    def test_metrics_records_errored_test_cases(self):
+        from calibrate_agent.llm.run_tests import _write_test_results_outputs
+
+        results = [
+            {"metrics": {"passed": True}, "test_case": {"evaluation": {}}},
+            {
+                "metrics": {"passed": False},
+                "error": True,
+                "test_case": {"evaluation": {}},
+            },
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertEqual(metrics["errored"], 1)
+
+    def test_metrics_omits_errored_when_all_ran(self):
+        from calibrate_agent.llm.run_tests import _write_test_results_outputs
+
+        results = [{"metrics": {"passed": True}, "test_case": {"evaluation": {}}}]
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertNotIn("errored", metrics)
+
+
 if __name__ == "__main__":
     unittest.main()

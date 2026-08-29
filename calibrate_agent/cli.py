@@ -790,10 +790,14 @@ Examples:
                         model_results=_model_results,
                         leaderboard_dir=_lb_dir,
                     )
-                    if _has_errors:
+                    if _has_errors or any(
+                        _r.get("metrics", {}).get("errored")
+                        for _r in _model_results.values()
+                        if isinstance(_r, dict)
+                    ):
                         sys.exit(1)
                 else:
-                    asyncio.run(
+                    _run_result = asyncio.run(
                         _tests.run(
                             agent=_agent,
                             test_cases=_config["test_cases"],
@@ -803,6 +807,8 @@ Examples:
                             overwrite=args.overwrite,
                         )
                     )
+                    if _run_result.get("metrics", {}).get("errored"):
+                        sys.exit(1)
             else:
                 from calibrate_agent.llm.benchmark import main as llm_benchmark_main
 

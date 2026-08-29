@@ -335,6 +335,14 @@ DEFAULT_TEST_PARALLEL = 4
 # every remaining test case.
 MAX_CONSECUTIVE_ERRORS = 10
 
+# Shown, and used to exit non-zero, when a run finishes with test cases that
+# never produced an answer — the score is not a verdict on the agent.
+ERRORED_SUMMARY = (
+    "\033[31m❌ {errored}/{total} test cases could not be run — "
+    "the agent or the judge could not be reached. The score above is "
+    "not a fair result.\033[0m"
+)
+
 
 def _error_result(item: Any, exc: BaseException) -> dict:
     """Build a failed result for a test case whose run raised.
@@ -352,6 +360,11 @@ def _error_result(item: Any, exc: BaseException) -> dict:
         if "id" in item:
             result["test_case_id"] = item["id"]
     return result
+
+
+def errored_count(results: List[dict]) -> int:
+    """Count results whose test case could not be run (see :func:`_error_result`)."""
+    return sum(1 for r in results if isinstance(r, dict) and r.get("error"))
 
 
 def _resolve_test_parallel(cli_value: Optional[int] = None) -> int:
@@ -2133,7 +2146,11 @@ async def run_model_tests(
     return {
         "model": model,
         "provider": provider,
-        "metrics": {"passed": passed_count, "total": total_tests},
+        "metrics": {
+            "passed": passed_count,
+            "total": total_tests,
+            "errored": errored_count(results),
+        },
         "results": results,
     }
 
@@ -2186,6 +2203,9 @@ def _write_test_results_outputs(
         "criteria": _aggregate_criteria(results, name_to_evaluator),
         "tool_calls": _aggregate_tool_calls(results),
     }
+    errored = errored_count(results)
+    if errored:
+        metrics["errored"] = errored
     cost = _aggregate_cost(results)
     if cost is not None:
         metrics["cost"] = cost
@@ -2516,6 +2536,11 @@ async def main():
     total = result["metrics"]["total"]
     pct = (passed / total * 100) if total > 0 else 0
     print(f"  {result['provider']}/{result['model']}: {passed}/{total} ({pct:.1f}%)")
+
+    errored = result["metrics"].get("errored", 0)
+    if errored:
+        print(ERRORED_SUMMARY.format(errored=errored, total=total))
+        sys.exit(1)
 
 
 if __name__ == "__main__":

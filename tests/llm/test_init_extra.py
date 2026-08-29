@@ -70,7 +70,12 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
                 output_dir=tmp,
                 models=["m1"],
             )
-        self.assertEqual(result["models"]["m1"]["status"], "error")
+        # A test case that raises is recorded as an errored result; the run
+        # itself completes.
+        m1 = result["models"]["m1"]
+        self.assertEqual(m1["status"], "completed")
+        self.assertEqual(m1["metrics"]["errored"], 1)
+        self.assertIn("nope", m1["results"][0]["metrics"]["reasoning"])
 
     async def test_run_with_agent(self):
         from calibrate_agent.llm import tests
@@ -332,8 +337,8 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_agent_benchmark_one_model_failure_isolated(self):
         from calibrate_agent.llm import tests
 
-        # One model's hard failure must not cancel the others: it's recorded as
-        # an error entry while the healthy model still completes.
+        # One model's failures must not cancel the others: they are recorded as
+        # errored test cases while the healthy model still completes.
         fake_ok = {
             "output": {"response": "Hi", "tool_calls": []},
             "metrics": {"passed": True, "judge_results": {}},
@@ -358,8 +363,10 @@ class TestLLMTestsRun(unittest.IsolatedAsyncioTestCase):
                 models=["good", "bad"],
             )
         self.assertEqual(set(result.keys()), {"good", "bad"})
-        self.assertEqual(result["bad"]["status"], "error")
-        self.assertIn("agent timed out", result["bad"]["error"])
+        self.assertEqual(result["bad"]["metrics"]["errored"], 1)
+        self.assertIn(
+            "agent timed out", result["bad"]["results"][0]["metrics"]["reasoning"]
+        )
         # The healthy model still produced real metrics.
         self.assertEqual(result["good"]["metrics"]["passed"], 1)
 
