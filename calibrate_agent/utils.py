@@ -17,7 +17,11 @@ import backoff
 import numpy as np
 from loguru import logger
 from pipecat.adapters.schemas.function_schema import FunctionSchema
-from pipecat.frames.frames import InputTransportMessageFrame
+from pipecat.frames.frames import (
+    InputTransportMessageFrame,
+    TTSAudioRawFrame,
+    ErrorFrame,
+)
 from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.transcriptions.language import Language
 
@@ -2124,6 +2128,95 @@ def create_tts_service(
         )
     else:
         raise ValueError(f"Unsupported TTS provider: {provider}")
+
+
+def wrap_tts_with_empty_response_retry(
+    tts,
+    *,
+    max_attempts: int = 3,
+    backoff_base_secs: float = 0.5,
+):
+    """Retry a TTS turn that yields no audio, in place, on any pipecat TTS service.
+
+    Some HTTP TTS providers (notably ElevenLabs) intermittently return an HTTP
+    200 with an *empty* audio stream: ``run_tts`` iterates zero times, yields no
+    ``TTSAudioRawFrame`` and no error, so the turn goes completely silent. In the
+    voice-agent simulator that stalls the whole conversation until the pipeline
+    idle timeout, leaving a truncated transcript.
+
+    This wraps the instance's ``run_tts`` so that any synthesis attempt producing
+    zero ``TTSAudioRawFrame`` is retried (exponential backoff) up to
+    ``max_attempts`` times. Audio is streamed as it arrives on the successful
+    attempt — only the empty case (nothing yielded) triggers a retry. If every
+    attempt is empty, an ``ErrorFrame`` is surfaced instead of silence so the
+    caller fails loudly rather than idle-timing-out with a corrupted transcript.
+
+    Provider-general and safe for streaming (websocket) services: those signal
+    "audio arrives via a separate receive loop" by yielding ``None`` from
+    ``run_tts``; when that happens the retry is skipped and frames pass through
+    untouched.
+
+    Returns the same ``tts`` instance (mutated) for convenient chaining.
+    """
+    original_run_tts = tts.run_tts
+    service_name = type(tts).__name__
+
+    async def run_tts_with_retry(text: str, context_id: str):
+        for attempt in range(1, max_attempts + 1):
+            audio_seen = False
+            streams_out_of_band = False
+            deferred = []  # non-audio frames held until we commit to this attempt
+            async for frame in original_run_tts(text, context_id):
+                if frame is None:
+                    # Websocket services deliver audio via a separate receive
+                    # loop; the None sentinel means "handled elsewhere". Never
+                    # retry these — pass through as-is.
+                    streams_out_of_band = True
+                    yield frame
+                elif isinstance(frame, TTSAudioRawFrame):
+                    audio_seen = True
+                    yield frame
+                elif isinstance(frame, ErrorFrame):
+                    deferred.append(frame)
+                elif audio_seen:
+                    yield frame
+                else:
+                    deferred.append(frame)
+
+            if audio_seen or streams_out_of_band:
+                for frame in deferred:
+                    if not isinstance(frame, ErrorFrame):
+                        yield frame
+                return
+
+            if attempt < max_attempts:
+                delay = backoff_base_secs * (2 ** (attempt - 1))
+                logger.warning(
+                    f"{service_name}: TTS produced no audio for [{text}] "
+                    f"(attempt {attempt}/{max_attempts}); retrying in {delay:.1f}s"
+                )
+                await asyncio.sleep(delay)
+                continue
+
+            logger.error(
+                f"{service_name}: TTS produced no audio for [{text}] after "
+                f"{max_attempts} attempts; surfacing error"
+            )
+            emitted_error = False
+            for frame in deferred:
+                yield frame
+                if isinstance(frame, ErrorFrame):
+                    emitted_error = True
+            if not emitted_error:
+                yield ErrorFrame(
+                    error=(
+                        f"{service_name} produced no audio for [{text}] after "
+                        f"{max_attempts} attempts"
+                    )
+                )
+
+    tts.run_tts = run_tts_with_retry
+    return tts
 
 
 def _build_param_property(param: dict) -> dict:
