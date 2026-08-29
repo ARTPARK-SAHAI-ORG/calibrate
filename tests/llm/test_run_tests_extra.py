@@ -3001,6 +3001,21 @@ class TestLoadResumableResults(unittest.TestCase):
         path.write_text(json.dumps(records))
         return str(path)
 
+    def test_error_record_is_rerun(self):
+        from calibrate_agent.llm.run_tests import _load_resumable_results
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = self._write(
+                tmp,
+                [
+                    {"test_case_id": "a", "metrics": {"passed": True}},
+                    {"test_case_id": "b", "metrics": {"passed": False}, "error": True},
+                ],
+            )
+            out = _load_resumable_results(path, [{"id": "a"}, {"id": "b"}], False)
+        self.assertIsNotNone(out[0])
+        self.assertIsNone(out[1])
+
     def test_missing_file_returns_all_none(self):
         from calibrate_agent.llm.run_tests import _load_resumable_results
 
@@ -3141,6 +3156,72 @@ class TestRunItemsParallelResume(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(sorted(processed), [0, 1])
         self.assertEqual(len(results), 2)
+
+
+class TestRunItemsParallelErrors(unittest.IsolatedAsyncioTestCase):
+    async def test_one_failure_does_not_lose_other_results(self):
+        from calibrate_agent.llm.run_tests import _run_items_parallel
+
+        async def process(index, item):
+            if index == 1:
+                raise RuntimeError("Agent request timed out (60s)")
+            return {"idx": index, "metrics": {"passed": True}}
+
+        items = [{"id": f"t{i}"} for i in range(4)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            results = await _run_items_parallel(items, process, path, test_parallel=1)
+            on_disk = json.loads(Path(path).read_text())
+
+        self.assertEqual(len(results), 4)
+        self.assertEqual(len(on_disk), 4)
+        self.assertFalse(results[1]["metrics"]["passed"])
+        self.assertIn("timed out", results[1]["metrics"]["reasoning"])
+        self.assertTrue(results[1]["error"])
+        self.assertEqual(results[1]["test_case_id"], "t1")
+        self.assertTrue(all(results[i]["metrics"]["passed"] for i in (0, 2, 3)))
+
+    async def test_stops_after_consecutive_failures(self):
+        from calibrate_agent.llm.run_tests import (
+            MAX_CONSECUTIVE_ERRORS,
+            _run_items_parallel,
+        )
+
+        attempted = []
+
+        async def process(index, item):
+            attempted.append(index)
+            raise RuntimeError("Could not connect to agent")
+
+        items = [{"id": f"t{i}"} for i in range(MAX_CONSECUTIVE_ERRORS + 5)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            results = await _run_items_parallel(items, process, path, test_parallel=1)
+
+        self.assertEqual(len(attempted), MAX_CONSECUTIVE_ERRORS)
+        self.assertEqual(len(results), MAX_CONSECUTIVE_ERRORS + 5)
+        self.assertIn("Not run", results[-1]["metrics"]["reasoning"])
+
+    async def test_success_resets_the_failure_streak(self):
+        from calibrate_agent.llm.run_tests import (
+            MAX_CONSECUTIVE_ERRORS,
+            _run_items_parallel,
+        )
+
+        attempted = []
+
+        async def process(index, item):
+            attempted.append(index)
+            if index == MAX_CONSECUTIVE_ERRORS - 1:
+                return {"idx": index, "metrics": {"passed": True}}
+            raise RuntimeError("Could not connect to agent")
+
+        items = [{"id": f"t{i}"} for i in range(MAX_CONSECUTIVE_ERRORS + 5)]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            await _run_items_parallel(items, process, path, test_parallel=1)
+
+        self.assertEqual(len(attempted), len(items))
 
 
 if __name__ == "__main__":

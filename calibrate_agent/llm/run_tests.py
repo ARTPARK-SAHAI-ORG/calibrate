@@ -330,6 +330,30 @@ _logger_lock = threading.Lock()
 DEFAULT_TEST_PARALLEL = 4
 
 
+# Stop starting new test cases once this many in a row have raised. A fully
+# unreachable agent would otherwise spend the whole per-request retry budget on
+# every remaining test case.
+MAX_CONSECUTIVE_ERRORS = 10
+
+
+def _error_result(item: Any, exc: BaseException) -> dict:
+    """Build a failed result for a test case whose run raised.
+
+    Marked with ``error`` so :func:`_load_resumable_results` re-runs it instead
+    of treating the failure as a completed result.
+    """
+    result: dict = {
+        "output": {"response": None, "tool_calls": []},
+        "metrics": {"passed": False, "reasoning": str(exc)},
+        "error": True,
+    }
+    if isinstance(item, dict):
+        result["test_case"] = item
+        if "id" in item:
+            result["test_case_id"] = item["id"]
+    return result
+
+
 def _resolve_test_parallel(cli_value: Optional[int] = None) -> int:
     """Resolve max test-case concurrency: CLI flag > CALIBRATE_TEST_PARALLEL > default."""
     if cli_value is not None and cli_value > 0:
@@ -362,6 +386,11 @@ async def _run_items_parallel(
     ``initial_results`` (same length as ``items``) pre-seeds already-computed
     entries — used to resume a partial run. Indices that are non-``None`` are
     kept as-is and never re-processed; only ``None`` slots invoke ``process``.
+
+    An item whose ``process`` raises becomes a failed result (see
+    :func:`_error_result`) instead of ending the run. After
+    ``MAX_CONSECUTIVE_ERRORS`` failures in a row the remaining items are not
+    started and are recorded as failures too.
     """
     if initial_results is not None:
         results: List[Optional[dict]] = list(initial_results)
@@ -369,10 +398,27 @@ async def _run_items_parallel(
         results = [None] * len(items)
     semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
     write_lock = asyncio.Lock()
+    consecutive_errors = 0
 
     async def run_one(index: int, item: Any) -> None:
+        nonlocal consecutive_errors
         async with semaphore:
-            results[index] = await process(index, item)
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                results[index] = _error_result(
+                    item,
+                    RuntimeError(
+                        f"Not run: {consecutive_errors} test cases in a row "
+                        f"failed to reach the agent"
+                    ),
+                )
+            else:
+                try:
+                    results[index] = await process(index, item)
+                    consecutive_errors = 0
+                except Exception as e:
+                    consecutive_errors += 1
+                    log_and_print(f"❌ Test case {index + 1} errored: {e}")
+                    results[index] = _error_result(item, e)
             # Save intermediate results as each item completes (in order).
             async with write_lock:
                 with open(results_file_path, "w") as f:
@@ -1898,7 +1944,8 @@ def _load_resumable_results(
 
     Resume is skipped entirely (all ``None``) when ``overwrite`` is set, the
     file is missing/unreadable, or test cases lack ids. A prior record is only
-    considered complete if it carries a ``metrics`` block.
+    considered complete if it carries a ``metrics`` block and is not marked
+    ``error``.
     """
     if overwrite or not exists(results_file_path):
         return [None] * len(test_cases)
@@ -1915,6 +1962,8 @@ def _load_resumable_results(
     by_id: dict = {}
     for record in prior:
         if not isinstance(record, dict) or "metrics" not in record:
+            continue
+        if record.get("error"):
             continue
         rid = _resumable_id(record)
         if rid is not None:
