@@ -339,7 +339,7 @@ MAX_CONSECUTIVE_ERRORS = 10
 # never produced an answer — the score is not a verdict on the agent.
 ERRORED_SUMMARY = (
     "❌ {errored}/{total} test cases could not be run — the agent or the "
-    "judge could not be reached. The score is not a fair result."
+    "judge could not be reached."
 )
 
 
@@ -2169,7 +2169,7 @@ async def run_model_tests(
             print_log_save_path,
         )
 
-    _write_test_results_outputs(results, model_output_dir, name_to_evaluator)
+    metrics = _write_test_results_outputs(results, model_output_dir, name_to_evaluator)
 
     # Remove pipecat log file sink
     with _logger_lock:
@@ -2180,12 +2180,7 @@ async def run_model_tests(
     return {
         "model": model,
         "provider": provider,
-        "metrics": {
-            "passed": passed_count,
-            "total": total_tests,
-            "errored": errored_count(results),
-            "stopped_early": run_stopped_early(results),
-        },
+        "metrics": metrics,
         "results": results,
     }
 
@@ -2221,10 +2216,11 @@ def _write_test_results_outputs(
     results: List[dict],
     output_dir: str,
     name_to_evaluator: dict,
-) -> tuple[int, int]:
+) -> dict:
     """Write results.json + metrics.json for an LLM test run.
 
-    Returns ``(passed, total)``.
+    Returns the metrics block it wrote, so a caller reports the same numbers
+    the file holds.
     """
     total = len(results)
     passed = sum(1 for r in results if r["metrics"]["passed"])
@@ -2252,7 +2248,7 @@ def _write_test_results_outputs(
     with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
 
-    return passed, total
+    return metrics
 
 
 def validate_llm_eval_only_dataset(
@@ -2414,7 +2410,8 @@ async def run_eval_only_tests(
         log=lambda text: _print_and_log(text, print_log_save_path),
     )
 
-    passed, total = _write_test_results_outputs(results, output_dir, name_to_evaluator)
+    metrics = _write_test_results_outputs(results, output_dir, name_to_evaluator)
+    passed, total = metrics["passed"], metrics["total"]
     pct = (passed / total * 100) if total else 0.0
     _print_and_log(
         f"\n✅ Total Passed: {passed}/{total} ({pct:.1f}%)", print_log_save_path
@@ -2422,7 +2419,12 @@ async def run_eval_only_tests(
 
     provider_log_file.reset(judge_log_token)
 
-    return {"passed": passed, "total": total, "results": results}
+    return {
+        "passed": passed,
+        "total": total,
+        "metrics": metrics,
+        "results": results,
+    }
 
 
 async def main():
@@ -2537,6 +2539,7 @@ async def main():
         print(f"\033[92mSummary\033[0m")
         print(f"\033[92m{'='*60}\033[0m\n")
         print(f"  eval-only: {passed}/{total} ({pct:.1f}%)")
+        exit_if_run_failed([result])
         return
 
     if not args.model:
