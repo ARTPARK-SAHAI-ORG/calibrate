@@ -761,7 +761,7 @@ Examples:
 
                 from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
                 from calibrate_agent.llm._output import print_benchmark_summary
-                from calibrate_agent.llm.run_tests import exit_if_errored
+                from calibrate_agent.llm.run_tests import exit_if_run_failed
 
                 # Run — all models together (tests.run fans them out in parallel)
                 if _models:
@@ -793,7 +793,7 @@ Examples:
                     )
                     if _has_errors:
                         sys.exit(1)
-                    exit_if_errored(_model_results.values())
+                    exit_if_run_failed(_model_results.values())
                 else:
                     _run_result = asyncio.run(
                         _tests.run(
@@ -805,7 +805,7 @@ Examples:
                             overwrite=args.overwrite,
                         )
                     )
-                    exit_if_errored([_run_result])
+                    exit_if_run_failed([_run_result])
             else:
                 from calibrate_agent.llm.benchmark import main as llm_benchmark_main
 

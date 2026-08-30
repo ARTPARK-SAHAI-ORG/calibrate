@@ -1815,6 +1815,30 @@ class TestValidateLLMEvalOnlyDataset(unittest.TestCase):
 
 
 class TestRunEvalOnlyTests(unittest.IsolatedAsyncioTestCase):
+    async def test_eval_only_reports_test_cases_that_could_not_be_scored(self):
+        from calibrate_agent.llm.run_tests import run_eval_only_tests
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate_agent.llm.run_tests.test_response_llm_judge",
+                   AsyncMock(side_effect=RuntimeError("judge is down"))):
+            result = await run_eval_only_tests(
+                config={"evaluators": []},
+                dataset=[
+                    {
+                        "test_case": {
+                            "id": "tc1",
+                            "history": [{"role": "user", "content": "hi"}],
+                            "evaluation": {"type": "response", "criteria": "polite"},
+                        },
+                        "output": {"response": "Hi!", "tool_calls": []},
+                    },
+                ],
+                output_dir=tmp,
+            )
+        # The command exits on these numbers, so they must reach the caller.
+        self.assertEqual(result["metrics"]["errored"], 1)
+        self.assertEqual(result["metrics"]["total"], 1)
+
     async def test_eval_only_basic(self):
         from calibrate_agent.llm.run_tests import run_eval_only_tests
 
@@ -1859,8 +1883,8 @@ class TestWriteTestResults(unittest.TestCase):
                     "output": {"response": "", "tool_calls": []},
                 },
             ]
-            passed, total = _write_test_results_outputs(results, tmp, {})
-            self.assertEqual((passed, total), (1, 1))
+            metrics = _write_test_results_outputs(results, tmp, {})
+            self.assertEqual((metrics["passed"], metrics["total"]), (1, 1))
             self.assertTrue((Path(tmp) / "results.json").exists())
             self.assertTrue((Path(tmp) / "metrics.json").exists())
 
@@ -3236,6 +3260,9 @@ class TestRunItemsParallelErrors(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(attempted), MAX_CONSECUTIVE_ERRORS)
         self.assertEqual(len(results), MAX_CONSECUTIVE_ERRORS + 5)
         self.assertIn("Not run", results[-1]["metrics"]["reasoning"])
+        # Only the unstarted test cases mark the run as stopped early.
+        self.assertTrue(results[-1]["not_run"])
+        self.assertNotIn("not_run", results[0])
 
     async def test_success_resets_the_failure_streak(self):
         from calibrate_agent.llm.run_tests import (
@@ -3294,19 +3321,65 @@ class TestErroredCount(unittest.TestCase):
             _write_test_results_outputs(results, tmp, {})
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
         self.assertEqual(metrics["errored"], 0)
+        self.assertFalse(metrics["stopped_early"])
 
-    def test_exit_if_errored_exits_only_when_a_test_could_not_run(self):
-        from calibrate_agent.llm.run_tests import exit_if_errored
+    def test_a_run_reports_the_metrics_it_wrote(self):
+        from calibrate_agent.llm.run_tests import _write_test_results_outputs
 
-        exit_if_errored([{"metrics": {"total": 2, "passed": 1, "errored": 0}}])
+        results = [
+            {"metrics": {"passed": False}, "error": True,
+             "test_case": {"evaluation": {}}},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics = _write_test_results_outputs(results, tmp, {})
+            on_disk = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertEqual(metrics, on_disk)
+
+    def test_a_finished_run_with_a_few_errors_succeeds(self):
+        from calibrate_agent.llm.run_tests import exit_if_run_failed
+
+        exit_if_run_failed(
+            [{"metrics": {"total": 266, "passed": 265, "errored": 1,
+                          "stopped_early": False}}]
+        )
+
+    def test_a_run_that_stopped_early_exits_one(self):
+        from calibrate_agent.llm.run_tests import exit_if_run_failed
+
         with self.assertRaises(SystemExit) as ctx:
-            exit_if_errored(
+            exit_if_run_failed(
                 [
-                    {"metrics": {"total": 2, "passed": 2, "errored": 0}},
-                    {"metrics": {"total": 2, "passed": 0, "errored": 2}},
+                    {"metrics": {"total": 10, "passed": 10, "errored": 0,
+                                 "stopped_early": False}},
+                    {"metrics": {"total": 266, "passed": 138, "errored": 128,
+                                 "stopped_early": True}},
                 ]
             )
         self.assertEqual(ctx.exception.code, 1)
+
+    def test_a_run_where_nothing_answered_exits_one(self):
+        from calibrate_agent.llm.run_tests import exit_if_run_failed
+
+        with self.assertRaises(SystemExit) as ctx:
+            exit_if_run_failed(
+                [{"metrics": {"total": 4, "passed": 0, "errored": 4,
+                              "stopped_early": False}}]
+            )
+        self.assertEqual(ctx.exception.code, 1)
+
+    def test_metrics_records_a_run_that_stopped_early(self):
+        from calibrate_agent.llm.run_tests import _write_test_results_outputs
+
+        results = [
+            {"metrics": {"passed": False}, "error": True,
+             "test_case": {"evaluation": {}}},
+            {"metrics": {"passed": False}, "error": True, "not_run": True,
+             "test_case": {"evaluation": {}}},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            _write_test_results_outputs(results, tmp, {})
+            metrics = json.loads((Path(tmp) / "metrics.json").read_text())
+        self.assertTrue(metrics["stopped_early"])
 
 
 if __name__ == "__main__":
