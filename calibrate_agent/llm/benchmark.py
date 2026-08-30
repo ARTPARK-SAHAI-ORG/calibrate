@@ -28,7 +28,7 @@ from os.path import exists, join
 
 from calibrate_agent.llm.run_tests import (
     display_label,
-    exit_if_errored,
+    exit_if_run_failed,
     run_model_tests,
 )
 from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
@@ -251,7 +251,7 @@ async def main():
 
         if has_errors:
             sys.exit(1)
-        exit_if_errored(result["models"].values())
+        exit_if_run_failed(result["models"].values())
     finally:
         sys.stdout = original_stdout
         sys.stderr = original_stderr

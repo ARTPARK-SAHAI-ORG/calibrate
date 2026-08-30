@@ -343,11 +343,13 @@ ERRORED_SUMMARY = (
 )
 
 
-def _error_result(item: dict, exc: BaseException) -> dict:
-    """Build a failed result for a test case whose run raised.
+def _error_result(item: dict, exc: BaseException, not_run: bool = False) -> dict:
+    """Build a failed result for a test case that produced no answer.
 
-    Marked with ``error`` so :func:`_load_resumable_results` re-runs it instead
-    of treating the failure as a completed result.
+    ``not_run`` marks a test case that was never started because the run had
+    already stopped. Every such result is marked with ``error`` so
+    :func:`_load_resumable_results` re-runs it instead of treating the failure
+    as a completed result.
     """
     result: dict = {
         "output": {"response": None, "tool_calls": []},
@@ -355,26 +357,37 @@ def _error_result(item: dict, exc: BaseException) -> dict:
         "error": True,
         "test_case": item,
     }
+    if not_run:
+        result["not_run"] = True
     if "id" in item:
         result["test_case_id"] = item["id"]
     return result
 
 
 def errored_count(results: List[dict]) -> int:
-    """Count results whose test case could not be run (see :func:`_error_result`)."""
+    """Count results whose test case produced no answer (see :func:`_error_result`)."""
     return sum(1 for r in results if r.get("error"))
 
 
-def exit_if_errored(run_results: "Iterable[dict]") -> None:
-    """Exit non-zero when any run finished with test cases that never ran.
+def run_stopped_early(results: List[dict]) -> bool:
+    """True when the run gave up and left test cases unstarted."""
+    return any(r.get("not_run") for r in results)
 
-    Each item is a run result carrying a ``metrics`` block. Called by every
-    command that starts a test run, so a broken agent or judge fails the
-    command instead of being reported as a low score.
+
+def exit_if_run_failed(run_results: "Iterable[dict]") -> None:
+    """Exit non-zero when a run could not be carried out.
+
+    That means the run stopped early after repeated failures, or no test case
+    at all produced an answer. A run that finished with a few test cases
+    errored along the way is a completed run: the count is in ``metrics.json``
+    and the reason is on each result, so the command succeeds.
     """
-    errored = sum(r.get("metrics", {}).get("errored", 0) for r in run_results)
-    if errored:
-        sys.exit(1)
+    for result in run_results:
+        metrics = result.get("metrics", {})
+        total = metrics.get("total", 0)
+        errored = metrics.get("errored", 0)
+        if metrics.get("stopped_early") or (total and errored == total):
+            sys.exit(1)
 
 
 def _resolve_test_parallel(cli_value: Optional[int] = None) -> int:
@@ -438,6 +451,7 @@ async def _run_items_parallel(
                         f"Not run: the run stopped after {consecutive_errors} "
                         f"test cases in a row failed. Last error: {last_error}"
                     ),
+                    not_run=True,
                 )
             else:
                 try:
@@ -2170,6 +2184,7 @@ async def run_model_tests(
             "passed": passed_count,
             "total": total_tests,
             "errored": errored_count(results),
+            "stopped_early": run_stopped_early(results),
         },
         "results": results,
     }
@@ -2224,6 +2239,7 @@ def _write_test_results_outputs(
         "tool_calls": _aggregate_tool_calls(results),
     }
     metrics["errored"] = errored_count(results)
+    metrics["stopped_early"] = run_stopped_early(results)
     cost = _aggregate_cost(results)
     if cost is not None:
         metrics["cost"] = cost
@@ -2559,7 +2575,7 @@ async def main():
     pct = (passed / total * 100) if total > 0 else 0
     print(f"  {result['provider']}/{result['model']}: {passed}/{total} ({pct:.1f}%)")
 
-    exit_if_errored([result])
+    exit_if_run_failed([result])
 
 
 if __name__ == "__main__":

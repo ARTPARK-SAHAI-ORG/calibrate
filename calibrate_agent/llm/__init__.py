@@ -241,6 +241,7 @@ class _Tests:
             _aggregate_latency,
             _aggregate_total_tokens,
             errored_count,
+            run_stopped_early,
         )
         metrics = {
             "total": total_tests,
@@ -249,6 +250,7 @@ class _Tests:
             "tool_calls": _aggregate_tool_calls(results),
         }
         metrics["errored"] = errored_count(results)
+        metrics["stopped_early"] = run_stopped_early(results)
         cost = _aggregate_cost(results)
         if cost is not None:
             metrics["cost"] = cost
