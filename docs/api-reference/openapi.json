@@ -454,6 +454,12 @@
             "title": "Unanswered Tests",
             "description": "Number of test cases that produced no answer because the agent or the judge could not be reached, which makes the pass rate an unfair measure of the agent"
           },
+          "aborted": {
+            "type": "boolean",
+            "title": "Aborted",
+            "description": "Whether a user stopped this run before it finished. The results collected up to that point are kept, and test cases that never ran are counted neither as passed nor as failed",
+            "default": false
+          },
           "error": {
             "type": "boolean",
             "title": "Error",
@@ -1326,6 +1332,12 @@
                 }
               ]
             ]
+          },
+          "aborted": {
+            "type": "boolean",
+            "title": "Aborted",
+            "description": "Whether a user stopped this run before it finished. The results collected up to that point are kept, and test cases that never ran are counted neither as passed nor as failed",
+            "default": false
           },
           "error": {
             "type": "boolean",
@@ -3878,6 +3890,12 @@
             "title": "Unanswered",
             "description": "Whether this case produced no answer because the agent or the judge could not be reached, in which case `reasoning` carries the error and `passed` is not a verdict on the agent",
             "default": false
+          },
+          "not_run": {
+            "type": "boolean",
+            "title": "Not Run",
+            "description": "Whether this case never started, because a user stopped the run first. It is counted neither as passed nor as failed",
+            "default": false
           }
         },
         "type": "object",
@@ -4461,6 +4479,12 @@
             "type": "boolean",
             "title": "Stopped Early",
             "description": "Whether the run stopped before starting every test case, after too many failed in a row",
+            "default": false
+          },
+          "aborted": {
+            "type": "boolean",
+            "title": "Aborted",
+            "description": "Whether a user stopped this run before it finished. The results collected up to that point are kept, and test cases that never ran are counted neither as passed nor as failed",
             "default": false
           },
           "error": {
