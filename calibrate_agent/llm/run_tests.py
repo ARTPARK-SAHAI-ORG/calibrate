@@ -5,7 +5,7 @@ import sys
 import time
 import uuid
 from collections import defaultdict
-from typing import Any, Awaitable, Callable, List, Optional, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, Iterable, List, Optional, TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -330,6 +330,53 @@ _logger_lock = threading.Lock()
 DEFAULT_TEST_PARALLEL = 4
 
 
+# Stop starting new test cases once this many in a row have raised. A fully
+# unreachable agent would otherwise spend the whole per-request retry budget on
+# every remaining test case.
+MAX_CONSECUTIVE_ERRORS = 10
+
+# Shown, and used to exit non-zero, when a run finishes with test cases that
+# never produced an answer — the score is not a verdict on the agent.
+ERRORED_SUMMARY = (
+    "❌ {errored}/{total} test cases could not be run — the agent or the "
+    "judge could not be reached. The score is not a fair result."
+)
+
+
+def _error_result(item: dict, exc: BaseException) -> dict:
+    """Build a failed result for a test case whose run raised.
+
+    Marked with ``error`` so :func:`_load_resumable_results` re-runs it instead
+    of treating the failure as a completed result.
+    """
+    result: dict = {
+        "output": {"response": None, "tool_calls": []},
+        "metrics": {"passed": False, "reasoning": str(exc)},
+        "error": True,
+        "test_case": item,
+    }
+    if "id" in item:
+        result["test_case_id"] = item["id"]
+    return result
+
+
+def errored_count(results: List[dict]) -> int:
+    """Count results whose test case could not be run (see :func:`_error_result`)."""
+    return sum(1 for r in results if r.get("error"))
+
+
+def exit_if_errored(run_results: "Iterable[dict]") -> None:
+    """Exit non-zero when any run finished with test cases that never ran.
+
+    Each item is a run result carrying a ``metrics`` block. Called by every
+    command that starts a test run, so a broken agent or judge fails the
+    command instead of being reported as a low score.
+    """
+    errored = sum(r.get("metrics", {}).get("errored", 0) for r in run_results)
+    if errored:
+        sys.exit(1)
+
+
 def _resolve_test_parallel(cli_value: Optional[int] = None) -> int:
     """Resolve max test-case concurrency: CLI flag > CALIBRATE_TEST_PARALLEL > default."""
     if cli_value is not None and cli_value > 0:
@@ -351,6 +398,7 @@ async def _run_items_parallel(
     results_file_path: str,
     test_parallel: Optional[int] = None,
     initial_results: Optional[List[Optional[dict]]] = None,
+    log: "Callable[[str], None]" = log_and_print,
 ) -> List[dict]:
     """Run ``process(index, item)`` over ``items`` with bounded concurrency.
 
@@ -362,6 +410,14 @@ async def _run_items_parallel(
     ``initial_results`` (same length as ``items``) pre-seeds already-computed
     entries — used to resume a partial run. Indices that are non-``None`` are
     kept as-is and never re-processed; only ``None`` slots invoke ``process``.
+
+    An item whose ``process`` raises becomes a failed result (see
+    :func:`_error_result`) instead of ending the run. After
+    ``MAX_CONSECUTIVE_ERRORS`` failures in a row the remaining items are not
+    started and are recorded as failures too, carrying the last error seen.
+
+    ``log`` writes the per-error line; callers that keep a per-model
+    ``results.log`` pass a writer bound to that file.
     """
     if initial_results is not None:
         results: List[Optional[dict]] = list(initial_results)
@@ -369,10 +425,29 @@ async def _run_items_parallel(
         results = [None] * len(items)
     semaphore = asyncio.Semaphore(_resolve_test_parallel(test_parallel))
     write_lock = asyncio.Lock()
+    consecutive_errors = 0
+    last_error = ""
 
     async def run_one(index: int, item: Any) -> None:
+        nonlocal consecutive_errors, last_error
         async with semaphore:
-            results[index] = await process(index, item)
+            if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                results[index] = _error_result(
+                    item,
+                    RuntimeError(
+                        f"Not run: the run stopped after {consecutive_errors} "
+                        f"test cases in a row failed. Last error: {last_error}"
+                    ),
+                )
+            else:
+                try:
+                    results[index] = await process(index, item)
+                    consecutive_errors = 0
+                except Exception as e:
+                    consecutive_errors += 1
+                    last_error = str(e)
+                    log(f"❌ Test case {index + 1} errored: {e}")
+                    results[index] = _error_result(item, e)
             # Save intermediate results as each item completes (in order).
             async with write_lock:
                 with open(results_file_path, "w") as f:
@@ -385,6 +460,9 @@ async def _run_items_parallel(
             if results[i] is None
         ]
     )
+    errored = errored_count(results)
+    if errored:
+        log(ERRORED_SUMMARY.format(errored=errored, total=len(results)))
     return results
 
 
@@ -1898,7 +1976,8 @@ def _load_resumable_results(
 
     Resume is skipped entirely (all ``None``) when ``overwrite`` is set, the
     file is missing/unreadable, or test cases lack ids. A prior record is only
-    considered complete if it carries a ``metrics`` block.
+    considered complete if it carries a ``metrics`` block and is not marked
+    ``error``.
     """
     if overwrite or not exists(results_file_path):
         return [None] * len(test_cases)
@@ -1915,6 +1994,8 @@ def _load_resumable_results(
     by_id: dict = {}
     for record in prior:
         if not isinstance(record, dict) or "metrics" not in record:
+            continue
+        if record.get("error"):
             continue
         rid = _resumable_id(record)
         if rid is not None:
@@ -2055,6 +2136,7 @@ async def run_model_tests(
         results_file_path,
         test_parallel,
         initial_results=initial_results,
+        log=lambda text: _print_and_log(text, print_log_save_path),
     )
 
     total_passed = sum(1 for result in results if result["metrics"]["passed"])
@@ -2084,7 +2166,11 @@ async def run_model_tests(
     return {
         "model": model,
         "provider": provider,
-        "metrics": {"passed": passed_count, "total": total_tests},
+        "metrics": {
+            "passed": passed_count,
+            "total": total_tests,
+            "errored": errored_count(results),
+        },
         "results": results,
     }
 
@@ -2137,6 +2223,7 @@ def _write_test_results_outputs(
         "criteria": _aggregate_criteria(results, name_to_evaluator),
         "tool_calls": _aggregate_tool_calls(results),
     }
+    metrics["errored"] = errored_count(results)
     cost = _aggregate_cost(results)
     if cost is not None:
         metrics["cost"] = cost
@@ -2304,7 +2391,11 @@ async def run_eval_only_tests(
         return result
 
     results = await _run_items_parallel(
-        dataset, process, results_file_path, test_parallel
+        dataset,
+        process,
+        results_file_path,
+        test_parallel,
+        log=lambda text: _print_and_log(text, print_log_save_path),
     )
 
     passed, total = _write_test_results_outputs(results, output_dir, name_to_evaluator)
@@ -2467,6 +2558,8 @@ async def main():
     total = result["metrics"]["total"]
     pct = (passed / total * 100) if total > 0 else 0
     print(f"  {result['provider']}/{result['model']}: {passed}/{total} ({pct:.1f}%)")
+
+    exit_if_errored([result])
 
 
 if __name__ == "__main__":
