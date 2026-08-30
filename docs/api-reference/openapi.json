@@ -442,6 +442,18 @@
             "title": "Model Results",
             "description": "Flat summary for each model in a benchmark run (fetch the benchmark detail for full results)"
           },
+          "unanswered_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unanswered Tests",
+            "description": "Number of test cases that produced no answer because the agent or the judge could not be reached, which makes the pass rate an unfair measure of the agent"
+          },
           "error": {
             "type": "boolean",
             "title": "Error",
@@ -3860,6 +3872,12 @@
             ],
             "title": "Cost",
             "description": "Cost of this case (USD)"
+          },
+          "unanswered": {
+            "type": "boolean",
+            "title": "Unanswered",
+            "description": "Whether this case produced no answer because the agent or the judge could not be reached, in which case `reasoning` carries the error and `passed` is not a verdict on the agent",
+            "default": false
           }
         },
         "type": "object",
@@ -4165,7 +4183,7 @@
               }
             ],
             "title": "Passed",
-            "description": "Whether the case passed (null if it errored or is still running)"
+            "description": "Whether the case passed (null while the case is still running)"
           }
         },
         "type": "object",
@@ -4426,6 +4444,24 @@
             ],
             "title": "Results",
             "description": "Results for each test case"
+          },
+          "unanswered_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unanswered Tests",
+            "description": "Number of test cases that produced no answer because the agent or the judge could not be reached, which makes the pass rate an unfair measure of the agent"
+          },
+          "stopped_early": {
+            "type": "boolean",
+            "title": "Stopped Early",
+            "description": "Whether the run stopped before starting every test case, after too many failed in a row",
+            "default": false
           },
           "error": {
             "type": "boolean",
