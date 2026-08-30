@@ -1176,10 +1176,11 @@
             "type": "string",
             "enum": [
               "no_linked_tests",
-              "connection_not_verified"
+              "connection_not_verified",
+              "over_row_limit"
             ],
             "title": "Reason",
-            "description": "Why this agent was not run:\n- `no_linked_tests`: the agent has no tests linked\n- `connection_not_verified`: the agent's connection is not verified"
+            "description": "Why this agent was not run:\n- `no_linked_tests`: the agent has no tests linked\n- `connection_not_verified`: the agent's connection is not verified\n- `over_row_limit`: the agent has more linked tests than this workspace allows in one run"
           }
         },
         "type": "object",
