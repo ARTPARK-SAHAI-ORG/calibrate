@@ -52,6 +52,7 @@ from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate_agent.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
 from calibrate_agent.judges import (
+    USAGE_FIELDS,
     attach_evaluator_id,
     evaluator_result_value,
     format_evaluation_result_lines,
@@ -85,12 +86,23 @@ async def _judge_and_emit(
     return evaluation_results
 
 
+def _simulation_metric_columns(evaluation_results: list) -> dict:
+    """Flatten one simulation's evaluation results into ``results.csv`` columns.
+
+    Each evaluator contributes its score under the evaluator's own name. What
+    each judge call cost, used, and took stays in the per-simulation
+    ``evaluation_results.csv``, which carries one row per evaluator.
+    """
+    return {m["name"]: float(m["value"]) for m in evaluation_results}
+
+
 def _build_evaluation_result(evaluator: dict, judge_row: dict) -> dict:
     """Build a per-row evaluation result, carrying rating scale bounds when relevant.
 
     The scale bounds propagate through to ``metrics.json`` so the simulation
     leaderboard can normalize rating means correctly when computing the
-    ``overall`` column.
+    ``overall`` column. What the judge call cost, used, and took rides along
+    from ``judge_row`` into ``evaluation_results.csv``.
     """
     result = {
         "name": evaluator["name"],
@@ -98,6 +110,9 @@ def _build_evaluation_result(evaluator: dict, judge_row: dict) -> dict:
         "value": evaluator_result_value(evaluator, judge_row),
         "reasoning": judge_row["reasoning"],
     }
+    for field in USAGE_FIELDS:
+        if field in judge_row:
+            result[field] = judge_row[field]
     result = attach_evaluator_id(evaluator, result)
     if is_rating(evaluator):
         result["scale_min"] = int(evaluator["scale_min"])
@@ -823,11 +838,9 @@ async def run_single_simulation_task(
                 simulation_metrics = {
                     "name": simulation_name,
                 }
-
-                for metric_dict in output["evaluation_results"]:
-                    simulation_metrics[metric_dict["name"]] = float(
-                        metric_dict["value"]
-                    )
+                simulation_metrics.update(
+                    _simulation_metric_columns(output["evaluation_results"])
+                )
 
                 save_transcript(simulation_output_dir, output["transcript"])
 
@@ -1131,8 +1144,7 @@ async def run_eval_only_simulation_task(
         )
 
         simulation_metrics = {"row_id": row_id, "name": display_name}
-        for metric_dict in evaluation_results:
-            simulation_metrics[metric_dict["name"]] = float(metric_dict["value"])
+        simulation_metrics.update(_simulation_metric_columns(evaluation_results))
 
         return simulation_metrics, evaluation_results
 
