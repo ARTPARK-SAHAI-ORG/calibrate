@@ -332,7 +332,8 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
              patch("asyncio.wait_for", AsyncMock(side_effect=asyncio.TimeoutError())):
             result = await S._check_single_provider(provider, MagicMock())
         self.assertEqual(result["status"], "fail")
-        self.assertIn("Timed out", result["error"])
+        self.assertIn("No response after 35s", result["error"])
+        self.assertIn("30s", result["error"])
 
     async def test_http_status_error(self):
         from calibrate_agent import status as S
@@ -342,6 +343,7 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
         async def fails(*a, **kw):
             resp = MagicMock()
             resp.status_code = 401
+            resp.text = '{"error": {"message": "Incorrect API key provided: sk-xxx"}}'
             raise httpx.HTTPStatusError("auth fail", request=MagicMock(), response=resp)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), \
@@ -349,20 +351,56 @@ class TestCheckSingleProvider(unittest.IsolatedAsyncioTestCase):
             result = await S._check_single_provider(provider, MagicMock())
         self.assertEqual(result["status"], "fail")
         self.assertIn("HTTP 401", result["error"])
+        self.assertIn("Incorrect API key provided", result["error"])
+
+    async def test_http_status_error_without_body(self):
+        from calibrate_agent import status as S
+
+        provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
+
+        async def fails(*a, **kw):
+            resp = MagicMock()
+            resp.status_code = 500
+            resp.text = "   "
+            raise httpx.HTTPStatusError("boom", request=MagicMock(), response=resp)
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), \
+             patch.dict(S._CHECK_FUNCTIONS, {"openai": fails}):
+            result = await S._check_single_provider(provider, MagicMock())
+        self.assertEqual(result["error"], "HTTP 500")
 
     async def test_other_exception(self):
         from calibrate_agent import status as S
 
         provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
 
+        long_message = (
+            "429 RESOURCE_EXHAUSTED. {'error': {'code': 429, 'message': "
+            "'You exceeded your current quota, please check your plan and billing "
+            "details.', 'status': 'RESOURCE_EXHAUSTED'}}"
+        )
+
         async def fails(*a, **kw):
-            raise RuntimeError("x" * 200)  # long error message
+            raise RuntimeError(long_message)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), \
              patch.dict(S._CHECK_FUNCTIONS, {"openai": fails}):
             result = await S._check_single_provider(provider, MagicMock())
         self.assertEqual(result["status"], "fail")
-        self.assertTrue(result["error"].endswith("..."))
+        self.assertEqual(result["error"], f"RuntimeError: {long_message}")
+
+    async def test_exception_without_message(self):
+        from calibrate_agent import status as S
+
+        provider = {"name": "openai", "types": ["llm"], "env_vars": ["OPENAI_API_KEY"]}
+
+        async def fails(*a, **kw):
+            raise ConnectionResetError()
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "k"}), \
+             patch.dict(S._CHECK_FUNCTIONS, {"openai": fails}):
+            result = await S._check_single_provider(provider, MagicMock())
+        self.assertEqual(result["error"], "ConnectionResetError")
 
 
 class TestPrintResults(unittest.TestCase):

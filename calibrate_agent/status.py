@@ -456,6 +456,21 @@ _CHECK_FUNCTIONS = {
 # ─────────────────────────────────────────────────────────────────────
 
 
+HTTP_TIMEOUT = 30.0
+# Sits above HTTP_TIMEOUT so an HTTP request reports its own timeout, with the
+# URL and phase, instead of being cancelled by the outer cap.
+OVERALL_TIMEOUT = 35.0
+
+
+def _http_error_message(e: httpx.HTTPStatusError) -> str:
+    """Status code plus the response body the provider sent back."""
+    try:
+        body = e.response.text.strip()
+    except Exception:
+        body = ""
+    return f"HTTP {e.response.status_code}: {body}" if body else f"HTTP {e.response.status_code}"
+
+
 async def _emit_status_event(emit, provider: dict, stage: str, message: str, result=None):
     if emit is None:
         return
@@ -510,7 +525,7 @@ async def _check_single_provider(
     start = time.time()
     try:
         await _emit_status_event(emit, provider, "input_sent", "Input sent")
-        check_type = await asyncio.wait_for(check_fn(client), timeout=30.0)
+        check_type = await asyncio.wait_for(check_fn(client), timeout=OVERALL_TIMEOUT)
         latency_ms = round((time.time() - start) * 1000)
         await _emit_status_event(emit, provider, "output_received", "Output received")
         result = {
@@ -534,7 +549,10 @@ async def _check_single_provider(
             "missing_vars": [],
             "status": "fail",
             "check_type": None,
-            "error": "Timed out (30s)",
+            "error": (
+                f"No response after {OVERALL_TIMEOUT:g}s "
+                f"(HTTP requests time out at {HTTP_TIMEOUT:g}s)"
+            ),
             "latency_ms": latency_ms,
         }
         await _emit_status_event(emit, provider, "not_working", "Not working", result)
@@ -549,16 +567,14 @@ async def _check_single_provider(
             "missing_vars": [],
             "status": "fail",
             "check_type": None,
-            "error": f"HTTP {e.response.status_code}",
+            "error": _http_error_message(e),
             "latency_ms": latency_ms,
         }
         await _emit_status_event(emit, provider, "not_working", "Not working", result)
         return result
     except Exception as e:
         latency_ms = round((time.time() - start) * 1000)
-        error_msg = str(e)
-        if len(error_msg) > 50:
-            error_msg = error_msg[:50] + "..."
+        error_msg = f"{type(e).__name__}: {e}" if str(e) else type(e).__name__
         result = {
             "name": name,
             "types": provider["types"],
@@ -591,7 +607,7 @@ def _status_json_entry(result: dict) -> dict:
 
 async def iter_provider_results():
     """Yield internal provider check results as soon as each provider finishes."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         tasks = [
             asyncio.create_task(_check_single_provider(provider, client))
             for provider in PROVIDERS
@@ -614,7 +630,7 @@ async def iter_status_events(include_internal: bool = False):
     async def emit(event):
         await queue.put(event)
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
         async def run_check(provider):
             result = await _check_single_provider(provider, client, emit=emit)
             await queue.put({"type": "_done", "provider": provider["name"], "result": result})
