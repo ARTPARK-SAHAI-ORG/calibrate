@@ -1,0 +1,130 @@
+---
+title: "Syncing local runs to Calibrate Cloud"
+description: "Store a run you already did with calibrate-agent, without paying to run it again"
+---
+
+A run done on your own machine with `calibrate-agent` stays on your machine. To
+see it in Calibrate Cloud you would normally have to run the whole thing again,
+paying every provider and every judge a second time for results you already
+have.
+
+Two endpoints take the output folder instead and store it as a finished run. No
+provider is called, nothing is queued, and the run reads like any other: the
+same pages, the same sharing, the same comparison against runs Calibrate did
+itself.
+
+| You ran | Send it to |
+| --- | --- |
+| `calibrate-agent stt` | `POST /stt/evaluate/import` |
+| `calibrate-agent llm` across several models | `POST /agent-tests/agent/{agent_uuid}/benchmark/import` |
+
+<Note>
+  Both are signed-in-browser endpoints, so they take the bearer token from your
+  Calibrate session rather than an API key. Add `X-Org-UUID` when the workspace
+  you are importing into is not your personal one — it is the first part of the
+  Calibrate URL you are looking at.
+</Note>
+
+## Before you import
+
+Calibrate needs somewhere to hang the results, and that has to exist first.
+
+<Accordion title="A speech evaluation needs its dataset">
+  Create the dataset and upload its audio, then pass its ID. **Add the audio in
+  the same order as the rows in `results.csv`.** Nothing in a calibrate run
+  records which uploaded file a row came from, so a row is paired with the
+  dataset item in the same position. Every ground truth is compared before
+  anything is stored, so a wrong order is refused rather than showing each score
+  beside the wrong clip.
+</Accordion>
+
+<Accordion title="A benchmark needs its tests">
+  Create one test per test case, **naming each test after the `test_case_id`
+  calibrate ran it under**, and link them all to the agent. That name is the
+  only handle back from a row to a test, because calibrate carries the ID it was
+  given rather than a Calibrate one. Any row that matches no test refuses the
+  whole import.
+
+  Attach the same evaluators the run used. Calibrate stamps each verdict with
+  the evaluator that produced it, so identity survives the import on its own,
+  and falls back to matching by name when that evaluator has since been
+  recreated.
+</Accordion>
+
+## Pack the output folder
+
+Only three kinds of file are read: each result folder's `results.csv` or
+`results.json`, its `metrics.json`, and the leaderboard. Everything else in a
+run folder is logs, which is most of its size.
+
+```bash
+env COPYFILE_DISABLE=1 tar czf run.tgz -C /path/to/parent --exclude=logs --exclude=results.log output
+```
+
+`COPYFILE_DISABLE` stops macOS writing a hidden `._leaderboard.csv` beside your
+real one. Those hidden files are ignored on the way in, so leaving it off still
+works — it just makes for a cleaner archive.
+
+You can leave folders out to import a subset. Delete the model folders you do
+not want and the leaderboard is trimmed to match.
+
+## Send it
+
+```bash
+curl -X POST https://api.calibrate.artpark.ai/stt/evaluate/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F dataset_id=$DATASET_UUID \
+  -F language=hindi \
+  -F archive=@run.tgz
+```
+
+```bash
+curl -X POST https://api.calibrate.artpark.ai/agent-tests/agent/$AGENT_UUID/benchmark/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F archive=@run.tgz
+```
+
+You never list the providers or models. A folder holding a `results.csv` is a
+provider, and one holding a `results.json` is a model, with `__` turned back
+into `/` to give the name the leaderboard already uses.
+
+## What comes back
+
+A speech import returns the evaluation it stored, the providers it found, and
+the number of rows each carries. A benchmark import returns the same plus
+`unresolved_evaluators`: evaluators the results score against that are no longer
+in the workspace. Their scores and reasoning are stored either way, they just
+render without a name or rubric.
+
+```json
+{
+  "task_id": "a3b2c1d0-e5f4-3210-abcd-ef1234567890",
+  "status": "done",
+  "models": ["openai/gpt-4.1", "anthropic/claude-sonnet-4.6"],
+  "test_count": 470,
+  "unresolved_evaluators": []
+}
+```
+
+## When an import is refused
+
+Nothing is stored when any of these is true, so it is safe to try.
+
+| Refused because | Fix |
+| --- | --- |
+| A provider's row count differs from the dataset's item count | Send the run that matches the dataset |
+| A row's ground truth differs from the dataset item beside it | Add the audio in the same order as the rows |
+| A row's `test_case_id` matches no test linked to the agent | Name each test after that ID and link it |
+| No `results.csv` or `results.json` in the archive | Send the calibrate output folder, not a folder above or below it |
+| Result folders sit under more than one run folder | Send one run at a time |
+| The archive is over 200 MB for speech, 500 MB for a benchmark, packed or unpacked | Leave the `logs` and `results.log` files out |
+
+## What is not carried over
+
+An import stores what the run measured and nothing more.
+
+- No files are copied to object storage. You already have the folder.
+- A re-judged run merged from a second pass carries no cost, latency or token
+  figures, because those are only written by the first pass.
+- Neither import counts against the workspace row limit, since no provider is
+  called.
