@@ -307,7 +307,7 @@
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Display name, such as `Run 1` for a unit test or `Benchmark 1` for a benchmark"
+            "description": "Name of the run. A run nobody has renamed shows its number instead, such as `Run 1` for a test run or `Benchmark 1` for a benchmark"
           },
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
@@ -1248,6 +1248,11 @@
               "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
             ]
           },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the run. A run nobody has renamed shows its number instead, such as `Run 1` for a test run or `Benchmark 1` for a benchmark"
+          },
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
             "description": "Current status of the run"
@@ -1368,6 +1373,7 @@
         "type": "object",
         "required": [
           "task_id",
+          "name",
           "status"
         ],
         "title": "BenchmarkStatusResponse"
@@ -4343,6 +4349,11 @@
               "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
             ]
           },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the run. A run nobody has renamed shows its number instead, such as `Run 1` for a test run or `Benchmark 1` for a benchmark"
+          },
           "status": {
             "$ref": "#/components/schemas/TaskStatus",
             "description": "Current status of the run"
@@ -4516,6 +4527,7 @@
         "type": "object",
         "required": [
           "task_id",
+          "name",
           "status"
         ],
         "title": "TestRunStatusResponse"
