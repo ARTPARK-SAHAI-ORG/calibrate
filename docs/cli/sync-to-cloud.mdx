@@ -117,13 +117,3 @@ Nothing is stored when any of these is true, so it is safe to try.
 | No `results.csv` or `results.json` in the archive                                 | Send the calibrate output folder, not a folder above or below it |
 | Result folders sit under more than one run folder                                 | Send one run at a time                                           |
 | The archive is over 200 MB for speech, 500 MB for a benchmark, packed or unpacked | Leave the `logs` and `results.log` files out                     |
-
-## What is not carried over
-
-An import stores what the run measured and nothing more.
-
-- No files are copied to object storage. You already have the folder.
-- A re-judged run merged from a second pass carries no cost, latency or token
-  figures, because those are only written by the first pass.
-- Neither import counts against the workspace row limit, since no provider is
-  called.
