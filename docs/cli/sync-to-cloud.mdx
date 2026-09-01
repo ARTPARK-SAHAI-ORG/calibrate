@@ -1,21 +1,13 @@
 ---
 title: "Syncing local runs to Cloud"
-description: "Store a run you already did with calibrate-agent, without paying to run it again"
+description: "Sync a local evaluation run to the UI"
 ---
 
-A run done on your own machine with `calibrate-agent` stays on your machine. To
-see it in Calibrate you would normally have to run the whole thing again,
-paying every provider and every judge a second time for results you already
-have.
+This page shows how you can sync an evaluation that was run on your machine using `calibrate-agent` to the app for you to see it in the UI and share it easily with others. We currently support syncing your [speech-to-text evaluations](/cli/speech-to-text) and [LLM test runs](/cli/text-to-text).
 
-Two endpoints take the output folder instead and store it as a finished run. No
-provider is called, nothing is queued, and the run reads like any other: the
-same pages, the same sharing, the same comparison against runs Calibrate did
-itself.
-
-| You ran | Send it to |
-| --- | --- |
-| `calibrate-agent stt` | `POST /stt/evaluate/import` |
+| You ran                                     | Send it to                                              |
+| ------------------------------------------- | ------------------------------------------------------- |
+| `calibrate-agent stt`                       | `POST /stt/evaluate/import`                             |
 | `calibrate-agent llm` across several models | `POST /agent-tests/agent/{agent_uuid}/benchmark/import` |
 
 <Note>
@@ -45,10 +37,11 @@ Calibrate needs somewhere to hang the results, and that has to exist first.
   given rather than a Calibrate one. Any row that matches no test refuses the
   whole import.
 
-  Attach the same evaluators the run used. Calibrate stamps each verdict with
-  the evaluator that produced it, so identity survives the import on its own,
-  and falls back to matching by name when that evaluator has since been
-  recreated.
+Attach the same evaluators the run used. Calibrate stamps each verdict with
+the evaluator that produced it, so identity survives the import on its own,
+and falls back to matching by name when that evaluator has since been
+recreated.
+
 </Accordion>
 
 ## Pack the output folder
@@ -110,14 +103,14 @@ render without a name or rubric.
 
 Nothing is stored when any of these is true, so it is safe to try.
 
-| Refused because | Fix |
-| --- | --- |
-| A provider's row count differs from the dataset's item count | Send the run that matches the dataset |
-| A row's ground truth differs from the dataset item beside it | Add the audio in the same order as the rows |
-| A row's `test_case_id` matches no test linked to the agent | Name each test after that ID and link it |
-| No `results.csv` or `results.json` in the archive | Send the calibrate output folder, not a folder above or below it |
-| Result folders sit under more than one run folder | Send one run at a time |
-| The archive is over 200 MB for speech, 500 MB for a benchmark, packed or unpacked | Leave the `logs` and `results.log` files out |
+| Refused because                                                                   | Fix                                                              |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| A provider's row count differs from the dataset's item count                      | Send the run that matches the dataset                            |
+| A row's ground truth differs from the dataset item beside it                      | Add the audio in the same order as the rows                      |
+| A row's `test_case_id` matches no test linked to the agent                        | Name each test after that ID and link it                         |
+| No `results.csv` or `results.json` in the archive                                 | Send the calibrate output folder, not a folder above or below it |
+| Result folders sit under more than one run folder                                 | Send one run at a time                                           |
+| The archive is over 200 MB for speech, 500 MB for a benchmark, packed or unpacked | Leave the `logs` and `results.log` files out                     |
 
 ## What is not carried over
 
