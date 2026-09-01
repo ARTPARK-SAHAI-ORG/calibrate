@@ -84,7 +84,8 @@
               "GET /agent-tests/benchmark/{task_id}",
               "POST /agent-tests/bulk-unlink",
               "POST /agent-tests/run",
-              "GET /agent-tests/run/{task_id}"
+              "GET /agent-tests/run/{task_id}",
+              "GET /agent-tests/run/{task_id}/results/{test_uuid}"
             ]
           },
           {
@@ -201,7 +202,8 @@
               "sdk/agent-tests/get_benchmark",
               "sdk/agent-tests/bulk_unlink",
               "sdk/agent-tests/run_batch",
-              "sdk/agent-tests/get_run"
+              "sdk/agent-tests/get_run",
+              "sdk/agent-tests/get_run_case"
             ]
           },
           {

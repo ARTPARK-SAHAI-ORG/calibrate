@@ -3794,6 +3794,39 @@
             "title": "Name",
             "description": "Name of the test"
           },
+          "test_uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Uuid",
+            "description": "ID of the test this case ran, which is what you pass to read the case on its own",
+            "examples": [
+              "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+            ]
+          },
+          "test_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "response",
+                  "tool_call",
+                  "conversation",
+                  "general"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Test Type",
+            "description": "What the test asks of the agent, which decides how a reader draws the case"
+          },
           "passed": {
             "anyOf": [
               {
@@ -4459,6 +4492,21 @@
             ],
             "title": "Evaluators",
             "description": "The evaluators used in this run. Each verdict in `judge_results` links to one of these by `evaluator_uuid`"
+          },
+          "evaluator_summary": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Totals for each evaluator over the whole run, matching the shape a benchmark reports for each model. Only evaluators that returned a verdict appear"
           },
           "results": {
             "anyOf": [
@@ -6680,6 +6728,22 @@
             "description": "Return only failing test cases. Omit to return every case"
           },
           {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "full",
+                "summary"
+              ],
+              "type": "string",
+              "description": "How much of each test case to return. `full` returns every field of every case. `summary` returns one light row per case, with its ID, name, verdict and short reason, leaving out the conversation, the agent's output and the evaluator verdicts. Read those one case at a time from `GET /agent-tests/run/{task_id}/results/{test_uuid}`",
+              "default": "full",
+              "title": "Mode"
+            },
+            "description": "How much of each test case to return. `full` returns every field of every case. `summary` returns one light row per case, with its ID, name, verdict and short reason, leaving out the conversation, the agent's output and the evaluator verdicts. Read those one case at a time from `GET /agent-tests/run/{task_id}/results/{test_uuid}`"
+          },
+          {
             "name": "compact",
             "in": "query",
             "required": false,
@@ -6699,6 +6763,94 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TestRunStatusResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent-tests/run/{task_id}/results/{test_uuid}": {
+      "get": {
+        "tags": [
+          "agent-tests"
+        ],
+        "summary": "Get test case result",
+        "description": "Get the full result of one test case in a run",
+        "operationId": "get_agent_test_case_result_agent_tests_run__task_id__results__test_uuid__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "task_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Test run or benchmark the case was run in",
+              "examples": [
+                "a3b2c1d0-e5f4-3210-abcd-ef1234567890"
+              ],
+              "title": "Task Id"
+            },
+            "description": "Test run or benchmark the case was run in"
+          },
+          {
+            "name": "test_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The test whose result to read, as `test_uuid` on the case",
+              "examples": [
+                "b1c2d3e4-f5a6-7890-bcde-f12345678901"
+              ],
+              "title": "Test Uuid"
+            },
+            "description": "The test whose result to read, as `test_uuid` on the case"
+          },
+          {
+            "name": "model",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Which model's answer to read. Required for a benchmark, which runs every test once per model",
+              "examples": [
+                "openai/gpt-4.1"
+              ],
+              "title": "Model"
+            },
+            "description": "Which model's answer to read. Required for a benchmark, which runs every test once per model"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TestCaseResult"
                 }
               }
             }
@@ -6818,6 +6970,22 @@
               "title": "Only Failed"
             },
             "description": "Return only failing test cases for each model. Omit to return every case"
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "full",
+                "summary"
+              ],
+              "type": "string",
+              "description": "How much of each test case to return. `full` returns every field of every case. `summary` returns one light row per case, with its ID, name, verdict and short reason, leaving out the conversation, the agent's output and the evaluator verdicts. Read those one case at a time from `GET /agent-tests/run/{task_id}/results/{test_uuid}`",
+              "default": "full",
+              "title": "Mode"
+            },
+            "description": "How much of each test case to return. `full` returns every field of every case. `summary` returns one light row per case, with its ID, name, verdict and short reason, leaving out the conversation, the agent's output and the evaluator verdicts. Read those one case at a time from `GET /agent-tests/run/{task_id}/results/{test_uuid}`"
           },
           {
             "name": "compact",
