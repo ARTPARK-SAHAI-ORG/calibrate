@@ -241,6 +241,8 @@ For voice simulations, specify the STT, LLM, and TTS providers:
 
     Refer to [Agent Connections → Chat agent](/cli/agent-connections/chat) for the full reference.
 
+    A simulation sends the conversation so far on every turn, so the agent must accept `{"messages": [...]}`. A config whose `agent_type` is `general` is rejected before the run starts.
+
     ```json
     {
       "agent_url": "https://your-agent.com/chat",
