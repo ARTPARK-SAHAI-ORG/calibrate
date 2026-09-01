@@ -12,62 +12,47 @@ You need to use the right API for importing the evaluation results, depending on
 | `calibrate-agent stt`                       | `POST /stt/evaluate/import`                             |
 | `calibrate-agent llm` across several models | `POST /agent-tests/agent/{agent_uuid}/benchmark/import` |
 
-## Before you import
+## Pre-requisites
 
-Calibrate needs somewhere to hang the results, and that has to exist first.
+Depending on the evaluation type, you need to prepare the app for import.
 
-<Accordion title="A speech evaluation needs its dataset">
-  Create the dataset and upload its audio, then pass its ID. **Add the audio in
-  the same order as the rows in `results.csv`.** Nothing in a calibrate run
-  records which uploaded file a row came from, so a row is paired with the
-  dataset item in the same position. Every ground truth is compared before
-  anything is stored, so a wrong order is refused rather than showing each score
-  beside the wrong clip.
+<Accordion title="Upload the speech evaluation dataset on Calibrate">
+  Make sure you **add the audio files in the same order in which they were kept
+  locally**. Nothing in a calibrate run records which uploaded file a row came
+  from, so a row is paired with the dataset item in the same position. Copy the
+  dataset ID from the URL as it will be used later.
 </Accordion>
 
-<Accordion title="A benchmark needs its tests">
-  Create one test per test case, **naming each test after the `test_case_id`
-  calibrate ran it under**, and link them all to the agent. That name is the
-  only handle back from a row to a test, because calibrate carries the ID it was
-  given rather than a Calibrate one. Any row that matches no test refuses the
-  whole import.
-
-Attach the same evaluators the run used. Calibrate stamps each verdict with
-the evaluator that produced it, so identity survives the import on its own,
-and falls back to matching by name when that evaluator has since been
-recreated.
+<Accordion title="Upload the LLM benchmark tests on Calibrate">
+  Create an agent on Calibrate if you haven't already and upload the tests against it. Make sure to **keep the same name for each test case on Calibrate as the `test_case_id` in the dataset used for the offline evaluation run**. Any row that matches no test refuses the
+  whole import. 
+  
+  Create the LLM judges used for the run on Calibrate **with the same name**. Calibrate maps each score to the evaluator that produced it.
 
 </Accordion>
 
-## Pack the output folder
+## Prepare the output folder
 
 Only three kinds of file are read: each result folder's `results.csv` or
-`results.json`, its `metrics.json`, and the leaderboard. Everything else in a
-run folder is logs, which is most of its size.
+`results.json`, its `metrics.json`, and the leaderboard.
 
 ```bash
 env COPYFILE_DISABLE=1 tar czf run.tgz -C /path/to/parent --exclude=logs --exclude=results.log output
 ```
 
-`COPYFILE_DISABLE` stops macOS writing a hidden `._leaderboard.csv` beside your
-real one. Those hidden files are ignored on the way in, so leaving it off still
-works — it just makes for a cleaner archive.
-
-You can leave folders out to import a subset. Delete the model folders you do
-not want and the leaderboard is trimmed to match.
-
 ## Authentication
 
-Both endpoints use your signed-in Calibrate session rather than an API key.
+Both the endpoints use the JWT key of your signed-in account on Calibrate to authenticate your request.
 
 Open Calibrate in your browser, open the network tab, and copy the
-`Authorization` header off any request the page makes. It starts with `Bearer`.
+`Authorization` header from any request made to Calibrate's backend API. It starts with `Bearer`.
 
-Send `X-Org-UUID` as well when you are importing into a workspace other than
-your personal one. It is the first part of the Calibrate URL you are looking at,
+Send `X-Org-UUID` as well, which indicates the ID of the workspace where you want to import the evaluations. It is the first part of the Calibrate URL you are looking at,
 `.../a9f1d0d4-1afa-4adc-b93b-e6a395208f0e/datasets/...`.
 
-## Send it
+## Run the import
+
+### Speech to text
 
 ```bash
 curl -X POST https://api.calibrate.artpark.ai/stt/evaluate/import \
@@ -77,23 +62,38 @@ curl -X POST https://api.calibrate.artpark.ai/stt/evaluate/import \
   -F archive=@run.tgz
 ```
 
+### LLM benchmark
+
 ```bash
 curl -X POST https://api.calibrate.artpark.ai/agent-tests/agent/$AGENT_UUID/benchmark/import \
   -H "Authorization: Bearer $TOKEN" \
   -F archive=@run.tgz
 ```
 
-You never list the providers or models. A folder holding a `results.csv` is a
-provider, and one holding a `results.json` is a model, with `__` turned back
-into `/` to give the name the leaderboard already uses.
-
 ## What comes back
 
-A speech import returns the evaluation it stored, the providers it found, and
-the number of rows each carries. A benchmark import returns the same plus
-`unresolved_evaluators`: evaluators the results score against that are no longer
-in the workspace. Their scores and reasoning are stored either way, they just
-render without a name or rubric.
+### Speech to text
+
+The evaluation it stored, the providers it found in the archive, and how many
+rows each of them carries.
+
+```json
+{
+  "task_id": "a3b2c1d0-e5f4-3210-abcd-ef1234567890",
+  "status": "done",
+  "dataset_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "dataset_name": "ARMMAN hindi v2",
+  "providers": ["deepgram", "elevenlabs", "google", "openai", "sarvam"],
+  "row_count": 380
+}
+```
+
+### LLM benchmark
+
+The benchmark it stored, the models it found, and how many tests each was scored
+on. `unresolved_evaluators` lists evaluators the results score against that are
+no longer in the workspace. Their scores and reasoning are stored either way,
+they just render without a name or rubric.
 
 ```json
 {
