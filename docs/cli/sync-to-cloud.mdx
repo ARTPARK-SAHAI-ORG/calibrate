@@ -3,19 +3,14 @@ title: "Syncing local runs to Cloud"
 description: "Sync a local evaluation run to the UI"
 ---
 
-This page shows how you can sync an evaluation that was run on your machine using `calibrate-agent` to the app for you to see it in the UI and share it easily with others. We currently support syncing your [speech-to-text evaluations](/cli/speech-to-text) and [LLM test runs](/cli/text-to-text).
+This page shows how you can sync an evaluation that was run on your machine using `calibrate-agent` to the app for you to see it in the UI and share it easily with others. We currently support syncing your [speech-to-text evaluations](/cli/speech-to-text) and [LLM benchmarking results](/cli/text-to-text).
 
-| You ran                                     | Send it to                                              |
+You need to use the right API for importing the evaluation results, depending on the type of evaluation.
+
+| If you ran                                  | Use                                                     |
 | ------------------------------------------- | ------------------------------------------------------- |
 | `calibrate-agent stt`                       | `POST /stt/evaluate/import`                             |
 | `calibrate-agent llm` across several models | `POST /agent-tests/agent/{agent_uuid}/benchmark/import` |
-
-<Note>
-  Both are signed-in-browser endpoints, so they take the bearer token from your
-  Calibrate session rather than an API key. Add `X-Org-UUID` when the workspace
-  you are importing into is not your personal one — it is the first part of the
-  Calibrate URL you are looking at.
-</Note>
 
 ## Before you import
 
@@ -60,6 +55,17 @@ works — it just makes for a cleaner archive.
 
 You can leave folders out to import a subset. Delete the model folders you do
 not want and the leaderboard is trimmed to match.
+
+## Authentication
+
+Both endpoints use your signed-in Calibrate session rather than an API key.
+
+Open Calibrate in your browser, open the network tab, and copy the
+`Authorization` header off any request the page makes. It starts with `Bearer`.
+
+Send `X-Org-UUID` as well when you are importing into a workspace other than
+your personal one. It is the first part of the Calibrate URL you are looking at,
+`.../a9f1d0d4-1afa-4adc-b93b-e6a395208f0e/datasets/...`.
 
 ## Send it
 
