@@ -60,6 +60,20 @@ git config core.hooksPath .githooks
 
 Every contributor needs to run it once.
 
+## Citation
+
+If you use Calibrate in your work, please cite it:
+
+```bibtex
+@software{calibrate2026,
+  author = {Dalmia, Aman and Doshi, Jigar},
+  title  = {Calibrate: An open-source framework for evaluating AI agents},
+  year   = {2026},
+  url    = {https://calibrate.artpark.ai},
+  note   = {Source code: \url{https://github.com/ARTPARK-SAHAI-ORG}}
+}
+```
+
 ## License
 
 This work is licensed under a
