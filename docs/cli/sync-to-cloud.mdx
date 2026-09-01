@@ -1,0 +1,119 @@
+---
+title: "Syncing local runs to Cloud"
+description: "Sync a local evaluation run to the UI"
+---
+
+This page shows how you can sync an evaluation that was run on your machine using `calibrate-agent` to the app for you to see it in the UI and share it easily with others. We currently support syncing your [speech-to-text evaluations](/cli/speech-to-text) and [LLM benchmarking results](/cli/text-to-text).
+
+You need to use the right API for importing the evaluation results, depending on the type of evaluation.
+
+| If you ran                                  | Use                                                     |
+| ------------------------------------------- | ------------------------------------------------------- |
+| `calibrate-agent stt`                       | `POST /stt/evaluate/import`                             |
+| `calibrate-agent llm` across several models | `POST /agent-tests/agent/{agent_uuid}/benchmark/import` |
+
+## Pre-requisites
+
+Depending on the evaluation type, you need to prepare the app for import.
+
+<Accordion title="Upload the speech evaluation dataset on Calibrate">
+  Make sure you **add the audio files in the same order in which they were kept
+  locally**. Nothing in a calibrate run records which uploaded file a row came
+  from, so a row is paired with the dataset item in the same position. Copy the
+  dataset ID from the URL as it will be used later.
+</Accordion>
+
+<Accordion title="Upload the LLM benchmark tests on Calibrate">
+  Create an agent on Calibrate if you haven't already and upload the tests against it. Make sure to **keep the same name for each test case on Calibrate as the `test_case_id` in the dataset used for the offline evaluation run**. Any row that matches no test refuses the
+  whole import. 
+  
+  Create the LLM judges used for the run on Calibrate **with the same name**. Calibrate maps each score to the evaluator that produced it.
+
+</Accordion>
+
+## Prepare the output folder
+
+Only three kinds of file are read: each result folder's `results.csv` or
+`results.json`, its `metrics.json`, and the leaderboard.
+
+```bash
+env COPYFILE_DISABLE=1 tar czf run.tgz -C /path/to/parent --exclude=logs --exclude=results.log output
+```
+
+## Authentication
+
+Both the endpoints use the JWT key of your signed-in account on Calibrate to authenticate your request.
+
+Open Calibrate in your browser, open the network tab, and copy the
+`Authorization` header from any request made to Calibrate's backend API. It starts with `Bearer`.
+
+Send `X-Org-UUID` as well, which indicates the ID of the workspace where you want to import the evaluations. It is the first part of the Calibrate URL you are looking at,
+`.../a9f1d0d4-1afa-4adc-b93b-e6a395208f0e/datasets/...`.
+
+## Run the import
+
+### Speech to text
+
+```bash
+curl -X POST https://api.calibrate.artpark.ai/stt/evaluate/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F dataset_id=$DATASET_UUID \
+  -F language=hindi \
+  -F archive=@run.tgz
+```
+
+### LLM benchmark
+
+```bash
+curl -X POST https://api.calibrate.artpark.ai/agent-tests/agent/$AGENT_UUID/benchmark/import \
+  -H "Authorization: Bearer $TOKEN" \
+  -F archive=@run.tgz
+```
+
+## What comes back
+
+### Speech to text
+
+The evaluation it stored, the providers it found in the archive, and how many
+rows each of them carries.
+
+```json
+{
+  "task_id": "a3b2c1d0-e5f4-3210-abcd-ef1234567890",
+  "status": "done",
+  "dataset_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "dataset_name": "ARMMAN hindi v2",
+  "providers": ["deepgram", "elevenlabs", "google", "openai", "sarvam"],
+  "row_count": 380
+}
+```
+
+### LLM benchmark
+
+The benchmark it stored, the models it found, and how many tests each was scored
+on. `unresolved_evaluators` lists evaluators the results score against that are
+no longer in the workspace. Their scores and reasoning are stored either way,
+they just render without a name or rubric.
+
+```json
+{
+  "task_id": "a3b2c1d0-e5f4-3210-abcd-ef1234567890",
+  "status": "done",
+  "models": ["openai/gpt-4.1", "anthropic/claude-sonnet-4.6"],
+  "test_count": 470,
+  "unresolved_evaluators": []
+}
+```
+
+## When an import is refused
+
+Nothing is stored when any of these is true, so it is safe to try.
+
+| Refused because                                                                   | Fix                                                              |
+| --------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| A provider's row count differs from the dataset's item count                      | Send the run that matches the dataset                            |
+| A row's ground truth differs from the dataset item beside it                      | Add the audio in the same order as the rows                      |
+| A row's `test_case_id` matches no test linked to the agent                        | Name each test after that ID and link it                         |
+| No `results.csv` or `results.json` in the archive                                 | Send the calibrate output folder, not a folder above or below it |
+| Result folders sit under more than one run folder                                 | Send one run at a time                                           |
+| The archive is over 200 MB for speech, 500 MB for a benchmark, packed or unpacked | Leave the `logs` and `results.log` files out                     |

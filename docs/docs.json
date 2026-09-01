@@ -301,6 +301,7 @@
               "cli/simulations",
               "guides/tools",
               "cli/calibrate-agent",
+              "cli/sync-to-cloud",
               {
                 "group": "Agent Connection",
                 "pages": [
