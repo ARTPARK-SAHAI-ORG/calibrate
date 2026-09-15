@@ -423,6 +423,48 @@ class TestEvaluateToolCallsCriteria(unittest.TestCase):
 
         return fake_text_judge
 
+    @staticmethod
+    def _judge_returning_usage(usage: dict):
+        async def fake_text_judge(evaluators, user_prompt, *a, **k):
+            name = evaluators[0]["name"]
+            return {name: {"match": True, "reasoning": "because", **usage}}
+
+        return fake_text_judge
+
+    def test_judged_parameter_carries_what_its_judge_call_cost(self):
+        from calibrate_agent.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge",
+            side_effect=self._judge_returning_usage(
+                {"cost_usd": 0.002, "input_tokens": 120, "latency_seconds": 0.8}
+            ),
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"note": "looks good"}}],
+                [{"tool": "a", "arguments": {
+                    "note": {"match_type": "llm_judge", "criteria": "positive"}}}],
+            ))
+        judged = result["tool_call_results"][0]["param_judgments"][0]
+        self.assertEqual(judged["cost_usd"], 0.002)
+        self.assertEqual(judged["input_tokens"], 120)
+        self.assertEqual(judged["latency_seconds"], 0.8)
+
+    def test_judged_parameter_without_usage_stays_unchanged(self):
+        from calibrate_agent.llm.run_tests import evaluate_tool_calls
+
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge",
+            side_effect=self._judge_returning(True),
+        ):
+            result = asyncio.run(evaluate_tool_calls(
+                [{"tool": "a", "arguments": {"note": "looks good"}}],
+                [{"tool": "a", "arguments": {
+                    "note": {"match_type": "llm_judge", "criteria": "positive"}}}],
+            ))
+        judged = result["tool_call_results"][0]["param_judgments"][0]
+        self.assertNotIn("cost_usd", judged)
+
     def test_llm_judge_param_pass(self):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 

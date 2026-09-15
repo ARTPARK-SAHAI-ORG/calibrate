@@ -48,6 +48,55 @@ class TestBuildEvaluationResult(unittest.TestCase):
         self.assertEqual(result["evaluator_id"], "ev1")
 
 
+class TestSimulationUsageColumns(unittest.TestCase):
+    """Judge cost, tokens and latency reach the simulation output files."""
+
+    _JUDGE_ROW = {
+        "match": True,
+        "reasoning": "ok",
+        "cost_usd": 0.004,
+        "input_tokens": 900,
+        "output_tokens": 30,
+        "cached_input_tokens": 512,
+        "latency_seconds": 1.5,
+    }
+
+    def test_evaluation_result_carries_usage(self):
+        from calibrate_agent.llm.run_simulation import _build_evaluation_result
+
+        result = _build_evaluation_result(_bin_ev("x"), self._JUDGE_ROW)
+        self.assertEqual(result["cost_usd"], 0.004)
+        self.assertEqual(result["input_tokens"], 900)
+        self.assertEqual(result["output_tokens"], 30)
+        self.assertEqual(result["cached_input_tokens"], 512)
+        self.assertEqual(result["latency_seconds"], 1.5)
+
+    def test_evaluation_result_omits_usage_the_judge_did_not_report(self):
+        from calibrate_agent.llm.run_simulation import _build_evaluation_result
+
+        result = _build_evaluation_result(
+            _bin_ev("x"), {"match": True, "reasoning": "ok"}
+        )
+        self.assertNotIn("cost_usd", result)
+        self.assertNotIn("latency_seconds", result)
+
+    def test_run_level_columns_hold_scores_only(self):
+        from calibrate_agent.llm.run_simulation import (
+            _build_evaluation_result,
+            _simulation_metric_columns,
+        )
+
+        columns = _simulation_metric_columns(
+            [
+                _build_evaluation_result(_bin_ev("accuracy"), self._JUDGE_ROW),
+                _build_evaluation_result(
+                    _rate_ev("empathy"), dict(self._JUDGE_ROW, score=4)
+                ),
+            ]
+        )
+        self.assertEqual(columns, {"accuracy": 1.0, "empathy": 4.0})
+
+
 class TestJudgeAndEmit(unittest.IsolatedAsyncioTestCase):
     async def test_emits_lines(self):
         from calibrate_agent.llm.run_simulation import _judge_and_emit

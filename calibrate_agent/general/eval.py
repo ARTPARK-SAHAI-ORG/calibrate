@@ -23,6 +23,7 @@ from calibrate_agent.judges import (
     evaluator_row_columns,
     require_unique_evaluator_names,
     write_evaluator_config,
+    write_judge_usage,
 )
 from calibrate_agent.utils import (
     provider_log as _log,
@@ -187,6 +188,9 @@ async def _score_and_write_results(
         json.dump(metrics_data, f, indent=4)
 
     pd.DataFrame(data).to_csv(join(output_dir, "results.csv"), index=False)
+    write_judge_usage(
+        output_dir, ids, llm_results["per_row"], list(evaluators_by_name)
+    )
 
     return metrics_data
 
