@@ -15,11 +15,12 @@ calibrate agent-tests benchmark [flags]
 
 **Options**
 
-| Option | Type | Description |
-| --- | --- | --- |
-| `-a, --agent-uuid` | string | **Required.** Agent to benchmark |
-| `-m, --models` | stringArray | **Required.** Model names to benchmark |
-| `-t, --test-uuids` | string | A subset of the agent's linked tests to benchmark. Each ID must be linked to the agent. Omit to run all linked tests |
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-a, --agent-uuid` | string | — | **Required.** Agent to benchmark |
+| `-m, --models` | stringArray | — | **Required.** Model names to benchmark |
+| `-p, --parallel-models` | — | `true` | Whether to run the models at the same time. Set false to run them one after another |
+| `-t, --test-uuids` | string | — | A subset of the agent's linked tests to benchmark. Each ID must be linked to the agent. Omit to run all linked tests |
 
 **Examples**
 

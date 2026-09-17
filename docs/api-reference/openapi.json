@@ -1228,6 +1228,12 @@
                 "b1c2d3e4-f5a6-7890-bcde-f12345678901"
               ]
             ]
+          },
+          "parallel_models": {
+            "type": "boolean",
+            "title": "Parallel Models",
+            "description": "Whether to run the models at the same time. Set false to run them one after another",
+            "default": true
           }
         },
         "type": "object",
