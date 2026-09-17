@@ -454,6 +454,12 @@
             "title": "Unanswered Tests",
             "description": "Number of test cases that produced no answer because the agent or the judge could not be reached, which makes the pass rate an unfair measure of the agent"
           },
+          "stopped_early": {
+            "type": "boolean",
+            "title": "Stopped Early",
+            "description": "Whether the run stopped before starting every test case, after too many failed in a row",
+            "default": false
+          },
           "aborted": {
             "type": "boolean",
             "title": "Aborted",
@@ -1345,6 +1351,12 @@
               ]
             ]
           },
+          "stopped_early": {
+            "type": "boolean",
+            "title": "Stopped Early",
+            "description": "Whether any model's run stopped before starting every test case, after too many failed in a row",
+            "default": false
+          },
           "aborted": {
             "type": "boolean",
             "title": "Aborted",
@@ -1352,10 +1364,16 @@
             "default": false
           },
           "error": {
-            "type": "boolean",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Error",
-            "description": "True if the run failed",
-            "default": false
+            "description": "Why the run could not be carried out, when it failed before producing any result"
           },
           "is_public": {
             "type": "boolean",
@@ -3164,6 +3182,24 @@
               }
             ],
             "description": "Aggregated token usage as `{mean, min, max, count}`"
+          },
+          "unanswered_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unanswered Tests",
+            "description": "Number of test cases that produced no answer because the agent or the judge could not be reached, which makes the pass rate an unfair measure of the agent"
+          },
+          "stopped_early": {
+            "type": "boolean",
+            "title": "Stopped Early",
+            "description": "Whether this model's run stopped before starting every test case, after too many failed in a row",
+            "default": false
           }
         },
         "type": "object",
@@ -4554,10 +4590,16 @@
             "default": false
           },
           "error": {
-            "type": "boolean",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Error",
-            "description": "True if the run failed",
-            "default": false
+            "description": "Why the run could not be carried out, when it failed before producing any result"
           },
           "is_public": {
             "type": "boolean",
