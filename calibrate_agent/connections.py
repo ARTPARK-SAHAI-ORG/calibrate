@@ -51,6 +51,21 @@ class _AgentRequestError(Exception):
     """A transient request failure that exhausted all retry attempts."""
 
 
+def _log_retry(details: dict) -> None:
+    """Print one line per failed attempt.
+
+    Only the last attempt's error reaches the caller, so without this the
+    earlier failures are never recorded. Goes to stdout because the CLI's
+    stdout is stored with the run.
+    """
+    print(
+        f"Agent call attempt {details['tries']}/{_MAX_ATTEMPTS} failed after "
+        f"{details['elapsed']:.1f}s: {details['exception']!r}. Retrying in "
+        f"{details['wait']:.1f}s.",
+        flush=True,
+    )
+
+
 @dataclass
 class TextAgentConnection:
     """
@@ -371,6 +386,7 @@ class TextAgentConnection:
         base=2,
         factor=_BACKOFF_BASE_SECONDS,
         jitter=None,
+        on_backoff=_log_retry,
     )
     async def _post_with_retry(self, body: dict, timeout: float) -> "httpx.Response":
         """POST ``body`` to the endpoint, retrying transient failures.
@@ -390,11 +406,11 @@ class TextAgentConnection:
                 resp = await client.post(self.url, json=body, headers=req_headers)
         except httpx.ConnectError as e:
             raise _AgentRequestError(
-                f"Could not connect to agent at {self.url}: {e}"
+                f"Could not connect to agent at {self.url}: {e!r}"
             ) from e
         except httpx.TimeoutException as e:
             raise _AgentRequestError(
-                f"Agent request timed out ({timeout:.0f}s): {self.url}"
+                f"Agent request timed out ({timeout:.0f}s): {self.url}: {e!r}"
             ) from e
 
         if resp.status_code in _RETRYABLE_STATUS:
@@ -487,7 +503,7 @@ class WebSocketAgentConnection:
         except Exception as e:
             return {
                 "ok": False,
-                "error": f"Could not connect to agent at {self.url}: {e}",
+                "error": f"Could not connect to agent at {self.url}: {e!r}",
             }
 
         return {"ok": True, "error": None}

@@ -785,6 +785,81 @@ class TestAgentType(unittest.IsolatedAsyncioTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Tests for failure diagnostics
+# ---------------------------------------------------------------------------
+
+class TestFailureDiagnostics(unittest.IsolatedAsyncioTestCase):
+
+    async def test_blank_connect_error_still_names_its_class(self):
+        """httpx.ConnectError can carry an empty message (TLS handshake cut,
+        silent timeout). The failure line must still identify the error."""
+        import httpx
+        from calibrate_agent.connections import TextAgentConnection, _MAX_ATTEMPTS
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, _ = _patch_httpx_sequence([httpx.ConnectError("")] * _MAX_ATTEMPTS)
+        with ctx, patch("asyncio.sleep", AsyncMock()):
+            with self.assertRaises(RuntimeError) as cm:
+                await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertIn("ConnectError", str(cm.exception))
+
+    async def test_blank_timeout_still_names_its_class(self):
+        import httpx
+        from calibrate_agent.connections import TextAgentConnection, _MAX_ATTEMPTS
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, _ = _patch_httpx_sequence([httpx.ConnectTimeout("")] * _MAX_ATTEMPTS)
+        with ctx, patch("asyncio.sleep", AsyncMock()):
+            with self.assertRaises(RuntimeError) as cm:
+                await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertIn("ConnectTimeout", str(cm.exception))
+
+    async def test_each_attempt_is_printed(self):
+        import httpx
+        from calibrate_agent.connections import TextAgentConnection, _MAX_ATTEMPTS
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, _ = _patch_httpx_sequence([httpx.ConnectError("")] * _MAX_ATTEMPTS)
+        printed = []
+        with ctx, patch("asyncio.sleep", AsyncMock()), \
+                patch("builtins.print", lambda *a, **k: printed.append(a[0])):
+            with self.assertRaises(RuntimeError):
+                await agent.call([{"role": "user", "content": "Hi"}])
+
+        self.assertEqual(len(printed), _MAX_ATTEMPTS - 1)
+        for attempt, line in enumerate(printed, start=1):
+            self.assertIn(f"attempt {attempt}/{_MAX_ATTEMPTS}", line)
+            self.assertIn("ConnectError", line)
+
+    async def test_message_prefixes_are_unchanged(self):
+        """The Calibrate backend classifies failures by these prefixes."""
+        import httpx
+        from calibrate_agent.connections import TextAgentConnection, _MAX_ATTEMPTS
+
+        cases = [
+            (httpx.ConnectError(""), "Could not connect to agent at http://fake-agent/chat: "),
+            (httpx.ConnectTimeout(""), "Agent request timed out (60s): "),
+        ]
+        for error, prefix in cases:
+            with self.subTest(prefix=prefix):
+                agent = TextAgentConnection(url="http://fake-agent/chat")
+                ctx, _ = _patch_httpx_sequence([error] * _MAX_ATTEMPTS)
+                with ctx, patch("asyncio.sleep", AsyncMock()):
+                    with self.assertRaises(RuntimeError) as cm:
+                        await agent.call([{"role": "user", "content": "Hi"}])
+                self.assertTrue(str(cm.exception).startswith(prefix), str(cm.exception))
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+        ctx, _ = _patch_httpx_sequence([({}, 502)] * _MAX_ATTEMPTS)
+        with ctx, patch("asyncio.sleep", AsyncMock()):
+            with self.assertRaises(RuntimeError) as cm:
+                await agent.call([{"role": "user", "content": "Hi"}])
+        self.assertTrue(str(cm.exception).startswith("Agent returned HTTP 502"))
+
+
+# ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
