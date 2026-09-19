@@ -139,7 +139,7 @@ Start a multi-model benchmark over an agent's linked tests as a background job. 
 | `agent_uuid` | string | Yes | Agent to benchmark |
 | `models` | array of string | Yes | Model names to benchmark |
 | `test_uuids` | array of string | No | A subset of the agent's linked tests to benchmark. Each ID must be linked to the agent. Omit to run all linked tests |
-| `parallel_models` | boolean | No | Whether to run the models at the same time. Set false to run them one after another |
+| `parallel_models` | boolean | No | How to run the models. `true` runs several at a time, `false` runs each one only after the one before it has finished. Use `false` to keep the load on your own agent down |
 
 See **POST /agent-tests/agent/&#123;agent_uuid&#125;/benchmark** in the [API reference](/api-reference/introduction) tab for the full schema.
 

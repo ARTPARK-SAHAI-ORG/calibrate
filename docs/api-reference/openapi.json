@@ -1238,7 +1238,7 @@
           "parallel_models": {
             "type": "boolean",
             "title": "Parallel Models",
-            "description": "Whether to run the models at the same time. Set false to run them one after another",
+            "description": "How to run the models. `true` runs several at a time, `false` runs each one only after the one before it has finished. Use `false` to keep the load on your own agent down",
             "default": true
           }
         },
@@ -1283,6 +1283,18 @@
             ],
             "title": "Test Uuids",
             "description": "IDs of the tests this benchmark executed, in run order"
+          },
+          "parallel_models": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parallel Models",
+            "description": "How the models were run. `true` means several ran at a time, `false` means each one ran only after the one before it had finished"
           },
           "evaluators": {
             "anyOf": [
