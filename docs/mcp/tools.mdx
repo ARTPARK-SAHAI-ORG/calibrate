@@ -22,7 +22,7 @@ List an agent's test and benchmark runs, most recently created first, with their
 | `agent_uuid` | string | Yes | Agent whose test runs to list |
 | `type` | string | No | Filter by run type. Omit to return both: |
 | `status` | TaskStatus | No | Filter by run status. Omit for all statuses |
-| `has_failures` | boolean | No | Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both |
+| `has_failures` | boolean | No | Filter by whether a test in the run did not pass. `true` returns only runs with a failing test, `false` only runs that got through every test and passed them all. A run that broke, was stopped, or gave up part way with no failing test is in neither: filter by `status` for those. Omit for both |
 | `around` | string | No | ID of a run to jump to, returning the page that contains it instead of the page at `offset` |
 | `limit` | integer | No | Maximum number of items to return. Omit for no limit (all items) |
 | `offset` | integer | No | Number of items to skip before returning results |

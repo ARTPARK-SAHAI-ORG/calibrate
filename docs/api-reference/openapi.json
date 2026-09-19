@@ -366,7 +366,7 @@
               }
             ],
             "title": "Failed",
-            "description": "Number of test cases that failed"
+            "description": "Number of test cases that did not pass, which includes the ones that produced no answer"
           },
           "evaluators": {
             "items": {
@@ -3127,7 +3127,7 @@
               }
             ],
             "title": "Failed",
-            "description": "Number of test cases that failed"
+            "description": "Number of test cases that did not pass, which includes the ones that produced no answer"
           },
           "evaluator_summary": {
             "anyOf": [
@@ -3283,7 +3283,19 @@
               }
             ],
             "title": "Failed",
-            "description": "Number of test cases that failed for this model"
+            "description": "Number of test cases that did not pass for this model, which includes the ones that produced no answer"
+          },
+          "unanswered_tests": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unanswered Tests",
+            "description": "Number of this model's test cases that produced no answer, already counted in `failed`"
           }
         },
         "type": "object",
@@ -4494,7 +4506,7 @@
               }
             ],
             "title": "Failed",
-            "description": "Number of test cases that failed"
+            "description": "Number of test cases that did not pass, which includes the ones that produced no answer"
           },
           "latency_ms": {
             "anyOf": [
@@ -6502,10 +6514,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both",
+              "description": "Filter by whether a test in the run did not pass. `true` returns only runs with a failing test, `false` only runs that got through every test and passed them all. A run that broke, was stopped, or gave up part way with no failing test is in neither: filter by `status` for those. Omit for both",
               "title": "Has Failures"
             },
-            "description": "Filter by whether the run has any failing test case or model. `true` returns only runs with failures (or errors), `false` only clean runs. Omit for both"
+            "description": "Filter by whether a test in the run did not pass. `true` returns only runs with a failing test, `false` only runs that got through every test and passed them all. A run that broke, was stopped, or gave up part way with no failing test is in neither: filter by `status` for those. Omit for both"
           },
           {
             "name": "around",
