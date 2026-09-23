@@ -500,6 +500,9 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._processing_time = processing_time
         self._text_buffer = ""  # buffer of the text that the bot has generated so far (received stream; used for interrupt completion matching)
         self._heard_text_buffer = ""  # buffer of agent text actually spoken (fed to simulated-user STT as what was heard)
+        # (segment_id, accumulated_text) of the last RTVI 2.x progress message,
+        # used to derive the newly spoken words from each progress update.
+        self._last_spoken_progress = (None, "")
         self._spoken_text_buffer = (
             ""  # buffer of the text that the bot has spoken so far
         )
@@ -642,6 +645,31 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._active_transcript_audio_index = candidate
         self._active_transcript_audio_role = role
         return candidate
+
+    def _parse_bot_output(self, data: dict) -> tuple[str, bool]:
+        """Return ``(text, spoken)`` for a ``bot-output`` payload in either RTVI format.
+
+        RTVI 1.x agents send one ``spoken=True`` message per spoken word. RTVI 2.x
+        agents (pipecat >= 1.4 talking to a client that declares no RTVI version)
+        suppress those and instead send progress messages (``spoken_status``
+        ``in-progress``/``completed``, no ``spoken``) whose ``text`` is the whole
+        sentence and whose ``spoken_progress.accumulated_text`` grows word by word;
+        the newly spoken words are the growth since the previous progress message
+        of the same segment. A 2.x ``completed`` message with ``spoken=True`` comes
+        from a TTS without word timestamps and already carries only its own text.
+        """
+        text = data.get("text") or ""
+        status = data.get("spoken_status")
+        if data.get("spoken") or status not in ("in-progress", "completed"):
+            return text, bool(data.get("spoken"))
+
+        segment_id = data.get("segment_id")
+        accumulated = (data.get("spoken_progress") or {}).get("accumulated_text") or ""
+        last_segment, last_accumulated = self._last_spoken_progress
+        self._last_spoken_progress = (segment_id, accumulated)
+        if segment_id == last_segment and accumulated.startswith(last_accumulated):
+            accumulated = accumulated[len(last_accumulated) :]
+        return accumulated.strip(), True
 
     async def _reset_buffers(self):
         concluded_turn = self._turn_index
@@ -939,8 +967,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     )
 
                 elif msg_type == "bot-output":
-                    text = data.get("text") or ""
-                    spoken = data.get("spoken") or False
+                    text, spoken = self._parse_bot_output(data)
 
                     if text:
                         # log_and_print(
