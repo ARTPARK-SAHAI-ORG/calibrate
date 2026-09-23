@@ -1,12 +1,12 @@
 """Cover create_stt_service / create_tts_service provider branches.
 
-pipecat 1.0.0 passes per-provider config through ``<Service>.Settings(...)``, so
+pipecat passes per-provider config through ``<Service>.Settings(...)``, so
 these tests patch the service class and inspect the recorded ``.Settings`` call.
 """
 
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 
 STT_SERVICE_TARGETS = {
@@ -18,7 +18,17 @@ STT_SERVICE_TARGETS = {
     "elevenlabs": "pipecat.services.elevenlabs.stt.ElevenLabsRealtimeSTTService",
     "smallest": "pipecat.services.smallest.stt.SmallestSTTService",
     "sarvam": "pipecat.services.sarvam.stt.SarvamSTTService",
+    "deepgram-flux": "pipecat.services.deepgram.flux.stt.DeepgramFluxSTTService",
+    "openai-transcribe": "pipecat.services.openai.stt.OpenAIRealtimeSTTService",
+    "sarvam-v4": "pipecat.services.sarvam.stt.SarvamRealtimeSTTService",
+    "sarvam-v3-realtime": "pipecat.services.sarvam.stt.SarvamRealtimeSTTService",
+    "sarvam-v4-manual": "pipecat.services.sarvam.stt.SarvamSTTService",
+    "cartesia-ink-preview": "pipecat.services.cartesia.turns.stt.CartesiaTurnsSTTService",
 }
+
+# openai-live builds a subclass of OpenAIRealtimeSTTService, which a patched
+# class can't serve as a base for, so its tests construct the real service.
+UNPATCHED_STT_PROVIDERS = {"openai-live"}
 
 TTS_SERVICE_TARGETS = {
     "cartesia": "pipecat.services.cartesia.tts.CartesiaTTSService",
@@ -65,7 +75,7 @@ class TestCreateSTTService(unittest.TestCase):
         from calibrate_agent.utils import create_stt_service, STT_PROVIDER_MODELS
 
         for prov, expected in STT_PROVIDER_MODELS.items():
-            if prov in BENCHMARK_ONLY_PROVIDERS:
+            if prov in BENCHMARK_ONLY_PROVIDERS | UNPATCHED_STT_PROVIDERS:
                 continue
             with patch.dict(os.environ, ALL_KEYS), \
                     patch(STT_SERVICE_TARGETS[prov]) as svc:
@@ -80,7 +90,9 @@ class TestCreateSTTService(unittest.TestCase):
         self.assertEqual(
             set(STT_PROVIDER_MODELS) - BENCHMARK_ONLY_PROVIDERS,
             {"deepgram", "openai", "groq", "google", "cartesia",
-             "elevenlabs", "smallest", "sarvam"},
+             "elevenlabs", "smallest", "sarvam", "deepgram-flux",
+             "openai-live", "openai-transcribe", "sarvam-v4", "sarvam-v3-realtime",
+             "sarvam-v4-manual", "cartesia-ink-preview"},
         )
 
     def test_sarvam_stt_transcribes(self):
@@ -97,6 +109,100 @@ class TestCreateSTTService(unittest.TestCase):
                 svc.Settings.call_args.kwargs["model"], STT_PROVIDER_MODELS["sarvam"]
             )
             self.assertEqual(STT_PROVIDER_MODELS["sarvam"], "saaras:v3")
+
+
+class TestCreateRealtimeSTTService(unittest.IsolatedAsyncioTestCase):
+    """The realtime streaming providers, built for real (offline) so the
+    per-language model, hints and language codes can be read back."""
+
+    def _build(self, provider, language):
+        from calibrate_agent.utils import create_stt_service
+
+        with patch.dict(os.environ, ALL_KEYS):
+            return create_stt_service(provider, language)
+
+    def test_deepgram_flux_english_uses_english_model_without_hints(self):
+        svc = self._build("deepgram-flux", "english")
+        self.assertEqual(svc._settings.model, "flux-general-en")
+        self.assertIsNone(svc._settings.language_hints)
+
+    def test_deepgram_flux_hindi_uses_multilingual_model_with_hint(self):
+        from pipecat.transcriptions.language import Language
+
+        svc = self._build("deepgram-flux", "hindi")
+        self.assertEqual(svc._settings.model, "flux-general-multi")
+        self.assertEqual(svc._settings.language_hints, [Language.HI])
+
+    def test_openai_transcribe_sends_listed_language(self):
+        svc = self._build("openai-transcribe", "hindi")
+        self.assertEqual(svc._settings.model, "gpt-transcribe")
+        self.assertEqual(str(svc._settings.language), "hi")
+
+    def test_openai_transcribe_omits_unlisted_language(self):
+        svc = self._build("openai-transcribe", "odia")
+        self.assertIsNone(svc._settings.language)
+
+    def test_sarvam_v4_passes_sarvam_language_code(self):
+        svc = self._build("sarvam-v4", "odia")
+        self.assertEqual(svc._settings.model, "saaras:v4")
+        self.assertEqual(svc._settings.language_code, "od-IN")
+        self.assertEqual(svc._settings.mode, "transcribe")
+
+    def test_sarvam_v3_realtime_uses_realtime_service(self):
+        from pipecat.services.sarvam.stt import SarvamRealtimeSTTService
+
+        svc = self._build("sarvam-v3-realtime", "odia")
+        self.assertIsInstance(svc, SarvamRealtimeSTTService)
+        self.assertEqual(svc._settings.model, "saaras:v3-realtime")
+        self.assertEqual(svc._settings.language_code, "od-IN")
+        self.assertEqual(svc._settings.mode, "transcribe")
+
+    def test_sarvam_v4_manual_uses_the_sarvam_streaming_service(self):
+        """sarvam-v4-manual is saaras:v4 on the same service as sarvam, not on
+        the realtime service that sarvam-v4 uses."""
+        from pipecat.services.sarvam.stt import SarvamSTTService
+        from pipecat.transcriptions.language import Language
+
+        svc = self._build("sarvam-v4-manual", "hindi")
+        self.assertIsInstance(svc, SarvamSTTService)
+        self.assertEqual(svc._settings.model, "saaras:v4")
+        self.assertEqual(svc._settings.language, Language.HI_IN)
+        self.assertEqual(svc._mode, "transcribe")
+        self.assertFalse(svc._settings.vad_signals)
+
+    async def test_sarvam_v4_manual_flushes_on_our_voice_detection(self):
+        from pipecat.frames.frames import VADUserStoppedSpeakingFrame
+        from pipecat.processors.frame_processor import FrameDirection
+
+        svc = self._build("sarvam-v4-manual", "hindi")
+        svc._socket_client = AsyncMock()
+        with patch.object(type(svc).__mro__[1], "process_frame", AsyncMock()):
+            await svc.process_frame(
+                VADUserStoppedSpeakingFrame(stop_secs=0.2), FrameDirection.DOWNSTREAM
+            )
+        svc._socket_client.flush.assert_awaited_once()
+
+    def test_cartesia_ink_preview_model(self):
+        svc = self._build("cartesia-ink-preview", "hindi")
+        self.assertEqual(svc._settings.model, "ink-preview")
+
+    async def test_openai_live_sends_languages_list(self):
+        from unittest.mock import AsyncMock
+        from pipecat.services.openai.stt import OpenAIRealtimeSTTService
+
+        svc = self._build("openai-live", "hindi")
+        self.assertIsInstance(svc, OpenAIRealtimeSTTService)
+        self.assertEqual(svc._settings.model, "gpt-live-transcribe")
+        with patch.object(
+            OpenAIRealtimeSTTService, "_ws_send", new=AsyncMock()
+        ) as sent:
+            await svc._send_session_update()
+        transcription = sent.call_args.args[0]["session"]["audio"]["input"][
+            "transcription"
+        ]
+        self.assertEqual(transcription["languages"], ["hi"])
+        self.assertNotIn("language", transcription)
+        self.assertEqual(transcription["model"], "gpt-live-transcribe")
 
 
 class TestCreateTTSService(unittest.TestCase):

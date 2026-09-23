@@ -64,6 +64,40 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
             result = await E.transcribe_sarvam(Path("/tmp/x.wav"), "english")
         self.assertEqual(result["transcript"], "hello")
 
+    async def test_sarvam_v4_manual_uses_saaras_v4_on_the_streaming_api(self):
+        from calibrate_agent.stt import eval as E
+
+        msg = MagicMock()
+        msg.type = "data"
+        msg.data.transcript = "नमस्ते"
+
+        class FakeWS:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                return False
+            async def transcribe(self, **kwargs): pass
+            async def flush(self): pass
+            def __aiter__(self):
+                async def gen():
+                    yield msg
+                return gen()
+
+        fake_client = MagicMock()
+        fake_client.speech_to_text_streaming.connect = MagicMock(return_value=FakeWS())
+
+        with patch.dict(os.environ, {"SARVAM_API_KEY": "k"}), \
+             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
+             patch.object(E, "AsyncSarvamAI", return_value=fake_client):
+            result = await E.transcribe_audio.__wrapped__(
+                Path("/tmp/x.wav"), "ref", "sarvam-v4-manual", "hindi", "uid"
+            )
+        self.assertEqual(result["transcript"], "नमस्ते")
+        kwargs = fake_client.speech_to_text_streaming.connect.call_args.kwargs
+        self.assertEqual(kwargs["model"], "saaras:v4")
+        self.assertEqual(kwargs["language_code"], "hi-IN")
+        self.assertTrue(kwargs["flush_signal"])
+
     async def test_sarvam_error_message(self):
         from calibrate_agent.stt import eval as E
 

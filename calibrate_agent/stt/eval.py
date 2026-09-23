@@ -6,6 +6,7 @@ import json
 import base64
 from os.path import join, exists
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 from typing import Dict, List
 from urllib.parse import urlencode
@@ -29,6 +30,9 @@ from calibrate_agent.utils import (
     validate_stt_language,
     STT_PROVIDER_MODELS,
     google_stt_model_and_location,
+    stt_provider_model,
+    SARVAM_REALTIME_STT_PROVIDERS,
+    SARVAM_FLUSH_STT_PROVIDERS,
     create_stt_service,
     get_gemini_api_key,
     provider_log as _log,
@@ -72,13 +76,9 @@ from calibrate_agent.rate_limit import (
 
 
 def _default_stt_model(provider: str, language: str | None = None) -> str | None:
-    # Mirrors the model each transcribe_* uses (table, or the Google helper for
-    # the Sindhi exception) so cost prices the model actually benchmarked. If a
-    # provider gains a language-specific model, update it here too.
-    if provider == "google":
-        model, _region = google_stt_model_and_location(language)
-        return model
-    return STT_PROVIDER_MODELS.get(provider)
+    # The model each transcribe_* uses, so cost prices the model actually
+    # benchmarked.
+    return stt_provider_model(provider, language)
 
 
 def _stt_result_row(
@@ -520,13 +520,15 @@ async def transcribe_gemini(audio_path: Path, language: str) -> Dict:
 SARVAM_STT_RECV_TIMEOUT = 60.0
 
 
-async def transcribe_sarvam(audio_path: Path, language: str) -> str:
-    """Transcribe audio using Sarvam's STT API."""
+async def transcribe_sarvam(
+    audio_path: Path, language: str, provider: str = "sarvam"
+) -> str:
+    """Transcribe audio with Sarvam's streaming STT API (saaras:v3 or saaras:v4)."""
     api_key = os.getenv("SARVAM_API_KEY")
     if not api_key:
         raise ValueError("SARVAM_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "sarvam")
+    lang_code = get_stt_language_code(language, provider)
 
     audio_data = base64.b64encode(load_audio(audio_path)).decode("utf-8")
 
@@ -539,7 +541,7 @@ async def transcribe_sarvam(audio_path: Path, language: str) -> str:
 
     async with client.speech_to_text_streaming.connect(
         language_code=lang_code,
-        model=STT_PROVIDER_MODELS["sarvam"],
+        model=STT_PROVIDER_MODELS[provider],
         mode="transcribe",
         flush_signal=True,
     ) as ws:
@@ -876,6 +878,346 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
 
 
 # =============================================================================
+# Realtime streaming providers (direct engine)
+# =============================================================================
+
+
+async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) -> Dict:
+    """Transcribe audio using Deepgram Flux (``wss://api.deepgram.com/v2/listen``).
+
+    Flux reports speech as turns; the transcript is the text of each
+    ``EndOfTurn`` event joined in order.
+    """
+    from websockets.asyncio.client import connect as websocket_connect
+
+    api_key = os.getenv("DEEPGRAM_API_KEY")
+    if not api_key:
+        raise ValueError("DEEPGRAM_API_KEY environment variable not set")
+
+    model = stt_provider_model("deepgram-flux", language)
+    params = [("model", model), ("encoding", "linear16"), ("sample_rate", "16000")]
+    # Flux honors a language hint only on the multilingual model.
+    if model == "flux-general-multi":
+        params.append(
+            ("language_hint", get_stt_language_code(language, "deepgram-flux"))
+        )
+    ws_url = f"wss://api.deepgram.com/v2/listen?{urlencode(params)}"
+    headers = {"Authorization": f"Token {api_key}"}
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 4096
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+
+        async def send_audio():
+            for start in range(0, len(audio), chunk_size):
+                await ws.send(audio[start : start + chunk_size])
+            # Flux ends the turn still open on the buffered audio, then closes the socket.
+            await ws.send(json.dumps({"type": "CloseStream"}))
+
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+
+        try:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
+                try:
+                    output = json.loads(message)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                if not isinstance(output, dict):
+                    continue
+
+                if output.get("type") == "Error":
+                    raise RuntimeError(
+                        f"Deepgram Flux STT error [{output.get('code', 'unknown')}]: "
+                        f"{output.get('description', output)}"
+                    )
+                if (
+                    output.get("type") == "TurnInfo"
+                    and output.get("event") == "EndOfTurn"
+                ):
+                    transcript_parts.append(output.get("transcript", ""))
+        finally:
+            if sender.done():
+                await sender
+            else:
+                sender.cancel()
+                try:
+                    await sender
+                except asyncio.CancelledError:
+                    pass
+
+    return {
+        "transcript": " ".join(
+            part.strip() for part in transcript_parts if part.strip()
+        ),
+    }
+
+
+async def transcribe_openai_realtime(
+    audio_path: Path, language: str, provider: str
+) -> Dict:
+    """Transcribe audio with OpenAI's Realtime API in transcription mode.
+
+    Serves ``openai-live`` (gpt-live-transcribe) and ``openai-transcribe``
+    (gpt-transcribe). Server VAD is off, so the whole clip is one item that is
+    committed explicitly and transcribed once.
+    """
+    from pydub import AudioSegment
+    from websockets.asyncio.client import connect as websocket_connect
+
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable not set")
+
+    transcription = {"model": STT_PROVIDER_MODELS[provider]}
+    lang_code = get_stt_language_code(language, provider)
+    if provider == "openai-live":
+        # gpt-live-transcribe reads a `languages` list and rejects `language`.
+        transcription["languages"] = [lang_code]
+    elif lang_code is not None:
+        transcription["language"] = lang_code
+
+    # The Realtime API takes 24 kHz PCM only.
+    audio = (
+        AudioSegment(
+            data=load_audio(audio_path, raw_pcm=True),
+            sample_width=2,
+            frame_rate=16000,
+            channels=1,
+        )
+        .set_frame_rate(24000)
+        .raw_data
+    )
+    chunk_size = 48000  # 1 s of 24 kHz 16-bit audio
+    session = {
+        "type": "transcription",
+        "audio": {
+            "input": {
+                "format": {"type": "audio/pcm", "rate": 24000},
+                "transcription": transcription,
+                "turn_detection": None,
+            }
+        },
+    }
+    ws_url = "wss://api.openai.com/v1/realtime?intent=transcription"
+    headers = {"Authorization": f"Bearer {api_key}"}
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+
+        async def send_audio():
+            await ws.send(json.dumps({"type": "session.update", "session": session}))
+            for start in range(0, len(audio), chunk_size):
+                chunk = base64.b64encode(audio[start : start + chunk_size])
+                await ws.send(
+                    json.dumps(
+                        {
+                            "type": "input_audio_buffer.append",
+                            "audio": chunk.decode("utf-8"),
+                        }
+                    )
+                )
+            await ws.send(json.dumps({"type": "input_audio_buffer.commit"}))
+
+        sender = asyncio.create_task(send_audio())
+        transcript = ""
+
+        try:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
+                try:
+                    evt = json.loads(message)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+                if not isinstance(evt, dict):
+                    continue
+
+                evt_type = evt.get("type")
+                if evt_type in (
+                    "error",
+                    "conversation.item.input_audio_transcription.failed",
+                ):
+                    error = (evt.get("error") or {}).get("message") or evt
+                    raise RuntimeError(f"OpenAI realtime STT error: {error}")
+
+                # With server VAD off the committed clip is the only item, so
+                # its completed event is the whole transcript.
+                if evt_type == "conversation.item.input_audio_transcription.completed":
+                    transcript = evt.get("transcript") or ""
+                    break
+        finally:
+            if sender.done():
+                await sender
+            else:
+                sender.cancel()
+                try:
+                    await sender
+                except asyncio.CancelledError:
+                    pass
+
+    return {"transcript": transcript.strip()}
+
+
+async def transcribe_sarvam_realtime_streaming(
+    audio_path: Path, language: str, provider: str
+) -> Dict:
+    """Transcribe audio with Sarvam's realtime STT WebSocket.
+
+    Serves ``sarvam-v4`` (saaras:v4) and ``sarvam-v3-realtime``
+    (saaras:v3-realtime), which share the endpoint and protocol.
+
+    Uses manual endpointing: the clip is framed by ``speech_start`` /
+    ``speech_end`` so the server finalizes it on that boundary without waiting
+    on its own silence detection; ``end`` then closes the session.
+    """
+    from websockets.asyncio.client import connect as websocket_connect
+
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key:
+        raise ValueError("SARVAM_API_KEY environment variable not set")
+
+    params = {
+        "language_code": get_stt_language_code(language, provider),
+        "stream_type": "balanced",
+        "endpointing": "manual",
+        "encoding": "linear16",
+        "sample_rate": "16000",
+        "model": STT_PROVIDER_MODELS[provider],
+        "mode": "transcribe",
+        "return_timestamps": "false",
+    }
+    ws_url = f"wss://api.sarvam.ai/speech-to-text-realtime/ws?{urlencode(params)}"
+    headers = {"API-SUBSCRIPTION-KEY": api_key}
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 1600  # 50 ms of 16 kHz 16-bit audio, pipecat's send cadence
+
+    await SARVAM_STT_STREAMING_LIMITER.acquire()
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+
+        async def send_audio():
+            await ws.send(json.dumps({"event": "speech_start"}))
+            for start in range(0, len(audio), chunk_size):
+                chunk = base64.b64encode(audio[start : start + chunk_size])
+                await ws.send(
+                    json.dumps({"event": "audio_input", "audio": chunk.decode("utf-8")})
+                )
+            await ws.send(json.dumps({"event": "speech_end"}))
+            await ws.send(json.dumps({"event": "end"}))
+
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+
+        try:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
+                try:
+                    output = json.loads(message)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+
+                if not isinstance(output, dict):
+                    continue
+
+                event = output.get("event")
+                if event == "error":
+                    raise RuntimeError(f"Sarvam realtime STT error: {output}")
+                if event == "transcript.final" and output.get("text"):
+                    transcript_parts.append(output["text"])
+                elif event == "session.end":
+                    break
+        finally:
+            if sender.done():
+                await sender
+            else:
+                sender.cancel()
+                try:
+                    await sender
+                except asyncio.CancelledError:
+                    pass
+
+    return {
+        "transcript": " ".join(
+            part.strip() for part in transcript_parts if part.strip()
+        ),
+    }
+
+
+async def transcribe_cartesia_ink_preview_streaming(
+    audio_path: Path, language: str
+) -> Dict:
+    """Transcribe audio using Cartesia's turns WebSocket (``/stt/turns/websocket``).
+
+    The model detects the spoken language, so ``language`` is not sent. The
+    transcript is the text of each ``turn.end`` event joined in order.
+    """
+    from websockets.asyncio.client import connect as websocket_connect
+
+    api_key = os.getenv("CARTESIA_API_KEY")
+    if not api_key:
+        raise ValueError("CARTESIA_API_KEY environment variable not set")
+
+    params = {
+        "model": STT_PROVIDER_MODELS["cartesia-ink-preview"],
+        "encoding": "pcm_s16le",
+        "sample_rate": "16000",
+    }
+    ws_url = f"wss://api.cartesia.ai/stt/turns/websocket?{urlencode(params)}"
+    headers = {"X-API-Key": api_key, "Cartesia-Version": "2026-03-01"}
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 4096
+
+    async with websocket_connect(ws_url, additional_headers=headers) as ws:
+
+        async def send_audio():
+            for start in range(0, len(audio), chunk_size):
+                await ws.send(audio[start : start + chunk_size])
+            # The server turns the buffered audio into events, then closes the socket.
+            await ws.send(json.dumps({"type": "close"}))
+
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+
+        try:
+            async for message in _aiter_with_idle_timeout(
+                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+            ):
+                try:
+                    output = json.loads(message)
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                if not isinstance(output, dict):
+                    continue
+
+                if output.get("type") == "error":
+                    raise RuntimeError(
+                        f"Cartesia STT error [{output.get('error_code', 'unknown')}]: "
+                        f"{output.get('message', output)}"
+                    )
+                if output.get("type") == "turn.end":
+                    transcript_parts.append(output.get("transcript", ""))
+        finally:
+            if sender.done():
+                await sender
+            else:
+                sender.cancel()
+                try:
+                    await sender
+                except asyncio.CancelledError:
+                    pass
+
+    return {
+        "transcript": " ".join(
+            part.strip() for part in transcript_parts if part.strip()
+        ),
+    }
+
+
+# =============================================================================
 # Main Transcription Router
 # =============================================================================
 
@@ -897,9 +1239,20 @@ async def transcribe_audio(
         "google": transcribe_google,
         "gemini": transcribe_gemini,
         "sarvam": transcribe_sarvam,
+        "sarvam-v4-manual": partial(transcribe_sarvam, provider="sarvam-v4-manual"),
         "elevenlabs": transcribe_elevenlabs_streaming,
         "cartesia": transcribe_cartesia,
         "smallest": transcribe_smallest_streaming,
+        "deepgram-flux": transcribe_deepgram_flux_streaming,
+        "openai-live": partial(transcribe_openai_realtime, provider="openai-live"),
+        "openai-transcribe": partial(
+            transcribe_openai_realtime, provider="openai-transcribe"
+        ),
+        **{
+            provider: partial(transcribe_sarvam_realtime_streaming, provider=provider)
+            for provider in SARVAM_REALTIME_STT_PROVIDERS
+        },
+        "cartesia-ink-preview": transcribe_cartesia_ink_preview_streaming,
     }
 
     if provider not in provider_methods:
@@ -961,7 +1314,7 @@ async def transcribe_audio_pipeline(
     """
     # Sarvam's streaming endpoint is rate-limited per account; honour the same
     # limiter the direct engine uses so concurrent clips don't blow the cap.
-    if provider == "sarvam":
+    if provider in SARVAM_FLUSH_STT_PROVIDERS or provider in SARVAM_REALTIME_STT_PROVIDERS:
         await SARVAM_STT_STREAMING_LIMITER.acquire()
 
     pcm = load_audio(audio_path, raw_pcm=True)
@@ -1236,6 +1589,13 @@ STT_PROVIDERS = [
     "gemini",
     "sarvam",
     "elevenlabs",
+    "deepgram-flux",
+    "openai-live",
+    "openai-transcribe",
+    "sarvam-v4",
+    "sarvam-v3-realtime",
+    "sarvam-v4-manual",
+    "cartesia-ink-preview",
 ]
 
 STT_LANGUAGES = [

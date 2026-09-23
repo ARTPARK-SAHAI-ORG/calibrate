@@ -43,6 +43,42 @@
       "pulse": {
         "price_per_minute_usd": 0.003
       }
+    },
+    "deepgram-flux": {
+      "flux-general-en": {
+        "price_per_minute_usd": 0.0065
+      },
+      "flux-general-multi": {
+        "price_per_minute_usd": 0.0078
+      }
+    },
+    "openai-live": {
+      "gpt-live-transcribe": {
+        "price_per_minute_usd": 0.017
+      }
+    },
+    "openai-transcribe": {
+      "gpt-transcribe": {
+        "price_per_minute_usd": 0.0045
+      }
+    },
+    "sarvam-v4": {
+      "saaras:v4": {
+        "currency": "INR",
+        "price_per_minute_inr": 0.5
+      }
+    },
+    "sarvam-v3-realtime": {
+      "saaras:v3-realtime": {
+        "currency": "INR",
+        "price_per_minute_inr": 0.5
+      }
+    },
+    "sarvam-v4-manual": {
+      "saaras:v4": {
+        "currency": "INR",
+        "price_per_minute_inr": 0.5
+      }
     }
   },
   "tts": {

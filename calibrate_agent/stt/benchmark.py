@@ -35,7 +35,7 @@ from calibrate_agent.stt.eval import (
 from calibrate_agent.stt.leaderboard import generate_leaderboard
 from calibrate_agent._env import resolve_stt_parallelism
 from calibrate_agent._cli_args import add_stt_eval_args
-from calibrate_agent.utils import StreamTee
+from calibrate_agent.utils import StreamTee, validate_stt_language
 
 
 async def run(
@@ -117,6 +117,12 @@ async def run(
         ...     output_dir="./out"
         ... ))
     """
+    # Every provider must support the language before any of them runs, so an
+    # unsupported pairing stops the whole benchmark instead of producing a
+    # partial leaderboard.
+    for provider in providers:
+        validate_stt_language(language, provider)
+
     max_parallel, max_concurrency = resolve_stt_parallelism(
         engine, max_parallel, max_concurrency
     )
@@ -275,6 +281,11 @@ async def main():
             if provider not in STT_PROVIDERS:
                 print(f"\033[31mError: Invalid provider '{provider}'.\033[0m")
                 print(f"Available providers: {', '.join(STT_PROVIDERS)}")
+                sys.exit(1)
+            try:
+                validate_stt_language(args.language, provider)
+            except ValueError as e:
+                print(f"\033[31mError: {e}\033[0m")
                 sys.exit(1)
 
         # Validate input directory structure

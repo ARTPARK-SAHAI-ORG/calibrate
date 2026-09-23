@@ -46899,6 +46899,108 @@ var STT_PROVIDERS = [
       "gujarati",
       "sindhi"
     ])
+  },
+  {
+    id: "deepgram-flux",
+    name: "Deepgram Flux",
+    envVar: "DEEPGRAM_API_KEY",
+    languages: /* @__PURE__ */ new Set(["english", "hindi"])
+  },
+  {
+    id: "openai-live",
+    name: "OpenAI Live (gpt-live-transcribe)",
+    envVar: "OPENAI_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "marathi",
+      "tamil"
+    ])
+  },
+  {
+    id: "openai-transcribe",
+    name: "OpenAI Transcribe (gpt-transcribe)",
+    envVar: "OPENAI_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "bengali",
+      "malayalam",
+      "marathi",
+      "odia",
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati",
+      "sindhi",
+      "maithili"
+    ])
+  },
+  {
+    id: "sarvam-v4",
+    name: "Sarvam AI v4 Realtime",
+    envVar: "SARVAM_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "bengali",
+      "malayalam",
+      "marathi",
+      "odia",
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati",
+      "sindhi",
+      "maithili"
+    ])
+  },
+  {
+    id: "sarvam-v3-realtime",
+    name: "Sarvam AI v3 Realtime",
+    envVar: "SARVAM_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "bengali",
+      "malayalam",
+      "marathi",
+      "odia",
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati",
+      "sindhi",
+      "maithili"
+    ])
+  },
+  {
+    id: "sarvam-v4-manual",
+    name: "Sarvam AI v4 (streaming, our end-of-speech detection)",
+    envVar: "SARVAM_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "bengali",
+      "malayalam",
+      "marathi",
+      "odia",
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati"
+    ])
+  },
+  {
+    id: "cartesia-ink-preview",
+    name: "Cartesia Ink Preview",
+    envVar: "CARTESIA_API_KEY",
+    languages: /* @__PURE__ */ new Set(["english", "hindi"])
   }
 ];
 var LANGUAGES = [

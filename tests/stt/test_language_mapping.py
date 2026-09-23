@@ -92,3 +92,78 @@ class TestGoogleSindhiRouting(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRealtimeProviderLanguages(unittest.TestCase):
+    """Language rules for the realtime streaming providers: officially listed
+    languages run, auto-detecting models run everything, and the rest are
+    rejected with the provider to use instead."""
+
+    def test_rejections_name_the_alternative_provider(self):
+        from calibrate_agent.utils import validate_stt_language
+
+        for provider, language, alternative in [
+            ("deepgram-flux", "kannada", "deepgram"),
+            ("openai-live", "odia", "openai-transcribe"),
+            ("cartesia-ink-preview", "tamil", "cartesia"),
+        ]:
+            with self.assertRaises(ValueError) as ctx:
+                validate_stt_language(language, provider)
+            self.assertIn(f"'{alternative}'", str(ctx.exception))
+
+    def test_supported_languages_pass(self):
+        from calibrate_agent.utils import validate_stt_language
+
+        for provider, language in [
+            ("deepgram-flux", "english"),
+            ("deepgram-flux", "hindi"),
+            ("openai-live", "kannada"),
+            ("cartesia-ink-preview", "hindi"),
+        ]:
+            validate_stt_language(language, provider)
+
+    def test_auto_detecting_and_full_coverage_providers_run_all_languages(self):
+        from calibrate_agent.utils import validate_stt_language
+
+        for language in STT_LANGUAGES:
+            validate_stt_language(language, "openai-transcribe")
+            validate_stt_language(language, "sarvam-v4")
+            validate_stt_language(language, "sarvam-v3-realtime")
+
+    def test_existing_provider_rejection_has_no_alternative(self):
+        from calibrate_agent.utils import validate_stt_language
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_stt_language("maithili", "deepgram")
+        self.assertNotIn("instead", str(ctx.exception))
+
+    def test_openai_transcribe_codes(self):
+        from calibrate_agent.utils import get_stt_language_code
+
+        self.assertEqual(get_stt_language_code("hindi", "openai-transcribe"), "hi")
+        self.assertIsNone(get_stt_language_code("odia", "openai-transcribe"))
+
+    def test_sarvam_v4_codes_and_enums(self):
+        from calibrate_agent.utils import get_stt_language, get_stt_language_code
+        from pipecat.transcriptions.language import Language
+
+        self.assertEqual(get_stt_language_code("sindhi", "sarvam-v4"), "sd-IN")
+        self.assertEqual(get_stt_language_code("odia", "sarvam-v4"), "od-IN")
+        self.assertEqual(get_stt_language("hindi", "sarvam-v4"), Language.HI_IN)
+        self.assertEqual(get_stt_language_code("sindhi", "sarvam-v3-realtime"), "sd-IN")
+        self.assertEqual(get_stt_language("hindi", "sarvam-v3-realtime"), Language.HI_IN)
+        self.assertEqual(get_stt_language_code("maithili", "sarvam-v4-manual"), "mai-IN")
+        self.assertEqual(get_stt_language("hindi", "sarvam-v4-manual"), Language.HI_IN)
+
+    def test_stt_provider_model_per_language(self):
+        from calibrate_agent.utils import stt_provider_model
+
+        self.assertEqual(stt_provider_model("deepgram-flux", "english"), "flux-general-en")
+        self.assertEqual(stt_provider_model("deepgram-flux", "hindi"), "flux-general-multi")
+        self.assertEqual(stt_provider_model("deepgram-flux"), "flux-general-en")
+        self.assertEqual(stt_provider_model("google", "sindhi"), "chirp_2")
+        self.assertEqual(stt_provider_model("sarvam-v4", "hindi"), "saaras:v4")
+        self.assertEqual(
+            stt_provider_model("sarvam-v3-realtime", "hindi"), "saaras:v3-realtime"
+        )
+        self.assertEqual(stt_provider_model("sarvam-v4-manual", "hindi"), "saaras:v4")

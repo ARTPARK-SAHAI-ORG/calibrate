@@ -15,6 +15,42 @@ description: "Supported STT providers in Calibrate"
 | **Sarvam**      | saarika-v2.5           | [sarvam.ai](https://sarvam.ai)                              |
 | **Smallest AI** | pulse                  | [smallest.ai](https://smallest.ai)                          |
 
+## Realtime streaming providers
+
+These providers stream audio to a realtime transcription API. Select them by
+their provider ID.
+
+| Provider ID            | Model                                                            | API key            | Languages                         |
+| ---------------------- | ---------------------------------------------------------------- | ------------------ | --------------------------------- |
+| `deepgram-flux`        | flux-general-en (English), flux-general-multi (Hindi)            | `DEEPGRAM_API_KEY` | English, Hindi                    |
+| `openai-live`          | gpt-live-transcribe                                              | `OPENAI_API_KEY`   | English, Hindi, Kannada, Marathi, Tamil |
+| `openai-transcribe`    | gpt-transcribe                                                   | `OPENAI_API_KEY`   | All supported languages           |
+| `sarvam-v4`            | saaras:v4                                                        | `SARVAM_API_KEY`   | All supported languages           |
+| `sarvam-v3-realtime`   | saaras:v3-realtime                                               | `SARVAM_API_KEY`   | All supported languages           |
+| `sarvam-v4-manual`     | saaras:v4                                                        | `SARVAM_API_KEY`   | Same languages as `sarvam`        |
+| `cartesia-ink-preview` | ink-preview                                                      | `CARTESIA_API_KEY` | English, Hindi                    |
+
+On the pipeline engine, `sarvam-v4` and `sarvam-v3-realtime` use Sarvam's
+realtime endpoint, where Sarvam's server decides when the speaker has stopped,
+so the final transcript arrives only after Sarvam's own silence window.
+`sarvam-v4-manual` runs the same saaras:v4 model on Sarvam's streaming
+endpoint, the one `sarvam` uses: Calibrate's voice detection decides when the
+speaker has stopped and asks Sarvam for the final transcript straight away.
+
+`deepgram-flux` and `cartesia-ink-preview` cover English and Hindi only.
+`openai-live` covers the languages OpenAI lists for gpt-live-transcribe.
+`openai-transcribe` auto-detects any language outside OpenAI's list, so it runs
+every language Calibrate supports. For a language a provider does not cover,
+Calibrate rejects the run and suggests another provider:
+
+| Provider ID            | Use instead         |
+| ---------------------- | ------------------- |
+| `deepgram-flux`        | `deepgram`          |
+| `openai-live`          | `openai-transcribe` |
+| `cartesia-ink-preview` | `cartesia`          |
+
+## Language-specific models
+
 Some providers use different models for specific languages:
 
 | Provider   | Language | Model   |

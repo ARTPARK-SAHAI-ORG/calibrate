@@ -1521,8 +1521,48 @@ SMALLEST_LANGUAGE_CODES = SMALLEST_STT_LANGUAGE_CODES
 GEMINI_STT_LANGUAGE_CODES = GOOGLE_STT_LANGUAGE_CODES
 GEMINI_TTS_LANGUAGE_CODES = GOOGLE_TTS_LANGUAGE_CODES
 
+# Realtime streaming STT providers. Each table lists only the languages the
+# model officially supports, except where the model auto-detects any language
+# (openai-transcribe), in which case a ``None`` code means "send no language".
+# Deepgram Flux: flux-general-en for English, flux-general-multi (with a Hindi
+# language hint) for Hindi; flux-general-multi covers no other Indian language.
+DEEPGRAM_FLUX_STT_LANGUAGE_CODES = {"english": "en", "hindi": "hi"}
+# gpt-live-transcribe: OpenAI's supported-language list. Its docs do not confirm
+# auto-detection, so unlisted languages are rejected.
+OPENAI_LIVE_STT_LANGUAGE_CODES = OPENAI_STT_LANGUAGE_CODES
+# saaras:v4 adds Sindhi to saaras:v3's languages.
+SARVAM_V4_STT_LANGUAGE_CODES = {**SARVAM_STT_LANGUAGE_CODES, "sindhi": "sd-IN"}
+# Sarvam's realtime endpoint serves saaras:v3-realtime and saaras:v4 with the
+# same connection parameters, protocol and languages.
+SARVAM_V3_REALTIME_STT_LANGUAGE_CODES = SARVAM_V4_STT_LANGUAGE_CODES
+SARVAM_REALTIME_STT_PROVIDERS = ("sarvam-v4", "sarvam-v3-realtime")
+# Sarvam's streaming endpoint, where our voice detection flushes the final
+# transcript. sarvam-v4-manual is saaras:v4 on that endpoint; sarvam-v4 serves
+# the same model on the realtime endpoint, which waits for Sarvam's own
+# end-of-speech detection.
+#
+# The realtime endpoint cannot take our voice detection in a live pipeline.
+# With endpointing="manual" Sarvam transcribes only the audio between
+# speech_start and speech_end, and pipecat sends speech_start when our voice
+# detection confirms speech, about 0.2 s after the speaker starts. Sarvam drops
+# the audio before speech_start, so each transcript loses its first word. The
+# streaming endpoint transcribes all the audio it receives. The direct engine
+# does use manual endpointing on the realtime endpoint, because it sends
+# speech_start before the first audio of a clip.
+SARVAM_FLUSH_STT_PROVIDERS = ("sarvam", "sarvam-v4-manual")
+# ink-preview takes no language parameter; it detects English, French, Hindi,
+# Japanese and Spanish on its own.
+CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES = {"english": "en", "hindi": "hi"}
 
-def get_stt_language_code(language: str, provider: str) -> str:
+# The provider to suggest when a realtime provider does not support a language.
+STT_PROVIDER_ALTERNATIVES = {
+    "deepgram-flux": "deepgram",
+    "openai-live": "openai-transcribe",
+    "cartesia-ink-preview": "cartesia",
+}
+
+
+def get_stt_language_code(language: str, provider: str) -> Optional[str]:
     """Get the appropriate language code string for an STT provider.
 
     Args:
@@ -1530,7 +1570,8 @@ def get_stt_language_code(language: str, provider: str) -> str:
         provider: The STT provider name (sarvam, google, deepgram, openai, etc.)
 
     Returns:
-        The appropriate language code string for the STT provider
+        The appropriate language code string for the STT provider, or ``None``
+        for ``openai-transcribe`` languages it transcribes by auto-detection.
 
     Examples:
         >>> get_stt_language_code("hindi", "sarvam")
@@ -1542,7 +1583,7 @@ def get_stt_language_code(language: str, provider: str) -> str:
     """
     language = language.lower()
 
-    if provider == "sarvam":
+    if provider in SARVAM_FLUSH_STT_PROVIDERS:
         return SARVAM_STT_LANGUAGE_CODES.get(language, "en-IN")
     elif provider == "google":
         return GOOGLE_STT_LANGUAGE_CODES.get(language, "en-US")
@@ -1560,6 +1601,18 @@ def get_stt_language_code(language: str, provider: str) -> str:
         return GROQ_STT_LANGUAGE_CODES.get(language, "en")
     elif provider == "deepgram":
         return DEEPGRAM_STT_LANGUAGE_CODES.get(language, "en")
+    elif provider == "deepgram-flux":
+        return DEEPGRAM_FLUX_STT_LANGUAGE_CODES.get(language, "en")
+    elif provider == "openai-live":
+        return OPENAI_LIVE_STT_LANGUAGE_CODES.get(language, "en")
+    elif provider == "openai-transcribe":
+        return OPENAI_TRANSCRIBE_STT_LANGUAGE_CODES.get(language)
+    elif provider == "sarvam-v4":
+        return SARVAM_V4_STT_LANGUAGE_CODES.get(language, "en-IN")
+    elif provider == "sarvam-v3-realtime":
+        return SARVAM_V3_REALTIME_STT_LANGUAGE_CODES.get(language, "en-IN")
+    elif provider == "cartesia-ink-preview":
+        return CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES.get(language, "en")
 
     # Default: use ISO 639-1 codes
     return DEFAULT_LANGUAGE_CODES.get(language, "en")
@@ -1645,6 +1698,13 @@ def validate_stt_language(language: str, provider: str) -> None:
         "openai": OPENAI_STT_LANGUAGE_CODES,
         "groq": GROQ_STT_LANGUAGE_CODES,
         "deepgram": DEEPGRAM_STT_LANGUAGE_CODES,
+        "deepgram-flux": DEEPGRAM_FLUX_STT_LANGUAGE_CODES,
+        "openai-live": OPENAI_LIVE_STT_LANGUAGE_CODES,
+        "openai-transcribe": OPENAI_TRANSCRIBE_STT_LANGUAGE_CODES,
+        "sarvam-v4": SARVAM_V4_STT_LANGUAGE_CODES,
+        "sarvam-v4-manual": SARVAM_STT_LANGUAGE_CODES,
+        "sarvam-v3-realtime": SARVAM_V3_REALTIME_STT_LANGUAGE_CODES,
+        "cartesia-ink-preview": CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES,
     }
 
     if provider not in provider_languages:
@@ -1654,10 +1714,14 @@ def validate_stt_language(language: str, provider: str) -> None:
 
     if language not in supported_languages:
         supported_list = sorted(supported_languages.keys())
-        raise ValueError(
+        message = (
             f"Language '{language}' is not supported by {provider} STT.\n"
             f"Supported languages for {provider} STT: {', '.join(supported_list)}"
         )
+        alternative = STT_PROVIDER_ALTERNATIVES.get(provider)
+        if alternative:
+            message += f"\nUse the '{alternative}' provider for {language} instead."
+        raise ValueError(message)
 
 
 def validate_tts_language(language: str, provider: str) -> None:
@@ -1723,6 +1787,13 @@ _STT_LANGUAGE_ENUMS = {
     "maithili": Language.MAI,
 }
 
+# gpt-transcribe auto-detects the spoken language, so it runs every STT
+# language: listed languages send their code, the rest send none.
+OPENAI_TRANSCRIBE_STT_LANGUAGE_CODES = {
+    **{language: None for language in _STT_LANGUAGE_ENUMS},
+    **OPENAI_STT_LANGUAGE_CODES,
+}
+
 _SARVAM_STT_LANGUAGE_ENUMS = {
     "english": Language.EN_IN,
     "hindi": Language.HI_IN,
@@ -1756,7 +1827,11 @@ def get_stt_language(
         unknown language, matching the direct-path code maps' defaults).
     """
     language = language.lower()
-    table = _SARVAM_STT_LANGUAGE_ENUMS if provider == "sarvam" else _STT_LANGUAGE_ENUMS
+    table = (
+        _SARVAM_STT_LANGUAGE_ENUMS
+        if provider in SARVAM_FLUSH_STT_PROVIDERS or provider in SARVAM_REALTIME_STT_PROVIDERS
+        else _STT_LANGUAGE_ENUMS
+    )
     return table.get(language, table["english"])
 
 
@@ -1774,7 +1849,7 @@ def get_tts_language(
         The appropriate Language enum value
     """
     # Sarvam uses regional language codes
-    if provider == "sarvam":
+    if provider in SARVAM_FLUSH_STT_PROVIDERS:
         if language == "kannada":
             return Language.KN_IN
         elif language == "hindi":
@@ -1877,11 +1952,9 @@ def get_gemini_api_key(required: bool = True) -> Optional[str]:
 # one place applies to both and a leaderboard always reflects the deployed
 # config. See CLAUDE.md ("Keeping live-agent and eval defaults in sync"); the
 # parity is guarded by tests/test_utils_factories.py. Sarvam STT uses saaras:v3
-# with mode="transcribe" — under pipecat 1.0.0 that routes to the plain STT
-# streaming endpoint (use_translate_endpoint=False), matching the benchmark's
-# transcribe_sarvam. (Under pipecat 0.0.98 this wasn't possible — its wrapper
-# forced saaras onto the translate endpoint with no mode param — which is why it
-# was previously excluded.) Providers absent here have no shared model string
+# with mode="transcribe", which routes to the plain STT streaming endpoint
+# (use_translate_endpoint=False), matching the benchmark's
+# transcribe_sarvam. Providers absent here have no shared model string
 # (e.g. Google/Smallest/Deepgram TTS carry the model in the voice name or set no
 # model at all).
 STT_PROVIDER_MODELS = {
@@ -1894,7 +1967,32 @@ STT_PROVIDER_MODELS = {
     "elevenlabs": "scribe_v2_realtime",
     "smallest": "pulse",
     "sarvam": "saaras:v3",
+    # Realtime streaming models. deepgram-flux switches to flux-general-multi
+    # for non-English languages (see stt_provider_model).
+    "deepgram-flux": "flux-general-en",
+    "openai-live": "gpt-live-transcribe",
+    "openai-transcribe": "gpt-transcribe",
+    "sarvam-v4": "saaras:v4",
+    "sarvam-v3-realtime": "saaras:v3-realtime",
+    "sarvam-v4-manual": "saaras:v4",
+    "cartesia-ink-preview": "ink-preview",
 }
+
+DEEPGRAM_FLUX_MULTILINGUAL_MODEL = "flux-general-multi"
+
+
+def stt_provider_model(provider: str, language: Optional[str] = None) -> Optional[str]:
+    """Return the STT model a provider uses for a language.
+
+    Single source for the per-language exceptions to ``STT_PROVIDER_MODELS``,
+    shared by the pipeline factory, the direct-engine functions and cost pricing.
+    """
+    if provider == "google":
+        model, _region = google_stt_model_and_location(language)
+        return model
+    if provider == "deepgram-flux" and language and language.lower() != "english":
+        return DEEPGRAM_FLUX_MULTILINGUAL_MODEL
+    return STT_PROVIDER_MODELS.get(provider)
 
 
 def google_stt_model_and_location(
@@ -1961,7 +2059,7 @@ def create_stt_service(
                 model=STT_PROVIDER_MODELS[provider],
             ),
         )
-    elif provider == "sarvam":
+    elif provider in SARVAM_FLUSH_STT_PROVIDERS:
         return SarvamSTTService(
             api_key=os.getenv("SARVAM_API_KEY"),
             mode="transcribe",
@@ -2018,6 +2116,73 @@ def create_stt_service(
                 model=google_model,
             ),
             credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS"),
+        )
+    elif provider == "deepgram-flux":
+        from pipecat.services.deepgram.flux.stt import DeepgramFluxSTTService
+
+        flux_model = stt_provider_model(provider, language)
+        return DeepgramFluxSTTService(
+            api_key=os.getenv("DEEPGRAM_API_KEY"),
+            settings=DeepgramFluxSTTService.Settings(
+                model=flux_model,
+                language_hints=(
+                    [stt_language]
+                    if flux_model == DEEPGRAM_FLUX_MULTILINGUAL_MODEL
+                    else None
+                ),
+            ),
+        )
+    elif provider in ("openai-live", "openai-transcribe"):
+        from pipecat.services.openai.stt import OpenAIRealtimeSTTService
+
+        service_class = OpenAIRealtimeSTTService
+        if provider == "openai-live":
+
+            class OpenAILiveTranscribeSTTService(OpenAIRealtimeSTTService):
+                # gpt-live-transcribe reads a `languages` list and rejects a
+                # session that also sets the singular `language` pipecat sends.
+                async def _ws_send(self, message: dict):
+                    transcription = (
+                        message.get("session", {})
+                        .get("audio", {})
+                        .get("input", {})
+                        .get("transcription", {})
+                    )
+                    if "language" in transcription:
+                        transcription["languages"] = [transcription.pop("language")]
+                    await super()._ws_send(message)
+
+            service_class = OpenAILiveTranscribeSTTService
+
+        # openai-transcribe sends no language for the languages it auto-detects.
+        send_language = get_stt_language_code(language, provider) is not None
+        return service_class(
+            api_key=os.getenv("OPENAI_API_KEY"),
+            settings=service_class.Settings(
+                model=STT_PROVIDER_MODELS[provider],
+                language=stt_language if send_language else None,
+            ),
+        )
+    elif provider in SARVAM_REALTIME_STT_PROVIDERS:
+        from pipecat.services.sarvam.stt import SarvamRealtimeSTTService
+
+        # Sarvam's own code (e.g. od-IN for Odia) rather than pipecat's mapping.
+        return SarvamRealtimeSTTService(
+            api_key=os.getenv("SARVAM_API_KEY"),
+            settings=SarvamRealtimeSTTService.Settings(
+                model=STT_PROVIDER_MODELS[provider],
+                language_code=get_stt_language_code(language, provider),
+                mode="transcribe",
+            ),
+        )
+    elif provider == "cartesia-ink-preview":
+        from pipecat.services.cartesia.turns.stt import CartesiaTurnsSTTService
+
+        return CartesiaTurnsSTTService(
+            api_key=os.getenv("CARTESIA_API_KEY"),
+            settings=CartesiaTurnsSTTService.Settings(
+                model=STT_PROVIDER_MODELS[provider],
+            ),
         )
     else:
         raise ValueError(f"Unsupported STT provider: {provider}")

@@ -26,7 +26,8 @@ class TestSTTPricingResolver(unittest.TestCase):
         from calibrate_agent.pricing import resolve_pricing
         from calibrate_agent.utils import STT_PROVIDER_MODELS
 
-        providers_without_per_minute_pricing = {"gemini"}
+        # Cartesia publishes no price for ink-preview.
+        providers_without_per_minute_pricing = {"gemini", "cartesia-ink-preview"}
         for provider, model in STT_PROVIDER_MODELS.items():
             if provider in providers_without_per_minute_pricing:
                 continue
@@ -34,6 +35,33 @@ class TestSTTPricingResolver(unittest.TestCase):
                 pricing = resolve_pricing("stt", provider)
                 self.assertEqual(pricing["model"], model)
                 self.assertIsInstance(pricing["native_rate"], float)
+
+    def test_sarvam_v3_realtime_priced_in_inr(self):
+        from calibrate_agent.pricing import resolve_pricing
+
+        pricing = resolve_pricing("stt", "sarvam-v3-realtime")
+
+        self.assertEqual(pricing["model"], "saaras:v3-realtime")
+        self.assertEqual(pricing["currency"], "INR")
+        self.assertEqual(pricing["native_rate"], 0.5)
+
+    def test_sarvam_v4_manual_priced_like_sarvam_v4(self):
+        from calibrate_agent.pricing import resolve_pricing
+
+        pricing = resolve_pricing("stt", "sarvam-v4-manual")
+
+        self.assertEqual(pricing["model"], "saaras:v4")
+        self.assertEqual(pricing["currency"], "INR")
+        self.assertEqual(pricing["native_rate"], 0.5)
+
+    def test_resolves_deepgram_flux_multilingual_model(self):
+        from calibrate_agent.pricing import resolve_pricing
+
+        pricing = resolve_pricing("stt", "deepgram-flux", model="flux-general-multi")
+
+        self.assertEqual(pricing["model"], "flux-general-multi")
+        self.assertEqual(pricing["currency"], "USD")
+        self.assertEqual(pricing["native_rate"], 0.0078)
 
     def test_provider_lookup_is_case_insensitive_for_canonical_model(self):
         from calibrate_agent.pricing import resolve_pricing

@@ -172,6 +172,24 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
         self.assertIn("leaderboard", result["providers"])
 
 
+    async def test_run_stops_before_any_provider_on_unsupported_language(self):
+        from calibrate_agent.stt import benchmark as B
+
+        mock_eval = AsyncMock()
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(B, "run_single_provider_eval", mock_eval), \
+             patch.object(B, "generate_leaderboard"):
+            with self.assertRaises(ValueError) as ctx:
+                await B.run(
+                    providers=["sarvam", "deepgram-flux"],
+                    input_dir=tmp,
+                    output_dir=tmp,
+                    language="kannada",
+                )
+        self.assertIn("'deepgram'", str(ctx.exception))
+        mock_eval.assert_not_called()
+
+
 class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
     def _make_input_dir(self, tmp: Path):
         (tmp / "audios").mkdir()
@@ -188,6 +206,24 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
             with patch.object(sys, "argv", argv):
                 with self.assertRaises(SystemExit):
                     await B.main()
+
+    async def test_main_unsupported_language_exits_before_running(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            argv = ["b.py", "-p", "openai-transcribe", "openai-live",
+                    "-l", "odia", "-i", str(base), "-o", str(base / "out")]
+            mock_run = AsyncMock()
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run", mock_run), \
+                 patch("builtins.print") as printed:
+                with self.assertRaises(SystemExit):
+                    await B.main()
+        mock_run.assert_not_called()
+        output = " ".join(str(c.args[0]) for c in printed.call_args_list if c.args)
+        self.assertIn("'openai-transcribe'", output)
 
     async def test_main_invalid_input(self):
         from calibrate_agent.stt import benchmark as B

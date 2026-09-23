@@ -141,6 +141,40 @@ class TestScoreAndWriteTTFS(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("ttfs", df.columns)
 
 
+class TestTranscribeAudioPipeline(unittest.IsolatedAsyncioTestCase):
+    async def _run(self, provider):
+        from calibrate_agent.stt import eval as stt_eval
+
+        pipeline_output = {
+            "transcript": " hi ",
+            "ttfs": 0.4,
+        }
+        limiter = AsyncMock()
+        with patch.object(stt_eval, "load_audio", return_value=b"\x00\x00"), \
+             patch.object(stt_eval, "create_stt_service") as factory, \
+             patch.object(stt_eval, "transcribe_via_pipeline",
+                          AsyncMock(return_value=pipeline_output)), \
+             patch.object(stt_eval.SARVAM_STT_STREAMING_LIMITER, "acquire", limiter):
+            result = await stt_eval.transcribe_audio_pipeline.__wrapped__(
+                Path("a.wav"), "hi", provider, "hindi", "uid"
+            )
+        return result, factory, limiter
+
+    async def test_returns_stripped_transcript_and_ttfs(self):
+        result, factory, _ = await self._run("deepgram-flux")
+        factory.assert_called_once_with("deepgram-flux", "hindi")
+        self.assertEqual(result, {"transcript": "hi", "ttfs": 0.4})
+
+    async def test_sarvam_realtime_models_share_the_sarvam_rate_limiter(self):
+        for provider in ("sarvam-v4", "sarvam-v3-realtime", "sarvam-v4-manual"):
+            _, _, limiter = await self._run(provider)
+            limiter.assert_awaited_once()
+
+    async def test_other_providers_skip_the_sarvam_rate_limiter(self):
+        _, _, limiter = await self._run("deepgram")
+        limiter.assert_not_awaited()
+
+
 class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
     async def test_direct_engine_concurrent_writes_no_ttfs(self):
         """Direct engine routes through the shared concurrent runner: writes all

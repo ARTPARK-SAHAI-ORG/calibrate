@@ -941,7 +941,8 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
         from calibrate_agent.stt.eval import STT_PROVIDERS
 
-        providers_without_per_minute_pricing = {"gemini"}
+        # Cartesia publishes no price for ink-preview.
+        providers_without_per_minute_pricing = {"gemini", "cartesia-ink-preview"}
         for provider in STT_PROVIDERS:
             if provider in providers_without_per_minute_pricing:
                 continue
@@ -1206,6 +1207,406 @@ class TestSTTMain(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(SystemExit):
                     await E.main()
 
+
+# --- realtime streaming providers (direct engine) ------------------------
+
+
+class _FakeTurnsWS:
+    """Fake websocket that replays ``messages`` once the client sends ``close_type``.
+
+    Waiting for the end-of-stream message mirrors the real servers, which
+    emit the last turn only after the client says the audio is done.
+    """
+
+    def __init__(self, messages, close_type):
+        self.sent = []
+        self.connect_args = None
+        self._messages = [json.dumps(m) for m in messages]
+        self._close_type = close_type
+        self._closed = asyncio.Event()
+
+    def connect(self, *args, **kwargs):
+        self.connect_args = (args, kwargs)
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def send(self, payload):
+        self.sent.append(payload)
+        if isinstance(payload, str) and json.loads(payload).get("type") == self._close_type:
+            self._closed.set()
+
+    def __aiter__(self):
+        async def gen():
+            await self._closed.wait()
+            for m in self._messages:
+                yield m
+
+        return gen()
+
+    @property
+    def url(self):
+        return self.connect_args[0][0]
+
+    @property
+    def headers(self):
+        return self.connect_args[1]["additional_headers"]
+
+
+async def _run_streaming(fn, env_key, fake_ws, language="english", audio=b"\x01" * 9000):
+    from calibrate_agent.stt import eval as E
+
+    with patch.dict(os.environ, {env_key: "k"}), patch.object(
+        E, "load_audio", return_value=audio
+    ), patch("websockets.asyncio.client.connect", side_effect=fake_ws.connect):
+        return await getattr(E, fn)(Path("/tmp/x.wav"), language)
+
+
+class TestDeepgramFluxStreaming(unittest.IsolatedAsyncioTestCase):
+    TURNS = [
+        {"type": "Connected", "request_id": "r"},
+        {"type": "TurnInfo", "event": "StartOfTurn", "transcript": ""},
+        {"type": "TurnInfo", "event": "Update", "transcript": "hel"},
+        {"type": "TurnInfo", "event": "EagerEndOfTurn", "transcript": "hello"},
+        {"type": "TurnInfo", "event": "EndOfTurn", "transcript": "hello there"},
+        {"type": "TurnInfo", "event": "Update", "transcript": "gen"},
+        {"type": "TurnInfo", "event": "EndOfTurn", "transcript": "general kenobi"},
+    ]
+
+    async def test_english_joins_end_of_turn_transcripts(self):
+        ws = _FakeTurnsWS(self.TURNS, "CloseStream")
+        result = await _run_streaming(
+            "transcribe_deepgram_flux_streaming", "DEEPGRAM_API_KEY", ws
+        )
+
+        self.assertEqual(result, {"transcript": "hello there general kenobi"})
+        self.assertTrue(ws.url.startswith("wss://api.deepgram.com/v2/listen?"))
+        self.assertIn("model=flux-general-en", ws.url)
+        self.assertIn("encoding=linear16", ws.url)
+        self.assertIn("sample_rate=16000", ws.url)
+        self.assertNotIn("language_hint", ws.url)
+        self.assertEqual(ws.headers, {"Authorization": "Token k"})
+
+    async def test_audio_sent_before_close_stream(self):
+        ws = _FakeTurnsWS(self.TURNS, "CloseStream")
+        await _run_streaming("transcribe_deepgram_flux_streaming", "DEEPGRAM_API_KEY", ws)
+
+        self.assertEqual(b"".join(ws.sent[:-1]), b"\x01" * 9000)
+        self.assertEqual(json.loads(ws.sent[-1]), {"type": "CloseStream"})
+
+    async def test_hindi_uses_multi_model_with_language_hint(self):
+        ws = _FakeTurnsWS(self.TURNS, "CloseStream")
+        await _run_streaming(
+            "transcribe_deepgram_flux_streaming", "DEEPGRAM_API_KEY", ws, "hindi"
+        )
+
+        self.assertIn("model=flux-general-multi", ws.url)
+        self.assertIn("language_hint=hi", ws.url)
+
+    async def test_error_message_raises(self):
+        ws = _FakeTurnsWS(
+            [{"type": "Error", "code": "UNPARSABLE_CLIENT_MESSAGE", "description": "bad"}],
+            "CloseStream",
+        )
+        with self.assertRaisesRegex(RuntimeError, "UNPARSABLE_CLIENT_MESSAGE.*bad"):
+            await _run_streaming(
+                "transcribe_deepgram_flux_streaming", "DEEPGRAM_API_KEY", ws
+            )
+
+    async def test_missing_api_key_raises(self):
+        from calibrate_agent.stt.eval import transcribe_deepgram_flux_streaming
+
+        with patch.dict(os.environ, {"DEEPGRAM_API_KEY": ""}):
+            with self.assertRaises(ValueError):
+                await transcribe_deepgram_flux_streaming(Path("/tmp/x.wav"), "english")
+
+
+class TestCartesiaInkPreviewStreaming(unittest.IsolatedAsyncioTestCase):
+    TURNS = [
+        {"type": "connected", "request_id": "r"},
+        {"type": "turn.start", "transcript": ""},
+        {"type": "turn.update", "transcript": "namas"},
+        {"type": "turn.eager_end", "transcript": "namaste"},
+        {"type": "turn.end", "transcript": "namaste"},
+        {"type": "turn.update", "transcript": "aap"},
+        {"type": "turn.end", "transcript": "aap kaise hain"},
+    ]
+
+    async def test_joins_turn_end_transcripts(self):
+        ws = _FakeTurnsWS(self.TURNS, "close")
+        result = await _run_streaming(
+            "transcribe_cartesia_ink_preview_streaming", "CARTESIA_API_KEY", ws, "hindi"
+        )
+
+        self.assertEqual(result, {"transcript": "namaste aap kaise hain"})
+        self.assertTrue(
+            ws.url.startswith("wss://api.cartesia.ai/stt/turns/websocket?")
+        )
+        self.assertIn("model=ink-preview", ws.url)
+        self.assertIn("encoding=pcm_s16le", ws.url)
+        self.assertIn("sample_rate=16000", ws.url)
+        self.assertNotIn("language", ws.url)
+        self.assertEqual(
+            ws.headers, {"X-API-Key": "k", "Cartesia-Version": "2026-03-01"}
+        )
+
+    async def test_audio_sent_before_close(self):
+        ws = _FakeTurnsWS(self.TURNS, "close")
+        await _run_streaming(
+            "transcribe_cartesia_ink_preview_streaming", "CARTESIA_API_KEY", ws
+        )
+
+        self.assertEqual(b"".join(ws.sent[:-1]), b"\x01" * 9000)
+        self.assertEqual(json.loads(ws.sent[-1]), {"type": "close"})
+
+    async def test_error_message_raises(self):
+        ws = _FakeTurnsWS(
+            [{"type": "error", "error_code": "bad_request", "message": "nope"}], "close"
+        )
+        with self.assertRaisesRegex(RuntimeError, "bad_request.*nope"):
+            await _run_streaming(
+                "transcribe_cartesia_ink_preview_streaming", "CARTESIA_API_KEY", ws
+            )
+
+    async def test_missing_api_key_raises(self):
+        from calibrate_agent.stt.eval import transcribe_cartesia_ink_preview_streaming
+
+        with patch.dict(os.environ, {"CARTESIA_API_KEY": ""}):
+            with self.assertRaises(ValueError):
+                await transcribe_cartesia_ink_preview_streaming(
+                    Path("/tmp/x.wav"), "english"
+                )
+
+
+# --- realtime streaming providers: OpenAI and Sarvam (direct engine) ---------------------------
+
+
+class _ScriptedWS:
+    """Fake websocket that replays ``messages`` once ``release_on`` is sent.
+
+    Holding the replies until the client's closing message goes out keeps the
+    sender task's full output observable in ``sent``.
+    """
+
+    def __init__(self, messages, release_on):
+        self.sent = []
+        self._messages = [json.dumps(m) for m in messages]
+        self._release_on = release_on
+        self._released = asyncio.Event()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def send(self, payload):
+        self.sent.append(json.loads(payload))
+        if self._release_on in payload:
+            self._released.set()
+
+    def __aiter__(self):
+        async def gen():
+            await self._released.wait()
+            for m in self._messages:
+                yield m
+
+        return gen()
+
+
+_PCM_16K = b"\x10\x00" * 16000  # 1 s of 16 kHz 16-bit mono
+
+
+class TestTranscribeOpenAIRealtime(unittest.IsolatedAsyncioTestCase):
+    COMPLETED = "conversation.item.input_audio_transcription.completed"
+
+    async def _run(self, provider, language, messages, env=None):
+        from calibrate_agent.stt import eval as E
+
+        ws = _ScriptedWS(messages, release_on="input_audio_buffer.commit")
+        connect = MagicMock(return_value=ws)
+        with patch.dict(
+            os.environ, env if env is not None else {"OPENAI_API_KEY": "k"}
+        ), patch.object(E, "load_audio", return_value=_PCM_16K), patch(
+            "websockets.asyncio.client.connect", connect
+        ):
+            result = await E.transcribe_openai_realtime(
+                Path("/tmp/x.wav"), language, provider=provider
+            )
+        return result, ws, connect
+
+    def _ok(self):
+        return [
+            {"type": "session.created"},
+            {"type": "conversation.item.input_audio_transcription.delta", "delta": "hel"},
+            {"type": "input_audio_buffer.committed", "item_id": "item_1"},
+            {"type": self.COMPLETED, "item_id": "item_1", "transcript": " hello world "},
+            {"type": self.COMPLETED, "item_id": "item_2", "transcript": "ignored"},
+        ]
+
+    async def test_live_sends_languages_list(self):
+        result, ws, connect = await self._run("openai-live", "hindi", self._ok())
+
+        self.assertEqual(result, {"transcript": "hello world"})
+        url = connect.call_args.args[0]
+        self.assertEqual(url, "wss://api.openai.com/v1/realtime?intent=transcription")
+        self.assertEqual(
+            connect.call_args.kwargs["additional_headers"],
+            {"Authorization": "Bearer k"},
+        )
+        session = ws.sent[0]["session"]
+        self.assertEqual(ws.sent[0]["type"], "session.update")
+        self.assertEqual(session["type"], "transcription")
+        audio_in = session["audio"]["input"]
+        self.assertEqual(audio_in["format"], {"type": "audio/pcm", "rate": 24000})
+        self.assertIsNone(audio_in["turn_detection"])
+        self.assertEqual(
+            audio_in["transcription"],
+            {"model": "gpt-live-transcribe", "languages": ["hi"]},
+        )
+
+    async def test_transcribe_sends_language_for_hindi(self):
+        _, ws, _ = await self._run("openai-transcribe", "hindi", self._ok())
+        transcription = ws.sent[0]["session"]["audio"]["input"]["transcription"]
+        self.assertEqual(transcription, {"model": "gpt-transcribe", "language": "hi"})
+
+    async def test_transcribe_sends_no_language_for_odia(self):
+        _, ws, _ = await self._run("openai-transcribe", "odia", self._ok())
+        transcription = ws.sent[0]["session"]["audio"]["input"]["transcription"]
+        self.assertEqual(transcription, {"model": "gpt-transcribe"})
+
+    async def test_audio_resampled_to_24k_then_committed(self):
+        import base64
+
+        _, ws, _ = await self._run("openai-transcribe", "english", self._ok())
+        types = [m["type"] for m in ws.sent]
+        self.assertEqual(types[-1], "input_audio_buffer.commit")
+        appended = b"".join(
+            base64.b64decode(m["audio"])
+            for m in ws.sent
+            if m["type"] == "input_audio_buffer.append"
+        )
+        self.assertAlmostEqual(len(appended), len(_PCM_16K) * 1.5, delta=8)
+
+    async def test_error_event_raises(self):
+        messages = [{"type": "error", "error": {"message": "bad field"}}]
+        with self.assertRaisesRegex(RuntimeError, "bad field"):
+            await self._run("openai-live", "english", messages)
+
+    async def test_failed_event_raises(self):
+        messages = [
+            {
+                "type": "conversation.item.input_audio_transcription.failed",
+                "error": {"message": "decode failed"},
+            }
+        ]
+        with self.assertRaisesRegex(RuntimeError, "decode failed"):
+            await self._run("openai-transcribe", "english", messages)
+
+    async def test_missing_key(self):
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError):
+                await self._run("openai-live", "english", [], env={})
+
+
+class TestTranscribeSarvamRealtimeStreaming(unittest.IsolatedAsyncioTestCase):
+    async def _run(self, language, messages, provider="sarvam-v4"):
+        from calibrate_agent.stt import eval as E
+
+        ws = _ScriptedWS(messages, release_on='"end"}')
+        connect = MagicMock(return_value=ws)
+        with patch.dict(os.environ, {"SARVAM_API_KEY": "k"}), patch.object(
+            E, "load_audio", return_value=_PCM_16K
+        ), patch.object(
+            E.SARVAM_STT_STREAMING_LIMITER, "acquire", AsyncMock()
+        ), patch("websockets.asyncio.client.connect", connect):
+            result = await E.transcribe_sarvam_realtime_streaming(
+                Path("/tmp/x.wav"), language, provider
+            )
+        return result, ws, connect
+
+    async def test_happy_path(self):
+        import base64
+        from urllib.parse import parse_qs, urlparse
+
+        messages = [
+            {"event": "session.begin", "request_id": "r"},
+            {"event": "transcript.partial", "text": "partial"},
+            {"event": "transcript.final", "text": " namaskar "},
+            {"event": "transcript.final", "text": ""},
+            {"event": "transcript.final", "text": "duniya"},
+            {"event": "session.end"},
+            {"event": "transcript.final", "text": "after end"},
+        ]
+        result, ws, connect = await self._run("odia", messages)
+
+        self.assertEqual(result, {"transcript": "namaskar duniya"})
+        url = urlparse(connect.call_args.args[0])
+        self.assertEqual(
+            f"{url.scheme}://{url.netloc}{url.path}",
+            "wss://api.sarvam.ai/speech-to-text-realtime/ws",
+        )
+        query = {k: v[0] for k, v in parse_qs(url.query).items()}
+        self.assertEqual(query["model"], "saaras:v4")
+        self.assertEqual(query["language_code"], "od-IN")
+        self.assertEqual(query["mode"], "transcribe")
+        self.assertEqual(query["endpointing"], "manual")
+        self.assertEqual(query["sample_rate"], "16000")
+        self.assertEqual(
+            connect.call_args.kwargs["additional_headers"],
+            {"API-SUBSCRIPTION-KEY": "k"},
+        )
+
+        events = [m["event"] for m in ws.sent]
+        self.assertEqual(events[0], "speech_start")
+        self.assertEqual(events[-2:], ["speech_end", "end"])
+        chunks = [base64.b64decode(m["audio"]) for m in ws.sent[1:-2]]
+        self.assertTrue(all(e == "audio_input" for e in events[1:-2]))
+        self.assertTrue(all(len(c) == 1600 for c in chunks))
+        self.assertEqual(b"".join(chunks), _PCM_16K)
+
+    async def test_v3_realtime_uses_its_own_model(self):
+        from urllib.parse import parse_qs, urlparse
+
+        messages = [{"event": "transcript.final", "text": "namaste"}, {"event": "session.end"}]
+        result, _, connect = await self._run("hindi", messages, provider="sarvam-v3-realtime")
+        self.assertEqual(result, {"transcript": "namaste"})
+        query = {
+            k: v[0] for k, v in parse_qs(urlparse(connect.call_args.args[0]).query).items()
+        }
+        self.assertEqual(query["model"], "saaras:v3-realtime")
+        self.assertEqual(query["language_code"], "hi-IN")
+
+    async def test_router_serves_both_realtime_models(self):
+        from calibrate_agent.stt import eval as E
+
+        mock = AsyncMock(return_value={"transcript": "x"})
+        with patch.object(E, "transcribe_sarvam_realtime_streaming", mock):
+            for provider in ("sarvam-v4", "sarvam-v3-realtime"):
+                await E.transcribe_audio.__wrapped__(
+                    Path("/tmp/x.wav"), "ref", provider, "hindi", "uid"
+                )
+        self.assertEqual(
+            [c.kwargs["provider"] for c in mock.call_args_list],
+            ["sarvam-v4", "sarvam-v3-realtime"],
+        )
+
+    async def test_error_event_raises(self):
+        with self.assertRaisesRegex(RuntimeError, "quota"):
+            await self._run("hindi", [{"event": "error", "message": "quota"}])
+
+    async def test_missing_key(self):
+        from calibrate_agent.stt import eval as E
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError):
+                await E.transcribe_sarvam_realtime_streaming(
+                    Path("/tmp/x.wav"), "hindi", "sarvam-v4"
+                )
 
 if __name__ == "__main__":
     unittest.main()
