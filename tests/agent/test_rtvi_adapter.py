@@ -307,9 +307,9 @@ def _count_frames(pushed, frame_cls):
 
 
 def _count_interruptions(pushed):
-    from pipecat.frames.frames import InterruptionTaskFrame
+    from pipecat.frames.frames import InterruptionWorkerFrame
 
-    return _count_frames(pushed, InterruptionTaskFrame)
+    return _count_frames(pushed, InterruptionWorkerFrame)
 
 
 class TestNaturalInterrupt(unittest.IsolatedAsyncioTestCase):

@@ -139,14 +139,14 @@ from pipecat.frames.frames import (
     OutputTransportMessageUrgentFrame,
     Frame,
     InterruptionFrame,
-    InterruptionTaskFrame,
+    InterruptionWorkerFrame,
     TTSStoppedFrame,
     TTSAudioRawFrame,
     ErrorFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -927,7 +927,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         # start strategies (not a manual UserStartedSpeakingFrame),
                         # so start and the smart-turn stop stay audio-consistent.
                         await self.push_frame(
-                            InterruptionTaskFrame(), FrameDirection.UPSTREAM
+                            InterruptionWorkerFrame(), FrameDirection.UPSTREAM
                         )
                 elif msg_type == "bot-stopped-speaking" and self._pending_user_turn:
                     if self._awaiting_first_bot_audio_chunk:
@@ -1704,7 +1704,7 @@ async def _run_simulation_inner(
         ]
     )
 
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=16000,
@@ -1831,10 +1831,11 @@ async def _run_simulation_inner(
             f"Eval transcript: [{message.timestamp}] assistant: {message.content}"
         )
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
 
     try:
-        await runner.run(task)
+        await runner.add_workers(task)
+        await runner.run()
     finally:
         if elevenlabs_http_session is not None:
             await elevenlabs_http_session.close()

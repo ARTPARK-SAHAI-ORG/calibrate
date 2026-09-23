@@ -28,7 +28,7 @@ from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
     EndFrame,
-    EndTaskFrame,
+    EndWorkerFrame,
     LLMFullResponseEndFrame,
     CancelFrame,
     LLMMessagesAppendFrame,
@@ -40,8 +40,8 @@ from calibrate_agent.judges import require_simulation_evaluators
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
@@ -211,17 +211,17 @@ class Processor(FrameProcessor):
         self._ready = False
         self._speaks_first = speaks_first
         self._conversation_state = conversation_state
-        self._partner_task: Optional["PipelineTask"] = None
+        self._partner_task: Optional["PipelineWorker"] = None
         self._self_end_sent = False
         self._role = role
         self._context = context
         self._output_dir = output_dir
 
-    def set_task(self, task: "PipelineTask"):
+    def set_task(self, task: "PipelineWorker"):
         """Set the task reference after task creation."""
         self._task = task
 
-    def set_partner(self, task: "PipelineTask"):
+    def set_partner(self, task: "PipelineWorker"):
         """Set the partner task to exchange messages with."""
         self._partner_task = task
 
@@ -488,7 +488,7 @@ async def run_simulation(
         ]
     )
 
-    task = PipelineTask(
+    task = PipelineWorker(
         bot_pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -499,7 +499,7 @@ async def run_simulation(
         conversation_id=str(uuid.uuid4()) if IS_TRACING_ENABLED else None,
     )
 
-    user_task = PipelineTask(
+    user_task = PipelineWorker(
         user_pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -515,8 +515,8 @@ async def run_simulation(
     bot_processor.set_partner(user_task)
     user_processor.set_partner(task)
 
-    runner = PipelineRunner(handle_sigint=False)
-    user_runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
+    user_runner = WorkerRunner(handle_sigint=False)
 
     # Capture ERROR-level logs to surface pipecat internal errors
     # and cancel pipeline tasks immediately on critical errors
@@ -540,9 +540,11 @@ async def run_simulation(
     error_sink_id = logger.add(error_capture_sink, level="ERROR")
 
     try:
+        await runner.add_workers(task)
+        await user_runner.add_workers(user_task)
         await asyncio.gather(
-            runner.run(task),
-            user_runner.run(user_task),
+            runner.run(),
+            user_runner.run(),
         )
     except Exception as e:
         logger.error(f"Pipeline error: {e}")

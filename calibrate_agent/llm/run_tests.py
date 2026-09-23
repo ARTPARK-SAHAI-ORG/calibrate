@@ -25,7 +25,7 @@ from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
     EndFrame,
-    EndTaskFrame,
+    EndWorkerFrame,
     LLMFullResponseEndFrame,
     CancelFrame,
     FunctionCallResultProperties,
@@ -39,8 +39,8 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
@@ -222,7 +222,7 @@ class Processor(FrameProcessor):
         self._chat_history = chat_history
         self._total_tokens: Optional[int] = None
 
-    def set_task(self, task: "PipelineTask"):
+    def set_task(self, task: "PipelineWorker"):
         """Set the task reference after task creation."""
         self._task = task
 
@@ -652,7 +652,7 @@ async def _run_inference_inner(
         ]
     )
 
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -665,10 +665,11 @@ async def _run_inference_inner(
     # Set task reference for text_input processor
     processor.set_task(task)
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
 
     try:
-        await runner.run(task)
+        await runner.add_workers(task)
+        await runner.run()
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
         raise

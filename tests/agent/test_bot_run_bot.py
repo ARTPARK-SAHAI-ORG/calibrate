@@ -40,6 +40,7 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
         fake_transport.input.return_value = MagicMock()
         fake_transport.output.return_value = MagicMock()
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
         fake_context = MagicMock()
         fake_context.get_messages.return_value = []
@@ -52,8 +53,8 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(B, "SileroVADAnalyzer"), \
              patch.object(B, "LocalSmartTurnAnalyzerV3"), \
              patch.object(B, "Pipeline"), \
-             patch.object(B, "PipelineTask"), \
-             patch.object(B, "PipelineRunner", return_value=fake_runner), \
+             patch.object(B, "PipelineWorker") as worker_cls, \
+             patch.object(B, "WorkerRunner", return_value=fake_runner), \
              patch.object(B, "LLMContext", return_value=fake_context), \
              patch.object(B, "LLMContextAggregatorPair"):
             await B.run_bot(
@@ -66,6 +67,8 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
                 llm_config=B.LLMConfig(provider="openrouter"),
                 language="english",
             )
+        fake_runner.add_workers.assert_awaited_once_with(worker_cls.return_value)
+        fake_runner.run.assert_awaited_once_with()
 
     async def test_basic_run_bot_openai(self):
         from calibrate_agent.agent import bot as B
@@ -77,6 +80,7 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
         fake_transport.input.return_value = MagicMock()
         fake_transport.output.return_value = MagicMock()
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
         fake_context = MagicMock()
         fake_context.get_messages.return_value = []
@@ -89,8 +93,8 @@ class TestAgentBotRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(B, "SileroVADAnalyzer"), \
              patch.object(B, "LocalSmartTurnAnalyzerV3"), \
              patch.object(B, "Pipeline"), \
-             patch.object(B, "PipelineTask"), \
-             patch.object(B, "PipelineRunner", return_value=fake_runner), \
+             patch.object(B, "PipelineWorker"), \
+             patch.object(B, "WorkerRunner", return_value=fake_runner), \
              patch.object(B, "LLMContext", return_value=fake_context), \
              patch.object(B, "LLMContextAggregatorPair"):
             await B.run_bot(
