@@ -296,12 +296,10 @@ per-provider params still need manual mirroring.)
 and voice in `create_*_service` matches the shared source for every language. If
 you add a provider or change a default, update both sides
 and that test. **Sarvam STT** uses `saaras:v3` with `mode="transcribe"` (passed
-to pipecat's `SarvamSTTService`), which under pipecat 1.0.0 routes to the plain
-STT streaming endpoint — matching the benchmark's `transcribe_sarvam`. This was
-impossible under pipecat 0.0.98 (its wrapper forced `saaras` onto the *translate*
-endpoint with no `mode` param), so Sarvam STT was excluded there; the 1.0.0
-upgrade removed that limitation and it's now single-sourced like every other
-provider. Sarvam **TTS** is likewise in `TTS_PROVIDER_MODELS` (`bulbul:v3`).
+to pipecat's `SarvamSTTService`), which routes to the plain STT streaming
+endpoint — matching the benchmark's `transcribe_sarvam` — and is single-sourced
+like every other provider. Sarvam **TTS** is likewise in `TTS_PROVIDER_MODELS`
+(`bulbul:v3`).
 
 ### Resumability
 `run_stt_eval` / `run_tts_eval` write `results.csv` row-by-row and skip already
@@ -479,8 +477,17 @@ one line, but still give the exact command.
   `tests/`.
 - The `out/` folder appears inside several module dirs (e.g. `calibrate_agent/stt/out`).
   These are gitignored runtime artifacts from local runs — don't commit them.
-- `pipecat-ai` is pinned to `1.0.0` because the API surface changes between
-  versions; bump deliberately and re-test the agent simulation paths.
+- `pipecat-ai` is pinned to `1.11.0` because the API surface changes between
+  versions; bump deliberately and re-test the agent simulation paths. Its
+  `runner` extra installs `pipecat-ai-prebuilt`, the browser UI the development
+  runner serves at `/client` for `calibrate_agent/agent/test.py`.
+- `openai` is capped at `<3`: openai 3 switches to `httpx2` and verifies TLS
+  against the OS trust store, which breaks in slim containers and behind
+  TLS-inspecting proxies. Lift the cap only when a feature needs it.
+- The RTVI `bot-output` parser in `agent/run_simulation.py` reads both RTVI
+  protocol formats: 1.x (`spoken: true` per word) and 2.x (`spoken_status` /
+  `spoken_progress`). Which one arrives depends on the pipecat version of the
+  agent under test, not ours.
 
 ## Useful pointers when debugging
 
