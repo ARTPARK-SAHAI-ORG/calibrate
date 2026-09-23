@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 from calibrate_agent.utils import (
     configure_print_logger,
+    split_model_provider,
     log_and_print,
     build_tools_schema,
     provider_log_file,
@@ -567,16 +568,20 @@ async def _run_inference_inner(
 ) -> dict:
     """Inner implementation of run_inference."""
     # Create LLM service
+    model_id, provider_routing = split_model_provider(model, provider)
     if provider == "openrouter":
         llm = CostTrackingOpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=model),
+            settings=OpenRouterLLMService.Settings(
+                model=model_id,
+                extra={"extra_body": provider_routing} if provider_routing else {},
+            ),
         )
     else:
         llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=model),
+            settings=OpenAILLMService.Settings(model=model_id),
         )
 
     # Create context with system prompt
@@ -2042,6 +2047,9 @@ async def run_model_tests(
             ``results.json`` (matched by test-case ``id``) so an interrupted run
             resumes instead of re-evaluating everything. Set True for a clean run.
     """
+    # Reject an unroutable model@serving_provider before any run directory exists
+    split_model_provider(model, provider)
+
     # Build model folder name: for openai provider, prefix with provider name
     save_folder_name = f"{provider}/{model}" if provider == "openai" else f"{model}"
     save_folder_name = save_folder_name.replace("/", "__")

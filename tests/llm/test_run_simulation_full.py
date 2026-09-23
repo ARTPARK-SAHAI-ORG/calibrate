@@ -117,3 +117,50 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSimulationServingProvider(unittest.IsolatedAsyncioTestCase):
+    async def test_serving_provider_pins_the_bot_model_only(self):
+        from calibrate_agent.llm import run_simulation as RS
+
+        fake_llm = MagicMock()
+        fake_llm.register_function = MagicMock()
+        fake_runner = MagicMock()
+        fake_runner.run = AsyncMock(return_value=None)
+        fake_context = MagicMock()
+        fake_context._messages = [{"role": "system", "content": "sp"}]
+        fake_context.get_messages.return_value = []
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RS, "OpenAILLMService"), \
+             patch.object(RS, "OpenRouterLLMService", return_value=fake_llm) as fake_service, \
+             patch.object(RS, "PipelineTask"), \
+             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
+             patch.object(RS, "Pipeline"), \
+             patch.object(RS, "LLMContext", return_value=fake_context), \
+             patch.object(RS, "LLMContextAggregatorPair"), \
+             patch.object(RS, "evaluate_simuation",
+                          AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}})):
+            await RS.run_simulation(
+                bot_system_prompt="bp",
+                tools=[],
+                user_system_prompt="up",
+                evaluators=[{"name": "x", "system_prompt": "x", "judge_model": "m"}],
+                bot_model="meta-llama/llama-3.3-70b-instruct@together",
+                user_model="openai/gpt-4.1",
+                bot_provider="openrouter",
+                user_provider="openrouter",
+                output_dir=tmp,
+                max_turns=1,
+            )
+
+        bot_settings, user_settings = [
+            call.kwargs for call in fake_service.Settings.call_args_list
+        ]
+        self.assertEqual(bot_settings["model"], "meta-llama/llama-3.3-70b-instruct")
+        self.assertEqual(
+            bot_settings["extra"],
+            {"extra_body": {"provider": {"only": ["together"], "allow_fallbacks": False}}},
+        )
+        self.assertEqual(user_settings["model"], "openai/gpt-4.1")
+        self.assertEqual(user_settings["extra"], {})

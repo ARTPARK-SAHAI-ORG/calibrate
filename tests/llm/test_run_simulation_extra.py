@@ -236,6 +236,38 @@ class TestRunSimulationWithAgent(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(result["transcript"], [])
 
+    async def test_serving_provider_pins_the_user_simulator_call(self):
+        from calibrate_agent.llm import run_simulation as RS
+
+        fake_user_resp = MagicMock()
+        fake_user_resp.choices = [MagicMock(message=MagicMock(content="hi"))]
+
+        fake_user_client = MagicMock()
+        fake_user_client.chat.completions.create = AsyncMock(return_value=fake_user_resp)
+
+        fake_agent = MagicMock()
+        fake_agent.call = AsyncMock(return_value={"response": "agent", "tool_calls": []})
+
+        with patch("openai.AsyncOpenAI", return_value=fake_user_client), \
+             patch.object(RS, "evaluate_simuation",
+                          AsyncMock(return_value={"x": {"match": True, "reasoning": "ok"}})):
+            await RS.run_simulation_with_agent(
+                agent=fake_agent,
+                user_system_prompt="up",
+                evaluators=[_bin_ev("x")],
+                max_turns=1,
+                agent_speaks_first=False,
+                user_model="meta-llama/llama-3.3-70b-instruct@together",
+                user_provider="openrouter",
+            )
+
+        call = fake_user_client.chat.completions.create.call_args.kwargs
+        self.assertEqual(call["model"], "meta-llama/llama-3.3-70b-instruct")
+        self.assertEqual(
+            call["extra_body"],
+            {"provider": {"only": ["together"], "allow_fallbacks": False}},
+        )
+
     async def test_openrouter_user_provider(self):
         from calibrate_agent.llm import run_simulation as RS
 

@@ -918,3 +918,68 @@ def pytest_approx(value, tol=1e-9):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSplitModelProvider(unittest.TestCase):
+    def test_plain_model_is_unchanged(self):
+        from calibrate_agent.utils import split_model_provider
+
+        self.assertEqual(
+            split_model_provider("openai/gpt-4.1", "openrouter"),
+            ("openai/gpt-4.1", None),
+        )
+
+    def test_serving_provider_becomes_request_body(self):
+        from calibrate_agent.utils import split_model_provider
+
+        model, routing = split_model_provider(
+            "meta-llama/llama-3.3-70b-instruct@together", "openrouter"
+        )
+        self.assertEqual(model, "meta-llama/llama-3.3-70b-instruct")
+        self.assertEqual(
+            routing,
+            {"provider": {"only": ["together"], "allow_fallbacks": False}},
+        )
+
+    def test_endpoint_slug_with_a_slash(self):
+        from calibrate_agent.utils import split_model_provider
+
+        _, routing = split_model_provider("x/y@deepinfra/turbo", "openrouter")
+        self.assertEqual(routing["provider"]["only"], ["deepinfra/turbo"])
+
+    def test_empty_serving_provider_raises(self):
+        from calibrate_agent.utils import split_model_provider
+
+        with self.assertRaises(ValueError):
+            split_model_provider("openai/gpt-4.1@", "openrouter")
+
+    def test_serving_provider_rejected_for_other_providers(self):
+        from calibrate_agent.utils import split_model_provider
+
+        with self.assertRaises(ValueError):
+            split_model_provider("gpt-4.1@together", "openai")
+
+
+class TestProviderPinningReachesTheRequest(unittest.TestCase):
+    """The pinned provider has to survive into the chat-completion call itself."""
+
+    def test_extra_body_lands_in_chat_completion_params(self):
+        from pipecat.services.openrouter.llm import OpenRouterLLMService
+        from calibrate_agent.utils import split_model_provider
+
+        model, routing = split_model_provider(
+            "meta-llama/llama-3.3-70b-instruct@together", "openrouter"
+        )
+        service = OpenRouterLLMService(
+            api_key="sk-fake",
+            settings=OpenRouterLLMService.Settings(
+                model=model, extra={"extra_body": routing}
+            ),
+        )
+        params = service.build_chat_completion_params({})
+
+        self.assertEqual(params["model"], "meta-llama/llama-3.3-70b-instruct")
+        self.assertEqual(
+            params["extra_body"],
+            {"provider": {"only": ["together"], "allow_fallbacks": False}},
+        )

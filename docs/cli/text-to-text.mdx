@@ -681,6 +681,19 @@ Multiple models (benchmark — runs in parallel, generates a leaderboard):
 calibrate-agent llm -c config.json -m openai/gpt-4.1 claude-sonnet-4-5 -p openrouter -o ./out
 ```
 
+Pin a model to one serving provider (OpenRouter only). OpenRouter serves most
+models from several upstream providers and picks one per request, so speed and
+cost can move between runs. Append `@` and the provider slug to fix the choice:
+
+```bash
+calibrate-agent llm -c config.json -m meta-llama/llama-3.3-70b-instruct@together meta-llama/llama-3.3-70b-instruct@deepinfra -p openrouter -o ./out
+```
+
+Each pinned run gets its own row on the leaderboard, named with the slug.
+Copy the slug from the provider list on the model's page on OpenRouter. To
+target one region or variant, use the full slug, such as
+`@google-vertex/us-east5`.
+
 **Agent connection:**
 
 Your config must include `agent_url` and optionally `agent_headers`:
