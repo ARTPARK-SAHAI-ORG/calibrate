@@ -710,6 +710,49 @@ calibrate-agent llm -c config.json -m gemma-4-26b-a4b-it gpt-4o -o ./out
 
 Each model gets its own results folder, and a summary with pass rates for all models is printed at the end.
 
+**Test one model more than once:**
+
+To evaluate the same model under different request settings, list model variants in the config. A variant is one model plus the extra fields to send with it:
+
+```json
+{
+  "agent_url": "https://your-agent.com/chat",
+  "model_variants": [
+    {
+      "id": "gpt-5-high",
+      "model": "openai/gpt-5",
+      "label": "gpt-5 (high thinking)",
+      "extra": { "reasoning": { "effort": "high" } }
+    },
+    {
+      "id": "gpt-5-low",
+      "model": "openai/gpt-5",
+      "label": "gpt-5 (low thinking)",
+      "extra": { "reasoning": { "effort": "low" } }
+    }
+  ]
+}
+```
+
+```bash
+calibrate-agent llm -c config.json -o ./out
+```
+
+Each variant is verified and then run on its own, in parallel, like separate models.
+
+- `id` names the variant's results folder, used as written apart from surrounding spaces, and must be unique in the run. Ids that cannot be folder names are rejected before the run starts: an id may not be empty, `.`, `..` or `leaderboard`, may not contain `/` or `\`, and two ids may not differ only in upper and lower case.
+- `model` is sent as the `model` field of every request, and may repeat across variants.
+- `label` is the display name, shown in the run output and in the leaderboard's `label` column. It defaults to the id.
+- `extra` must be a JSON object. Its contents are sent as-is in every request body, alongside `model` rather than nested inside it, and nothing in them is checked or restricted.
+
+Request fields are merged in this order, each step overwriting the one before it: `agent_default_inputs`, the variant's `extra`, the test case's `inputs`, and finally `model`. A test case can therefore override a variant, and nothing can override `model`.
+
+In the leaderboard, the `model` column holds the variant id and the `label` column its display name.
+
+Rerunning into the same output directory picks up where an interrupted run stopped. A variant whose `extra` changed is run again from the start, so its results always match the fields that were sent.
+
+When the config lists `model_variants`, they replace `-m` entirely, and the config also needs `agent_url`.
+
 **Skip verification:**
 
 Pass `--skip-verify` to skip the agent connection verification step. This is useful in CI/automation pipelines where you've already confirmed the agent is reachable:

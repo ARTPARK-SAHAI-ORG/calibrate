@@ -1,10 +1,12 @@
 """Tests for calibrate_agent/cli.py — entry point and subcommand dispatching."""
 
 import asyncio
+import io
 import json
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -441,6 +443,82 @@ class TestMainDispatch(unittest.TestCase):
                 self.assertEqual(
                     kwargs.get("default_inputs"), {"condition_area": "cardiology"}
                 )
+
+    def test_llm_with_config_model_variants(self):
+        """model_variants in the config reach tests.run, and each variant is
+        verified with its own extra request fields."""
+        variants = [
+            {"id": "gpt-5#1", "model": "openai/gpt-5", "label": "high",
+             "extra": {"reasoning": {"effort": "high"}}},
+            {"id": "gpt-5#2", "model": "openai/gpt-5", "label": "low",
+             "extra": {"reasoning": {"effort": "low"}}},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "model_variants": variants,
+                "test_cases": [],
+            }))
+            run_mock = AsyncMock(return_value={
+                "gpt-5#1": {"metrics": {"passed": 1, "total": 1}},
+                "gpt-5#2": {"metrics": {"passed": 0, "total": 1}},
+            })
+            verify_mock = AsyncMock(return_value={"ok": True, "sample_output": {}})
+            printed = io.StringIO()
+            with patch("calibrate_agent.connections.TextAgentConnection.verify",
+                       verify_mock), \
+                 patch("calibrate_agent.llm.tests_leaderboard.generate_leaderboard"), \
+                 patch("calibrate_agent.llm.tests.run", run_mock), \
+                 redirect_stdout(printed):
+                self._run_with_argv([
+                    "calibrate_agent", "llm", "-c", str(cfg), "-o", tmp,
+                ])
+
+            self.assertEqual(
+                [call.kwargs for call in verify_mock.await_args_list],
+                [
+                    {"model": "openai/gpt-5", "extra": {"reasoning": {"effort": "high"}}},
+                    {"model": "openai/gpt-5", "extra": {"reasoning": {"effort": "low"}}},
+                ],
+            )
+            _, kwargs = run_mock.call_args
+            self.assertEqual([v["id"] for v in kwargs["variants"]],
+                             ["gpt-5#1", "gpt-5#2"])
+            self.assertIsNone(kwargs.get("models"))
+            # The summary names the variants by label, not by id.
+            self.assertIn("high: 1/1", printed.getvalue())
+            self.assertIn("low: 0/1", printed.getvalue())
+
+    def test_llm_config_model_variants_need_an_agent_url(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text(json.dumps({
+                "model_variants": [{"id": "v1", "model": "m"}],
+                "test_cases": [],
+            }))
+            with patch("calibrate_agent.llm.benchmark.main") as bench:
+                with self.assertRaises(SystemExit):
+                    self._run_with_argv([
+                        "calibrate_agent", "llm", "-c", str(cfg), "-o", tmp,
+                    ])
+            bench.assert_not_called()
+
+    def test_llm_config_rejects_unusable_variant_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Path(tmp) / "config.json"
+            cfg.write_text(json.dumps({
+                "agent_url": "http://x",
+                "model_variants": [{"id": "a/b", "model": "m"}],
+                "test_cases": [],
+            }))
+            with patch("calibrate_agent.llm.tests.run", AsyncMock()) as run_mock:
+                with self.assertRaises(SystemExit):
+                    self._run_with_argv([
+                        "calibrate_agent", "llm", "-c", str(cfg), "-o", tmp,
+                        "--skip-verify",
+                    ])
+            run_mock.assert_not_awaited()
 
     def test_llm_with_config_agent_url_no_models(self):
         with tempfile.TemporaryDirectory() as tmp:
