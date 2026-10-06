@@ -166,20 +166,20 @@ class TestLanguageCodes(unittest.TestCase):
         from calibrate_agent.utils import get_stt_language_code
 
         # Sample a few providers + languages
-        self.assertEqual(get_stt_language_code("hindi", "sarvam"), "hi-IN")
-        self.assertEqual(get_stt_language_code("english", "google"), "en-US")
-        self.assertEqual(get_stt_language_code("english", "smallest"), "en")
-        self.assertEqual(get_stt_language_code("english", "cartesia"), "en")
-        self.assertEqual(get_stt_language_code("english", "elevenlabs"), "eng")
-        self.assertEqual(get_stt_language_code("english", "openai"), "en")
-        self.assertEqual(get_stt_language_code("english", "groq"), "en")
-        self.assertEqual(get_stt_language_code("bengali", "groq"), "bn")
-        self.assertEqual(get_stt_language_code("mandarin", "groq"), "zh")
-        self.assertEqual(get_stt_language_code("myanmar", "groq"), "my")
-        self.assertEqual(get_stt_language_code("burmese", "groq"), "my")
-        self.assertEqual(get_stt_language_code("haitian creole", "groq"), "ht")
-        self.assertEqual(get_stt_language_code("bengali", "openai"), "en")
-        self.assertEqual(get_stt_language_code("english", "deepgram"), "en")
+        self.assertEqual(get_stt_language_code("hindi", "sarvam-saaras-v3"), "hi-IN")
+        self.assertEqual(get_stt_language_code("english", "google-chirp-3"), "en-US")
+        self.assertEqual(get_stt_language_code("english", "smallest-pulse"), "en")
+        self.assertEqual(get_stt_language_code("english", "cartesia-ink-whisper"), "en")
+        self.assertEqual(get_stt_language_code("english", "elevenlabs-scribe-v2-realtime"), "eng")
+        self.assertEqual(get_stt_language_code("english", "openai-gpt-4o-transcribe"), "en")
+        self.assertEqual(get_stt_language_code("english", "groq-whisper-large-v3-turbo"), "en")
+        self.assertEqual(get_stt_language_code("bengali", "groq-whisper-large-v3-turbo"), "bn")
+        self.assertEqual(get_stt_language_code("mandarin", "groq-whisper-large-v3-turbo"), "zh")
+        self.assertEqual(get_stt_language_code("myanmar", "groq-whisper-large-v3-turbo"), "my")
+        self.assertEqual(get_stt_language_code("burmese", "groq-whisper-large-v3-turbo"), "my")
+        self.assertEqual(get_stt_language_code("haitian creole", "groq-whisper-large-v3-turbo"), "ht")
+        self.assertEqual(get_stt_language_code("bengali", "openai-gpt-4o-transcribe"), "en")
+        self.assertEqual(get_stt_language_code("english", "deepgram-nova-3"), "en")
         # Unknown provider falls through to default
         self.assertEqual(get_stt_language_code("english", "unknown"), "en")
 
@@ -198,7 +198,7 @@ class TestLanguageCodes(unittest.TestCase):
     def test_legacy_get_language_code(self):
         from calibrate_agent.utils import get_language_code
 
-        self.assertEqual(get_language_code("hindi", "sarvam"), "hi-IN")
+        self.assertEqual(get_language_code("hindi", "sarvam-saaras-v3"), "hi-IN")
 
     def test_validate_stt_language_unknown_provider(self):
         from calibrate_agent.utils import validate_stt_language
@@ -210,12 +210,12 @@ class TestLanguageCodes(unittest.TestCase):
         from calibrate_agent.utils import validate_stt_language
 
         with self.assertRaises(ValueError):
-            validate_stt_language("klingon", "google")
+            validate_stt_language("klingon", "google-chirp-3")
 
     def test_validate_stt_language_supported(self):
         from calibrate_agent.utils import validate_stt_language
 
-        validate_stt_language("english", "google")
+        validate_stt_language("english", "google-chirp-3")
 
     def test_validate_tts_language_unknown_provider(self):
         from calibrate_agent.utils import validate_tts_language
@@ -242,8 +242,8 @@ class TestLanguageCodes(unittest.TestCase):
             validate_tts_language,
         )
 
-        self.assertEqual(get_stt_language_code("maithili", "sarvam"), "mai-IN")
-        validate_stt_language("maithili", "sarvam")
+        self.assertEqual(get_stt_language_code("maithili", "sarvam-saaras-v3"), "mai-IN")
+        validate_stt_language("maithili", "sarvam-saaras-v3")
 
         # Sarvam TTS does not support Maithili
         with self.assertRaises(ValueError):
@@ -252,42 +252,65 @@ class TestLanguageCodes(unittest.TestCase):
         self.assertEqual(get_tts_language_code("maithili", "sarvam"), "en-IN")
 
 
+class TestResolveSTTProvider(unittest.TestCase):
+    def test_vendor_names_select_the_default_provider(self):
+        from calibrate_agent.utils import resolve_stt_provider
+
+        self.assertEqual(resolve_stt_provider("sarvam"), "sarvam-saaras-v3")
+        self.assertEqual(resolve_stt_provider("google"), "google-chirp-3")
+        self.assertEqual(resolve_stt_provider("deepgram"), "deepgram-nova-3")
+
+    def test_full_and_unknown_names_are_unchanged(self):
+        from calibrate_agent.utils import resolve_stt_provider
+
+        self.assertEqual(resolve_stt_provider("sarvam-saaras-v4"), "sarvam-saaras-v4")
+        self.assertEqual(resolve_stt_provider("not-a-provider"), "not-a-provider")
+
+    def test_every_default_is_a_known_provider(self):
+        from calibrate_agent.stt.eval import STT_PROVIDERS
+        from calibrate_agent.utils import STT_PROVIDER_MODELS, STT_VENDOR_DEFAULTS
+
+        for vendor, provider in STT_VENDOR_DEFAULTS.items():
+            self.assertIn(provider, STT_PROVIDERS, vendor)
+            self.assertIn(provider, STT_PROVIDER_MODELS, vendor)
+
+
 class TestGetSTTLanguageEnum(unittest.TestCase):
     def test_sarvam_kannada(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("kannada", "sarvam"), Language.KN_IN)
+        self.assertEqual(get_stt_language("kannada", "sarvam-saaras-v3"), Language.KN_IN)
 
     def test_sarvam_hindi(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("hindi", "sarvam"), Language.HI_IN)
+        self.assertEqual(get_stt_language("hindi", "sarvam-saaras-v3"), Language.HI_IN)
 
     def test_sarvam_english(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("english", "sarvam"), Language.EN_IN)
+        self.assertEqual(get_stt_language("english", "sarvam-saaras-v3"), Language.EN_IN)
 
     def test_default_kannada(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("kannada", "deepgram"), Language.KN)
+        self.assertEqual(get_stt_language("kannada", "deepgram-nova-3"), Language.KN)
 
     def test_default_hindi(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("hindi", "deepgram"), Language.HI)
+        self.assertEqual(get_stt_language("hindi", "deepgram-nova-3"), Language.HI)
 
     def test_default_english(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("english", "deepgram"), Language.EN)
+        self.assertEqual(get_stt_language("english", "deepgram-nova-3"), Language.EN)
 
 
 class TestGetTTSLanguageEnum(unittest.TestCase):

@@ -118,7 +118,7 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_basic(self):
         from calibrate_agent.stt import benchmark as B
 
-        fake_result = {"provider": "deepgram", "status": "completed",
+        fake_result = {"provider": "deepgram-nova-3", "status": "completed",
                        "metrics": {"wer": 0.1,
                                    "semantic_match": {"type": "binary", "mean": 0.9}}}
         with tempfile.TemporaryDirectory() as tmp:
@@ -131,24 +131,24 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
                               AsyncMock(return_value=fake_result)), \
                  patch.object(B, "generate_leaderboard"):
                 result = await B.run(
-                    providers=["deepgram", "google"],
+                    providers=["deepgram-nova-3", "google-chirp-3"],
                     input_dir=str(base),
                     output_dir=output_dir,
                 )
         self.assertEqual(result["status"], "completed")
-        self.assertIn("deepgram", result["providers"])
+        self.assertIn("deepgram-nova-3", result["providers"])
 
     async def test_run_forwards_intent_entity_to_provider_eval(self):
         from calibrate_agent.stt import benchmark as B
 
-        fake_result = {"provider": "deepgram", "status": "completed",
+        fake_result = {"provider": "deepgram-nova-3", "status": "completed",
                        "metrics": {"wer": 0.1}}
         mock_eval = AsyncMock(return_value=fake_result)
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(B, "run_single_provider_eval", mock_eval), \
              patch.object(B, "generate_leaderboard"):
             await B.run(
-                providers=["deepgram"],
+                providers=["deepgram-nova-3"],
                 input_dir=tmp,
                 output_dir=tmp,
                 run_llm_judges=True,
@@ -158,14 +158,14 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
     async def test_run_leaderboard_error(self):
         from calibrate_agent.stt import benchmark as B
 
-        fake_result = {"provider": "deepgram", "status": "completed",
+        fake_result = {"provider": "deepgram-nova-3", "status": "completed",
                        "metrics": {"wer": 0.1}}
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(B, "run_single_provider_eval",
                           AsyncMock(return_value=fake_result)), \
              patch.object(B, "generate_leaderboard", side_effect=Exception("lb fail")):
             result = await B.run(
-                providers=["deepgram"],
+                providers=["deepgram-nova-3"],
                 input_dir=tmp,
                 output_dir=tmp,
             )
@@ -181,13 +181,32 @@ class TestSTTBenchmarkRun(unittest.IsolatedAsyncioTestCase):
              patch.object(B, "generate_leaderboard"):
             with self.assertRaises(ValueError) as ctx:
                 await B.run(
-                    providers=["sarvam", "deepgram-flux"],
+                    providers=["sarvam-saaras-v3", "deepgram-flux"],
                     input_dir=tmp,
                     output_dir=tmp,
                     language="kannada",
                 )
-        self.assertIn("'deepgram'", str(ctx.exception))
+        self.assertIn("'deepgram-nova-3'", str(ctx.exception))
         mock_eval.assert_not_called()
+
+    async def test_run_resolves_vendor_names_and_runs_each_provider_once(self):
+        from calibrate_agent.stt import benchmark as B
+
+        mock_eval = AsyncMock(return_value={"status": "completed", "metrics": {}})
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(B, "run_single_provider_eval", mock_eval), \
+             patch.object(B, "generate_leaderboard"):
+            result = await B.run(
+                providers=["sarvam", "sarvam-saaras-v3", "deepgram"],
+                input_dir=tmp,
+                output_dir=tmp,
+            )
+        self.assertEqual(
+            [c.kwargs["provider"] for c in mock_eval.call_args_list],
+            ["sarvam-saaras-v3", "deepgram-nova-3"],
+        )
+        self.assertIn("sarvam-saaras-v3", result["providers"])
+
 
 
 class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
@@ -213,7 +232,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             self._make_input_dir(base)
-            argv = ["b.py", "-p", "openai-transcribe", "openai-live",
+            argv = ["b.py", "-p", "openai-gpt-transcribe", "openai-gpt-live-transcribe",
                     "-l", "odia", "-i", str(base), "-o", str(base / "out")]
             mock_run = AsyncMock()
             with patch.object(sys, "argv", argv), \
@@ -223,12 +242,63 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                     await B.main()
         mock_run.assert_not_called()
         output = " ".join(str(c.args[0]) for c in printed.call_args_list if c.args)
-        self.assertIn("'openai-transcribe'", output)
+        self.assertIn("'openai-gpt-transcribe'", output)
+
+    async def test_main_accepts_vendor_names(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            argv = ["b.py", "-p", "google", "sarvam", "-i", str(base), "-o", str(base / "out")]
+            mock_run = AsyncMock(return_value={"status": "completed", "providers": {},
+                                               "output_dir": "", "leaderboard_dir": ""})
+            with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
+                await B.main()
+        self.assertEqual(
+            mock_run.call_args.kwargs["providers"], ["google-chirp-3", "sarvam-saaras-v3"]
+        )
+
+    async def test_main_summary_with_vendor_name_reports_failed_run(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            argv = ["b.py", "-p", "sarvam", "-i", str(base), "-o", str(base / "out")]
+            failed = {"status": "completed", "output_dir": "", "leaderboard_dir": "",
+                      "providers": {"sarvam-saaras-v3": {"status": "error", "error": "boom"}}}
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run", AsyncMock(return_value=failed)), \
+                 patch("builtins.print") as printed:
+                with self.assertRaises(SystemExit) as ctx:
+                    await B.main()
+        self.assertEqual(ctx.exception.code, 1)
+        output = " ".join(str(c.args[0]) for c in printed.call_args_list if c.args)
+        self.assertIn("sarvam-saaras-v3", output)
+        self.assertIn("boom", output)
+
+    async def test_main_invalid_provider_lists_vendor_names(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            argv = ["b.py", "-p", "sarvamm", "-i", str(base), "-o", str(base / "out")]
+            with patch.object(sys, "argv", argv), \
+                 patch.object(B, "run", AsyncMock()) as mock_run, \
+                 patch("builtins.print") as printed:
+                with self.assertRaises(SystemExit):
+                    await B.main()
+        mock_run.assert_not_called()
+        output = " ".join(str(c.args[0]) for c in printed.call_args_list if c.args)
+        self.assertIn("'sarvamm'", output)
+        self.assertIn("Vendor names", output)
 
     async def test_main_invalid_input(self):
         from calibrate_agent.stt import benchmark as B
 
-        argv = ["b.py", "-p", "deepgram", "-i", "/nonexistent/missing",
+        argv = ["b.py", "-p", "deepgram-nova-3", "-i", "/nonexistent/missing",
                 "-o", "/tmp/x"]
         with patch.object(sys, "argv", argv):
             with self.assertRaises(SystemExit):
@@ -345,7 +415,7 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
         from calibrate_agent.stt import benchmark as B
 
         with tempfile.TemporaryDirectory() as tmp:
-            argv = ["b.py", "-p", "deepgram", "-o", tmp]
+            argv = ["b.py", "-p", "deepgram-nova-3", "-o", tmp]
             with patch.object(sys, "argv", argv):
                 with self.assertRaises(SystemExit):
                     await B.main()
@@ -363,12 +433,12 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 "output_dir": str(out),
                 "leaderboard_dir": str(out / "leaderboard"),
                 "providers": {
-                    "deepgram": {"status": "completed",
+                    "deepgram-nova-3": {"status": "completed",
                                  "metrics": {"wer": 0.1,
                                              "semantic_match": {"type": "binary", "mean": 0.9}}},
                 },
             }
-            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
+            argv = ["b.py", "-p", "deepgram-nova-3", "-i", str(base), "-o", str(out)]
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
                 await B.main()
@@ -386,13 +456,13 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 "output_dir": str(out),
                 "leaderboard_dir": str(out / "leaderboard"),
                 "providers": {
-                    "deepgram": {"status": "completed", "metrics": {"wer": 0.1}},
+                    "deepgram-nova-3": {"status": "completed", "metrics": {"wer": 0.1}},
                 },
             }
             mock_run = AsyncMock(return_value=fake_run_result)
 
             # Default on.
-            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
+            argv = ["b.py", "-p", "deepgram-nova-3", "-i", str(base), "-o", str(out)]
             with patch.object(sys, "argv", argv), patch.object(B, "run", mock_run):
                 await B.main()
             self.assertTrue(mock_run.call_args.kwargs["run_llm_judges"])
@@ -416,10 +486,10 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 "output_dir": str(out),
                 "leaderboard_dir": str(out / "leaderboard"),
                 "providers": {
-                    "deepgram": {"status": "error", "error": "boom"},
+                    "deepgram-nova-3": {"status": "error", "error": "boom"},
                 },
             }
-            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out)]
+            argv = ["b.py", "-p", "deepgram-nova-3", "-i", str(base), "-o", str(out)]
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run", AsyncMock(return_value=fake_run_result)):
                 with self.assertRaises(SystemExit):
@@ -440,10 +510,10 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 "output_dir": str(out),
                 "leaderboard_dir": str(out / "leaderboard"),
                 "providers": {
-                    "deepgram": "error: lb",
+                    "deepgram-nova-3": "error: lb",
                 },
             }
-            argv = ["b.py", "-p", "deepgram", "-i", str(base), "-o", str(out),
+            argv = ["b.py", "-p", "deepgram-nova-3", "-i", str(base), "-o", str(out),
                     "-c", str(cfg)]
             with patch.object(sys, "argv", argv), \
                  patch.object(B, "run", AsyncMock(return_value=fake_run_result)):

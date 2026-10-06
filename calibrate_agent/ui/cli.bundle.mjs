@@ -46771,7 +46771,7 @@ var TTS_PROVIDERS = [
 ];
 var STT_PROVIDERS = [
   {
-    id: "deepgram",
+    id: "deepgram-nova-3",
     name: "Deepgram",
     envVar: "DEEPGRAM_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46785,7 +46785,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "openai",
+    id: "openai-gpt-4o-transcribe",
     name: "OpenAI",
     envVar: "OPENAI_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46797,7 +46797,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "groq",
+    id: "groq-whisper-large-v3-turbo",
     name: "Groq",
     envVar: "GROQ_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46809,7 +46809,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "cartesia",
+    id: "cartesia-ink-whisper",
     name: "Cartesia",
     envVar: "CARTESIA_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46827,7 +46827,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "smallest",
+    id: "smallest-pulse",
     name: "Smallest AI",
     envVar: "SMALLEST_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46844,7 +46844,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "google",
+    id: "google-chirp-3",
     name: "Google Cloud",
     envVar: "GOOGLE_APPLICATION_CREDENTIALS",
     isFilePath: true,
@@ -46864,7 +46864,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "sarvam",
+    id: "sarvam-saaras-v3",
     name: "Sarvam AI",
     envVar: "SARVAM_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46882,7 +46882,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "elevenlabs",
+    id: "elevenlabs-scribe-v2-realtime",
     name: "ElevenLabs",
     envVar: "ELEVENLABS_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46907,7 +46907,7 @@ var STT_PROVIDERS = [
     languages: /* @__PURE__ */ new Set(["english", "hindi"])
   },
   {
-    id: "openai-live",
+    id: "openai-gpt-live-transcribe",
     name: "OpenAI Live (gpt-live-transcribe)",
     envVar: "OPENAI_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46919,7 +46919,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "openai-transcribe",
+    id: "openai-gpt-transcribe",
     name: "OpenAI Transcribe (gpt-transcribe)",
     envVar: "OPENAI_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46939,7 +46939,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "sarvam-v4",
+    id: "sarvam-saaras-v4-realtime",
     name: "Sarvam AI v4 Realtime",
     envVar: "SARVAM_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46959,7 +46959,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "sarvam-v3-realtime",
+    id: "sarvam-saaras-v3-realtime",
     name: "Sarvam AI v3 Realtime",
     envVar: "SARVAM_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -46979,7 +46979,7 @@ var STT_PROVIDERS = [
     ])
   },
   {
-    id: "sarvam-v4-manual",
+    id: "sarvam-saaras-v4",
     name: "Sarvam AI v4 (streaming, our end-of-speech detection)",
     envVar: "SARVAM_API_KEY",
     languages: /* @__PURE__ */ new Set([
@@ -47031,6 +47031,12 @@ function getTtsProvidersForLanguage(language) {
 }
 function getSttProvidersForLanguage(language) {
   return STT_PROVIDERS.filter((p) => p.languages.has(language));
+}
+function outputDirName(provider, mode2, language) {
+  if (mode2 === "stt" && provider === "deepgram-flux") {
+    return language === "english" ? "deepgram-flux-general-en" : "deepgram-flux-general-multi";
+  }
+  return provider;
 }
 function getProvidersForLanguage(language, mode2) {
   return mode2 === "tts" ? getTtsProvidersForLanguage(language) : getSttProvidersForLanguage(language);
@@ -48897,10 +48903,12 @@ function SimulationsApp({ onBack }) {
         const configData = JSON.parse(
           fs5.readFileSync(config.configPath, "utf-8")
         );
-        const sttProvider = configData.stt?.provider || "google";
+        const sttProvider = configData.stt?.provider || "google-chirp-3";
         const ttsProvider = configData.tts?.provider || "google";
         const llmProvider = configData.llm?.provider || "openrouter";
-        for (const p of [sttProvider, ttsProvider, llmProvider]) {
+        const sttKey = getSttProviderById(sttProvider)?.envVar ?? PROVIDER_KEY_MAP[sttProvider];
+        if (sttKey) addIfMissing(sttKey);
+        for (const p of [ttsProvider, llmProvider]) {
           const key = PROVIDER_KEY_MAP[p];
           if (key) addIfMissing(key);
         }
@@ -50592,7 +50600,7 @@ function RunStep({
         try {
           const metricsPath = path5.join(
             config.outputDir,
-            provider,
+            outputDirName(provider, config.mode, config.language),
             "metrics.json"
           );
           const raw = JSON.parse(fs6.readFileSync(metricsPath, "utf-8"));
@@ -50741,13 +50749,13 @@ function LeaderboardStep({ config }) {
       try {
         const metricsPath = path5.join(
           config.outputDir,
-          provider,
+          outputDirName(provider, config.mode, config.language),
           "metrics.json"
         );
         const data = JSON.parse(fs6.readFileSync(metricsPath, "utf-8"));
         const resultsPath = path5.join(
           config.outputDir,
-          provider,
+          outputDirName(provider, config.mode, config.language),
           "results.csv"
         );
         let count = 0;
@@ -50805,7 +50813,7 @@ function LeaderboardStep({ config }) {
     try {
       const resultsPath = path5.join(
         config.outputDir,
-        selectedProvider,
+        outputDirName(selectedProvider, config.mode, config.language),
         "results.csv"
       );
       const csvContent = fs6.readFileSync(resultsPath, "utf-8");
@@ -50847,7 +50855,7 @@ function LeaderboardStep({ config }) {
     try {
       const metricsPath = path5.join(
         config.outputDir,
-        selectedProvider,
+        outputDirName(selectedProvider, config.mode, config.language),
         "metrics.json"
       );
       const data = JSON.parse(fs6.readFileSync(metricsPath, "utf-8"));
@@ -50864,7 +50872,7 @@ function LeaderboardStep({ config }) {
     if (!selectedProvider) return;
     const audioPath = path5.join(
       config.outputDir,
-      selectedProvider,
+      outputDirName(selectedProvider, config.mode, config.language),
       "audios",
       `${rowId}.wav`
     );
@@ -51533,7 +51541,9 @@ function EvalApp({
       return /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
         ConfigOutputStep,
         {
-          providers: config.providers,
+          providers: config.providers.map(
+            (p) => outputDirName(p, config.mode, config.language)
+          ),
           onComplete: (dir, overwrite) => {
             setConfig((c) => ({ ...c, outputDir: dir, overwrite }));
             setStep("config-file");

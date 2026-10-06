@@ -292,6 +292,19 @@ place — reference the constant / call `get_tts_voice`. (Voices are per-languag
 e.g. Cartesia and Smallest ship distinct Hindi/Kannada voices; other
 per-provider params still need manual mirroring.)
 
+Each STT provider name states the model it runs (`deepgram-nova-3`,
+`sarvam-saaras-v3`, `openai-gpt-transcribe`), so a provider's results folder
+names the model. `deepgram-flux` is the one exception: its model depends on the
+language, so `stt_output_name(provider, language)` in `utils.py` returns the
+folder name `deepgram-flux-general-en` or `deepgram-flux-general-multi`. The UI
+mirrors it in `outputDirName` (`ui/source/providers.ts`). TTS provider names are
+vendor names (`cartesia`, `sarvam`), so one vendor's STT and TTS names differ.
+A user can also pass an STT vendor name (`sarvam`, `google`): `resolve_stt_provider`
+maps it to that vendor's default provider through `STT_VENDOR_DEFAULTS` in
+`utils.py`. Every entry point that takes a provider name calls it first
+(`stt/benchmark.py`, `run_single_provider_eval`, `create_stt_service`, the
+agent's `STTConfig`), so results are always stored under the full provider name.
+
 `tests/test_utils_factories.py` guards this: it asserts every provider's model
 and voice in `create_*_service` matches the shared source for every language. If
 you add a provider or change a default, update both sides

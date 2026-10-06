@@ -5,7 +5,7 @@ Library Usage:
     # STT Evaluation (runs eval across providers + generates leaderboard)
     from calibrate_agent.stt import run
     import asyncio
-    asyncio.run(run(providers=["deepgram", "google"], input_dir="./data", output_dir="./out"))
+    asyncio.run(run(providers=["deepgram-nova-3", "google-chirp-3"], input_dir="./data", output_dir="./out"))
 
     # TTS Evaluation (runs eval across providers + generates leaderboard)
     from calibrate_agent.tts import run

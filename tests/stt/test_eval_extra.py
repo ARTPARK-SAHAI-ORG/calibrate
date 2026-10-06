@@ -583,7 +583,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
         while hasattr(inner, "__wrapped__"):
             inner = inner.__wrapped__
         with patch.object(E, "transcribe_deepgram_streaming", fake_fn):
-            result = await inner(Path("/tmp/x.wav"), "ref", "deepgram", "english", "u")
+            result = await inner(Path("/tmp/x.wav"), "ref", "deepgram-nova-3", "english", "u")
         self.assertEqual(result["transcript"], "hello world")
         fake_fn.assert_called_once()
 
@@ -599,7 +599,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
              patch.object(E, "langfuse_enabled", True), \
              patch.object(E, "langfuse", fake_lf), \
              patch.object(E, "create_langfuse_audio_media", return_value=None):
-            await inner(Path("/tmp/x.wav"), "ref", "deepgram", "english", "u")
+            await inner(Path("/tmp/x.wav"), "ref", "deepgram-nova-3", "english", "u")
         fake_lf.update_current_trace.assert_called_once()
 
 
@@ -873,7 +873,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
 
         metrics = E._build_stt_cost_metrics(
-            provider="openai",
+            provider="openai-gpt-4o-transcribe",
             audio_duration_seconds=[60.0],
             model="gpt-4o-transcribe",
         )
@@ -890,7 +890,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
 
         metrics = E._build_stt_cost_metrics(
-            provider="openai",
+            provider="openai-gpt-4o-transcribe",
             audio_duration_seconds=[30.0, 90.0, None],
             model="gpt-4o-transcribe",
         )
@@ -906,7 +906,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
 
         metrics = E._build_stt_cost_metrics(
-            provider="openai",
+            provider="openai-gpt-4o-transcribe",
             audio_duration_seconds=[100.0],
             model="gpt-4o-transcribe",
         )
@@ -917,9 +917,9 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
 
         metrics = E._build_stt_cost_metrics(
-            provider="google",
+            provider="google-chirp-3",
             audio_duration_seconds=[60.0],
-            model=E._default_stt_model("google", "sindhi"),
+            model=E._default_stt_model("google-chirp-3", "sindhi"),
         )
 
         self.assertEqual(metrics["pricing_model"], "chirp_2")
@@ -929,9 +929,9 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
 
         metrics = E._build_stt_cost_metrics(
-            provider="gemini",
+            provider="gemini-3.5-flash",
             audio_duration_seconds=[60.0],
-            model=E._default_stt_model("gemini", "english"),
+            model=E._default_stt_model("gemini-3.5-flash", "english"),
         )
 
         self.assertIsNone(metrics)
@@ -942,7 +942,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt.eval import STT_PROVIDERS
 
         # Cartesia publishes no price for ink-preview.
-        providers_without_per_minute_pricing = {"gemini", "cartesia-ink-preview"}
+        providers_without_per_minute_pricing = {"gemini-3.5-flash", "cartesia-ink-preview"}
         for provider in STT_PROVIDERS:
             if provider in providers_without_per_minute_pricing:
                 continue
@@ -959,9 +959,9 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
 
         metrics = E._build_stt_cost_metrics(
-            provider="sarvam",
+            provider="sarvam-saaras-v3",
             audio_duration_seconds=[120.0],  # 2 minutes
-            model=E._default_stt_model("sarvam", "hindi"),
+            model=E._default_stt_model("sarvam-saaras-v3", "hindi"),
         )
 
         self.assertEqual(metrics["currency"], "INR")
@@ -1035,7 +1035,7 @@ class TestRunStteval(unittest.IsolatedAsyncioTestCase):
                 count = await E.run_stt_eval(
                     gt_data=[{"id": "a", "gt": "X"}, {"id": "b", "gt": "Y"}],
                     audio_dir=audio_dir,
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="english",
                     results_csv_path=str(results_csv),
                     engine="direct",
@@ -1062,9 +1062,9 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
 
             output = Path(tmp) / "out"
             output.mkdir()
-            (output / "deepgram").mkdir()
+            (output / "deepgram-nova-3").mkdir()
             # Pre-existing results.csv to trigger overwrite path
-            (output / "deepgram" / "results.csv").write_text("id,gt,pred\na,hello,hi\n")
+            (output / "deepgram-nova-3" / "results.csv").write_text("id,gt,pred\na,hello,hi\n")
 
             with patch.object(E, "transcribe_audio", AsyncMock(return_value={"transcript": "hello"})), \
                  patch.object(E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}), \
@@ -1075,7 +1075,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                      "per_row": [{"semantic_match": {"match": True, "reasoning": "ok"}}],
                  })):
                 result = await E.run_single_provider_eval(
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="english",
                     input_dir=str(base),
                     input_file_name="stt.csv",
@@ -1088,6 +1088,74 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                 )
             self.assertEqual(result["status"], "completed")
 
+    async def test_deepgram_flux_stores_results_under_the_model_it_ran(self):
+        from calibrate_agent.stt import eval as E
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            (base / "audios" / "a.wav").write_bytes(b"\x00")
+            pd.DataFrame({"id": ["a"], "text": ["hello"]}).to_csv(base / "stt.csv", index=False)
+            output = Path(tmp) / "out"
+
+            with patch.object(E, "transcribe_audio", AsyncMock(return_value={"transcript": "hello"})), \
+                 patch.object(E, "get_audio_duration_seconds", return_value=60.0), \
+                 patch.object(E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}), \
+                 patch.object(E, "get_cer_score", return_value={"score": 0.0, "per_row": [0.0]}):
+                result = await E.run_single_provider_eval(
+                    provider="deepgram-flux",
+                    language="hindi",
+                    input_dir=str(base),
+                    input_file_name="stt.csv",
+                    output_dir=str(output),
+                    debug=False,
+                    debug_count=5,
+                    ignore_retry=False,
+                    overwrite=True,
+                    run_llm_judges=False,
+                    engine="direct",
+                )
+
+            stored = output / "deepgram-flux-general-multi"
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(result["output_dir"], str(stored))
+            self.assertFalse((output / "deepgram-flux").exists())
+            metrics = json.loads((stored / "metrics.json").read_text())
+            self.assertEqual(metrics["cost"]["provider"], "deepgram-flux-general-multi")
+            self.assertEqual(metrics["cost"]["pricing_model"], "flux-general-multi")
+
+    async def test_vendor_name_runs_and_stores_the_default_provider(self):
+        from calibrate_agent.stt import eval as E
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            (base / "audios").mkdir()
+            (base / "audios" / "a.wav").write_bytes(b"\x00")
+            pd.DataFrame({"id": ["a"], "text": ["hello"]}).to_csv(base / "stt.csv", index=False)
+            output = Path(tmp) / "out"
+            transcribe = AsyncMock(return_value={"transcript": "hello"})
+
+            with patch.object(E, "transcribe_audio", transcribe), \
+                 patch.object(E, "get_wer_score", return_value={"score": 0.0, "per_row": [0.0]}), \
+                 patch.object(E, "get_cer_score", return_value={"score": 0.0, "per_row": [0.0]}):
+                result = await E.run_single_provider_eval(
+                    provider="sarvam",
+                    language="hindi",
+                    input_dir=str(base),
+                    input_file_name="stt.csv",
+                    output_dir=str(output),
+                    debug=False,
+                    debug_count=5,
+                    ignore_retry=False,
+                    overwrite=True,
+                    run_llm_judges=False,
+                    engine="direct",
+                )
+
+            self.assertEqual(result["output_dir"], str(output / "sarvam-saaras-v3"))
+            self.assertFalse((output / "sarvam").exists())
+            self.assertEqual(transcribe.call_args.args[2], "sarvam-saaras-v3")
+
     async def test_existing_invalid_csv_error(self):
         from calibrate_agent.stt import eval as E
 
@@ -1099,11 +1167,11 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
 
             output = Path(tmp) / "out"
             output.mkdir()
-            (output / "deepgram").mkdir()
-            (output / "deepgram" / "results.csv").write_text("bad,csv\n1,2\n")
+            (output / "deepgram-nova-3").mkdir()
+            (output / "deepgram-nova-3" / "results.csv").write_text("bad,csv\n1,2\n")
 
             result = await E.run_single_provider_eval(
-                provider="deepgram",
+                provider="deepgram-nova-3",
                 language="english",
                 input_dir=str(base),
                 input_file_name="stt.csv",
@@ -1138,7 +1206,7 @@ class TestRunSingleProviderEval(unittest.IsolatedAsyncioTestCase):
                      "per_row": [{"semantic_match": {"match": True, "reasoning": "ok"}}],
                  })):
                 result = await E.run_single_provider_eval(
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="english",
                     input_dir=str(base),
                     input_file_name="stt.csv",
@@ -1168,7 +1236,7 @@ class TestSTTMain(unittest.IsolatedAsyncioTestCase):
     async def test_main_invalid_input_dir(self):
         from calibrate_agent.stt import eval as E
 
-        argv = ["e.py", "-p", "deepgram", "-i", "/nonexistent", "-o", "/tmp/x"]
+        argv = ["e.py", "-p", "deepgram-nova-3", "-i", "/nonexistent", "-o", "/tmp/x"]
         with patch.object(sys, "argv", argv):
             with self.assertRaises(SystemExit):
                 await E.main()
@@ -1183,8 +1251,8 @@ class TestSTTMain(unittest.IsolatedAsyncioTestCase):
             pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(base / "stt.csv", index=False)
             output = Path(tmp) / "out"
 
-            argv = ["e.py", "-p", "deepgram", "-i", str(base), "-o", str(output)]
-            fake_result = {"provider": "deepgram", "status": "completed",
+            argv = ["e.py", "-p", "deepgram-nova-3", "-i", str(base), "-o", str(output)]
+            fake_result = {"provider": "deepgram-nova-3", "status": "completed",
                            "metrics": {"wer": 0.1, "semantic_match": {"type": "binary", "mean": 0.9}}}
             with patch.object(sys, "argv", argv), \
                  patch.object(E, "run_single_provider_eval", AsyncMock(return_value=fake_result)):
@@ -1200,8 +1268,8 @@ class TestSTTMain(unittest.IsolatedAsyncioTestCase):
             pd.DataFrame({"id": ["a"], "text": ["hi"]}).to_csv(base / "stt.csv", index=False)
             output = Path(tmp) / "out"
 
-            argv = ["e.py", "-p", "deepgram", "-i", str(base), "-o", str(output)]
-            fake_result = {"provider": "deepgram", "status": "error", "error": "fail"}
+            argv = ["e.py", "-p", "deepgram-nova-3", "-i", str(base), "-o", str(output)]
+            fake_result = {"provider": "deepgram-nova-3", "status": "error", "error": "fail"}
             with patch.object(sys, "argv", argv), \
                  patch.object(E, "run_single_provider_eval", AsyncMock(return_value=fake_result)):
                 with self.assertRaises(SystemExit):
@@ -1449,7 +1517,7 @@ class TestTranscribeOpenAIRealtime(unittest.IsolatedAsyncioTestCase):
         ]
 
     async def test_live_sends_languages_list(self):
-        result, ws, connect = await self._run("openai-live", "hindi", self._ok())
+        result, ws, connect = await self._run("openai-gpt-live-transcribe", "hindi", self._ok())
 
         self.assertEqual(result, {"transcript": "hello world"})
         url = connect.call_args.args[0]
@@ -1470,19 +1538,19 @@ class TestTranscribeOpenAIRealtime(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_transcribe_sends_language_for_hindi(self):
-        _, ws, _ = await self._run("openai-transcribe", "hindi", self._ok())
+        _, ws, _ = await self._run("openai-gpt-transcribe", "hindi", self._ok())
         transcription = ws.sent[0]["session"]["audio"]["input"]["transcription"]
         self.assertEqual(transcription, {"model": "gpt-transcribe", "language": "hi"})
 
     async def test_transcribe_sends_no_language_for_odia(self):
-        _, ws, _ = await self._run("openai-transcribe", "odia", self._ok())
+        _, ws, _ = await self._run("openai-gpt-transcribe", "odia", self._ok())
         transcription = ws.sent[0]["session"]["audio"]["input"]["transcription"]
         self.assertEqual(transcription, {"model": "gpt-transcribe"})
 
     async def test_audio_resampled_to_24k_then_committed(self):
         import base64
 
-        _, ws, _ = await self._run("openai-transcribe", "english", self._ok())
+        _, ws, _ = await self._run("openai-gpt-transcribe", "english", self._ok())
         types = [m["type"] for m in ws.sent]
         self.assertEqual(types[-1], "input_audio_buffer.commit")
         appended = b"".join(
@@ -1495,7 +1563,7 @@ class TestTranscribeOpenAIRealtime(unittest.IsolatedAsyncioTestCase):
     async def test_error_event_raises(self):
         messages = [{"type": "error", "error": {"message": "bad field"}}]
         with self.assertRaisesRegex(RuntimeError, "bad field"):
-            await self._run("openai-live", "english", messages)
+            await self._run("openai-gpt-live-transcribe", "english", messages)
 
     async def test_failed_event_raises(self):
         messages = [
@@ -1505,16 +1573,16 @@ class TestTranscribeOpenAIRealtime(unittest.IsolatedAsyncioTestCase):
             }
         ]
         with self.assertRaisesRegex(RuntimeError, "decode failed"):
-            await self._run("openai-transcribe", "english", messages)
+            await self._run("openai-gpt-transcribe", "english", messages)
 
     async def test_missing_key(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
-                await self._run("openai-live", "english", [], env={})
+                await self._run("openai-gpt-live-transcribe", "english", [], env={})
 
 
 class TestTranscribeSarvamRealtimeStreaming(unittest.IsolatedAsyncioTestCase):
-    async def _run(self, language, messages, provider="sarvam-v4"):
+    async def _run(self, language, messages, provider="sarvam-saaras-v4-realtime"):
         from calibrate_agent.stt import eval as E
 
         ws = _ScriptedWS(messages, release_on='"end"}')
@@ -1573,7 +1641,7 @@ class TestTranscribeSarvamRealtimeStreaming(unittest.IsolatedAsyncioTestCase):
         from urllib.parse import parse_qs, urlparse
 
         messages = [{"event": "transcript.final", "text": "namaste"}, {"event": "session.end"}]
-        result, _, connect = await self._run("hindi", messages, provider="sarvam-v3-realtime")
+        result, _, connect = await self._run("hindi", messages, provider="sarvam-saaras-v3-realtime")
         self.assertEqual(result, {"transcript": "namaste"})
         query = {
             k: v[0] for k, v in parse_qs(urlparse(connect.call_args.args[0]).query).items()
@@ -1586,13 +1654,13 @@ class TestTranscribeSarvamRealtimeStreaming(unittest.IsolatedAsyncioTestCase):
 
         mock = AsyncMock(return_value={"transcript": "x"})
         with patch.object(E, "transcribe_sarvam_realtime_streaming", mock):
-            for provider in ("sarvam-v4", "sarvam-v3-realtime"):
+            for provider in ("sarvam-saaras-v4-realtime", "sarvam-saaras-v3-realtime"):
                 await E.transcribe_audio.__wrapped__(
                     Path("/tmp/x.wav"), "ref", provider, "hindi", "uid"
                 )
         self.assertEqual(
             [c.kwargs["provider"] for c in mock.call_args_list],
-            ["sarvam-v4", "sarvam-v3-realtime"],
+            ["sarvam-saaras-v4-realtime", "sarvam-saaras-v3-realtime"],
         )
 
     async def test_error_event_raises(self):
@@ -1605,7 +1673,7 @@ class TestTranscribeSarvamRealtimeStreaming(unittest.IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(ValueError):
                 await E.transcribe_sarvam_realtime_streaming(
-                    Path("/tmp/x.wav"), "hindi", "sarvam-v4"
+                    Path("/tmp/x.wav"), "hindi", "sarvam-saaras-v4-realtime"
                 )
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ export const TTS_PROVIDERS: ProviderInfo[] = [
 // ─── STT Providers ──────────────────────────────────────────
 export const STT_PROVIDERS: ProviderInfo[] = [
   {
-    id: 'deepgram',
+    id: 'deepgram-nova-3',
     name: 'Deepgram',
     envVar: 'DEEPGRAM_API_KEY',
     languages: new Set([
@@ -80,7 +80,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'openai',
+    id: 'openai-gpt-4o-transcribe',
     name: 'OpenAI',
     envVar: 'OPENAI_API_KEY',
     languages: new Set([
@@ -88,7 +88,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'groq',
+    id: 'groq-whisper-large-v3-turbo',
     name: 'Groq',
     envVar: 'GROQ_API_KEY',
     languages: new Set([
@@ -96,7 +96,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'cartesia',
+    id: 'cartesia-ink-whisper',
     name: 'Cartesia',
     envVar: 'CARTESIA_API_KEY',
     languages: new Set([
@@ -105,7 +105,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'smallest',
+    id: 'smallest-pulse',
     name: 'Smallest AI',
     envVar: 'SMALLEST_API_KEY',
     languages: new Set([
@@ -114,7 +114,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'google',
+    id: 'google-chirp-3',
     name: 'Google Cloud',
     envVar: 'GOOGLE_APPLICATION_CREDENTIALS',
     isFilePath: true,
@@ -124,7 +124,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'sarvam',
+    id: 'sarvam-saaras-v3',
     name: 'Sarvam AI',
     envVar: 'SARVAM_API_KEY',
     languages: new Set([
@@ -133,7 +133,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'elevenlabs',
+    id: 'elevenlabs-scribe-v2-realtime',
     name: 'ElevenLabs',
     envVar: 'ELEVENLABS_API_KEY',
     languages: new Set([
@@ -148,7 +148,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     languages: new Set(['english', 'hindi']),
   },
   {
-    id: 'openai-live',
+    id: 'openai-gpt-live-transcribe',
     name: 'OpenAI Live (gpt-live-transcribe)',
     envVar: 'OPENAI_API_KEY',
     languages: new Set([
@@ -156,7 +156,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'openai-transcribe',
+    id: 'openai-gpt-transcribe',
     name: 'OpenAI Transcribe (gpt-transcribe)',
     envVar: 'OPENAI_API_KEY',
     languages: new Set([
@@ -165,7 +165,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'sarvam-v4',
+    id: 'sarvam-saaras-v4-realtime',
     name: 'Sarvam AI v4 Realtime',
     envVar: 'SARVAM_API_KEY',
     languages: new Set([
@@ -174,7 +174,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'sarvam-v3-realtime',
+    id: 'sarvam-saaras-v3-realtime',
     name: 'Sarvam AI v3 Realtime',
     envVar: 'SARVAM_API_KEY',
     languages: new Set([
@@ -183,7 +183,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     ]),
   },
   {
-    id: 'sarvam-v4-manual',
+    id: 'sarvam-saaras-v4',
     name: 'Sarvam AI v4 (streaming, our end-of-speech detection)',
     envVar: 'SARVAM_API_KEY',
     languages: new Set([
@@ -222,6 +222,15 @@ export function getTtsProvidersForLanguage(language: string): ProviderInfo[] {
 
 export function getSttProvidersForLanguage(language: string): ProviderInfo[] {
   return STT_PROVIDERS.filter(p => p.languages.has(language));
+}
+
+// The folder a provider's results are stored under. Mirrors stt_output_name in
+// calibrate_agent/utils.py: deepgram-flux adds the model it runs for the language.
+export function outputDirName(provider: string, mode: 'tts' | 'stt', language: string): string {
+  if (mode === 'stt' && provider === 'deepgram-flux') {
+    return language === 'english' ? 'deepgram-flux-general-en' : 'deepgram-flux-general-multi';
+  }
+  return provider;
 }
 
 export function getProvidersForLanguage(language: string, mode: 'tts' | 'stt'): ProviderInfo[] {

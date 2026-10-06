@@ -206,7 +206,7 @@ class TestMainDispatch(unittest.TestCase):
 
             with patch("calibrate_agent.stt.benchmark.main", AsyncMock(return_value=None)):
                 self._run_with_argv([
-                    "calibrate_agent", "stt", "-p", "deepgram",
+                    "calibrate_agent", "stt", "-p", "deepgram-nova-3",
                     "-i", str(base), "-o", str(base / "out"),
                     "-d", "--ignore_retry", "--overwrite",
                 ])
@@ -243,7 +243,7 @@ class TestMainDispatch(unittest.TestCase):
             with patch("calibrate_agent.stt.benchmark.main",
                        AsyncMock(side_effect=fake_main)):
                 self._run_with_argv([
-                    "calibrate_agent", "stt", "-p", "deepgram",
+                    "calibrate_agent", "stt", "-p", "deepgram-nova-3",
                     "-i", str(base), "-o", str(base / "out"),
                     "--skip-llm-judges",
                 ])
@@ -268,7 +268,7 @@ class TestMainDispatch(unittest.TestCase):
             with patch("calibrate_agent.stt.benchmark.main",
                        AsyncMock(side_effect=fake_main)):
                 self._run_with_argv([
-                    "calibrate_agent", "stt", "-p", "deepgram",
+                    "calibrate_agent", "stt", "-p", "deepgram-nova-3",
                     "-i", str(base), "-o", str(base / "out"),
                 ])
 

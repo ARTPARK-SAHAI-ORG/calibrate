@@ -172,7 +172,7 @@ class TestConfigWithoutTools(unittest.IsolatedAsyncioTestCase):
         config = {
             "system_prompt": "You are a helpful agent.",
             # no "tools" key on purpose
-            "stt": {"provider": "google"},
+            "stt": {"provider": "google-chirp-3"},
             "tts": {"provider": "google"},
             "llm": {"provider": "openrouter", "model": "some/model"},
             "settings": {"agent_speaks_first": True, "max_turns": 1},

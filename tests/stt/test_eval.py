@@ -221,7 +221,7 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
             output = await stt_eval.transcribe_audio.__wrapped__(
                 Path("/tmp/x.wav"),
                 "ref",
-                "deepgram",
+                "deepgram-nova-3",
                 "english",
                 "uid",
             )
@@ -1090,7 +1090,7 @@ class TestTranscribeGemini(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["transcript"], "hola mundo")
         self.assertEqual(
             generate.await_args.kwargs["model"],
-            stt_eval.STT_PROVIDER_MODELS["gemini"],
+            stt_eval.STT_PROVIDER_MODELS["gemini-3.5-flash"],
         )
 
     async def test_none_text_yields_empty_transcript(self):

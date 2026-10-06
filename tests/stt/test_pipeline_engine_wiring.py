@@ -28,25 +28,25 @@ class TestGetSTTLanguageCoverage(unittest.TestCase):
         from pipecat.transcriptions.language import Language
 
         for lang in STT_LANGUAGES:
-            base = get_stt_language(lang, "deepgram")
-            sarvam = get_stt_language(lang, "sarvam")
+            base = get_stt_language(lang, "deepgram-nova-3")
+            sarvam = get_stt_language(lang, "sarvam-saaras-v3")
             self.assertIsInstance(base, Language)
             self.assertIsInstance(sarvam, Language)
 
         # Non-English languages must NOT silently fall back to English.
         self.assertNotEqual(
-            get_stt_language("tamil", "deepgram"),
-            get_stt_language("english", "deepgram"),
+            get_stt_language("tamil", "deepgram-nova-3"),
+            get_stt_language("english", "deepgram-nova-3"),
         )
-        self.assertEqual(get_stt_language("tamil", "sarvam"), Language.TA_IN)
-        self.assertEqual(get_stt_language("tamil", "deepgram"), Language.TA)
+        self.assertEqual(get_stt_language("tamil", "sarvam-saaras-v3"), Language.TA_IN)
+        self.assertEqual(get_stt_language("tamil", "deepgram-nova-3"), Language.TA)
 
     def test_unknown_language_falls_back_to_english(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("klingon", "deepgram"), Language.EN)
-        self.assertEqual(get_stt_language("klingon", "sarvam"), Language.EN_IN)
+        self.assertEqual(get_stt_language("klingon", "deepgram-nova-3"), Language.EN)
+        self.assertEqual(get_stt_language("klingon", "sarvam-saaras-v3"), Language.EN_IN)
 
 
 class TestGetTTFSStats(unittest.TestCase):
@@ -166,12 +166,12 @@ class TestTranscribeAudioPipeline(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result, {"transcript": "hi", "ttfs": 0.4})
 
     async def test_sarvam_realtime_models_share_the_sarvam_rate_limiter(self):
-        for provider in ("sarvam-v4", "sarvam-v3-realtime", "sarvam-v4-manual"):
+        for provider in ("sarvam-saaras-v4-realtime", "sarvam-saaras-v3-realtime", "sarvam-saaras-v4"):
             _, _, limiter = await self._run(provider)
             limiter.assert_awaited_once()
 
     async def test_other_providers_skip_the_sarvam_rate_limiter(self):
-        _, _, limiter = await self._run("deepgram")
+        _, _, limiter = await self._run("deepgram-nova-3")
         limiter.assert_not_awaited()
 
 
@@ -194,7 +194,7 @@ class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
                 n = await stt_eval.run_stt_eval(
                     gt_data=gt_data,
                     audio_dir=Path(tmp),
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="english",
                     results_csv_path=csv_path,
                     engine="direct",
@@ -213,7 +213,10 @@ class TestRunSTTEvalPipelineRouting(unittest.IsolatedAsyncioTestCase):
         async def fake_transcribe(audio_path, reference, provider, language, uid):
             # id is the wav stem; echo a per-id transcript + latency.
             stem = Path(audio_path).stem
-            return {"transcript": f"pred_{stem}", "ttfs": 0.1 * int(stem)}
+            return {
+                "transcript": f"pred_{stem}",
+                "ttfs": 0.1 * int(stem),
+            }
 
         gt_data = [{"id": 1, "gt": "one"}, {"id": 2, "gt": "two"}]
         with tempfile.TemporaryDirectory() as tmp:
@@ -226,7 +229,7 @@ class TestRunSTTEvalPipelineRouting(unittest.IsolatedAsyncioTestCase):
                 n = await stt_eval.run_stt_eval(
                     gt_data=gt_data,
                     audio_dir=Path(tmp),
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="tamil",
                     results_csv_path=csv_path,
                     engine="pipeline",
@@ -265,7 +268,7 @@ class TestRunSTTEvalPipelineRouting(unittest.IsolatedAsyncioTestCase):
                 await stt_eval.run_stt_eval(
                     gt_data=gt_data,
                     audio_dir=Path(tmp),
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="hindi",
                     results_csv_path=csv_path,
                     engine="pipeline",
@@ -298,7 +301,7 @@ class TestRunSTTEvalPipelineRouting(unittest.IsolatedAsyncioTestCase):
                 n = await stt_eval.run_stt_eval(
                     gt_data=gt_data,
                     audio_dir=Path(tmp),
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="english",
                     results_csv_path=csv_path,
                     engine="pipeline",

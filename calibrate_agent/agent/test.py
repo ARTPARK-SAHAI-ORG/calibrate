@@ -83,8 +83,14 @@ transport_params = {
 @dataclass
 class STTConfig:
     provider: Literal[
-        "deepgram", "google", "openai", "elevenlabs", "sarvam", "cartesia", "smallest"
-    ] = "elevenlabs"
+        "deepgram-nova-3",
+        "google-chirp-3",
+        "openai-gpt-4o-transcribe",
+        "elevenlabs-scribe-v2-realtime",
+        "sarvam-saaras-v3",
+        "cartesia-ink-whisper",
+        "smallest-pulse",
+    ] = "elevenlabs-scribe-v2-realtime"
     model: Optional[str] = None
 
 
@@ -132,7 +138,7 @@ def parse_bot_config(config_data: Dict[str, Any]) -> BotConfig:
 
     stt_data = config_data.get("stt", {})
     stt_config = STTConfig(
-        provider=stt_data.get("provider", "elevenlabs"),
+        provider=stt_data.get("provider", "elevenlabs-scribe-v2-realtime"),
         model=stt_data.get("model"),
     )
 

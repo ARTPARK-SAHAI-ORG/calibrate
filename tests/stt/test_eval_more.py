@@ -93,10 +93,10 @@ class TestRunSinglProviderEvalProgressNoChange(unittest.IsolatedAsyncioTestCase)
             )
             out = base / "out"
             out.mkdir()
-            (out / "deepgram").mkdir()
+            (out / "deepgram-nova-3").mkdir()
             # Pre-existing partial: a only (so 1/2 — partial)
             pd.DataFrame([{"id": "a", "gt": "hi", "pred": "hi"}]).to_csv(
-                out / "deepgram" / "results.csv", index=False
+                out / "deepgram-nova-3" / "results.csv", index=False
             )
 
             # First call returns 0 (no new), second loop sees no progress -> writes empty
@@ -117,7 +117,7 @@ class TestRunSinglProviderEvalProgressNoChange(unittest.IsolatedAsyncioTestCase)
                 # Will raise after first attempt since transcribe_audio raises
                 try:
                     await E.run_single_provider_eval(
-                        provider="deepgram",
+                        provider="deepgram-nova-3",
                         language="english",
                         input_dir=str(base),
                         input_file_name="stt.csv",
@@ -144,9 +144,9 @@ class TestRunSinglProviderEvalAlreadyAllProcessed(unittest.IsolatedAsyncioTestCa
             )
             out = base / "out"
             out.mkdir()
-            (out / "deepgram").mkdir()
+            (out / "deepgram-nova-3").mkdir()
             pd.DataFrame([{"id": "a", "gt": "hi", "pred": "hi"}]).to_csv(
-                out / "deepgram" / "results.csv", index=False
+                out / "deepgram-nova-3" / "results.csv", index=False
             )
 
             with patch.object(E, "get_wer_score",
@@ -159,7 +159,7 @@ class TestRunSinglProviderEvalAlreadyAllProcessed(unittest.IsolatedAsyncioTestCa
                      "per_row": [{"semantic_match": {"match": True, "reasoning": "ok"}}],
                  })):
                 result = await E.run_single_provider_eval(
-                    provider="deepgram",
+                    provider="deepgram-nova-3",
                     language="english",
                     input_dir=str(base),
                     input_file_name="stt.csv",

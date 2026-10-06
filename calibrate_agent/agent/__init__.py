@@ -35,7 +35,7 @@ from calibrate_agent.agent.bot import (
 class STTConfig:
     """Configuration for Speech-to-Text service."""
 
-    provider: str = "google"
+    provider: str = "google-chirp-3"
 
     def to_dict(self) -> dict:
         return {"provider": self.provider}
@@ -119,7 +119,7 @@ class _Simulation:
             ...     scenarios=[{"description": "User completes the form"}],
             ...     evaluators=[{"name": "completeness", "system_prompt": "Evaluate whether all questions were answered..."}],
             ...     output_dir="./out",
-            ...     stt=STTConfig(provider="google"),
+            ...     stt=STTConfig(provider="google-chirp-3"),
             ...     tts=TTSConfig(provider="google"),
             ...     llm=LLMConfig(provider="openrouter", model=DEFAULT_TEST_AGENT_LLM_MODEL),
             ... ))

@@ -41,7 +41,7 @@ class TestParseBotConfig(unittest.TestCase):
         self.assertEqual(cfg.system_prompt, "be helpful")
         self.assertEqual(cfg.language, "english")
         self.assertEqual(cfg.tools, [])
-        self.assertEqual(cfg.stt.provider, "elevenlabs")
+        self.assertEqual(cfg.stt.provider, "elevenlabs-scribe-v2-realtime")
         self.assertEqual(cfg.tts.provider, "elevenlabs")
         self.assertEqual(cfg.llm.provider, "openrouter")
 
@@ -52,12 +52,12 @@ class TestParseBotConfig(unittest.TestCase):
             "system_prompt": "sp",
             "language": "hindi",
             "tools": [{"name": "x"}],
-            "stt": {"provider": "deepgram", "model": "nova-3"},
+            "stt": {"provider": "deepgram-nova-3", "model": "nova-3"},
             "tts": {"provider": "google", "voice_id": "v1", "model": "m"},
             "llm": {"provider": "openai", "model": "gpt-4", "api_key": "k"},
         })
         self.assertEqual(cfg.language, "hindi")
-        self.assertEqual(cfg.stt.provider, "deepgram")
+        self.assertEqual(cfg.stt.provider, "deepgram-nova-3")
         self.assertEqual(cfg.stt.model, "nova-3")
         self.assertEqual(cfg.tts.voice_id, "v1")
         self.assertEqual(cfg.llm.provider, "openai")

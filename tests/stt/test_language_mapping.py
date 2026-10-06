@@ -17,35 +17,35 @@ class TestGetSTTLanguage(unittest.TestCase):
         from pipecat.transcriptions.language import Language
 
         for lang in STT_LANGUAGES:
-            self.assertIsInstance(get_stt_language(lang, "deepgram"), Language)
-            self.assertIsInstance(get_stt_language(lang, "sarvam"), Language)
+            self.assertIsInstance(get_stt_language(lang, "deepgram-nova-3"), Language)
+            self.assertIsInstance(get_stt_language(lang, "sarvam-saaras-v3"), Language)
 
     def test_non_english_does_not_fall_back_to_english(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
         # The bug this fixes: tamil/telugu/etc. used to become English.
-        self.assertEqual(get_stt_language("tamil", "deepgram"), Language.TA)
-        self.assertEqual(get_stt_language("telugu", "deepgram"), Language.TE)
-        self.assertEqual(get_stt_language("bengali", "deepgram"), Language.BN)
+        self.assertEqual(get_stt_language("tamil", "deepgram-nova-3"), Language.TA)
+        self.assertEqual(get_stt_language("telugu", "deepgram-nova-3"), Language.TE)
+        self.assertEqual(get_stt_language("bengali", "deepgram-nova-3"), Language.BN)
         self.assertNotEqual(
-            get_stt_language("tamil", "deepgram"),
-            get_stt_language("english", "deepgram"),
+            get_stt_language("tamil", "deepgram-nova-3"),
+            get_stt_language("english", "deepgram-nova-3"),
         )
 
     def test_sarvam_uses_regional_variants(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("tamil", "sarvam"), Language.TA_IN)
-        self.assertEqual(get_stt_language("hindi", "sarvam"), Language.HI_IN)
+        self.assertEqual(get_stt_language("tamil", "sarvam-saaras-v3"), Language.TA_IN)
+        self.assertEqual(get_stt_language("hindi", "sarvam-saaras-v3"), Language.HI_IN)
 
     def test_unknown_language_falls_back_to_english(self):
         from calibrate_agent.utils import get_stt_language
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language("klingon", "deepgram"), Language.EN)
-        self.assertEqual(get_stt_language("klingon", "sarvam"), Language.EN_IN)
+        self.assertEqual(get_stt_language("klingon", "deepgram-nova-3"), Language.EN)
+        self.assertEqual(get_stt_language("klingon", "sarvam-saaras-v3"), Language.EN_IN)
 
 
 class TestGoogleModelAndLocation(unittest.TestCase):
@@ -60,7 +60,7 @@ class TestGoogleModelAndLocation(unittest.TestCase):
         )
         self.assertEqual(
             google_stt_model_and_location("hindi"),
-            (STT_PROVIDER_MODELS["google"], "us"),
+            (STT_PROVIDER_MODELS["google-chirp-3"], "us"),
         )
         # Explicit model override wins for non-Sindhi.
         self.assertEqual(google_stt_model_and_location("hindi", "chirp_3"), ("chirp_3", "us"))
@@ -74,7 +74,7 @@ class TestGoogleSindhiRouting(unittest.TestCase):
 
         target = "pipecat.services.google.stt.GoogleSTTService"
         with patch.dict(os.environ, self.ALL_KEYS), patch(target) as svc:
-            create_stt_service("google", "sindhi")
+            create_stt_service("google-chirp-3", "sindhi")
         self.assertEqual(svc.call_args.kwargs["location"], "asia-southeast1")
         self.assertEqual(svc.Settings.call_args.kwargs["model"], "chirp_2")
 
@@ -83,15 +83,30 @@ class TestGoogleSindhiRouting(unittest.TestCase):
 
         target = "pipecat.services.google.stt.GoogleSTTService"
         with patch.dict(os.environ, self.ALL_KEYS), patch(target) as svc:
-            create_stt_service("google", "hindi")
+            create_stt_service("google-chirp-3", "hindi")
         self.assertEqual(svc.call_args.kwargs["location"], "us")
         self.assertEqual(
-            svc.Settings.call_args.kwargs["model"], STT_PROVIDER_MODELS["google"]
+            svc.Settings.call_args.kwargs["model"], STT_PROVIDER_MODELS["google-chirp-3"]
         )
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestSttOutputName(unittest.TestCase):
+    def test_deepgram_flux_adds_the_model_for_the_language(self):
+        from calibrate_agent.utils import stt_output_name
+
+        self.assertEqual(stt_output_name("deepgram-flux", "english"), "deepgram-flux-general-en")
+        self.assertEqual(stt_output_name("deepgram-flux", "English"), "deepgram-flux-general-en")
+        self.assertEqual(stt_output_name("deepgram-flux", "hindi"), "deepgram-flux-general-multi")
+
+    def test_other_providers_keep_their_name(self):
+        from calibrate_agent.utils import STT_PROVIDER_MODELS, stt_output_name
+
+        for provider in set(STT_PROVIDER_MODELS) - {"deepgram-flux"}:
+            self.assertEqual(stt_output_name(provider, "hindi"), provider)
 
 
 class TestRealtimeProviderLanguages(unittest.TestCase):
@@ -103,9 +118,9 @@ class TestRealtimeProviderLanguages(unittest.TestCase):
         from calibrate_agent.utils import validate_stt_language
 
         for provider, language, alternative in [
-            ("deepgram-flux", "kannada", "deepgram"),
-            ("openai-live", "odia", "openai-transcribe"),
-            ("cartesia-ink-preview", "tamil", "cartesia"),
+            ("deepgram-flux", "kannada", "deepgram-nova-3"),
+            ("openai-gpt-live-transcribe", "odia", "openai-gpt-transcribe"),
+            ("cartesia-ink-preview", "tamil", "cartesia-ink-whisper"),
         ]:
             with self.assertRaises(ValueError) as ctx:
                 validate_stt_language(language, provider)
@@ -117,7 +132,7 @@ class TestRealtimeProviderLanguages(unittest.TestCase):
         for provider, language in [
             ("deepgram-flux", "english"),
             ("deepgram-flux", "hindi"),
-            ("openai-live", "kannada"),
+            ("openai-gpt-live-transcribe", "kannada"),
             ("cartesia-ink-preview", "hindi"),
         ]:
             validate_stt_language(language, provider)
@@ -126,34 +141,34 @@ class TestRealtimeProviderLanguages(unittest.TestCase):
         from calibrate_agent.utils import validate_stt_language
 
         for language in STT_LANGUAGES:
-            validate_stt_language(language, "openai-transcribe")
-            validate_stt_language(language, "sarvam-v4")
-            validate_stt_language(language, "sarvam-v3-realtime")
+            validate_stt_language(language, "openai-gpt-transcribe")
+            validate_stt_language(language, "sarvam-saaras-v4-realtime")
+            validate_stt_language(language, "sarvam-saaras-v3-realtime")
 
     def test_existing_provider_rejection_has_no_alternative(self):
         from calibrate_agent.utils import validate_stt_language
 
         with self.assertRaises(ValueError) as ctx:
-            validate_stt_language("maithili", "deepgram")
+            validate_stt_language("maithili", "deepgram-nova-3")
         self.assertNotIn("instead", str(ctx.exception))
 
     def test_openai_transcribe_codes(self):
         from calibrate_agent.utils import get_stt_language_code
 
-        self.assertEqual(get_stt_language_code("hindi", "openai-transcribe"), "hi")
-        self.assertIsNone(get_stt_language_code("odia", "openai-transcribe"))
+        self.assertEqual(get_stt_language_code("hindi", "openai-gpt-transcribe"), "hi")
+        self.assertIsNone(get_stt_language_code("odia", "openai-gpt-transcribe"))
 
     def test_sarvam_v4_codes_and_enums(self):
         from calibrate_agent.utils import get_stt_language, get_stt_language_code
         from pipecat.transcriptions.language import Language
 
-        self.assertEqual(get_stt_language_code("sindhi", "sarvam-v4"), "sd-IN")
-        self.assertEqual(get_stt_language_code("odia", "sarvam-v4"), "od-IN")
-        self.assertEqual(get_stt_language("hindi", "sarvam-v4"), Language.HI_IN)
-        self.assertEqual(get_stt_language_code("sindhi", "sarvam-v3-realtime"), "sd-IN")
-        self.assertEqual(get_stt_language("hindi", "sarvam-v3-realtime"), Language.HI_IN)
-        self.assertEqual(get_stt_language_code("maithili", "sarvam-v4-manual"), "mai-IN")
-        self.assertEqual(get_stt_language("hindi", "sarvam-v4-manual"), Language.HI_IN)
+        self.assertEqual(get_stt_language_code("sindhi", "sarvam-saaras-v4-realtime"), "sd-IN")
+        self.assertEqual(get_stt_language_code("odia", "sarvam-saaras-v4-realtime"), "od-IN")
+        self.assertEqual(get_stt_language("hindi", "sarvam-saaras-v4-realtime"), Language.HI_IN)
+        self.assertEqual(get_stt_language_code("sindhi", "sarvam-saaras-v3-realtime"), "sd-IN")
+        self.assertEqual(get_stt_language("hindi", "sarvam-saaras-v3-realtime"), Language.HI_IN)
+        self.assertEqual(get_stt_language_code("maithili", "sarvam-saaras-v4"), "mai-IN")
+        self.assertEqual(get_stt_language("hindi", "sarvam-saaras-v4"), Language.HI_IN)
 
     def test_stt_provider_model_per_language(self):
         from calibrate_agent.utils import stt_provider_model
@@ -161,9 +176,9 @@ class TestRealtimeProviderLanguages(unittest.TestCase):
         self.assertEqual(stt_provider_model("deepgram-flux", "english"), "flux-general-en")
         self.assertEqual(stt_provider_model("deepgram-flux", "hindi"), "flux-general-multi")
         self.assertEqual(stt_provider_model("deepgram-flux"), "flux-general-en")
-        self.assertEqual(stt_provider_model("google", "sindhi"), "chirp_2")
-        self.assertEqual(stt_provider_model("sarvam-v4", "hindi"), "saaras:v4")
+        self.assertEqual(stt_provider_model("google-chirp-3", "sindhi"), "chirp_2")
+        self.assertEqual(stt_provider_model("sarvam-saaras-v4-realtime", "hindi"), "saaras:v4")
         self.assertEqual(
-            stt_provider_model("sarvam-v3-realtime", "hindi"), "saaras:v3-realtime"
+            stt_provider_model("sarvam-saaras-v3-realtime", "hindi"), "saaras:v3-realtime"
         )
-        self.assertEqual(stt_provider_model("sarvam-v4-manual", "hindi"), "saaras:v4")
+        self.assertEqual(stt_provider_model("sarvam-saaras-v4", "hindi"), "saaras:v4")

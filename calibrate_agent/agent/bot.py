@@ -4,10 +4,11 @@ import uuid
 from loguru import logger
 import asyncio
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from calibrate_agent.utils import (
     create_stt_service,
     create_tts_service,
+    resolve_stt_provider,
     build_tools_schema,
     make_webhook_call,
 )
@@ -112,8 +113,18 @@ class MetricsLogger(FrameProcessor):
 
 class STTConfig(BaseModel):
     provider: Literal[
-        "deepgram", "google", "openai", "cartesia", "groq", "elevenlabs", "sarvam"
-    ] = "deepgram"
+        "deepgram-nova-3",
+        "google-chirp-3",
+        "openai-gpt-4o-transcribe",
+        "cartesia-ink-whisper",
+        "groq-whisper-large-v3-turbo",
+        "elevenlabs-scribe-v2-realtime",
+        "sarvam-saaras-v3",
+    ] = "deepgram-nova-3"
+
+    _resolve_vendor = field_validator("provider", mode="before")(
+        lambda name: resolve_stt_provider(name) if isinstance(name, str) else name
+    )
 
 
 class TTSConfig(BaseModel):

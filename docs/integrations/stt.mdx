@@ -3,51 +3,68 @@ title: "Speech to Text"
 description: "Supported STT providers in Calibrate"
 ---
 
-| Provider        | Model                  | Website                                                     |
-| --------------- | ---------------------- | ----------------------------------------------------------- |
-| **Deepgram**    | nova-3                 | [deepgram.com](https://deepgram.com)                        |
-| **OpenAI**      | gpt-4o-transcribe      | [openai.com](https://openai.com)                            |
-| **Cartesia**    | ink                    | [cartesia.ai](https://cartesia.ai)                          |
-| **ElevenLabs**  | scribe-v2              | [elevenlabs.io](https://elevenlabs.io)                      |
-| **Groq**        | whisper-large-v3-turbo | [groq.com](https://groq.com)                                |
-| **Google**      | chirp-3                | [cloud.google.com](https://cloud.google.com/speech-to-text) |
-| **Gemini**      | gemini-3.5-flash       | [ai.google.dev](https://ai.google.dev/gemini-api)           |
-| **Sarvam**      | saarika-v2.5           | [sarvam.ai](https://sarvam.ai)                              |
-| **Smallest AI** | pulse                  | [smallest.ai](https://smallest.ai)                          |
+Select a provider by its vendor name or by its provider ID.
+
+| You pass               | Calibrate runs     |
+| ---------------------- | ------------------ |
+| `-p sarvam`            | `sarvam-saaras-v3` |
+| `-p sarvam-saaras-v4`  | `sarvam-saaras-v4` |
+
+A vendor name runs the vendor's default model, listed in the table below. A
+provider ID runs one specific model. Calibrate stores the results in a folder
+named after the provider ID, so `-p sarvam` writes to `sarvam-saaras-v3/`.
+
+| Provider        | Vendor name  | Provider ID                     | Model                  | Website                                                     |
+| --------------- | ------------ | ------------------------------- | ---------------------- | ----------------------------------------------------------- |
+| **Deepgram**    | `deepgram`   | `deepgram-nova-3`               | nova-3                 | [deepgram.com](https://deepgram.com)                        |
+| **OpenAI**      | `openai`     | `openai-gpt-4o-transcribe`      | gpt-4o-transcribe      | [openai.com](https://openai.com)                            |
+| **Cartesia**    | `cartesia`   | `cartesia-ink-whisper`          | ink-whisper            | [cartesia.ai](https://cartesia.ai)                          |
+| **ElevenLabs**  | `elevenlabs` | `elevenlabs-scribe-v2-realtime` | scribe_v2_realtime     | [elevenlabs.io](https://elevenlabs.io)                      |
+| **Groq**        | `groq`       | `groq-whisper-large-v3-turbo`   | whisper-large-v3-turbo | [groq.com](https://groq.com)                                |
+| **Google**      | `google`     | `google-chirp-3`                | chirp_3                | [cloud.google.com](https://cloud.google.com/speech-to-text) |
+| **Gemini**      | `gemini`     | `gemini-3.5-flash`              | gemini-3.5-flash       | [ai.google.dev](https://ai.google.dev/gemini-api)           |
+| **Sarvam**      | `sarvam`     | `sarvam-saaras-v3`              | saaras:v3              | [sarvam.ai](https://sarvam.ai)                              |
+| **Smallest AI** | `smallest`   | `smallest-pulse`                | pulse                  | [smallest.ai](https://smallest.ai)                          |
 
 ## Realtime streaming providers
 
-These providers stream audio to a realtime transcription API. Select them by
-their provider ID.
+These providers stream audio to a realtime transcription API.
 
-| Provider ID            | Model                                                            | API key            | Languages                         |
-| ---------------------- | ---------------------------------------------------------------- | ------------------ | --------------------------------- |
-| `deepgram-flux`        | flux-general-en (English), flux-general-multi (Hindi)            | `DEEPGRAM_API_KEY` | English, Hindi                    |
-| `openai-live`          | gpt-live-transcribe                                              | `OPENAI_API_KEY`   | English, Hindi, Kannada, Marathi, Tamil |
-| `openai-transcribe`    | gpt-transcribe                                                   | `OPENAI_API_KEY`   | All supported languages           |
-| `sarvam-v4`            | saaras:v4                                                        | `SARVAM_API_KEY`   | All supported languages           |
-| `sarvam-v3-realtime`   | saaras:v3-realtime                                               | `SARVAM_API_KEY`   | All supported languages           |
-| `sarvam-v4-manual`     | saaras:v4                                                        | `SARVAM_API_KEY`   | Same languages as `sarvam`        |
-| `cartesia-ink-preview` | ink-preview                                                      | `CARTESIA_API_KEY` | English, Hindi                    |
+| Provider ID                  | Model                                                 | API key            | Languages                               |
+| ---------------------------- | ----------------------------------------------------- | ------------------ | --------------------------------------- |
+| `deepgram-flux`              | flux-general-en (English), flux-general-multi (Hindi) | `DEEPGRAM_API_KEY` | English, Hindi                          |
+| `openai-gpt-live-transcribe` | gpt-live-transcribe                                   | `OPENAI_API_KEY`   | English, Hindi, Kannada, Marathi, Tamil |
+| `openai-gpt-transcribe`      | gpt-transcribe                                        | `OPENAI_API_KEY`   | All supported languages                 |
+| `sarvam-saaras-v4-realtime`  | saaras:v4                                             | `SARVAM_API_KEY`   | All supported languages                 |
+| `sarvam-saaras-v3-realtime`  | saaras:v3-realtime                                    | `SARVAM_API_KEY`   | All supported languages                 |
+| `sarvam-saaras-v4`           | saaras:v4                                             | `SARVAM_API_KEY`   | Same languages as `sarvam-saaras-v3`    |
+| `cartesia-ink-preview`       | ink-preview                                           | `CARTESIA_API_KEY` | English, Hindi                          |
 
-On the pipeline engine, `sarvam-v4` and `sarvam-v3-realtime` use Sarvam's
-realtime endpoint, where Sarvam's server decides when the speaker has stopped,
-so the final transcript arrives only after Sarvam's own silence window.
-`sarvam-v4-manual` runs the same saaras:v4 model on Sarvam's streaming
-endpoint, the one `sarvam` uses: Calibrate's voice detection decides when the
-speaker has stopped and asks Sarvam for the final transcript straight away.
+`deepgram-flux` runs a different model for each language, so Calibrate stores
+its results under the model it ran: the folder `deepgram-flux-general-en` for
+English and `deepgram-flux-general-multi` for Hindi. Every other provider
+stores its results in a folder named after its provider ID.
+
+On the pipeline engine, `sarvam-saaras-v4-realtime` and
+`sarvam-saaras-v3-realtime` use Sarvam's realtime endpoint, where Sarvam's
+server decides when the speaker has stopped, so the final transcript arrives
+only after Sarvam's own silence window. `sarvam-saaras-v4` runs the same
+saaras:v4 model on Sarvam's streaming endpoint, the one `sarvam-saaras-v3`
+uses: Calibrate's voice detection decides when the speaker has stopped and asks
+Sarvam for the final transcript straight away.
 
 `deepgram-flux` and `cartesia-ink-preview` cover English and Hindi only.
-`openai-live` covers the languages OpenAI lists for gpt-live-transcribe.
-`openai-transcribe` auto-detects any language outside OpenAI's list, so it runs
-every language Calibrate supports. For a language a provider does not cover,
-Calibrate rejects the run and suggests another provider:
+`openai-gpt-live-transcribe` covers the languages OpenAI lists for
+gpt-live-transcribe. `openai-gpt-transcribe` auto-detects any language outside
+OpenAI's list, so it runs every language Calibrate supports. For a language a
+provider does not cover, Calibrate rejects the run and suggests another
+provider:
 
-| Provider ID            | Use instead         |
-| ---------------------- | ------------------- |
-| `deepgram-flux`        | `deepgram`          |
-| `openai-live`          | `openai-transcribe` |
-| `cartesia-ink-preview` | `cartesia`          |
+| Provider ID                  | Use instead             |
+| ---------------------------- | ----------------------- |
+| `deepgram-flux`              | `deepgram-nova-3`       |
+| `openai-gpt-live-transcribe` | `openai-gpt-transcribe` |
+| `cartesia-ink-preview`       | `cartesia-ink-whisper`  |
 
 ## Language-specific models
 

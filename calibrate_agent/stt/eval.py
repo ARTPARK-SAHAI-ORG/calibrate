@@ -30,6 +30,9 @@ from calibrate_agent.utils import (
     validate_stt_language,
     STT_PROVIDER_MODELS,
     google_stt_model_and_location,
+    stt_output_name,
+    resolve_stt_provider,
+    STT_VENDOR_DEFAULTS,
     stt_provider_model,
     SARVAM_REALTIME_STT_PROVIDERS,
     SARVAM_FLUSH_STT_PROVIDERS,
@@ -210,11 +213,11 @@ async def transcribe_deepgram_streaming(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("DEEPGRAM_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "deepgram")
+    lang_code = get_stt_language_code(language, "deepgram-nova-3")
 
     endpoint = "wss://api.deepgram.com/v1/listen"
     params = {
-        "model": STT_PROVIDER_MODELS["deepgram"],
+        "model": STT_PROVIDER_MODELS["deepgram-nova-3"],
         "language": lang_code,
         "encoding": "linear16",
         "sample_rate": "16000",
@@ -295,7 +298,7 @@ async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "openai")
+    lang_code = get_stt_language_code(language, "openai-gpt-4o-transcribe")
 
     client = AsyncOpenAI()
 
@@ -308,7 +311,7 @@ async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
     # the wrong script (e.g. Urdu for English/Hindi audio).
     # https://developers.openai.com/api/docs/guides/speech-to-text
     stream = await client.audio.transcriptions.create(
-        model=STT_PROVIDER_MODELS["openai"],
+        model=STT_PROVIDER_MODELS["openai-gpt-4o-transcribe"],
         file=audio_file,
         language=lang_code,
         prompt=f"Transcribe the audio in {language.capitalize()}.",
@@ -337,7 +340,7 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "groq")
+    lang_code = get_stt_language_code(language, "groq-whisper-large-v3-turbo")
 
     client = AsyncGroq(api_key=api_key)
 
@@ -346,7 +349,7 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
     transcription = await asyncio.wait_for(
         client.audio.transcriptions.create(
             file=audio_file,  # Required audio file
-            model=STT_PROVIDER_MODELS["groq"],  # Required model to use for transcription
+            model=STT_PROVIDER_MODELS["groq-whisper-large-v3-turbo"],  # Required model to use for transcription
             response_format="text",  # Optional
             language=lang_code,  # Optional
             temperature=0.0,  # Optional
@@ -452,7 +455,7 @@ async def transcribe_google(audio_path: Path, language: str) -> str:
     if not credentials_path:
         raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
 
-    lang_code = get_stt_language_code(language, "google")
+    lang_code = get_stt_language_code(language, "google-chirp-3")
 
     model, region = google_stt_model_and_location(language)
 
@@ -486,7 +489,7 @@ async def transcribe_gemini(audio_path: Path, language: str) -> Dict:
     """
     client = _gemini_client()
 
-    lang_code = get_stt_language_code(language, "gemini")
+    lang_code = get_stt_language_code(language, "gemini-3.5-flash")
     audio_bytes = load_audio(audio_path)
 
     prompt = (
@@ -498,7 +501,7 @@ async def transcribe_gemini(audio_path: Path, language: str) -> Dict:
 
     response = await asyncio.wait_for(
         client.aio.models.generate_content(
-            model=STT_PROVIDER_MODELS["gemini"],
+            model=STT_PROVIDER_MODELS["gemini-3.5-flash"],
             contents=[
                 prompt,
                 genai_types.Part.from_bytes(
@@ -521,7 +524,7 @@ SARVAM_STT_RECV_TIMEOUT = 60.0
 
 
 async def transcribe_sarvam(
-    audio_path: Path, language: str, provider: str = "sarvam"
+    audio_path: Path, language: str, provider: str = "sarvam-saaras-v3"
 ) -> str:
     """Transcribe audio with Sarvam's streaming STT API (saaras:v3 or saaras:v4)."""
     api_key = os.getenv("SARVAM_API_KEY")
@@ -588,14 +591,14 @@ async def transcribe_cartesia(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("CARTESIA_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "cartesia")
+    lang_code = get_stt_language_code(language, "cartesia-ink-whisper")
 
     client = AsyncCartesia(api_key=api_key)
 
     try:
         # Create websocket connection with voice activity detection
         ws = await client.stt.websocket(
-            model=STT_PROVIDER_MODELS["cartesia"],  # Model (required)
+            model=STT_PROVIDER_MODELS["cartesia-ink-whisper"],  # Model (required)
             language=lang_code,  # Language of your audio (required)
             encoding="pcm_s16le",  # Audio encoding format (required)
             sample_rate=16000,  # Audio sample rate (required)
@@ -671,10 +674,10 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
     if not api_key:
         raise ValueError("SMALLEST_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "smallest")
+    lang_code = get_stt_language_code(language, "smallest-pulse")
     endpoint = "wss://api.smallest.ai/waves/v1/stt/live"
     params = {
-        "model": STT_PROVIDER_MODELS["smallest"],
+        "model": STT_PROVIDER_MODELS["smallest-pulse"],
         "language": lang_code,
         "encoding": "linear16",
         "sample_rate": "16000",
@@ -762,7 +765,7 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
     if not api_key:
         raise ValueError("ELEVENLABS_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "elevenlabs")
+    lang_code = get_stt_language_code(language, "elevenlabs-scribe-v2-realtime")
 
     audio = load_audio(audio_path, raw_pcm=True)
     chunk_size = 32000  # 1s of 16 kHz, 16-bit mono PCM
@@ -811,7 +814,7 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
     client = ElevenLabs(api_key=api_key)
     connection = await client.speech_to_text.realtime.connect(
         RealtimeAudioOptions(
-            model_id=STT_PROVIDER_MODELS["elevenlabs"],
+            model_id=STT_PROVIDER_MODELS["elevenlabs-scribe-v2-realtime"],
             audio_format=AudioFormat.PCM_16000,
             sample_rate=16000,
             commit_strategy=CommitStrategy.MANUAL,
@@ -960,8 +963,7 @@ async def transcribe_openai_realtime(
 ) -> Dict:
     """Transcribe audio with OpenAI's Realtime API in transcription mode.
 
-    Serves ``openai-live`` (gpt-live-transcribe) and ``openai-transcribe``
-    (gpt-transcribe). Server VAD is off, so the whole clip is one item that is
+    Serves ``openai-gpt-live-transcribe`` and ``openai-gpt-transcribe``. Server VAD is off, so the whole clip is one item that is
     committed explicitly and transcribed once.
     """
     from pydub import AudioSegment
@@ -973,7 +975,7 @@ async def transcribe_openai_realtime(
 
     transcription = {"model": STT_PROVIDER_MODELS[provider]}
     lang_code = get_stt_language_code(language, provider)
-    if provider == "openai-live":
+    if provider == "openai-gpt-live-transcribe":
         # gpt-live-transcribe reads a `languages` list and rejects `language`.
         transcription["languages"] = [lang_code]
     elif lang_code is not None:
@@ -1066,8 +1068,8 @@ async def transcribe_sarvam_realtime_streaming(
 ) -> Dict:
     """Transcribe audio with Sarvam's realtime STT WebSocket.
 
-    Serves ``sarvam-v4`` (saaras:v4) and ``sarvam-v3-realtime``
-    (saaras:v3-realtime), which share the endpoint and protocol.
+    Serves ``sarvam-saaras-v4-realtime`` and ``sarvam-saaras-v3-realtime``,
+    which share the endpoint and protocol.
 
     Uses manual endpointing: the clip is framed by ``speech_start`` /
     ``speech_end`` so the server finalizes it on that boundary without waiting
@@ -1233,20 +1235,22 @@ async def transcribe_audio(
 ) -> str:
     """Route audio transcription to the appropriate provider."""
     provider_methods = {
-        "deepgram": transcribe_deepgram_streaming,
-        "openai": transcribe_openai_streaming,
-        "groq": transcribe_groq,
-        "google": transcribe_google,
-        "gemini": transcribe_gemini,
-        "sarvam": transcribe_sarvam,
-        "sarvam-v4-manual": partial(transcribe_sarvam, provider="sarvam-v4-manual"),
-        "elevenlabs": transcribe_elevenlabs_streaming,
-        "cartesia": transcribe_cartesia,
-        "smallest": transcribe_smallest_streaming,
+        "deepgram-nova-3": transcribe_deepgram_streaming,
+        "openai-gpt-4o-transcribe": transcribe_openai_streaming,
+        "groq-whisper-large-v3-turbo": transcribe_groq,
+        "google-chirp-3": transcribe_google,
+        "gemini-3.5-flash": transcribe_gemini,
+        "sarvam-saaras-v3": transcribe_sarvam,
+        "sarvam-saaras-v4": partial(transcribe_sarvam, provider="sarvam-saaras-v4"),
+        "elevenlabs-scribe-v2-realtime": transcribe_elevenlabs_streaming,
+        "cartesia-ink-whisper": transcribe_cartesia,
+        "smallest-pulse": transcribe_smallest_streaming,
         "deepgram-flux": transcribe_deepgram_flux_streaming,
-        "openai-live": partial(transcribe_openai_realtime, provider="openai-live"),
-        "openai-transcribe": partial(
-            transcribe_openai_realtime, provider="openai-transcribe"
+        "openai-gpt-live-transcribe": partial(
+            transcribe_openai_realtime, provider="openai-gpt-live-transcribe"
+        ),
+        "openai-gpt-transcribe": partial(
+            transcribe_openai_realtime, provider="openai-gpt-transcribe"
         ),
         **{
             provider: partial(transcribe_sarvam_realtime_streaming, provider=provider)
@@ -1312,7 +1316,7 @@ async def transcribe_audio_pipeline(
 
     Returns ``{"transcript": str, "ttfs": float | None}``.
     """
-    # Sarvam's streaming endpoint is rate-limited per account; honour the same
+    # Sarvam's streaming endpoints are rate-limited per account; honour the same
     # limiter the direct engine uses so concurrent clips don't blow the cap.
     if provider in SARVAM_FLUSH_STT_PROVIDERS or provider in SARVAM_REALTIME_STT_PROVIDERS:
         await SARVAM_STT_STREAMING_LIMITER.acquire()
@@ -1580,21 +1584,21 @@ def validate_existing_results_csv(results_csv_path: str) -> tuple[bool, str]:
 
 
 STT_PROVIDERS = [
-    "deepgram",
-    "openai",
-    "cartesia",
-    "smallest",
-    "groq",
-    "google",
-    "gemini",
-    "sarvam",
-    "elevenlabs",
+    "deepgram-nova-3",
+    "openai-gpt-4o-transcribe",
+    "cartesia-ink-whisper",
+    "smallest-pulse",
+    "groq-whisper-large-v3-turbo",
+    "google-chirp-3",
+    "gemini-3.5-flash",
+    "sarvam-saaras-v3",
+    "elevenlabs-scribe-v2-realtime",
     "deepgram-flux",
-    "openai-live",
-    "openai-transcribe",
-    "sarvam-v4",
-    "sarvam-v3-realtime",
-    "sarvam-v4-manual",
+    "openai-gpt-live-transcribe",
+    "openai-gpt-transcribe",
+    "sarvam-saaras-v4-realtime",
+    "sarvam-saaras-v3-realtime",
+    "sarvam-saaras-v4",
     "cartesia-ink-preview",
 ]
 
@@ -1635,7 +1639,9 @@ async def run_single_provider_eval(
     ``max_concurrency=None`` is forwarded to ``run_stt_eval``, which resolves the
     per-engine default (pipeline 1, direct 4).
     """
-    provider_output_dir = join(output_dir, provider)
+    provider = resolve_stt_provider(provider)
+    stored_name = stt_output_name(provider, language)
+    provider_output_dir = join(output_dir, stored_name)
 
     # ``exist_ok=True`` keeps this safe when the same provider folder is
     # created concurrently by multiple eval coroutines/subprocesses.
@@ -1766,6 +1772,8 @@ async def run_single_provider_eval(
             audio_duration_seconds=audio_durations,
             model=_default_stt_model(provider, language),
         )
+        if cost_metrics:
+            cost_metrics["provider"] = stored_name
 
         # TTFS latency is only produced by the pipeline engine; NaN/absent -> None.
         if "ttfs" in results_df.columns:
@@ -2280,12 +2288,13 @@ async def main():
 
     args = parser.parse_args()
 
-    provider = args.provider
+    provider = resolve_stt_provider(args.provider)
 
     # Validate provider
     if provider not in STT_PROVIDERS:
-        print(f"\033[31mError: Invalid provider '{provider}'.\033[0m")
+        print(f"\033[31mError: Invalid provider '{args.provider}'.\033[0m")
         print(f"Available providers: {', '.join(STT_PROVIDERS)}")
+        print(f"Vendor names (run the vendor's default model): {', '.join(STT_VENDOR_DEFAULTS)}")
         sys.exit(1)
 
     # Validate input directory structure

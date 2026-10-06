@@ -42,13 +42,13 @@ class TestSTTLeaderboard(unittest.TestCase):
     def test_default_single_evaluator_produces_score_metric(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "deepgram", {
+            _write_provider(base, "deepgram-nova-3", {
                 "wer": 0.1,
                 "semantic_match": {"type": "binary", "mean": 0.85},
             }, results_rows=[
                 {"id": 1, "gt": "hello", "pred": "hello", "semantic_match": True},
             ])
-            _write_provider(base, "google", {
+            _write_provider(base, "google-chirp-3", {
                 "wer": 0.2,
                 "semantic_match": {"type": "binary", "mean": 0.75},
             }, results_rows=[
@@ -64,7 +64,7 @@ class TestSTTLeaderboard(unittest.TestCase):
             summary = pd.read_excel(xlsx, sheet_name="summary")
             self.assertIn("wer", summary.columns)
             self.assertIn("semantic_match", summary.columns)
-            self.assertEqual(set(summary["run"]), {"deepgram", "google"})
+            self.assertEqual(set(summary["run"]), {"deepgram-nova-3", "google-chirp-3"})
 
     def test_custom_criterion_metrics_surface_dynamically(self):
         """A provider with custom criterion `semantic_match` should produce a
@@ -88,7 +88,7 @@ class TestSTTLeaderboard(unittest.TestCase):
     def test_cost_metrics_surface_as_scalar_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
-            _write_provider(base, "openai", {
+            _write_provider(base, "openai-gpt-4o-transcribe", {
                 "wer": 0.1,
                 "semantic_match": {"type": "binary", "mean": 0.9},
                 "cost": {

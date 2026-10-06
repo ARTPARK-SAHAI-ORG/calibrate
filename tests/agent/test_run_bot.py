@@ -15,7 +15,7 @@ def _make_bot_config(provider="openrouter"):
         system_prompt="You are helpful",
         language="english",
         tools=[],
-        stt=STTConfig(provider="elevenlabs"),
+        stt=STTConfig(provider="elevenlabs-scribe-v2-realtime"),
         tts=TTSConfig(provider="elevenlabs"),
         llm=LLMConfig(provider=provider, model="m1"),
     )

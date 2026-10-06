@@ -11,6 +11,7 @@ import {
   BarChart,
 } from "./components.js";
 import { getCredential, saveCredential } from "./credentials.js";
+import { getSttProviderById } from "./providers.js";
 import { type CalibrateCmd, findCalibrateBin, stripAnsi } from "./shared.js";
 
 // ─── CSV parser ──────────────────────────────────────────────
@@ -412,11 +413,14 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
         const configData = JSON.parse(
           fs.readFileSync(config.configPath, "utf-8"),
         );
-        const sttProvider = configData.stt?.provider || "google";
+        const sttProvider = configData.stt?.provider || "google-chirp-3";
         const ttsProvider = configData.tts?.provider || "google";
         const llmProvider = configData.llm?.provider || "openrouter";
 
-        for (const p of [sttProvider, ttsProvider, llmProvider]) {
+        const sttKey =
+          getSttProviderById(sttProvider)?.envVar ?? PROVIDER_KEY_MAP[sttProvider];
+        if (sttKey) addIfMissing(sttKey);
+        for (const p of [ttsProvider, llmProvider]) {
           const key = PROVIDER_KEY_MAP[p];
           if (key) addIfMissing(key);
         }

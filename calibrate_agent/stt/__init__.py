@@ -8,7 +8,7 @@ Library Usage:
     # Run STT evaluation across providers and generate leaderboard
     import asyncio
     result = asyncio.run(run(
-        providers=["deepgram", "google"],
+        providers=["deepgram-nova-3", "google-chirp-3"],
         language="english",
         input_dir="./data",
         output_dir="./out"
@@ -18,7 +18,7 @@ For single-provider evaluation without leaderboard:
     from calibrate_agent.stt import run_single
 
     result = asyncio.run(run_single(
-        provider="deepgram",
+        provider="deepgram-nova-3",
         language="english",
         input_dir="./data",
         output_dir="./out"

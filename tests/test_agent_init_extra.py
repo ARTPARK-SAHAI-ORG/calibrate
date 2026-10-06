@@ -12,7 +12,7 @@ class TestConfigDataclasses(unittest.TestCase):
     def test_stt_config_to_dict(self):
         from calibrate_agent.agent import STTConfig
 
-        self.assertEqual(STTConfig(provider="deepgram").to_dict(), {"provider": "deepgram"})
+        self.assertEqual(STTConfig(provider="deepgram-nova-3").to_dict(), {"provider": "deepgram-nova-3"})
 
     def test_tts_config_with_voice(self):
         from calibrate_agent.agent import TTSConfig

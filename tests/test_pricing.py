@@ -6,7 +6,7 @@ class TestSTTPricingResolver(unittest.TestCase):
     def test_resolves_default_stt_provider_pricing(self):
         from calibrate_agent.pricing import resolve_pricing
 
-        pricing = resolve_pricing("stt", "openai")
+        pricing = resolve_pricing("stt", "openai-gpt-4o-transcribe")
 
         self.assertEqual(pricing["billing_unit"], "minute")
         self.assertEqual(pricing["currency"], "USD")
@@ -16,7 +16,7 @@ class TestSTTPricingResolver(unittest.TestCase):
     def test_resolves_explicit_stt_model_pricing(self):
         from calibrate_agent.pricing import resolve_pricing
 
-        pricing = resolve_pricing("stt", "google", model="chirp_2")
+        pricing = resolve_pricing("stt", "google-chirp-3", model="chirp_2")
 
         self.assertEqual(pricing["currency"], "USD")
         self.assertEqual(pricing["model"], "chirp_2")
@@ -27,7 +27,7 @@ class TestSTTPricingResolver(unittest.TestCase):
         from calibrate_agent.utils import STT_PROVIDER_MODELS
 
         # Cartesia publishes no price for ink-preview.
-        providers_without_per_minute_pricing = {"gemini", "cartesia-ink-preview"}
+        providers_without_per_minute_pricing = {"gemini-3.5-flash", "cartesia-ink-preview"}
         for provider, model in STT_PROVIDER_MODELS.items():
             if provider in providers_without_per_minute_pricing:
                 continue
@@ -39,7 +39,7 @@ class TestSTTPricingResolver(unittest.TestCase):
     def test_sarvam_v3_realtime_priced_in_inr(self):
         from calibrate_agent.pricing import resolve_pricing
 
-        pricing = resolve_pricing("stt", "sarvam-v3-realtime")
+        pricing = resolve_pricing("stt", "sarvam-saaras-v3-realtime")
 
         self.assertEqual(pricing["model"], "saaras:v3-realtime")
         self.assertEqual(pricing["currency"], "INR")
@@ -48,7 +48,7 @@ class TestSTTPricingResolver(unittest.TestCase):
     def test_sarvam_v4_manual_priced_like_sarvam_v4(self):
         from calibrate_agent.pricing import resolve_pricing
 
-        pricing = resolve_pricing("stt", "sarvam-v4-manual")
+        pricing = resolve_pricing("stt", "sarvam-saaras-v4")
 
         self.assertEqual(pricing["model"], "saaras:v4")
         self.assertEqual(pricing["currency"], "INR")
@@ -66,7 +66,7 @@ class TestSTTPricingResolver(unittest.TestCase):
     def test_provider_lookup_is_case_insensitive_for_canonical_model(self):
         from calibrate_agent.pricing import resolve_pricing
 
-        pricing = resolve_pricing("stt", "OpenAI", model="gpt-4o-transcribe")
+        pricing = resolve_pricing("stt", "OpenAI-GPT-4o-Transcribe", model="gpt-4o-transcribe")
 
         self.assertEqual(pricing["model"], "gpt-4o-transcribe")
         self.assertEqual(pricing["native_rate"], 0.006)
@@ -126,7 +126,7 @@ class TestSarvamINRPricing(unittest.TestCase):
     def test_stt_sarvam_resolves_in_inr(self):
         from calibrate_agent.pricing import resolve_pricing
 
-        pricing = resolve_pricing("stt", "sarvam")
+        pricing = resolve_pricing("stt", "sarvam-saaras-v3")
 
         self.assertEqual(pricing["currency"], "INR")
         self.assertEqual(pricing["model"], "saaras:v3")

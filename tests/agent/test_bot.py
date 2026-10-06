@@ -9,13 +9,19 @@ class TestSTTConfig(unittest.TestCase):
         from calibrate_agent.agent.bot import STTConfig
 
         cfg = STTConfig()
-        self.assertEqual(cfg.provider, "deepgram")
+        self.assertEqual(cfg.provider, "deepgram-nova-3")
 
     def test_custom_provider(self):
         from calibrate_agent.agent.bot import STTConfig
 
-        cfg = STTConfig(provider="google")
-        self.assertEqual(cfg.provider, "google")
+        cfg = STTConfig(provider="google-chirp-3")
+        self.assertEqual(cfg.provider, "google-chirp-3")
+
+    def test_vendor_name_selects_the_default_provider(self):
+        from calibrate_agent.agent.bot import STTConfig
+
+        self.assertEqual(STTConfig(provider="google").provider, "google-chirp-3")
+        self.assertEqual(STTConfig(provider="sarvam").provider, "sarvam-saaras-v3")
 
 
 class TestTTSConfig(unittest.TestCase):

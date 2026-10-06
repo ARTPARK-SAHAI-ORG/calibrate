@@ -90,7 +90,7 @@ class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
              patch.object(E, "load_audio", side_effect=_mock_load_audio), \
              patch.object(E, "AsyncSarvamAI", return_value=fake_client):
             result = await E.transcribe_audio.__wrapped__(
-                Path("/tmp/x.wav"), "ref", "sarvam-v4-manual", "hindi", "uid"
+                Path("/tmp/x.wav"), "ref", "sarvam-saaras-v4", "hindi", "uid"
             )
         self.assertEqual(result["transcript"], "नमस्ते")
         kwargs = fake_client.speech_to_text_streaming.connect.call_args.kwargs

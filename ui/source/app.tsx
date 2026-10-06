@@ -9,6 +9,7 @@ import {
   LANGUAGES,
   getProviderById,
   getProvidersForLanguage,
+  outputDirName,
 } from "./providers.js";
 import { getCredential, saveCredential } from "./credentials.js";
 import {
@@ -1003,7 +1004,7 @@ function RunStep({
         try {
           const metricsPath = path.join(
             config.outputDir,
-            provider,
+            outputDirName(provider, config.mode, config.language),
             "metrics.json"
           );
           const raw = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
@@ -1233,13 +1234,13 @@ function LeaderboardStep({ config }: { config: EvalConfig }) {
       try {
         const metricsPath = path.join(
           config.outputDir,
-          provider,
+          outputDirName(provider, config.mode, config.language),
           "metrics.json"
         );
         const data = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
         const resultsPath = path.join(
           config.outputDir,
-          provider,
+          outputDirName(provider, config.mode, config.language),
           "results.csv"
         );
         let count = 0;
@@ -1306,7 +1307,7 @@ function LeaderboardStep({ config }: { config: EvalConfig }) {
     try {
       const resultsPath = path.join(
         config.outputDir,
-        selectedProvider,
+        outputDirName(selectedProvider, config.mode, config.language),
         "results.csv"
       );
       const csvContent = fs.readFileSync(resultsPath, "utf-8");
@@ -1355,7 +1356,7 @@ function LeaderboardStep({ config }: { config: EvalConfig }) {
     try {
       const metricsPath = path.join(
         config.outputDir,
-        selectedProvider,
+        outputDirName(selectedProvider, config.mode, config.language),
         "metrics.json"
       );
       const data = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
@@ -1377,7 +1378,7 @@ function LeaderboardStep({ config }: { config: EvalConfig }) {
 
     const audioPath = path.join(
       config.outputDir,
-      selectedProvider,
+      outputDirName(selectedProvider, config.mode, config.language),
       "audios",
       `${rowId}.wav`
     );
@@ -2178,7 +2179,9 @@ function EvalApp({
     case "config-output":
       return (
         <ConfigOutputStep
-          providers={config.providers}
+          providers={config.providers.map((p) =>
+            outputDirName(p, config.mode, config.language)
+          )}
           onComplete={(dir, overwrite) => {
             setConfig((c) => ({ ...c, outputDir: dir, overwrite }));
             setStep("config-file");

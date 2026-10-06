@@ -65,7 +65,7 @@ _Deepgram, OpenAI, Groq, Google, ElevenLabs, Cartesia, Smallest_
 
 ```jsonc
 {
-  "provider": "deepgram", "pricing_model": "nova-3",
+  "provider": "deepgram-nova-3", "pricing_model": "nova-3",
   "billing_unit": "minute", "total_seconds": 120.0, "audio_minutes": 2.0,
   "currency": "USD",
   "cost_per_minute_currency": 0.0048,
@@ -78,7 +78,7 @@ _Sarvam (`saaras:v3`)_
 
 ```jsonc
 {
-  "provider": "sarvam", "pricing_model": "saaras:v3",
+  "provider": "sarvam-saaras-v3", "pricing_model": "saaras:v3",
   "billing_unit": "minute", "total_seconds": 120.0, "audio_minutes": 2.0,
   "currency": "INR",
   "cost_per_minute_currency": 0.5,      // ₹/min

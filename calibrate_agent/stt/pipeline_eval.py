@@ -12,7 +12,7 @@ actually deploy, and lets us harvest pipecat's own speech-stop -> final-transcri
 latency (``TTFBMetricsData``, branded "TTFS") the same way pipecat's published
 per-service P99 numbers are measured (https://github.com/pipecat-ai/stt-benchmark).
 
-Mirrors pipecat's stt-benchmark methodology on our pinned pipecat 1.0.0:
+Mirrors pipecat's stt-benchmark methodology:
 - audio is pushed as 20 ms ``InputAudioRawFrame`` chunks with a real-time sleep
   between them, then a trailing-silence tail so VAD fires ``UserStoppedSpeaking``
   and streaming services flush their final segment;

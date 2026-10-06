@@ -2359,7 +2359,7 @@ async def _run_single_simulation_inner(
 
     # Extract STT and TTS configs from config dict
     stt_config_data = config.get("stt", {})
-    stt_config = STTConfig(provider=stt_config_data.get("provider", "google"))
+    stt_config = STTConfig(provider=stt_config_data.get("provider", "google-chirp-3"))
 
     tts_config_data = config.get("tts", {})
     tts_config = TTSConfig(provider=tts_config_data.get("provider", "google"))

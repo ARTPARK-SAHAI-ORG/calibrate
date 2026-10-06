@@ -375,7 +375,7 @@ from calibrate_agent.agent import simulation, STTConfig, TTSConfig, LLMConfig
 
 # STT Benchmark (runs multiple providers in parallel + generates leaderboard)
 asyncio.run(stt_run(
-    providers=["deepgram", "google", "sarvam"],
+    providers=["deepgram-nova-3", "google-chirp-3", "sarvam-saaras-v3"],
     language="english",
     input_dir="./data",
     output_dir="./out"
@@ -473,7 +473,7 @@ asyncio.run(simulation.run(
     }],
     scenarios=[{"description": "..."}],
     evaluation_criteria=[{"name": "completeness", "description": "..."}],
-    stt=STTConfig(provider="google"),
+    stt=STTConfig(provider="google-chirp-3"),
     tts=TTSConfig(provider="google"),
     llm=LLMConfig(provider="openrouter", model="openai/gpt-4.1"),
     output_dir="./out"
@@ -493,13 +493,13 @@ calibrate stt
 calibrate tts
 
 # STT Evaluation - single provider (uses eval.py)
-calibrate stt -p deepgram -i ./data -l english -o ./out
+calibrate stt -p deepgram-nova-3 -i ./data -l english -o ./out
 
 # STT Evaluation - single provider with leaderboard (Ink UI uses this for last provider)
-calibrate stt -p deepgram -i ./data -l english -o ./out --leaderboard
+calibrate stt -p deepgram-nova-3 -i ./data -l english -o ./out --leaderboard
 
 # STT Benchmark - multiple providers (uses benchmark.py, auto-generates leaderboard)
-calibrate stt -p deepgram google sarvam -i ./data -l english -o ./out
+calibrate stt -p deepgram-nova-3 google-chirp-3 sarvam-saaras-v3 -i ./data -l english -o ./out
 
 # TTS Evaluation - single provider (uses eval.py)
 calibrate tts -p google -i ./data/texts.csv -l english -o ./out
@@ -722,7 +722,7 @@ The `RTVIFunctionCallResponder` class handles function calls received via RTVI p
 {
     "system_prompt": "You are a helpful assistant.",
     "language": "english",
-    "stt": {"provider": "deepgram"},
+    "stt": {"provider": "deepgram-nova-3"},
     "tts": {"provider": "cartesia", "voice_id": "YOUR_VOICE_ID"},
     "llm": {"provider": "openrouter", "model": "openai/gpt-4.1"},
     "tools": [...],
@@ -1185,7 +1185,7 @@ Config builder functions (`buildTestsConfig`, `buildTextSimConfig`, `buildVoiceS
 - `cd ui && npm run bundle` uses esbuild to compile the entire Ink app into a single self-contained `calibrate_agent/ui/cli.bundle.mjs` (~2MB)
 - `pyproject.toml` includes `cli.bundle.mjs` via `[tool.setuptools.package-data]` so it ships with the Python package
 - `calibrate_agent/cli.py` dispatches all interactive commands via the shared `_launch_ink_ui(mode)` helper, which checks for `node` then runs `node calibrate_agent/ui/cli.bundle.mjs <mode>`
-- STT and TTS commands accept arguments directly (no `eval` subcommand): `calibrate stt -p deepgram -i ./data` runs evaluation, `calibrate stt` without args launches interactive UI
+- STT and TTS commands accept arguments directly (no `eval` subcommand): `calibrate stt -p deepgram-nova-3 -i ./data` runs evaluation, `calibrate stt` without args launches interactive UI
 - Hidden internal CLI subcommands (`llm leaderboard`, `simulations leaderboard`, `agent test`) still exist in argparse because the Ink UI spawns them as child processes
 - The `--leaderboard` flag on STT/TTS commands triggers leaderboard generation after evaluation completes
 - If Node.js is not installed, the user gets a clear error with instructions

@@ -8,13 +8,13 @@ Usage:
     # Python SDK
     from calibrate_agent.stt import run
     result = asyncio.run(run(
-        providers=["deepgram", "google", "sarvam"],
+        providers=["deepgram-nova-3", "google-chirp-3", "sarvam-saaras-v3"],
         input_dir="./data",
         output_dir="./out"
     ))
 
     # CLI
-    calibrate-agent stt -p deepgram google sarvam -i ./data -o ./out
+    calibrate-agent stt -p deepgram-nova-3 google-chirp-3 sarvam-saaras-v3 -i ./data -o ./out
 """
 
 import asyncio
@@ -35,20 +35,25 @@ from calibrate_agent.stt.eval import (
 from calibrate_agent.stt.leaderboard import generate_leaderboard
 from calibrate_agent._env import resolve_stt_parallelism
 from calibrate_agent._cli_args import add_stt_eval_args
-from calibrate_agent.utils import StreamTee, validate_stt_language
+from calibrate_agent.utils import (
+    STT_VENDOR_DEFAULTS,
+    StreamTee,
+    resolve_stt_provider,
+    validate_stt_language,
+)
 
 
 async def run(
     providers: list[
         Literal[
-            "deepgram",
-            "openai",
-            "cartesia",
-            "smallest",
-            "groq",
-            "google",
-            "sarvam",
-            "elevenlabs",
+            "deepgram-nova-3",
+            "openai-gpt-4o-transcribe",
+            "cartesia-ink-whisper",
+            "smallest-pulse",
+            "groq-whisper-large-v3-turbo",
+            "google-chirp-3",
+            "sarvam-saaras-v3",
+            "elevenlabs-scribe-v2-realtime",
         ]
     ],
     input_dir: str,
@@ -111,12 +116,15 @@ async def run(
         >>> import asyncio
         >>> from calibrate_agent.stt import run
         >>> result = asyncio.run(run(
-        ...     providers=["deepgram", "google", "sarvam"],
+        ...     providers=["deepgram-nova-3", "google-chirp-3", "sarvam-saaras-v3"],
         ...     language="english",
         ...     input_dir="./data",
         ...     output_dir="./out"
         ... ))
     """
+    # A vendor name and its full provider name are the same provider, so it
+    # runs once.
+    providers = list(dict.fromkeys(resolve_stt_provider(p) for p in providers))
     # Every provider must support the language before any of them runs, so an
     # unsupported pairing stops the whole benchmark instead of producing a
     # partial leaderboard.
@@ -262,7 +270,11 @@ async def main():
 
     args = parser.parse_args()
 
-    providers = args.provider
+    # Full provider names from here on: results are stored and reported under
+    # them, and a vendor name passed with its full name runs once.
+    providers = list(
+        dict.fromkeys(resolve_stt_provider(p) for p in args.provider or [])
+    )
 
     if args.eval_only:
         if not args.dataset:
@@ -281,6 +293,7 @@ async def main():
             if provider not in STT_PROVIDERS:
                 print(f"\033[31mError: Invalid provider '{provider}'.\033[0m")
                 print(f"Available providers: {', '.join(STT_PROVIDERS)}")
+                print(f"Vendor names (run the vendor's default model): {', '.join(STT_VENDOR_DEFAULTS)}")
                 sys.exit(1)
             try:
                 validate_stt_language(args.language, provider)

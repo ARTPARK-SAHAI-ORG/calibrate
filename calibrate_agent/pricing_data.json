@@ -1,21 +1,21 @@
 {
   "stt": {
-    "deepgram": {
+    "deepgram-nova-3": {
       "nova-3": {
         "price_per_minute_usd": 0.0048
       }
     },
-    "openai": {
+    "openai-gpt-4o-transcribe": {
       "gpt-4o-transcribe": {
         "price_per_minute_usd": 0.006
       }
     },
-    "groq": {
+    "groq-whisper-large-v3-turbo": {
       "whisper-large-v3-turbo": {
         "price_per_minute_usd": 0.0006666667
       }
     },
-    "google": {
+    "google-chirp-3": {
       "chirp_2": {
         "price_per_minute_usd": 0.016
       },
@@ -23,23 +23,23 @@
         "price_per_minute_usd": 0.016
       }
     },
-    "sarvam": {
+    "sarvam-saaras-v3": {
       "saaras:v3": {
         "currency": "INR",
         "price_per_minute_inr": 0.5
       }
     },
-    "elevenlabs": {
+    "elevenlabs-scribe-v2-realtime": {
       "scribe_v2_realtime": {
         "price_per_minute_usd": 0.0065
       }
     },
-    "cartesia": {
+    "cartesia-ink-whisper": {
       "ink-whisper": {
         "price_per_minute_usd": 0.003
       }
     },
-    "smallest": {
+    "smallest-pulse": {
       "pulse": {
         "price_per_minute_usd": 0.003
       }
@@ -52,29 +52,29 @@
         "price_per_minute_usd": 0.0078
       }
     },
-    "openai-live": {
+    "openai-gpt-live-transcribe": {
       "gpt-live-transcribe": {
         "price_per_minute_usd": 0.017
       }
     },
-    "openai-transcribe": {
+    "openai-gpt-transcribe": {
       "gpt-transcribe": {
         "price_per_minute_usd": 0.0045
       }
     },
-    "sarvam-v4": {
+    "sarvam-saaras-v4-realtime": {
       "saaras:v4": {
         "currency": "INR",
         "price_per_minute_inr": 0.5
       }
     },
-    "sarvam-v3-realtime": {
+    "sarvam-saaras-v3-realtime": {
       "saaras:v3-realtime": {
         "currency": "INR",
         "price_per_minute_inr": 0.5
       }
     },
-    "sarvam-v4-manual": {
+    "sarvam-saaras-v4": {
       "saaras:v4": {
         "currency": "INR",
         "price_per_minute_inr": 0.5
