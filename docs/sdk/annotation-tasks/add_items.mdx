@@ -8,7 +8,7 @@ description: "Bulk-create annotation items in a task, optionally seeding human a
 ## Usage
 
 ```python
-from calibrate import Calibrate
+from calibrate import Calibrate, AnnotationItemPayload, ItemPayload
 
 client = Calibrate(
     api_key="your_api_key",
@@ -16,7 +16,13 @@ client = Calibrate(
 
 client.annotation_tasks.add_items(
     task_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    items=[],
+    items=[
+        AnnotationItemPayload(
+            payload=ItemPayload(
+                name="name",
+            ),
+        )
+    ],
 )
 ```
 

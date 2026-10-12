@@ -651,13 +651,18 @@
       "AnnotationItemPayload": {
         "properties": {
           "payload": {
-            "title": "Payload",
-            "description": "The item's payload. `name` is required and unique within the task for every type. The other fields depend on the task `type`:\n\n- `stt`: `name`, `reference_transcript`, `predicted_transcript`\n- `llm`: `name`, `chat_history` (list of `{role, content}` turns ending at the user turn), `agent_response` (the reply to judge), optional `evaluator_variables`\n- `llm-general`: `name`, `input`, `output`, optional `evaluator_variables`\n- `conversation`: `name`, `transcript` (list of `{role, content}` turns), optional `evaluator_variables`\n\n`evaluator_variables` maps an evaluator ID to that evaluator's `{{variable}}` values for this item",
+            "$ref": "#/components/schemas/ItemPayload",
+            "description": "The item's payload. `name` is unique within the task for every type, and `description` is accepted by every type. The other fields depend on the task `type`:\n\n- `stt`: `predicted_transcript`, `reference_transcript`\n- `tts`: `audio_path`, `text`\n- `llm`: `agent_response`, `chat_history`, optional `actual_tool_calls`, `evaluator_variables`, `expected_tool_calls`, `tool_calls`\n- `llm-general`: `input`, `output`, optional `actual_tool_calls`, `evaluator_variables`, `expected_tool_calls`, `tool_calls`\n- `conversation`: `transcript`, optional `evaluator_variables`",
             "examples": [
               {
                 "name": "clip-001",
                 "predicted_transcript": "the quick brown fax",
                 "reference_transcript": "the quick brown fox"
+              },
+              {
+                "audio_path": "tts/media/f47ac10b-58cc-4372-a567-0e02b2c3d479.wav",
+                "name": "clip-001",
+                "text": "the quick brown fox"
               },
               {
                 "agent_response": "Your balance is $42.00.",
@@ -692,6 +697,22 @@
                 ]
               }
             ]
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ItemMetadataEntry"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Key-value pairs stored with the item and shown beside it on the labelling form. Omit if you have none"
           },
           "annotations": {
             "anyOf": [
@@ -1836,6 +1857,37 @@
         ],
         "title": "ChatMessage"
       },
+      "ChatTurn": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Role",
+            "description": "Message author role in the conversation history"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "Message text. Omit for turns that only carry tool calls"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "role"
+        ],
+        "title": "ChatTurn",
+        "description": "One message in a conversation, in OpenAI chat format"
+      },
       "CreateJobsRequest": {
         "properties": {
           "annotator_ids": {
@@ -2875,6 +2927,234 @@
         ],
         "title": "HumanAgreementBlock"
       },
+      "ItemMetadataEntry": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Key",
+            "description": "Name of the metadata entry"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 8192,
+            "title": "Value",
+            "description": "Value of the metadata entry"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "key",
+          "value"
+        ],
+        "title": "ItemMetadataEntry",
+        "description": "One key-value pair stored with an item and shown beside it on the labelling form"
+      },
+      "ItemPayload": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Name of the item, unique within the task. For every task type"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "A description of the item. For every task type"
+          },
+          "reference_transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference Transcript",
+            "description": "The correct transcript. For `stt` tasks"
+          },
+          "predicted_transcript": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicted Transcript",
+            "description": "The transcript to judge. For `stt` tasks"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text",
+            "description": "The text that was spoken. For `tts` tasks"
+          },
+          "audio_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Path",
+            "description": "Storage key or `s3://` URI of the audio clip. For `tts` tasks"
+          },
+          "chat_history": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatTurn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chat History",
+            "description": "The conversation up to the reply being judged, ending at the user turn. For `llm` tasks"
+          },
+          "agent_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent Response",
+            "description": "The reply to judge. An empty string when the reply was a tool call. For `llm` tasks"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input",
+            "description": "The standalone input the agent was given. For `llm-general` tasks"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output",
+            "description": "The output to judge. For `llm-general` tasks"
+          },
+          "transcript": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ChatTurn"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transcript",
+            "description": "The full conversation to judge. For `conversation` tasks"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls",
+            "description": "Tool calls the agent made in place of a text reply. With no text reply, sending this marks the item as a tool call for a person to judge. For `llm` and `llm-general` tasks"
+          },
+          "expected_tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Tool Calls",
+            "description": "Tool calls the agent should have made. Sending this marks the item as a tool call for a person to judge. For `llm` and `llm-general` tasks"
+          },
+          "actual_tool_calls": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ToolCall"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Tool Calls",
+            "description": "Tool calls the agent made. Sending this marks the item as a tool call for a person to judge. For `llm` and `llm-general` tasks"
+          },
+          "evaluator_variables": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Values for each evaluator's `{{variable}}` placeholders, keyed by evaluator ID. For `llm`, `llm-general` and `conversation` tasks"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "ItemPayload",
+        "description": "What an annotation item holds. Which fields apply depends on the task type"
+      },
       "ItemUpdatePayload": {
         "properties": {
           "uuid": {
@@ -2888,8 +3168,68 @@
             ]
           },
           "payload": {
-            "title": "Payload",
-            "description": "The item's new payload. `payload['name']` is still required and must be unique within the task"
+            "$ref": "#/components/schemas/ItemPayload",
+            "description": "The item's new payload. It replaces the stored one. `name` is unique within the task for every type, and `description` is accepted by every type. The other fields depend on the task `type`:\n\n- `stt`: `predicted_transcript`, `reference_transcript`\n- `tts`: `audio_path`, `text`\n- `llm`: `agent_response`, `chat_history`, optional `actual_tool_calls`, `evaluator_variables`, `expected_tool_calls`, `tool_calls`\n- `llm-general`: `input`, `output`, optional `actual_tool_calls`, `evaluator_variables`, `expected_tool_calls`, `tool_calls`\n- `conversation`: `transcript`, optional `evaluator_variables`",
+            "examples": [
+              {
+                "name": "clip-001",
+                "predicted_transcript": "the quick brown fax",
+                "reference_transcript": "the quick brown fox"
+              },
+              {
+                "audio_path": "tts/media/f47ac10b-58cc-4372-a567-0e02b2c3d479.wav",
+                "name": "clip-001",
+                "text": "the quick brown fox"
+              },
+              {
+                "agent_response": "Your balance is $42.00.",
+                "chat_history": [
+                  {
+                    "content": "What is my account balance?",
+                    "role": "user"
+                  }
+                ],
+                "name": "case-001"
+              },
+              {
+                "input": "Summarize: the meeting is moved to 3pm.",
+                "name": "pair-001",
+                "output": "The meeting is now at 3pm."
+              },
+              {
+                "name": "convo-001",
+                "transcript": [
+                  {
+                    "content": "Hi, how can I help?",
+                    "role": "assistant"
+                  },
+                  {
+                    "content": "I lost my card.",
+                    "role": "user"
+                  },
+                  {
+                    "content": "I can block it now. Can you confirm the last 4 digits?",
+                    "role": "assistant"
+                  }
+                ]
+              }
+            ]
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ItemMetadataEntry"
+                },
+                "type": "array",
+                "maxItems": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Key-value pairs stored with the item and shown beside it on the labelling form. Omit to leave the stored pairs as they are. Send an empty list to clear them"
           }
         },
         "type": "object",
@@ -4730,6 +5070,52 @@
         },
         "type": "object",
         "title": "TestUpdate"
+      },
+      "ToolCall": {
+        "properties": {
+          "tool": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Tool",
+            "description": "Name of the tool the agent called"
+          },
+          "arguments": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Argument values the agent passed to the tool. Omit when the call had none"
+          },
+          "output": {
+            "title": "Output",
+            "description": "What the tool returned for this call. Any JSON value. Omit when you do not record it"
+          },
+          "accept_any_arguments": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accept Any Arguments",
+            "description": "When `true`, only the tool name had to match and `arguments` was ignored. Carried over from a tool-call test's expected calls"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "tool"
+        ],
+        "title": "ToolCall",
+        "description": "One call to a tool"
       },
       "ToolCallOutput": {
         "properties": {
