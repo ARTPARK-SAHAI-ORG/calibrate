@@ -323,6 +323,7 @@
           {
             "group": "Providers",
             "pages": [
+              "integrations/setup",
               "integrations/stt",
               "integrations/llm",
               "integrations/tts"

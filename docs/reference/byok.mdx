@@ -1,52 +1,26 @@
 ---
 title: "Bring your own keys (BYOK)"
-description: "Use your own AI provider API keys to remove the rate limits on evaluation runs"
+description: "Add your own provider API keys to remove the limits on evaluation runs and have them billed to your account"
 ---
 
-Add your own API keys to remove the rate limits on evaluation runs and have them billed to your account.
+## Why use your own keys?
 
-Add keys in [Workspace settings → Bring your own keys (BYOK)](https://calibrate.artpark.ai/workspace-settings?tab=provider-keys). Paste the key and click **Save**. Calibrate checks the key with the provider before saving it.
+### Billing
+
+Evaluation runs are billed to your own provider accounts.
+
+### Rate limits
+
+When using Calibrate's default keys, all your evaluation runs have rate limits, which become a hindrance once you have tested your agent and want to scale your evaluations to a larger dataset. With your own keys, these limits are removed.
+
+## Add a key
+
+1. Open [Workspace settings → Bring your own keys (BYOK)](https://calibrate.artpark.ai/workspace-settings?tab=provider-keys).
+2. Add each provider's API key. See [Setup](/integrations/setup) for how to configure different providers.
+3. Click **Save**. Calibrate checks the key with the provider before saving it.
 
 ## How keys are used
 
 - Once you add any key, every run in your workspace uses only your keys.
 - A run that needs a provider you have not added a key for will not run.
 - If you remove all your keys, runs go back to Calibrate's default keys and rate limits.
-
-## Providers
-
-### OpenRouter
-
-Used by every evaluator, and by LLM tests, benchmarks and simulations. Get a key from [OpenRouter](https://openrouter.ai).
-
-### OpenAI
-
-Used for OpenAI speech-to-text and text-to-speech, and by every voice simulation. Get a key from [OpenAI](https://openai.com).
-
-### Deepgram
-
-Used for Deepgram speech-to-text. Get a key from [Deepgram](https://deepgram.com).
-
-### ElevenLabs
-
-Used for ElevenLabs speech-to-text and text-to-speech. Get a key from [ElevenLabs](https://elevenlabs.io).
-
-### Sarvam
-
-Used for Sarvam speech-to-text and text-to-speech. Get a key from [Sarvam](https://sarvam.ai).
-
-### Cartesia
-
-Used for Cartesia speech-to-text and text-to-speech. Get a key from [Cartesia](https://cartesia.ai).
-
-### Gemini
-
-Used for Gemini speech-to-text and text-to-speech. Get a key from [Google AI Studio](https://ai.google.dev).
-
-### Google Cloud
-
-Used for Google Cloud speech-to-text and text-to-speech. Paste the full service account JSON file. Create one in the [Google Cloud console](https://cloud.google.com).
-
-### Smallest AI
-
-Used for Smallest AI speech-to-text and text-to-speech. Get a key from [Smallest AI](https://smallest.ai).
