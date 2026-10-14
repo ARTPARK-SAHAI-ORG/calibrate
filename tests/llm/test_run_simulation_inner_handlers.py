@@ -39,7 +39,7 @@ class TestRunSimulationWithTools(unittest.IsolatedAsyncioTestCase):
         ]
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RS, "OpenAILLMService",
+             patch.object(RS, "OpenRouterLLMService",
                           side_effect=[fake_bot_llm, fake_user_llm]), \
              patch.object(RS, "PipelineTask"), \
              patch.object(RS, "PipelineRunner", return_value=fake_runner), \

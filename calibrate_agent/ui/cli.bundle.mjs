@@ -47411,12 +47411,12 @@ function LlmTestsApp({ onBack }) {
   }, [step]);
   function checkApiKeys(provider) {
     const needed = [];
-    if (!getCredential("OPENAI_API_KEY")) {
-      needed.push("OPENAI_API_KEY");
+    if (!getCredential("OPENROUTER_API_KEY")) {
+      needed.push("OPENROUTER_API_KEY");
     }
-    if (!config.agentUrl && provider === "openrouter") {
-      if (!getCredential("OPENROUTER_API_KEY")) {
-        needed.push("OPENROUTER_API_KEY");
+    if (!config.agentUrl && provider === "openai") {
+      if (!getCredential("OPENAI_API_KEY")) {
+        needed.push("OPENAI_API_KEY");
       }
     }
     return needed;
@@ -48784,12 +48784,12 @@ function SimulationsApp({ onBack }) {
       }
     };
     if (simType === "text") {
-      addIfMissing("OPENAI_API_KEY");
-      if (provider === "openrouter" && !isAgentConnection) {
-        addIfMissing("OPENROUTER_API_KEY");
+      addIfMissing("OPENROUTER_API_KEY");
+      if (provider === "openai" && !isAgentConnection) {
+        addIfMissing("OPENAI_API_KEY");
       }
     } else if (simType === "voice") {
-      addIfMissing("OPENAI_API_KEY");
+      addIfMissing("OPENROUTER_API_KEY");
       addIfMissing("GOOGLE_APPLICATION_CREDENTIALS");
       try {
         const configData = JSON.parse(
@@ -50296,12 +50296,12 @@ function KeySetupStep({
     const result = [];
     const seen = /* @__PURE__ */ new Set();
     result.push({
-      envVar: "OPENAI_API_KEY",
-      label: "OpenAI (Evaluators)",
+      envVar: "OPENROUTER_API_KEY",
+      label: "OpenRouter (Evaluators)",
       isFilePath: false,
-      found: !!getCredential("OPENAI_API_KEY")
+      found: !!getCredential("OPENROUTER_API_KEY")
     });
-    seen.add("OPENAI_API_KEY");
+    seen.add("OPENROUTER_API_KEY");
     for (const id of selectedProviders) {
       const p = getProviderById(id, mode2);
       if (p && !seen.has(p.envVar)) {

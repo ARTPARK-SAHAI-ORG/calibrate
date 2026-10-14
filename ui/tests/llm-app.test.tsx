@@ -569,7 +569,7 @@ describe("LlmTestsApp", () => {
       stdin.write("\r");
       await wait(100); // → api-keys or running
 
-      // api-keys: submit fake key for OPENAI_API_KEY
+      // api-keys: submit fake key for OPENROUTER_API_KEY
       // (getCredential returns "sk-fake-key" so it might skip api-keys)
       await wait(100); // → running
 
@@ -805,7 +805,7 @@ describe("LlmTestsApp", () => {
       await wait(100);
 
       const frame = stdout.lastFrame() ?? "";
-      expect(frame).toContain("OPENAI_API_KEY");
+      expect(frame).toContain("OPENROUTER_API_KEY");
     });
 
     it("submitting with existing dirs shows output-dir-confirm", async () => {
@@ -905,7 +905,7 @@ describe("LlmTestsApp", () => {
     it("shows key name prompt", async () => {
       const { stdout } = await reachApiKeys();
       const frame = stdout.lastFrame() ?? "";
-      expect(frame).toContain("OPENAI_API_KEY");
+      expect(frame).toContain("OPENROUTER_API_KEY");
     });
 
     it("entering key advances to running", async () => {
@@ -914,7 +914,7 @@ describe("LlmTestsApp", () => {
       await wait(100);
       const frame = stdout.lastFrame() ?? "";
       // Should have left api-keys step
-      expect(frame).not.toContain("OPENAI_API_KEY:");
+      expect(frame).not.toContain("OPENROUTER_API_KEY:");
     });
 
     it("entering first of two keys advances to second key", async () => {
@@ -926,14 +926,15 @@ describe("LlmTestsApp", () => {
 
       const fs = await import("node:fs");
       (fs.default.readFileSync as ReturnType<typeof vi.fn>).mockReturnValue(
-        JSON.stringify({}), // internal path → needs both OPENAI and OPENROUTER keys
+        JSON.stringify({}), // internal path with OpenAI → needs both OPENROUTER and OPENAI keys
       );
       (fs.default.readdirSync as ReturnType<typeof vi.fn>).mockReturnValue([]);
 
       const { stdout, stdin } = await renderAndInit();
       await typeAndSubmit(stdin, "./config.json"); // → provider
-      await pressEnter(stdin); // OpenRouter → enter-model
-      await typeAndSubmit(stdin, "openai/gpt-4.1"); // → model-confirm
+      await pressDown(stdin);
+      await pressEnter(stdin); // OpenAI → enter-model
+      await typeAndSubmit(stdin, "gpt-4.1"); // → model-confirm
       await pressDown(stdin);
       await pressEnter(stdin); // continue → output-dir
       await wait(100);
@@ -942,11 +943,11 @@ describe("LlmTestsApp", () => {
       await wait(100);
 
       // Enter first key
-      await typeAndSubmit(stdin, "sk-openai-key");
+      await typeAndSubmit(stdin, "sk-openrouter-key");
       await wait(100);
 
       const frame = stdout.lastFrame() ?? "";
-      expect(frame).toContain("OPENROUTER_API_KEY");
+      expect(frame).toContain("OPENAI_API_KEY");
     });
   });
 
@@ -1246,7 +1247,7 @@ describe("LlmTestsApp", () => {
 
       await pressEnter(stdin); // → api-keys
       await wait(100);
-      expect(stdout.lastFrame()).toContain("OPENAI_API_KEY");
+      expect(stdout.lastFrame()).toContain("OPENROUTER_API_KEY");
 
       await pressEsc(stdin); // → output-dir
       await wait(50);

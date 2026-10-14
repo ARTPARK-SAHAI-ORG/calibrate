@@ -395,15 +395,15 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
     };
 
     if (simType === "text") {
-      // Always need OPENAI_API_KEY for evaluators
-      addIfMissing("OPENAI_API_KEY");
-      // Need OPENROUTER_API_KEY if using OpenRouter
-      if (provider === "openrouter" && !isAgentConnection) {
-        addIfMissing("OPENROUTER_API_KEY");
+      // Simulated user LLM and evaluation judge both run through OpenRouter
+      addIfMissing("OPENROUTER_API_KEY");
+      // Need OPENAI_API_KEY if the agent uses OpenAI
+      if (provider === "openai" && !isAgentConnection) {
+        addIfMissing("OPENAI_API_KEY");
       }
     } else if (simType === "voice") {
-      // Always need OPENAI_API_KEY for simulated user LLM and evaluation judge
-      addIfMissing("OPENAI_API_KEY");
+      // Simulated user LLM and evaluation judge both run through OpenRouter
+      addIfMissing("OPENROUTER_API_KEY");
       // Always need GOOGLE_APPLICATION_CREDENTIALS for simulated user TTS
       addIfMissing("GOOGLE_APPLICATION_CREDENTIALS");
 

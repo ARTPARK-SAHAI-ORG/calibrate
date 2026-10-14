@@ -124,7 +124,7 @@ class TTSConfig(BaseModel):
 
 
 DEFAULT_TEST_AGENT_LLM_MODEL = "openai/gpt-5.4-mini"
-DEFAULT_SIMULATED_USER_LLM_MODEL = "gpt-5.4-mini"
+DEFAULT_SIMULATED_USER_LLM_MODEL = "openai/gpt-5.4-mini"
 
 
 class LLMConfig(BaseModel):

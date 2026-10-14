@@ -732,14 +732,14 @@ function KeySetupStep({
     }> = [];
     const seen = new Set<string>();
 
-    // Always need OPENAI_API_KEY for evaluators
+    // Evaluators run through OpenRouter
     result.push({
-      envVar: "OPENAI_API_KEY",
-      label: "OpenAI (Evaluators)",
+      envVar: "OPENROUTER_API_KEY",
+      label: "OpenRouter (Evaluators)",
       isFilePath: false,
-      found: !!getCredential("OPENAI_API_KEY"),
+      found: !!getCredential("OPENROUTER_API_KEY"),
     });
-    seen.add("OPENAI_API_KEY");
+    seen.add("OPENROUTER_API_KEY");
 
     for (const id of selectedProviders) {
       const p = getProviderById(id, mode);

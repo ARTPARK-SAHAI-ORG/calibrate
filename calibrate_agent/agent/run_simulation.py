@@ -163,7 +163,7 @@ from pipecat.processors.frame_processor import FrameDirection, FrameProcessor
 from pipecat.runner.types import RunnerArguments
 from pipecat.services.cartesia.tts import CartesiaTTSService
 from pipecat.services.llm_service import FunctionCallParams
-from pipecat.services.openai.llm import OpenAILLMService
+from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.services.elevenlabs.tts import ElevenLabsHttpTTSService
 
 # from pipecat.processors.transcript_processor import TranscriptProcessor
@@ -204,6 +204,14 @@ _PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
 
 DEFAULT_SERIALIZER_NAME = "protobuf"
 SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
+
+
+def build_simulated_user_llm() -> OpenRouterLLMService:
+    return OpenRouterLLMService(
+        api_key=os.getenv("OPENROUTER_API_KEY"),
+        settings=OpenRouterLLMService.Settings(model=DEFAULT_SIMULATED_USER_LLM_MODEL),
+    )
+
 
 # Voices for the SIMULATED USER (the fake human), one place to see/edit them.
 # Deliberately kept distinct from the agent's voice (create_tts_service) so the
@@ -1593,10 +1601,7 @@ async def _run_simulation_inner(
             f"Unsupported simulated-user TTS provider: {voices['provider']}"
         )
 
-    llm = OpenAILLMService(
-        api_key=os.getenv("OPENAI_API_KEY"),
-        settings=OpenAILLMService.Settings(model=DEFAULT_SIMULATED_USER_LLM_MODEL),
-    )
+    llm = build_simulated_user_llm()
 
     simulation_system_prompt = system_prompt
     if not agent_speaks_first:

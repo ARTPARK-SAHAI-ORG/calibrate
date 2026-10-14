@@ -335,6 +335,24 @@ describe("SimulationsApp", () => {
       // api-keys step shows the key name as the prompt
       expect(frame).toMatch(/API_KEY|sk-/i);
     });
+
+    it("text simulation asks for the OpenRouter key, not the OpenAI key", async () => {
+      const { stdout } = await reachApiKeys();
+      const frame = stdout.lastFrame() ?? "";
+      expect(frame).toContain("OPENROUTER_API_KEY");
+      expect(frame).not.toContain("OPENAI_API_KEY");
+    });
+
+    it("voice simulation asks for the OpenRouter key, not the OpenAI key", async () => {
+      const credentials = await import("../source/credentials.js");
+      vi.mocked(credentials.getCredential).mockReturnValue(null as unknown as string);
+      const { stdout, stdin } = await reachOutputDirVoice();
+      await pressEnter(stdin); // submit output-dir → parallel
+      await pressEnter(stdin); // submit parallel → api-keys
+      const frame = stdout.lastFrame() ?? "";
+      expect(frame).toContain("OPENROUTER_API_KEY");
+      expect(frame).not.toContain("OPENAI_API_KEY");
+    });
   });
 
   // ──────────────────────────────────────────────────────────────────────────

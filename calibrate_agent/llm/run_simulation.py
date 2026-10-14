@@ -324,10 +324,10 @@ async def run_simulation(
     tools: List[dict],
     user_system_prompt: str,
     evaluators: list[dict],
-    bot_model: str = "gpt-4.1",
-    user_model: str = "gpt-4.1",
-    bot_provider: str = "openai",
-    user_provider: str = "openai",
+    bot_model: str = "openai/gpt-4.1",
+    user_model: str = "openai/gpt-4.1",
+    bot_provider: str = "openrouter",
+    user_provider: str = "openrouter",
     agent_speaks_first: bool = True,
     max_turns: int = DEFAULT_MAX_TURNS,
     output_dir: Optional[str] = None,
@@ -586,8 +586,8 @@ async def run_simulation_with_agent(
     evaluators: list[dict],
     agent_speaks_first: bool = True,
     max_turns: int = DEFAULT_MAX_TURNS,
-    user_model: str = "gpt-4.1",
-    user_provider: str = "openai",
+    user_model: str = "openai/gpt-4.1",
+    user_provider: str = "openrouter",
     output_dir: Optional[str] = None,
     fallback_judge_model: str = DEFAULT_SIMULATION_JUDGE_MODEL,
 ) -> dict:
@@ -603,8 +603,8 @@ async def run_simulation_with_agent(
         evaluators: List of evaluator dicts with ``name`` and ``system_prompt``.
         agent_speaks_first: Whether the agent sends the first message. Default: True.
         max_turns: Maximum agent turns before ending. Default: 50.
-        user_model: Model for the user simulator. Default: ``gpt-4.1``.
-        user_provider: Provider for the user simulator. Default: ``openai``.
+        user_model: Model for the user simulator. Default: ``openai/gpt-4.1``.
+        user_provider: Provider for the user simulator. Default: ``openrouter``.
         output_dir: Optional directory to save intermediate transcript.
 
     Returns:
@@ -798,8 +798,6 @@ async def run_single_simulation_task(
                         max_turns=config.get("settings", {}).get(
                             "max_turns", DEFAULT_MAX_TURNS
                         ),
-                        user_model="gpt-4.1",
-                        user_provider="openai",
                         output_dir=simulation_output_dir,
                     )
                 else:
@@ -810,9 +808,7 @@ async def run_single_simulation_task(
                         user_system_prompt=user_system_prompt,
                         evaluators=evaluators,
                         bot_model=args.model,
-                        user_model="gpt-4.1",
                         bot_provider=args.provider,
-                        user_provider="openai",
                         agent_speaks_first=agent_speaks_first,
                         max_turns=config.get("settings", {}).get(
                             "max_turns", DEFAULT_MAX_TURNS
@@ -885,14 +881,14 @@ async def main():
         "-m",
         "--model",
         type=str,
-        default="gpt-4.1",
-        help="OpenAI model to use for the evaluation",
+        default="openai/gpt-4.1",
+        help="Model to use for the agent",
     )
     parser.add_argument(
         "-p",
         "--provider",
         type=str,
-        default="openai",
+        default="openrouter",
         help="LLM provider to use (openai or openrouter)",
     )
     parser.add_argument(

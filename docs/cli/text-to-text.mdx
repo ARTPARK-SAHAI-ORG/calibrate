@@ -642,7 +642,7 @@ calibrate-agent llm
 3. **Model entry** — enter model names one at a time (single or multiple)
 4. **Confirm models** — review the list and add more or proceed
 5. **Output directory** — where results will be saved (defaults to `./out`)
-6. **API keys** — enter the API keys for the selected provider
+6. **API keys** — `OPENROUTER_API_KEY` (used by the LLM judge), plus `OPENAI_API_KEY` if you selected OpenAI
 
 The evaluation runs the selected models in parallel (max 2 at a time), showing results for each test as they complete.
 
@@ -654,7 +654,7 @@ _Single test:_
 2. **Mode** — select "Single test"
 3. **Verify** — calibrate verifies the connection; shows success or failure with the option to go back
 4. **Output directory** — where results will be saved (defaults to `./out`)
-5. **API keys** — only `OPENAI_API_KEY` is required (used by the LLM judge)
+5. **API keys** — only `OPENROUTER_API_KEY` is required (used by the LLM judge)
 
 _Benchmark across models:_
 
@@ -663,7 +663,7 @@ _Benchmark across models:_
 3. **Model entry** — enter a model name; calibrate verifies the connection with that model before asking if you want to add another
 4. **Confirm models** — review the list and add more or proceed
 5. **Output directory** — where results will be saved (defaults to `./out`)
-6. **API keys** — only `OPENAI_API_KEY` is required (used by the LLM judge)
+6. **API keys** — only `OPENROUTER_API_KEY` is required (used by the LLM judge)
 
 ### Non-interactive mode
 
