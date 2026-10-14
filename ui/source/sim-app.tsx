@@ -402,8 +402,8 @@ export function SimulationsApp({ onBack }: { onBack?: () => void }) {
         addIfMissing("OPENROUTER_API_KEY");
       }
     } else if (simType === "voice") {
-      // Always need OPENAI_API_KEY for simulated user LLM and evaluation judge
-      addIfMissing("OPENAI_API_KEY");
+      // Simulated user LLM and evaluation judge both run through OpenRouter
+      addIfMissing("OPENROUTER_API_KEY");
       // Always need GOOGLE_APPLICATION_CREDENTIALS for simulated user TTS
       addIfMissing("GOOGLE_APPLICATION_CREDENTIALS");
 

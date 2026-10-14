@@ -551,5 +551,20 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(adapter._spoken_text_buffer, "")
 
 
+class TestBuildSimulatedUserLlm:
+    def test_uses_openrouter_key_and_model(self, monkeypatch):
+        from unittest.mock import patch
+        from calibrate_agent.agent import run_simulation as RS
+
+        monkeypatch.setenv("OPENROUTER_API_KEY", "or-fake")
+        monkeypatch.setenv("OPENAI_API_KEY", "oa-fake")
+        with patch.object(RS, "OpenRouterLLMService") as svc:
+            RS.build_simulated_user_llm()
+        kwargs = svc.call_args.kwargs
+        assert kwargs["api_key"] == "or-fake"
+        svc.Settings.assert_called_once_with(model="openai/gpt-5.4-mini")
+
+
 if __name__ == "__main__":
     unittest.main()
+

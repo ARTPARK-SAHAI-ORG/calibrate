@@ -48789,7 +48789,7 @@ function SimulationsApp({ onBack }) {
         addIfMissing("OPENROUTER_API_KEY");
       }
     } else if (simType === "voice") {
-      addIfMissing("OPENAI_API_KEY");
+      addIfMissing("OPENROUTER_API_KEY");
       addIfMissing("GOOGLE_APPLICATION_CREDENTIALS");
       try {
         const configData = JSON.parse(
