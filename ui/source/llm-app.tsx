@@ -309,15 +309,15 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
   // ── Check API keys ──
   function checkApiKeys(provider: string) {
     const needed: string[] = [];
-    // Always need OPENAI_API_KEY for evaluators
-    if (!getCredential("OPENAI_API_KEY")) {
-      needed.push("OPENAI_API_KEY");
+    // Evaluators run through OpenRouter
+    if (!getCredential("OPENROUTER_API_KEY")) {
+      needed.push("OPENROUTER_API_KEY");
     }
-    // Need OPENROUTER_API_KEY only for internal agent using OpenRouter
+    // Need OPENAI_API_KEY only for internal agent using OpenAI
     // Agent connection path does not use provider/model, so skip this check
-    if (!config.agentUrl && provider === "openrouter") {
-      if (!getCredential("OPENROUTER_API_KEY")) {
-        needed.push("OPENROUTER_API_KEY");
+    if (!config.agentUrl && provider === "openai") {
+      if (!getCredential("OPENAI_API_KEY")) {
+        needed.push("OPENAI_API_KEY");
       }
     }
     return needed;

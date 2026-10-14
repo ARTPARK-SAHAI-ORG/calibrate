@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -259,6 +260,34 @@ class TestRunSimulationWithAgent(unittest.IsolatedAsyncioTestCase):
                 agent_speaks_first=False,
                 user_provider="openrouter",
             )
+
+    async def test_default_user_provider_is_openrouter(self):
+        from calibrate_agent.llm import run_simulation as RS
+
+        fake_user_resp = MagicMock()
+        fake_user_resp.choices = [MagicMock(message=MagicMock(content="hi"))]
+        fake_user_client = MagicMock()
+        fake_user_client.chat.completions.create = AsyncMock(return_value=fake_user_resp)
+        fake_agent = MagicMock()
+        fake_agent.call = AsyncMock(return_value={"response": "agent", "tool_calls": []})
+
+        with patch.dict(os.environ, {"OPENROUTER_API_KEY": "or-fake", "OPENAI_API_KEY": "oa-fake"}), \
+             patch("openai.AsyncOpenAI", return_value=fake_user_client) as client_cls, \
+             patch.object(RS, "evaluate_simuation",
+                          AsyncMock(return_value={"x": {"match": True, "reasoning": "ok"}})):
+            await RS.run_simulation_with_agent(
+                agent=fake_agent,
+                user_system_prompt="up",
+                evaluators=[_bin_ev("x")],
+                max_turns=1,
+                agent_speaks_first=False,
+            )
+        self.assertEqual(client_cls.call_args.kwargs["api_key"], "or-fake")
+        self.assertEqual(client_cls.call_args.kwargs["base_url"], "https://openrouter.ai/api/v1")
+        self.assertEqual(
+            fake_user_client.chat.completions.create.call_args.kwargs["model"],
+            "openai/gpt-4.1",
+        )
 
 
 class TestMainEvalOnly(unittest.IsolatedAsyncioTestCase):

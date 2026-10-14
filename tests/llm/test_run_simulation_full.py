@@ -98,7 +98,7 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         fake_context.get_messages.return_value = []
 
         with tempfile.TemporaryDirectory() as tmp, \
-             patch.object(RS, "OpenAILLMService", return_value=fake_llm), \
+             patch.object(RS, "OpenRouterLLMService", return_value=fake_llm), \
              patch.object(RS, "PipelineTask"), \
              patch.object(RS, "PipelineRunner", return_value=fake_runner), \
              patch.object(RS, "Pipeline"), \
