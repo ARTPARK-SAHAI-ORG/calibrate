@@ -45,6 +45,7 @@
             "group": "Reference",
             "pages": [
               "reference/api-keys",
+              "reference/byok",
               "reference/github-actions"
             ]
           }
