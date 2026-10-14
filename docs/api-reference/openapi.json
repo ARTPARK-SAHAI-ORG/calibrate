@@ -1933,7 +1933,7 @@
                 "type": "null"
               }
             ],
-            "description": "Other forms of the same text, such as a translation or a human rewrite, keyed by the name annotators see for each. Shown to annotators only"
+            "description": "Other forms of the same text, such as a translation or a human rewrite, keyed by the name annotators see for each. Shown to annotators only. Requires text in `content`"
           }
         },
         "additionalProperties": true,
@@ -5553,7 +5553,7 @@
                 "type": "null"
               }
             ],
-            "description": "Other forms of the same text, such as a translation or a human rewrite, keyed by the name annotators see for each. Shown to annotators only"
+            "description": "Other forms of the same text, such as a translation or a human rewrite, keyed by the name annotators see for each. Shown to annotators only. Requires text in `content`"
           }
         },
         "additionalProperties": false,
