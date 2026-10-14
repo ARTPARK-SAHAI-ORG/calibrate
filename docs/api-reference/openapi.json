@@ -675,6 +675,36 @@
                 "name": "case-001"
               },
               {
+                "agent_response": {
+                  "content": "Keep her hydrated and check again in four hours. If it goes above 104, go to the nearest hospital.",
+                  "label": "AI draft",
+                  "versions": {
+                    "AI draft (Translated)": "\u0909\u0938\u0947 \u092a\u093e\u0928\u0940 \u092a\u093f\u0932\u093e\u0924\u0947 \u0930\u0939\u0947\u0902 \u0914\u0930 \u091a\u093e\u0930 \u0918\u0902\u091f\u0947 \u092c\u093e\u0926 \u092b\u093f\u0930 \u091c\u093e\u0902\u091a\u0947\u0902\u0964 104 \u0938\u0947 \u090a\u092a\u0930 \u091c\u093e\u090f \u0924\u094b \u0928\u091c\u093c\u0926\u0940\u0915\u0940 \u0905\u0938\u094d\u092a\u0924\u093e\u0932 \u091c\u093e\u090f\u0902\u0964",
+                    "Nurse (Translated)": "\u0909\u0938\u0947 \u0924\u0930\u0932 \u092a\u0926\u093e\u0930\u094d\u0925 \u0926\u0947\u0924\u0947 \u0930\u0939\u0947\u0902\u0964 \u0905\u0917\u0930 \u092c\u0941\u0916\u093e\u0930 104 \u0938\u0947 \u090a\u092a\u0930 \u091c\u093e\u090f \u092f\u093e \u0926\u094c\u0930\u093e \u092a\u0921\u093c\u0947, \u0924\u094b \u0924\u0941\u0930\u0902\u0924 \u0905\u0938\u094d\u092a\u0924\u093e\u0932 \u0932\u0947 \u091c\u093e\u090f\u0902\u0964"
+                  }
+                },
+                "chat_history": [
+                  {
+                    "content": "My child has had a fever since last night.",
+                    "role": "user"
+                  },
+                  {
+                    "content": "How old is your child, and what is the temperature now?",
+                    "label": "AI draft",
+                    "role": "assistant",
+                    "versions": {
+                      "AI draft (Translated)": "\u0906\u092a\u0915\u093e \u092c\u091a\u094d\u091a\u093e \u0915\u093f\u0924\u0928\u0947 \u0938\u093e\u0932 \u0915\u093e \u0939\u0948, \u0914\u0930 \u0905\u092d\u0940 \u0924\u093e\u092a\u092e\u093e\u0928 \u0915\u093f\u0924\u0928\u093e \u0939\u0948?",
+                      "Nurse": "How old is she? Please check her temperature now and tell me."
+                    }
+                  },
+                  {
+                    "content": "She is two. It is 102 now.",
+                    "role": "user"
+                  }
+                ],
+                "name": "case-002"
+              },
+              {
                 "input": "Summarize: the meeting is moved to 3pm.",
                 "name": "pair-001",
                 "output": "The meeting is now at 3pm."
@@ -1878,6 +1908,32 @@
             ],
             "title": "Content",
             "description": "Message text. Omit for turns that only carry tool calls"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Display name for the text in `content`, shown to annotators"
+          },
+          "versions": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Other forms of the same text, such as a translation or a human rewrite, keyed by the name annotators see for each. Shown to annotators only"
           }
         },
         "additionalProperties": true,
@@ -3041,6 +3097,9 @@
                 "type": "string"
               },
               {
+                "$ref": "#/components/schemas/TurnText"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -3053,6 +3112,9 @@
                 "type": "string"
               },
               {
+                "$ref": "#/components/schemas/TurnText"
+              },
+              {
                 "type": "null"
               }
             ],
@@ -3063,6 +3125,9 @@
             "anyOf": [
               {
                 "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/TurnText"
               },
               {
                 "type": "null"
@@ -3190,6 +3255,36 @@
                   }
                 ],
                 "name": "case-001"
+              },
+              {
+                "agent_response": {
+                  "content": "Keep her hydrated and check again in four hours. If it goes above 104, go to the nearest hospital.",
+                  "label": "AI draft",
+                  "versions": {
+                    "AI draft (Translated)": "\u0909\u0938\u0947 \u092a\u093e\u0928\u0940 \u092a\u093f\u0932\u093e\u0924\u0947 \u0930\u0939\u0947\u0902 \u0914\u0930 \u091a\u093e\u0930 \u0918\u0902\u091f\u0947 \u092c\u093e\u0926 \u092b\u093f\u0930 \u091c\u093e\u0902\u091a\u0947\u0902\u0964 104 \u0938\u0947 \u090a\u092a\u0930 \u091c\u093e\u090f \u0924\u094b \u0928\u091c\u093c\u0926\u0940\u0915\u0940 \u0905\u0938\u094d\u092a\u0924\u093e\u0932 \u091c\u093e\u090f\u0902\u0964",
+                    "Nurse (Translated)": "\u0909\u0938\u0947 \u0924\u0930\u0932 \u092a\u0926\u093e\u0930\u094d\u0925 \u0926\u0947\u0924\u0947 \u0930\u0939\u0947\u0902\u0964 \u0905\u0917\u0930 \u092c\u0941\u0916\u093e\u0930 104 \u0938\u0947 \u090a\u092a\u0930 \u091c\u093e\u090f \u092f\u093e \u0926\u094c\u0930\u093e \u092a\u0921\u093c\u0947, \u0924\u094b \u0924\u0941\u0930\u0902\u0924 \u0905\u0938\u094d\u092a\u0924\u093e\u0932 \u0932\u0947 \u091c\u093e\u090f\u0902\u0964"
+                  }
+                },
+                "chat_history": [
+                  {
+                    "content": "My child has had a fever since last night.",
+                    "role": "user"
+                  },
+                  {
+                    "content": "How old is your child, and what is the temperature now?",
+                    "label": "AI draft",
+                    "role": "assistant",
+                    "versions": {
+                      "AI draft (Translated)": "\u0906\u092a\u0915\u093e \u092c\u091a\u094d\u091a\u093e \u0915\u093f\u0924\u0928\u0947 \u0938\u093e\u0932 \u0915\u093e \u0939\u0948, \u0914\u0930 \u0905\u092d\u0940 \u0924\u093e\u092a\u092e\u093e\u0928 \u0915\u093f\u0924\u0928\u093e \u0939\u0948?",
+                      "Nurse": "How old is she? Please check her temperature now and tell me."
+                    }
+                  },
+                  {
+                    "content": "She is two. It is 102 now.",
+                    "role": "user"
+                  }
+                ],
+                "name": "case-002"
               },
               {
                 "input": "Summarize: the meeting is moved to 3pm.",
@@ -5426,6 +5521,48 @@
           "role"
         ],
         "title": "TraceTurn"
+      },
+      "TurnText": {
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "description": "The text the LLM judge reads and annotators see by default"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label",
+            "description": "Display name for the text in `content`, shown to annotators"
+          },
+          "versions": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Other forms of the same text, such as a translation or a human rewrite, keyed by the name annotators see for each. Shown to annotators only"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content"
+        ],
+        "title": "TurnText",
+        "description": "Text with a display name and other forms of it, sent in place of a plain string"
       },
       "ValidationError": {
         "properties": {
