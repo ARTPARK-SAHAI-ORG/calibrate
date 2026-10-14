@@ -45,6 +45,7 @@
             "group": "Reference",
             "pages": [
               "reference/api-keys",
+              "reference/byok",
               "reference/github-actions"
             ]
           }
@@ -322,6 +323,7 @@
           {
             "group": "Providers",
             "pages": [
+              "integrations/setup",
               "integrations/stt",
               "integrations/llm",
               "integrations/tts"

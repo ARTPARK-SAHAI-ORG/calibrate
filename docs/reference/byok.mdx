@@ -1,0 +1,26 @@
+---
+title: "Bring your own keys (BYOK)"
+description: "Add your own provider API keys to remove the limits on evaluation runs and have them billed to your account"
+---
+
+## Why use your own keys?
+
+### Billing
+
+Evaluation runs are billed to your own provider accounts.
+
+### Rate limits
+
+When using Calibrate's default keys, all your evaluation runs have rate limits, which become a hindrance once you have tested your agent and want to scale your evaluations to a larger dataset. With your own keys, these limits are removed.
+
+## Add a key
+
+1. Open [Workspace settings → Bring your own keys (BYOK)](https://calibrate.artpark.ai/workspace-settings?tab=provider-keys).
+2. Add each provider's API key. See [Setup](/integrations/setup) for how to configure different providers.
+3. Click **Save**. Calibrate checks the key with the provider before saving it.
+
+## How keys are used
+
+- Once you add any key, every run in your workspace uses only your keys.
+- A run that needs a provider you have not added a key for will not run.
+- If you remove all your keys, runs go back to Calibrate's default keys and rate limits.
