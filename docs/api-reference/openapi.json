@@ -5288,7 +5288,7 @@
               }
             ],
             "title": "Conversation Id",
-            "description": "Your own ID for the conversation this turn belongs to, stored for reference only. Omit if you have none"
+            "description": "Your own ID for the conversation this turn belongs to. Turns sharing it are grouped into one conversation. Omit if you have none"
           },
           "input": {
             "anyOf": [

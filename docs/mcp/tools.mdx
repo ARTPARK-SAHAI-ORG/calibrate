@@ -810,7 +810,7 @@ hits its trace limit.
 | --- | --- | --- | --- |
 | `agent_id` | string | Yes | ID of the agent that produced the turn. Must be an agent in your workspace |
 | `message_id` | string | No | Your own ID for the last user message in `input`, stored for reference only. Omit if you have none |
-| `conversation_id` | string | No | Your own ID for the conversation this turn belongs to, stored for reference only. Omit if you have none |
+| `conversation_id` | string | No | Your own ID for the conversation this turn belongs to. Turns sharing it are grouped into one conversation. Omit if you have none |
 | `input` | string | Yes | What the agent was given for this turn. For a `general` agent, the standalone prompt as a string. For a `conversation` agent, the history up to the reported output, oldest turn first, in OpenAI chat format |
 | `output` | TraceOutput | Yes | What the agent produced for this turn |
 | `metadata` | array of TraceMetadataEntry | No | Key-value pairs stored with the trace. Prefer OTel `gen_ai.*` key names where they fit. Omit if you have none |
