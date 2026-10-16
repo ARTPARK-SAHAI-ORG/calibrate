@@ -171,6 +171,107 @@ class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(len(df), 3)
             self.assertNotIn("ttfs", df.columns)
 
+    async def test_batch_engine_routes_to_batch_router_no_ttfs(self):
+        """Batch engine calls ``transcribe_audio`` with ``engine="batch"`` for
+        every clip and emits no ttfs column."""
+        from calibrate_agent.stt import eval as stt_eval
+
+        async def fake_batch(audio_path, reference, provider, language, uid, engine):
+            return {"transcript": f"pred_{Path(audio_path).stem}"}
+
+        batch = AsyncMock(side_effect=fake_batch)
+        gt_data = [{"id": i, "gt": str(i)} for i in (1, 2)]
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "results.csv"
+            with patch.object(stt_eval, "transcribe_audio", batch):
+                n = await stt_eval.run_stt_eval(
+                    gt_data=gt_data,
+                    audio_dir=Path(tmp),
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=csv_path,
+                    engine="batch",
+                    max_concurrency=2,
+                )
+            self.assertEqual(n, 2)
+            self.assertEqual(batch.await_count, 2)
+            for call in batch.await_args_list:
+                self.assertEqual(call.kwargs["engine"], "batch")
+            df = pd.read_csv(csv_path)
+            self.assertEqual(sorted(df["pred"]), ["pred_1", "pred_2"])
+            self.assertNotIn("ttfs", df.columns)
+
+    async def test_unknown_engine_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(KeyError):
+                await stt_eval.run_stt_eval(
+                    gt_data=[{"id": 1, "gt": "1"}],
+                    audio_dir=Path(tmp),
+                    provider="deepgram",
+                    language="english",
+                    results_csv_path=Path(tmp) / "results.csv",
+                    engine="bacth",
+                )
+
+    async def test_unsupported_engine_returns_error_before_running(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        cases = [("gemini", "pipeline"), ("gemini", "batch")]
+        for provider, engine in cases:
+            with self.subTest(provider=provider, engine=engine), \
+                    tempfile.TemporaryDirectory() as tmp:
+                run = AsyncMock()
+                with patch.object(stt_eval, "run_stt_eval", run):
+                    result = await stt_eval.run_single_provider_eval(
+                        provider=provider,
+                        language="english",
+                        input_dir=tmp,
+                        input_file_name="stt.csv",
+                        output_dir=tmp,
+                        debug=False,
+                        debug_count=5,
+                        ignore_retry=False,
+                        overwrite=False,
+                        engine=engine,
+                    )
+                self.assertEqual(result["status"], "error")
+                self.assertIn(f"--engine {engine}", result["error"])
+                self.assertFalse(Path(tmp, provider).exists())
+                run.assert_not_awaited()
+
+    async def test_engine_table_matches_router(self):
+        """STT_ENGINE_UNSUPPORTED_PROVIDERS lists exactly the providers the
+        router has no function for on the direct and batch engines."""
+        from calibrate_agent.stt import eval as stt_eval
+
+        router = stt_eval.transcribe_audio
+        while hasattr(router, "__wrapped__"):
+            router = router.__wrapped__
+        for engine in ("direct", "batch"):
+            for provider in stt_eval.STT_PROVIDERS:
+                with self.subTest(engine=engine, provider=provider):
+                    stub = AsyncMock(return_value={"transcript": ""})
+                    unsupported = False
+                    with patch.dict("os.environ", {}, clear=True), patch.multiple(
+                        stt_eval,
+                        **{
+                            name: stub
+                            for name in dir(stt_eval)
+                            if name.startswith("transcribe_")
+                            and name not in ("transcribe_audio", "transcribe_audio_pipeline")
+                        },
+                    ):
+                        try:
+                            await router(Path("x.wav"), "r", provider, "english", "u", engine)
+                        except ValueError as e:
+                            unsupported = "Unsupported STT provider" in str(e)
+                    self.assertEqual(
+                        unsupported,
+                        provider in stt_eval.STT_ENGINE_UNSUPPORTED_PROVIDERS[engine],
+                    )
+
 
 class TestRunSTTEvalPipelineRouting(unittest.IsolatedAsyncioTestCase):
     async def test_pipeline_engine_writes_transcript_and_ttfs(self):

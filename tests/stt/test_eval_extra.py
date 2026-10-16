@@ -942,16 +942,17 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt.eval import STT_PROVIDERS
 
         providers_without_per_minute_pricing = {"gemini"}
-        for provider in STT_PROVIDERS:
-            if provider in providers_without_per_minute_pricing:
-                continue
-            with self.subTest(provider=provider):
-                metrics = E._build_stt_cost_metrics(
-                    provider=provider,
-                    audio_duration_seconds=[60.0],
-                    model=E._default_stt_model(provider, "english"),
-                )
-                self.assertIn("cost_usd", metrics)
+        for engine in ("direct", "batch"):
+            for provider in STT_PROVIDERS:
+                if provider in providers_without_per_minute_pricing:
+                    continue
+                with self.subTest(engine=engine, provider=provider):
+                    metrics = E._build_stt_cost_metrics(
+                        provider=provider,
+                        audio_duration_seconds=[60.0],
+                        model=E._default_stt_model(provider, "english", engine),
+                    )
+                    self.assertIn("cost_usd", metrics)
 
     @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
     def test_sarvam_stt_cost_reported_in_inr_and_usd(self, _fx):
@@ -1163,6 +1164,17 @@ class TestSTTMain(unittest.IsolatedAsyncioTestCase):
             with patch.object(sys, "argv", argv):
                 with self.assertRaises(SystemExit):
                     await E.main()
+
+    async def test_main_rejects_gemini_on_default_pipeline_engine(self):
+        from calibrate_agent.stt import eval as E
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            argv = ["e.py", "-p", "gemini", "-i", tmp, "-o", str(out)]
+            with patch.object(sys, "argv", argv):
+                with self.assertRaises(SystemExit):
+                    await E.main()
+            self.assertFalse(out.exists())
 
     async def test_main_invalid_input_dir(self):
         from calibrate_agent.stt import eval as E

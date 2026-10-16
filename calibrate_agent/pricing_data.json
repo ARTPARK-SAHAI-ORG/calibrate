@@ -8,6 +8,9 @@
     "openai": {
       "gpt-4o-transcribe": {
         "price_per_minute_usd": 0.006
+      },
+      "gpt-transcribe": {
+        "price_per_minute_usd": 0.0045
       }
     },
     "groq": {
@@ -27,11 +30,18 @@
       "saaras:v3": {
         "currency": "INR",
         "price_per_minute_inr": 0.5
+      },
+      "saaras:v4": {
+        "currency": "INR",
+        "price_per_minute_inr": 0.5
       }
     },
     "elevenlabs": {
       "scribe_v2_realtime": {
         "price_per_minute_usd": 0.0065
+      },
+      "scribe_v2": {
+        "price_per_minute_usd": 0.0036666667
       }
     },
     "cartesia": {

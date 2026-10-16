@@ -31,11 +31,12 @@ def env_int(name: str, default: int) -> int:
 # ``(max_parallel, max_concurrency)``. The pipeline engine reports TTFS — a
 # wall-clock latency measured on the shared event loop — so it defaults to no
 # contention (one provider, one clip at a time) to keep that number clean. The
-# direct engine has no latency metric, so it defaults to parallel for
-# throughput. Precedence when resolving: explicit CLI flag > env var > these.
+# direct and batch engines have no latency metric, so they default to parallel
+# for throughput. Precedence when resolving: explicit CLI flag > env var > these.
 STT_PARALLELISM_DEFAULTS = {
     "pipeline": (1, 1),
     "direct": (2, 4),
+    "batch": (2, 4),
 }
 
 

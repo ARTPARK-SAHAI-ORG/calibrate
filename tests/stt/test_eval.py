@@ -8,6 +8,7 @@ Run with:
 import json
 import os
 import tempfile
+import base64
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -1121,6 +1122,443 @@ class TestTranscribeGemini(unittest.IsolatedAsyncioTestCase):
         with patch.dict("os.environ", {}, clear=True):
             with self.assertRaises(ValueError):
                 await stt_eval.transcribe_gemini(Path("/tmp/x.wav"), "english")
+
+
+async def _run_batch(
+    stt_eval, fn_name, language, *patches, env=None, audio=b"RIFFfake"
+):
+    """Call a batch transcribe function with ``load_audio`` and env patched."""
+    patches = (
+        patch.dict("os.environ", env or {}),
+        patch.object(stt_eval, "load_audio", return_value=audio),
+        *patches,
+    )
+    for p in patches:
+        p.start()
+    try:
+        return await getattr(stt_eval, fn_name)(Path("/tmp/x.wav"), language)
+    finally:
+        for p in patches:
+            p.stop()
+
+
+class TestTranscribeBatchProviders(unittest.IsolatedAsyncioTestCase):
+    async def test_deepgram_sends_whole_file_with_model_and_language(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        response = SimpleNamespace(
+            results=SimpleNamespace(
+                channels=[
+                    SimpleNamespace(
+                        alternatives=[SimpleNamespace(transcript=" namaste ")]
+                    )
+                ]
+            )
+        )
+        transcribe_file = AsyncMock(return_value=response)
+        fake_client = MagicMock()
+        fake_client.listen.v1.media.transcribe_file = transcribe_file
+
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_deepgram_batch",
+            "hindi",
+            patch.object(stt_eval, "AsyncDeepgramClient", return_value=fake_client),
+            env={"DEEPGRAM_API_KEY": "dg-fake"},
+        )
+
+        self.assertEqual(result, {"transcript": "namaste"})
+        kwargs = transcribe_file.await_args.kwargs
+        self.assertEqual(kwargs["request"], b"RIFFfake")
+        self.assertEqual(kwargs["model"], stt_eval.STT_BATCH_PROVIDER_MODELS["deepgram"])
+        self.assertEqual(kwargs["language"], "hi")
+
+    async def test_openai_is_not_streamed(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        create = AsyncMock(return_value=" hello world \n")
+        fake_client = MagicMock()
+        fake_client.audio.transcriptions.create = create
+
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_openai_batch",
+            "hindi",
+            patch.object(stt_eval, "AsyncOpenAI", return_value=fake_client),
+            env={"OPENAI_API_KEY": "sk-fake"},
+        )
+
+        self.assertEqual(result, {"transcript": "hello world"})
+        kwargs = create.await_args.kwargs
+        self.assertEqual(kwargs["model"], "gpt-transcribe")
+        self.assertEqual(kwargs["language"], "hi")
+        self.assertEqual(kwargs["prompt"], "Transcribe the audio in Hindi.")
+        self.assertNotIn("stream", kwargs)
+
+    async def test_google_recognize_joins_results(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        def _result(text):
+            return SimpleNamespace(alternatives=[SimpleNamespace(transcript=text)])
+
+        fake_client = MagicMock()
+        fake_client.recognize.return_value = SimpleNamespace(
+            results=[_result(" hello "), SimpleNamespace(alternatives=[]), _result("world")]
+        )
+
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_google_batch",
+            "sindhi",
+            patch.object(stt_eval, "SpeechClient", return_value=fake_client),
+            env={
+                "GOOGLE_APPLICATION_CREDENTIALS": "/tmp/creds.json",
+                "GOOGLE_CLOUD_PROJECT_ID": "proj",
+            },
+            audio=b"\x00" * 32000,
+        )
+
+        self.assertEqual(result, {"transcript": "hello world"})
+        request = fake_client.recognize.call_args.kwargs["request"]
+        self.assertTrue(request.content.startswith(b"RIFF"))
+        # Sindhi is served by chirp_2 in asia-southeast1.
+        self.assertEqual(request.config.model, "chirp_2")
+        self.assertEqual(
+            request.recognizer,
+            "projects/proj/locations/asia-southeast1/recognizers/_",
+        )
+
+    async def test_google_splits_clips_longer_than_60_seconds(self):
+        import io
+        import wave
+
+        from calibrate_agent.stt import eval as stt_eval
+
+        fake_client = MagicMock()
+        fake_client.recognize.side_effect = [
+            SimpleNamespace(
+                results=[SimpleNamespace(alternatives=[SimpleNamespace(transcript=t)])]
+            )
+            for t in ("first", "second")
+        ]
+
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_google_batch",
+            "hindi",
+            patch.object(stt_eval, "SpeechClient", return_value=fake_client),
+            env={
+                "GOOGLE_APPLICATION_CREDENTIALS": "/tmp/creds.json",
+                "GOOGLE_CLOUD_PROJECT_ID": "proj",
+            },
+            audio=b"\x00" * (61 * 32000),
+        )
+
+        self.assertEqual(result, {"transcript": "first second"})
+        durations = []
+        for call in fake_client.recognize.call_args_list:
+            with wave.open(io.BytesIO(call.kwargs["request"].content)) as w:
+                durations.append(w.getnframes() / w.getframerate())
+        self.assertEqual(durations, [60.0, 1.0])
+
+    async def test_google_empty_audio_is_empty_transcript(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        speech_client = MagicMock()
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_google_batch",
+            "hindi",
+            patch.object(stt_eval, "SpeechClient", speech_client),
+            env={
+                "GOOGLE_APPLICATION_CREDENTIALS": "/tmp/creds.json",
+                "GOOGLE_CLOUD_PROJECT_ID": "proj",
+            },
+            audio=b"",
+        )
+        self.assertEqual(result, {"transcript": ""})
+        speech_client.assert_not_called()
+
+    async def test_google_missing_project_id_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with patch.dict("os.environ", {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "GOOGLE_CLOUD_PROJECT_ID"):
+                await _run_batch(
+                    stt_eval,
+                    "transcribe_google_batch",
+                    "hindi",
+                    env={"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/creds.json"},
+                )
+
+    async def _sarvam(self, duration_seconds, job=None):
+        import io
+        import wave
+
+        from calibrate_agent.stt import eval as stt_eval
+
+        wav = io.BytesIO()
+        with wave.open(wav, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16000)
+            w.writeframes(b"\x00" * int(duration_seconds * 32000))
+
+        fake_client = MagicMock()
+        fake_client.speech_to_text.transcribe = AsyncMock(
+            return_value=SimpleNamespace(transcript=" नमस्ते ")
+        )
+        fake_client.speech_to_text_job.create_job = AsyncMock(return_value=job)
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_sarvam_batch",
+            "hindi",
+            patch.object(stt_eval, "AsyncSarvamAI", return_value=fake_client),
+            env={"SARVAM_API_KEY": "sk-fake"},
+            audio=wav.getvalue(),
+        )
+        return result, fake_client
+
+    async def test_sarvam_short_clip_uses_rest(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        # A clip of exactly 30 s stays on the REST endpoint.
+        result, client = await self._sarvam(30.0)
+
+        self.assertEqual(result, {"transcript": "नमस्ते"})
+        kwargs = client.speech_to_text.transcribe.await_args.kwargs
+        self.assertEqual(kwargs["model"], stt_eval.STT_BATCH_PROVIDER_MODELS["sarvam"])
+        self.assertEqual(kwargs["mode"], "transcribe")
+        self.assertEqual(kwargs["language_code"], "hi-IN")
+        client.speech_to_text_job.create_job.assert_not_awaited()
+
+    def _sarvam_job(self, state="Completed", transcript="लंबा ऑडियो"):
+        job = MagicMock()
+        job.job_id = "job-1"
+        job.upload_files = AsyncMock()
+        job.start = AsyncMock()
+        job.wait_until_complete = AsyncMock(
+            return_value=SimpleNamespace(job_state=state)
+        )
+
+        async def _download(output_dir):
+            if transcript is not None:
+                with open(os.path.join(output_dir, "audio.wav.json"), "w") as f:
+                    json.dump({"transcript": transcript}, f)
+
+        job.download_outputs = AsyncMock(side_effect=_download)
+        return job
+
+    async def test_sarvam_long_clip_uses_job_api(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        job = self._sarvam_job()
+        result, client = await self._sarvam(31.0, job=job)
+
+        self.assertEqual(result, {"transcript": "लंबा ऑडियो"})
+        client.speech_to_text.transcribe.assert_not_awaited()
+        self.assertEqual(
+            client.speech_to_text_job.create_job.await_args.kwargs,
+            {
+                "model": stt_eval.STT_BATCH_PROVIDER_MODELS["sarvam"],
+                "mode": "transcribe",
+                "language_code": "hi-IN",
+            },
+        )
+        uploaded = job.upload_files.await_args.args[0][0]
+        self.assertEqual(os.path.basename(uploaded), "audio.wav")
+        # The temp directory holding the upload is removed afterwards.
+        self.assertFalse(os.path.exists(uploaded))
+        job.start.assert_awaited_once()
+
+    async def test_sarvam_failed_job_raises(self):
+        with self.assertRaises(RuntimeError):
+            await self._sarvam(31.0, job=self._sarvam_job("Failed"))
+
+    async def test_sarvam_job_without_output_raises(self):
+        with self.assertRaises(RuntimeError):
+            await self._sarvam(31.0, job=self._sarvam_job(transcript=None))
+
+    async def test_sarvam_job_output_without_transcript_is_empty(self):
+        job = self._sarvam_job()
+
+        async def _download(output_dir):
+            with open(os.path.join(output_dir, "audio.wav.json"), "w") as f:
+                json.dump({}, f)
+
+        job.download_outputs = AsyncMock(side_effect=_download)
+        result, _ = await self._sarvam(31.0, job=job)
+        self.assertEqual(result, {"transcript": ""})
+
+    async def test_cartesia_closes_client(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        fake_client = MagicMock()
+        fake_client.stt.transcribe = AsyncMock(
+            return_value=SimpleNamespace(text=" hello ")
+        )
+        fake_client.close = AsyncMock()
+
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_cartesia_batch",
+            "hindi",
+            patch.object(stt_eval, "AsyncCartesia", return_value=fake_client),
+            env={"CARTESIA_API_KEY": "ck-fake"},
+        )
+
+        self.assertEqual(result, {"transcript": "hello"})
+        kwargs = fake_client.stt.transcribe.await_args.kwargs
+        self.assertEqual(kwargs["model"], stt_eval.STT_BATCH_PROVIDER_MODELS["cartesia"])
+        self.assertEqual(kwargs["language"], "hi")
+        fake_client.close.assert_awaited_once()
+
+    async def test_elevenlabs_uses_whole_file_model_without_event_tags(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        convert = AsyncMock(return_value=SimpleNamespace(text=" hello "))
+        fake_client = MagicMock()
+        fake_client.speech_to_text.convert = convert
+
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_elevenlabs_batch",
+            "hindi",
+            patch("elevenlabs.AsyncElevenLabs", return_value=fake_client),
+            env={"ELEVENLABS_API_KEY": "el-fake"},
+        )
+
+        self.assertEqual(result, {"transcript": "hello"})
+        kwargs = convert.await_args.kwargs
+        self.assertEqual(kwargs["model_id"], "scribe_v2")
+        self.assertEqual(kwargs["language_code"], "hin")
+        self.assertIs(kwargs["tag_audio_events"], False)
+
+    async def test_smallest_posts_raw_bytes(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        response = MagicMock()
+        response.json.return_value = {"status": "success", "transcription": " hi "}
+        post = AsyncMock(return_value=response)
+        http_client = MagicMock()
+        http_client.post = post
+        http_client.__aenter__ = AsyncMock(return_value=http_client)
+        http_client.__aexit__ = AsyncMock(return_value=False)
+
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_smallest_batch",
+            "hindi",
+            patch.object(stt_eval.httpx, "AsyncClient", return_value=http_client),
+            env={"SMALLEST_API_KEY": "sm-fake"},
+        )
+
+        self.assertEqual(result, {"transcript": "hi"})
+        self.assertEqual(post.await_args.args[0], stt_eval.SMALLEST_STT_BATCH_URL)
+        kwargs = post.await_args.kwargs
+        self.assertEqual(
+            kwargs["params"],
+            {"model": stt_eval.STT_BATCH_PROVIDER_MODELS["smallest"], "language": "hi"},
+        )
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer sm-fake")
+        self.assertEqual(kwargs["content"], b"RIFFfake")
+        response.raise_for_status.assert_called_once()
+
+    async def test_missing_api_key_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        for fn_name in (
+            "transcribe_deepgram_batch",
+            "transcribe_openai_batch",
+            "transcribe_google_batch",
+            "transcribe_sarvam_batch",
+            "transcribe_cartesia_batch",
+            "transcribe_elevenlabs_batch",
+            "transcribe_smallest_batch",
+        ):
+            with self.subTest(fn=fn_name), patch.dict("os.environ", {}, clear=True):
+                with self.assertRaises(ValueError):
+                    await getattr(stt_eval, fn_name)(Path("/tmp/x.wav"), "english")
+
+
+class TestTranscribeAudioBatchRouter(unittest.IsolatedAsyncioTestCase):
+    async def test_unknown_provider_raises(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with self.assertRaises(ValueError):
+            await stt_eval.transcribe_audio.__wrapped__(
+                Path("/tmp/x.wav"), "ref", "no-such-provider", "english", "uid", "batch"
+            )
+
+    async def test_routes_to_whole_file_function_and_tags_engine(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        batch_fn = AsyncMock(return_value={"transcript": "  hello  "})
+        streaming_fn = AsyncMock(return_value={"transcript": "wrong"})
+        fake_lf = MagicMock()
+        inner = stt_eval.transcribe_audio
+        while hasattr(inner, "__wrapped__"):
+            inner = inner.__wrapped__
+        with patch.object(stt_eval, "transcribe_deepgram_batch", batch_fn), patch.object(
+            stt_eval, "transcribe_deepgram_streaming", streaming_fn
+        ), patch.object(stt_eval, "langfuse_enabled", True), patch.object(
+            stt_eval, "langfuse", fake_lf
+        ), patch.object(stt_eval, "create_langfuse_audio_media", return_value=None):
+            output = await inner(
+                Path("/tmp/x.wav"), "ref", "deepgram", "english", "uid", "batch"
+            )
+
+        self.assertEqual(output, {"transcript": "hello"})
+        batch_fn.assert_awaited_once()
+        streaming_fn.assert_not_awaited()
+        metadata = fake_lf.update_current_trace.call_args.kwargs["metadata"]
+        self.assertEqual(metadata["engine"], "batch")
+
+    async def test_groq_shares_the_direct_function(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        groq_fn = AsyncMock(return_value={"transcript": "hi"})
+        with patch.object(stt_eval, "transcribe_groq", groq_fn):
+            await stt_eval.transcribe_audio.__wrapped__(
+                Path("/tmp/x.wav"), "ref", "groq", "english", "uid", "batch"
+            )
+        groq_fn.assert_awaited_once()
+
+
+class TestBatchEngineCostModel(unittest.TestCase):
+    def test_batch_engine_prices_the_model_it_runs(self):
+        from calibrate_agent.stt.eval import _default_stt_model
+
+        self.assertEqual(_default_stt_model("openai", "hindi", "batch"), "gpt-transcribe")
+        self.assertEqual(_default_stt_model("sarvam", "hindi", "batch"), "saaras:v4")
+        self.assertEqual(_default_stt_model("elevenlabs", "hindi", "batch"), "scribe_v2")
+        self.assertEqual(_default_stt_model("google", "sindhi", "batch"), "chirp_2")
+
+    def test_other_engines_keep_their_models(self):
+        from calibrate_agent.stt.eval import _default_stt_model
+        from calibrate_agent.utils import STT_PROVIDER_MODELS
+
+        for engine in ("direct", "pipeline"):
+            for provider in ("openai", "sarvam", "elevenlabs", "gemini"):
+                self.assertEqual(
+                    _default_stt_model(provider, "hindi", engine),
+                    STT_PROVIDER_MODELS[provider],
+                )
+
+    def test_cost_metrics_use_batch_price_and_skip_unpriced_models(self):
+        from calibrate_agent.stt.eval import _build_stt_cost_metrics, _default_stt_model
+
+        cost = _build_stt_cost_metrics(
+            "openai", [60.0], model=_default_stt_model("openai", "hindi", "batch")
+        )
+        self.assertEqual(cost["pricing_model"], "gpt-transcribe")
+        self.assertAlmostEqual(cost["cost_usd"], 0.0045)
+
+        cost = _build_stt_cost_metrics(
+            "elevenlabs", [60.0], model=_default_stt_model("elevenlabs", "hindi", "batch")
+        )
+        self.assertEqual(cost["pricing_model"], "scribe_v2")
+        self.assertAlmostEqual(cost["cost_usd"], 0.22 / 60)
 
 
 if __name__ == "__main__":

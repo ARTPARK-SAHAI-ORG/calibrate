@@ -1896,6 +1896,15 @@ STT_PROVIDER_MODELS = {
     "sarvam": "saaras:v3",
 }
 
+# Models for the batch engine (whole file in one request). A provider is listed
+# when its whole-file API serves a different model from its streaming API.
+STT_BATCH_PROVIDER_MODELS = {
+    **STT_PROVIDER_MODELS,
+    "openai": "gpt-transcribe",
+    "sarvam": "saaras:v4",
+    "elevenlabs": "scribe_v2",
+}
+
 
 def google_stt_model_and_location(
     language: str, model: str | None = None

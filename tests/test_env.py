@@ -41,6 +41,10 @@ class TestResolveSTTParallelism:
         self._clear(monkeypatch)
         assert resolve_stt_parallelism("direct") == (2, 4)
 
+    def test_batch_default_is_two_four(self, monkeypatch):
+        self._clear(monkeypatch)
+        assert resolve_stt_parallelism("batch") == (2, 4)
+
     def test_unknown_engine_falls_back_to_direct(self, monkeypatch):
         self._clear(monkeypatch)
         assert resolve_stt_parallelism("banana") == (2, 4)
@@ -73,6 +77,7 @@ class TestResolveSTTMaxConcurrency:
         self._clear(monkeypatch)
         assert resolve_stt_max_concurrency("pipeline") == 1
         assert resolve_stt_max_concurrency("direct") == 4
+        assert resolve_stt_max_concurrency("batch") == 4
 
     def test_explicit_wins(self, monkeypatch):
         monkeypatch.setenv("CALIBRATE_STT_MAX_CONCURRENCY", "9")

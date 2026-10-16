@@ -620,7 +620,7 @@ Examples:
                 argv.append("--skip-llm-judges")
             # Only forward the parallelism knobs when the user set them
             # explicitly; otherwise let the benchmark resolve the per-engine
-            # default (pipeline 1/1, direct 2/4).
+            # default (pipeline 1/1, direct and batch 2/4).
             if args.max_parallel is not None:
                 argv.extend(["--max-parallel", str(args.max_parallel)])
             if args.max_concurrency is not None:

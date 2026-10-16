@@ -56,6 +56,11 @@ class TestAddSTTEvalArgs:
             8,
         )
 
+    def test_batch_engine_accepted(self):
+        parser = argparse.ArgumentParser()
+        add_stt_engine_args(parser)
+        assert parser.parse_args(["--engine", "batch"]).engine == "batch"
+
     def test_engine_choices_enforced(self):
         parser = argparse.ArgumentParser()
         add_stt_engine_args(parser)

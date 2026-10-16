@@ -1,15 +1,21 @@
 import asyncio
+import functools
+import io
+import wave
 import argparse
 import sys
 import os
 import json
 import base64
+import tempfile
 from os.path import join, exists
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List
 from urllib.parse import urlencode
 import backoff
+import httpx
+from deepgram import AsyncDeepgramClient
 from sarvamai import AsyncSarvamAI
 from openai import AsyncOpenAI
 from groq import AsyncGroq
@@ -28,6 +34,7 @@ from calibrate_agent.utils import (
     get_audio_duration_seconds,
     validate_stt_language,
     STT_PROVIDER_MODELS,
+    STT_BATCH_PROVIDER_MODELS,
     google_stt_model_and_location,
     create_stt_service,
     get_gemini_api_key,
@@ -71,13 +78,17 @@ from calibrate_agent.rate_limit import (
 # =============================================================================
 
 
-def _default_stt_model(provider: str, language: str | None = None) -> str | None:
+def _default_stt_model(
+    provider: str, language: str, engine: str = "pipeline"
+) -> str | None:
     # Mirrors the model each transcribe_* uses (table, or the Google helper for
     # the Sindhi exception) so cost prices the model actually benchmarked. If a
     # provider gains a language-specific model, update it here too.
     if provider == "google":
         model, _region = google_stt_model_and_location(language)
         return model
+    if engine == "batch":
+        return STT_BATCH_PROVIDER_MODELS.get(provider)
     return STT_PROVIDER_MODELS.get(provider)
 
 
@@ -876,6 +887,293 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
 
 
 # =============================================================================
+# Whole-file (batch engine) provider methods
+# =============================================================================
+
+
+async def transcribe_deepgram_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with Deepgram's pre-recorded API."""
+    api_key = os.getenv("DEEPGRAM_API_KEY")
+    if not api_key:
+        raise ValueError("DEEPGRAM_API_KEY environment variable not set")
+
+    client = AsyncDeepgramClient(api_key=api_key)
+
+    response = await asyncio.wait_for(
+        client.listen.v1.media.transcribe_file(
+            request=load_audio(audio_path),
+            model=STT_BATCH_PROVIDER_MODELS["deepgram"],
+            language=get_stt_language_code(language, "deepgram"),
+            smart_format=True,
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+    )
+
+    return {
+        "transcript": response.results.channels[0].alternatives[0].transcript.strip(),
+    }
+
+
+async def transcribe_openai_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with OpenAI's transcriptions API."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable not set")
+
+    client = AsyncOpenAI()
+
+    # `language` is a soft hint for OpenAI's transcribe models, so `prompt`
+    # also names the output language (see transcribe_openai_streaming).
+    transcription = await asyncio.wait_for(
+        client.audio.transcriptions.create(
+            model=STT_BATCH_PROVIDER_MODELS["openai"],
+            file=load_audio(audio_path, as_file=True),
+            language=get_stt_language_code(language, "openai"),
+            prompt=f"Transcribe the audio in {language.capitalize()}.",
+            response_format="text",
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+    )
+
+    return {
+        "transcript": transcription.strip(),
+    }
+
+
+# Longest audio Google's synchronous Recognize accepts; longer clips are cut
+# into pieces of this length and their transcripts joined.
+GOOGLE_STT_RECOGNIZE_MAX_SECONDS = 60
+
+
+def _wav_chunks(pcm: bytes, max_seconds: int) -> list[bytes]:
+    """Cut 16 kHz 16-bit mono PCM into WAV files of at most ``max_seconds`` each."""
+    step = max_seconds * 32000
+    chunks = []
+    for start in range(0, len(pcm), step):
+        buf = io.BytesIO()
+        with wave.open(buf, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(16000)
+            w.writeframes(pcm[start : start + step])
+        chunks.append(buf.getvalue())
+    return chunks
+
+
+def _transcribe_google_recognize(
+    chunks: list[bytes], lang_code: str, model: str, region: str
+) -> str:
+    """Transcribe each WAV chunk with Google's synchronous Recognize and join the text."""
+    client = SpeechClient(
+        client_options=ClientOptions(
+            api_endpoint=f"{region}-speech.googleapis.com",
+        )
+    )
+
+    recognizer = (
+        f"projects/{os.getenv('GOOGLE_CLOUD_PROJECT_ID')}"
+        f"/locations/{region}/recognizers/_"
+    )
+    config = cloud_speech_types.RecognitionConfig(
+        auto_decoding_config=cloud_speech_types.AutoDetectDecodingConfig(),
+        language_codes=[lang_code],
+        model=model,
+    )
+
+    transcripts = []
+    for chunk in chunks:
+        response = client.recognize(
+            request=cloud_speech_types.RecognizeRequest(
+                recognizer=recognizer, config=config, content=chunk
+            )
+        )
+        transcripts += [
+            t
+            for r in response.results
+            if r.alternatives
+            if (t := r.alternatives[0].transcript.strip())
+        ]
+    return " ".join(transcripts)
+
+
+async def transcribe_google_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with Google Cloud Speech-to-Text, in pieces of up to 60 s."""
+    credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if not credentials_path:
+        raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable not set")
+    if not os.getenv("GOOGLE_CLOUD_PROJECT_ID"):
+        raise ValueError("GOOGLE_CLOUD_PROJECT_ID environment variable not set")
+
+    model, region = google_stt_model_and_location(language)
+    chunks = _wav_chunks(
+        load_audio(audio_path, raw_pcm=True), GOOGLE_STT_RECOGNIZE_MAX_SECONDS
+    )
+    if not chunks:
+        return {"transcript": ""}
+
+    transcript = await asyncio.wait_for(
+        asyncio.to_thread(
+            _transcribe_google_recognize,
+            chunks,
+            get_stt_language_code(language, "google"),
+            model,
+            region,
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS * len(chunks),
+    )
+    return {
+        "transcript": transcript,
+    }
+
+
+# Longest audio Sarvam's synchronous REST endpoint accepts; longer clips go
+# through its job API.
+SARVAM_STT_REST_MAX_SECONDS = 30.0
+# Max seconds to wait for a Sarvam transcription job to finish.
+SARVAM_STT_JOB_TIMEOUT_SECONDS = 600
+
+
+async def _transcribe_sarvam_job(client, audio: bytes, lang_code: str) -> str:
+    """Transcribe one clip through Sarvam's job API and return its transcript."""
+    job = await client.speech_to_text_job.create_job(
+        model=STT_BATCH_PROVIDER_MODELS["sarvam"],
+        mode="transcribe",
+        language_code=lang_code,
+    )
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        wav_path = join(tmp_dir, "audio.wav")
+        with open(wav_path, "wb") as f:
+            f.write(audio)
+
+        await job.upload_files([wav_path])
+        await job.start()
+        status = await job.wait_until_complete(timeout=SARVAM_STT_JOB_TIMEOUT_SECONDS)
+        if status.job_state.lower() != "completed":
+            raise RuntimeError(f"Sarvam STT job {job.job_id} {status.job_state}")
+
+        await job.download_outputs(tmp_dir)
+        output_path = join(tmp_dir, "audio.wav.json")
+        if not exists(output_path):
+            raise RuntimeError(f"Sarvam STT job {job.job_id} produced no transcript")
+        with open(output_path, encoding="utf-8") as f:
+            return json.load(f).get("transcript")
+
+
+async def transcribe_sarvam_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with Sarvam: REST up to 30 s, the job API beyond."""
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key:
+        raise ValueError("SARVAM_API_KEY environment variable not set")
+
+    lang_code = get_stt_language_code(language, "sarvam")
+    client = AsyncSarvamAI(api_subscription_key=api_key, timeout=120.0)
+
+    audio = load_audio(audio_path)
+
+    with wave.open(io.BytesIO(audio)) as w:
+        duration_seconds = w.getnframes() / w.getframerate()
+    if duration_seconds > SARVAM_STT_REST_MAX_SECONDS:
+        transcript = await _transcribe_sarvam_job(client, audio, lang_code)
+    else:
+        response = await asyncio.wait_for(
+            client.speech_to_text.transcribe(
+                file=("audio.wav", audio, "audio/wav"),
+                model=STT_BATCH_PROVIDER_MODELS["sarvam"],
+                mode="transcribe",
+                language_code=lang_code,
+            ),
+            timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+        )
+        transcript = response.transcript
+
+    return {
+        "transcript": (transcript or "").strip(),
+    }
+
+
+async def transcribe_cartesia_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with Cartesia's batch STT API."""
+    api_key = os.getenv("CARTESIA_API_KEY")
+    if not api_key:
+        raise ValueError("CARTESIA_API_KEY environment variable not set")
+
+    client = AsyncCartesia(api_key=api_key)
+
+    try:
+        response = await asyncio.wait_for(
+            client.stt.transcribe(
+                file=load_audio(audio_path, as_file=True),
+                model=STT_BATCH_PROVIDER_MODELS["cartesia"],
+                language=get_stt_language_code(language, "cartesia"),
+            ),
+            timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+        )
+    finally:
+        await client.close()
+
+    return {
+        "transcript": response.text.strip(),
+    }
+
+
+async def transcribe_elevenlabs_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with ElevenLabs' Scribe speech-to-text API."""
+    from elevenlabs import AsyncElevenLabs
+
+    api_key = os.getenv("ELEVENLABS_API_KEY")
+    if not api_key:
+        raise ValueError("ELEVENLABS_API_KEY environment variable not set")
+
+    client = AsyncElevenLabs(api_key=api_key)
+
+    # Audio-event tags such as "(laughter)" are not spoken words and would
+    # count as insertions in WER.
+    response = await asyncio.wait_for(
+        client.speech_to_text.convert(
+            model_id=STT_BATCH_PROVIDER_MODELS["elevenlabs"],
+            file=load_audio(audio_path, as_file=True),
+            language_code=get_stt_language_code(language, "elevenlabs"),
+            tag_audio_events=False,
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+    )
+
+    return {
+        "transcript": response.text.strip(),
+    }
+
+
+SMALLEST_STT_BATCH_URL = "https://api.smallest.ai/waves/v1/stt/"
+
+
+async def transcribe_smallest_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with Smallest's Pulse pre-recorded STT API."""
+    api_key = os.getenv("SMALLEST_API_KEY")
+    if not api_key:
+        raise ValueError("SMALLEST_API_KEY environment variable not set")
+
+    async with httpx.AsyncClient(timeout=STT_PROVIDER_TIMEOUT_SECONDS) as client:
+        response = await client.post(
+            SMALLEST_STT_BATCH_URL,
+            params={
+                "model": STT_BATCH_PROVIDER_MODELS["smallest"],
+                "language": get_stt_language_code(language, "smallest"),
+            },
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/octet-stream",
+            },
+            content=load_audio(audio_path),
+        )
+    response.raise_for_status()
+
+    return {
+        "transcript": (response.json().get("transcription") or "").strip(),
+    }
+
+
+# =============================================================================
 # Main Transcription Router
 # =============================================================================
 
@@ -888,25 +1186,40 @@ async def transcribe_audio(
     provider: str,
     language: str,
     unique_id: str,
-) -> str:
-    """Route audio transcription to the appropriate provider."""
-    provider_methods = {
-        "deepgram": transcribe_deepgram_streaming,
-        "openai": transcribe_openai_streaming,
-        "groq": transcribe_groq,
-        "google": transcribe_google,
-        "gemini": transcribe_gemini,
-        "sarvam": transcribe_sarvam,
-        "elevenlabs": transcribe_elevenlabs_streaming,
-        "cartesia": transcribe_cartesia,
-        "smallest": transcribe_smallest_streaming,
-    }
+    engine: str = "direct",
+) -> Dict:
+    """Route audio transcription to the appropriate provider.
 
+    The "batch" engine sends each provider the complete audio in one request
+    and gets the complete transcript in one response.
+    """
+    provider_methods = {
+        "direct": {
+            "deepgram": transcribe_deepgram_streaming,
+            "openai": transcribe_openai_streaming,
+            "groq": transcribe_groq,
+            "google": transcribe_google,
+            "gemini": transcribe_gemini,
+            "sarvam": transcribe_sarvam,
+            "elevenlabs": transcribe_elevenlabs_streaming,
+            "cartesia": transcribe_cartesia,
+            "smallest": transcribe_smallest_streaming,
+        },
+        "batch": {
+            "deepgram": transcribe_deepgram_batch,
+            "openai": transcribe_openai_batch,
+            "groq": transcribe_groq,
+            "google": transcribe_google_batch,
+            "sarvam": transcribe_sarvam_batch,
+            "elevenlabs": transcribe_elevenlabs_batch,
+            "cartesia": transcribe_cartesia_batch,
+            "smallest": transcribe_smallest_batch,
+        },
+    }[engine]
     if provider not in provider_methods:
         raise ValueError(f"Unsupported STT provider: {provider}")
 
-    method = provider_methods[provider]
-    output = await method(audio_path, language)
+    output = await provider_methods[provider](audio_path, language)
 
     transcript = output["transcript"].strip()
 
@@ -926,6 +1239,7 @@ async def transcribe_audio(
                 "provider": provider,
                 "language": language,
                 "reference": reference,
+                "engine": engine,
             },
             session_id=unique_id,
         )
@@ -1006,9 +1320,10 @@ async def _run_stt_eval_concurrent(
 ) -> int:
     """Transcribe clips with bounded concurrency, writing rows as they complete.
 
-    Shared by both engines: ``transcribe_fn`` is the per-clip coroutine
-    (``transcribe_audio`` for direct, ``transcribe_audio_pipeline`` for pipeline)
-    and ``with_ttfs`` adds the ``ttfs`` column (pipeline only). Up to
+    Shared by every engine: ``transcribe_fn`` is the per-clip coroutine
+    (``transcribe_audio`` for direct and batch,
+    ``transcribe_audio_pipeline`` for pipeline) and ``with_ttfs`` adds the
+    ``ttfs`` column (pipeline only). Up to
     ``max_concurrency`` clips run at once (for pipeline each is a 1x real-time
     pipeline, so concurrency keeps a large run tractable); each result is written
     to ``results.csv`` under a lock (resumable, skip-processed). A failed clip is
@@ -1085,19 +1400,22 @@ async def run_stt_eval(
         provider: STT provider name
         language: Language code
         results_csv_path: Path to save results CSV
-        engine: ``"direct"`` (per-provider SDK calls) or ``"pipeline"`` (stream
-            through a real pipecat agent pipeline, capturing TTFS latency).
-        max_concurrency: Concurrent clips per provider (both engines). ``None``
-            resolves per engine (pipeline 1, direct 4) via
+        engine: ``"direct"`` (per-provider SDK calls), ``"batch"`` (whole file
+            in one request per clip) or ``"pipeline"`` (stream through a real
+            pipecat agent pipeline, capturing TTFS latency).
+        max_concurrency: Concurrent clips per provider (every engine). ``None``
+            resolves per engine (pipeline 1, direct 4, batch 4) via
             ``resolve_stt_parallelism``.
 
     Returns:
         Number of files successfully transcribed (non-empty) in this run.
     """
     max_concurrency = resolve_stt_max_concurrency(engine, max_concurrency)
-    transcribe_fn = (
-        transcribe_audio_pipeline if engine == "pipeline" else transcribe_audio
-    )
+    transcribe_fn = {
+        "pipeline": transcribe_audio_pipeline,
+        "direct": transcribe_audio,
+        "batch": functools.partial(transcribe_audio, engine="batch"),
+    }[engine]
     return await _run_stt_eval_concurrent(
         gt_data,
         audio_dir,
@@ -1238,6 +1556,15 @@ STT_PROVIDERS = [
     "elevenlabs",
 ]
 
+# Providers each engine has no transcribe function for: the live-agent pipeline
+# has no Gemini service, and Gemini has no whole-file function. Keep in sync
+# with the provider tables in transcribe_audio.
+STT_ENGINE_UNSUPPORTED_PROVIDERS = {
+    "pipeline": {"gemini"},
+    "direct": set(),
+    "batch": {"gemini"},
+}
+
 STT_LANGUAGES = [
     "english",
     "hindi",
@@ -1273,8 +1600,15 @@ async def run_single_provider_eval(
     """Run STT evaluation for a single provider.
 
     ``max_concurrency=None`` is forwarded to ``run_stt_eval``, which resolves the
-    per-engine default (pipeline 1, direct 4).
+    per-engine default (pipeline 1, direct 4, batch 4).
     """
+    if provider in STT_ENGINE_UNSUPPORTED_PROVIDERS[engine]:
+        return {
+            "provider": provider,
+            "status": "error",
+            "error": f"STT provider '{provider}' does not support --engine {engine}",
+        }
+
     provider_output_dir = join(output_dir, provider)
 
     # ``exist_ok=True`` keeps this safe when the same provider folder is
@@ -1404,7 +1738,7 @@ async def run_single_provider_eval(
         cost_metrics = _build_stt_cost_metrics(
             provider=provider,
             audio_duration_seconds=audio_durations,
-            model=_default_stt_model(provider, language),
+            model=_default_stt_model(provider, language, engine),
         )
 
         # TTFS latency is only produced by the pipeline engine; NaN/absent -> None.
@@ -1926,6 +2260,9 @@ async def main():
     if provider not in STT_PROVIDERS:
         print(f"\033[31mError: Invalid provider '{provider}'.\033[0m")
         print(f"Available providers: {', '.join(STT_PROVIDERS)}")
+        sys.exit(1)
+    if provider in STT_ENGINE_UNSUPPORTED_PROVIDERS[args.engine]:
+        print(f"\033[31mError: Provider '{provider}' does not support --engine {args.engine}.\033[0m")
         sys.exit(1)
 
     # Validate input directory structure

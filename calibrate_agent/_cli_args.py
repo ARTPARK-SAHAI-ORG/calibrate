@@ -40,7 +40,7 @@ def add_stt_max_parallel_arg(parser):
         default=None,
         help=(
             "Number of providers to evaluate in parallel (default: pipeline 1, "
-            "direct 2; or $CALIBRATE_STT_MAX_PARALLEL)."
+            "direct and batch 2; or $CALIBRATE_STT_MAX_PARALLEL)."
         ),
     )
 
@@ -51,11 +51,13 @@ def add_stt_engine_args(parser):
         "--engine",
         type=str,
         default="pipeline",
-        choices=["direct", "pipeline"],
+        choices=["direct", "pipeline", "batch"],
         help=(
             "Transcription engine: 'pipeline' (default; streams through a real "
             "pipecat agent pipeline at real-time pace, also reporting TTFS "
-            "latency) or 'direct' (faster; per-provider SDK, no latency)."
+            "latency), 'direct' (faster; per-provider SDK, no latency) or "
+            "'batch' (uploads each whole file in one request to the provider's "
+            "file transcription API, no latency)."
         ),
     )
     parser.add_argument(
@@ -63,8 +65,8 @@ def add_stt_engine_args(parser):
         type=int,
         default=None,
         help=(
-            "Concurrent clips per provider, both engines (default: pipeline 1, "
-            "direct 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
+            "Concurrent clips per provider, every engine (default: pipeline 1, "
+            "direct and batch 4; or $CALIBRATE_STT_MAX_CONCURRENCY). Pipeline defaults to "
             "1 to keep TTFS latency uncontended."
         ),
     )

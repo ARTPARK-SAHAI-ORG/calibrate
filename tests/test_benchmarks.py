@@ -189,6 +189,18 @@ class TestSTTBenchmarkMain(unittest.IsolatedAsyncioTestCase):
                 with self.assertRaises(SystemExit):
                     await B.main()
 
+    async def test_main_rejects_gemini_on_default_pipeline_engine(self):
+        from calibrate_agent.stt import benchmark as B
+
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            self._make_input_dir(base)
+            argv = ["b.py", "-p", "gemini", "-i", str(base), "-o", str(base / "out")]
+            with patch.object(sys, "argv", argv):
+                with self.assertRaises(SystemExit):
+                    await B.main()
+            self.assertFalse((base / "out").exists())
+
     async def test_main_invalid_input(self):
         from calibrate_agent.stt import benchmark as B
 

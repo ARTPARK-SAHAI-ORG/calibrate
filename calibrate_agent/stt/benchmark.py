@@ -29,6 +29,7 @@ from calibrate_agent.stt.eval import (
     run_eval_only,
     validate_stt_input_dir,
     format_metrics_summary,
+    STT_ENGINE_UNSUPPORTED_PROVIDERS,
     STT_PROVIDERS,
     STT_LANGUAGES,
 )
@@ -39,18 +40,7 @@ from calibrate_agent.utils import StreamTee
 
 
 async def run(
-    providers: list[
-        Literal[
-            "deepgram",
-            "openai",
-            "cartesia",
-            "smallest",
-            "groq",
-            "google",
-            "sarvam",
-            "elevenlabs",
-        ]
-    ],
+    providers: list[str],
     input_dir: str,
     output_dir: str = "./out",
     language: Literal[
@@ -82,11 +72,12 @@ async def run(
     """
     Run STT evaluation for one or more providers and generate a leaderboard.
 
-    Evaluates providers in parallel (per-engine default: pipeline 1, direct 2),
+    Evaluates providers in parallel (per-engine default: pipeline 1, direct and
+    batch 2),
     then generates a comparison leaderboard.
 
     Args:
-        providers: List of STT providers to evaluate
+        providers: STT providers to evaluate (any of ``STT_PROVIDERS``)
         input_dir: Path to input directory containing audio files and stt.csv
         output_dir: Path to output directory for results (default: ./out)
         language: Language of the audio files
@@ -96,7 +87,7 @@ async def run(
         ignore_retry: Skip retry if not all audios are processed
         overwrite: Overwrite existing results instead of resuming from checkpoint (default: False)
         max_parallel: Providers to run in parallel. ``None`` resolves per engine
-            (pipeline 1, direct 2) via ``resolve_stt_parallelism``.
+            (pipeline 1, direct and batch 2) via ``resolve_stt_parallelism``.
         judge_evaluators: Optional list of evaluator dicts (each with ``name``,
             ``system_prompt``, ``judge_model``, ``type``, ...). When omitted no
             LLM judge runs and only WER/CER are reported.
@@ -275,6 +266,9 @@ async def main():
             if provider not in STT_PROVIDERS:
                 print(f"\033[31mError: Invalid provider '{provider}'.\033[0m")
                 print(f"Available providers: {', '.join(STT_PROVIDERS)}")
+                sys.exit(1)
+            if provider in STT_ENGINE_UNSUPPORTED_PROVIDERS[args.engine]:
+                print(f"\033[31mError: Provider '{provider}' does not support --engine {args.engine}.\033[0m")
                 sys.exit(1)
 
         # Validate input directory structure
