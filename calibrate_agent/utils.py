@@ -1518,7 +1518,7 @@ SMALLEST_LANGUAGE_CODES = SMALLEST_STT_LANGUAGE_CODES
 # Google's maps. Benchmark-only (calibrate_agent/{stt,tts}/eval.py via
 # google-genai) — there is no cascaded pipecat Gemini STT/TTS service, so it is
 # not wired into create_stt_service / create_tts_service.
-GEMINI_STT_LANGUAGE_CODES = GOOGLE_STT_LANGUAGE_CODES
+GEMINI_STT_LANGUAGE_CODES = {**GOOGLE_STT_LANGUAGE_CODES, "maithili": "mai-IN"}
 GEMINI_TTS_LANGUAGE_CODES = GOOGLE_TTS_LANGUAGE_CODES
 
 
@@ -1901,6 +1901,7 @@ STT_PROVIDER_MODELS = {
 STT_BATCH_PROVIDER_MODELS = {
     **STT_PROVIDER_MODELS,
     "openai": "gpt-transcribe",
+    "gemini": "gemini-3.5-transcribe",
     "sarvam": "saaras:v4",
     "elevenlabs": "scribe_v2",
 }

@@ -1291,6 +1291,76 @@ class TestTranscribeBatchProviders(unittest.IsolatedAsyncioTestCase):
                     env={"GOOGLE_APPLICATION_CREDENTIALS": "/tmp/creds.json"},
                 )
 
+    async def _gemini(self, language):
+        from calibrate_agent.stt import eval as stt_eval
+
+        response = MagicMock()
+        response.json.return_value = {"text": "  salam  ", "usage": {"seconds": 1}}
+        http_client = MagicMock()
+        http_client.post = AsyncMock(return_value=response)
+        http_client.__aenter__ = AsyncMock(return_value=http_client)
+        http_client.__aexit__ = AsyncMock(return_value=False)
+
+        chat_client = MagicMock()
+        chat_client.chat.completions.create = AsyncMock(
+            return_value=SimpleNamespace(
+                choices=[
+                    SimpleNamespace(message=SimpleNamespace(content=" fallback text "))
+                ]
+            )
+        )
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_gemini_batch",
+            language,
+            patch.object(stt_eval.httpx, "AsyncClient", return_value=http_client),
+            patch.object(stt_eval, "_build_openrouter_client", return_value=chat_client),
+            env={"OPENROUTER_API_KEY": "or-fake"},
+        )
+        return result, http_client.post, chat_client.chat.completions.create, response
+
+    async def test_gemini_uses_transcribe_model_through_openrouter(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        result, post, chat, response = await self._gemini("sindhi")
+
+        self.assertEqual(result, {"transcript": "salam"})
+        self.assertEqual(
+            post.await_args.args[0],
+            "https://openrouter.ai/api/v1/audio/transcriptions",
+        )
+        kwargs = post.await_args.kwargs
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer or-fake")
+        self.assertEqual(
+            kwargs["json"],
+            {
+                "model": f"google/{stt_eval.STT_BATCH_PROVIDER_MODELS['gemini']}",
+                "input_audio": {
+                    "data": base64.b64encode(b"RIFFfake").decode("utf-8"),
+                    "format": "wav",
+                },
+                "language": "sd",
+            },
+        )
+        response.raise_for_status.assert_called_once()
+        chat.assert_not_awaited()
+
+    async def test_gemini_unsupported_languages_use_multimodal_model(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        for language in ("tamil", "maithili"):
+            with self.subTest(language=language):
+                result, post, chat, _ = await self._gemini(language)
+                self.assertEqual(result, {"transcript": "fallback text"})
+                post.assert_not_awaited()
+                kwargs = chat.await_args.kwargs
+                self.assertEqual(
+                    kwargs["model"], f"google/{stt_eval.STT_PROVIDER_MODELS['gemini']}"
+                )
+                content = kwargs["messages"][0]["content"]
+                self.assertIn(language, content[0]["text"])
+                self.assertEqual(content[1]["input_audio"]["format"], "wav")
+
     async def _sarvam(self, duration_seconds, job=None):
         import io
         import wave
@@ -1471,6 +1541,7 @@ class TestTranscribeBatchProviders(unittest.IsolatedAsyncioTestCase):
             "transcribe_deepgram_batch",
             "transcribe_openai_batch",
             "transcribe_google_batch",
+            "transcribe_gemini_batch",
             "transcribe_sarvam_batch",
             "transcribe_cartesia_batch",
             "transcribe_elevenlabs_batch",
@@ -1532,6 +1603,14 @@ class TestBatchEngineCostModel(unittest.TestCase):
         self.assertEqual(_default_stt_model("openai", "hindi", "batch"), "gpt-transcribe")
         self.assertEqual(_default_stt_model("sarvam", "hindi", "batch"), "saaras:v4")
         self.assertEqual(_default_stt_model("elevenlabs", "hindi", "batch"), "scribe_v2")
+        self.assertEqual(
+            _default_stt_model("gemini", "hindi", "batch"), "gemini-3.5-transcribe"
+        )
+        # Languages the transcription model does not serve run the direct model.
+        self.assertEqual(
+            _default_stt_model("gemini", "tamil", "batch"),
+            _default_stt_model("gemini", "tamil", "direct"),
+        )
         self.assertEqual(_default_stt_model("google", "sindhi", "batch"), "chirp_2")
 
     def test_other_engines_keep_their_models(self):
@@ -1559,6 +1638,13 @@ class TestBatchEngineCostModel(unittest.TestCase):
         )
         self.assertEqual(cost["pricing_model"], "scribe_v2")
         self.assertAlmostEqual(cost["cost_usd"], 0.22 / 60)
+
+        # Gemini is billed per token, so it has no per-minute price.
+        self.assertIsNone(
+            _build_stt_cost_metrics(
+                "gemini", [60.0], model=_default_stt_model("gemini", "hindi", "batch")
+            )
+        )
 
 
 if __name__ == "__main__":

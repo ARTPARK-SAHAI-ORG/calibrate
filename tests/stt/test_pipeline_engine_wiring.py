@@ -218,7 +218,7 @@ class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
     async def test_unsupported_engine_returns_error_before_running(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        cases = [("gemini", "pipeline"), ("gemini", "batch")]
+        cases = [("gemini", "pipeline")]
         for provider, engine in cases:
             with self.subTest(provider=provider, engine=engine), \
                     tempfile.TemporaryDirectory() as tmp:
@@ -271,6 +271,12 @@ class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
                         unsupported,
                         provider in stt_eval.STT_ENGINE_UNSUPPORTED_PROVIDERS[engine],
                     )
+
+    def test_gemini_accepts_maithili(self):
+        from calibrate_agent.utils import get_stt_language_code, validate_stt_language
+
+        validate_stt_language("maithili", "gemini")
+        self.assertEqual(get_stt_language_code("maithili", "gemini"), "mai-IN")
 
 
 class TestRunSTTEvalPipelineRouting(unittest.IsolatedAsyncioTestCase):

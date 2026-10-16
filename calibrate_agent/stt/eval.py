@@ -55,6 +55,8 @@ from calibrate_agent._env import resolve_stt_max_concurrency
 from calibrate_agent._cli_args import add_stt_eval_args
 from calibrate_agent.judges import (
     PartialResultsWriter,
+    _OPENROUTER_BASE_URL,
+    _build_openrouter_client,
     evaluator_row_columns,
     require_unique_evaluator_names,
     write_evaluator_config,
@@ -78,6 +80,17 @@ from calibrate_agent.rate_limit import (
 # =============================================================================
 
 
+# Languages gemini-3.5-transcribe does not serve; the batch engine transcribes
+# these with the multimodal Gemini model.
+GEMINI_TRANSCRIBE_UNSUPPORTED_LANGUAGES = {"tamil", "maithili"}
+
+
+def _gemini_batch_model(language: str) -> str:
+    if language.lower() in GEMINI_TRANSCRIBE_UNSUPPORTED_LANGUAGES:
+        return STT_PROVIDER_MODELS["gemini"]
+    return STT_BATCH_PROVIDER_MODELS["gemini"]
+
+
 def _default_stt_model(
     provider: str, language: str, engine: str = "pipeline"
 ) -> str | None:
@@ -88,6 +101,8 @@ def _default_stt_model(
         model, _region = google_stt_model_and_location(language)
         return model
     if engine == "batch":
+        if provider == "gemini":
+            return _gemini_batch_model(language)
         return STT_BATCH_PROVIDER_MODELS.get(provider)
     return STT_PROVIDER_MODELS.get(provider)
 
@@ -488,6 +503,16 @@ def _gemini_client() -> genai.Client:
     return genai.Client(api_key=get_gemini_api_key())
 
 
+def _gemini_transcription_prompt(language: str) -> str:
+    lang_code = get_stt_language_code(language, "gemini")
+    return (
+        f"Transcribe the following {language} ({lang_code}) audio to text "
+        "verbatim. Output only the exact spoken words in the original language, "
+        "with no translation, no commentary, and no surrounding quotation marks. "
+        "If the audio contains no speech, output an empty string."
+    )
+
+
 async def transcribe_gemini(audio_path: Path, language: str) -> Dict:
     """Transcribe audio with a Gemini multimodal model via the google-genai API.
 
@@ -497,21 +522,13 @@ async def transcribe_gemini(audio_path: Path, language: str) -> Dict:
     """
     client = _gemini_client()
 
-    lang_code = get_stt_language_code(language, "gemini")
     audio_bytes = load_audio(audio_path)
-
-    prompt = (
-        f"Transcribe the following {language} ({lang_code}) audio to text "
-        "verbatim. Output only the exact spoken words in the original language, "
-        "with no translation, no commentary, and no surrounding quotation marks. "
-        "If the audio contains no speech, output an empty string."
-    )
 
     response = await asyncio.wait_for(
         client.aio.models.generate_content(
             model=STT_PROVIDER_MODELS["gemini"],
             contents=[
-                prompt,
+                _gemini_transcription_prompt(language),
                 genai_types.Part.from_bytes(
                     data=audio_bytes, mime_type="audio/wav"
                 ),
@@ -1026,6 +1043,84 @@ async def transcribe_google_batch(audio_path: Path, language: str) -> Dict:
     }
 
 
+def _openrouter_input_audio(audio_path: Path) -> Dict:
+    return {
+        "data": base64.b64encode(load_audio(audio_path)).decode("utf-8"),
+        "format": "wav",
+    }
+
+
+async def _transcribe_gemini_openrouter_chat(
+    audio_path: Path, language: str, model: str
+) -> Dict:
+    """Transcribe a whole file as an OpenRouter chat completion with the audio attached."""
+    if not os.getenv("OPENROUTER_API_KEY"):
+        raise ValueError("OPENROUTER_API_KEY environment variable not set")
+
+    completion = await asyncio.wait_for(
+        _build_openrouter_client().chat.completions.create(
+            model=f"google/{model}",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": _gemini_transcription_prompt(language),
+                        },
+                        {
+                            "type": "input_audio",
+                            "input_audio": _openrouter_input_audio(audio_path),
+                        },
+                    ],
+                }
+            ],
+            temperature=0,
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+    )
+
+    return {
+        "transcript": (completion.choices[0].message.content or "").strip(),
+    }
+
+
+async def transcribe_gemini_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with a Gemini model through OpenRouter.
+
+    Gemini's dedicated transcription model goes through OpenRouter's
+    transcriptions endpoint. Languages in
+    ``GEMINI_TRANSCRIBE_UNSUPPORTED_LANGUAGES`` go to the multimodal Gemini
+    model as a chat completion with the audio attached.
+    """
+    if language.lower() in GEMINI_TRANSCRIBE_UNSUPPORTED_LANGUAGES:
+        return await _transcribe_gemini_openrouter_chat(
+            audio_path, language, _gemini_batch_model(language)
+        )
+
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise ValueError("OPENROUTER_API_KEY environment variable not set")
+
+    # OpenRouter takes ISO-639-1 codes; the Gemini codes are BCP-47.
+    lang_code = get_stt_language_code(language, "gemini").split("-")[0]
+    async with httpx.AsyncClient(timeout=STT_PROVIDER_TIMEOUT_SECONDS) as client:
+        response = await client.post(
+            f"{_OPENROUTER_BASE_URL}/audio/transcriptions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={
+                "model": f"google/{STT_BATCH_PROVIDER_MODELS['gemini']}",
+                "input_audio": _openrouter_input_audio(audio_path),
+                "language": lang_code,
+            },
+        )
+    response.raise_for_status()
+
+    return {
+        "transcript": (response.json().get("text") or "").strip(),
+    }
+
+
 # Longest audio Sarvam's synchronous REST endpoint accepts; longer clips go
 # through its job API.
 SARVAM_STT_REST_MAX_SECONDS = 30.0
@@ -1210,6 +1305,7 @@ async def transcribe_audio(
             "openai": transcribe_openai_batch,
             "groq": transcribe_groq,
             "google": transcribe_google_batch,
+            "gemini": transcribe_gemini_batch,
             "sarvam": transcribe_sarvam_batch,
             "elevenlabs": transcribe_elevenlabs_batch,
             "cartesia": transcribe_cartesia_batch,
@@ -1557,12 +1653,12 @@ STT_PROVIDERS = [
 ]
 
 # Providers each engine has no transcribe function for: the live-agent pipeline
-# has no Gemini service, and Gemini has no whole-file function. Keep in sync
-# with the provider tables in transcribe_audio.
+# has no Gemini service. Keep in sync with the provider tables in
+# transcribe_audio.
 STT_ENGINE_UNSUPPORTED_PROVIDERS = {
     "pipeline": {"gemini"},
     "direct": set(),
-    "batch": {"gemini"},
+    "batch": set(),
 }
 
 STT_LANGUAGES = [
