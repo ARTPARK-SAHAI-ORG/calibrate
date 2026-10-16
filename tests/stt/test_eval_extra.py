@@ -640,6 +640,36 @@ class TestValidateExistingResultsCsv(unittest.TestCase):
             ok, _ = validate_existing_results_csv(str(p))
             self.assertTrue(ok)
 
+    def _check_engine(self, saved_engines, engine):
+        from calibrate_agent.stt.eval import validate_existing_results_csv
+
+        with tempfile.TemporaryDirectory() as tmp:
+            p = Path(tmp) / "results.csv"
+            df = pd.DataFrame({"id": ["a", "b"], "gt": ["x", "y"], "pred": ["x", "y"]})
+            if saved_engines is not None:
+                df["engine"] = saved_engines
+            df.to_csv(p, index=False)
+            return validate_existing_results_csv(str(p), engine)
+
+    def test_same_engine_resumes(self):
+        ok, _ = self._check_engine(["batch", "batch"], "batch")
+        self.assertTrue(ok)
+
+    def test_different_engine_is_rejected(self):
+        ok, err = self._check_engine(["direct", "direct"], "batch")
+        self.assertFalse(ok)
+        self.assertIn("--engine direct", err)
+        self.assertIn("--overwrite", err)
+
+    def test_file_without_engine_column_resumes(self):
+        ok, _ = self._check_engine(None, "batch")
+        self.assertTrue(ok)
+
+    def test_rows_without_engine_are_ignored(self):
+        # Rows written before the column existed read back as NaN.
+        ok, _ = self._check_engine([None, "batch"], "batch")
+        self.assertTrue(ok)
+
 
 # --- validate_stt_eval_only_dataset --------------------------------------
 

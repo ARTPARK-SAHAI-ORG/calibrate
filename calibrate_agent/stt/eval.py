@@ -112,12 +112,14 @@ def _stt_result_row(
     gt_text: object,
     pred_text: str,
     audio_dir: Path,
+    engine: str,
 ) -> dict:
     return {
         "id": row_id,
         "gt": gt_text,
         "pred": pred_text,
         "audio_duration_seconds": get_audio_duration_seconds(audio_dir / f"{row_id}.wav"),
+        "engine": engine,
     }
 
 
@@ -1420,14 +1422,14 @@ async def _run_stt_eval_concurrent(
     results_csv_path: Path,
     max_concurrency: int,
     transcribe_fn,
-    with_ttfs: bool,
+    engine: str,
 ) -> int:
     """Transcribe clips with bounded concurrency, writing rows as they complete.
 
     Shared by every engine: ``transcribe_fn`` is the per-clip coroutine
     (``transcribe_audio`` for direct and batch,
-    ``transcribe_audio_pipeline`` for pipeline) and ``with_ttfs`` adds the
-    ``ttfs`` column (pipeline only). Up to
+    ``transcribe_audio_pipeline`` for pipeline); the pipeline engine also
+    writes the ``ttfs`` column. Up to
     ``max_concurrency`` clips run at once (for pipeline each is a 1x real-time
     pipeline, so concurrency keeps a large run tractable); each result is written
     to ``results.csv`` under a lock (resumable, skip-processed). A failed clip is
@@ -1474,9 +1476,9 @@ async def _run_stt_eval_concurrent(
                 if transcript:
                     success_count += 1
                 row = _stt_result_row(
-                    gt_info["id"], gt_info["gt"], transcript, audio_dir
+                    gt_info["id"], gt_info["gt"], transcript, audio_dir, engine
                 )
-                if with_ttfs:
+                if engine == "pipeline":
                     row["ttfs"] = output.get("ttfs")
                 results.append(row)
                 pd.DataFrame(results).to_csv(results_csv_path, index=False)
@@ -1528,7 +1530,7 @@ async def run_stt_eval(
         results_csv_path,
         max_concurrency,
         transcribe_fn=transcribe_fn,
-        with_ttfs=(engine == "pipeline"),
+        engine=engine,
     )
 
 def validate_stt_input_dir(input_dir: str, input_file_name: str) -> tuple[bool, str]:
@@ -1611,13 +1613,17 @@ STT_RESULTS_COLUMNS = [
 ]
 
 
-def validate_existing_results_csv(results_csv_path: str) -> tuple[bool, str]:
+def validate_existing_results_csv(
+    results_csv_path: str, engine: str | None = None
+) -> tuple[bool, str]:
     """Validate existing results.csv file structure.
 
-    Checks if the file is either empty or has the expected columns for STT results.
+    Checks if the file is either empty or has the expected columns for STT
+    results, and that its rows were transcribed with ``engine``.
 
     Args:
         results_csv_path: Path to the results.csv file
+        engine: Engine of the run about to resume from the file
 
     Returns:
         tuple[bool, str]: (is_valid, error_message)
@@ -1644,6 +1650,15 @@ def validate_existing_results_csv(results_csv_path: str) -> tuple[bool, str]:
             f"Found columns: {list(df.columns)}. "
             f"Use --overwrite to replace the file or delete it manually."
         )
+
+    if engine and "engine" in df.columns:
+        saved_engines = set(df["engine"].dropna()) - {engine}
+        if saved_engines:
+            return False, (
+                f"Existing results.csv was transcribed with --engine "
+                f"{', '.join(sorted(saved_engines))}, not --engine {engine}. "
+                f"Use --overwrite to replace it or a different --output-dir."
+            )
 
     return True, ""
 
@@ -1744,7 +1759,9 @@ async def run_single_provider_eval(
 
         # Validate existing results.csv structure (if not overwriting)
         if not overwrite:
-            is_valid, error_msg = validate_existing_results_csv(str(results_csv_path))
+            is_valid, error_msg = validate_existing_results_csv(
+                str(results_csv_path), engine
+            )
             if not is_valid:
                 _log(f"\033[31mError: {error_msg}\033[0m")
                 return {"provider": provider, "status": "error", "error": error_msg}
@@ -1805,6 +1822,7 @@ async def run_single_provider_eval(
                                 gt_info["gt"],
                                 "",
                                 audio_dir,
+                                engine,
                             )
                         )
 
@@ -1840,10 +1858,11 @@ async def run_single_provider_eval(
             if duration is None or pd.isna(duration):
                 duration = get_audio_duration_seconds(audio_dir / f"{row_id}.wav")
             audio_durations.append(duration)
+        model = _default_stt_model(provider, language, engine)
         cost_metrics = _build_stt_cost_metrics(
             provider=provider,
             audio_duration_seconds=audio_durations,
-            model=_default_stt_model(provider, language, engine),
+            model=model,
         )
 
         # TTFS latency is only produced by the pipeline engine; NaN/absent -> None.
@@ -1872,6 +1891,8 @@ async def run_single_provider_eval(
             audio_durations=audio_durations,
             cost_metrics=cost_metrics,
             ttfs_values=all_ttfs,
+            model=model,
+            engine=engine,
         )
 
         return {
@@ -1929,6 +1950,8 @@ async def _score_and_write_results(
     language: str = "english",
     run_llm_judges: bool = True,
     cost_metrics: dict | None = None,
+    model: str | None = None,
+    engine: str | None = None,
     audio_durations: list[float | None] | None = None,
     ttfs_values: list = None,
     stream_rows: bool = False,
@@ -2070,6 +2093,8 @@ async def _score_and_write_results(
             metrics_data[name] = score_dict
     if cost_metrics:
         metrics_data["cost"] = cost_metrics
+    if model:
+        metrics_data["model"] = model
 
     # TTFS latency (pipeline engine only). Emitted as a {p50,p95,p99,mean} dict
     # so read_leaderboard_metrics fans it into ttfs_p50/ttfs_p95/ttfs_p99 columns.
@@ -2144,6 +2169,8 @@ async def _score_and_write_results(
         }
         if duration is not None and not pd.isna(duration):
             row["audio_duration_seconds"] = duration
+        if engine:
+            row["engine"] = engine
         if has_ttfs:
             row["ttfs"] = ttfs_row
         if ie_row is not None:

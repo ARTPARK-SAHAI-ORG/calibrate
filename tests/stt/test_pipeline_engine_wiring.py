@@ -8,6 +8,7 @@ pipeline or API keys:
 - ``_score_and_write_results`` threading TTFS into metrics.json + results.csv.
 """
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -120,6 +121,29 @@ class TestScoreAndWriteTTFS(unittest.IsolatedAsyncioTestCase):
             df = pd.read_csv(out / "results.csv")
             self.assertEqual(len(df), 3)  # all rows written, none dropped
 
+    async def test_model_saved_in_metrics_and_ignored_by_leaderboard(self):
+        from calibrate_agent.stt import eval as stt_eval
+        from calibrate_agent.utils import read_leaderboard_metrics
+
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp)
+            with patch.object(stt_eval, "get_llm_judge_score", _fake_judge()):
+                metrics = await stt_eval._score_and_write_results(
+                    ids=["a"],
+                    gt_transcripts=["hi"],
+                    pred_transcripts=["hi"],
+                    output_dir=str(out),
+                    evaluator_config_dir=str(out),
+                    model="gemini-3.5-flash",
+                    engine="batch",
+                )
+
+            self.assertEqual(metrics["model"], "gemini-3.5-flash")
+            saved = json.loads((out / "metrics.json").read_text())
+            self.assertEqual(saved["model"], "gemini-3.5-flash")
+            self.assertNotIn("model", read_leaderboard_metrics(out / "metrics.json"))
+            self.assertEqual(list(pd.read_csv(out / "results.csv")["engine"]), ["batch"])
+
     async def test_direct_engine_omits_ttfs(self):
         """All-None TTFS (direct engine) leaves ttfs out entirely."""
         from calibrate_agent.stt import eval as stt_eval
@@ -200,6 +224,34 @@ class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
             df = pd.read_csv(csv_path)
             self.assertEqual(sorted(df["pred"]), ["pred_1", "pred_2"])
             self.assertNotIn("ttfs", df.columns)
+            self.assertEqual(set(df["engine"]), {"batch"})
+
+    async def test_resume_from_another_engine_returns_error(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        with tempfile.TemporaryDirectory() as tmp:
+            provider_dir = Path(tmp, "deepgram")
+            provider_dir.mkdir()
+            pd.DataFrame(
+                {"id": ["a"], "gt": ["hi"], "pred": ["hi"], "engine": ["direct"]}
+            ).to_csv(provider_dir / "results.csv", index=False)
+            run = AsyncMock()
+            with patch.object(stt_eval, "run_stt_eval", run):
+                result = await stt_eval.run_single_provider_eval(
+                    provider="deepgram",
+                    language="english",
+                    input_dir=tmp,
+                    input_file_name="stt.csv",
+                    output_dir=tmp,
+                    debug=False,
+                    debug_count=5,
+                    ignore_retry=False,
+                    overwrite=False,
+                    engine="batch",
+                )
+            self.assertEqual(result["status"], "error")
+            self.assertIn("--engine direct", result["error"])
+            run.assert_not_awaited()
 
     async def test_unknown_engine_raises(self):
         from calibrate_agent.stt import eval as stt_eval
