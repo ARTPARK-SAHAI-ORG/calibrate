@@ -1361,6 +1361,54 @@ class TestTranscribeBatchProviders(unittest.IsolatedAsyncioTestCase):
                 self.assertIn(language, content[0]["text"])
                 self.assertEqual(content[1]["input_audio"]["format"], "wav")
 
+    async def test_gemini_flash_sends_audio_as_chat_completion(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        chat_client = MagicMock()
+        chat_client.chat.completions.create = AsyncMock(
+            return_value=SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=" namaste "))]
+            )
+        )
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_gemini_flash_batch",
+            "hindi",
+            patch.object(stt_eval, "_build_openrouter_client", return_value=chat_client),
+            env={"OPENROUTER_API_KEY": "or-fake"},
+        )
+
+        self.assertEqual(result, {"transcript": "namaste"})
+        kwargs = chat_client.chat.completions.create.await_args.kwargs
+        self.assertEqual(
+            kwargs["model"],
+            f"google/{stt_eval.STT_BATCH_PROVIDER_MODELS['gemini-flash']}",
+        )
+        content = kwargs["messages"][0]["content"]
+        self.assertIn("hindi (hi-IN)", content[0]["text"])
+        self.assertEqual(
+            content[1]["input_audio"],
+            {"data": base64.b64encode(b"RIFFfake").decode("utf-8"), "format": "wav"},
+        )
+
+    async def test_gemini_flash_empty_content_is_empty_transcript(self):
+        from calibrate_agent.stt import eval as stt_eval
+
+        chat_client = MagicMock()
+        chat_client.chat.completions.create = AsyncMock(
+            return_value=SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content=None))]
+            )
+        )
+        result = await _run_batch(
+            stt_eval,
+            "transcribe_gemini_flash_batch",
+            "english",
+            patch.object(stt_eval, "_build_openrouter_client", return_value=chat_client),
+            env={"OPENROUTER_API_KEY": "or-fake"},
+        )
+        self.assertEqual(result, {"transcript": ""})
+
     async def _sarvam(self, duration_seconds, job=None):
         import io
         import wave
@@ -1542,6 +1590,7 @@ class TestTranscribeBatchProviders(unittest.IsolatedAsyncioTestCase):
             "transcribe_openai_batch",
             "transcribe_google_batch",
             "transcribe_gemini_batch",
+            "transcribe_gemini_flash_batch",
             "transcribe_sarvam_batch",
             "transcribe_cartesia_batch",
             "transcribe_elevenlabs_batch",

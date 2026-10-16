@@ -218,7 +218,11 @@ class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
     async def test_unsupported_engine_returns_error_before_running(self):
         from calibrate_agent.stt import eval as stt_eval
 
-        cases = [("gemini", "pipeline")]
+        cases = [
+            ("gemini-flash", "direct"),
+            ("gemini-flash", "pipeline"),
+            ("gemini", "pipeline"),
+        ]
         for provider, engine in cases:
             with self.subTest(provider=provider, engine=engine), \
                     tempfile.TemporaryDirectory() as tmp:
@@ -272,11 +276,21 @@ class TestRunSTTEvalDirectRouting(unittest.IsolatedAsyncioTestCase):
                         provider in stt_eval.STT_ENGINE_UNSUPPORTED_PROVIDERS[engine],
                     )
 
-    def test_gemini_accepts_maithili(self):
+    def test_batch_only_provider_is_registered_for_batch(self):
+        from calibrate_agent.stt import eval as stt_eval
         from calibrate_agent.utils import get_stt_language_code, validate_stt_language
 
-        validate_stt_language("maithili", "gemini")
-        self.assertEqual(get_stt_language_code("maithili", "gemini"), "mai-IN")
+        self.assertIn("gemini-flash", stt_eval.STT_PROVIDERS)
+        self.assertNotIn("gemini-flash", stt_eval.STT_PROVIDER_MODELS)
+        self.assertEqual(
+            stt_eval._default_stt_model("gemini-flash", "hindi", "batch"),
+            stt_eval.STT_BATCH_PROVIDER_MODELS["gemini-flash"],
+        )
+        self.assertEqual(get_stt_language_code("hindi", "gemini-flash"), "hi-IN")
+        validate_stt_language("tamil", "gemini-flash")
+        for provider in ("gemini", "gemini-flash"):
+            validate_stt_language("maithili", provider)
+            self.assertEqual(get_stt_language_code("maithili", provider), "mai-IN")
 
 
 class TestRunSTTEvalPipelineRouting(unittest.IsolatedAsyncioTestCase):

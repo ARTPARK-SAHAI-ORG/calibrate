@@ -1121,6 +1121,13 @@ async def transcribe_gemini_batch(audio_path: Path, language: str) -> Dict:
     }
 
 
+async def transcribe_gemini_flash_batch(audio_path: Path, language: str) -> Dict:
+    """Transcribe a whole file with the multimodal Gemini Flash model through OpenRouter."""
+    return await _transcribe_gemini_openrouter_chat(
+        audio_path, language, STT_BATCH_PROVIDER_MODELS["gemini-flash"]
+    )
+
+
 # Longest audio Sarvam's synchronous REST endpoint accepts; longer clips go
 # through its job API.
 SARVAM_STT_REST_MAX_SECONDS = 30.0
@@ -1306,6 +1313,7 @@ async def transcribe_audio(
             "groq": transcribe_groq,
             "google": transcribe_google_batch,
             "gemini": transcribe_gemini_batch,
+            "gemini-flash": transcribe_gemini_flash_batch,
             "sarvam": transcribe_sarvam_batch,
             "elevenlabs": transcribe_elevenlabs_batch,
             "cartesia": transcribe_cartesia_batch,
@@ -1648,16 +1656,17 @@ STT_PROVIDERS = [
     "groq",
     "google",
     "gemini",
+    "gemini-flash",
     "sarvam",
     "elevenlabs",
 ]
 
 # Providers each engine has no transcribe function for: the live-agent pipeline
-# has no Gemini service. Keep in sync with the provider tables in
-# transcribe_audio.
+# has no Gemini service, and gemini-flash has a whole-file function only. Keep
+# in sync with the provider tables in transcribe_audio.
 STT_ENGINE_UNSUPPORTED_PROVIDERS = {
-    "pipeline": {"gemini"},
-    "direct": set(),
+    "pipeline": {"gemini", "gemini-flash"},
+    "direct": {"gemini-flash"},
     "batch": set(),
 }
 

@@ -941,7 +941,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt import eval as E
         from calibrate_agent.stt.eval import STT_PROVIDERS
 
-        providers_without_per_minute_pricing = {"gemini"}
+        providers_without_per_minute_pricing = {"gemini", "gemini-flash"}
         for engine in ("direct", "batch"):
             for provider in STT_PROVIDERS:
                 if provider in providers_without_per_minute_pricing:

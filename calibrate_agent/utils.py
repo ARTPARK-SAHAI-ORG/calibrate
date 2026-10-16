@@ -1546,7 +1546,7 @@ def get_stt_language_code(language: str, provider: str) -> str:
         return SARVAM_STT_LANGUAGE_CODES.get(language, "en-IN")
     elif provider == "google":
         return GOOGLE_STT_LANGUAGE_CODES.get(language, "en-US")
-    elif provider == "gemini":
+    elif provider in ("gemini", "gemini-flash"):
         return GEMINI_STT_LANGUAGE_CODES.get(language, "en-US")
     elif provider == "smallest":
         return SMALLEST_STT_LANGUAGE_CODES.get(language, "multi")
@@ -1639,6 +1639,7 @@ def validate_stt_language(language: str, provider: str) -> None:
         "sarvam": SARVAM_STT_LANGUAGE_CODES,
         "google": GOOGLE_STT_LANGUAGE_CODES,
         "gemini": GEMINI_STT_LANGUAGE_CODES,
+        "gemini-flash": GEMINI_STT_LANGUAGE_CODES,
         "smallest": SMALLEST_STT_LANGUAGE_CODES,
         "cartesia": CARTESIA_STT_LANGUAGE_CODES,
         "elevenlabs": ELEVENLABS_STT_LANGUAGE_CODES,
@@ -1897,11 +1898,13 @@ STT_PROVIDER_MODELS = {
 }
 
 # Models for the batch engine (whole file in one request). A provider is listed
-# when its whole-file API serves a different model from its streaming API.
+# when its whole-file API serves a different model from its streaming API, or
+# when it runs only in the batch engine (``gemini-flash``).
 STT_BATCH_PROVIDER_MODELS = {
     **STT_PROVIDER_MODELS,
     "openai": "gpt-transcribe",
     "gemini": "gemini-3.5-transcribe",
+    "gemini-flash": "gemini-3.8-flash",
     "sarvam": "saaras:v4",
     "elevenlabs": "scribe_v2",
 }
