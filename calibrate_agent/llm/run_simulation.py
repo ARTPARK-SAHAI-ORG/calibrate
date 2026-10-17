@@ -15,6 +15,7 @@ from collections import defaultdict
 import traceback
 from calibrate_agent.utils import (
     configure_print_logger,
+    split_model_provider,
     log_and_print,
     build_tools_schema,
     make_webhook_call,
@@ -338,28 +339,37 @@ async def run_simulation(
 
     # Create LLM service
 
+    bot_model_id, bot_routing = split_model_provider(bot_model, bot_provider)
+    user_model_id, user_routing = split_model_provider(user_model, user_provider)
+
     if bot_provider == "openrouter":
         bot_llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=bot_model),
+            settings=OpenRouterLLMService.Settings(
+                model=bot_model_id,
+                extra={"extra_body": bot_routing} if bot_routing else {},
+            ),
         )
     else:
         bot_llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=bot_model),
+            settings=OpenAILLMService.Settings(model=bot_model_id),
         )
 
     if user_provider == "openrouter":
         user_llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=user_model),
+            settings=OpenRouterLLMService.Settings(
+                model=user_model_id,
+                extra={"extra_body": user_routing} if user_routing else {},
+            ),
         )
     else:
         user_llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=user_model),
+            settings=OpenAILLMService.Settings(model=user_model_id),
         )
 
     conversation_state = ConversationState(max_turns=max_turns)
@@ -615,6 +625,7 @@ async def run_simulation_with_agent(
     from openai import AsyncOpenAI as _AsyncOpenAI
 
     # User LLM client
+    user_model_id, user_routing = split_model_provider(user_model, user_provider)
     if user_provider == "openrouter":
         user_client = _AsyncOpenAI(
             api_key=os.getenv("OPENROUTER_API_KEY"),
@@ -669,8 +680,9 @@ async def run_simulation_with_agent(
     for turn in range(max_turns):
         # --- User simulator turn ---
         user_resp = await user_client.chat.completions.create(
-            model=user_model,
+            model=user_model_id,
             messages=user_messages,
+            extra_body=user_routing,
         )
         user_message = user_resp.choices[0].message.content.strip()
         user_messages.append({"role": "assistant", "content": user_message})
