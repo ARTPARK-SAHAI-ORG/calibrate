@@ -205,6 +205,8 @@ A single-shot task with no conversation. The agent receives one user message, ta
 
 A general test case carries `input` and no `history`. Supplying `history` is an error, as is an empty `input`.
 
+With an [agent connection](/cli/agent-connections/chat), the `input` is sent as a single user message. An agent that takes a plain instruction rather than a conversation can receive it as `{"input": "..."}` instead, by setting `agent_type` to `general` in the config.
+
 Its evaluators must be listed by name. There is no built-in evaluator for this type, so the plain criteria string that a [response test](#response-test) accepts is rejected here.
 
 See [`examples/llm/config-general.json`](https://github.com/ARTPARK-SAHAI-ORG/calibrate/blob/main/examples/llm/config-general.json) for a full template.
@@ -683,16 +685,19 @@ calibrate-agent llm -c config.json -m openai/gpt-4.1 claude-sonnet-4-5 -p openro
 
 **Agent connection:**
 
-Your config must include `agent_url` and optionally `agent_headers`:
+Your config must include `agent_url`, and optionally `agent_headers` and `agent_type`:
 
 ```json
 {
   "agent_url": "https://your-agent.com/chat",
   "agent_headers": {
     "Authorization": "Bearer YOUR_API_KEY"
-  }
+  },
+  "agent_type": "conversation"
 }
 ```
+
+`agent_type` sets what the request body carries: `conversation`, the default, sends the test case's messages as `{"messages": [...]}`; `general` sends the single user message as `{"input": "..."}`, for an agent that takes one instruction per call. A `general` agent accepts a test case of exactly one user message, so it pairs with [general tests](#general-test). See [Chat agent](/cli/agent-connections/chat#request-format).
 
 Single run (use the default model of the agent):
 
