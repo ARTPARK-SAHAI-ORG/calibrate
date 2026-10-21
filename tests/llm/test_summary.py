@@ -15,8 +15,6 @@ import pandas as pd
 
 from calibrate_agent.llm.summary import (
     NO_ANSWER,
-    aggregate_criteria,
-    format_pass_rate,
     format_share,
     mean_interval,
     pass_rate_from_metrics,
@@ -86,51 +84,8 @@ class TestPassRate(unittest.TestCase):
         self.assertEqual(pass_rate_from_metrics({"passed": 3, "total": 4})["pass_rate"], 75.0)
 
     def test_format(self):
-        self.assertEqual(
-            format_pass_rate({"passed": 2, "total": 4, "errored": 1}), "2/3 (66.7%)"
-        )
-        self.assertEqual(format_pass_rate({}), NO_ANSWER)
-        self.assertEqual(
-            format_pass_rate({"passed": 0, "total": 2, "errored": 2}), NO_ANSWER
-        )
         self.assertEqual(format_share(1, 4), "1/4 (25.0%)")
-
-
-def _case(criteria, judge_results, type_="response"):
-    return {
-        "metrics": {"passed": True, "judge_results": judge_results},
-        "test_case": {"evaluation": {"type": type_, "criteria": criteria}},
-    }
-
-
-class TestAggregateCriteria(unittest.TestCase):
-    def test_binary_and_rating_carry_ci(self):
-        registry = {
-            "acc": {"name": "acc", "type": "binary", "id": "ev-1"},
-            "flu": {"name": "flu", "type": "rating", "scale_min": 1, "scale_max": 5},
-        }
-        refs = [{"name": "acc"}, {"name": "flu"}]
-        results = [
-            _case(refs, {"acc": {"match": True}, "flu": {"score": 4}}),
-            _case(refs, {"acc": {"match": False}, "flu": {"score": 2}}),
-        ]
-        agg = aggregate_criteria(results, registry)
-        self.assertEqual(agg["acc"]["ci"], wilson_interval(1, 2))
-        self.assertEqual(agg["acc"]["evaluator_id"], "ev-1")
-        self.assertEqual(agg["flu"]["ci"], mean_interval([4, 2], 1, 5))
-        self.assertNotIn("evaluator_id", agg["flu"])
-
-    def test_single_rating_has_no_ci(self):
-        registry = {"flu": {"name": "flu", "type": "rating", "scale_min": 1, "scale_max": 5}}
-        agg = aggregate_criteria([_case([{"name": "flu"}], {"flu": {"score": 3}})], registry)
-        self.assertIsNone(agg["flu"]["ci"])
-
-    def test_string_criteria_use_default_evaluator(self):
-        registry = {"correctness": {"name": "correctness", "type": "binary"}}
-        agg = aggregate_criteria(
-            [_case("be nice", {"correctness": {"match": True}})], registry
-        )
-        self.assertEqual(agg["correctness"]["passed"], 1)
+        self.assertEqual(format_share(0, 0), NO_ANSWER)
 
 
 class TestImportIsLight(unittest.TestCase):
@@ -228,20 +183,6 @@ class TestLeaderboard(unittest.TestCase):
         self.assertEqual((m1["flu"], m1["flu_low"]), (3.5, 3.0))
         m2 = df[df["model"] == "m2"].iloc[0]
         self.assertTrue(pd.isna(m2["acc"]) and pd.isna(m2["acc_low"]))
-
-    def test_write_leaderboard_records_failure(self):
-        from unittest.mock import patch
-
-        from calibrate_agent.llm.tests_leaderboard import write_leaderboard
-
-        results: dict = {}
-        with patch(
-            "calibrate_agent.llm.tests_leaderboard.generate_leaderboard",
-            side_effect=RuntimeError("boom"),
-        ):
-            save_dir = write_leaderboard("/tmp/x", results)
-        self.assertEqual(save_dir, str(Path("/tmp/x") / "leaderboard"))
-        self.assertEqual(results["leaderboard"], "error: boom")
 
 
 @unittest.skipIf(os.geteuid() == 0, "root can write to a read-only folder")

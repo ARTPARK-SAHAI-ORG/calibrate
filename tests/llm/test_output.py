@@ -85,10 +85,10 @@ class TestPartialPass(unittest.TestCase):
         self.assertIn("33.3%", combined)
         self.assertFalse(result)
 
-    def test_two_thirds(self):
+    def test_two_thirds_leaving_out_unanswered(self):
         captured, _ = _call(
             models=["m"],
-            model_results={"m": {"metrics": {"passed": 2, "total": 3}}},
+            model_results={"m": {"metrics": {"passed": 2, "total": 4, "errored": 1}}},
         )
         combined = "\n".join(_plain_lines(captured))
         self.assertIn("2/3", combined)

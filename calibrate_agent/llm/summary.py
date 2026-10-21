@@ -93,11 +93,6 @@ def format_share(count: int, answered: int) -> str:
     return f"{count}/{answered} ({rate:.1f}%)"
 
 
-def format_pass_rate(metrics: dict) -> str:
-    """:func:`format_share` of the passed cases in a ``metrics.json`` block."""
-    return format_share(int(metrics.get("passed", 0)), answered_count(metrics))
-
-
 def _normalize_criteria_refs(criteria) -> list[dict]:
     """Coerce a test case's ``evaluation.criteria`` into a list of evaluator refs.
 

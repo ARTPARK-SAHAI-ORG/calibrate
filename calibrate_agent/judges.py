@@ -43,6 +43,7 @@ import csv
 import json
 import os
 import re
+import statistics
 from typing import Callable, Optional
 
 import instructor
@@ -201,8 +202,6 @@ def aggregate_judge_scores(evaluators: list, results: list) -> dict:
     Returns ``{"scores": {name: {"type", "mean", ...}}, "score": float}``. A
     binary mean is the pass fraction (0.0-1.0); a rating mean is on its scale.
     """
-    import numpy as np
-
     scores: dict = {}
     for ev in evaluators:
         name = ev["name"]
@@ -210,15 +209,15 @@ def aggregate_judge_scores(evaluators: list, results: list) -> dict:
         if is_rating(ev):
             scores[name] = {
                 "type": RATING,
-                "mean": float(np.mean(per_row_values)),
+                "mean": float(statistics.fmean(per_row_values)),
                 "scale_min": int(ev["scale_min"]),
                 "scale_max": int(ev["scale_max"]),
             }
         else:
-            scores[name] = {"type": BINARY, "mean": float(np.mean(per_row_values))}
+            scores[name] = {"type": BINARY, "mean": float(statistics.fmean(per_row_values))}
     return {
         "scores": scores,
-        "score": float(np.mean([s["mean"] for s in scores.values()])),
+        "score": float(statistics.fmean([s["mean"] for s in scores.values()])),
     }
 
 

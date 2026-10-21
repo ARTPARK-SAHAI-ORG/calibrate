@@ -2,7 +2,7 @@
 
 import sys
 
-from calibrate_agent.llm.summary import format_pass_rate
+from calibrate_agent.llm.summary import answered_count, format_share
 
 
 def print_benchmark_summary(
@@ -36,7 +36,8 @@ def print_benchmark_summary(
             print(f"  {label}: \033[31mError - {mr.get('error') if isinstance(mr, dict) else mr}\033[0m")
             has_errors = True
         else:
-            print(f"  {label}: {format_pass_rate(mr.get('metrics', {}))}")
+            metrics = mr.get("metrics", {})
+            print(f"  {label}: {format_share(int(metrics.get('passed', 0)), answered_count(metrics))}")
 
     leaderboard_error = model_results.get("leaderboard")
     if leaderboard_error:
