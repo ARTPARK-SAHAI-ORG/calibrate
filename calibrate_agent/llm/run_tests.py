@@ -52,6 +52,13 @@ from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
 from calibrate_agent.llm.metrics import test_response_llm_judge, evaluate_simuation
 from calibrate_agent.general.metrics import general_judge
 from calibrate_agent.llm._metrics_utils import _numeric_or_none, _latency_percentiles
+from calibrate_agent.llm.summary import (
+    EVALUATOR_TEST_TYPES,
+    _normalize_criteria_refs,
+    aggregate_criteria,
+    format_pass_rate,
+    pass_rate_summary,
+)
 from calibrate_agent.judges import (
     DEFAULT_LLM_TEST_EVALUATOR,
     attach_evaluator_id,
@@ -67,10 +74,6 @@ from calibrate_agent.judges import (
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 
 
-# The four kinds of LLM test case. ``EVALUATOR_TEST_TYPES`` are the ones graded
-# by evaluators the test case names in ``evaluation.criteria``; ``tool_call``
-# cases are graded against an expected tool-call list instead.
-EVALUATOR_TEST_TYPES = ("response", "conversation", "general")
 TEST_TYPES = ("tool_call",) + EVALUATOR_TEST_TYPES
 
 
@@ -100,35 +103,6 @@ def test_case_history(test_case: dict) -> List[dict]:
 
 
 # ── Evaluator resolution helpers (LLM-test-specific) ────────────────────────
-
-
-def _normalize_criteria_refs(criteria) -> list[dict]:
-    """Coerce a test case's ``evaluation.criteria`` into a list of evaluator refs.
-
-    Accepted shapes:
-    - ``str`` → ``[{"name": <DEFAULT_LLM_TEST_EVALUATOR.name>, "arguments": {"criteria": <str>}}]``
-    - ``list[{name, arguments}]`` → returned as-is
-
-    Any other shape raises ``ValueError``.
-    """
-    if isinstance(criteria, str):
-        return [
-            {
-                "name": DEFAULT_LLM_TEST_EVALUATOR["name"],
-                "arguments": {"criteria": criteria},
-            }
-        ]
-    if isinstance(criteria, list):
-        for entry in criteria:
-            if not isinstance(entry, dict) or "name" not in entry:
-                raise ValueError(
-                    "evaluation.criteria entries must be dicts with a 'name' key "
-                    "(and optional 'arguments'); got: " + repr(entry)
-                )
-        return criteria
-    raise ValueError(
-        f"evaluation.criteria must be a string or list of evaluator refs; got {type(criteria).__name__}"
-    )
 
 
 def _get_name_to_evaluator_dict(config: dict, include_default: bool = True) -> dict:
@@ -383,6 +357,8 @@ def exit_if_run_failed(run_results: "Iterable[dict]") -> None:
     and the reason is on each result, so the command succeeds.
     """
     for result in run_results:
+        if not isinstance(result, dict):
+            continue
         metrics = result.get("metrics", {})
         total = metrics.get("total", 0)
         errored = metrics.get("errored", 0)
@@ -1757,80 +1733,6 @@ async def run_test_external(
     return result
 
 
-def _aggregate_criteria(results: List[dict], name_to_evaluator: dict) -> dict:
-    """Aggregate per-evaluator metrics across test case results.
-
-    Each ``response`` / ``conversation`` test case contributes to the totals for
-    the evaluators referenced in its ``evaluation.criteria``.
-    ``name_to_evaluator`` maps evaluator name to its config dict (type/scale).
-
-    Per-evaluator output shape depends on the evaluator's type:
-    - binary: ``{"type": "binary", "passed": int, "total": int, "pass_rate": float}``
-    - rating: ``{"type": "rating", "mean": float, "min": int, "max": int,
-                  "count": int, "scale_min": int, "scale_max": int}``
-    """
-    binary_totals: defaultdict = defaultdict(lambda: {"passed": 0, "total": 0})
-    rating_scores: defaultdict = defaultdict(list)
-    rating_scale: dict = {}
-
-    for result in results:
-        metrics = result.get("metrics", {})
-        evaluation = result.get("test_case", {}).get("evaluation", {})
-
-        if evaluation.get("type") not in EVALUATOR_TEST_TYPES:
-            continue
-
-        judge_results = metrics.get("judge_results")
-        if not judge_results:
-            continue
-
-        refs = _normalize_criteria_refs(evaluation.get("criteria"))
-        for ref in refs:
-            name = ref["name"]
-            ev = name_to_evaluator.get(name)
-            if ev is None:
-                continue
-            ev_data = judge_results.get(name, {})
-            if is_rating(ev):
-                if "score" in ev_data:
-                    rating_scores[name].append(int(ev_data["score"]))
-                    rating_scale[name] = (
-                        int(ev["scale_min"]),
-                        int(ev["scale_max"]),
-                    )
-            else:
-                binary_totals[name]["total"] += 1
-                if ev_data.get("match"):
-                    binary_totals[name]["passed"] += 1
-
-    aggregated: dict = {}
-    for name, c in binary_totals.items():
-        aggregated[name] = {
-            "type": "binary",
-            "passed": c["passed"],
-            "total": c["total"],
-            "pass_rate": (c["passed"] / c["total"]) * 100 if c["total"] else 0.0,
-        }
-        ev = name_to_evaluator.get(name)
-        if ev and "id" in ev:
-            aggregated[name]["evaluator_id"] = ev["id"]
-    for name, scores in rating_scores.items():
-        lo, hi = rating_scale[name]
-        aggregated[name] = {
-            "type": "rating",
-            "mean": float(sum(scores) / len(scores)) if scores else 0.0,
-            "min": min(scores) if scores else 0,
-            "max": max(scores) if scores else 0,
-            "count": len(scores),
-            "scale_min": lo,
-            "scale_max": hi,
-        }
-        ev = name_to_evaluator.get(name)
-        if ev and "id" in ev:
-            aggregated[name]["evaluator_id"] = ev["id"]
-    return aggregated
-
-
 def _aggregate_cost(results: List[dict]) -> Optional[dict]:
     """Aggregate per-test-case LLM cost (USD) across results that report one.
 
@@ -2153,23 +2055,13 @@ async def run_model_tests(
         log=lambda text: _print_and_log(text, print_log_save_path),
     )
 
-    total_passed = sum(1 for result in results if result["metrics"]["passed"])
-    total_tests = len(results)
-    passed_count = total_passed
-    failed_count = total_tests - total_passed
-
-    # Print summary for this model (mirrored to results.log)
-    if passed_count == total_tests:
-        _print_and_log(f"[{label}] 🎉 All tests passed!", print_log_save_path)
-    elif failed_count == total_tests:
-        _print_and_log(f"[{label}] ❌ All tests failed!", print_log_save_path)
-    else:
-        _print_and_log(
-            f"[{label}] ✅ Total Passed: {passed_count}/{total_tests} ({(passed_count/total_tests)*100:.1f}%)",
-            print_log_save_path,
-        )
-
-    metrics = _write_test_results_outputs(results, model_output_dir, name_to_evaluator)
+    metrics = finish_test_run(
+        results,
+        model_output_dir,
+        name_to_evaluator,
+        log=lambda text: _print_and_log(text, print_log_save_path),
+        prefix=f"[{label}] ",
+    )
 
     # Remove pipecat log file sink
     with _logger_lock:
@@ -2231,7 +2123,8 @@ def _write_test_results_outputs(
     metrics = {
         "total": total,
         "passed": passed,
-        "criteria": _aggregate_criteria(results, name_to_evaluator),
+        **pass_rate_summary(results),
+        "criteria": aggregate_criteria(results, name_to_evaluator),
         "tool_calls": _aggregate_tool_calls(results),
     }
     metrics["errored"] = errored_count(results)
@@ -2248,6 +2141,24 @@ def _write_test_results_outputs(
     with open(join(output_dir, "metrics.json"), "w") as f:
         json.dump(metrics, f, indent=4)
 
+    return metrics
+
+
+def finish_test_run(
+    results: List[dict],
+    output_dir: str,
+    name_to_evaluator: dict,
+    log: Callable[[str], None],
+    prefix: str = "",
+) -> dict:
+    """Write results.json + metrics.json and log the run's pass summary."""
+    metrics = _write_test_results_outputs(results, output_dir, name_to_evaluator)
+    if metrics["passed"] == metrics["total"]:
+        log(f"{prefix}🎉 All tests passed!")
+    elif metrics["passed"] == 0:
+        log(f"{prefix}❌ All tests failed!")
+    else:
+        log(f"{prefix}✅ Total Passed: {format_pass_rate(metrics)}")
     return metrics
 
 
@@ -2411,11 +2322,10 @@ async def run_eval_only_tests(
     )
 
     metrics = _write_test_results_outputs(results, output_dir, name_to_evaluator)
-    passed, total = metrics["passed"], metrics["total"]
-    pct = (passed / total * 100) if total else 0.0
     _print_and_log(
-        f"\n✅ Total Passed: {passed}/{total} ({pct:.1f}%)", print_log_save_path
+        f"\n✅ Total Passed: {format_pass_rate(metrics)}", print_log_save_path
     )
+    passed, total = metrics["passed"], metrics["total"]
 
     provider_log_file.reset(judge_log_token)
 

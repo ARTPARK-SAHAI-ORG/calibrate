@@ -1464,7 +1464,7 @@ class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["judge_results"]["helpful"]["match"])
 
     def test_scores_reach_metrics_aggregation(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         results = [
             {
@@ -1608,7 +1608,7 @@ class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
 
 class TestAggregateCriteria(unittest.TestCase):
     def test_binary_aggregation(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {"x": dict(_bin_ev("x"), id="ev1")}
         results = [
@@ -1637,7 +1637,7 @@ class TestAggregateCriteria(unittest.TestCase):
         self.assertEqual(agg["x"]["evaluator_id"], "ev1")
 
     def test_rating_aggregation(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {"r": _rate_ev("r", 1, 5)}
         results = [
@@ -1655,7 +1655,7 @@ class TestAggregateCriteria(unittest.TestCase):
         self.assertEqual(agg["r"]["mean"], 4.0)
 
     def test_unknown_evaluator_skipped(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {}
         results = [
@@ -2648,7 +2648,7 @@ class TestRunTestExternalConversation(unittest.IsolatedAsyncioTestCase):
 
 class TestAggregateCriteriaConversation(unittest.TestCase):
     def test_conversation_cases_aggregated(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {"tone": dict(_bin_ev("tone"), id="ev1")}
         results = [

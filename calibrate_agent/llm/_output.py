@@ -2,6 +2,8 @@
 
 import sys
 
+from calibrate_agent.llm.summary import format_pass_rate
+
 
 def print_benchmark_summary(
     models: list,
@@ -30,11 +32,7 @@ def print_benchmark_summary(
             print(f"  {label}: \033[31mError - {mr.get('error') if isinstance(mr, dict) else mr}\033[0m")
             has_errors = True
         else:
-            metrics = mr.get("metrics", {})
-            passed = metrics.get("passed", 0)
-            total = metrics.get("total", 0)
-            pct = (passed / total * 100) if total > 0 else 0
-            print(f"  {label}: {passed}/{total} ({pct:.1f}%)")
+            print(f"  {label}: {format_pass_rate(mr.get('metrics', {}))}")
 
     print(f"\n\033[92mLeaderboard saved to {leaderboard_dir}\033[0m")
     return has_errors

@@ -50,6 +50,7 @@ from pydantic import BaseModel, Field, create_model
 
 from calibrate_agent.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
 from calibrate_agent.utils import log_judge_io, provider_log
+from calibrate_agent.llm.summary import DEFAULT_LLM_TEST_EVALUATOR_NAME
 
 
 # ── OpenRouter configuration ────────────────────────────────────────────────
@@ -88,7 +89,7 @@ RATING = "rating"
 # default evaluator's name). Simulation has no implicit default.
 
 DEFAULT_LLM_TEST_EVALUATOR = {
-    "name": "correctness",
+    "name": DEFAULT_LLM_TEST_EVALUATOR_NAME,
     "system_prompt": (
         "You are a highly accurate evaluator evaluating the response of an agent to a "
         "user's message.\n\n"
@@ -192,6 +193,33 @@ def evaluator_result_value(evaluator: dict, result: dict) -> float:
     if is_rating(evaluator):
         return float(result["score"])
     return float(int(bool(result["match"])))
+
+
+def aggregate_judge_scores(evaluators: list, results: list) -> dict:
+    """Mean per evaluator across judged rows, plus the mean of those means.
+
+    Returns ``{"scores": {name: {"type", "mean", ...}}, "score": float}``. A
+    binary mean is the pass fraction (0.0-1.0); a rating mean is on its scale.
+    """
+    import numpy as np
+
+    scores: dict = {}
+    for ev in evaluators:
+        name = ev["name"]
+        per_row_values = [evaluator_result_value(ev, row[name]) for row in results]
+        if is_rating(ev):
+            scores[name] = {
+                "type": RATING,
+                "mean": float(np.mean(per_row_values)),
+                "scale_min": int(ev["scale_min"]),
+                "scale_max": int(ev["scale_max"]),
+            }
+        else:
+            scores[name] = {"type": BINARY, "mean": float(np.mean(per_row_values))}
+    return {
+        "scores": scores,
+        "score": float(np.mean([s["mean"] for s in scores.values()])),
+    }
 
 
 def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:
