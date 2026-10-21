@@ -127,7 +127,7 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             # No criterion columns (latency percentiles, cost and total_tokens
             # are standard columns, empty here)
             expected_cols = {
-                "model", "passed", "total", "pass_rate", "pass_rate_low",
+                "model", "passed", "total", "answered", "pass_rate", "pass_rate_low",
                 "pass_rate_high", "latency_p50", "latency_p95", "latency_p99",
                 "cost", "total_tokens",
             }

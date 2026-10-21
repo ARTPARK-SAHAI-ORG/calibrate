@@ -13,6 +13,10 @@ def print_benchmark_summary(
 ) -> bool:
     """Print the standard benchmark summary and return True if any errors occurred.
 
+    A leaderboard that could not be written, recorded by
+    :func:`calibrate_agent.llm.tests_leaderboard.write_leaderboard` as
+    ``model_results["leaderboard"]``, counts as an error.
+
     Args:
         models: Ordered list of model names.
         model_results: Dict of model → result. Each value must have shape:
@@ -34,5 +38,9 @@ def print_benchmark_summary(
         else:
             print(f"  {label}: {format_pass_rate(mr.get('metrics', {}))}")
 
+    leaderboard_error = model_results.get("leaderboard")
+    if leaderboard_error:
+        print(f"\n\033[31mLeaderboard not saved: {leaderboard_error}\033[0m")
+        return True
     print(f"\n\033[92mLeaderboard saved to {leaderboard_dir}\033[0m")
     return has_errors

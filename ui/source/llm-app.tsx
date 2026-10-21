@@ -106,6 +106,41 @@ function formatEvaluatorSummary(
     .join(" · ");
 }
 
+type RunCounts = { total?: number; passed?: number; passRate?: number };
+
+// Total/passed counts and the pass rate for one model's leaderboard row.
+// Prefers metrics.json, falls back to counting results.json rows. The pass
+// rate leaves out test cases that got no answer (``error: true``), so it
+// matches metrics.json and the leaderboard CSV.
+export function readRunCounts(
+  mj: { total?: unknown; passed?: unknown; pass_rate?: unknown } | undefined,
+  readRows: () => unknown
+): RunCounts {
+  const counts: RunCounts = {};
+  if (typeof mj?.total === "number") counts.total = mj.total;
+  if (typeof mj?.passed === "number") counts.passed = mj.passed;
+  if (typeof mj?.pass_rate === "number") counts.passRate = mj.pass_rate;
+  if (
+    counts.total !== undefined &&
+    counts.passed !== undefined &&
+    counts.passRate !== undefined
+  ) {
+    return counts;
+  }
+  const rows = readRows();
+  if (!Array.isArray(rows)) return counts;
+  const answered = rows.filter((r: { error?: boolean }) => !r.error);
+  const answeredPassed = answered.filter(
+    (r: { metrics?: { passed?: boolean } }) => r.metrics?.passed
+  ).length;
+  counts.total ??= rows.length;
+  counts.passed ??= answeredPassed;
+  if (counts.passRate === undefined && answered.length > 0) {
+    counts.passRate = (answeredPassed / answered.length) * 100;
+  }
+  return counts;
+}
+
 // ─── Main Component ──────────────────────────────────────────
 export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
   const { exit } = useApp();
@@ -169,10 +204,8 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
   const [metrics, setMetrics] = useState<
     Array<{
       model: string;
-      total?: number;
-      passed?: number;
       evaluators?: Record<string, EvaluatorAggregate>;
-    }>
+    } & RunCounts>
   >([]);
 
   // Step navigation helper
@@ -638,34 +671,20 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
         path.join(getResultsDir(model), "metrics.json")
       );
 
-      // Read total/passed counts so the leaderboard can show overall test
-      // pass rate alongside the per-evaluator columns. Prefer metrics.json
-      // (canonical), fall back to counting results.json entries.
-      let total: number | undefined;
-      let passed: number | undefined;
-      try {
-        const metricsPath = path.join(getResultsDir(model), "metrics.json");
-        if (fs.existsSync(metricsPath)) {
-          const mj = JSON.parse(fs.readFileSync(metricsPath, "utf-8"));
-          if (typeof mj?.total === "number") total = mj.total;
-          if (typeof mj?.passed === "number") passed = mj.passed;
+      // Best-effort; missing counts just render as "-".
+      const readJson = (file: string) => {
+        try {
+          return JSON.parse(fs.readFileSync(file, "utf-8"));
+        } catch {
+          return undefined;
         }
-        if (total === undefined || passed === undefined) {
-          const data = JSON.parse(fs.readFileSync(resultsPath, "utf-8"));
-          if (Array.isArray(data)) {
-            total = total ?? data.length;
-            passed =
-              passed ??
-              data.filter(
-                (r: { metrics?: { passed?: boolean } }) => r.metrics?.passed
-              ).length;
-          }
-        }
-      } catch {
-        // Best-effort; missing counts just render as "-".
-      }
+      };
+      const counts = readRunCounts(
+        readJson(path.join(getResultsDir(model), "metrics.json")),
+        () => readJson(resultsPath)
+      );
 
-      results.push({ model, total, passed, evaluators });
+      results.push({ model, ...counts, evaluators });
     }
 
     setMetrics(results);
@@ -1781,9 +1800,7 @@ export function LlmTestsApp({ onBack }: { onBack?: () => void }) {
                   row.total = m.total != null ? String(m.total) : "-";
                   row.passed = m.passed != null ? String(m.passed) : "-";
                   row.pass_rate =
-                    m.total != null && m.passed != null && m.total > 0
-                      ? `${((m.passed / m.total) * 100).toFixed(1)}%`
-                      : "-";
+                    m.passRate != null ? `${m.passRate.toFixed(1)}%` : "-";
                   for (const name of evaluatorNames) {
                     row[name] = m.evaluators?.[name]?.display ?? "-";
                   }

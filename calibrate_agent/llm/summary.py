@@ -27,14 +27,20 @@ def wilson_interval(passed: int, total: int) -> Optional[dict]:
     denom = 1 + z2 / total
     center = (p + z2 / (2 * total)) / denom
     half = Z_95 * math.sqrt(p * (1 - p) / total + z2 / (4 * total * total)) / denom
-    return {"low": (center - half) * 100, "high": (center + half) * 100}
+    return {
+        "low": max(0.0, (center - half) * 100),
+        "high": min(100.0, (center + half) * 100),
+    }
 
 
 def mean_interval(
     scores: List[float], scale_min: float, scale_max: float
 ) -> Optional[dict]:
-    """95% interval around the mean of ``scores``, clamped to the rating scale."""
-    if len(scores) < 2:
+    """95% interval around the mean of ``scores``, clamped to the rating scale.
+
+    ``None`` with fewer than two scores or when every score is the same.
+    """
+    if len(set(scores)) < 2:
         return None
     mean = statistics.fmean(scores)
     half = Z_95 * statistics.stdev(scores) / math.sqrt(len(scores))
@@ -44,9 +50,16 @@ def mean_interval(
     }
 
 
+NO_ANSWER = "No test case got an answer"
+
+
+def _percent(count: int, answered: int) -> Optional[float]:
+    return count / answered * 100 if answered > 0 else None
+
+
 def _pass_rate(passed: int, answered: int) -> dict:
     return {
-        "pass_rate": passed / answered * 100 if answered > 0 else None,
+        "pass_rate": _percent(passed, answered),
         "pass_rate_ci": wilson_interval(passed, answered),
     }
 
@@ -62,18 +75,27 @@ def pass_rate_summary(results: List[dict]) -> dict:
     return _pass_rate(passed, len(answered))
 
 
+def answered_count(metrics: dict) -> int:
+    """Test cases in a ``metrics.json`` block that got an answer."""
+    return int(metrics.get("total", 0)) - int(metrics.get("errored", 0))
+
+
 def pass_rate_from_metrics(metrics: dict) -> dict:
     """:func:`pass_rate_summary` from the counts in a ``metrics.json`` block."""
-    passed = int(metrics.get("passed", 0))
-    return _pass_rate(passed, int(metrics.get("total", 0)) - int(metrics.get("errored", 0)))
+    return _pass_rate(int(metrics.get("passed", 0)), answered_count(metrics))
+
+
+def format_share(count: int, answered: int) -> str:
+    """``count/answered (rate%)``, or :data:`NO_ANSWER` when nothing was answered."""
+    rate = _percent(count, answered)
+    if rate is None:
+        return NO_ANSWER
+    return f"{count}/{answered} ({rate:.1f}%)"
 
 
 def format_pass_rate(metrics: dict) -> str:
-    """``passed/answered (rate%)`` for a ``metrics.json`` block."""
-    passed = int(metrics.get("passed", 0))
-    answered = int(metrics.get("total", 0)) - int(metrics.get("errored", 0))
-    rate = pass_rate_from_metrics(metrics)["pass_rate"]
-    return f"{passed}/{answered} ({rate or 0:.1f}%)"
+    """:func:`format_share` of the passed cases in a ``metrics.json`` block."""
+    return format_share(int(metrics.get("passed", 0)), answered_count(metrics))
 
 
 def _normalize_criteria_refs(criteria) -> list[dict]:

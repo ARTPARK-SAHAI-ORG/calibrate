@@ -1835,6 +1835,9 @@ class TestRunEvalOnlyTests(unittest.IsolatedAsyncioTestCase):
                 ],
                 output_dir=tmp,
             )
+            log = (Path(tmp) / "results.log").read_text()
+        self.assertIn("No test case got an answer", log)
+        self.assertNotIn("Total Passed", log)
         # The command exits on these numbers, so they must reach the caller.
         self.assertEqual(result["metrics"]["errored"], 1)
         self.assertEqual(result["metrics"]["total"], 1)
@@ -1867,6 +1870,9 @@ class TestRunEvalOnlyTests(unittest.IsolatedAsyncioTestCase):
                 ],
                 output_dir=tmp,
             )
+            log = (Path(tmp) / "results.log").read_text()
+        self.assertIn("✅ Total Passed: 1/2 (50.0%)", log)
+        self.assertIn("❌ Total Failed: 1/2 (50.0%)", log)
         self.assertEqual(result["passed"], 1)
         self.assertEqual(result["total"], 2)
 

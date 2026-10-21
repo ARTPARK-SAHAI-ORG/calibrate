@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from calibrate_agent.llm._metrics_utils import _numeric_or_none
-from calibrate_agent.llm.summary import pass_rate_from_metrics
+from calibrate_agent.llm.summary import answered_count, pass_rate_from_metrics
 
 
 def generate_leaderboard(output_dir: str, save_dir: str) -> None:
@@ -108,13 +108,13 @@ def _build_leaderboard(
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, pass_rate_low, pass_rate_high,
-    latency_p50, latency_p95, latency_p99, cost, total_tokens,
+    Columns: model, passed, total, answered, pass_rate, pass_rate_low,
+    pass_rate_high, latency_p50, latency_p95, latency_p99, cost, total_tokens,
     [criterion_1, criterion_1_low, criterion_1_high, ...]
 
-    ``pass_rate`` leaves out test cases that got no answer. Each ``_low`` /
-    ``_high`` pair is the 95% likely range of the column before it (``None``
-    when the run did not record one).
+    ``answered`` counts the test cases that got an answer, and ``pass_rate``
+    is ``passed / answered``. Each ``_low`` / ``_high`` pair is the 95% likely
+    range of the column before it (``None`` when the run did not record one).
 
     ``latency_p50``/``latency_p95``/``latency_p99`` are percentiles of the
     per-test-case response-generation latency (in milliseconds, judge time
@@ -149,6 +149,7 @@ def _build_leaderboard(
             "model": model_name,
             "passed": passed,
             "total": total,
+            "answered": answered_count(data),
             "pass_rate": summary["pass_rate"],
             "pass_rate_low": ci.get("low"),
             "pass_rate_high": ci.get("high"),

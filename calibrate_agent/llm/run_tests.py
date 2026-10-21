@@ -54,9 +54,11 @@ from calibrate_agent.general.metrics import general_judge
 from calibrate_agent.llm._metrics_utils import _numeric_or_none, _latency_percentiles
 from calibrate_agent.llm.summary import (
     EVALUATOR_TEST_TYPES,
+    NO_ANSWER,
     _normalize_criteria_refs,
     aggregate_criteria,
-    format_pass_rate,
+    answered_count,
+    format_share,
     pass_rate_summary,
 )
 from calibrate_agent.judges import (
@@ -2153,12 +2155,16 @@ def finish_test_run(
 ) -> dict:
     """Write results.json + metrics.json and log the run's pass summary."""
     metrics = _write_test_results_outputs(results, output_dir, name_to_evaluator)
-    if metrics["passed"] == metrics["total"]:
+    passed, answered = metrics["passed"], answered_count(metrics)
+    if answered == 0:
+        log(f"{prefix}{NO_ANSWER}")
+    elif passed == metrics["total"]:
         log(f"{prefix}🎉 All tests passed!")
-    elif metrics["passed"] == 0:
+    elif passed == 0:
         log(f"{prefix}❌ All tests failed!")
     else:
-        log(f"{prefix}✅ Total Passed: {format_pass_rate(metrics)}")
+        log(f"{prefix}✅ Total Passed: {format_share(passed, answered)}")
+        log(f"{prefix}❌ Total Failed: {format_share(answered - passed, answered)}")
     return metrics
 
 
@@ -2321,9 +2327,11 @@ async def run_eval_only_tests(
         log=lambda text: _print_and_log(text, print_log_save_path),
     )
 
-    metrics = _write_test_results_outputs(results, output_dir, name_to_evaluator)
-    _print_and_log(
-        f"\n✅ Total Passed: {format_pass_rate(metrics)}", print_log_save_path
+    metrics = finish_test_run(
+        results,
+        output_dir,
+        name_to_evaluator,
+        log=lambda text: _print_and_log(text, print_log_save_path),
     )
     passed, total = metrics["passed"], metrics["total"]
 
