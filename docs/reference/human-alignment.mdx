@@ -325,6 +325,7 @@ Because this number mixes a rating evaluator with a pass or fail evaluator, it i
 Kappa is left blank when:
 
 - **There is nothing to compare.** For example, only one annotator has labelled the items.
+- **Only one item has been compared.** One item cannot show what chance alone would produce. For example, an evaluator scored one item 4 and an annotator rated the same item 1. Agreement is 25%, and kappa is blank. Without this rule, Cohen's kappa would always come out 0 here, because with one answer on each side, chance agreement equals the agreement itself.
 - **Everyone gave the same answer.** If every answer compared is pass, chance agreement is 1 and kappa cannot be worked out. For example, Asha and Ben both say pass on three items. Agreement is 100% and kappa is blank.
 - **One evaluator's compared answers mix ratings and pass or fail.** For example, annotators gave one evaluator pass or fail on one item and ratings on another item. Agreement is shown, but kappa is blank.
 
