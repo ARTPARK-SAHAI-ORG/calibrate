@@ -1,5 +1,5 @@
 ---
-title: "How human alignment numbers are worked out"
+title: "Human alignment computation"
 description: "How Calibrate works out annotator agreement, evaluator agreement, human and evaluator scores, and kappa on the Human alignment pages"
 ---
 
@@ -12,9 +12,9 @@ The examples use pass and fail for evaluators that give one of two answers. Each
 | Number | Where it appears |
 | --- | --- |
 | **Annotator agreement**: how often annotators gave the same answer as each other | The **Annotator agreement** row on the **Overview** tab of **Human alignment**, and the **Annotator agreement** card under **Score reliability** on a task's **Overview** tab |
-| **Evaluator agreement with annotators**: how often an evaluator gave the same answer as the annotators | The evaluator's **alignment** row on the **Overview** tab of **Human alignment**, the evaluator's **alignment** card under **Score reliability** on a task's **Overview** tab, and the evaluator's **Agreement** tab |
+| **Evaluator agreement with annotators**: how often an evaluator gave the same answer as the annotators | The row with the evaluator's name on the **Overview** tab of **Human alignment**, the card with the evaluator's name followed by **alignment** under **Score reliability** on a task's **Overview** tab, and the evaluator's **Agreement** tab |
 | **Human score** and **evaluator score**: the share of pass answers, or the average rating | The **Human scores** and **Evaluator scores** cards on a task's **Overview** tab |
-| **Kappa**: agreement after removing what chance alone would produce | Beside each agreement number, named by the kind of kappa, for example "Fleiss' kappa 0.47" |
+| **Kappa**: agreement after removing what chance alone would produce | The **Kappa** column beside **Current agreement** on the **Overview** and **Annotators** tabs of **Human alignment**, and beside each agreement number on the cards. It is named by the kind of kappa, for example "Fleiss' kappa 0.47" |
 | **Trend charts**: agreement and kappa over time | The chart on the **Overview** tab of **Human alignment**, the **Agreement with other annotators** chart on an annotator's page, and the **Agreement trend** chart on an evaluator's **Agreement** tab |
 | **One annotator's agreement with the others** | The **Current agreement** column on the **Annotators** tab of **Human alignment**, and **Latest agreement** on an annotator's page |
 | **Human agreement on an evaluation run** | Each evaluator's card under **Evaluator results** on an evaluation run's page, beside the evaluator's **Score** for that run |
@@ -260,7 +260,7 @@ The same answers can give different kappas. Priya says pass on all four items. R
 | **Cohen's kappa** (Priya against the others) | Priya always says pass, Ravi says pass half the time: (1 x 0.5) + (0 x 0.5) = 0.50 | (0.50 - 0.50) / (1 - 0.50) = **0.00** |
 | **Fleiss' kappa** (annotator agreement) | One list of 8 answers, 6 pass and 2 fail: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.50 - 0.625) / (1 - 0.625) = **-0.33** |
 
-Cohen's kappa says Priya and Ravi agree exactly as often as their own habits would predict. Fleiss' kappa says that, as a group, they agree less often than chance, because Priya's habit of always saying pass is itself a disagreement with Ravi.
+Cohen's kappa keeps Priya's habit and Ravi's habit apart, and finds they agree exactly as often as those two habits would predict. Fleiss' kappa treats them as one group. Together they say pass on 6 of 8 answers, so chance alone would make them agree 62.5% of the time, more than the 50% they actually agree.
 
 You see Fleiss' kappa for the pair as annotators, and Cohen's kappa on Priya's own page.
 
@@ -336,13 +336,12 @@ Kappa is left blank when:
 | **Linear weighted Fleiss' kappa** | Annotators with each other, on ratings |
 | **Cohen's kappa** | An evaluator against annotators, or one annotator against the others, on pass or fail answers |
 | **Linear weighted Cohen's kappa** | An evaluator against annotators, or one annotator against the others, on ratings |
-| **Fleiss' kappa, linear weighted for ratings** | Several evaluators combined, where some give ratings and some give pass or fail |
-
-On the **Annotators** tab and on an annotator's page, the label **Fleiss' kappa, linear weighted for ratings** also appears when that annotator's evaluators mix ratings and pass or fail. There, the number is Cohen's kappa, worked out in the same mixed way.
+| **Fleiss' kappa, linear weighted for ratings** | Annotators with each other, when several evaluators are combined and some give ratings while others give pass or fail |
+| **Cohen's kappa, linear weighted for ratings** | One annotator against the others, in the same mixed case |
 
 On an annotator's page, the label starts with "Latest", for example **Latest Cohen's kappa**.
 
-Hover over a kappa number to see what kappa means.
+On the agreement cards on a task's **Overview** tab and on an evaluation run's page, hover over a kappa number to see what kappa means.
 
 ## Trend charts
 
