@@ -3384,3 +3384,47 @@ class TestErroredCount(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestInferenceServingProvider(unittest.IsolatedAsyncioTestCase):
+    async def test_serving_provider_pins_the_openrouter_call(self):
+        from calibrate_agent.llm import run_tests as RT
+
+        fake_runner = MagicMock()
+        fake_runner.run = AsyncMock(return_value=None)
+
+        with patch.object(RT, "CostTrackingOpenRouterLLMService"), \
+             patch.object(RT, "OpenRouterLLMService") as fake_service, \
+             patch.object(RT, "Processor"), \
+             patch.object(RT, "LLMContext"), \
+             patch.object(RT, "LLMContextAggregatorPair"), \
+             patch.object(RT, "Pipeline"), \
+             patch.object(RT, "PipelineTask"), \
+             patch.object(RT, "PipelineRunner", return_value=fake_runner):
+            await RT._run_inference_inner(
+                chat_history=[],
+                system_prompt="sp",
+                model="meta-llama/llama-3.3-70b-instruct@together",
+                provider="openrouter",
+                tools=[],
+            )
+
+        settings = fake_service.Settings.call_args.kwargs
+        self.assertEqual(settings["model"], "meta-llama/llama-3.3-70b-instruct")
+        self.assertEqual(
+            settings["extra"],
+            {"extra_body": {"provider": {"only": ["together"], "allow_fallbacks": False}}},
+        )
+
+    async def test_serving_provider_rejected_before_the_run_starts(self):
+        from calibrate_agent.llm import run_tests as RT
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                await RT.run_model_tests(
+                    model="gpt-4.1@together",
+                    provider="openai",
+                    config={"system_prompt": "sp", "test_cases": []},
+                    output_dir=tmp,
+                )
+            self.assertEqual(list(Path(tmp).iterdir()), [])
