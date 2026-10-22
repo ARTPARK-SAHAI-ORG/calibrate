@@ -11,38 +11,48 @@ The examples use pass and fail for evaluators that give one of two answers. Each
 
 | Number | Where it appears |
 | --- | --- |
-| **Inter-annotator agreement**: how often annotators gave the same answer as each other | The **Inter-annotator agreement** card at the top of the **Overview** tab of **Human alignment**, and the same card under **Score reliability** on a task's **Overview** tab. For one evaluator: the **Agreement** column under **Inter-annotator agreement** in the evaluator's row of the table on the **Overview** tab, and the **Inter-annotator agreement** section of the evaluator's card under **Score reliability** |
-| **Evaluator agreement with humans**: how often an evaluator gave the same answer as the annotators | The **Evaluator agreement with humans** card at the top of the **Overview** tab of **Human alignment**, and the same card under **Score reliability**. For one evaluator: the **Agreement** column under **Evaluator agreement with humans** in the evaluator's row of the table, the **Evaluator agreement with humans** section of the evaluator's card under **Score reliability**, **Human agreement** on an evaluation run's page, and the evaluator's **Agreement** tab |
+| **Inter-annotator agreement**: how often annotators gave the same answer as each other | The **Inter-annotator agreement** card at the top of the **Overview** tab of **Human alignment**, and the same card under **Score reliability** on a task's **Overview** tab. For one evaluator: the **Inter-annotator agreement** column in the evaluator's row of the table on the **Overview** tab, and the **Inter-annotator agreement** section of the evaluator's card under **Score reliability** |
+| **Evaluator agreement with humans**: how often an evaluator gave the same answer as the annotators | The **Evaluator agreement with humans** card at the top of the **Overview** tab of **Human alignment**, and the same card under **Score reliability**. For one evaluator: the **Evaluator agreement with humans** column in the evaluator's row of the table, the **Evaluator agreement with humans** section of the evaluator's card under **Score reliability**, **Human agreement** on an evaluation run's page, and the evaluator's **Agreement** tab |
 | **Human score** and **evaluator score**: the share of pass answers, or the average rating | The **Human scores** and **Evaluator scores** cards on a task's **Overview** tab |
-| **Kappa**: agreement after removing what chance alone would produce | The **Kappa** columns in the table on the **Overview** tab and on the **Annotators** tab of **Human alignment**, **Kappa** under the bar on each evaluator's card under **Score reliability** and on an evaluation run's page, and **Latest kappa** on an annotator's page |
-| **Chance agreement**: how often answers would agree by chance alone | **Chance** under the bar on each evaluator's card under **Score reliability** and on an evaluation run's page, and the tick on that bar |
-| **Trend charts**: agreement and kappa over time | The chart on the **Overview** tab of **Human alignment**, the **Agreement with other annotators** chart on an annotator's page, and the **Agreement trend** chart on an evaluator's **Agreement** tab |
+| **Kappa**: agreement after removing what chance alone would produce | **Kappa** beside each percentage in the table on the **Overview** tab of **Human alignment**, the **Kappa** column on the **Annotators** tab, **Kappa** under the bar on each evaluator's card under **Score reliability** and on an evaluation run's page, and **Latest kappa** on an annotator's page |
+| **Chance agreement**: how often answers would agree by chance alone | The tick on each bar in the table on the **Overview** tab, on each evaluator's card under **Score reliability** and on an evaluation run's page. On the cards and the run page it is also written as **Chance** under the bar |
+| **Trend charts**: agreement and kappa over time | The **Agreement with other annotators** chart on an annotator's page, and the **Agreement trend** chart on an evaluator's **Agreement** tab |
 | **One annotator's agreement with the others** | The **Current agreement** and **Kappa** columns on the **Annotators** tab of **Human alignment**, and **Latest agreement** and **Latest kappa** on an annotator's page |
 
 Agreement is shown as a whole percentage. Kappa is shown to two decimal places.
 
 ## The Overview tab of Human alignment
 
-At the top are two cards, **Inter-annotator agreement** and **Evaluator agreement with humans**. Each covers every evaluator together and shows only a percentage, with no kappa. The reason is under [Each kind of answer gets its own kappa](#each-kind-of-answer-gets-its-own-kappa).
+The tab opens with the heading **Agreement summary** and the line "How often annotators agree with each other, and how often each evaluator agrees with them". Beside it is the task picker.
 
-Under the cards is the trend chart, described under [Trend charts](#trend-charts).
+Under the heading are two cards, **Inter-annotator agreement** and **Evaluator agreement with humans**. Each covers every evaluator together and shows only a percentage, with no kappa. The reason is under [Each kind of answer gets its own kappa](#each-kind-of-answer-gets-its-own-kappa). The percentage is green at 75% or more, red at 50% or less, and yellow in between.
 
-Under the chart is a table with one row per evaluator. Under each evaluator's name is the kind of answer it gives: binary or rating. The columns come in two groups:
+Under the cards is a key to the bars in the table:
 
-- **Inter-annotator agreement**, with **Agreement** and **Kappa**: how often annotators agreed with each other on this evaluator.
-- **Evaluator agreement with humans**, with **Agreement** and **Kappa**: how often this evaluator agreed with the annotators.
+- A tick: **Agreement expected by chance alone**.
+- Green: **Better than chance**.
+- Red: **Worse than chance**.
+- Grey: **Cannot be compared with chance**.
 
-Click **Name** or either **Agreement** heading to sort the table. Evaluators of the same type, such as LLM or speech to text, stay together.
+Under the key is a table with one row per evaluator. Beside each evaluator's name is the kind of answer it gives, binary or rating. The table has three columns:
 
-Use the task picker above the cards to show **All tasks** or one task. With one task, the table has a row for every evaluator linked to that task. With **All tasks**, the table lists every evaluator that has been run at least once, and leaves out an evaluator that has no agreement in either group.
+- **Evaluator**: the evaluator's name.
+- **Inter-annotator agreement**: how often annotators agreed with each other on this evaluator.
+- **Evaluator agreement with humans**: how often this evaluator agreed with the annotators.
+
+In each of the last two columns, a cell shows the agreement as a percentage, then **Kappa** with the kappa and an information icon, then a bar filled up to the agreement with a tick at chance agreement. A cell with no agreement shows a dash. How to read the bar is under [Reading the bar against chance](#reading-the-bar-against-chance).
+
+Click any of the three column headings to sort the table. Evaluators of the same type, such as LLM or speech to text, stay together.
+
+Use the task picker to show **All tasks** or one task. With one task, the table has a row for every evaluator linked to that task. With **All tasks**, the table lists every evaluator that has been run or that annotators have labelled, and leaves out an evaluator with no number in either column. An evaluator that annotators labelled but that has never been run shows its inter-annotator agreement, and a dash under **Evaluator agreement with humans**.
 
 ## The Score reliability cards on a task
 
-**Score reliability** on a task's **Overview** tab starts with the same two cards, **Inter-annotator agreement** and **Evaluator agreement with humans**, for that task. Each shows only a percentage.
+**Score reliability** on a task's **Overview** tab starts with the same key to the bars as the **Overview** tab of **Human alignment**. Under it are the same two cards, **Inter-annotator agreement** and **Evaluator agreement with humans**, for that task. Each shows only a percentage, coloured in the same way.
 
 Then there is one card for each evaluator linked to the task, including the **Tool call correctness** evaluator. Each card has two sections, **Inter-annotator agreement** and **Evaluator agreement with humans**. Each section shows:
 
-- The agreement, as a percentage.
+- The agreement, as a percentage, or a dash when there is none.
 - A bar filled up to the agreement, with a tick where chance agreement is. The bar is green when the agreement is above chance and red when it is below.
 - **Chance** with the chance agreement, and **Kappa** with the kappa.
 
@@ -183,7 +193,7 @@ The cards under **Evaluator results** appear once the run has finished.
 
 ### On an evaluator's Agreement tab
 
-The **Agreement trend** chart on an evaluator's **Agreement** tab has one point for each version of the evaluator: v1, v2 and so on. The live version is marked **Live**. Each point is that version's agreement with humans, using only that version's scores. Use the task picker to show **All tasks** or one task.
+The **Agreement trend** chart on an evaluator's **Agreement** tab has one point for each version of the evaluator that has scores: v1, v2 and so on. Each point is that version's agreement with humans, using only that version's scores. The chart is described under [Trend charts](#trend-charts).
 
 ## One annotator compared with the others
 
@@ -277,7 +287,7 @@ Kappa = (0.80 - 0.82) / (1 - 0.82) = **-0.11**
 
 ### Reading the bar against chance
 
-On each evaluator's card under **Score reliability**, and on an evaluation run's page, the bar shows the agreement and chance agreement side by side. The bar is filled up to the agreement. The tick on the bar marks chance agreement, which is also written as **Chance** under the bar. **Kappa** is written beside it.
+In the table on the **Overview** tab, on each evaluator's card under **Score reliability**, and on an evaluation run's page, the bar shows the agreement and chance agreement side by side. The bar is filled up to the agreement. The tick on the bar marks chance agreement. On the cards and the run page, chance agreement is also written as **Chance** under the bar, with **Kappa** beside it. In the table, **Kappa** is written above the bar.
 
 | Example | Agreement | Chance | Kappa | The bar |
 | --- | --- | --- | --- | --- |
@@ -289,6 +299,7 @@ On each evaluator's card under **Score reliability**, and on an evaluation run's
 - The bar is grey when the agreement and chance are the same whole percentage.
 - When everyone gave the same answer, chance is 100%, the bar is full and grey, and **Kappa** shows **Everyone agreed**.
 - When there are too few items for kappa, there is no tick and no **Chance**, the bar is grey, and **Kappa** shows **Too few items**.
+- When there is no kappa for any other reason, there is no tick and no **Chance**, the bar is grey, and **Kappa** shows a dash.
 
 ### How chance agreement is worked out
 
@@ -445,50 +456,50 @@ Everywhere kappa appears, it is labelled **Kappa**, or **Latest kappa** on an an
 
 ## Trend charts
 
-The chart on the **Overview** tab of **Human alignment** and the **Agreement with other annotators** chart on an annotator's page show agreement over time.
+There are two charts:
 
-- Each point covers a period of 30 days. The periods are counted back from today, so the last period ends today.
-- The **Overview** tab shows the last 180 days. An annotator's page shows the last 365 days, so its oldest period is 5 days long.
-- Each point covers every answer saved up to the end of its period, not only the answers saved during that period. Answers saved before the first period count from the first point on.
-- An answer belongs to the time it was last saved. An edited label moves to the period of its latest edit.
-- So the last point always equals the current number shown beside the chart.
-- The label under each point is the month its period ends in.
-- Use the **Agreement** and **Kappa** switch above the chart to show either the agreement lines, in percent, or the kappa lines. The kappa view runs from 0 to 1, and from -1 to 1 when some kappa is below 0.
+- The **Agreement with other annotators** chart on an annotator's page.
+- The **Agreement trend** chart on an evaluator's **Agreement** tab.
+
+Both work the same way:
+
+- Use the **Agreement** and **Kappa** switch above the chart to show either the agreement lines, in percent, or the kappa lines. The switch appears only when there is a kappa to show.
+- The **Agreement** view runs from 0% to 100%. The **Kappa** view runs from 0 to 1, and from -1 to 1 when some kappa is below 0.
+- A point with nothing to compare is left out. In the **Kappa** view, a point where kappa is blank, for example because everyone agreed, is left out too.
 - Hover over a point to see its value.
-
-### The chart on the Overview tab
-
-In the **Agreement** view, each evaluator has two lines in its own colour:
-
-- **[evaluator name] inter-annotator agreement**, drawn dashed.
-- **[evaluator name] agreement with humans**, drawn solid.
-
-Two thicker lines show the two cards at the top of the page: **Overall inter-annotator agreement**, dashed, and **Overall evaluator agreement with humans**, solid. They are shown by default. Turn them off with the **Show overall** switch. While they are shown, the evaluator lines are faded.
-
-In the **Kappa** view, each evaluator has two lines: **[evaluator name] inter-annotator kappa** and **[evaluator name] kappa with humans**, each followed by the kind of kappa in brackets, for example "(Fleiss' kappa)". There are no overall lines in this view, because the overall numbers have no kappa.
 
 ### The chart on an annotator's page
 
-The **Agreement** view has one line, **Agreement with other annotators**. The **Kappa** view has one line for each kind of answer: **Binary answers** and **Rating answers**, each followed by the kind of kappa in brackets.
+The chart shows how this annotator's agreement with the other annotators has changed over the last 365 days.
+
+- Each point covers a period of 30 days. The periods are counted back from today, so the last period ends today. The oldest period is 5 days long.
+- Each point covers every answer saved up to the end of its period, not only the answers saved during that period. Answers saved before the first period count from the first point on.
+- An answer belongs to the time it was last saved. An edited label moves to the period of its latest edit.
+- So the last point always equals **Latest agreement** and **Latest kappa** above the chart.
+- The label under each point is the month its period ends in.
+
+The **Agreement** view has one line, **Agreement with other annotators**. The **Kappa** view has one line for each kind of answer: **Binary answers** and **Rating answers**, each followed by the kind of kappa in brackets, for example **Binary answers (Cohen's kappa)**.
 
 ### Worked example
 
-On 22 October 2026, the four items from the Fleiss' kappa example above are on the **Overview** tab, all for one evaluator. Items 1 and 2 were labelled 70 days earlier. Items 3 and 4 were labelled 10 days earlier.
+On 22 October 2026, Asha and Ben have labelled the four items from the Fleiss' kappa example above, all for one pass or fail evaluator. Items 1 and 2 were labelled 70 days earlier. Items 3 and 4 were labelled 10 days earlier. Asha's page shows:
 
-| Period ends | Inter-annotator agreement | Inter-annotator kappa |
-| --- | --- | --- |
-| 25 May | Nothing to show | Nothing to show |
-| 24 June | Nothing to show | Nothing to show |
-| 24 July | Nothing to show | Nothing to show |
-| 23 August | 100% | Blank, because everyone said pass |
-| 22 September | 100% | Blank, because everyone said pass |
-| 22 October | 75% | 0.47 |
+| Period ends | Label under the point | Agreement with other annotators | Binary answers (Cohen's kappa) |
+| --- | --- | --- | --- |
+| The ten periods up to 24 July 2026 | Oct to Jul, one per period | No point | No point |
+| 23 August 2026 | Aug | 100% | No point, because everyone said pass |
+| 22 September 2026 | Sep | 100% | No point, because everyone said pass |
+| 22 October 2026 | Oct | 75% | 0.50 |
 
-The 23 August point counts items 1 and 2. The 22 October point counts all four items, and matches the current number. With one evaluator, the **Overall inter-annotator agreement** line has the same agreement as the evaluator's line.
+The 23 August point counts items 1 and 2. The 22 October point counts all four items, and matches Asha's **Latest agreement** of 75% and her **Latest kappa**, which shows **Binary** 0.50. The kappa is Cohen's kappa, worked out as in the Cohen's kappa example under [Kappa](#kappa): Asha says pass on 3 of 4 items and Ben on 2 of 4, so chance agreement is 0.50.
 
 ### The chart on an evaluator's Agreement tab
 
-The **Agreement trend** chart on an evaluator's **Agreement** tab has one point per version, not one point per period. Its line is **[evaluator name] agreement with humans**, and in the **Kappa** view the line is the evaluator's name followed by the kind of kappa in brackets. That chart is described under [Evaluator agreement with humans](#evaluator-agreement-with-humans).
+The **Agreement trend** chart has one point for each version of the evaluator that has scores, in version order, not one point per period. The label under each point is the version: v1, v2 and so on. The live version is marked **Live** under its label.
+
+Each point is that version's agreement with humans, using only that version's scores. Use the task picker beside the **Agreement trend** heading to show **All tasks** or one task.
+
+The **Agreement** view has one line, **[evaluator name] agreement with humans**. The **Kappa** view has one line, the evaluator's name followed by the kind of kappa in brackets.
 
 ## What changes the numbers
 
