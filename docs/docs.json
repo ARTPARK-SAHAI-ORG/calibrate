@@ -46,6 +46,7 @@
             "pages": [
               "reference/api-keys",
               "reference/byok",
+              "reference/human-alignment",
               "reference/github-actions"
             ]
           }
