@@ -1255,3 +1255,50 @@ describe("LlmTestsApp", () => {
     });
   });
 });
+
+describe("readRunCounts", () => {
+  it("prefers the pass rate in metrics.json", async () => {
+    const { readRunCounts } = await import("../source/llm-app.js");
+    const readRows = vi.fn();
+    expect(
+      readRunCounts({ total: 4, passed: 2, pass_rate: 66.7 }, readRows)
+    ).toEqual({ total: 4, passed: 2, passRate: 66.7 });
+    expect(readRows).not.toHaveBeenCalled();
+  });
+
+  it("counts over answered rows when metrics.json has no pass rate", async () => {
+    const { readRunCounts } = await import("../source/llm-app.js");
+    const rows = [
+      { metrics: { passed: true } },
+      { metrics: { passed: false } },
+      { metrics: { passed: false }, error: true },
+    ];
+    expect(readRunCounts(undefined, () => rows)).toEqual({
+      total: 3,
+      passed: 1,
+      passRate: 50,
+    });
+    expect(readRunCounts({ total: 3, passed: 1 }, () => rows)).toEqual({
+      total: 3,
+      passed: 1,
+      passRate: 50,
+    });
+  });
+
+  it("leaves the pass rate out when nothing was answered", async () => {
+    const { readRunCounts } = await import("../source/llm-app.js");
+    expect(
+      readRunCounts({ total: 1, passed: 0, pass_rate: null }, () => [
+        { metrics: { passed: false }, error: true },
+      ])
+    ).toEqual({ total: 1, passed: 0 });
+  });
+
+  it("keeps metrics.json counts when results.json cannot be read", async () => {
+    const { readRunCounts } = await import("../source/llm-app.js");
+    expect(readRunCounts({ total: 2, passed: 1 }, () => undefined)).toEqual({
+      total: 2,
+      passed: 1,
+    });
+  });
+});

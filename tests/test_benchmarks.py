@@ -24,7 +24,7 @@ class TestLLMBenchmarkRun(unittest.IsolatedAsyncioTestCase):
                         "metrics": {"passed": 1, "total": 1}, "results": []}
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(B, "run_model_tests", AsyncMock(return_value=fake_results)), \
-             patch.object(B, "generate_leaderboard"):
+             patch("calibrate_agent.llm.tests_leaderboard.generate_leaderboard"):
             result = await B.run(
                 config={"system_prompt": "sp", "tools": [], "test_cases": []},
                 models=["m1", "m2"],
@@ -42,7 +42,8 @@ class TestLLMBenchmarkRun(unittest.IsolatedAsyncioTestCase):
                         "metrics": {"passed": 1, "total": 1}, "results": []}
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(B, "run_model_tests", AsyncMock(return_value=fake_results)), \
-             patch.object(B, "generate_leaderboard", side_effect=RuntimeError("lb fail")):
+             patch("calibrate_agent.llm.tests_leaderboard.generate_leaderboard",
+                   side_effect=RuntimeError("lb fail")):
             result = await B.run(
                 config={"system_prompt": "sp", "tools": [], "test_cases": []},
                 models=["m1"],

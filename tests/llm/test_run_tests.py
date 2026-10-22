@@ -204,11 +204,11 @@ class TestAggregateCriteria(unittest.TestCase):
         return reg
 
     def test_empty_list_returns_empty_dict(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
         self.assertEqual(_aggregate_criteria([], self._registry()), {})
 
     def test_tool_call_tests_excluded(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
         results = [
             {
                 "metrics": {"passed": True},
@@ -223,7 +223,7 @@ class TestAggregateCriteria(unittest.TestCase):
 
     def test_string_criteria_aggregates_under_default_evaluator(self):
         """String criteria are normalized to the implicit ``correctness`` evaluator."""
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
         results = [
             {
                 "metrics": {
@@ -253,7 +253,8 @@ class TestAggregateCriteria(unittest.TestCase):
         self.assertEqual(agg["correctness"]["pass_rate"], 50.0)
 
     def test_multi_evaluators_counted_independently(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import wilson_interval
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
         accuracy = _binary_ev("accuracy")
         tone = _binary_ev("tone")
         results = [
@@ -280,15 +281,18 @@ class TestAggregateCriteria(unittest.TestCase):
         agg = _aggregate_criteria(results, self._registry(accuracy, tone))
         self.assertEqual(
             agg["accuracy"],
-            {"type": "binary", "passed": 1, "total": 1, "pass_rate": 100.0},
+            {"type": "binary", "passed": 1, "total": 1, "pass_rate": 100.0,
+             "ci": wilson_interval(1, 1)},
         )
         self.assertEqual(
             agg["tone"],
-            {"type": "binary", "passed": 0, "total": 1, "pass_rate": 0.0},
+            {"type": "binary", "passed": 0, "total": 1, "pass_rate": 0.0,
+             "ci": wilson_interval(0, 1)},
         )
 
     def test_rating_evaluator_aggregates_mean(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import mean_interval
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
         fluency = _rating_ev("fluency")
         results = [
             {
@@ -333,11 +337,12 @@ class TestAggregateCriteria(unittest.TestCase):
                 "count": 2,
                 "scale_min": 1,
                 "scale_max": 5,
+                "ci": mean_interval([4, 2], 1, 5),
             },
         )
 
     def test_mixed_binary_and_rating_evaluators(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
         accuracy = _binary_ev("accuracy")
         fluency = _rating_ev("fluency")
         results = [
@@ -370,7 +375,7 @@ class TestAggregateCriteria(unittest.TestCase):
         self.assertEqual(agg["fluency"]["scale_max"], 5)
 
     def test_mixed_string_and_multi_evaluator_criteria(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
         accuracy = _binary_ev("accuracy")
         tone = _binary_ev("tone")
         results = [

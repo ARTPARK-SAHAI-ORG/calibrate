@@ -85,10 +85,10 @@ class TestPartialPass(unittest.TestCase):
         self.assertIn("33.3%", combined)
         self.assertFalse(result)
 
-    def test_two_thirds(self):
+    def test_two_thirds_leaving_out_unanswered(self):
         captured, _ = _call(
             models=["m"],
-            model_results={"m": {"metrics": {"passed": 2, "total": 3}}},
+            model_results={"m": {"metrics": {"passed": 2, "total": 4, "errored": 1}}},
         )
         combined = "\n".join(_plain_lines(captured))
         self.assertIn("2/3", combined)
@@ -96,7 +96,7 @@ class TestPartialPass(unittest.TestCase):
 
 
 class TestZeroTotal(unittest.TestCase):
-    """Zero total — shows 0/0 (0.0%), no ZeroDivisionError."""
+    """Zero total: says no test case got an answer, no ZeroDivisionError."""
 
     def test_zero_total_no_crash(self):
         captured, result = _call(
@@ -104,9 +104,24 @@ class TestZeroTotal(unittest.TestCase):
             model_results={"m": {"metrics": {"passed": 0, "total": 0}}},
         )
         combined = "\n".join(_plain_lines(captured))
-        self.assertIn("0/0", combined)
-        self.assertIn("0.0%", combined)
+        self.assertIn("m: No test case got an answer", combined)
+        self.assertNotIn("0/0", combined)
         self.assertFalse(result)
+
+
+class TestLeaderboardError(unittest.TestCase):
+    def test_reports_error_instead_of_saved(self):
+        captured, result = _call(
+            models=["m"],
+            model_results={
+                "m": {"metrics": {"passed": 1, "total": 1}},
+                "leaderboard": "error: disk full",
+            },
+        )
+        combined = "\n".join(_plain_lines(captured))
+        self.assertIn("Leaderboard not saved: error: disk full", combined)
+        self.assertNotIn("Leaderboard saved", combined)
+        self.assertTrue(result)
 
 
 class TestErrorModel(unittest.TestCase):

@@ -65,7 +65,6 @@ import os
 import json
 import asyncio
 from collections import defaultdict
-import pandas as pd
 
 
 class _Tests:
@@ -105,6 +104,7 @@ class _Tests:
             EVALUATOR_TEST_TYPES,
             _run_items_parallel,
             _load_resumable_results,
+            finish_test_run,
         )
         from calibrate_agent.judges import write_evaluator_config
         from calibrate_agent.utils import configure_print_logger, log_and_print
@@ -214,54 +214,9 @@ class _Tests:
             test_cases, process, results_file_path, test_parallel, initial_results
         )
 
-        total_passed = sum(1 for r in results if r["metrics"]["passed"])
-        total_tests = len(results)
-        failed_count = total_tests - total_passed
-
-        if total_passed == total_tests:
-            log_and_print("🎉 All tests passed!")
-        elif failed_count == total_tests:
-            log_and_print("❌ All tests failed!")
-        else:
-            log_and_print(
-                f"✅ Total Passed: {total_passed}/{total_tests} ({(total_passed/total_tests)*100:.1f}%)"
-            )
-            log_and_print(
-                f"❌ Total Failed: {failed_count}/{total_tests} ({(failed_count/total_tests)*100:.1f}%)"
-            )
-
-        # Save final results
-        with open(os.path.join(final_output_dir, "results.json"), "w") as f:
-            json.dump(results, f, indent=4)
-
-        from calibrate_agent.llm.run_tests import (
-            _aggregate_criteria,
-            _aggregate_tool_calls,
-            _aggregate_cost,
-            _aggregate_latency,
-            _aggregate_total_tokens,
-            errored_count,
-            run_stopped_early,
+        metrics = finish_test_run(
+            results, final_output_dir, name_to_evaluator, log=log_and_print
         )
-        metrics = {
-            "total": total_tests,
-            "passed": total_passed,
-            "criteria": _aggregate_criteria(results, name_to_evaluator),
-            "tool_calls": _aggregate_tool_calls(results),
-        }
-        metrics["errored"] = errored_count(results)
-        metrics["stopped_early"] = run_stopped_early(results)
-        cost = _aggregate_cost(results)
-        if cost is not None:
-            metrics["cost"] = cost
-        latency = _aggregate_latency(results)
-        if latency is not None:
-            metrics["latency_ms"] = latency
-        total_tokens = _aggregate_total_tokens(results)
-        if total_tokens is not None:
-            metrics["total_tokens"] = total_tokens
-        with open(os.path.join(final_output_dir, "metrics.json"), "w") as f:
-            json.dump(metrics, f, indent=4)
 
         return {
             "status": "completed",
@@ -737,6 +692,8 @@ class _Simulations:
 
         # Save results
         if all_simulation_metrics:
+            import pandas as pd
+
             df = pd.DataFrame(all_simulation_metrics)
             df.to_csv(os.path.join(final_output_dir, "results.csv"), index=False)
 

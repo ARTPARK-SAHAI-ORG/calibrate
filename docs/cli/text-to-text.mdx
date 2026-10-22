@@ -724,7 +724,21 @@ calibrate-agent llm -c config.json -m gemma-4-26b-a4b-it gpt-4o -o ./out --skip-
 
 ## Output
 
-Once all the models have completed, it displays a leaderboard with pass rates (% of tests passed) and bar charts for visualization.
+Once all the models have completed, it displays a leaderboard with pass rates and bar charts for visualization. The pass rate is the % of tests that passed, out of the tests that got an answer. A test whose request to the model or agent failed is left out of the pass rate.
+
+The leaderboard is also saved as `leaderboard/llm_leaderboard.csv` in the output directory, with one row per model:
+
+| Column | What it holds |
+| --- | --- |
+| `passed` | Tests that passed |
+| `total` | Tests in the run |
+| `answered` | Tests that got an answer |
+| `pass_rate` | `passed` / `answered`, as a % |
+| `pass_rate_low`, `pass_rate_high` | The 95% likely range of `pass_rate` |
+| One column per evaluator | % passed for a binary evaluator, mean score for a rating evaluator |
+| `<evaluator>_low`, `<evaluator>_high` | The 95% likely range of that evaluator's column |
+
+The CSV also has latency, cost and token columns when the run recorded them. If the leaderboard cannot be saved, the command prints the error and exits with a non-zero code.
 
 <Frame>
   <img src="./images/llm_leaderboard.png" alt="LLM leaderboard" />
