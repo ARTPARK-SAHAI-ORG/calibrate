@@ -39,11 +39,12 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.38.0",
     "opentelemetry-sdk>=1.38.0",
     "pipecat-ai-small-webrtc-prebuilt==1.0.0",
-    "pipecat-ai[cartesia,deepgram,google,groq,local-smart-turn-v3,openrouter,smallest,tracing,webrtc,websocket]==1.0.0",
+    "pipecat-ai[cartesia,deepgram,google,groq,openrouter,smallest,tracing,webrtc,websocket]==1.3.0",
     "python-dotenv>=1.2.1",
     "sarvamai>=0.1.21",
     "simpleaudio>=1.0.4",
     "sounddevice>=0.5.3",
+    "transformers>=4.48.0,<6",
     "uvicorn>=0.38.0",
     "whisper-normalizer>=0.1.12",
 ]
