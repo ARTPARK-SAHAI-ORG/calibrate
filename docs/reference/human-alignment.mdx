@@ -14,7 +14,7 @@ The examples use pass and fail for evaluators that give one of two answers. Each
 | **Annotator agreement**: how often annotators gave the same answer as each other | The **Annotator agreement** row on the **Overview** tab of **Human alignment**, and the **Annotator agreement** card under **Score reliability** on a task's **Overview** tab |
 | **Evaluator agreement with annotators**: how often an evaluator gave the same answer as the annotators | The row with the evaluator's name on the **Overview** tab of **Human alignment**, the card with the evaluator's name followed by **alignment** under **Score reliability** on a task's **Overview** tab, and the evaluator's **Agreement** tab |
 | **Human score** and **evaluator score**: the share of pass answers, or the average rating | The **Human scores** and **Evaluator scores** cards on a task's **Overview** tab |
-| **Kappa**: agreement after removing what chance alone would produce | The **Kappa** column beside **Current agreement** on the **Overview** and **Annotators** tabs of **Human alignment**, and beside each agreement number on the cards. It is named by the kind of kappa, for example "Fleiss' kappa 0.47" |
+| **Kappa**: agreement after removing what chance alone would produce | The **Kappa** column beside **Current agreement** on the **Overview** and **Annotators** tabs of **Human alignment**, and beside **Agreement** on the cards. It is labelled **Kappa**. Hover over the information icon beside the number to see which kind of kappa it is, for example "Fleiss' kappa" |
 | **Trend charts**: agreement and kappa over time | The chart on the **Overview** tab of **Human alignment**, the **Agreement with other annotators** chart on an annotator's page, and the **Agreement trend** chart on an evaluator's **Agreement** tab |
 | **One annotator's agreement with the others** | The **Current agreement** column on the **Annotators** tab of **Human alignment**, and **Latest agreement** on an annotator's page |
 | **Human agreement on an evaluation run** | Each evaluator's card under **Evaluator results** on an evaluation run's page, beside the evaluator's **Score** for that run |
@@ -318,7 +318,7 @@ In the example under [Several evaluators in one number](#several-evaluators-in-o
 - Chance agreement = (0.505 x 10 + 0.875 x 1) / 11 = 0.5386.
 - Kappa = (0.5227 - 0.5386) / (1 - 0.5386) = **-0.03**.
 
-Because this number mixes a rating evaluator with a pass or fail evaluator, it is labelled **Fleiss' kappa, linear weighted for ratings**: linear weighting applies to the ratings, and the pass or fail answers are compared as same or different.
+Because this number mixes a rating evaluator with a pass or fail evaluator, its information icon shows **Fleiss' kappa, linear weighted for ratings**: linear weighting applies to the ratings, and the pass or fail answers are compared as same or different.
 
 ### When kappa is left blank
 
@@ -339,7 +339,7 @@ Hover over the information icon beside **Too few items** or **Everyone agreed** 
 - **Everyone gave the same answer.** If every answer compared is pass, chance agreement is 1 and kappa cannot be worked out. For example, Asha and Ben both say pass on three items. Agreement is 100% and kappa is blank.
 - **One evaluator's compared answers mix ratings and pass or fail.** For example, annotators gave one evaluator pass or fail on one item and ratings on another item. Agreement is shown, but kappa is blank.
 
-### Kappa labels on screen
+### Kinds of kappa shown on hover
 
 | Label | What it is |
 | --- | --- |
@@ -350,9 +350,9 @@ Hover over the information icon beside **Too few items** or **Everyone agreed** 
 | **Fleiss' kappa, linear weighted for ratings** | Annotators with each other, when several evaluators are combined and some give ratings while others give pass or fail |
 | **Cohen's kappa, linear weighted for ratings** | One annotator against the others, in the same mixed case |
 
-On an annotator's page, the label starts with "Latest", for example **Latest Cohen's kappa**.
+On an annotator's page, the card is labelled **Latest kappa**.
 
-On the agreement cards on a task's **Overview** tab and on an evaluation run's page, **Agreement** and kappa sit side by side. Hover over the information icon beside the kind of kappa to see what kappa means. In the **Kappa** column of the tables, hover over the information icon beside a number to see the kind of kappa.
+Everywhere kappa appears, it is labelled **Kappa**, and the information icon beside the number shows which of the kinds above it is. On the agreement cards on a task's **Overview** tab and on an evaluation run's page, **Agreement** and **Kappa** sit side by side.
 
 ## Trend charts
 
