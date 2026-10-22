@@ -1,25 +1,52 @@
 ---
 title: "Human alignment computation"
-description: "How Calibrate works out annotator agreement, evaluator agreement, human and evaluator scores, and kappa on the Human alignment pages"
+description: "How Calibrate works out inter-annotator agreement, evaluator agreement with humans, human and evaluator scores, and kappa on the Human alignment pages"
 ---
 
 This page explains every number on the Human alignment pages: what it measures, where it appears, and how it is worked out. Each section has a worked example with real numbers.
 
-The examples use pass and fail for evaluators that give one of two answers. Each evaluator can give these two answers its own names, such as Correct and Wrong.
+The examples use pass and fail for evaluators that give one of two answers. Each evaluator can give these two answers its own names, such as Correct and Wrong. On screen, an evaluator that gives one of two answers is called **binary**, and one that gives a number on a scale is called **rating**.
 
 ## Where each number appears
 
 | Number | Where it appears |
 | --- | --- |
-| **Annotator agreement**: how often annotators gave the same answer as each other | The **Annotator agreement** row on the **Overview** tab of **Human alignment**, and the **Annotator agreement** card under **Score reliability** on a task's **Overview** tab |
-| **Evaluator agreement with annotators**: how often an evaluator gave the same answer as the annotators | The row with the evaluator's name on the **Overview** tab of **Human alignment**, the card with the evaluator's name followed by **alignment** under **Score reliability** on a task's **Overview** tab, and the evaluator's **Agreement** tab |
+| **Inter-annotator agreement**: how often annotators gave the same answer as each other | The **Inter-annotator agreement** card at the top of the **Overview** tab of **Human alignment**, and the same card under **Score reliability** on a task's **Overview** tab. For one evaluator: the **Agreement** column under **Inter-annotator agreement** in the evaluator's row of the table on the **Overview** tab, and the **Inter-annotator agreement** section of the evaluator's card under **Score reliability** |
+| **Evaluator agreement with humans**: how often an evaluator gave the same answer as the annotators | The **Evaluator agreement with humans** card at the top of the **Overview** tab of **Human alignment**, and the same card under **Score reliability**. For one evaluator: the **Agreement** column under **Evaluator agreement with humans** in the evaluator's row of the table, the **Evaluator agreement with humans** section of the evaluator's card under **Score reliability**, **Human agreement** on an evaluation run's page, and the evaluator's **Agreement** tab |
 | **Human score** and **evaluator score**: the share of pass answers, or the average rating | The **Human scores** and **Evaluator scores** cards on a task's **Overview** tab |
-| **Kappa**: agreement after removing what chance alone would produce | The **Kappa** column beside **Current agreement** on the **Overview** and **Annotators** tabs of **Human alignment**, and beside **Agreement** on the cards. It is labelled **Kappa**. Hover over the information icon beside the number to see which kind of kappa it is, for example "Fleiss' kappa" |
+| **Kappa**: agreement after removing what chance alone would produce | The **Kappa** columns in the table on the **Overview** tab and on the **Annotators** tab of **Human alignment**, **Kappa** under the bar on each evaluator's card under **Score reliability** and on an evaluation run's page, and **Latest kappa** on an annotator's page |
+| **Chance agreement**: how often answers would agree by chance alone | **Chance** under the bar on each evaluator's card under **Score reliability** and on an evaluation run's page, and the tick on that bar |
 | **Trend charts**: agreement and kappa over time | The chart on the **Overview** tab of **Human alignment**, the **Agreement with other annotators** chart on an annotator's page, and the **Agreement trend** chart on an evaluator's **Agreement** tab |
-| **One annotator's agreement with the others** | The **Current agreement** column on the **Annotators** tab of **Human alignment**, and **Latest agreement** on an annotator's page |
-| **Human agreement on an evaluation run** | Each evaluator's card under **Evaluator results** on an evaluation run's page, beside the evaluator's **Score** for that run |
+| **One annotator's agreement with the others** | The **Current agreement** and **Kappa** columns on the **Annotators** tab of **Human alignment**, and **Latest agreement** and **Latest kappa** on an annotator's page |
 
 Agreement is shown as a whole percentage. Kappa is shown to two decimal places.
+
+## The Overview tab of Human alignment
+
+At the top are two cards, **Inter-annotator agreement** and **Evaluator agreement with humans**. Each covers every evaluator together and shows only a percentage, with no kappa. The reason is under [Each kind of answer gets its own kappa](#each-kind-of-answer-gets-its-own-kappa).
+
+Under the cards is the trend chart, described under [Trend charts](#trend-charts).
+
+Under the chart is a table with one row per evaluator. Under each evaluator's name is the kind of answer it gives: binary or rating. The columns come in two groups:
+
+- **Inter-annotator agreement**, with **Agreement** and **Kappa**: how often annotators agreed with each other on this evaluator.
+- **Evaluator agreement with humans**, with **Agreement** and **Kappa**: how often this evaluator agreed with the annotators.
+
+Click **Name** or either **Agreement** heading to sort the table. Evaluators of the same type stay together.
+
+Use the task picker above the cards to show **All tasks** or one task. With one task, the table has a row for every evaluator linked to that task. With **All tasks**, the table lists every evaluator that has been run at least once, and leaves out an evaluator that has no agreement in either group.
+
+## The Score reliability cards on a task
+
+**Score reliability** on a task's **Overview** tab starts with the same two cards, **Inter-annotator agreement** and **Evaluator agreement with humans**, for that task. Each shows only a percentage.
+
+Then there is one card for each evaluator linked to the task, including the **Tool call correctness** evaluator. Each card has two sections, **Inter-annotator agreement** and **Evaluator agreement with humans**. Each section shows:
+
+- The agreement, as a percentage.
+- A bar filled up to the agreement, with a tick where chance agreement is. The bar is green when the agreement is above chance and red when it is below.
+- **Chance** with the chance agreement, and **Kappa** with the kappa.
+
+How to read the bar is under [Reading the bar against chance](#reading-the-bar-against-chance).
 
 ## How a saved label becomes an answer
 
@@ -65,7 +92,7 @@ An annotator's rating is compared on the scale of the evaluator's live version. 
 
 A rating can fall outside the scale, for example when it was given on an older version with a wider scale. When the ratings on an item are further apart than the scale allows, the widest gap is taken from the ratings themselves. This keeps every agreement between 0 and 1.
 
-For example, three annotators rate one item 1, 6 and 7 on a scale of 1 to 5. The ratings span 7 - 1 = 6, which is wider than 4, so the widest gap used is 6.
+For example, three annotators rate one item 1, 6 and 7 on a scale of 1 to 5. The ratings span 7 - 1 = 6, which is wider than 4, so the widest gap used on this item is 6.
 
 | First rating | Second rating | Agreement |
 | --- | --- | --- |
@@ -73,15 +100,17 @@ For example, three annotators rate one item 1, 6 and 7 on a scale of 1 to 5. The
 | 1 | 7 | 1 - 6/6 = 0.00 |
 | 6 | 7 | 1 - 1/6 = 0.83 |
 
+When no scale is known for an evaluator, the widest gap on each item is taken from the ratings on that item. So when only two people rated an item, any two different ratings agree 0. For example, 4 and 3 agree 0.
+
 ### Answers of different kinds
 
 A pass or fail answer is never compared with a rating. Such a comparison is left out of every number.
 
-## Annotator agreement
+## Inter-annotator agreement
 
-Annotator agreement compares every pair of annotators who answered the same item for the same evaluator. Each pair of answers counts once. So an item with more annotators has more pairs, and counts for more.
+Inter-annotator agreement compares every pair of annotators who answered the same item for the same evaluator. Each pair of answers counts once. So an item with more annotators has more pairs, and counts for more.
 
-**Annotator agreement = (sum of the agreement of every pair) / (number of pairs)**
+**Inter-annotator agreement = (sum of the agreement of every pair) / (number of pairs)**
 
 ### Worked example
 
@@ -93,23 +122,25 @@ One pass or fail evaluator, three items:
 | 2 | Pass | Fail | Pass | | 3 | 1 | 1/3 = 0.33 |
 | 3 | Fail | Fail | Fail | Pass | 6 | 3 | 3/6 = 0.50 |
 
-Annotator agreement = (1 + 1 + 3) / (1 + 3 + 6) = 5 / 10 = **50%**.
+Inter-annotator agreement = (1 + 1 + 3) / (1 + 3 + 6) = 5 / 10 = **50%**.
 
 Item 3 has four annotators and six pairs, so it counts six times as much as item 1. A plain average of the three item numbers would give (1.00 + 0.33 + 0.50) / 3 = 61%, which is not the number Calibrate shows.
 
-### Several evaluators in one number
+### The overall inter-annotator agreement
 
-When a task has several evaluators, the pairs from every evaluator go into one average. Each pair counts once.
+The **Inter-annotator agreement** card at the top puts the pairs from every evaluator into one average. Each pair counts once.
 
 For example, add a rating evaluator on a scale of 1 to 5 to the task above. On item 1, Asha gives it 4 and Ben gives it 3, which agree 0.75. That adds one pair:
 
-Annotator agreement = (5 + 0.75) / (10 + 1) = 5.75 / 11 = **52%**.
+Inter-annotator agreement on the card = (5 + 0.75) / (10 + 1) = 5.75 / 11 = **52%**.
 
-## An evaluator's agreement with annotators
+The table keeps the two evaluators apart. Under **Inter-annotator agreement**, the pass or fail evaluator's row shows **50%** and the rating evaluator's row shows **75%**.
 
-An evaluator's agreement with annotators compares the evaluator's score on each item with each annotator's answer on the same item. Each pair counts once, so an item labelled by three annotators gives three pairs.
+## Evaluator agreement with humans
 
-**Evaluator agreement = (sum of the agreement of every pair) / (number of pairs)**
+An evaluator's agreement with humans compares the evaluator's score on each item with each annotator's answer on the same item. Each pair counts once, so an item labelled by three annotators gives three pairs.
+
+**Evaluator agreement with humans = (sum of the agreement of every pair) / (number of pairs)**
 
 On a task's **Overview** tab and on the **Overview** tab of **Human alignment**, only scores from the evaluator's live version count. When you make a different version the live one, the evaluator's agreement and its **Evaluator scores** card start again from that version's scores. Until that version has been run on the task, they show nothing.
 
@@ -125,19 +156,34 @@ The same three items, with the evaluator's scores added:
 | 2 | Fail | Asha pass, Ben fail, Chitra pass | 3 | 1 |
 | 3 | Fail | Asha fail, Ben fail, Chitra fail, Dev pass | 4 | 3 |
 
-Evaluator agreement = (2 + 1 + 3) / (2 + 3 + 4) = 6 / 9 = **67%**.
+Evaluator agreement with humans = (2 + 1 + 3) / (2 + 3 + 4) = 6 / 9 = **67%**.
 
 If the evaluator had also scored item 1 as fail in an earlier run, that earlier score is ignored. Only its latest score on each item counts.
 
+### The overall evaluator agreement with humans
+
+The **Evaluator agreement with humans** card at the top puts the pairs from every evaluator into one average. Each pair counts once, so an evaluator compared on more pairs counts for more.
+
+For example, the rating evaluator from [The overall inter-annotator agreement](#the-overall-inter-annotator-agreement) scores item 1 as 3. Asha gave 4, which agrees 0.75, and Ben gave 3, which agrees 1.00. The rating evaluator's agreement with humans is (0.75 + 1.00) / 2 = 88%.
+
+| Evaluator | Sum of agreement | Pairs | Agreement with humans |
+| --- | --- | --- | --- |
+| Pass or fail | 6 | 9 | 67% |
+| Rating | 1.75 | 2 | 88% |
+
+Evaluator agreement with humans on the card = (6 + 1.75) / (9 + 2) = 7.75 / 11 = **70%**.
+
+A plain average of the two evaluators would give (67% + 88%) / 2 = 77%, which is not the number Calibrate shows.
+
 ### On an evaluation run page
 
-The **Human agreement** on an evaluation run's page uses only that run's scores. It compares them with the annotators' answers on the same items and evaluators. Scores from other runs, and from other versions, are not part of it.
+The **Human agreement** on an evaluation run's page uses only that run's scores. It compares them with the annotators' answers on the same items and evaluators. Scores from other runs, and from other versions, are not part of it. It sits beside the evaluator's **Score** for that run, with the same bar, **Chance** and **Kappa** as the cards under **Score reliability**.
 
 The cards under **Evaluator results** appear once the run has finished.
 
 ### On an evaluator's Agreement tab
 
-The **Agreement trend** chart on an evaluator's **Agreement** tab has one point for each version of the evaluator: v1, v2 and so on. The live version is marked **Live**. Each point is that version's agreement with annotators, using only that version's scores. Use the task picker to show **All tasks** or one task.
+The **Agreement trend** chart on an evaluator's **Agreement** tab has one point for each version of the evaluator: v1, v2 and so on. The live version is marked **Live**. Each point is that version's agreement with humans, using only that version's scores. Use the task picker to show **All tasks** or one task.
 
 ## One annotator compared with the others
 
@@ -154,6 +200,32 @@ Ben, in the same three items:
 | 3 | Fail | Asha fail, Chitra fail, Dev pass | 3 | 2 |
 
 Ben's agreement = (1 + 0 + 2) / (1 + 2 + 3) = 3 / 6 = **50%**.
+
+Ben's kappa uses Cohen's kappa, described under [Kappa](#kappa). Ben's answers, counted once for each pair, are 1 pass and 5 fail. The other annotators' answers in the same pairs are 4 pass and 2 fail.
+
+- Chance agreement = (1/6 x 4/6) + (5/6 x 2/6) = 4/36 + 10/36 = 0.3889.
+- Kappa = (0.50 - 0.3889) / (1 - 0.3889) = **0.18**.
+
+### One agreement, a kappa for each kind of answer
+
+An annotator's agreement is one number over every evaluator they answered. Their kappa is shown once for each kind of answer, labelled **Binary** for pass or fail answers and **Rating** for ratings.
+
+Add the rating evaluator from [The overall inter-annotator agreement](#the-overall-inter-annotator-agreement), where Ben gave 3 and Asha gave 4 on item 1. That adds one pair, which agrees 0.75:
+
+- Ben's agreement = (3 + 0.75) / (6 + 1) = **54%**.
+- **Binary** kappa = **0.18**, from the pass or fail evaluator, as above.
+- **Rating** kappa shows **Too few items**, because the rating evaluator's pairs all come from one item.
+
+An evaluator counts towards a kind's kappa only when its pairs come from at least two items. Add a second rating evaluator, which Ben, Asha and Chitra answered on items 1 and 2:
+
+| Item | Ben | Other annotators | Agreement of each pair |
+| --- | --- | --- | --- |
+| 1 | 4 | Asha 5 | 0.75 |
+| 2 | 3 | Asha 2, Chitra 2 | 0.75, 0.75 |
+
+- Ben's agreement = (3 + 0.75 + 2.25) / (6 + 1 + 3) = 6 / 10 = **60%**. Every pair counts here.
+- **Binary** kappa = **0.18**.
+- **Rating** kappa = **0.31**. It uses only the second rating evaluator, whose pairs come from two items. The first rating evaluator's single item is left out of the kappa, but not out of the agreement.
 
 ## Human scores and evaluator scores
 
@@ -203,6 +275,21 @@ For the two people above, who say pass 9 times out of 10 each and agree on 8 ite
 
 Kappa = (0.80 - 0.82) / (1 - 0.82) = **-0.11**
 
+### Reading the bar against chance
+
+On each evaluator's card under **Score reliability**, and on an evaluation run's page, the bar shows the agreement and chance agreement side by side. The bar is filled up to the agreement. The tick on the bar marks chance agreement, which is also written as **Chance** under the bar. **Kappa** is written beside it.
+
+| Example | Agreement | Chance | Kappa | The bar |
+| --- | --- | --- | --- | --- |
+| The evaluator under [Evaluator agreement with humans](#evaluator-agreement-with-humans) | 67% | 47% | 0.37 | Green, filled past the tick |
+| Priya and Ravi as annotators, under **When Fleiss' and Cohen's kappa differ** below | 50% | 63% | -0.33 | Red, filled short of the tick |
+
+- The bar is green when the agreement is above chance, so kappa is above 0.
+- The bar is red when the agreement is below chance, so kappa is below 0.
+- The bar is grey when the agreement and chance are the same whole percentage.
+- When everyone gave the same answer, chance is 100%, the bar is full and grey, and **Kappa** shows **Everyone agreed**.
+- When there are too few items for kappa, there is no tick and no **Chance**, the bar is grey, and **Kappa** shows **Too few items**.
+
 ### How chance agreement is worked out
 
 Chance agreement is how much two answers drawn at random would agree. For pass or fail, it is the chance that both are pass plus the chance that both are fail.
@@ -213,7 +300,7 @@ The answers are drawn from the same pairs the agreement number compared. Calibra
 
 Fleiss' kappa is the kappa for a group of people who all do the same job. It is named after Joseph Fleiss, who described it.
 
-Annotator agreement uses Fleiss' kappa. All the annotators' answers go into one list, and both random answers are drawn from that one list. No annotator is singled out, because annotators are interchangeable: it does not matter which one labelled an item.
+Inter-annotator agreement uses Fleiss' kappa. All the annotators' answers go into one list, and both random answers are drawn from that one list. No annotator is singled out, because annotators are interchangeable: it does not matter which one labelled an item.
 
 Worked example, two annotators and four items:
 
@@ -233,7 +320,7 @@ Worked example, two annotators and four items:
 
 Cohen's kappa is the kappa for two sides that each have their own habits. It is named after Jacob Cohen, who described it.
 
-An evaluator's agreement with annotators uses Cohen's kappa: the evaluator is one side and the annotators are the other. One annotator's agreement with the others also uses Cohen's kappa: that annotator is one side and the other annotators are the other.
+An evaluator's agreement with humans uses Cohen's kappa: the evaluator is one side and the annotators are the other. One annotator's agreement with the others also uses Cohen's kappa: that annotator is one side and the other annotators are the other.
 
 Each side keeps its own list of answers. One random answer is drawn from each side. So if the evaluator says pass much more often than the annotators, chance agreement takes that into account.
 
@@ -258,11 +345,11 @@ The same answers can give different kappas. Priya says pass on all four items. R
 | | Chance agreement | Kappa |
 | --- | --- | --- |
 | **Cohen's kappa** (Priya against the others) | Priya always says pass, Ravi says pass half the time: (1 x 0.5) + (0 x 0.5) = 0.50 | (0.50 - 0.50) / (1 - 0.50) = **0.00** |
-| **Fleiss' kappa** (annotator agreement) | One list of 8 answers, 6 pass and 2 fail: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.50 - 0.625) / (1 - 0.625) = **-0.33** |
+| **Fleiss' kappa** (inter-annotator agreement) | One list of 8 answers, 6 pass and 2 fail: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.50 - 0.625) / (1 - 0.625) = **-0.33** |
 
 Cohen's kappa keeps Priya's habit and Ravi's habit apart, and finds they agree exactly as often as those two habits would predict. Fleiss' kappa treats them as one group. Together they say pass on 6 of 8 answers, so chance alone would make them agree 62.5% of the time, more than the 50% they actually agree.
 
-You see Fleiss' kappa for the pair as annotators, and Cohen's kappa on Priya's own page.
+You see Fleiss' kappa under **Inter-annotator agreement** for this evaluator, and Cohen's kappa as the **Binary** kappa for Priya on the **Annotators** tab and on her own page.
 
 ### Ratings: linear weighted kappa
 
@@ -293,11 +380,21 @@ Worked example, two annotators rating four items on a scale of 1 to 5:
 - Chance agreement, worked out over the one list of 8 ratings with the same partial credit, is 0.6094.
 - Linear weighted Fleiss' kappa = (0.875 - 0.6094) / (1 - 0.6094) = **0.68**.
 
+### Chance agreement on ratings outside the scale
+
+Chance agreement uses the same widest gap as the agreement it is compared with. Two random ratings further apart than that gap get no credit, never less than 0. This keeps kappa between -1 and 1.
+
+For example, take the item rated 1, 6 and 7 under [Ratings outside the scale](#ratings-outside-the-scale), where the widest gap is 6. A second item is rated 4 and 5, with the widest gap of 4 from the scale.
+
+- Agreement = (0.17 + 0.00 + 0.83 + 0.75) / 4 = 0.4375.
+- For the second item's pair, chance agreement is worked out with a gap of 4. A random 1 drawn against a random 7 is 6 apart, more than 4, so it gets no credit.
+- Chance agreement is 0.5605, and kappa = (0.4375 - 0.5605) / (1 - 0.5605) = **-0.28**.
+
 ### Items with different numbers of annotators
 
 Kappa uses the same pairs as the agreement number, so each answer counts once for every pair it is in.
 
-In the three-item example under [Annotator agreement](#annotator-agreement):
+In the three-item example under [Inter-annotator agreement](#inter-annotator-agreement):
 
 | Item | Annotators | Each answer is in | Answers in the one list |
 | --- | --- | --- | --- |
@@ -307,18 +404,15 @@ In the three-item example under [Annotator agreement](#annotator-agreement):
 
 That gives 20 answers: 9 pass and 11 fail. Chance agreement = (9/20 x 9/20) + (11/20 x 11/20) = 0.505. Kappa = (0.50 - 0.505) / (1 - 0.505) = **-0.01**. These annotators agree about as often as chance would predict.
 
-The same rule applies to Cohen's kappa. In the example of an evaluator's agreement with annotators earlier on this page, the evaluator's answer on item 3 is compared with four annotators, so it counts four times. Chance agreement there is 0.4691 and kappa is **0.37**.
+The same rule applies to Cohen's kappa. In the example under [Evaluator agreement with humans](#evaluator-agreement-with-humans), the evaluator's answer on item 3 is compared with four annotators, so it counts four times. Chance agreement there is 0.4691 and kappa is **0.37**.
 
-### Several evaluators in one kappa
+### Each kind of answer gets its own kappa
 
-When several evaluators go into one number, chance agreement is worked out for each evaluator from its own answers, then averaged, with each evaluator counting as much as its number of pairs. A pass answer from one evaluator is never matched against a pass answer from another.
+Pass or fail answers and ratings never go into the same kappa. Chance agreement for a rating and chance agreement for a pass or fail answer are worked out in different ways, so one kappa over both would describe neither.
 
-In the example under [Several evaluators in one number](#several-evaluators-in-one-number), the pass or fail evaluator has 10 pairs and chance agreement 0.505. The rating evaluator has 1 pair and chance agreement 0.875.
-
-- Chance agreement = (0.505 x 10 + 0.875 x 1) / 11 = 0.5386.
-- Kappa = (0.5227 - 0.5386) / (1 - 0.5386) = **-0.03**.
-
-Because this number mixes a rating evaluator with a pass or fail evaluator, its information icon shows **Fleiss' kappa, linear weighted for ratings**: linear weighting applies to the ratings, and the pass or fail answers are compared as same or different.
+- Each evaluator has its own inter-annotator kappa, which is Fleiss' kappa, and its own kappa with humans, which is Cohen's kappa.
+- One annotator's agreement with the others has one kappa for each kind of answer, shown as **Binary** and **Rating**. Within a kind, chance agreement is worked out for each evaluator from its own answers, then averaged, with each evaluator counting as much as its number of pairs. A pass answer from one evaluator is never matched against a pass answer from another.
+- The two cards at the top of the **Overview** tab and of **Score reliability** cover every evaluator together, which can mix both kinds. They show agreement only, with no kappa.
 
 ### When kappa is left blank
 
@@ -326,33 +420,28 @@ Kappa is left blank in these cases. Where kappa would go, the screen shows a das
 
 | Case | Shown in place of kappa |
 | --- | --- |
-| Nothing has been compared | — |
-| Only one item has been compared | **Too few items** |
+| Nothing has been compared | A dash |
+| Every pair compared comes from one item | **Too few items** |
 | Everyone gave the same answer | **Everyone agreed** |
-| One evaluator's compared answers mix ratings and pass or fail | — |
+| One evaluator's compared answers mix ratings and pass or fail | A dash |
 
 Hover over the information icon beside **Too few items** or **Everyone agreed** to see the reason.
 
-
 - **There is nothing to compare.** For example, only one annotator has labelled the items.
-- **Only one item has been compared.** One item cannot show what chance alone would produce. For example, an evaluator scored one item 4 and an annotator rated the same item 1. Agreement is 25%, and kappa is blank. Without this rule, Cohen's kappa would always come out 0 here, because with one answer on each side, chance agreement equals the agreement itself.
-- **Everyone gave the same answer.** If every answer compared is pass, chance agreement is 1 and kappa cannot be worked out. For example, Asha and Ben both say pass on three items. Agreement is 100% and kappa is blank.
-- **One evaluator's compared answers mix ratings and pass or fail.** For example, annotators gave one evaluator pass or fail on one item and ratings on another item. Agreement is shown, but kappa is blank.
+- **Every pair compared comes from one item.** One item cannot show what chance alone would produce. For example, an evaluator scored one item 4 and an annotator rated the same item 1. Agreement is 25%, and kappa shows **Too few items**. Without this rule, Cohen's kappa would always come out 0 here, because with one answer on each side, chance agreement equals the agreement itself. For one annotator's **Binary** or **Rating** kappa, it shows **Too few items** when no evaluator of that kind has pairs from at least two items.
+- **Everyone gave the same answer.** If every answer compared is pass, chance agreement is 1 and kappa cannot be worked out. For example, Asha and Ben both say pass on three items. Agreement is 100% and kappa shows **Everyone agreed**.
+- **One evaluator's compared answers mix ratings and pass or fail.** For example, on a scale of 1 to 5, Asha and Ben gave one evaluator pass and fail on item 1, 4 and 3 on item 2, pass and pass on item 3, and 2 and 2 on item 4. Agreement is (0 + 0.75 + 1 + 1) / 4 = 69%, but kappa is a dash. On the **Annotators** tab and on Asha's page, the same answers give a **Binary** kappa of 0.00 and a **Rating** kappa of 0.50 instead.
 
 ### Kinds of kappa shown on hover
 
-| Label | What it is |
+Everywhere kappa appears, it is labelled **Kappa**, or **Latest kappa** on an annotator's page. Hover over the information icon beside the number to see which kind it is:
+
+| Shown on hover | What it is |
 | --- | --- |
 | **Fleiss' kappa** | Annotators with each other, on pass or fail answers |
 | **Linear weighted Fleiss' kappa** | Annotators with each other, on ratings |
 | **Cohen's kappa** | An evaluator against annotators, or one annotator against the others, on pass or fail answers |
 | **Linear weighted Cohen's kappa** | An evaluator against annotators, or one annotator against the others, on ratings |
-| **Fleiss' kappa, linear weighted for ratings** | Annotators with each other, when several evaluators are combined and some give ratings while others give pass or fail |
-| **Cohen's kappa, linear weighted for ratings** | One annotator against the others, in the same mixed case |
-
-On an annotator's page, the card is labelled **Latest kappa**.
-
-Everywhere kappa appears, it is labelled **Kappa**, and the information icon beside the number shows which of the kinds above it is. On the agreement cards on a task's **Overview** tab and on an evaluation run's page, **Agreement** and **Kappa** sit side by side.
 
 ## Trend charts
 
@@ -362,15 +451,31 @@ The chart on the **Overview** tab of **Human alignment** and the **Agreement wit
 - The **Overview** tab shows the last 180 days. An annotator's page shows the last 365 days, so its oldest period is 5 days long.
 - Each point covers every answer saved up to the end of its period, not only the answers saved during that period. Answers saved before the first period count from the first point on.
 - An answer belongs to the time it was last saved. An edited label moves to the period of its latest edit.
-- So the last point always equals the current number shown in the table beside the chart.
-- Agreement is a solid line on the left-hand axis, in percent. Kappa is a dashed line in the same colour on the right-hand axis. The right-hand axis runs from 0 to 1, and from -1 to 1 when some kappa is below 0.
+- So the last point always equals the current number shown beside the chart.
 - The label under each point is the month its period ends in.
+- Use the **Agreement** and **Kappa** switch above the chart to show either the agreement lines, in percent, or the kappa lines. The kappa view runs from 0 to 1, and from -1 to 1 when some kappa is below 0.
+- Hover over a point to see its value.
+
+### The chart on the Overview tab
+
+In the **Agreement** view, each evaluator has two lines in its own colour:
+
+- **[evaluator name] inter-annotator agreement**, drawn dashed.
+- **[evaluator name] agreement with humans**, drawn solid.
+
+Two thicker lines show the two cards at the top of the page: **Overall inter-annotator agreement**, dashed, and **Overall evaluator agreement with humans**, solid. They are shown by default. Turn them off with the **Show overall** switch. While they are shown, the evaluator lines are faded.
+
+In the **Kappa** view, each evaluator has two lines: **[evaluator name] inter-annotator kappa** and **[evaluator name] kappa with humans**, each followed by the kind of kappa in brackets, for example "(Fleiss' kappa)". There are no overall lines in this view, because the overall numbers have no kappa.
+
+### The chart on an annotator's page
+
+The **Agreement** view has one line, **Agreement with other annotators**. The **Kappa** view has one line for each kind of answer: **Binary answers** and **Rating answers**, each followed by the kind of kappa in brackets.
 
 ### Worked example
 
-On 22 October 2026, the four items from the Fleiss' kappa example above are on the **Overview** tab. Items 1 and 2 were labelled 70 days earlier. Items 3 and 4 were labelled 10 days earlier.
+On 22 October 2026, the four items from the Fleiss' kappa example above are on the **Overview** tab, all for one evaluator. Items 1 and 2 were labelled 70 days earlier. Items 3 and 4 were labelled 10 days earlier.
 
-| Period ends | Agreement | Kappa |
+| Period ends | Inter-annotator agreement | Inter-annotator kappa |
 | --- | --- | --- |
 | 25 May | Nothing to show | Nothing to show |
 | 24 June | Nothing to show | Nothing to show |
@@ -379,9 +484,11 @@ On 22 October 2026, the four items from the Fleiss' kappa example above are on t
 | 22 September | 100% | Blank, because everyone said pass |
 | 22 October | 75% | 0.47 |
 
-The 23 August point counts items 1 and 2. The 22 October point counts all four items, and matches the current number.
+The 23 August point counts items 1 and 2. The 22 October point counts all four items, and matches the current number. With one evaluator, the **Overall inter-annotator agreement** line has the same agreement as the evaluator's line.
 
-The **Agreement trend** chart on an evaluator's **Agreement** tab has one point per version, not one point per period. That chart is described earlier on this page, with an evaluator's agreement with annotators.
+### The chart on an evaluator's Agreement tab
+
+The **Agreement trend** chart on an evaluator's **Agreement** tab has one point per version, not one point per period. Its line is **[evaluator name] agreement with humans**, and in the **Kappa** view the line is the evaluator's name followed by the kind of kappa in brackets. That chart is described under [Evaluator agreement with humans](#evaluator-agreement-with-humans).
 
 ## What changes the numbers
 
@@ -399,6 +506,8 @@ The **Agreement trend** chart on an evaluator's **Agreement** tab has one point 
 | --- | --- |
 | **Linear weighting, not quadratic, for ratings** | Kappa is built from the agreement number shown beside it, which gives credit in equal steps. Quadratic weighting would make the two numbers disagree about the same ratings. |
 | **Fleiss' kappa for annotators, Cohen's kappa for an evaluator or one annotator** | Annotators with each other are one group doing the same job, so their answers go in one list. An evaluator, or a single annotator, is a separate side with its own habits, so each side keeps its own list. |
-| **Each pair of answers counts once** | An item labelled by more people tells you more about agreement, so it counts for more. Agreement and kappa use exactly the same pairs, so they always describe the same answers. |
+| **Each pair of answers counts once** | An item labelled by more people tells you more about agreement, so it counts for more. Agreement and kappa use exactly the same pairs, so they always describe the same answers. The same holds across evaluators: in the overall evaluator agreement with humans, an evaluator compared on more pairs counts for more. |
+| **Each kind of answer gets its own kappa** | Chance agreement is worked out differently for ratings and for pass or fail answers, so one kappa over both would describe neither. This is why the two overall cards show agreement only. |
+| **An evaluator needs pairs from at least two items to count towards kappa** | One item cannot show what chance alone would produce. Counting it would pull kappa towards 0 for a reason that has nothing to do with how well people agree. |
 | **Only the latest answer counts** | A label that was changed was changed for a reason. Counting the old answer as well would count one person twice. |
 | **Only the live version's scores count on the task** | A new version of an evaluator can behave differently. Mixing its scores with an older version's would describe neither. Each version's own number is on the evaluator's **Agreement** tab. |
