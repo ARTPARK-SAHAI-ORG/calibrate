@@ -322,7 +322,17 @@ Because this number mixes a rating evaluator with a pass or fail evaluator, it i
 
 ### When kappa is left blank
 
-Kappa is left blank when:
+Kappa is left blank in these cases. Where kappa would go, the screen shows a dash or a short reason:
+
+| Case | Shown in place of kappa |
+| --- | --- |
+| Nothing has been compared | — |
+| Only one item has been compared | **Too few items** |
+| Everyone gave the same answer | **Everyone agreed** |
+| One evaluator's compared answers mix ratings and pass or fail | — |
+
+Hover over **Too few items** or **Everyone agreed** to see the reason.
+
 
 - **There is nothing to compare.** For example, only one annotator has labelled the items.
 - **Only one item has been compared.** One item cannot show what chance alone would produce. For example, an evaluator scored one item 4 and an annotator rated the same item 1. Agreement is 25%, and kappa is blank. Without this rule, Cohen's kappa would always come out 0 here, because with one answer on each side, chance agreement equals the agreement itself.
@@ -342,7 +352,7 @@ Kappa is left blank when:
 
 On an annotator's page, the label starts with "Latest", for example **Latest Cohen's kappa**.
 
-On the agreement cards on a task's **Overview** tab and on an evaluation run's page, hover over a kappa number to see what kappa means.
+On the agreement cards on a task's **Overview** tab and on an evaluation run's page, **Agreement** and kappa sit side by side. Hover over the information icon beside the kind of kappa to see what kappa means. In the **Kappa** column of the tables, hover over the information icon beside a number to see the kind of kappa.
 
 ## Trend charts
 
