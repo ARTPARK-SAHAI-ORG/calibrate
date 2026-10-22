@@ -1465,6 +1465,27 @@
         ],
         "title": "BenchmarkStatusResponse"
       },
+      "Body_upload_stt_item_datasets__dataset_id__items_upload_post": {
+        "properties": {
+          "audio": {
+            "type": "string",
+            "format": "binary",
+            "title": "Audio",
+            "description": "WAV file of the spoken audio, at most 25 MB and 10 minutes long"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Ground-truth transcript of the audio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio",
+          "text"
+        ],
+        "title": "Body_upload_stt_item_datasets__dataset_id__items_upload_post"
+      },
       "BulkCreateItemsResponse": {
         "properties": {
           "item_ids": {
@@ -2052,6 +2073,210 @@
           "count"
         ],
         "title": "CreateJobsResponse"
+      },
+      "DatasetCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Dataset name, unique within the workspace"
+          },
+          "dataset_type": {
+            "type": "string",
+            "enum": [
+              "stt",
+              "tts"
+            ],
+            "title": "Dataset Type",
+            "description": "`stt` items carry audio + ground-truth text. `tts` items carry text only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "dataset_type"
+        ],
+        "title": "DatasetCreateRequest"
+      },
+      "DatasetDetailResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Dataset ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Dataset name"
+          },
+          "dataset_type": {
+            "type": "string",
+            "title": "Dataset Type",
+            "description": "Dataset type (`stt` or `tts`)"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "Number of items in the dataset"
+          },
+          "eval_count": {
+            "type": "integer",
+            "title": "Eval Count",
+            "description": "Number of evaluation jobs that used this dataset"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the dataset was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the dataset was last updated (ISO 8601 UTC)"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DatasetItemResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "All items in the dataset, ordered by `order_index`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "dataset_type",
+          "item_count",
+          "eval_count",
+          "created_at",
+          "updated_at",
+          "items"
+        ],
+        "title": "DatasetDetailResponse"
+      },
+      "DatasetItemResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Dataset item ID",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "audio_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Path",
+            "description": "Presigned download URL for the item's audio"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Ground-truth transcript (STT) or synthesis text (TTS)"
+          },
+          "order_index": {
+            "type": "integer",
+            "title": "Order Index",
+            "description": "Position of the item within the dataset. The first item is 0"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the dataset item was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When the dataset item was last updated (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "text",
+          "order_index",
+          "created_at"
+        ],
+        "title": "DatasetItemResponse"
+      },
+      "DatasetResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Dataset ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Dataset name"
+          },
+          "dataset_type": {
+            "type": "string",
+            "title": "Dataset Type",
+            "description": "Dataset type (`stt` or `tts`)"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "Number of items in the dataset"
+          },
+          "eval_count": {
+            "type": "integer",
+            "title": "Eval Count",
+            "description": "Number of evaluation jobs that used this dataset"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the dataset was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the dataset was last updated (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "dataset_type",
+          "item_count",
+          "eval_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DatasetResponse"
       },
       "EvaluatorCreate": {
         "properties": {
@@ -7925,6 +8150,169 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/VersionCreateResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Create dataset",
+        "description": "Create a new empty dataset. Add items separately",
+        "operationId": "create_new_dataset_datasets_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/{dataset_id}": {
+      "get": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Get dataset",
+        "description": "Get a dataset with all of its items",
+        "operationId": "get_dataset_detail_datasets__dataset_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The dataset to retrieve",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Dataset Id"
+            },
+            "description": "The dataset to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/{dataset_id}/items/upload": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Upload STT dataset item",
+        "description": "Upload one audio clip with its transcript and append it to an STT dataset",
+        "operationId": "upload_stt_item_datasets__dataset_id__items_upload_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The STT dataset to add the item to",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Dataset Id"
+            },
+            "description": "The STT dataset to add the item to"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_stt_item_datasets__dataset_id__items_upload_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetItemResponse"
                 }
               }
             }

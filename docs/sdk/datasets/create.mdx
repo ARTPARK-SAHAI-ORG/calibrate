@@ -1,0 +1,25 @@
+---
+title: "Create dataset"
+description: "Create a new empty dataset. Add items separately"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.datasets.create(
+    name="name",
+    dataset_type="stt",
+)
+```
+
+## API endpoint
+
+See **POST /datasets** in the [API reference](/api-reference/introduction) tab.

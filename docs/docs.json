@@ -130,6 +130,15 @@
             ]
           },
           {
+            "group": "Datasets",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /datasets",
+              "GET /datasets/{dataset_id}",
+              "POST /datasets/{dataset_id}/items/upload"
+            ]
+          },
+          {
             "group": "Evaluators",
             "openapi": "api-reference/openapi.json",
             "pages": [
@@ -176,6 +185,7 @@
               "cli/calibrate/agents",
               "cli/calibrate/annotation-tasks",
               "cli/calibrate/annotators",
+              "cli/calibrate/datasets",
               "cli/calibrate/evaluators",
               "cli/calibrate/tests",
               "cli/calibrate/traces"
@@ -242,6 +252,14 @@
               "sdk/annotators/list",
               "sdk/annotators/create",
               "sdk/annotators/update"
+            ]
+          },
+          {
+            "group": "Datasets",
+            "pages": [
+              "sdk/datasets/create",
+              "sdk/datasets/get",
+              "sdk/datasets/upload_item"
             ]
           },
           {

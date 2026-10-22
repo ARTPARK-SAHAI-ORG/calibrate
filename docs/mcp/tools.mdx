@@ -624,6 +624,57 @@ Rename an annotator in your workspace.
 
 See **PUT /annotators/&#123;annotator_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
+## Datasets
+
+### get-dataset
+
+Get one dataset in the caller's org with all of its items, each with
+a download link for its audio (STT) and its text.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `dataset_id` | string | Yes | The dataset to retrieve |
+
+See **GET /datasets/&#123;dataset_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-dataset
+
+Create an empty STT or TTS dataset in the caller's org. The name must
+be unique in the workspace (409 otherwise). Add items separately.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Dataset name, unique within the workspace |
+| `dataset_type` | string | Yes | `stt` items carry audio + ground-truth text. `tts` items carry text only |
+
+See **POST /datasets** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### upload-dataset-item
+
+Upload one WAV clip (at most 25 MB and 10 minutes) with its
+ground-truth transcript and append it to an STT dataset in the
+caller's org.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `dataset_id` | string | Yes | The STT dataset to add the item to |
+| `audio` | string | Yes | WAV file of the spoken audio, at most 25 MB and 10 minutes long |
+| `text` | string | Yes | Ground-truth transcript of the audio |
+
+See **POST /datasets/&#123;dataset_id&#125;/items/upload** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ## Evaluators
 
 ### list-evaluators
