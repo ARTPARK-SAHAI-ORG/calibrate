@@ -158,8 +158,14 @@ class TextAgentConnection:
                 f"got {self.type!r}"
             )
 
-    def build_body(self, messages, inputs=None, model=None) -> dict:
+    def build_body(self, messages, inputs=None, model=None, extra=None) -> dict:
         """Return the JSON body this agent is sent for ``messages``.
+
+        Fields are merged in this order, each step overwriting the one before
+        it: the conversation, ``default_inputs``, ``extra`` (the model
+        variant's own request fields), ``inputs`` (the test case's), and
+        finally ``model``. So a test case can override a variant, and nothing
+        can override ``model``.
 
         Raises:
             ValueError: For a ``general`` agent, when ``messages`` is not a
@@ -180,6 +186,8 @@ class TextAgentConnection:
             body = {"messages": messages}
         if self.default_inputs:
             body.update(self.default_inputs)
+        if extra:
+            body.update(extra)
         if inputs:
             body.update(inputs)
         if model is not None:
@@ -191,6 +199,7 @@ class TextAgentConnection:
         messages: Optional[list] = None,
         model: Optional[str] = None,
         inputs: Optional[dict] = None,
+        extra: Optional[dict] = None,
     ) -> dict:
         """Check the endpoint is reachable and returns the expected format.
 
@@ -207,6 +216,8 @@ class TextAgentConnection:
                 is used as-is (so verify works with no test case). Passed →
                 merged over ``default_inputs`` per key, so individual inputs can
                 be edited while untouched ones keep their default.
+            extra: Optional extra request fields for one model variant, merged
+                over ``default_inputs`` and under ``inputs``.
 
         Returns:
             ``{"ok": True, "sample_output": {"response": "...", "tool_calls": [...]}}``
@@ -225,7 +236,9 @@ class TextAgentConnection:
         """
         input_messages = messages if messages is not None else _DEFAULT_VERIFY_MESSAGES
 
-        body = self.build_body(input_messages, inputs=inputs, model=model)
+        body = self.build_body(
+            input_messages, inputs=inputs, model=model, extra=extra
+        )
 
         # ── 1. POST to endpoint (retry transient failures) ───────────────
         try:
@@ -324,6 +337,7 @@ class TextAgentConnection:
         messages: list,
         model: "Optional[str]" = None,
         inputs: "Optional[dict]" = None,
+        extra: "Optional[dict]" = None,
     ) -> dict:
         """POST a messages array to the agent endpoint and return its output.
 
@@ -333,6 +347,8 @@ class TextAgentConnection:
                 benchmarking, e.g. ``"gemma-4-26b-a4b-it"``).
             inputs: Optional per-call extra request fields, merged over
                 ``default_inputs`` per key.
+            extra: Optional extra request fields for one model variant, merged
+                over ``default_inputs`` and under ``inputs``.
 
         Returns:
             dict with ``response`` (str | None) and ``tool_calls`` (list) keys.
@@ -347,7 +363,7 @@ class TextAgentConnection:
                 timeouts, and HTTP 429/502/503/504) are retried with
                 exponential backoff before giving up.
         """
-        body = self.build_body(messages, inputs=inputs, model=model)
+        body = self.build_body(messages, inputs=inputs, model=model, extra=extra)
 
         try:
             resp = await self._post_with_retry(body, timeout=60.0)
