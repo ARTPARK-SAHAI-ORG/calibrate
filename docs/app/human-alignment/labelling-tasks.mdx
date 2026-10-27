@@ -9,6 +9,11 @@ A labelling task holds the items people label and the evaluators they label them
 
 1. Click **Human alignment** in the sidebar, then **Create new labelling task**.
 2. In **Details**, enter the **Name** "Check tutor replies" and an optional **Description**. Click **Next**.
+
+<Frame>
+  <img src="/images/app/human-alignment-create-task.png" alt="The Create labelling task window on the Details step, with the name Check tutor replies filled in" />
+</Frame>
+
 3. In **Type**, answer **What do you want to label?** For the tutor, click **Text**, then **Conversation**, then **The whole conversation**. Click **Next**.
 4. In **Evaluators**, select "Explains step by step". Only evaluators of the type you picked are listed. To make one here, click **New evaluator**.
 5. Click **Create task**.
@@ -21,10 +26,18 @@ Each item is one conversation for annotators to label. There are three ways to a
 
 <AccordionGroup>
   <Accordion title="Add one item by hand" icon="plus" defaultOpen>
-    Click **Add item** at the top of the task page. Give the item a name, such as "Fractions: asks for the next step", and enter the conversation.
+    Click **Add item** at the top of the task page. Give the item a name, such as "Fractions: asks for the next step", and enter the conversation. Click **Create**.
+
+    <Frame>
+      <img src="/images/app/human-alignment-add-item.png" alt="The add item window with the item name Hindi: replies in Hindi, a student message and the tutor reply in Hindi, and the Explains step by step evaluator" />
+    </Frame>
   </Accordion>
   <Accordion title="Upload many items from a CSV file" icon="upload">
     Click **Bulk upload**. Upload a CSV file with one row per item: a name, an optional description and the transcript. If people have already labelled these conversations, answer **Yes** to **Do you want to upload existing human labels?** and pick the annotator.
+
+    <Frame>
+      <img src="/images/app/human-alignment-bulk-upload.png" alt="The Bulk upload items window, asking whether to upload existing human labels, with a box to drop a CSV file" />
+    </Frame>
   </Accordion>
   <Accordion title="Send results from Calibrate" icon="share">
     Test results, simulation runs and the **Traces** list on an agent's **Monitoring** tab each have a **Submit for labelling** button. Select the rows you want, click **Submit for labelling**, then choose **Use existing task** and pick "Check tutor replies", or choose **Create new task**.
@@ -52,6 +65,11 @@ A labelling job is one annotator's set of items to label.
 3. In **Assign annotators**, select Meena and Kabir. To add another person, click **Add annotator**.
 4. Under **Labels**, pick the evaluators annotators should answer. This section only shows when the task has more than one label to choose from.
 5. Under **Settings**, choose whether annotators see **Comments on each item** and **Reasoning on each label**, and whether reasoning is required.
+
+<Frame>
+  <img src="/images/app/human-alignment-assign-annotators.png" alt="The Assign annotators window listing Kabir and Meena, with the settings for comments on each item and reasoning on each label" />
+</Frame>
+
 6. Click **Assign**.
 
 Calibrate creates one labelling job for each annotator and shows a link for each one. Click **Copy** next to each link and send it to that annotator.
