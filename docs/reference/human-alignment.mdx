@@ -41,7 +41,7 @@ export const KappaScale = () => (
     {[[-0.11, 0], [0.2, 1], [0.25, 0], [0.47, 1], [0.6, 0]].map(([kappa, row]) => (
       <g key={kappa}>
         <circle cx={320 + kappa * 300} cy="48" r="6" fill={kappa < 0 ? "#DC2626" : "#16A34A"} />
-        <text x={320 + kappa * 300} y={row ? 14 : 32} fill="currentColor" fontSize="13" textAnchor="middle">{kappa.toFixed(2)}</text>
+        <text x={320 + kappa * 300} y={row ? 14 : 32} fill="currentColor" fontSize="13" textAnchor="middle">{kappa}</text>
       </g>
     ))}
   </svg>
@@ -118,7 +118,7 @@ Only the evaluator's latest score on each item is used. Scores from versions of 
 
 ## Do the annotators agree with each other?
 
-Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each item. For `Empathy (rating)`, close ratings get partial credit: two equal ratings agree 1.00, ratings 1 apart agree 0.75, ratings 2 apart agree 0.50, and so on down to 1 and 5, which agree 0.
+Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each item. For `Empathy (rating)`, close ratings get partial credit: two equal ratings agree 1, ratings 1 apart agree 0.75, ratings 2 apart agree 0.5, and so on down to 1 and 5, which agree 0.
 
 <Tabs>
 <Tab title="Safety (binary)">
@@ -136,9 +136,9 @@ Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each it
 
 | Item | 👩 Asha | 👨 Ben | Agreement |
 | --- | --- | --- | --- |
-| 1 | 4 | 4 | 1.00 |
+| 1 | 4 | 4 | 1 |
 | 2 | 3 | 2 | 0.75 |
-| 3 | 5 | 5 | 1.00 |
+| 3 | 5 | 5 | 1 |
 | 4 | 2 | 3 | 0.75 |
 | **Agreement** |  |  | **3.5 / 4 = 88%** |
 
@@ -166,7 +166,7 @@ Kappa uses the same pairs, so each answer is used once for every pair it is in:
 | 2 | 3 | 2 pairs | 4 `Pass`, 2 `Fail` |
 | 3 | 4 | 3 pairs | 3 `Pass`, 9 `Fail` |
 
-That gives 20 answers: 9 `Pass` and 11 `Fail`. Chance agreement = (9/20 x 9/20) + (11/20 x 11/20) = 0.505. Kappa = (0.50 - 0.505) / (1 - 0.505) = **-0.01**.
+That gives 20 answers: 9 `Pass` and 11 `Fail`. Chance agreement = (9/20 x 9/20) + (11/20 x 11/20) = 0.505. Kappa = (0.5 - 0.505) / (1 - 0.505) = **-0.01**.
 
 </Accordion>
 <Accordion title="Show the calculation: ratings outside the scale">
@@ -178,12 +178,12 @@ On a scale of 1 to 5, the widest difference is 4. Suppose 👩 Asha, 👨 Ben an
 | Two ratings | Agreement |
 | --- | --- |
 | 1 and 6 | 1 - 5/6 = 0.17 |
-| 1 and 7 | 1 - 6/6 = 0.00 |
+| 1 and 7 | 1 - 6/6 = 0 |
 | 6 and 7 | 1 - 1/6 = 0.83 |
 
 Chance agreement uses the same widest difference as the agreement it is compared with, and two random ratings further apart than that get no credit. Add a second item that 👩 Asha and 👨 Ben rate 4 and 5, which agree 0.75 on the normal scale:
 
-- Agreement = (0.17 + 0.00 + 0.83 + 0.75) / 4 = 0.4375.
+- Agreement = (0.17 + 0 + 0.83 + 0.75) / 4 = 0.4375.
 - Chance agreement is 0.5605, and kappa = (0.4375 - 0.5605) / (1 - 0.5605) = **-0.28**.
 
 When no scale is known for a dimension, the widest difference on each item is taken from the ratings on that item.
@@ -204,12 +204,12 @@ One annotator's agreement compares their answer on each item with each other ann
 - 👨 Ben's agreement on `Safety (binary)` = 3 / 6 = 50%.
 - Taking each answer once for every pair it is in, 👨 Ben's answers are 1 `Pass` and 5 `Fail`, and the others' are 4 `Pass` and 2 `Fail`.
 - Chance agreement = (1/6 x 4/6) + (5/6 x 2/6) = 0.3889.
-- 👨 Ben's kappa on binary answers = (0.50 - 0.3889) / (1 - 0.3889) = **0.18**.
+- 👨 Ben's kappa on binary answers = (0.5 - 0.3889) / (1 - 0.3889) = **0.18**.
 
 On `Empathy (rating)`, 👨 Ben is compared with 👩 Asha on the four items in the Setup, which agree 3.5 of 4.
 
 - 👨 Ben's agreement is one number over every dimension: (3 + 3.5) / (6 + 4) = **65%**.
-- 👨 Ben's kappa on ratings = (0.875 - 0.6875) / (1 - 0.6875) = **0.60**. With only two annotators, this Cohen's chance agreement comes out the same as the Fleiss' one.
+- 👨 Ben's kappa on ratings = (0.875 - 0.6875) / (1 - 0.6875) = **0.6**. With only two annotators, this Cohen's chance agreement comes out the same as the Fleiss' one.
 
 Kappa is one number for each kind of answer, and a dimension is used in it only when its pairs come from at least two items. If 👨 Ben had rated `Empathy (rating)` on item 1 alone, his kappa on ratings could not be worked out, because every pair would come from one item.
 
@@ -237,9 +237,9 @@ Evaluator agreement with humans compares the 🤖 evaluator's answer with each a
 | Item | 🤖 Evaluator | 👩 Asha, agreement | 👨 Ben, agreement |
 | --- | --- | --- | --- |
 | 1 | 5 | 4 → 0.75 | 4 → 0.75 |
-| 2 | 4 | 3 → 0.75 | 2 → 0.50 |
+| 2 | 4 | 3 → 0.75 | 2 → 0.5 |
 | 3 | 4 | 5 → 0.75 | 5 → 0.75 |
-| 4 | 2 | 2 → 1.00 | 3 → 0.75 |
+| 4 | 2 | 2 → 1 | 3 → 0.75 |
 | **Agreement** | | | **6 / 8 = 75%** |
 
 </Tab>
@@ -298,10 +298,10 @@ Kappa is agreement after removing what chance alone would produce.
 | Comparison | Agreement | Chance agreement | Kappa |
 | --- | --- | --- | --- |
 | 👩 Asha and 👨 Ben on `Safety (binary)` | 75% | 53% | (0.75 - 0.53) / (1 - 0.53) = **0.47** |
-| 🤖 `Safety (binary)` and the annotators | 63% | 50% | (0.625 - 0.50) / (1 - 0.50) = **0.25** |
-| 👩 Asha and 👨 Ben on `Empathy (rating)` | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.60** |
-| 🤖 `Empathy (rating)` and the annotators | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.20** |
-| 👩 Asha and 👨 Ben, saying `Pass` 9 times in 10 | 80% | 82% | (0.80 - 0.82) / (1 - 0.82) = **-0.11** |
+| 🤖 `Safety (binary)` and the annotators | 63% | 50% | (0.625 - 0.5) / (1 - 0.5) = **0.25** |
+| 👩 Asha and 👨 Ben on `Empathy (rating)` | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.6** |
+| 🤖 `Empathy (rating)` and the annotators | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.2** |
+| 👩 Asha and 👨 Ben, saying `Pass` 9 times in 10 | 80% | 82% | (0.8 - 0.82) / (1 - 0.82) = **-0.11** |
 
 Chance agreement comes from how often each side gives each answer. On `Safety (binary)`, 👩 Asha's and 👨 Ben's 8 labels are 5 `Pass` and 3 `Fail`, so two labels picked at random agree (5/8 x 5/8) + (3/8 x 3/8) = 53% of the time. For `Empathy (rating)`, two random ratings get the same partial credit as in the agreement.
 
@@ -340,12 +340,12 @@ For ratings, the kappa is **linear weighted**: close ratings get partial credit 
 <AccordionGroup>
 <Accordion title="Show the calculation: Fleiss' and Cohen's kappa on the same answers">
 
-Suppose 👩 Asha says `Pass` on all four items and 👨 Ben says `Pass`, `Pass`, `Fail`, `Fail`. They agree on 2 of 4 items, so agreement is 0.50.
+Suppose 👩 Asha says `Pass` on all four items and 👨 Ben says `Pass`, `Pass`, `Fail`, `Fail`. They agree on 2 of 4 items, so agreement is 0.5.
 
 | | Chance agreement | Kappa |
 | --- | --- | --- |
-| **Cohen's kappa** (👩 Asha against the others) | 👩 Asha always says `Pass`, 👨 Ben says `Pass` half the time: (1 x 0.5) + (0 x 0.5) = 0.50 | (0.50 - 0.50) / (1 - 0.50) = **0.00** |
-| **Fleiss' kappa** (inter-annotator agreement) | One list of 8 answers, 6 `Pass` and 2 `Fail`: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.50 - 0.625) / (1 - 0.625) = **-0.33** |
+| **Cohen's kappa** (👩 Asha against the others) | 👩 Asha always says `Pass`, 👨 Ben says `Pass` half the time: (1 x 0.5) + (0 x 0.5) = 0.5 | (0.5 - 0.5) / (1 - 0.5) = **0** |
+| **Fleiss' kappa** (inter-annotator agreement) | One list of 8 answers, 6 `Pass` and 2 `Fail`: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.5 - 0.625) / (1 - 0.625) = **-0.33** |
 
 Cohen's kappa keeps 👩 Asha's habit and 👨 Ben's habit apart, and finds they agree exactly as often as those two habits predict. Fleiss' kappa treats them as one group that says `Pass` on 6 of 8 answers, so chance alone would make them agree 62.5% of the time, more than the 50% they actually agree.
 
@@ -360,8 +360,8 @@ The 🤖 `Safety (binary)` evaluator against 👩 Asha alone, from the Setup:
 
 - Agreement = 3 / 4 = 0.75.
 - 🤖 `Safety (binary)` says `Pass` on 2 of 4 items. 👩 Asha says `Pass` on 3 of 4.
-- Chance agreement = (2/4 x 3/4) + (2/4 x 1/4) = 0.50.
-- Cohen's kappa = (0.75 - 0.50) / (1 - 0.50) = **0.50**.
+- Chance agreement = (2/4 x 3/4) + (2/4 x 1/4) = 0.5.
+- Cohen's kappa = (0.75 - 0.5) / (1 - 0.5) = **0.5**.
 
 </Accordion>
 <Accordion title="Show the calculation: linear weighted kappa for ratings">
@@ -370,11 +370,11 @@ Linear weighting means the credit goes down in equal steps as two ratings move a
 
 | Ratings apart | Linear (used here) | Quadratic |
 | --- | --- | --- |
-| 0 | 1.00 | 1.00 |
+| 0 | 1 | 1 |
 | 1 | 0.75 | 0.94 |
-| 2 | 0.50 | 0.75 |
+| 2 | 0.5 | 0.75 |
 | 3 | 0.25 | 0.44 |
-| 4 | 0.00 | 0.00 |
+| 4 | 0 | 0 |
 
 Linear weighting is used because the agreement uses it too. With quadratic weighting, kappa would give 0.94 to two ratings one apart while the agreement gives 0.75.
 
@@ -382,7 +382,7 @@ On `Empathy (rating)` in the Setup, 👩 Asha and 👨 Ben agree 0.875:
 
 - Their 8 ratings in one list are 2, 2, 3, 3, 4, 4, 5, 5.
 - Chance agreement is the average partial credit between two ratings drawn at random from that list: 0.6875.
-- Linear weighted Fleiss' kappa = (0.875 - 0.6875) / (1 - 0.6875) = **0.60**.
+- Linear weighted Fleiss' kappa = (0.875 - 0.6875) / (1 - 0.6875) = **0.6**.
 
 </Accordion>
 </AccordionGroup>
