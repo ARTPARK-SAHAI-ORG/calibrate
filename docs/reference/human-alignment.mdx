@@ -186,16 +186,16 @@ Kappa runs from -1 to 1: 1 is full agreement, 0 is the same as chance, and below
 
 | Comparison | Agreement | Chance agreement | Kappa |
 | --- | --- | --- | --- |
-| 👩 Asha and 👨 Ben on `Safety (binary)` | 75% | 53% | (0.75 - 0.53) / (1 - 0.53) = **0.47** |
+| 👩 Asha and 👨 Ben on `Safety (binary)` | 75% | 50% | (0.75 - 0.5) / (1 - 0.5) = **0.5** |
 | 🤖 Evaluator and the annotators on `Safety (binary)` | 63% | 50% | (0.625 - 0.5) / (1 - 0.5) = **0.25** |
 | 👩 Asha and 👨 Ben on `Empathy (rating)` | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.6** |
 | 🤖 Evaluator and the annotators on `Empathy (rating)` | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.2** |
 
 How each chance agreement is worked out:
 
-- **👩 Asha and 👨 Ben on `Safety (binary)`:** annotators are treated as one group ([Fleiss' kappa](#which-kappa-is-used)), so their 8 labels go into one list: 5 `Pass` and 3 `Fail`. Chance = (5/8 x 5/8) + (3/8 x 3/8) = 0.53.
+- **👩 Asha and 👨 Ben on `Safety (binary)`:** with exactly two annotators, each person's answers are kept apart ([Cohen's kappa](#which-kappa-is-used)). 👩 Asha says `Pass` 3 times out of 4 and 👨 Ben 2 times out of 4. Chance = (3/4 x 2/4) + (1/4 x 2/4) = 0.5.
 - **🤖 Evaluator and the annotators on `Safety (binary)`:** the evaluator and the annotators are kept apart ([Cohen's kappa](#which-kappa-is-used)). Over the 8 pairs, the evaluator says `Pass` 4 times and the annotators 5 times. Chance = (4/8 x 5/8) + (4/8 x 3/8) = 0.5.
-- **👩 Asha and 👨 Ben on `Empathy (rating)`:** as one group, their 8 ratings go into one list: two each of 2, 3, 4 and 5. Over the 16 ways to pick two of these, the agreements add up to (4 x 1) + (6 x 0.75) + (4 x 0.5) + (2 x 0.25) = 11. Chance = 11 / 16 = 0.6875.
+- **👩 Asha and 👨 Ben on `Empathy (rating)`:** kept apart, as above. 👩 Asha's ratings are 2, 3, 4 and 5, and so are 👨 Ben's. Over the 16 ways to pair one of hers with one of his, the agreements add up to (4 x 1) + (6 x 0.75) + (4 x 0.5) + (2 x 0.25) = 11. Chance = 11 / 16 = 0.6875.
 - **🤖 Evaluator and the annotators on `Empathy (rating)`:** kept apart, as above. Over the 8 pairs, the evaluator gives 5 twice, 4 four times and 2 twice. The annotators give two each of 2, 3, 4 and 5. Against those, a 5 agrees 0.625 on average, a 4 agrees 0.75 and a 2 agrees 0.625. Chance = (2/8 x 0.625) + (4/8 x 0.75) + (2/8 x 0.625) = 0.6875.
 
 ## Why can kappa not be worked out?
@@ -210,7 +210,8 @@ How each chance agreement is worked out:
 
 | Comparison | Kappa | Where the chance answers come from |
 | --- | --- | --- |
-| Annotators with each other | **Fleiss' kappa** | All the annotators' answers in one list, because any annotator could have labelled any item |
+| Exactly two annotators with each other | **Cohen's kappa** | Each annotator's answers kept apart, because each person has their own habits |
+| Three or more annotators with each other | **Fleiss' kappa** | All the annotators' answers in one list, because Cohen's kappa only works for a fixed pair of people |
 | An evaluator with the annotators | **Cohen's kappa** | The evaluator's answers and the annotators' answers kept apart, because each side has its own habits |
 | One annotator with the other annotators | **Cohen's kappa** | That annotator's answers and the others' answers kept apart |
 
@@ -218,6 +219,10 @@ For ratings, the kappa is **linear weighted**: close ratings get partial credit 
 
 <Note>
 `Pass` or `Fail` answers and ratings never go into the same kappa, because chance agreement is worked out differently for each.
+</Note>
+
+<Note>
+Only annotators who labelled at least one item that another annotator also labelled are counted. When a third annotator shares an item on a dimension, its kappa between annotators switches from Cohen's to Fleiss' and can change.
 </Note>
 
 
