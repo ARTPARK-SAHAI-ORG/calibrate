@@ -12,10 +12,10 @@ export const Match = () => <span style={{color: "#16A34A", fontWeight: 600, font
 export const NoMatch = () => <span style={{color: "#DC2626", fontWeight: 600, fontSize: "1.1em"}}>✗</span>;
 
 export const Answers = ({ name, answers }) => (
-  <div style={{display: "flex", alignItems: "center", gap: "4px", margin: "6px 0"}}>
+  <div style={{display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px", margin: "6px 0"}}>
     <span style={{width: "4.5em"}}>{name}</span>
     {answers.split("").map((answer, index) => (
-      <span key={index} style={{width: "1.9em", textAlign: "center", padding: "2px 0", borderRadius: "5px", fontSize: "0.8em", fontWeight: 500, background: answer === "P" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: answer === "P" ? "#16A34A" : "#DC2626"}}>{answer}</span>
+      <span key={index} style={{width: "3.2em", textAlign: "center", padding: "2px 0", borderRadius: "5px", fontSize: "0.8em", fontWeight: 500, background: answer === "P" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: answer === "P" ? "#16A34A" : "#DC2626"}}>{answer === "P" ? "Pass" : "Fail"}</span>
     ))}
   </div>
 );
@@ -50,13 +50,14 @@ export const KappaScale = () => (
 
 This page answers three questions:
 
-- What score did the annotators give, and what score did the evaluator give?
+- What score did the annotators give?
+- What score did the evaluator give?
 - Do the annotators agree with each other?
 - Does the evaluator agree with the annotators?
 
 ## Setup
 
-Two annotators, Asha and Ben, and one evaluator answered the same four items. The evaluator answers pass or fail.
+Two annotators, Asha and Ben, and one evaluator answered the same four items. The evaluator answers `Pass` or `Fail`.
 
 | Item | Asha | Ben | Evaluator |
 | --- | --- | --- | --- |
@@ -66,41 +67,69 @@ Two annotators, Asha and Ben, and one evaluator answered the same four items. Th
 | 4 | <Pass /> | <Pass /> | <Fail /> |
 
 <Note>
-Only the latest answer counts. If Asha changes item 2 from fail to pass, only the pass counts.
+Only the latest answer counts. If Asha changes item 2 from `Fail` to `Pass`, only the `Pass` counts.
 </Note>
 
-## What score did the annotators and the evaluator give?
+## How is the human score worked out?
 
-Scores are on the **Human scores** and **Evaluator scores** cards on a task's **Overview** tab, and in the **Score** column on an evaluation run's page.
+For a binary evaluator, the human score is the share of labels that are `Pass`. For a rating evaluator, it is the average rating.
 
-- For a binary evaluator, the score is the share of answers that are pass.
-- For a rating evaluator, the score is the average rating.
-
-| Score | Answers counted | Pass | Score |
-| --- | --- | --- | --- |
-| Human score | 8 labels: 4 from Asha, 4 from Ben | 5 | 5 / 8 = **63%** |
-| Evaluator score | 4 items | 2 | 2 / 4 = **50%** |
+| Annotator | Labels | `Pass` |
+| --- | --- | --- |
+| Asha | 4 | 3 |
+| Ben | 4 | 2 |
+| **Human score** | **8** | **5 of 8 = 63%** |
 
 <Note>
-The human score counts every annotator's label, with no majority vote. The evaluator score counts its latest score on each item, and on a task only scores from the evaluator's live version count.
+Every annotator's label counts. An item labelled by two people adds two labels. There is no majority vote.
 </Note>
 
-## How often do they give the same answer?
+## How is the evaluator score worked out?
 
-Agreement is how often two answers match, as a percentage. Every pair of answers on the same item is compared.
+For a binary evaluator, the evaluator score is the share of items it scored `Pass`. For a rating evaluator, it is the average rating.
 
-| Item | Asha and Ben | Evaluator and Asha | Evaluator and Ben |
+| Item | Evaluator |
+| --- | --- |
+| 1 | <Pass /> |
+| 2 | <Pass /> |
+| 3 | <Fail /> |
+| 4 | <Fail /> |
+
+Evaluator score = 2 of 4 = **50%**.
+
+<Note>
+Only the evaluator's latest score on each item counts. On a task, only scores from the evaluator's live version count.
+</Note>
+
+## Do the annotators agree with each other?
+
+Inter-annotator agreement compares the annotators' answers on each item.
+
+| Item | Asha | Ben | Same answer? |
 | --- | --- | --- | --- |
-| 1 | <Match /> | <Match /> | <Match /> |
-| 2 | <NoMatch /> | <Match /> | <NoMatch /> |
-| 3 | <Match /> | <Match /> | <Match /> |
-| 4 | <Match /> | <NoMatch /> | <NoMatch /> |
-| **Matches** | **3 of 4** | **3 of 4** | **2 of 4** |
+| 1 | <Pass /> | <Pass /> | <Match /> |
+| 2 | <Pass /> | <Fail /> | <NoMatch /> |
+| 3 | <Fail /> | <Fail /> | <Match /> |
+| 4 | <Pass /> | <Pass /> | <Match /> |
 
-- **Inter-annotator agreement** compares the annotators with each other: 3 of 4 = **75%**.
-- **Evaluator agreement with humans** compares the evaluator with each annotator: (3 + 2) of 8 = **63%**.
+Inter-annotator agreement = 3 of 4 = **75%**.
 
-For ratings, close ratings get partial credit. On a scale of 1 to 5, the widest gap is 5 - 1 = 4:
+## Does the evaluator agree with the annotators?
+
+Evaluator agreement with humans compares the evaluator's answer with each annotator's answer on the same item.
+
+| Item | Evaluator | Same as Asha? | Same as Ben? |
+| --- | --- | --- | --- |
+| 1 | <Pass /> | <Match /> | <Match /> |
+| 2 | <Pass /> | <Match /> | <NoMatch /> |
+| 3 | <Fail /> | <Match /> | <Match /> |
+| 4 | <Fail /> | <NoMatch /> | <NoMatch /> |
+
+Evaluator agreement with humans = (3 + 2) of 8 = **63%**.
+
+## How are two ratings compared?
+
+Close ratings get partial credit. On a scale of 1 to 5, the widest gap is 5 - 1 = 4:
 
 | Two ratings | Gap | Agreement |
 | --- | --- | --- |
@@ -111,7 +140,7 @@ For ratings, close ratings get partial credit. On a scale of 1 to 5, the widest 
 
 ## Is a high agreement good enough?
 
-Kiran and Meera each say pass 9 times out of 10, without looking at the items:
+Kiran and Meera each say `Pass` 9 times out of 10, without looking at the items:
 
 <Answers name="Kiran" answers="PPPPPPPPFP" />
 <Answers name="Meera" answers="PPPPPPPPPF" />
@@ -132,7 +161,7 @@ Kappa is agreement after removing what chance alone would produce.
 | The evaluator and the annotators | 63% | 50% | (0.625 - 0.50) / (1 - 0.50) = **0.25** |
 | Kiran and Meera | 80% | 82% | (0.80 - 0.82) / (1 - 0.82) = **-0.11** |
 
-Chance agreement comes from how often each side says pass and fail. Asha's and Ben's 8 labels are 5 pass and 3 fail, so two labels picked at random agree (5/8 x 5/8) + (3/8 x 3/8) = 53% of the time.
+Chance agreement comes from how often each side says `Pass` and `Fail`. Asha's and Ben's 8 labels are 5 `Pass` and 3 `Fail`, so two labels picked at random agree (5/8 x 5/8) + (3/8 x 3/8) = 53% of the time.
 
 ## Is the agreement better than chance?
 
@@ -140,7 +169,7 @@ Under each agreement on the **Overview** tab of **Human alignment**, under **Sco
 
 <ChanceBar label="Asha and Ben" agreement={75} chance={53} colour="#16A34A" caption="Better than chance" />
 <ChanceBar label="Kiran and Meera" agreement={80} chance={82} colour="#DC2626" caption="Worse than chance" />
-<ChanceBar label="Everyone said pass" agreement={100} colour="#9CA3AF" caption="Same as chance, or cannot be compared" />
+<ChanceBar label={<>Everyone said <code>Pass</code></>} agreement={100} colour="#9CA3AF" caption="Same as chance, or cannot be compared" />
 
 The bar is filled up to the agreement. The tick marks the agreement expected by chance alone.
 
@@ -193,9 +222,9 @@ Each pair of answers counts once, so an item labelled by more people has more pa
 
 | Item | Asha | Ben | Chitra | Dev | Pairs | Pairs that agree |
 | --- | --- | --- | --- | --- | --- | --- |
-| 1 | Pass | Pass | | | 1 | 1 |
-| 2 | Pass | Fail | Pass | | 3 | 1 |
-| 3 | Fail | Fail | Fail | Pass | 6 | 3 |
+| 1 | `Pass` | `Pass` | | | 1 | 1 |
+| 2 | `Pass` | `Fail` | `Pass` | | 3 | 1 |
+| 3 | `Fail` | `Fail` | `Fail` | `Pass` | 6 | 3 |
 
 Inter-annotator agreement = (1 + 1 + 3) / (1 + 3 + 6) = 5 / 10 = **50%**. A plain average of the three items would give (1.00 + 0.33 + 0.50) / 3 = 61%, which is not the number Calibrate shows.
 
@@ -203,19 +232,19 @@ Kappa uses the same pairs, so each answer counts once for every pair it is in:
 
 | Item | Annotators | Each answer is in | Answers in the one list |
 | --- | --- | --- | --- |
-| 1 | 2 | 1 pair | 2 pass |
-| 2 | 3 | 2 pairs | 4 pass, 2 fail |
-| 3 | 4 | 3 pairs | 3 pass, 9 fail |
+| 1 | 2 | 1 pair | 2 `Pass` |
+| 2 | 3 | 2 pairs | 4 `Pass`, 2 `Fail` |
+| 3 | 4 | 3 pairs | 3 `Pass`, 9 `Fail` |
 
-That gives 20 answers: 9 pass and 11 fail. Chance agreement = (9/20 x 9/20) + (11/20 x 11/20) = 0.505. Kappa = (0.50 - 0.505) / (1 - 0.505) = **-0.01**.
+That gives 20 answers: 9 `Pass` and 11 `Fail`. Chance agreement = (9/20 x 9/20) + (11/20 x 11/20) = 0.505. Kappa = (0.50 - 0.505) / (1 - 0.505) = **-0.01**.
 
-Now add an evaluator that scores the three items pass, fail and fail:
+Now add an evaluator that scores the three items `Pass`, `Fail` and `Fail`:
 
 | Item | Evaluator | Annotators | Pairs | Pairs that agree |
 | --- | --- | --- | --- | --- |
-| 1 | Pass | Asha pass, Ben pass | 2 | 2 |
-| 2 | Fail | Asha pass, Ben fail, Chitra pass | 3 | 1 |
-| 3 | Fail | Asha fail, Ben fail, Chitra fail, Dev pass | 4 | 3 |
+| 1 | `Pass` | Asha `Pass`, Ben `Pass` | 2 | 2 |
+| 2 | `Fail` | Asha `Pass`, Ben `Fail`, Chitra `Pass` | 3 | 1 |
+| 3 | `Fail` | Asha `Fail`, Ben `Fail`, Chitra `Fail`, Dev `Pass` | 4 | 3 |
 
 Evaluator agreement with humans = (2 + 1 + 3) / (2 + 3 + 4) = 6 / 9 = **67%**. The evaluator's answer on item 3 is compared with four annotators, so it counts four times in chance agreement too. Chance agreement is 0.4691 and kappa is **0.37**.
 
@@ -239,26 +268,26 @@ A plain average of the two evaluators' 67% and 88% would give 77%, which is not 
 </Accordion>
 <Accordion title="Show the calculation: Fleiss' and Cohen's kappa on the same answers">
 
-Priya says pass on all four items. Ravi says pass, pass, fail, fail. They agree on 2 of 4 items, so agreement is 0.50.
+Priya says `Pass` on all four items. Ravi says `Pass`, `Pass`, `Fail`, `Fail`. They agree on 2 of 4 items, so agreement is 0.50.
 
 | | Chance agreement | Kappa |
 | --- | --- | --- |
-| **Cohen's kappa** (Priya against the others) | Priya always says pass, Ravi says pass half the time: (1 x 0.5) + (0 x 0.5) = 0.50 | (0.50 - 0.50) / (1 - 0.50) = **0.00** |
-| **Fleiss' kappa** (inter-annotator agreement) | One list of 8 answers, 6 pass and 2 fail: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.50 - 0.625) / (1 - 0.625) = **-0.33** |
+| **Cohen's kappa** (Priya against the others) | Priya always says `Pass`, Ravi says `Pass` half the time: (1 x 0.5) + (0 x 0.5) = 0.50 | (0.50 - 0.50) / (1 - 0.50) = **0.00** |
+| **Fleiss' kappa** (inter-annotator agreement) | One list of 8 answers, 6 `Pass` and 2 `Fail`: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.50 - 0.625) / (1 - 0.625) = **-0.33** |
 
-Cohen's kappa keeps Priya's habit and Ravi's habit apart, and finds they agree exactly as often as those two habits predict. Fleiss' kappa treats them as one group that says pass on 6 of 8 answers, so chance alone would make them agree 62.5% of the time, more than the 50% they actually agree.
+Cohen's kappa keeps Priya's habit and Ravi's habit apart, and finds they agree exactly as often as those two habits predict. Fleiss' kappa treats them as one group that says `Pass` on 6 of 8 answers, so chance alone would make them agree 62.5% of the time, more than the 50% they actually agree.
 
 An evaluator against one annotator:
 
 | Item | Evaluator | Asha |
 | --- | --- | --- |
-| 1 | Pass | Pass |
-| 2 | Pass | Pass |
-| 3 | Fail | Fail |
-| 4 | Fail | Pass |
+| 1 | `Pass` | `Pass` |
+| 2 | `Pass` | `Pass` |
+| 3 | `Fail` | `Fail` |
+| 4 | `Fail` | `Pass` |
 
 - Agreement = 3 / 4 = 0.75.
-- The evaluator says pass on 2 of 4 items. Asha says pass on 3 of 4.
+- The evaluator says `Pass` on 2 of 4 items. Asha says `Pass` on 3 of 4.
 - Chance agreement = (2/4 x 3/4) + (2/4 x 1/4) = 0.50.
 - Kappa = (0.75 - 0.50) / (1 - 0.50) = **0.50**.
 
@@ -319,12 +348,12 @@ Ben, in the three items from the first box:
 
 | Item | Ben | Other annotators | Pairs | Pairs that agree |
 | --- | --- | --- | --- | --- |
-| 1 | Pass | Asha pass | 1 | 1 |
-| 2 | Fail | Asha pass, Chitra pass | 2 | 0 |
-| 3 | Fail | Asha fail, Chitra fail, Dev pass | 3 | 2 |
+| 1 | `Pass` | Asha `Pass` | 1 | 1 |
+| 2 | `Fail` | Asha `Pass`, Chitra `Pass` | 2 | 0 |
+| 3 | `Fail` | Asha `Fail`, Chitra `Fail`, Dev `Pass` | 3 | 2 |
 
 - Ben's agreement = 3 / 6 = **50%**.
-- Counted once for each pair, Ben's answers are 1 pass and 5 fail, and the others' are 4 pass and 2 fail.
+- Counted once for each pair, Ben's answers are 1 `Pass` and 5 `Fail`, and the others' are 4 `Pass` and 2 `Fail`.
 - Chance agreement = (1/6 x 4/6) + (5/6 x 2/6) = 0.3889.
 - **Kappa (binary)** = (0.50 - 0.3889) / (1 - 0.3889) = **0.18**.
 
