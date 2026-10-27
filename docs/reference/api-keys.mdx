@@ -10,13 +10,17 @@ API keys authenticate Calibrate in the [GitHub Action](/reference/github-actions
 ## Creating an API key
 
 <Steps>
-  <Step title="Open Workspace settings">
-    Go to [Workspace settings → API
-    keys](https://calibrate.artpark.ai/workspace-settings?tab=api-keys) and
-    select the **API keys** tab.
+  <Step title="Open the API keys tab">
+    Click the workspace name at the top of the sidebar, then click **API keys**.
+    You can also click your profile picture in the top right and click **API keys**.
+    Both open the **API keys** tab of Workspace settings.
+
+    <Frame>
+      <img src="/images/app/workspace-settings-api-keys.png" alt="The API keys tab of Workspace settings with no keys yet and a Create key button" />
+    </Frame>
   </Step>
   <Step title="Click Create key">
-    Click **Create key** in the top right of the API keys section.
+    Click **Create key**. It is in the middle of the tab when you have no keys yet, and in the top right once you have some.
   </Step>
   <Step title="Name your key">
     Enter a **Name** for the key (for example, `GitHub Action CI`).
@@ -50,10 +54,10 @@ The API keys table lists every key with three columns:
 | Column        | Description                                          |
 | ------------- | ---------------------------------------------------- |
 | **Name**      | The label you gave the key when creating it          |
-| **Value**     | The masked key prefix                                |
+| **Value**     | The first few characters of the key, with the rest hidden |
 | **Last used** | When the key was last used to authenticate a request |
 
-To permanently disable a key, click **Revoke**. Any integration using that key will immediately lose access.
+To permanently disable a key, click **Revoke**. Any app or script using that key stops working straight away.
 
 ## Best practices
 
@@ -63,7 +67,7 @@ Name keys after their purpose (for example, `GitHub Action CI` or `Staging autom
 
 ### Rotate keys regularly
 
-Create a new key, update your integrations, then **Revoke** the old one — especially for production CI pipelines.
+Create a new key, put it in every app or script that uses the old one, then **Revoke** the old one. Do this most of all for keys that run your tests automatically, such as in a GitHub Action.
 
 ### Revoke unused keys
 
@@ -71,7 +75,7 @@ Promptly revoke keys that are no longer in use.
 
 ### Store keys as secrets
 
-Never commit API keys to version control. Use GitHub secrets, environment variables, or your team's secret manager.
+Never paste an API key into code that you save or share, such as a file in a GitHub repository. Keep it somewhere private, such as a GitHub secret or the place your team keeps passwords.
 
 ## Next steps
 
@@ -80,6 +84,6 @@ Never commit API keys to version control. Use GitHub secrets, environment variab
     Explore the full API documentation
   </Card>
   <Card title="GitHub Action" icon="github" href="/reference/github-actions">
-    Use API keys in your CI/CD pipeline
+    Run your tests automatically on GitHub with an API key
   </Card>
 </CardGroup>

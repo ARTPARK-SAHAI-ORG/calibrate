@@ -1,0 +1,63 @@
+---
+title: "Members and workspace details"
+description: "Invite your team to a workspace, rename it, and switch between workspaces"
+---
+
+A workspace holds your agents, tests, evaluators and runs. Everyone who is a member of a workspace sees the same things.
+
+## Open workspace settings
+
+1. Click the workspace name at the top of the sidebar.
+2. Click **Workspace settings**.
+
+The settings page has four tabs: **Members**, **API keys**, **Bring your own keys (BYOK)** and **General**.
+
+## Members
+
+The **Members** tab lists everyone in the workspace, with their email and role. The person who created the workspace has the owner role.
+
+<Frame>
+  <img src="/images/app/workspace-settings-members.png" alt="The Members tab of Workspace settings, with the Invite button and one member marked as owner" />
+</Frame>
+
+### Invite people
+
+1. On the **Members** tab, click **Invite**.
+2. Choose how to invite:
+   - **By email**: type one or more email addresses and click **Add**. The workspace shows up for them the next time they log in.
+   - **Invite with a link**: click **Create an invite link** and share the link. Anyone with the link can join this workspace.
+
+### Remove someone
+
+Click **Remove** next to their name, then confirm. They lose access straight away. The owner cannot be removed.
+
+To leave a workspace yourself, click **Leave** next to your own name.
+
+## General
+
+The **General** tab has two settings.
+
+<Frame>
+  <img src="/images/app/workspace-settings-general.png" alt="The General tab of Workspace settings, with the Name field and the Benchmarking choice" />
+</Frame>
+
+- **Name**: type a new name for the workspace and click **Save**.
+- **Benchmarking**: choose **Parallel** or **Sequential**. This sets how models run when you [compare models on your tests](/app/agents/compare-models). **Parallel** is quicker but puts more load on your agent's server. Pick **Sequential** to avoid overloading it.
+
+## Switch or create a workspace
+
+Click the workspace name at the top of the sidebar to see all your workspaces.
+
+- To switch, click another workspace in the list.
+- To make a new one, click **Create workspace**, type a **Name**, and click **Create workspace**.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="API keys" icon="key" href="/reference/api-keys">
+    Create a key to use Calibrate from other apps
+  </Card>
+  <Card title="Bring your own keys (BYOK)" icon="lock" href="/reference/byok">
+    Add your own provider keys
+  </Card>
+</CardGroup>

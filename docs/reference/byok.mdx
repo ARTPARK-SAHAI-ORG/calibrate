@@ -9,18 +9,35 @@ description: "Add your own provider API keys to remove the limits on evaluation 
 
 Evaluation runs are billed to your own provider accounts.
 
-### Rate limits
+### No limits on evaluation runs
 
-When using Calibrate's default keys, all your evaluation runs have rate limits, which become a hindrance once you have tested your agent and want to scale your evaluations to a larger dataset. With your own keys, these limits are removed.
+On Calibrate's default keys, your workspace has two limits:
+
+- The number of rows a single evaluation run can process.
+- The number of [live conversations](/app/agents/monitoring) Calibrate scores automatically.
+
+With your own keys, both limits are removed. The limit on how many live conversations your workspace can store stays the same.
 
 ## Add a key
 
-1. Open [Workspace settings → Bring your own keys (BYOK)](https://calibrate.artpark.ai/workspace-settings?tab=provider-keys).
-2. Add each provider's API key. See [Setup](/integrations/setup) for how to configure different providers.
-3. Click **Save**. Calibrate checks the key with the provider before saving it.
+1. Click the workspace name at the top of the sidebar.
+2. Click **Workspace settings**.
+3. Click the **Bring your own keys (BYOK)** tab.
+4. Paste a provider's API key into its field. See [Setup](/integrations/setup) for how to get a key from each provider.
+5. Click **Save** next to the field. For your first key, click **Save the key** to confirm. Calibrate checks the key with the provider before saving it.
+
+<Frame>
+  <img src="/images/app/workspace-settings-byok.png" alt="The Bring your own keys (BYOK) tab, with a key field for OpenRouter under Language models and for each speech provider under Voice evaluation" />
+</Frame>
+
+**OpenRouter** under **Language models** is used by every evaluator, and by LLM tests, benchmarks and simulations. The providers under **Voice evaluation** are used for speech-to-text, text-to-speech and voice simulations.
+
+### Add a missing key while you set up a run
+
+Once your workspace uses its own keys, the **Speech-to-Text** and **Text-to-Speech** pages mark a provider without a key as **API key needed**. Select that provider and a key field opens under it. Paste the key and click **Save**.
 
 ## How keys are used
 
 - Once you add any key, every run in your workspace uses only your keys.
-- A run that needs a provider you have not added a key for will not run.
-- If you remove all your keys, runs go back to Calibrate's default keys and rate limits.
+- A run that needs a provider you have not added a key for starts and then fails.
+- If you remove all your keys, runs go back to Calibrate's default keys and their limits.
