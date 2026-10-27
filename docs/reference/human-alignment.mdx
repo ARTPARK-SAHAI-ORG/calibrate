@@ -3,26 +3,71 @@ title: "Human alignment computation"
 description: "How Calibrate computes human and evaluator (LLM judge) scores, and measures agreement among humans and between evaluators and humans"
 ---
 
+export const Pass = () => <span style={{display: "inline-block", minWidth: "3.2em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(22,163,74,0.15)", color: "#16A34A"}}>Pass</span>;
+
+export const Fail = () => <span style={{display: "inline-block", minWidth: "3.2em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(220,38,38,0.15)", color: "#DC2626"}}>Fail</span>;
+
+export const Match = () => <span style={{color: "#16A34A", fontWeight: 600, fontSize: "1.1em"}}>✓</span>;
+
+export const NoMatch = () => <span style={{color: "#DC2626", fontWeight: 600, fontSize: "1.1em"}}>✗</span>;
+
+export const Answers = ({ name, answers }) => (
+  <div style={{display: "flex", alignItems: "center", gap: "4px", margin: "6px 0"}}>
+    <span style={{width: "4.5em"}}>{name}</span>
+    {answers.split("").map((answer, index) => (
+      <span key={index} style={{width: "1.9em", textAlign: "center", padding: "2px 0", borderRadius: "5px", fontSize: "0.8em", fontWeight: 500, background: answer === "P" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: answer === "P" ? "#16A34A" : "#DC2626"}}>{answer}</span>
+    ))}
+  </div>
+);
+
+export const ChanceBar = ({ label, agreement, chance, colour, caption }) => (
+  <div style={{display: "grid", gridTemplateColumns: "minmax(0, 11em) minmax(0, 1fr) minmax(0, 9em)", gap: "16px", alignItems: "center", margin: "14px 0"}}>
+    <span>{label}</span>
+    <div style={{position: "relative", height: "10px", borderRadius: "5px", background: "rgba(128,128,128,0.25)"}}>
+      <div style={{position: "absolute", left: 0, top: 0, bottom: 0, width: `${agreement}%`, borderRadius: "5px", background: colour}} />
+      {chance !== undefined && <div style={{position: "absolute", top: "-4px", left: `${chance}%`, width: "2px", height: "18px", background: "currentColor"}} />}
+    </div>
+    <span style={{fontSize: "0.9em"}}>{caption}</span>
+  </div>
+);
+
+export const KappaScale = () => (
+  <svg viewBox="0 0 640 74" style={{width: "100%", margin: "8px 0"}} role="img" aria-label="Kappa from -1 to 1, with the three examples marked">
+    <line x1="20" y1="34" x2="620" y2="34" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+    <line x1="320" y1="26" x2="320" y2="42" stroke="currentColor" strokeOpacity="0.6" />
+    <text x="20" y="64" fill="currentColor" fontSize="13">-1 worse than chance</text>
+    <text x="320" y="64" fill="currentColor" fontSize="13" textAnchor="middle">0 same as chance</text>
+    <text x="620" y="64" fill="currentColor" fontSize="13" textAnchor="end">1 full agreement</text>
+    <circle cx="287" cy="34" r="6" fill="#DC2626" />
+    <text x="287" y="17" fill="currentColor" fontSize="13" textAnchor="middle">-0.11</text>
+    <circle cx="395" cy="34" r="6" fill="#16A34A" />
+    <text x="395" y="17" fill="currentColor" fontSize="13" textAnchor="middle">0.25</text>
+    <circle cx="461" cy="34" r="6" fill="#16A34A" />
+    <text x="461" y="17" fill="currentColor" fontSize="13" textAnchor="middle">0.47</text>
+  </svg>
+);
+
+
 This page answers three questions:
 
 - What score did the annotators give, and what score did the evaluator give?
 - Do the annotators agree with each other?
 - Does the evaluator agree with the annotators?
 
-## The example used on this page
+## The example on this page
 
 Two annotators, Asha and Ben, and one evaluator answered the same four items. The evaluator answers pass or fail.
 
 | Item | Asha | Ben | Evaluator |
 | --- | --- | --- | --- |
-| 1 | Pass | Pass | Pass |
-| 2 | Pass | Fail | Pass |
-| 3 | Fail | Fail | Fail |
-| 4 | Pass | Pass | Fail |
+| 1 | <Pass /> | <Pass /> | <Pass /> |
+| 2 | <Pass /> | <Fail /> | <Pass /> |
+| 3 | <Fail /> | <Fail /> | <Fail /> |
+| 4 | <Pass /> | <Pass /> | <Fail /> |
 
 Only the latest answer counts. If Asha changes item 2 from fail to pass, only the pass counts. Comments and reasons are never part of any number.
 
-## Scores
+## What score did the annotators and the evaluator give?
 
 A score shows what the answers came to, not how often they match. Scores are on the **Human scores** and **Evaluator scores** cards on a task's **Overview** tab, and in the **Score** column on an evaluation run's page.
 
@@ -37,19 +82,20 @@ A score shows what the answers came to, not how often they match. Scores are on 
 - The human score counts every annotator's label. An item labelled by two people adds two labels. There is no majority vote.
 - The evaluator score counts the evaluator's latest score on each item, so each item counts once. On a task, only scores from the evaluator's live version count.
 
-## Agreement
+## How often do they give the same answer?
 
 Agreement is how often two answers match, as a percentage. Every pair of answers on the same item is compared.
 
 | Item | Asha and Ben | Evaluator and Asha | Evaluator and Ben |
 | --- | --- | --- | --- |
-| 1 | Match | Match | Match |
-| 2 | No match | Match | No match |
-| 3 | Match | Match | Match |
-| 4 | Match | No match | No match |
+| 1 | <Match /> | <Match /> | <Match /> |
+| 2 | <NoMatch /> | <Match /> | <NoMatch /> |
+| 3 | <Match /> | <Match /> | <Match /> |
+| 4 | <Match /> | <NoMatch /> | <NoMatch /> |
+| **Matches** | **3 of 4** | **3 of 4** | **2 of 4** |
 
-- **Inter-annotator agreement** compares the annotators with each other. Asha and Ben match on 3 of 4 pairs: **75%**.
-- **Evaluator agreement with humans** compares the evaluator with each annotator. The evaluator matches on 5 of 8 pairs: **63%**.
+- **Inter-annotator agreement** compares the annotators with each other: 3 of 4 = **75%**.
+- **Evaluator agreement with humans** compares the evaluator with each annotator: (3 + 2) of 8 = **63%**.
 
 For ratings, close ratings get partial credit. On a scale of 1 to 5, the widest gap is 5 - 1 = 4:
 
@@ -60,53 +106,42 @@ For ratings, close ratings get partial credit. On a scale of 1 to 5, the widest 
 | 2 and 4 | 2 | 1 - 2/4 = 50% |
 | 5 and 1 | 4 | 1 - 4/4 = 0% |
 
-## Why a high agreement can mislead
+## Is a high agreement good enough?
 
-Two people who each say pass 9 times out of 10, without looking at the items, still agree most of the time by chance:
+Kiran and Meera each say pass 9 times out of 10, without looking at the items:
 
-| Both say | Chance |
-| --- | --- |
-| Pass | 0.9 x 0.9 = 0.81 |
-| Fail | 0.1 x 0.1 = 0.01 |
-| **Agree by chance** | **0.82, or 82%** |
+<Answers name="Kiran" answers="PPPPPPPPFP" />
+<Answers name="Meera" answers="PPPPPPPPPF" />
 
-So if they agree on 80% of items, they did slightly worse than chance, even though 80% sounds good.
+They agree on 8 of 10 items, 80%. By chance alone they would agree (0.9 x 0.9) + (0.1 x 0.1) = 82% of the time. So 80% sounds good, but it is slightly worse than chance.
 
-## Kappa
+## How much of the agreement is more than luck?
 
 Kappa is agreement after removing what chance alone would produce.
 
 **Kappa = (agreement - chance agreement) / (1 - chance agreement)**
 
-- **1** means full agreement.
-- **0** means no better than chance.
-- **Below 0** means worse than chance.
+<KappaScale />
 
 | Comparison | Agreement | Chance agreement | Kappa |
 | --- | --- | --- | --- |
 | Asha and Ben | 75% | 53% | (0.75 - 0.53) / (1 - 0.53) = **0.47** |
 | The evaluator and the annotators | 63% | 50% | (0.625 - 0.50) / (1 - 0.50) = **0.25** |
-| Two people who say pass 9 times out of 10 | 80% | 82% | (0.80 - 0.82) / (1 - 0.82) = **-0.11** |
+| Kiran and Meera | 80% | 82% | (0.80 - 0.82) / (1 - 0.82) = **-0.11** |
 
 Chance agreement comes from how often each side says pass and fail. Asha's and Ben's 8 labels are 5 pass and 3 fail, so two labels picked at random agree (5/8 x 5/8) + (3/8 x 3/8) = 53% of the time.
 
-## Reading the bar
+## Is the agreement better than chance?
 
 Under each agreement on the **Overview** tab of **Human alignment**, under **Score reliability** on a task, and on an evaluation run's page, there is a bar:
 
-- The bar is filled up to the agreement.
-- The tick on the bar marks **Agreement expected by chance alone**.
-- The colour says how the two compare.
+<ChanceBar label="Asha and Ben" agreement={75} chance={53} colour="#16A34A" caption="Better than chance" />
+<ChanceBar label="Kiran and Meera" agreement={80} chance={82} colour="#DC2626" caption="Worse than chance" />
+<ChanceBar label="Everyone said pass" agreement={100} colour="#9CA3AF" caption="Same as chance, or cannot be compared" />
 
-| Example | Agreement | Chance | Kappa | The bar |
-| --- | --- | --- | --- | --- |
-| Asha and Ben | 75% | 53% | 0.47 | Green, **Better than chance** |
-| Two people who say pass 9 times out of 10 | 80% | 82% | -0.11 | Red, **Worse than chance** |
-| Everyone said pass | 100% | 100% | Blank | Grey, **Same as chance, or cannot be compared** |
+The bar is filled up to the agreement. The tick marks the agreement expected by chance alone.
 
-The bar is also grey when there is no chance agreement to compare with.
-
-## When kappa is blank
+## Why is kappa missing?
 
 | Shown in place of kappa | Why | What to do |
 | --- | --- | --- |
@@ -116,7 +151,7 @@ The bar is also grey when there is no chance agreement to compare with.
 
 Hover over the information icon beside **Too few items** or **Everyone agreed** to see the reason on screen.
 
-## Which kappa you see
+## Which kind of kappa is shown?
 
 Hover over the information icon beside a kappa to see which kind it is.
 
@@ -130,7 +165,7 @@ For ratings, the kappa is **linear weighted**: close ratings get partial credit 
 
 Binary and rating answers never go into the same kappa. This is why the **Annotators** tab has a **Kappa (binary)** and a **Kappa (rating)** column, and why the two cards at the top of the **Overview** tab show agreement only.
 
-## What changes the numbers
+## Why did a number change?
 
 - **Making a different evaluator version the live one.** On a task's **Overview** tab and the **Overview** tab of **Human alignment**, only the live version's scores count. The evaluator's agreement and score start again from that version.
 - **Deleting an annotator.** Their answers stop counting everywhere, including on past evaluation runs.
@@ -140,7 +175,7 @@ Binary and rating answers never go into the same kappa. This is why the **Annota
 - **An evaluation run in progress.** Its scores count as they arrive, before the run finishes.
 - **An evaluation run that fails.** Its scores are removed, so they stop counting.
 
-## The full calculations
+## Check a number by hand
 
 <AccordionGroup>
 <Accordion title="Show the calculation: items with different numbers of annotators">
