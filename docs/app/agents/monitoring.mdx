@@ -12,7 +12,11 @@ Each turn your app sends is called a trace. A trace holds what the student said,
 1. In the sidebar, click **Agents**, then click "Maths homework tutor".
 2. Click the **Monitoring** tab.
 3. Under **Create an API key**, click **Create API key**, or paste a key you already have and click **Check key**.
-4. Under **Send your first trace**, pick **cURL**, **Python** or **JavaScript** and copy the code into your app. Your API key and the agent's ID are already filled in.
+4. Under **Send your first trace**, pick **cURL**, **Python** or **JavaScript** and copy the code into your app. The agent's ID is already filled in. If you created or checked a key in the step above, it is filled in too. If not, replace `YOUR_API_KEY` with your key.
+
+<Frame>
+  <img src="/images/app/agents-monitoring-setup.png" alt="The Getting started steps on the Monitoring tab, with Send your first trace open showing the cURL code and what each value means" />
+</Frame>
 5. Run your app so it sends one trace.
 6. Under **Check that it arrived**, click **Check for traces**.
 
@@ -50,6 +54,12 @@ Calibrate can score each trace with the evaluators on the agent's **Evaluators**
 
 The button changes to **Continuous monitoring on**. From then on, every trace that arrives is scored. Traces that arrived earlier are not scored.
 
+To stop scoring, click **Continuous monitoring on**, then click **Turn off**. Scores already given are kept.
+
+<Frame>
+  <img src="/images/app/agents-monitoring-scoring.png" alt="The Turn off continuous monitoring window, saying new traces will not be scored, with Cancel and Turn off buttons" />
+</Frame>
+
 Above the list, **Production quality** shows the average score for each evaluator across your traces. It updates as more traces are scored. To score with a different evaluator, add it on the agent's **Evaluators** tab.
 
 ## Turn traces into tests
@@ -57,7 +67,11 @@ Above the list, **Production quality** shows the average score for each evaluato
 When a real conversation goes wrong, you can keep it as a test.
 
 1. On the **Traces** view, tick the traces you want.
-2. Click **Add to tests**.
+2. Click **Add to tests**. The button shows how many traces you ticked.
+
+<Frame>
+  <img src="/images/app/agents-traces-to-tests.png" alt="The Traces view with two traces ticked, the Add to tests (2) button, Production quality scores for Step-by-step reply and Warm tone, and Continuous monitoring on" />
+</Frame>
 
 The tests appear on the agent's **Tests** tab. See [Write tests for an agent](/app/agents/tests).
 
