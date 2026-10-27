@@ -77,8 +77,9 @@
             ]
           },
           {
-            "group": "For Teams",
+            "group": "Workspaces for Teams",
             "pages": [
+              "app/workspace-settings/overview",
               "app/workspace-settings/members",
               "app/workspace-settings/settings",
               "reference/byok",
