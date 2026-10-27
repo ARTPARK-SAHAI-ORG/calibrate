@@ -80,8 +80,9 @@
             "group": "For Teams",
             "pages": [
               "app/workspace-settings/members",
-              "reference/api-keys",
-              "reference/byok"
+              "app/workspace-settings/settings",
+              "reference/byok",
+              "reference/api-keys"
             ]
           },
           {
