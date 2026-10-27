@@ -34,12 +34,17 @@ Each evaluator has three buttons:
 
 ## Create a simulation evaluator
 
-1. Click **Create evaluator** at the top right of the page. The **Add evaluator** panel opens.
+1. Click **Create evaluator** at the top right of the page. The **Add evaluator** window opens.
 2. Enter a **Name**, such as "Explains step by step". **Description** is optional and shows in the list.
-3. Under **Review type**, pick `binary` for pass or fail, or `rating` for a score on a scale. For a rating, set the levels of the scale.
+3. Under **Review type**, pick **Binary** for pass or fail, or **Rating** for a score on a scale. For **Binary**, you can change the **Labels** shown for a pass and a fail. For **Rating**, set the levels of the scale.
+
+<Frame>
+  <img src="/images/app/simulations-create-evaluator.png" alt="The Add evaluator window with Name, Description, Review type set to Binary, and the True and False labels" />
+</Frame>
+
 4. Under **Judge model**, pick the AI model that does the scoring.
 5. Under **Judge prompt**, write what the judge should check.
-6. Click **Create evaluator** at the bottom of the panel.
+6. Click **Create evaluator** at the bottom of the window.
 
 The judge reads the whole conversation, so the prompt cannot use `{{...}}` variables. Any you type are read as plain text.
 
@@ -60,8 +65,12 @@ How encouraging and patient is the tutor's reply? 1 is dismissive,
 You pick evaluators on the **Config** tab of a simulation, under **Select evaluators**.
 
 1. Click **Add evaluators**.
-2. Tick the evaluators you want.
+2. Tick the evaluators you want. Your own evaluators are listed first, then the pre-built ones. Click a name to see its model and prompt on the right.
 3. Click **Add**.
+
+<Frame>
+  <img src="/images/app/simulations-add-evaluators.png" alt="The Add evaluators window listing Encouraging tone and Explains step by step, then three pre-built evaluators, with the prompt of Encouraging tone shown on the right" />
+</Frame>
 
 To write a new one without leaving the simulation, click **Create evaluator** next to **Add evaluators**.
 
