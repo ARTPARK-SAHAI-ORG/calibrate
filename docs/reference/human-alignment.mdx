@@ -31,21 +31,6 @@ export const ChanceBar = ({ children, agreement, chance, colour, caption }) => (
   </div>
 );
 
-export const KappaScale = () => (
-  <svg viewBox="0 0 640 88" style={{width: "100%", margin: "8px 0"}} role="img" aria-label="Kappa from -1 to 1, with the examples on this page marked">
-    <line x1="20" y1="48" x2="620" y2="48" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
-    <line x1="320" y1="40" x2="320" y2="56" stroke="currentColor" strokeOpacity="0.6" />
-    <text x="20" y="80" fill="currentColor" fontSize="13">-1 worse than chance</text>
-    <text x="320" y="80" fill="currentColor" fontSize="13" textAnchor="middle">0 same as chance</text>
-    <text x="620" y="80" fill="currentColor" fontSize="13" textAnchor="end">1 full agreement</text>
-    {[[0.2, 1], [0.25, 0], [0.47, 1], [0.6, 0]].map(([kappa, row]) => (
-      <g key={kappa}>
-        <circle cx={320 + kappa * 300} cy="48" r="6" fill={kappa < 0 ? "#DC2626" : "#16A34A"} />
-        <text x={320 + kappa * 300} y={row ? 14 : 32} fill="currentColor" fontSize="13" textAnchor="middle">{kappa}</text>
-      </g>
-    ))}
-  </svg>
-);
 
 
 
@@ -207,7 +192,7 @@ Kappa is agreement after removing what chance alone would produce.
 
 **Kappa = (agreement - chance agreement) / (1 - chance agreement)**
 
-<KappaScale />
+Kappa runs from -1 to 1: 1 is full agreement, 0 is the same as chance, and below 0 is worse than chance.
 
 | Comparison | Agreement | Chance agreement | Kappa |
 | --- | --- | --- | --- |
