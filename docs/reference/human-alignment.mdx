@@ -118,7 +118,7 @@ Only the evaluator's latest score on each item is used. Scores from versions of 
 
 ## Do the annotators agree with each other?
 
-Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each item. For `Empathy (rating)`, close ratings get partial credit: two equal ratings agree 1, ratings 1 apart agree 0.75, ratings 2 apart agree 0.5, and so on down to 1 and 5, which agree 0.
+Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each item. For `Empathy (rating)`, ratings that are close still get some agreement: 4 and 4 agree 1, 3 and 2 agree 0.75, 2 and 4 agree 0.5, and 1 and 5 agree 0.
 
 <Tabs>
 <Tab title="Safety (binary)">
@@ -171,9 +171,9 @@ That gives 20 answers: 9 `Pass` and 11 `Fail`. Chance agreement = (9/20 x 9/20) 
 </Accordion>
 <Accordion title="Show the calculation: ratings outside the scale">
 
-A rating can fall outside the scale, for example when it was given on an older version of the evaluator with a wider scale. When the ratings on an item are further apart than the scale allows, the widest difference is taken from the ratings themselves, so every agreement stays between 0 and 1.
+A rating can fall outside the scale, for example when it was given on an older version of the evaluator with a wider scale. When two ratings on an item differ by more than the scale allows, the largest difference is taken from the ratings themselves, so every agreement stays between 0 and 1.
 
-On a scale of 1 to 5, the widest difference is 4. Suppose 👩 Asha, 👨 Ben and 👧 Chitra rate one item 1, 6 and 7. Those ratings are up to 6 apart, so on this item, two ratings 6 apart agree 0:
+On a scale of 1 to 5, the largest possible difference is 5 - 1 = 4. Suppose 👩 Asha, 👨 Ben and 👧 Chitra rate one item 1, 6 and 7. The largest difference among them is 7 - 1 = 6, so on this item 1 and 7 agree 0:
 
 | Two ratings | Agreement |
 | --- | --- |
@@ -181,12 +181,12 @@ On a scale of 1 to 5, the widest difference is 4. Suppose 👩 Asha, 👨 Ben an
 | 1 and 7 | 1 - 6/6 = 0 |
 | 6 and 7 | 1 - 1/6 = 0.83 |
 
-Chance agreement uses the same widest difference as the agreement it is compared with, and two random ratings further apart than that get no credit. Add a second item that 👩 Asha and 👨 Ben rate 4 and 5, which agree 0.75 on the normal scale:
+Chance agreement uses the same largest difference as the agreement, and two random ratings that differ by more than that get no credit. Add a second item that 👩 Asha and 👨 Ben rate 4 and 5, which agree 0.75 on the normal scale:
 
 - Agreement = (0.17 + 0 + 0.83 + 0.75) / 4 = 0.4375.
 - Chance agreement is 0.5605, and kappa = (0.4375 - 0.5605) / (1 - 0.5605) = **-0.28**.
 
-When no scale is known for a dimension, the widest difference on each item is taken from the ratings on that item.
+When no scale is known for a dimension, the largest difference on each item is taken from the ratings on that item.
 
 </Accordion>
 <Accordion title="Show the calculation: one annotator against the others">
@@ -366,9 +366,9 @@ The 🤖 `Safety (binary)` evaluator against 👩 Asha alone, from the Setup:
 </Accordion>
 <Accordion title="Show the calculation: linear weighted kappa for ratings">
 
-Linear weighting means the credit goes down in equal steps as two ratings move apart. Another common choice, quadratic weighting, gives much more credit to ratings that are close. On a scale of 1 to 5:
+Linear weighting means the credit goes down in equal steps as the difference between two ratings grows. Another common choice, quadratic weighting, gives much more credit to ratings that are close. On a scale of 1 to 5:
 
-| Ratings apart | Linear (used here) | Quadratic |
+| Difference between the two ratings | Linear (used here) | Quadratic |
 | --- | --- | --- |
 | 0 | 1 | 1 |
 | 1 | 0.75 | 0.94 |
@@ -376,7 +376,7 @@ Linear weighting means the credit goes down in equal steps as two ratings move a
 | 3 | 0.25 | 0.44 |
 | 4 | 0 | 0 |
 
-Linear weighting is used because the agreement uses it too. With quadratic weighting, kappa would give 0.94 to two ratings one apart while the agreement gives 0.75.
+Linear weighting is used because the agreement uses it too. With quadratic weighting, kappa would give 0.94 to two ratings that differ by 1, such as 3 and 4, while the agreement gives 0.75.
 
 On `Empathy (rating)` in the Setup, 👩 Asha and 👨 Ben agree 0.875:
 
