@@ -1,11 +1,11 @@
 ---
-title: "Human alignment computation"
-description: "How Calibrate computes human and evaluator (LLM judge) scores, and measures agreement among humans and between evaluators and humans"
+title: "How the agreement numbers are worked out"
+description: "How Calibrate computes human and evaluator scores, and measures agreement among humans and between evaluators and humans"
 ---
 
-export const Pass = () => <span style={{display: "inline-block", minWidth: "3.2em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(22,163,74,0.15)", color: "#16A34A"}}>Pass</span>;
+export const Correct = () => <span style={{display: "inline-block", minWidth: "4.5em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(22,163,74,0.15)", color: "#16A34A"}}>Correct</span>;
 
-export const Fail = () => <span style={{display: "inline-block", minWidth: "3.2em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(220,38,38,0.15)", color: "#DC2626"}}>Fail</span>;
+export const Wrong = () => <span style={{display: "inline-block", minWidth: "4.5em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(220,38,38,0.15)", color: "#DC2626"}}>Wrong</span>;
 
 export const Match = () => <span style={{color: "#16A34A", fontWeight: 600, fontSize: "1.1em"}}>✓</span>;
 
@@ -15,7 +15,7 @@ export const Answers = ({ name, answers }) => (
   <div style={{display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px", margin: "6px 0"}}>
     <span style={{width: "4.5em"}}>{name}</span>
     {answers.split("").map((answer, index) => (
-      <span key={index} style={{width: "3.2em", textAlign: "center", padding: "2px 0", borderRadius: "5px", fontSize: "0.8em", fontWeight: 500, background: answer === "P" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: answer === "P" ? "#16A34A" : "#DC2626"}}>{answer === "P" ? "Pass" : "Fail"}</span>
+      <span key={index} style={{width: "4.5em", textAlign: "center", padding: "2px 0", borderRadius: "5px", fontSize: "0.8em", fontWeight: 500, background: answer === "C" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: answer === "C" ? "#16A34A" : "#DC2626"}}>{answer === "C" ? "Correct" : "Wrong"}</span>
     ))}
   </div>
 );
@@ -33,25 +33,25 @@ This page shows how four numbers are computed, and the kappa for each agreement:
 
 ## Setup
 
-Two annotators, 👩 Asha and 👨 Ben, labelled four replies from a support agent on two dimensions. Each dimension also has a 🤖 evaluator, an LLM judge, that scored the same four replies.
+Two annotators, 👩 Meena and 👨 Kabir, labelled four replies from the maths tutor against two evaluators. Each 🤖 evaluator also scored the same four replies.
 
-- `Safety (binary)`: each answer is `Pass` or `Fail`.
-- `Empathy (rating)`: each answer is a rating from 1 to 5.
+- `Explains step by step (binary)`: each answer is `Correct` or `Wrong`.
+- `Encouraging tone (rating)`: each answer is a rating from 1 to 5.
 
 <Tabs>
-<Tab title="Safety (binary)">
+<Tab title="Explains step by step (binary)">
 
-| Item | 👩 Asha | 👨 Ben | 🤖 Evaluator |
+| Item | 👩 Meena | 👨 Kabir | 🤖 Evaluator |
 | --- | --- | --- | --- |
-| 1 | <Pass /> | <Pass /> | <Pass /> |
-| 2 | <Pass /> | <Fail /> | <Pass /> |
-| 3 | <Fail /> | <Fail /> | <Fail /> |
-| 4 | <Pass /> | <Pass /> | <Fail /> |
+| 1 | <Correct /> | <Correct /> | <Correct /> |
+| 2 | <Correct /> | <Wrong /> | <Correct /> |
+| 3 | <Wrong /> | <Wrong /> | <Wrong /> |
+| 4 | <Correct /> | <Correct /> | <Correct /> |
 
 </Tab>
-<Tab title="Empathy (rating)">
+<Tab title="Encouraging tone (rating)">
 
-| Item | 👩 Asha | 👨 Ben | 🤖 Evaluator |
+| Item | 👩 Meena | 👨 Kabir | 🤖 Evaluator |
 | --- | --- | --- | --- |
 | 1 | 4 | 4 | 5 |
 | 2 | 3 | 2 | 4 |
@@ -62,30 +62,35 @@ Two annotators, 👩 Asha and 👨 Ben, labelled four replies from a support age
 </Tabs>
 
 <Note>
-Only each person's latest answer is used. If 👩 Asha changes her answer on item 2 from `Fail` to `Pass`, the calculations use `Pass` and ignore the earlier `Fail`.
+Only each person's latest answer is used. If 👩 Meena changes her answer on item 2 from `Wrong` to `Correct`, the calculations use `Correct` and ignore the earlier `Wrong`.
 </Note>
 
 ## How is the human score worked out?
 
-For `Safety (binary)`, the human score is the share of labels that are `Pass`. For `Empathy (rating)`, it is the average rating.
+For `Explains step by step (binary)`, the human score is the share of labels that are `Correct`. For `Encouraging tone (rating)`, it is the average rating.
 
-| Annotator | Safety (binary) | Empathy (rating) |
+| Annotator | Explains step by step (binary) | Encouraging tone (rating) |
 | --- | --- | --- |
-| 👩 Asha | 3 `Pass` of 4 | 4 + 3 + 5 + 2 = 14 |
-| 👨 Ben | 2 `Pass` of 4 | 4 + 2 + 5 + 3 = 14 |
+| 👩 Meena | 3 `Correct` of 4 | 4 + 3 + 5 + 2 = 14 |
+| 👨 Kabir | 2 `Correct` of 4 | 4 + 2 + 5 + 3 = 14 |
 | **Human score** | **(3 + 2) of 8 labels = 63%** | **(14 + 14) / 8 labels = 3.5 / 5** |
+
+{/* not-a-ui-label: Human score */}
 
 ## How is the evaluator score worked out?
 
-For `Safety (binary)`, the evaluator score is the share of items it scored `Pass`. For `Empathy (rating)`, it is the average rating.
+For `Explains step by step (binary)`, the evaluator score is the share of items it scored `Correct`. For `Encouraging tone (rating)`, it is the average rating.
 
-| Item | 🤖 Evaluator on Safety (binary) | 🤖 Evaluator on Empathy (rating) |
+| Item | 🤖 Evaluator on Explains step by step (binary) | 🤖 Evaluator on Encouraging tone (rating) |
 | --- | --- | --- |
-| 1 | <Pass /> | 5 |
-| 2 | <Pass /> | 4 |
-| 3 | <Fail /> | 4 |
-| 4 | <Fail /> | 2 |
-| **Evaluator score** | **2 of 4 items = 50%** | **(5 + 4 + 4 + 2) / 4 items = 3.75 / 5** |
+| 1 | <Correct /> | 5 |
+| 2 | <Correct /> | 4 |
+| 3 | <Wrong /> | 4 |
+| 4 | <Correct /> | 2 |
+| **Evaluator score** | **3 of 4 items = 75%** | **(5 + 4 + 4 + 2) / 4 items = 3.75 / 5** |
+
+{/* not-a-ui-label: 3 of 4 items = 75% */}
+{/* not-a-ui-label: Evaluator score */}
 
 <Note>
 Only the evaluator's latest score on each item is used. Scores from versions of the evaluator other than the live version are not used.
@@ -93,21 +98,23 @@ Only the evaluator's latest score on each item is used. Scores from versions of 
 
 ## Do the annotators agree with each other?
 
-Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each item.
+Inter-annotator agreement compares 👩 Meena's and 👨 Kabir's answers on each item.
 
 <Tabs>
-<Tab title="Safety (binary)">
+<Tab title="Explains step by step (binary)">
 
-| Item | 👩 Asha | 👨 Ben | Same answer? |
+| Item | 👩 Meena | 👨 Kabir | Same answer? |
 | --- | --- | --- | --- |
-| 1 | <Pass /> | <Pass /> | <Match /> |
-| 2 | <Pass /> | <Fail /> | <NoMatch /> |
-| 3 | <Fail /> | <Fail /> | <Match /> |
-| 4 | <Pass /> | <Pass /> | <Match /> |
+| 1 | <Correct /> | <Correct /> | <Match /> |
+| 2 | <Correct /> | <Wrong /> | <NoMatch /> |
+| 3 | <Wrong /> | <Wrong /> | <Match /> |
+| 4 | <Correct /> | <Correct /> | <Match /> |
 | **Agreement** |  |  | **3 of 4 items = 75%** |
 
+{/* not-a-ui-label: 3 of 4 items = 75% */}
+
 </Tab>
-<Tab title="Empathy (rating)">
+<Tab title="Encouraging tone (rating)">
 
 Two ratings that are close still agree partly:
 
@@ -115,7 +122,7 @@ Two ratings that are close still agree partly:
 
 On a scale of 1 to 5, that is 1 - difference / (5 - 1).
 
-| Item | 👩 Asha | 👨 Ben | Agreement |
+| Item | 👩 Meena | 👨 Kabir | Agreement |
 | --- | --- | --- | --- |
 | 1 | 4 | 4 | 1 - (4 - 4) / (5 - 1) = 1 |
 | 2 | 3 | 2 | 1 - (3 - 2) / (5 - 1) = 0.75 |
@@ -132,35 +139,37 @@ On a scale of 1 to 5, that is 1 - difference / (5 - 1).
 Evaluator agreement with humans compares the 🤖 evaluator's answer with each annotator's answer on the same item.
 
 <Tabs>
-<Tab title="Safety (binary)">
+<Tab title="Explains step by step (binary)">
 
 | Item | 🤖 Evaluator | Annotator | Same answer? |
 | --- | --- | --- | --- |
-| 1 | <Pass /> | 👩 Asha <Pass /> | <Match /> |
-| 1 | <Pass /> | 👨 Ben <Pass /> | <Match /> |
-| 2 | <Pass /> | 👩 Asha <Pass /> | <Match /> |
-| 2 | <Pass /> | 👨 Ben <Fail /> | <NoMatch /> |
-| 3 | <Fail /> | 👩 Asha <Fail /> | <Match /> |
-| 3 | <Fail /> | 👨 Ben <Fail /> | <Match /> |
-| 4 | <Fail /> | 👩 Asha <Pass /> | <NoMatch /> |
-| 4 | <Fail /> | 👨 Ben <Pass /> | <NoMatch /> |
-| **Agreement** | | | **5 of 8 pairs = 63%** |
+| 1 | <Correct /> | 👩 Meena <Correct /> | <Match /> |
+| 1 | <Correct /> | 👨 Kabir <Correct /> | <Match /> |
+| 2 | <Correct /> | 👩 Meena <Correct /> | <Match /> |
+| 2 | <Correct /> | 👨 Kabir <Wrong /> | <NoMatch /> |
+| 3 | <Wrong /> | 👩 Meena <Wrong /> | <Match /> |
+| 3 | <Wrong /> | 👨 Kabir <Wrong /> | <Match /> |
+| 4 | <Correct /> | 👩 Meena <Correct /> | <Match /> |
+| 4 | <Correct /> | 👨 Kabir <Correct /> | <Match /> |
+| **Agreement** | | | **7 of 8 pairs = 88%** |
+
+{/* not-a-ui-label: 7 of 8 pairs = 88% */}
 
 </Tab>
-<Tab title="Empathy (rating)">
+<Tab title="Encouraging tone (rating)">
 
 Each pair is worked out the same way as between the annotators.
 
 | Item | 🤖 Evaluator | Annotator | Agreement |
 | --- | --- | --- | --- |
-| 1 | 5 | 👩 Asha 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
-| 1 | 5 | 👨 Ben 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
-| 2 | 4 | 👩 Asha 3 | 1 - (4 - 3) / (5 - 1) = 0.75 |
-| 2 | 4 | 👨 Ben 2 | 1 - (4 - 2) / (5 - 1) = 0.5 |
-| 3 | 4 | 👩 Asha 5 | 1 - (5 - 4) / (5 - 1) = 0.75 |
-| 3 | 4 | 👨 Ben 5 | 1 - (5 - 4) / (5 - 1) = 0.75 |
-| 4 | 2 | 👩 Asha 2 | 1 - (2 - 2) / (5 - 1) = 1 |
-| 4 | 2 | 👨 Ben 3 | 1 - (3 - 2) / (5 - 1) = 0.75 |
+| 1 | 5 | 👩 Meena 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 1 | 5 | 👨 Kabir 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 2 | 4 | 👩 Meena 3 | 1 - (4 - 3) / (5 - 1) = 0.75 |
+| 2 | 4 | 👨 Kabir 2 | 1 - (4 - 2) / (5 - 1) = 0.5 |
+| 3 | 4 | 👩 Meena 5 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 3 | 4 | 👨 Kabir 5 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 4 | 2 | 👩 Meena 2 | 1 - (2 - 2) / (5 - 1) = 1 |
+| 4 | 2 | 👨 Kabir 3 | 1 - (3 - 2) / (5 - 1) = 0.75 |
 | **Agreement** | | | **(0.75 + 0.75 + 0.75 + 0.5 + 0.75 + 0.75 + 1 + 0.75) / 8 pairs = 75%** |
 
 </Tab>
@@ -169,10 +178,10 @@ Each pair is worked out the same way as between the annotators.
 
 ## Is a high agreement good enough?
 
-Suppose 👩 Asha and 👨 Ben label 10 other replies on `Safety (binary)`, and each says `Pass` 9 times out of 10 without reading them:
+Suppose 👩 Meena and 👨 Kabir label 10 other replies on `Explains step by step (binary)`, and each says `Correct` 9 times out of 10 without reading them:
 
-<Answers name="👩 Asha" answers="PPPPPPPPFP" />
-<Answers name="👨 Ben" answers="PPPPPPPPPF" />
+<Answers name="👩 Meena" answers="CCCCCCCCWC" />
+<Answers name="👨 Kabir" answers="CCCCCCCCCW" />
 
 They agree on 8 of 10 replies, 80%. By chance alone they would agree (0.9 x 0.9) + (0.1 x 0.1) = 82% of the time. So 80% sounds good, but it is slightly worse than chance.
 
@@ -186,23 +195,23 @@ Kappa runs from -1 to 1: 1 is full agreement, 0 is the same as chance, and below
 
 | Comparison | Agreement | Chance agreement | Kappa |
 | --- | --- | --- | --- |
-| 👩 Asha and 👨 Ben on `Safety (binary)` | 75% | 50% | (0.75 - 0.5) / (1 - 0.5) = **0.5** |
-| 🤖 Evaluator and the annotators on `Safety (binary)` | 63% | 50% | (0.625 - 0.5) / (1 - 0.5) = **0.25** |
-| 👩 Asha and 👨 Ben on `Empathy (rating)` | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.6** |
-| 🤖 Evaluator and the annotators on `Empathy (rating)` | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.2** |
+| 👩 Meena and 👨 Kabir on `Explains step by step (binary)` | 75% | 50% | (0.75 - 0.5) / (1 - 0.5) = **0.5** |
+| 🤖 Evaluator and the annotators on `Explains step by step (binary)` | 88% | 56% | (0.875 - 0.5625) / (1 - 0.5625) = **0.71** |
+| 👩 Meena and 👨 Kabir on `Encouraging tone (rating)` | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.6** |
+| 🤖 Evaluator and the annotators on `Encouraging tone (rating)` | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.2** |
 
 How each chance agreement is worked out:
 
-- **👩 Asha and 👨 Ben on `Safety (binary)`:** with exactly two annotators, each person's answers are kept apart ([Cohen's kappa](#which-kappa-is-used)). 👩 Asha says `Pass` 3 times out of 4 and 👨 Ben 2 times out of 4. Chance = (3/4 x 2/4) + (1/4 x 2/4) = 0.5.
-- **🤖 Evaluator and the annotators on `Safety (binary)`:** the evaluator and the annotators are kept apart ([Cohen's kappa](#which-kappa-is-used)). Over the 8 pairs, the evaluator says `Pass` 4 times and the annotators 5 times. Chance = (4/8 x 5/8) + (4/8 x 3/8) = 0.5.
-- **👩 Asha and 👨 Ben on `Empathy (rating)`:** kept apart, as above. 👩 Asha's ratings are 2, 3, 4 and 5, and so are 👨 Ben's. Over the 16 ways to pair one of hers with one of his, the agreements add up to (4 x 1) + (6 x 0.75) + (4 x 0.5) + (2 x 0.25) = 11. Chance = 11 / 16 = 0.6875.
-- **🤖 Evaluator and the annotators on `Empathy (rating)`:** kept apart, as above. Over the 8 pairs, the evaluator gives 5 twice, 4 four times and 2 twice. The annotators give two each of 2, 3, 4 and 5. Against those, a 5 agrees 0.625 on average, a 4 agrees 0.75 and a 2 agrees 0.625. Chance = (2/8 x 0.625) + (4/8 x 0.75) + (2/8 x 0.625) = 0.6875.
+- 👩 Meena and 👨 Kabir on `Explains step by step (binary)`: with exactly two annotators, each person's answers are kept apart ([Cohen's kappa](#which-kappa-is-used)). 👩 Meena says `Correct` 3 times out of 4 and 👨 Kabir 2 times out of 4. Chance = (3/4 x 2/4) + (1/4 x 2/4) = 0.5.
+- 🤖 Evaluator and the annotators on `Explains step by step (binary)`: the evaluator and the annotators are kept apart ([Cohen's kappa](#which-kappa-is-used)). Over the 8 pairs, the evaluator says `Correct` 6 times and the annotators 5 times. Chance = (6/8 x 5/8) + (2/8 x 3/8) = 0.5625.
+- 👩 Meena and 👨 Kabir on `Encouraging tone (rating)`: kept apart, as above. 👩 Meena's ratings are 2, 3, 4 and 5, and so are 👨 Kabir's. Over the 16 ways to pair one of hers with one of his, the agreements add up to (4 x 1) + (6 x 0.75) + (4 x 0.5) + (2 x 0.25) = 11. Chance = 11 / 16 = 0.6875.
+- 🤖 Evaluator and the annotators on `Encouraging tone (rating)`: kept apart, as above. Over the 8 pairs, the evaluator gives 5 twice, 4 four times and 2 twice. The annotators give two each of 2, 3, 4 and 5. Against those, a 5 agrees 0.625 on average, a 4 agrees 0.75 and a 2 agrees 0.625. Chance = (2/8 x 0.625) + (4/8 x 0.75) + (2/8 x 0.625) = 0.6875.
 
 ## Why can kappa not be worked out?
 
 | Case | Why | What to do |
 | --- | --- | --- |
-| Every pair comes from one item | One item cannot show what chance alone would produce. | Label more items on this dimension. |
+| Every pair comes from one item | One item cannot show what chance alone would produce. | Label more items for this evaluator. |
 | Everyone gave the same answer | Chance agreement is 100%, so the formula divides by 0. | Nothing is wrong. Kappa can be worked out once someone gives a different answer. |
 | Nothing to compare | For example, only one annotator labelled the items. | Have a second annotator label the same items, or run the evaluator. |
 
@@ -215,23 +224,23 @@ How each chance agreement is worked out:
 | An evaluator with the annotators | **Cohen's kappa** | The evaluator's answers and the annotators' answers kept apart, because each side has its own habits |
 | One annotator with the other annotators | **Cohen's kappa** | That annotator's answers and the others' answers kept apart |
 
-For ratings, the kappa is **linear weighted**: close ratings get partial credit in chance agreement too, the same way as in the agreement.
+For ratings, the kappa is linear weighted: close ratings get partial credit in chance agreement too, the same way as in the agreement.
 
 <Note>
-`Pass` or `Fail` answers and ratings never go into the same kappa, because chance agreement is worked out differently for each.
+`Correct` or `Wrong` answers and ratings never go into the same kappa, because chance agreement is worked out differently for each.
 </Note>
 
 <Note>
-Only annotators who labelled at least one item that another annotator also labelled are counted. When a third annotator shares an item on a dimension, its kappa between annotators switches from Cohen's to Fleiss' and can change.
+Only annotators who labelled at least one item that another annotator also labelled are counted. When a third annotator shares an item for an evaluator, its kappa between annotators switches from Cohen's to Fleiss' and can change.
 </Note>
 
 
 ## Why did a number change?
 
-- **A different evaluator version was made the live one.** Only the live version's scores are used, so the evaluator's agreement and score start again from that version.
-- **An annotator was deleted.** Their answers are no longer used, including in evaluation runs that already finished.
-- **A labelling job was deleted.** The answers given in that job are no longer used, including in evaluation runs that already finished.
-- **An evaluation run was deleted.** Its scores are no longer used.
-- **An item was deleted.** It is no longer used, except in evaluation runs that already scored it.
-- **An evaluation run is in progress.** Its scores are used as they arrive, before the run finishes.
-- **An evaluation run failed.** Its scores are removed, so they are no longer used.
+- A different evaluator version was made the live one. Only the live version's scores are used, so the evaluator's agreement and score start again from that version.
+- An annotator was deleted. Their answers are no longer used, including in evaluation runs that already finished.
+- A labelling job was deleted. The answers given in that job are no longer used, including in evaluation runs that already finished.
+- An evaluation run was deleted. Its scores are no longer used.
+- An item was deleted. It is no longer used, except in evaluation runs that already scored it.
+- An evaluation run is in progress. Its scores are used as they arrive, before the run finishes.
+- An evaluation run failed. Its scores are removed, so they are no longer used.

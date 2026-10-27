@@ -1,0 +1,58 @@
+---
+title: "Human alignment overview"
+description: "Check whether an evaluator scores your agent's replies the way people do"
+---
+
+An evaluator is an AI judge that scores your agent's replies. Before you trust its scores, check that it agrees with people who know the subject.
+
+For the Maths homework tutor, the evaluator "Explains step by step" decides whether the tutor explains the next step rather than giving the answer straight away. Two teachers, Meena and Kabir, label the same replies by hand. Calibrate then shows how often the evaluator gives the same answer as Meena and Kabir.
+
+## How it works
+
+1. Create a labelling task, for example "Check tutor replies", and choose the evaluators it checks.
+2. Add items to the task. Each item is one conversation to label.
+3. Assign the items to annotators. Each annotator gets a link and labels every item.
+4. Run the evaluator on the same items.
+5. Compare the answers. Calibrate shows how often the annotators agree with each other, and how often the evaluator agrees with them.
+
+## The Human alignment page
+
+Click **Human alignment** in the sidebar. The page has three tabs.
+
+### Overview
+
+The **Overview** tab shows the **Agreement summary** across your labelling tasks:
+
+- **Annotator agreement**: how often the annotators give the same answer on the same item.
+- **Evaluator agreement with humans**: how often each evaluator gives the same answer as the annotators.
+
+The table below the two numbers has one row per evaluator. Each row also shows a kappa, which is the agreement after removing what chance alone would produce. The bar is green when the agreement is better than chance, red when it is worse, and grey when it is the same as chance. Use the **All tasks** menu to see the numbers for one task.
+
+<Frame><img src="/images/app/human-alignment-overview.png" alt="The Overview tab of the Human alignment page, showing 75% annotator agreement and 88% evaluator agreement with humans for Explains step by step" /></Frame>
+
+### Tasks
+
+The **Tasks** tab lists your labelling tasks, with each task's type, number of items, and evaluators. Click a task to open it.
+
+<Frame><img src="/images/app/human-alignment-tasks.png" alt="The Tasks tab with the Check tutor replies task, 4 items and the Explains step by step evaluator" /></Frame>
+
+### Annotators
+
+The **Annotators** tab lists the people who label items, with how many jobs each one has and how often they agree with the others.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Create a labelling task" href="/app/human-alignment/labelling-tasks">
+    Create the task, add items, and send them to annotators.
+  </Card>
+  <Card title="Invite annotators" href="/app/human-alignment/annotators">
+    Add annotators and see how they label items.
+  </Card>
+  <Card title="Check how well an evaluator agrees with people" href="/app/human-alignment/agreement">
+    Run the evaluator and compare its answers with the annotators.
+  </Card>
+  <Card title="How the agreement numbers are worked out" href="/reference/human-alignment">
+    A worked example of every number on these pages.
+  </Card>
+</CardGroup>
