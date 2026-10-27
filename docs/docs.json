@@ -18,7 +18,6 @@
             "pages": [
               "getting-started/introduction",
               "getting-started/create-account",
-              "getting-started/product-tour",
               "getting-started/quickstart"
             ]
           },
@@ -88,6 +87,8 @@
           {
             "group": "Reference",
             "pages": [
+              "reference/product-tour",
+              "reference/learning-resources",
               "reference/github-actions"
             ]
           }
