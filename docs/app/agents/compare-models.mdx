@@ -1,0 +1,73 @@
+---
+title: "Compare models on your tests"
+description: "Run the same tests on several models and pick the one that does best"
+---
+
+Your tests run on the model your agent is set up with. Another model may pass more tests, answer faster or cost less. Compare models runs the same tests on up to five models and ranks them.
+
+This page compares three models on the four tests of the Maths homework tutor.
+
+## Start a comparison
+
+1. In the sidebar, click **Agents**, then click "Maths homework tutor".
+2. Click the **Tests** tab.
+3. Click **Compare models**.
+4. Click **Select a model** and pick `openai/gpt-4.1-mini`.
+5. Add `google/gemini-2.5-flash` and `anthropic/claude-haiku-4.5` the same way.
+6. Click **Run comparison**.
+7. Click **Start the comparison** to confirm.
+
+To compare on only some tests, tick them in the list before you click **Compare models**.
+
+## Compare models for an agent you connected
+
+If you connected your own agent, its connection must pass the connection check before you can compare models.
+
+If **Support benchmarking different models** is off in the agent's connection settings, Calibrate first asks which provider your agent uses for models. Pick it and click **Continue**. The model list then shows only that provider's models. See [Enable benchmarking across models](/core-concepts/agent-connections#enable-benchmarking-across-models).
+
+Calibrate also checks that your agent works with each model before the comparison runs. Each model shows one of these:
+
+- **not checked**: the model has not been checked yet.
+- **verified**: your agent works with this model.
+- **failed**: the check did not pass. Click **See why** to see the error and what your agent sent back.
+
+After you click **Run comparison** and confirm with **Start the comparison**, Calibrate checks every model that is not verified. Click **Retry failed** to check the failed models again after you fix your agent. The comparison starts only when every model is verified. See [Verify your connection](/core-concepts/agent-connections#verify-your-connection).
+
+## Read the leaderboard
+
+The results window opens and fills in as each model finishes. The **Results** tab shows one row per model:
+
+<Frame>
+  <img src="/images/app/agents-compare-models.png" alt="The Results tab of a model comparison for the Maths homework tutor, with a table of three models and bar charts of pass rate and latency" />
+</Frame>
+
+| Model | Test pass rate (%) | Latency | Average cost |
+| --- | --- | --- | --- |
+| gpt-4.1-mini | 75% | 820 ms | $0.0011 |
+| gemini-2.5-flash | 100% | 640 ms | $0.0007 |
+| claude-haiku-4.5 | 100% | 910 ms | $0.0016 |
+
+In this comparison, gemini-2.5-flash passed every test and was the fastest and cheapest.
+
+The table also shows **Average tokens**, **Tool-call pass rate (%)** and one column for each evaluator. Below the table, bar charts show each number. Click **Download CSV** to save the table, or **PNG** to save a chart.
+
+The other tabs of the results window:
+
+- **Model selection**: a chart of quality against cost and speed, to help you pick a model.
+- **Tests**: each test's reply and verdict for every model.
+- **About**: what each number means.
+
+You can also **Export results**, **Share** a public link and **Submit for labelling** from the top of the window, the same as for a test run. See [Run tests and read results](/app/agents/run-tests).
+
+Every comparison is kept on the agent's **Evaluations** tab.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Build an agent in Calibrate" icon="robot" href="/core-concepts/agents">
+    Change the agent's model to the one that did best
+  </Card>
+  <Card title="Monitor live conversations" icon="chart-line" href="/app/agents/monitoring">
+    Check how the agent does with real users
+  </Card>
+</CardGroup>

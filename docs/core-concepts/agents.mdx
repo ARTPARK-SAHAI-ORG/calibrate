@@ -1,154 +1,84 @@
 ---
-title: "Agents"
-description: "Create AI agents to evaluate and improve"
+title: "Build an agent in Calibrate"
+description: "Write the system prompt, pick the models and set how the conversation runs"
 ---
 
-An agent is a core building block of Calibrate. Agents can:
-
-- Respond intelligently using LLM models following the instructions given to them
-- Use tools for structured data extraction
-- Process voice conversations using Speech To Text (STT) and Text To Speech (TTS)
+Build your agent in Calibrate when you want to try a prompt and a model without running your own server. This page builds the Maths homework tutor.
 
 <Tip>
-  Already have a deployed agent? You can connect it to Calibrate via its HTTP
-  endpoint instead of rebuilding it here. See [Agent
-  Connections](/core-concepts/agent-connections) for the setup guide.
+  Your agent already runs somewhere else? See [Connect your own
+  agent](/core-concepts/agent-connections).
 </Tip>
 
-## Quickstart
+## Create the agent
 
-### Navigate to agents
-
-From the sidebar, click **Agents** to view your existing agents or create a new one.
-
-<Frame>
-  <img src="./images/agents-1.png" alt="Agents List" />
-</Frame>
-
-### Create a new agent
-
-Click the **New agent** button in the top right corner.
+1. From the sidebar, click **Agents** → **New agent**.
+2. Under **Agent name**, type `Maths homework tutor`.
+3. Under **Setup**, select **Build your agent in Calibrate**.
 
 <Frame>
-  <img src="./images/agents-2.png" alt="Create Agent" />
+  <img src="/images/app/agents-new-agent-build.png" alt="The New agent dialog with Build your agent in Calibrate selected" />
 </Frame>
 
-Select **Build your agent in Calibrate**, give it a name, and click Create.
+4. Click **Next**.
+5. Select **Conversation**, then click **Create**.
+
+The agent page opens on the **Agent** tab.
+
+## Write the system prompt and pick the models
 
 <Frame>
-  <img src="./images/agents-0.png" alt="Create Agent" />
+  <img src="/images/app/agents-agent-tab.png" alt="The Agent tab of the Maths homework tutor, with its system prompt on the left and the three model choices on the right" />
 </Frame>
 
-Once ready, you'll be taken to the agent configuration page with multiple tabs.
+**System prompt** is where you tell the agent who it is and how to behave. The tutor's prompt is:
 
-## Configure your agent
-
-### Add instructions and select providers
-
-Configure the core agent behavior.
-
-<Frame>
-  <img src="./images/agents-3.png" alt="Agent tab" />
-</Frame>
-
-**System prompt**
-
-Define the context for the agent, its persona, how it should behave, and any guidelines it should follow. Write clear instructions.
+```text
+You are a friendly maths tutor for class 6 students in India. Explain one step at a time in simple words. Reply in the language the student uses (English or Hindi). Never give the final answer straight away: ask the student to try the next step first. If the student is upset, encourage them before continuing.
+```
 
 <Tip>
-  Be specific about the agent's tone, capabilities, and limitations in the
-  system prompt.
+  Write down the tone, what the agent should do, and what it must never do. Each
+  rule you write here is something you can test later.
 </Tip>
 
-For detailed guidance on writing effective system prompts, see [ElevenLabs Prompting Guide](https://elevenlabs.io/docs/agents-platform/best-practices/prompting-guide) and [OpenAI Prompt Engineering Guide](https://platform.openai.com/docs/guides/prompt-engineering).
+On the right, pick three models:
 
-**Speech To Text**
+- **Speech To Text**: the provider that turns the student's voice into text. The tutor uses Sarvam.
+- **Text To Speech**: the provider that turns the tutor's reply into voice. The tutor uses Sarvam.
+- **LLM**: the model that writes the replies. Click the box and search for a model. The tutor uses `openai/gpt-4.1-mini`.
 
-Select the STT provider for the agent.
+Calibrate uses the speech models only in voice simulations. Tests and text simulations use the LLM alone.
 
-**Text To Speech**
+Click **Save** at the top right.
 
-Select the TTS provider for the agent.
+## Set how the conversation runs
 
-**LLM**
-
-Select the provider and model for the agent.
-
-Click **Save** in the top right to save your configuration.
-
-### Add tools
-
-Add tools to enable structured outputs by the agent.
+Click the **Settings** tab.
 
 <Frame>
-  <img src="./images/agents-4.png" alt="Tools tab" />
+  <img src="/images/app/agents-settings.png" alt="The Settings tab of the Maths homework tutor" />
 </Frame>
 
-Click **Add tool** to attach tools to your agent. See the [Tools guide](/core-concepts/tools) for how to create tools.
+- **Agent speaks first**: turn this on if the agent should start the conversation. The tutor greets the student first.
+- **Max assistant turns**: the most replies the agent gives before the call ends. The default is 50.
+- **Enable continuous monitoring**: scores conversations from your live agent with the evaluators on the **Evaluators** tab. See [Monitor live conversations](/app/agents/monitoring).
 
-**In-built tools**
-
-The platform provides built-in tools like "End conversation" that are automatically available to all agents.
-
-### Define data extraction fields
-
-Define fields for extracting structured data from conversations.
-
-<Frame>
-  <img src="./images/agents-5.png" alt="Data extraction tab" />
-</Frame>
-
-Click **Add field** to define custom data specifications to extract from conversation transcripts.
-
-### Add tests
-
-Add tests to evaluate your agent's performance.
-
-<Frame>
-  <img src="./images/agents-6.png" alt="Tests tab" />
-</Frame>
-
-- Click **Add test** to attach tests to your agent
-- Click **Run all tests** to execute all tests for this agent
-- Click **Compare models** to benchmark different LLMs
-
-See the [LLM Testing guide](/quickstart/text-to-text) for how to create tests.
-
-### Configure advanced settings
-
-Configure advanced agent behavior.
-
-<Frame>
-  <img src="./images/agents-7.png" alt="Settings tab" />
-</Frame>
-
-**Agent speaks first**
-
-Toggle whether the agent should initiate the conversation.
-
-**Max assistant turns**
-
-Set the maximum number of assistant turns before ending the call.
-
-Click **Save** in the top right to save your configuration.
+Click **Save** at the top right.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card
-    title="Agent Connections"
-    icon="link"
-    href="/core-concepts/agent-connections"
-  >
-    Connect your existing deployed agent to Calibrate
+  <Card title="Add tools to an agent" icon="wrench" href="/core-concepts/tools">
+    Let the tutor save progress and fetch practice questions
   </Card>
-  <Card title="Run LLM Tests" icon="flask" href="/quickstart/text-to-text">
-    Test your agent's responses and tool usage
+  <Card title="Write tests for an agent" icon="flask" href="/app/agents/tests">
+    Check the tutor's replies and tool calls
   </Card>
-  <Card title="Run Simulations" icon="play" href="/quickstart/simulations">
-    Simulate conversations with the agent to identify issues before deployment
+  <Card title="Compare models on your tests" icon="chart-bar" href="/app/agents/compare-models">
+    Find the best LLM for the tutor
   </Card>
-  <Card title="Tools" icon="wrench" href="/core-concepts/tools">
-    Define tools for structured data extraction
+  <Card title="Run a text or voice simulation" icon="play" href="/quickstart/simulations">
+    Have simulated students talk to the tutor
   </Card>
 </CardGroup>
