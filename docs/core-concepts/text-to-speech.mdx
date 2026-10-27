@@ -1,13 +1,11 @@
 ---
 title: "Text-to-speech metrics"
-description: "What each text-to-speech score means, and how to manage the text you test with"
+description: "What each text-to-speech score means"
 ---
-
-## Metrics
 
 The **About** tab on a results page explains every score that run produced.
 
-### Evaluators
+## Evaluators
 
 An evaluator listens to the recording a provider made and judges it against the text it was given. It does not turn the speech back into text first.
 
@@ -22,7 +20,7 @@ The leaderboard shows, for each provider, the share of recordings that passed. H
 
 A run needs at least one evaluator. To score something else, such as how natural the voice sounds, click **Add evaluators** on the **Evaluators** tab of a new evaluation. See [Create an evaluator](/app/evaluators/create).
 
-### Latency
+## Latency
 
 Latency is the time, in seconds, from asking a provider for speech until the first part of the audio arrives. The leaderboard shows it as **Latency (s)**. Each provider's number is the middle value across all lines of text.
 
@@ -31,56 +29,13 @@ Latency is the time, in seconds, from asking a provider for speech until the fir
 
 Latency matters for a voice agent, because a student waits this long before hearing the tutor start to speak.
 
-## Datasets
-
-A dataset is a set of lines of text for the providers to read aloud. You can run many evaluations on the same dataset.
-
-### See your datasets
-
-In the sidebar, click **Text-to-Speech**, then click the **Datasets** tab. Each row shows how many lines the dataset has (**Items**) and how many evaluations used it (**Evals**).
-
-<Frame>
-  <img src="/images/app/tts-datasets.png" alt="The Datasets tab of the Text-to-Speech page, listing Tutor replies in Hindi" />
-</Frame>
-
-### Create a dataset
-
-1. On the **Datasets** tab, click **New dataset**.
-2. Under **Dataset name**, type a name, for example `Tutor replies in Hindi`, and click **Create**.
-3. On the dataset page, type a line of text in the first row.
-4. Click **Add another row** for each other line. To add many at once, click **Choose CSV** in the **Upload CSV** box.
-5. Click **Save**.
-
-Each line can be up to 200 characters long.
-
-A dataset is also created when you enter text on the **Dataset** tab of a new evaluation.
-
-### Change a dataset
-
-Click a dataset on the **Datasets** tab to open it. On the dataset page you can:
-
-- Add lines with **Add another row** or **Choose CSV**.
-- Change a line by typing in its box.
-- Remove a line with the bin button on its row. The button shows once your other changes are saved, and only while the dataset has more than one line.
-- Rename the dataset with the pencil button next to its name.
-
-Click **Save** to keep your changes.
-
-### Run an evaluation on a dataset
-
-On the dataset page, click **New evaluation**. The dataset is already chosen, so you only pick the language and providers. Save any changes first.
-
-### Delete a dataset
-
-On the **Datasets** tab, click the bin button at the end of the dataset's row. This cannot be undone.
-
 ## Next steps
 
 <CardGroup cols={2}>
   <Card title="Benchmark text-to-speech providers" icon="play" href="/quickstart/text-to-speech">
     Run an evaluation on your text
   </Card>
-  <Card title="Speech-to-text metrics" icon="microphone" href="/core-concepts/speech-to-text">
-    How transcripts of what students say are scored
+  <Card title="Text-to-speech datasets" icon="database" href="/app/text-to-speech/datasets">
+    Create and manage the text you test with
   </Card>
 </CardGroup>

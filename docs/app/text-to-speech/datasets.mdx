@@ -1,0 +1,56 @@
+---
+title: "Text-to-speech datasets"
+description: "Create and manage the text you test with"
+---
+
+A dataset is a set of lines of text for the providers to read aloud. You can run many evaluations on the same dataset.
+
+## See your datasets
+
+In the sidebar, click **Text-to-Speech**, then click the **Datasets** tab. Each row shows how many lines the dataset has (**Items**) and how many evaluations used it (**Evals**).
+
+<Frame>
+  <img src="/images/app/tts-datasets.png" alt="The Datasets tab of the Text-to-Speech page, listing Tutor replies in Hindi" />
+</Frame>
+
+## Create a dataset
+
+1. On the **Datasets** tab, click **New dataset**.
+2. Under **Dataset name**, type a name, for example `Tutor replies in Hindi`, and click **Create**.
+3. On the dataset page, type a line of text in the first row.
+4. Click **Add another row** for each other line. To add many at once, click **Choose CSV** in the **Upload CSV** box.
+5. Click **Save**.
+
+Each line can be up to 200 characters long.
+
+A dataset is also created when you enter text on the **Dataset** tab of a new evaluation.
+
+## Change a dataset
+
+Click a dataset on the **Datasets** tab to open it. On the dataset page you can:
+
+- Add lines with **Add another row** or **Choose CSV**.
+- Change a line by typing in its box.
+- Remove a line with the bin button on its row. The button shows once your other changes are saved, and only while the dataset has more than one line.
+- Rename the dataset with the pencil button next to its name.
+
+Click **Save** to keep your changes.
+
+## Run an evaluation on a dataset
+
+On the dataset page, click **New evaluation**. The dataset is already chosen, so you only pick the language and providers. Save any changes first.
+
+## Delete a dataset
+
+On the **Datasets** tab, click the bin button at the end of the dataset's row. This cannot be undone.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Benchmark text-to-speech providers" icon="play" href="/quickstart/text-to-speech">
+    Run an evaluation on your text
+  </Card>
+  <Card title="Text-to-speech metrics" icon="chart-simple" href="/core-concepts/text-to-speech">
+    What each score means
+  </Card>
+</CardGroup>

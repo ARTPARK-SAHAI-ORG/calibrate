@@ -1,13 +1,11 @@
 ---
 title: "Speech-to-text metrics"
-description: "What each speech-to-text score means, and how to manage the recordings you test with"
+description: "What each speech-to-text score means"
 ---
-
-## Metrics
 
 Each score compares a provider's transcript, the **Prediction**, with the words you typed for that recording, the **Ground Truth**. The **About** tab on a results page explains every score that run produced.
 
-### Word error rate (WER)
+## Word error rate (WER)
 
 WER counts the words in the transcript that differ from the words you typed. A word can be wrong, missing, or extra. The count is divided by the number of words you typed.
 
@@ -22,14 +20,14 @@ WER counts the words in the transcript that differ from the words you typed. A w
 
 The second and third rows show the limit of WER. In the second row, "1" and "एक" mean the same thing, but WER counts it as a wrong word. In the third row, "दो" changes the question, yet its WER is lower.
 
-### Character error rate (CER)
+## Character error rate (CER)
 
 CER works the same way as WER, but counts letters instead of words. A small change inside a long word costs less than with WER. This helps with Hindi and other Indian languages, where one long word can carry a lot of meaning.
 
 - Range: 0 and up. 0 means every letter matches. Lower is better.
 - Every run measures it.
 
-### Meaning-based scores
+## Meaning-based scores
 
 These scores appear when **Use built-in LLM-based evaluation metrics** is on in the **Evaluators** tab of a new evaluation. It is on by default. An AI model reads each transcript next to the words you typed and judges the meaning.
 
@@ -42,52 +40,9 @@ These scores appear when **Use built-in LLM-based evaluation metrics** is on in 
 
 In the WER table above, the second row would get an LLM-WER of 0, because "1" and "एक" mean the same thing. The third row still counts as an error, because "दो" changes the question.
 
-### Your own evaluators
+## Your own evaluators
 
 You can also add evaluators that score each transcript in your own way. Click **Add evaluators** on the **Evaluators** tab of a new evaluation. Each evaluator gets its own column on the **Leaderboard** and **Results** tabs. See [Create an evaluator](/app/evaluators/create).
-
-## Datasets
-
-A dataset is a set of recordings with the words spoken in each one. You can run many evaluations on the same dataset.
-
-### See your datasets
-
-In the sidebar, click **Speech-to-Text**, then click the **Datasets** tab. Each row shows how many recordings the dataset has (**Items**) and how many evaluations used it (**Evals**).
-
-<Frame>
-  <img src="/images/app/stt-datasets.png" alt="The Datasets tab of the Speech-to-Text page, listing Tutor questions in Hindi" />
-</Frame>
-
-### Create a dataset
-
-1. On the **Datasets** tab, click **New dataset**.
-2. Under **Dataset name**, type a name, for example `Tutor questions in Hindi`, and click **Create**.
-3. On the dataset page, click **Upload .wav** and type the words spoken in the box next to it.
-4. Click **Add another sample** for each other recording. To add many at once, click **Choose ZIP file** in the **Upload ZIP** box.
-5. Click **Save**.
-
-Each recording must be a `.wav` file of under 60 seconds and under 5 MB.
-
-A dataset is also created when you upload recordings on the **Dataset** tab of a new evaluation.
-
-### Change a dataset
-
-Click a dataset on the **Datasets** tab to open it. On the dataset page you can:
-
-- Add recordings with **Add another sample** or **Choose ZIP file**.
-- Fix the words for a recording by typing in its box.
-- Remove a recording with the bin button on its row. The button shows once your other changes are saved, and only while the dataset has more than one recording.
-- Rename the dataset with the pencil button next to its name.
-
-Click **Save** to keep your changes. To change the audio of a recording, remove that row and add the recording again.
-
-### Run an evaluation on a dataset
-
-On the dataset page, click **New evaluation**. The dataset is already chosen, so you only pick the language and providers. Save any changes first.
-
-### Delete a dataset
-
-On the **Datasets** tab, click the bin button at the end of the dataset's row. Evaluations that used it keep their results.
 
 ## Next steps
 
@@ -95,7 +50,7 @@ On the **Datasets** tab, click the bin button at the end of the dataset's row. E
   <Card title="Benchmark speech-to-text providers" icon="play" href="/quickstart/speech-to-text">
     Run an evaluation on your recordings
   </Card>
-  <Card title="Text-to-speech metrics" icon="volume-high" href="/core-concepts/text-to-speech">
-    How the voices that read replies aloud are scored
+  <Card title="Speech-to-text datasets" icon="database" href="/app/speech-to-text/datasets">
+    Create and manage the recordings you test with
   </Card>
 </CardGroup>
