@@ -66,14 +66,16 @@
             "group": "Speech-to-text",
             "pages": [
               "quickstart/speech-to-text",
-              "core-concepts/speech-to-text"
+              "core-concepts/speech-to-text",
+              "app/speech-to-text/datasets"
             ]
           },
           {
             "group": "Text-to-speech",
             "pages": [
               "quickstart/text-to-speech",
-              "core-concepts/text-to-speech"
+              "core-concepts/text-to-speech",
+              "app/text-to-speech/datasets"
             ]
           },
           {
