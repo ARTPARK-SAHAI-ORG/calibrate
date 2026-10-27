@@ -77,7 +77,7 @@
             ]
           },
           {
-            "group": "Workspace settings",
+            "group": "For Teams",
             "pages": [
               "app/workspace-settings/members",
               "reference/api-keys",
