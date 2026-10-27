@@ -20,9 +20,9 @@ export const Answers = ({ name, answers }) => (
   </div>
 );
 
-export const ChanceBar = ({ label, agreement, chance, colour, caption }) => (
+export const ChanceBar = ({ children, agreement, chance, colour, caption }) => (
   <div style={{display: "grid", gridTemplateColumns: "minmax(0, 11em) minmax(0, 1fr) minmax(0, 9em)", gap: "16px", alignItems: "center", margin: "14px 0"}}>
-    <span>{label}</span>
+    <span>{children}</span>
     <div style={{position: "relative", height: "10px", borderRadius: "5px", background: "rgba(128,128,128,0.25)"}}>
       <div style={{position: "absolute", left: 0, top: 0, bottom: 0, width: `${agreement}%`, borderRadius: "5px", background: colour}} />
       {chance !== undefined && <div style={{position: "absolute", top: "-4px", left: `${chance}%`, width: "2px", height: "18px", background: "currentColor"}} />}
@@ -32,23 +32,24 @@ export const ChanceBar = ({ label, agreement, chance, colour, caption }) => (
 );
 
 export const KappaScale = () => (
-  <svg viewBox="0 0 640 74" style={{width: "100%", margin: "8px 0"}} role="img" aria-label="Kappa from -1 to 1, with the three examples marked">
-    <line x1="20" y1="34" x2="620" y2="34" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
-    <line x1="320" y1="26" x2="320" y2="42" stroke="currentColor" strokeOpacity="0.6" />
-    <text x="20" y="64" fill="currentColor" fontSize="13">-1 worse than chance</text>
-    <text x="320" y="64" fill="currentColor" fontSize="13" textAnchor="middle">0 same as chance</text>
-    <text x="620" y="64" fill="currentColor" fontSize="13" textAnchor="end">1 full agreement</text>
-    <circle cx="287" cy="34" r="6" fill="#DC2626" />
-    <text x="287" y="17" fill="currentColor" fontSize="13" textAnchor="middle">-0.11</text>
-    <circle cx="395" cy="34" r="6" fill="#16A34A" />
-    <text x="395" y="17" fill="currentColor" fontSize="13" textAnchor="middle">0.25</text>
-    <circle cx="461" cy="34" r="6" fill="#16A34A" />
-    <text x="461" y="17" fill="currentColor" fontSize="13" textAnchor="middle">0.47</text>
+  <svg viewBox="0 0 640 88" style={{width: "100%", margin: "8px 0"}} role="img" aria-label="Kappa from -1 to 1, with the examples on this page marked">
+    <line x1="20" y1="48" x2="620" y2="48" stroke="currentColor" strokeOpacity="0.3" strokeWidth="2" />
+    <line x1="320" y1="40" x2="320" y2="56" stroke="currentColor" strokeOpacity="0.6" />
+    <text x="20" y="80" fill="currentColor" fontSize="13">-1 worse than chance</text>
+    <text x="320" y="80" fill="currentColor" fontSize="13" textAnchor="middle">0 same as chance</text>
+    <text x="620" y="80" fill="currentColor" fontSize="13" textAnchor="end">1 full agreement</text>
+    {[[-0.11, 0], [0.2, 1], [0.25, 0], [0.47, 1], [0.6, 0]].map(([kappa, row]) => (
+      <g key={kappa}>
+        <circle cx={320 + kappa * 300} cy="48" r="6" fill={kappa < 0 ? "#DC2626" : "#16A34A"} />
+        <text x={320 + kappa * 300} y={row ? 14 : 32} fill="currentColor" fontSize="13" textAnchor="middle">{kappa.toFixed(2)}</text>
+      </g>
+    ))}
   </svg>
 );
 
 
-This page shows how Calibrate computes four numbers:
+
+This page shows how Calibrate computes four numbers, and the kappa beside each agreement:
 
 - [Human score](#how-is-the-human-score-worked-out)
 - [Evaluator score](#how-is-the-evaluator-score-worked-out)
@@ -57,28 +58,47 @@ This page shows how Calibrate computes four numbers:
 
 ## Setup
 
-Two annotators, Asha and Ben, and one evaluator answered the same four items. The evaluator answers `Pass` or `Fail`.
+Two annotators, 👩 Asha and 👨 Ben, labelled four replies from a support agent on two evaluators. Each 🤖 evaluator also scored the same four replies.
 
-| Item | Asha | Ben | Evaluator |
+- **Safety (binary)** answers `Pass` or `Fail`.
+- **Empathy (rating)** answers on a scale of 1 to 5.
+
+<Tabs>
+<Tab title="Safety (binary)">
+
+| Item | 👩 Asha | 👨 Ben | 🤖 Evaluator |
 | --- | --- | --- | --- |
 | 1 | <Pass /> | <Pass /> | <Pass /> |
 | 2 | <Pass /> | <Fail /> | <Pass /> |
 | 3 | <Fail /> | <Fail /> | <Fail /> |
 | 4 | <Pass /> | <Pass /> | <Fail /> |
 
+</Tab>
+<Tab title="Empathy (rating)">
+
+| Item | 👩 Asha | 👨 Ben | 🤖 Evaluator |
+| --- | --- | --- | --- |
+| 1 | 4 | 4 | 5 |
+| 2 | 3 | 2 | 4 |
+| 3 | 5 | 5 | 4 |
+| 4 | 2 | 3 | 2 |
+
+</Tab>
+</Tabs>
+
 <Note>
-Only the latest answer counts. If Asha changes item 2 from `Fail` to `Pass`, only the `Pass` counts.
+Only the latest answer counts. If 👩 Asha changes item 2 from `Fail` to `Pass`, only the `Pass` counts.
 </Note>
 
 ## How is the human score worked out?
 
-For a binary evaluator, the human score is the share of labels that are `Pass`. For a rating evaluator, it is the average rating.
+For Safety (binary), the human score is the share of labels that are `Pass`. For Empathy (rating), it is the average rating.
 
-| Annotator | Labels | `Pass` |
+| Annotator | Safety (binary) | Empathy (rating) |
 | --- | --- | --- |
-| Asha | 4 | 3 |
-| Ben | 4 | 2 |
-| **Human score** | **8** | **5 of 8 = 63%** |
+| 👩 Asha | 3 `Pass` of 4 | 4 + 3 + 5 + 2 = 14 |
+| 👨 Ben | 2 `Pass` of 4 | 4 + 2 + 5 + 3 = 14 |
+| **Human score** | **5 of 8 = 63%** | **28 / 8 = 3.5 / 5** |
 
 <Note>
 Every annotator's label counts. An item labelled by two people adds two labels. There is no majority vote.
@@ -86,16 +106,15 @@ Every annotator's label counts. An item labelled by two people adds two labels. 
 
 ## How is the evaluator score worked out?
 
-For a binary evaluator, the evaluator score is the share of items it scored `Pass`. For a rating evaluator, it is the average rating.
+For Safety (binary), the evaluator score is the share of items it scored `Pass`. For Empathy (rating), it is the average rating.
 
-| Item | Evaluator |
-| --- | --- |
-| 1 | <Pass /> |
-| 2 | <Pass /> |
-| 3 | <Fail /> |
-| 4 | <Fail /> |
-
-Evaluator score = 2 of 4 = **50%**.
+| Item | 🤖 Safety (binary) | 🤖 Empathy (rating) |
+| --- | --- | --- |
+| 1 | <Pass /> | 5 |
+| 2 | <Pass /> | 4 |
+| 3 | <Fail /> | 4 |
+| 4 | <Fail /> | 2 |
+| **Evaluator score** | **2 of 4 = 50%** | **15 / 4 = 3.75 / 5** |
 
 <Note>
 Only the evaluator's latest score on each item counts. On a task, only scores from the evaluator's live version count.
@@ -103,49 +122,70 @@ Only the evaluator's latest score on each item counts. On a task, only scores fr
 
 ## Do the annotators agree with each other?
 
-Inter-annotator agreement compares the annotators' answers on each item.
+Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each item. For Empathy (rating), close ratings get partial credit: two equal ratings agree 1.00, ratings 1 apart agree 0.75, ratings 2 apart agree 0.50, and so on down to 1 and 5, which agree 0.
 
-| Item | Asha | Ben | Same answer? |
+<Tabs>
+<Tab title="Safety (binary)">
+
+| Item | 👩 Asha | 👨 Ben | Same answer? |
 | --- | --- | --- | --- |
 | 1 | <Pass /> | <Pass /> | <Match /> |
 | 2 | <Pass /> | <Fail /> | <NoMatch /> |
 | 3 | <Fail /> | <Fail /> | <Match /> |
 | 4 | <Pass /> | <Pass /> | <Match /> |
+| **Agreement** |  |  | **3 of 4 = 75%** |
 
-Inter-annotator agreement = 3 of 4 = **75%**.
+</Tab>
+<Tab title="Empathy (rating)">
+
+| Item | 👩 Asha | 👨 Ben | Agreement |
+| --- | --- | --- | --- |
+| 1 | 4 | 4 | 1.00 |
+| 2 | 3 | 2 | 0.75 |
+| 3 | 5 | 5 | 1.00 |
+| 4 | 2 | 3 | 0.75 |
+| **Agreement** |  |  | **3.5 / 4 = 88%** |
+
+</Tab>
+</Tabs>
 
 ## Does the evaluator agree with the annotators?
 
-Evaluator agreement with humans compares the evaluator's answer with each annotator's answer on the same item.
+Evaluator agreement with humans compares the 🤖 evaluator's answer with each annotator's answer on the same item.
 
-| Item | Evaluator | Same as Asha? | Same as Ben? |
+<Tabs>
+<Tab title="Safety (binary)">
+
+| Item | 🤖 Evaluator | Same as 👩 Asha? | Same as 👨 Ben? |
 | --- | --- | --- | --- |
 | 1 | <Pass /> | <Match /> | <Match /> |
 | 2 | <Pass /> | <Match /> | <NoMatch /> |
 | 3 | <Fail /> | <Match /> | <Match /> |
 | 4 | <Fail /> | <NoMatch /> | <NoMatch /> |
+| **Agreement** |  |  | **5 of 8 = 63%** |
 
-Evaluator agreement with humans = (3 + 2) of 8 = **63%**.
+</Tab>
+<Tab title="Empathy (rating)">
 
-## How are two ratings compared?
+| Item | 🤖 Evaluator | 👩 Asha, agreement | 👨 Ben, agreement |
+| --- | --- | --- | --- |
+| 1 | 5 | 4 → 0.75 | 4 → 0.75 |
+| 2 | 4 | 3 → 0.75 | 2 → 0.50 |
+| 3 | 4 | 5 → 0.75 | 5 → 0.75 |
+| 4 | 2 | 2 → 1.00 | 3 → 0.75 |
+| **Agreement** | | | **6 / 8 = 75%** |
 
-Close ratings get partial credit. On a scale of 1 to 5, the widest gap is 5 - 1 = 4:
-
-| Two ratings | Gap | Agreement |
-| --- | --- | --- |
-| 4 and 4 | 0 | 1 - 0/4 = 100% |
-| 4 and 3 | 1 | 1 - 1/4 = 75% |
-| 2 and 4 | 2 | 1 - 2/4 = 50% |
-| 5 and 1 | 4 | 1 - 4/4 = 0% |
+</Tab>
+</Tabs>
 
 ## Is a high agreement good enough?
 
-Kiran and Meera each say `Pass` 9 times out of 10, without looking at the items:
+Suppose 👩 Asha and 👨 Ben label 10 other replies on Safety (binary), and each says `Pass` 9 times out of 10 without reading them:
 
-<Answers name="Kiran" answers="PPPPPPPPFP" />
-<Answers name="Meera" answers="PPPPPPPPPF" />
+<Answers name="👩 Asha" answers="PPPPPPPPFP" />
+<Answers name="👨 Ben" answers="PPPPPPPPPF" />
 
-They agree on 8 of 10 items, 80%. By chance alone they would agree (0.9 x 0.9) + (0.1 x 0.1) = 82% of the time. So 80% sounds good, but it is slightly worse than chance.
+They agree on 8 of 10 replies, 80%. By chance alone they would agree (0.9 x 0.9) + (0.1 x 0.1) = 82% of the time. So 80% sounds good, but it is slightly worse than chance.
 
 ## How much of the agreement is more than luck?
 
@@ -157,19 +197,21 @@ Kappa is agreement after removing what chance alone would produce.
 
 | Comparison | Agreement | Chance agreement | Kappa |
 | --- | --- | --- | --- |
-| Asha and Ben | 75% | 53% | (0.75 - 0.53) / (1 - 0.53) = **0.47** |
-| The evaluator and the annotators | 63% | 50% | (0.625 - 0.50) / (1 - 0.50) = **0.25** |
-| Kiran and Meera | 80% | 82% | (0.80 - 0.82) / (1 - 0.82) = **-0.11** |
+| 👩 Asha and 👨 Ben on Safety (binary) | 75% | 53% | (0.75 - 0.53) / (1 - 0.53) = **0.47** |
+| 🤖 Safety (binary) and the annotators | 63% | 50% | (0.625 - 0.50) / (1 - 0.50) = **0.25** |
+| 👩 Asha and 👨 Ben on Empathy (rating) | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.60** |
+| 🤖 Empathy (rating) and the annotators | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.20** |
+| 👩 Asha and 👨 Ben, saying `Pass` 9 times in 10 | 80% | 82% | (0.80 - 0.82) / (1 - 0.82) = **-0.11** |
 
-Chance agreement comes from how often each side says `Pass` and `Fail`. Asha's and Ben's 8 labels are 5 `Pass` and 3 `Fail`, so two labels picked at random agree (5/8 x 5/8) + (3/8 x 3/8) = 53% of the time.
+Chance agreement comes from how often each side gives each answer. On Safety (binary), 👩 Asha's and 👨 Ben's 8 labels are 5 `Pass` and 3 `Fail`, so two labels picked at random agree (5/8 x 5/8) + (3/8 x 3/8) = 53% of the time. For Empathy (rating), two random ratings get the same partial credit as in the agreement.
 
 ## Is the agreement better than chance?
 
-Under each agreement on the **Overview** tab of **Human alignment**, under **Score reliability** on a task, and on an evaluation run's page, there is a bar:
+Calibrate draws a bar under each agreement:
 
-<ChanceBar label="Asha and Ben" agreement={75} chance={53} colour="#16A34A" caption="Better than chance" />
-<ChanceBar label="Kiran and Meera" agreement={80} chance={82} colour="#DC2626" caption="Worse than chance" />
-<ChanceBar label={<>Everyone said <code>Pass</code></>} agreement={100} colour="#9CA3AF" caption="Same as chance, or cannot be compared" />
+<ChanceBar agreement={75} chance={53} colour="#16A34A" caption="Better than chance">👩 Asha and 👨 Ben on Safety (binary)</ChanceBar>
+<ChanceBar agreement={80} chance={82} colour="#DC2626" caption="Worse than chance">👩 Asha and 👨 Ben, saying `Pass` 9 times in 10</ChanceBar>
+<ChanceBar agreement={100} colour="#9CA3AF" caption="Same as chance, or cannot be compared">Everyone said `Pass`</ChanceBar>
 
 The bar is filled up to the agreement. The tick marks the agreement expected by chance alone.
 
@@ -196,7 +238,7 @@ Hover over the information icon beside **Too few items** or **Everyone agreed** 
 For ratings, the kappa is **linear weighted**: close ratings get partial credit in chance agreement too, the same way as in the agreement beside it.
 
 <Note>
-Binary and rating answers never go into the same kappa. This is why the **Annotators** tab has a **Kappa (binary)** and a **Kappa (rating)** column, and why the two cards at the top of the **Overview** tab show agreement only.
+`Pass` or `Fail` answers and ratings never go into the same kappa. This is why the **Annotators** tab has a **Kappa (binary)** and a **Kappa (rating)** column, and why the two cards at the top of the **Overview** tab show agreement only.
 </Note>
 
 <Tip>
@@ -218,15 +260,15 @@ Hover over the information icon beside a kappa to see which kind it is.
 <AccordionGroup>
 <Accordion title="Show the calculation: items with different numbers of annotators">
 
-Each pair of answers counts once, so an item labelled by more people has more pairs and counts for more.
+Take Safety (binary) on items 1 to 3 from the Setup, and add two more annotators, 👧 Chitra and 👦 Dev. Each pair of answers counts once, so an item labelled by more people has more pairs and counts for more.
 
-| Item | Asha | Ben | Chitra | Dev | Pairs | Pairs that agree |
+| Item | 👩 Asha | 👨 Ben | 👧 Chitra | 👦 Dev | Pairs | Pairs that agree |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | `Pass` | `Pass` | | | 1 | 1 |
 | 2 | `Pass` | `Fail` | `Pass` | | 3 | 1 |
 | 3 | `Fail` | `Fail` | `Fail` | `Pass` | 6 | 3 |
 
-Inter-annotator agreement = (1 + 1 + 3) / (1 + 3 + 6) = 5 / 10 = **50%**. A plain average of the three items would give (1.00 + 0.33 + 0.50) / 3 = 61%, which is not the number Calibrate shows.
+Inter-annotator agreement = (1 + 1 + 3) / (1 + 3 + 6) = 5 / 10 = **50%**. Item 3 has six pairs, so it counts six times as much as item 1.
 
 Kappa uses the same pairs, so each answer counts once for every pair it is in:
 
@@ -238,48 +280,48 @@ Kappa uses the same pairs, so each answer counts once for every pair it is in:
 
 That gives 20 answers: 9 `Pass` and 11 `Fail`. Chance agreement = (9/20 x 9/20) + (11/20 x 11/20) = 0.505. Kappa = (0.50 - 0.505) / (1 - 0.505) = **-0.01**.
 
-Now add an evaluator that scores the three items `Pass`, `Fail` and `Fail`:
+The 🤖 Safety (binary) evaluator scored the same three items `Pass`, `Pass` and `Fail`:
 
-| Item | Evaluator | Annotators | Pairs | Pairs that agree |
+| Item | 🤖 Safety (binary) | Annotators | Pairs | Pairs that agree |
 | --- | --- | --- | --- | --- |
-| 1 | `Pass` | Asha `Pass`, Ben `Pass` | 2 | 2 |
-| 2 | `Fail` | Asha `Pass`, Ben `Fail`, Chitra `Pass` | 3 | 1 |
-| 3 | `Fail` | Asha `Fail`, Ben `Fail`, Chitra `Fail`, Dev `Pass` | 4 | 3 |
+| 1 | `Pass` | 👩 Asha `Pass`, 👨 Ben `Pass` | 2 | 2 |
+| 2 | `Pass` | 👩 Asha `Pass`, 👨 Ben `Fail`, 👧 Chitra `Pass` | 3 | 2 |
+| 3 | `Fail` | 👩 Asha `Fail`, 👨 Ben `Fail`, 👧 Chitra `Fail`, 👦 Dev `Pass` | 4 | 3 |
 
-Evaluator agreement with humans = (2 + 1 + 3) / (2 + 3 + 4) = 6 / 9 = **67%**. The evaluator's answer on item 3 is compared with four annotators, so it counts four times in chance agreement too. Chance agreement is 0.4691 and kappa is **0.37**.
+Evaluator agreement with humans = (2 + 2 + 3) / (2 + 3 + 4) = 7 / 9 = **78%**. The evaluator's answer on item 3 is compared with four annotators, so it counts four times in chance agreement too. Chance agreement is 0.5062 and kappa is **0.55**.
 
 </Accordion>
 <Accordion title="Show the calculation: the two cards at the top">
 
 The **Inter-annotator agreement** and **Evaluator agreement with humans** cards put the pairs from every evaluator into one average. An evaluator compared on more pairs counts for more.
 
-Take the three items in the box above, and add a rating evaluator on a scale of 1 to 5. On item 1, Asha rates it 4 and Ben rates it 3, which agree 0.75. The evaluator scores item 1 as 3, which agrees 0.75 with Asha and 1.00 with Ben.
+Take Safety (binary) from the box above and Empathy (rating) from the Setup:
 
 | Evaluator | Annotator pairs | Sum of annotator agreement | Evaluator pairs | Sum of evaluator agreement |
 | --- | --- | --- | --- | --- |
-| Binary | 10 | 5 | 9 | 6 |
-| Rating | 1 | 0.75 | 2 | 1.75 |
+| Safety (binary) | 10 | 5 | 9 | 7 |
+| Empathy (rating) | 4 | 3.5 | 8 | 6 |
 
-- Inter-annotator agreement on the card = (5 + 0.75) / (10 + 1) = **52%**.
-- Evaluator agreement with humans on the card = (6 + 1.75) / (9 + 2) = **70%**.
+- Inter-annotator agreement on the card = (5 + 3.5) / (10 + 4) = **61%**.
+- Evaluator agreement with humans on the card = (7 + 6) / (9 + 8) = **76%**.
 
-A plain average of the two evaluators' 67% and 88% would give 77%, which is not the number Calibrate shows.
+A plain average of the two inter-annotator agreements, 50% and 88%, would give 69%, which is not the number Calibrate shows.
 
 </Accordion>
 <Accordion title="Show the calculation: Fleiss' and Cohen's kappa on the same answers">
 
-Priya says `Pass` on all four items. Ravi says `Pass`, `Pass`, `Fail`, `Fail`. They agree on 2 of 4 items, so agreement is 0.50.
+Suppose 👩 Asha says `Pass` on all four items and 👨 Ben says `Pass`, `Pass`, `Fail`, `Fail`. They agree on 2 of 4 items, so agreement is 0.50.
 
 | | Chance agreement | Kappa |
 | --- | --- | --- |
-| **Cohen's kappa** (Priya against the others) | Priya always says `Pass`, Ravi says `Pass` half the time: (1 x 0.5) + (0 x 0.5) = 0.50 | (0.50 - 0.50) / (1 - 0.50) = **0.00** |
+| **Cohen's kappa** (👩 Asha against the others) | 👩 Asha always says `Pass`, 👨 Ben says `Pass` half the time: (1 x 0.5) + (0 x 0.5) = 0.50 | (0.50 - 0.50) / (1 - 0.50) = **0.00** |
 | **Fleiss' kappa** (inter-annotator agreement) | One list of 8 answers, 6 `Pass` and 2 `Fail`: (0.75 x 0.75) + (0.25 x 0.25) = 0.625 | (0.50 - 0.625) / (1 - 0.625) = **-0.33** |
 
-Cohen's kappa keeps Priya's habit and Ravi's habit apart, and finds they agree exactly as often as those two habits predict. Fleiss' kappa treats them as one group that says `Pass` on 6 of 8 answers, so chance alone would make them agree 62.5% of the time, more than the 50% they actually agree.
+Cohen's kappa keeps 👩 Asha's habit and 👨 Ben's habit apart, and finds they agree exactly as often as those two habits predict. Fleiss' kappa treats them as one group that says `Pass` on 6 of 8 answers, so chance alone would make them agree 62.5% of the time, more than the 50% they actually agree.
 
-An evaluator against one annotator:
+The 🤖 Safety (binary) evaluator against 👩 Asha alone, from the Setup:
 
-| Item | Evaluator | Asha |
+| Item | 🤖 Safety (binary) | 👩 Asha |
 | --- | --- | --- |
 | 1 | `Pass` | `Pass` |
 | 2 | `Pass` | `Pass` |
@@ -287,9 +329,9 @@ An evaluator against one annotator:
 | 4 | `Fail` | `Pass` |
 
 - Agreement = 3 / 4 = 0.75.
-- The evaluator says `Pass` on 2 of 4 items. Asha says `Pass` on 3 of 4.
+- 🤖 Safety (binary) says `Pass` on 2 of 4 items. 👩 Asha says `Pass` on 3 of 4.
 - Chance agreement = (2/4 x 3/4) + (2/4 x 1/4) = 0.50.
-- Kappa = (0.75 - 0.50) / (1 - 0.50) = **0.50**.
+- Cohen's kappa = (0.75 - 0.50) / (1 - 0.50) = **0.50**.
 
 </Accordion>
 <Accordion title="Show the calculation: linear weighted kappa for ratings">
@@ -306,25 +348,18 @@ Linear weighting means the credit goes down in equal steps as two ratings move a
 
 Calibrate uses linear weighting because the agreement shown beside kappa uses it. With quadratic weighting, kappa would give 0.94 to two ratings one apart while the agreement beside it gives 0.75.
 
-Two annotators rate four items on a scale of 1 to 5:
+On Empathy (rating) in the Setup, 👩 Asha and 👨 Ben agree 0.875:
 
-| Item | Asha | Ben | Agreement |
-| --- | --- | --- | --- |
-| 1 | 5 | 4 | 0.75 |
-| 2 | 4 | 4 | 1.00 |
-| 3 | 2 | 3 | 0.75 |
-| 4 | 1 | 1 | 1.00 |
-
-- Agreement = (0.75 + 1.00 + 0.75 + 1.00) / 4 = 0.875.
-- Chance agreement, worked out over the one list of 8 ratings with the same partial credit, is 0.6094.
-- Linear weighted Fleiss' kappa = (0.875 - 0.6094) / (1 - 0.6094) = **0.68**.
+- Their 8 ratings in one list are 2, 2, 3, 3, 4, 4, 5, 5.
+- Chance agreement is the average partial credit between two ratings drawn at random from that list: 0.6875.
+- Linear weighted Fleiss' kappa = (0.875 - 0.6875) / (1 - 0.6875) = **0.60**.
 
 </Accordion>
 <Accordion title="Show the calculation: ratings outside the scale">
 
-A rating can fall outside the scale, for example when it was given on an older version with a wider scale. When the ratings on an item are further apart than the scale allows, the widest gap is taken from the ratings themselves, so every agreement stays between 0 and 1.
+A rating can fall outside the scale, for example when it was given on an older version of the evaluator with a wider scale. When the ratings on an item are further apart than the scale allows, the widest difference is taken from the ratings themselves, so every agreement stays between 0 and 1.
 
-Three annotators rate one item 1, 6 and 7 on a scale of 1 to 5. The ratings span 7 - 1 = 6, which is wider than 4, so the widest gap on this item is 6:
+On a scale of 1 to 5, the widest difference is 4. Suppose 👩 Asha, 👨 Ben and 👧 Chitra rate one item 1, 6 and 7. Those ratings are up to 6 apart, so on this item 6 apart counts as 0:
 
 | Two ratings | Agreement |
 | --- | --- |
@@ -332,35 +367,37 @@ Three annotators rate one item 1, 6 and 7 on a scale of 1 to 5. The ratings span
 | 1 and 7 | 1 - 6/6 = 0.00 |
 | 6 and 7 | 1 - 1/6 = 0.83 |
 
-Chance agreement uses the same widest gap as the agreement it is compared with, and two random ratings further apart than that gap get no credit. Add a second item rated 4 and 5, which agree 0.75 on the scale's gap of 4:
+Chance agreement uses the same widest difference as the agreement it is compared with, and two random ratings further apart than that get no credit. Add a second item that 👩 Asha and 👨 Ben rate 4 and 5, which agree 0.75 on the normal scale:
 
 - Agreement = (0.17 + 0.00 + 0.83 + 0.75) / 4 = 0.4375.
 - Chance agreement is 0.5605, and kappa = (0.4375 - 0.5605) / (1 - 0.5605) = **-0.28**.
 
-When no scale is known for an evaluator, the widest gap on each item is taken from the ratings on that item.
+When no scale is known for an evaluator, the widest difference on each item is taken from the ratings on that item.
 
 </Accordion>
 <Accordion title="Show the calculation: one annotator's agreement and kappa">
 
 An annotator's agreement compares their answer on each item with each other annotator's answer on the same item, across every task in the workspace. It is in the **Agreement with others** column on the **Annotators** tab, and on the annotator's page.
 
-Ben, in the three items from the first box:
+👨 Ben on Safety (binary), with the four annotators from the first box:
 
-| Item | Ben | Other annotators | Pairs | Pairs that agree |
+| Item | 👨 Ben | Other annotators | Pairs | Pairs that agree |
 | --- | --- | --- | --- | --- |
-| 1 | `Pass` | Asha `Pass` | 1 | 1 |
-| 2 | `Fail` | Asha `Pass`, Chitra `Pass` | 2 | 0 |
-| 3 | `Fail` | Asha `Fail`, Chitra `Fail`, Dev `Pass` | 3 | 2 |
+| 1 | `Pass` | 👩 Asha `Pass` | 1 | 1 |
+| 2 | `Fail` | 👩 Asha `Pass`, 👧 Chitra `Pass` | 2 | 0 |
+| 3 | `Fail` | 👩 Asha `Fail`, 👧 Chitra `Fail`, 👦 Dev `Pass` | 3 | 2 |
 
-- Ben's agreement = 3 / 6 = **50%**.
-- Counted once for each pair, Ben's answers are 1 `Pass` and 5 `Fail`, and the others' are 4 `Pass` and 2 `Fail`.
+- 👨 Ben's agreement on Safety (binary) = 3 / 6 = 50%.
+- Counted once for each pair, 👨 Ben's answers are 1 `Pass` and 5 `Fail`, and the others' are 4 `Pass` and 2 `Fail`.
 - Chance agreement = (1/6 x 4/6) + (5/6 x 2/6) = 0.3889.
 - **Kappa (binary)** = (0.50 - 0.3889) / (1 - 0.3889) = **0.18**.
 
-Agreement is one number over every evaluator. Kappa is one number for each kind of answer, and an evaluator counts towards it only when its pairs come from at least two items.
+On Empathy (rating), 👨 Ben is compared with 👩 Asha on the four items in the Setup, which agree 3.5 of 4.
 
-- Add a rating evaluator where Ben gave 3 and Asha gave 4 on item 1, which agree 0.75. Ben's agreement = (3 + 0.75) / (6 + 1) = **54%**. **Kappa (rating)** shows **Too few items**, because that evaluator's pairs all come from one item.
-- Add a second rating evaluator: on item 1 Ben gives 4 and Asha 5, and on item 2 Ben gives 3 and Asha and Chitra give 2. Each pair agrees 0.75. Ben's agreement = (3 + 0.75 + 2.25) / (6 + 1 + 3) = **60%**. **Kappa (rating)** = **0.31**, from the second rating evaluator only.
+- **Agreement with others** is one number over every evaluator: (3 + 3.5) / (6 + 4) = **65%**.
+- **Kappa (rating)** = (0.875 - 0.6875) / (1 - 0.6875) = **0.60**. With only two annotators, this Cohen's chance agreement comes out the same as the Fleiss' one in the box above.
+
+Kappa is one number for each kind of answer, and an evaluator counts towards it only when its pairs come from at least two items. If 👨 Ben had rated Empathy (rating) on item 1 alone, **Kappa (rating)** would show **Too few items**.
 
 </Accordion>
 </AccordionGroup>
