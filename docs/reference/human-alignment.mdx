@@ -1,0 +1,232 @@
+---
+title: "Human alignment computation"
+description: "How Calibrate computes human and evaluator (LLM judge) scores, and measures agreement among humans and between evaluators and humans"
+---
+
+export const Pass = () => <span style={{display: "inline-block", minWidth: "3.2em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(22,163,74,0.15)", color: "#16A34A"}}>Pass</span>;
+
+export const Fail = () => <span style={{display: "inline-block", minWidth: "3.2em", textAlign: "center", padding: "2px 8px", borderRadius: "6px", fontSize: "0.85em", fontWeight: 500, background: "rgba(220,38,38,0.15)", color: "#DC2626"}}>Fail</span>;
+
+export const Match = () => <span style={{color: "#16A34A", fontWeight: 600, fontSize: "1.1em"}}>✓</span>;
+
+export const NoMatch = () => <span style={{color: "#DC2626", fontWeight: 600, fontSize: "1.1em"}}>✗</span>;
+
+export const Answers = ({ name, answers }) => (
+  <div style={{display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px", margin: "6px 0"}}>
+    <span style={{width: "4.5em"}}>{name}</span>
+    {answers.split("").map((answer, index) => (
+      <span key={index} style={{width: "3.2em", textAlign: "center", padding: "2px 0", borderRadius: "5px", fontSize: "0.8em", fontWeight: 500, background: answer === "P" ? "rgba(22,163,74,0.15)" : "rgba(220,38,38,0.15)", color: answer === "P" ? "#16A34A" : "#DC2626"}}>{answer === "P" ? "Pass" : "Fail"}</span>
+    ))}
+  </div>
+);
+
+
+
+
+
+This page shows how four numbers are computed, and the kappa for each agreement:
+
+- [Human score](#how-is-the-human-score-worked-out)
+- [Evaluator score](#how-is-the-evaluator-score-worked-out)
+- [Inter-annotator agreement](#do-the-annotators-agree-with-each-other)
+- [Evaluator agreement with humans](#does-the-evaluator-agree-with-the-annotators)
+
+## Setup
+
+Two annotators, 👩 Asha and 👨 Ben, labelled four replies from a support agent on two dimensions. Each dimension also has a 🤖 evaluator, an LLM judge, that scored the same four replies.
+
+- `Safety (binary)`: each answer is `Pass` or `Fail`.
+- `Empathy (rating)`: each answer is a rating from 1 to 5.
+
+<Tabs>
+<Tab title="Safety (binary)">
+
+| Item | 👩 Asha | 👨 Ben | 🤖 Evaluator |
+| --- | --- | --- | --- |
+| 1 | <Pass /> | <Pass /> | <Pass /> |
+| 2 | <Pass /> | <Fail /> | <Pass /> |
+| 3 | <Fail /> | <Fail /> | <Fail /> |
+| 4 | <Pass /> | <Pass /> | <Fail /> |
+
+</Tab>
+<Tab title="Empathy (rating)">
+
+| Item | 👩 Asha | 👨 Ben | 🤖 Evaluator |
+| --- | --- | --- | --- |
+| 1 | 4 | 4 | 5 |
+| 2 | 3 | 2 | 4 |
+| 3 | 5 | 5 | 4 |
+| 4 | 2 | 3 | 2 |
+
+</Tab>
+</Tabs>
+
+<Note>
+Only each person's latest answer is used. If 👩 Asha changes her answer on item 2 from `Fail` to `Pass`, the calculations use `Pass` and ignore the earlier `Fail`.
+</Note>
+
+## How is the human score worked out?
+
+For `Safety (binary)`, the human score is the share of labels that are `Pass`. For `Empathy (rating)`, it is the average rating.
+
+| Annotator | Safety (binary) | Empathy (rating) |
+| --- | --- | --- |
+| 👩 Asha | 3 `Pass` of 4 | 4 + 3 + 5 + 2 = 14 |
+| 👨 Ben | 2 `Pass` of 4 | 4 + 2 + 5 + 3 = 14 |
+| **Human score** | **(3 + 2) of 8 labels = 63%** | **(14 + 14) / 8 labels = 3.5 / 5** |
+
+## How is the evaluator score worked out?
+
+For `Safety (binary)`, the evaluator score is the share of items it scored `Pass`. For `Empathy (rating)`, it is the average rating.
+
+| Item | 🤖 Evaluator on Safety (binary) | 🤖 Evaluator on Empathy (rating) |
+| --- | --- | --- |
+| 1 | <Pass /> | 5 |
+| 2 | <Pass /> | 4 |
+| 3 | <Fail /> | 4 |
+| 4 | <Fail /> | 2 |
+| **Evaluator score** | **2 of 4 items = 50%** | **(5 + 4 + 4 + 2) / 4 items = 3.75 / 5** |
+
+<Note>
+Only the evaluator's latest score on each item is used. Scores from versions of the evaluator other than the live version are not used.
+</Note>
+
+## Do the annotators agree with each other?
+
+Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each item.
+
+<Tabs>
+<Tab title="Safety (binary)">
+
+| Item | 👩 Asha | 👨 Ben | Same answer? |
+| --- | --- | --- | --- |
+| 1 | <Pass /> | <Pass /> | <Match /> |
+| 2 | <Pass /> | <Fail /> | <NoMatch /> |
+| 3 | <Fail /> | <Fail /> | <Match /> |
+| 4 | <Pass /> | <Pass /> | <Match /> |
+| **Agreement** |  |  | **3 of 4 items = 75%** |
+
+</Tab>
+<Tab title="Empathy (rating)">
+
+Two ratings that are close still agree partly:
+
+**Agreement = 1 - difference between the two ratings / (highest rating on the scale - lowest rating on the scale)**
+
+On a scale of 1 to 5, that is 1 - difference / (5 - 1).
+
+| Item | 👩 Asha | 👨 Ben | Agreement |
+| --- | --- | --- | --- |
+| 1 | 4 | 4 | 1 - (4 - 4) / (5 - 1) = 1 |
+| 2 | 3 | 2 | 1 - (3 - 2) / (5 - 1) = 0.75 |
+| 3 | 5 | 5 | 1 - (5 - 5) / (5 - 1) = 1 |
+| 4 | 2 | 3 | 1 - (3 - 2) / (5 - 1) = 0.75 |
+| **Agreement** |  |  | **(1 + 0.75 + 1 + 0.75) / 4 items = 88%** |
+
+</Tab>
+</Tabs>
+
+
+## Does the evaluator agree with the annotators?
+
+Evaluator agreement with humans compares the 🤖 evaluator's answer with each annotator's answer on the same item.
+
+<Tabs>
+<Tab title="Safety (binary)">
+
+| Item | 🤖 Evaluator | Annotator | Same answer? |
+| --- | --- | --- | --- |
+| 1 | <Pass /> | 👩 Asha <Pass /> | <Match /> |
+| 1 | <Pass /> | 👨 Ben <Pass /> | <Match /> |
+| 2 | <Pass /> | 👩 Asha <Pass /> | <Match /> |
+| 2 | <Pass /> | 👨 Ben <Fail /> | <NoMatch /> |
+| 3 | <Fail /> | 👩 Asha <Fail /> | <Match /> |
+| 3 | <Fail /> | 👨 Ben <Fail /> | <Match /> |
+| 4 | <Fail /> | 👩 Asha <Pass /> | <NoMatch /> |
+| 4 | <Fail /> | 👨 Ben <Pass /> | <NoMatch /> |
+| **Agreement** | | | **5 of 8 pairs = 63%** |
+
+</Tab>
+<Tab title="Empathy (rating)">
+
+Each pair is worked out the same way as between the annotators.
+
+| Item | 🤖 Evaluator | Annotator | Agreement |
+| --- | --- | --- | --- |
+| 1 | 5 | 👩 Asha 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 1 | 5 | 👨 Ben 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 2 | 4 | 👩 Asha 3 | 1 - (4 - 3) / (5 - 1) = 0.75 |
+| 2 | 4 | 👨 Ben 2 | 1 - (4 - 2) / (5 - 1) = 0.5 |
+| 3 | 4 | 👩 Asha 5 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 3 | 4 | 👨 Ben 5 | 1 - (5 - 4) / (5 - 1) = 0.75 |
+| 4 | 2 | 👩 Asha 2 | 1 - (2 - 2) / (5 - 1) = 1 |
+| 4 | 2 | 👨 Ben 3 | 1 - (3 - 2) / (5 - 1) = 0.75 |
+| **Agreement** | | | **(0.75 + 0.75 + 0.75 + 0.5 + 0.75 + 0.75 + 1 + 0.75) / 8 pairs = 75%** |
+
+</Tab>
+</Tabs>
+
+
+## Is a high agreement good enough?
+
+Suppose 👩 Asha and 👨 Ben label 10 other replies on `Safety (binary)`, and each says `Pass` 9 times out of 10 without reading them:
+
+<Answers name="👩 Asha" answers="PPPPPPPPFP" />
+<Answers name="👨 Ben" answers="PPPPPPPPPF" />
+
+They agree on 8 of 10 replies, 80%. By chance alone they would agree (0.9 x 0.9) + (0.1 x 0.1) = 82% of the time. So 80% sounds good, but it is slightly worse than chance.
+
+## How much of the agreement is more than luck?
+
+Kappa is agreement after removing what chance alone would produce.
+
+**Kappa = (agreement - chance agreement) / (1 - chance agreement)**
+
+Kappa runs from -1 to 1: 1 is full agreement, 0 is the same as chance, and below 0 is worse than chance.
+
+| Comparison | Agreement | Chance agreement | Kappa |
+| --- | --- | --- | --- |
+| 👩 Asha and 👨 Ben on `Safety (binary)` | 75% | 53% | (0.75 - 0.53) / (1 - 0.53) = **0.47** |
+| 🤖 Evaluator and the annotators on `Safety (binary)` | 63% | 50% | (0.625 - 0.5) / (1 - 0.5) = **0.25** |
+| 👩 Asha and 👨 Ben on `Empathy (rating)` | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.6** |
+| 🤖 Evaluator and the annotators on `Empathy (rating)` | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.2** |
+
+How each chance agreement is worked out:
+
+- **👩 Asha and 👨 Ben on `Safety (binary)`:** annotators are treated as one group ([Fleiss' kappa](#which-kappa-is-used)), so their 8 labels go into one list: 5 `Pass` and 3 `Fail`. Chance = (5/8 x 5/8) + (3/8 x 3/8) = 0.53.
+- **🤖 Evaluator and the annotators on `Safety (binary)`:** the evaluator and the annotators are kept apart ([Cohen's kappa](#which-kappa-is-used)). Over the 8 pairs, the evaluator says `Pass` 4 times and the annotators 5 times. Chance = (4/8 x 5/8) + (4/8 x 3/8) = 0.5.
+- **👩 Asha and 👨 Ben on `Empathy (rating)`:** as one group, their 8 ratings go into one list: two each of 2, 3, 4 and 5. Over the 16 ways to pick two of these, the agreements add up to (4 x 1) + (6 x 0.75) + (4 x 0.5) + (2 x 0.25) = 11. Chance = 11 / 16 = 0.6875.
+- **🤖 Evaluator and the annotators on `Empathy (rating)`:** kept apart, as above. Over the 8 pairs, the evaluator gives 5 twice, 4 four times and 2 twice. The annotators give two each of 2, 3, 4 and 5. Against those, a 5 agrees 0.625 on average, a 4 agrees 0.75 and a 2 agrees 0.625. Chance = (2/8 x 0.625) + (4/8 x 0.75) + (2/8 x 0.625) = 0.6875.
+
+## Why can kappa not be worked out?
+
+| Case | Why | What to do |
+| --- | --- | --- |
+| Every pair comes from one item | One item cannot show what chance alone would produce. | Label more items on this dimension. |
+| Everyone gave the same answer | Chance agreement is 100%, so the formula divides by 0. | Nothing is wrong. Kappa can be worked out once someone gives a different answer. |
+| Nothing to compare | For example, only one annotator labelled the items. | Have a second annotator label the same items, or run the evaluator. |
+
+## Which kappa is used?
+
+| Comparison | Kappa | Where the chance answers come from |
+| --- | --- | --- |
+| Annotators with each other | **Fleiss' kappa** | All the annotators' answers in one list, because any annotator could have labelled any item |
+| An evaluator with the annotators | **Cohen's kappa** | The evaluator's answers and the annotators' answers kept apart, because each side has its own habits |
+| One annotator with the other annotators | **Cohen's kappa** | That annotator's answers and the others' answers kept apart |
+
+For ratings, the kappa is **linear weighted**: close ratings get partial credit in chance agreement too, the same way as in the agreement.
+
+<Note>
+`Pass` or `Fail` answers and ratings never go into the same kappa, because chance agreement is worked out differently for each.
+</Note>
+
+
+## Why did a number change?
+
+- **A different evaluator version was made the live one.** Only the live version's scores are used, so the evaluator's agreement and score start again from that version.
+- **An annotator was deleted.** Their answers are no longer used, including in evaluation runs that already finished.
+- **A labelling job was deleted.** The answers given in that job are no longer used, including in evaluation runs that already finished.
+- **An evaluation run was deleted.** Its scores are no longer used.
+- **An item was deleted.** It is no longer used, except in evaluation runs that already scored it.
+- **An evaluation run is in progress.** Its scores are used as they arrive, before the run finishes.
+- **An evaluation run failed.** Its scores are removed, so they are no longer used.
