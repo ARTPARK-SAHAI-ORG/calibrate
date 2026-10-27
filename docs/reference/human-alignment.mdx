@@ -20,16 +20,6 @@ export const Answers = ({ name, answers }) => (
   </div>
 );
 
-export const ChanceBar = ({ children, agreement, chance, colour, caption }) => (
-  <div style={{display: "grid", gridTemplateColumns: "minmax(0, 11em) minmax(0, 1fr) minmax(0, 9em)", gap: "16px", alignItems: "center", margin: "14px 0"}}>
-    <span>{children}</span>
-    <div style={{position: "relative", height: "10px", borderRadius: "5px", background: "rgba(128,128,128,0.25)"}}>
-      <div style={{position: "absolute", left: 0, top: 0, bottom: 0, width: `${agreement}%`, borderRadius: "5px", background: colour}} />
-      {chance !== undefined && <div style={{position: "absolute", top: "-4px", left: `${chance}%`, width: "2px", height: "18px", background: "currentColor"}} />}
-    </div>
-    <span style={{fontSize: "0.9em"}}>{caption}</span>
-  </div>
-);
 
 
 
@@ -201,17 +191,12 @@ Kappa runs from -1 to 1: 1 is full agreement, 0 is the same as chance, and below
 | 👩 Asha and 👨 Ben on `Empathy (rating)` | 88% | 69% | (0.875 - 0.6875) / (1 - 0.6875) = **0.6** |
 | 🤖 Evaluator and the annotators on `Empathy (rating)` | 75% | 69% | (0.75 - 0.6875) / (1 - 0.6875) = **0.2** |
 
-Chance agreement comes from how often each side gives each answer. On `Safety (binary)`, 👩 Asha's and 👨 Ben's 8 labels are 5 `Pass` and 3 `Fail`, so two labels picked at random agree (5/8 x 5/8) + (3/8 x 3/8) = 53% of the time. For `Empathy (rating)`, two random ratings get the same partial credit as in the agreement.
+How each chance agreement is worked out:
 
-## Is the agreement better than chance?
-
-In each bar, the fill is the agreement and the tick is chance agreement. The first two are 👩 Asha and 👨 Ben.
-
-<ChanceBar agreement={75} chance={53} colour="#16A34A" caption="75% against 53%: better">`Safety (binary)`</ChanceBar>
-<ChanceBar agreement={80} chance={82} colour="#DC2626" caption="80% against 82%: worse">The 10 other replies</ChanceBar>
-<ChanceBar agreement={100} chance={100} colour="#9CA3AF" caption="100% against 100%: no difference">Everyone said `Pass`</ChanceBar>
-
-Agreement above chance gives a kappa above 0. Agreement below chance gives a kappa below 0.
+- **👩 Asha and 👨 Ben on `Safety (binary)`:** their 8 labels are 5 `Pass` and 3 `Fail`. Chance = (5/8 x 5/8) + (3/8 x 3/8) = 0.53.
+- **🤖 Evaluator and the annotators on `Safety (binary)`:** over the 8 pairs, the evaluator says `Pass` 4 times and the annotators 5 times. Chance = (4/8 x 5/8) + (4/8 x 3/8) = 0.5.
+- **👩 Asha and 👨 Ben on `Empathy (rating)`:** their 8 ratings are two each of 2, 3, 4 and 5. Over the 16 ways to pick two of these, the agreements add up to (4 x 1) + (6 x 0.75) + (4 x 0.5) + (2 x 0.25) = 11. Chance = 11 / 16 = 0.6875.
+- **🤖 Evaluator and the annotators on `Empathy (rating)`:** over the 8 pairs, the evaluator gives 5 twice, 4 four times and 2 twice. The annotators give two each of 2, 3, 4 and 5. Against those, a 5 agrees 0.625 on average, a 4 agrees 0.75 and a 2 agrees 0.625. Chance = (2/8 x 0.625) + (4/8 x 0.75) + (2/8 x 0.625) = 0.6875.
 
 ## Why can kappa not be worked out?
 
