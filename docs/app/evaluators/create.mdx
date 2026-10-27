@@ -37,11 +37,26 @@ Optional. One line that shows under the name in the list, for example `Checks th
 Choose **Binary** or **Rating**.
 
 - **Binary** returns a pass or fail. Under **Labels**, the **True** row and the **False** row show "Correct" and "Wrong" until you type your own labels. Under each label you can add what a reply needs to get it. "Step-by-step reply" uses **Binary**.
+
+<Frame>
+  <img src="/images/app/evaluators-review-type-binary.png" alt="The Add evaluator form with Binary chosen and the True and False label rows" />
+</Frame>
+
 - **Rating** returns a score. Under **Rating scale**, each row has a number and a label. The highest number is the best and the lowest is the worst. You need at least two rows, and every row needs a label. Click **Add row** to add more. "Warm tone" uses **Rating**, with rows 1 to 5.
+
+<Frame>
+  <img src="/images/app/evaluators-review-type-rating.png" alt="The Add evaluator form with Rating chosen and the rating scale rows" />
+</Frame>
+
 
 ### Judge model
 
-Click the box under **Judge model** to choose the AI model that does the judging.
+Click the box under **Judge model**. In the **Select LLM** window, search for or click the AI model that does the judging.
+
+<Frame>
+  <img src="/images/app/evaluators-judge-model.png" alt="The Select LLM window with a search box and models grouped by provider" />
+</Frame>
+
 
 ### Judge prompt
 
@@ -60,11 +75,21 @@ How encouraging and patient is the tutor's reply? 1 is dismissive, 5 is warm and
 ```
 
 <Tip>
-  To reuse one evaluator across tests with a different value in each test, put a variable in the prompt, such as `{{ topic }}`. A **Variables** list then appears above the prompt. Give each variable a short description. When you add the evaluator to a test, you fill in that test's value. Variables can only be added when you first create the evaluator.
+  To reuse one evaluator across tests with a different value in each test, put a variable in the prompt, such as `{{criteria}}`. A **Variables** list then appears above the prompt. Give each variable a short description. When you add the evaluator to a test, you fill in that test's value. Variables can only be added when you first create the evaluator.
 </Tip>
+
+<Frame>
+  <img src="/images/app/evaluators-judge-prompt.png" alt="The Judge prompt box with a prompt ending in a criteria variable, and the Variables list above it" />
+</Frame>
+
 
 ## Save the evaluator
 
-Click **Create evaluator**. If a required field is empty, it is outlined in red and nothing is saved. Fill it in and click **Create evaluator** again.
+Click **Create evaluator**. If a required field is empty, nothing is saved and the field is outlined in red. An empty name shows "Name is required" under the box. Fill it in and click **Create evaluator** again.
+
+<Frame>
+  <img src="/images/app/evaluators-required-field.png" alt="The Add evaluator form showing Name is required under an empty name box" />
+</Frame>
+
 
 The evaluator appears in the list. Its first version is v1. To change it later, see [Edit an evaluator and manage versions](/app/evaluators/versions).

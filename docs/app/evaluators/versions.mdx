@@ -22,6 +22,11 @@ The page has two tabs:
 
 Click the pencil next to the evaluator's name. In the **Edit evaluator** window, change the **Name** or the **Description**, then click **Save**.
 
+<Frame>
+  <img src="/images/app/evaluators-edit.png" alt="The Edit evaluator window with Name and Description boxes" />
+</Frame>
+
+
 A new name or description does not make a new version.
 
 ## Change the prompt
@@ -41,11 +46,21 @@ Variable names stay the same as when the evaluator was created. You can change e
 
 **Mark the new version as the live version** is ticked by default. Leave it ticked to use the new version straight away, and click **Create and mark live**. Untick it to save the version without using it, and click **Create version**.
 
+<Frame>
+  <img src="/images/app/evaluators-new-version.png" alt="The New version window with the judge prompt, labels, summary of change, live version tick box and judge model" />
+</Frame>
+
+
 ## Choose the current version
 
 One version carries the **Current** label. New tests use the current version.
 
 To make an older version current, click the tick on that version in the list. Its tooltip reads **Mark as current**.
+
+<Frame>
+  <img src="/images/app/evaluators-mark-current.png" alt="The Mark as current tooltip on version v1" />
+</Frame>
+
 
 For example, if v2 of "Explains step by step" fails replies that v1 passed correctly, mark v1 as current again.
 
@@ -53,12 +68,27 @@ For example, if v2 of "Explains step by step" fails replies that v1 passed corre
 
 Click the bin on a version in the list, then click **Delete** to confirm. You cannot delete the current version. Mark another version as current first.
 
+<Frame>
+  <img src="/images/app/evaluators-delete-version.png" alt="The Delete version window asking to confirm deleting v1" />
+</Frame>
+
+
 ## Duplicate an evaluator
 
 Click **Duplicate** at the top of the page or on the evaluator's card in the list. The create form opens filled in from the current version, named "Copy of" followed by the original name. Change what you need and click **Create evaluator**. The copy is a separate evaluator with its own versions.
 
+<Frame>
+  <img src="/images/app/evaluators-duplicate.png" alt="The Add evaluator form filled in with the name Copy of Explains step by step" />
+</Frame>
+
+
 ## Delete an evaluator
 
 Click the bin at the top right of the evaluator page, then click **Delete** to confirm. You can also click **Delete** on the evaluator's card in the list.
+
+<Frame>
+  <img src="/images/app/evaluators-delete.png" alt="The Delete evaluator window asking to confirm deleting Explains step by step" />
+</Frame>
+
 
 Deleting an evaluator removes it from everywhere it is used. This cannot be undone. Some pre-built evaluators cannot be deleted, so they have no delete button.
