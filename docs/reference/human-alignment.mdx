@@ -65,7 +65,9 @@ Two annotators, Asha and Ben, and one evaluator answered the same four items. Th
 | 3 | <Fail /> | <Fail /> | <Fail /> |
 | 4 | <Pass /> | <Pass /> | <Fail /> |
 
+<Note>
 Only the latest answer counts. If Asha changes item 2 from fail to pass, only the pass counts. Comments and reasons are never part of any number.
+</Note>
 
 ## What score did the annotators and the evaluator give?
 
@@ -79,8 +81,9 @@ A score shows what the answers came to, not how often they match. Scores are on 
 | Human score | 8 labels: 4 from Asha, 4 from Ben | 5 | 5 / 8 = **63%** |
 | Evaluator score | 4 items | 2 | 2 / 4 = **50%** |
 
-- The human score counts every annotator's label. An item labelled by two people adds two labels. There is no majority vote.
-- The evaluator score counts the evaluator's latest score on each item, so each item counts once. On a task, only scores from the evaluator's live version count.
+<Note>
+The human score counts every annotator's label, with no majority vote. The evaluator score counts its latest score on each item, and on a task only scores from the evaluator's live version count.
+</Note>
 
 ## How often do they give the same answer?
 
@@ -149,11 +152,11 @@ The bar is filled up to the agreement. The tick marks the agreement expected by 
 | **Everyone agreed** | Everyone gave the same answer, so chance agreement is 100% and kappa cannot be worked out. | Nothing is wrong. Kappa appears once someone gives a different answer. |
 | A dash | There is nothing to compare, for example only one annotator labelled the items. | Have a second annotator label the same items, or run the evaluator. |
 
+<Tip>
 Hover over the information icon beside **Too few items** or **Everyone agreed** to see the reason on screen.
+</Tip>
 
 ## Which kind of kappa is shown?
-
-Hover over the information icon beside a kappa to see which kind it is.
 
 | Comparison | Kappa | Where the chance answers come from |
 | --- | --- | --- |
@@ -163,7 +166,13 @@ Hover over the information icon beside a kappa to see which kind it is.
 
 For ratings, the kappa is **linear weighted**: close ratings get partial credit in chance agreement too, the same way as in the agreement beside it.
 
+<Note>
 Binary and rating answers never go into the same kappa. This is why the **Annotators** tab has a **Kappa (binary)** and a **Kappa (rating)** column, and why the two cards at the top of the **Overview** tab show agreement only.
+</Note>
+
+<Tip>
+Hover over the information icon beside a kappa to see which kind it is.
+</Tip>
 
 ## Why did a number change?
 
