@@ -11,6 +11,10 @@ You need a few lines of text, each up to 200 characters long.
 
 In the sidebar, under **Voice evaluation**, click **Text-to-Speech**. Then click **New evaluation**.
 
+<Frame>
+  <img src="/images/app/tts-start.png" alt="The Evaluations tab of the Text-to-Speech page, with the New evaluation button at the top right" />
+</Frame>
+
 ## Add the text to read aloud
 
 The **Dataset** tab opens first. Keep **Enter manually** selected.
@@ -60,11 +64,19 @@ The text is saved as a dataset with this name, so you can use it again in later 
 2. Under **Language**, pick **Hindi**. The list shows only providers that support Hindi.
 3. Under **Select providers to evaluate**, tick Sarvam, ElevenLabs and Google. Each row shows the model and the voice that provider uses.
 
+<Frame>
+  <img src="/images/app/tts-models.png" alt="The Models tab with Hindi chosen as the language and a list of providers, most marked API key needed" />
+</Frame>
+
 If your workspace uses its own provider keys, a provider without a key shows **API key needed**. Tick it, paste the key in the field that opens under it, and click **Save**. The key is saved for the whole workspace. See [Bring your own keys (BYOK)](/reference/byok).
 
 ## Choose how the speech is scored
 
 Click the **Evaluators** tab. An evaluator listens to each recording and judges it against the text.
+
+<Frame>
+  <img src="/images/app/tts-evaluators-tab.png" alt="The Evaluators tab of a new text-to-speech evaluation, with the pre-built Pronunciation evaluator added" />
+</Frame>
 
 The Pronunciation evaluator is already added. It checks that the spoken words match the text and are clear enough to understand. A run needs at least one evaluator.
 
@@ -74,15 +86,19 @@ To add more, click **Add evaluators**. See [Text-to-speech metrics](/core-concep
 
 Click **Evaluate** at the top of the page. The results page opens and fills in as each provider finishes.
 
+<Frame>
+  <img src="/images/app/tts-running.png" alt="The results page for Tutor replies in Hindi while it is running, with a tick next to each provider that has finished" />
+</Frame>
+
 ## Read the results
 
 The **Leaderboard** tab puts the providers side by side, with a column and a chart for each evaluator and for **Latency (s)**. Latency is how long a provider takes to start sending audio. Lower is better.
 
 <Frame>
-  <img src="/images/app/tts-results.png" alt="The Leaderboard tab for Tutor replies in Hindi, comparing latency for Sarvam, ElevenLabs and Google" />
+  <img src="/images/app/tts-results.png" alt="The Leaderboard tab for Tutor replies in Hindi, comparing Pronunciation and latency for Sarvam, ElevenLabs and Google" />
 </Frame>
 
-In this example Sarvam starts sending audio first, after 0.32 seconds.
+In this example Sarvam passes every line and starts sending audio first, after 0.32 seconds.
 
 The **Results** tab shows every line of text. Pick a provider on the left. Each row has the **Text**, the **Audio** to play, and a pass or fail from each evaluator. Hover over the small info button next to a result to read the reason. For example, a reply fails when "1/4" is read out as "one by four" instead of "एक बटा चार".
 
@@ -94,6 +110,10 @@ The **About** tab explains each score shown on the page.
 - **Download CSV** on the **Leaderboard** tab downloads the leaderboard table.
 - **Share** makes the results page public. Click **Copy link** to copy the link. Anyone with the link can see the results without a Calibrate account. Click **Public** to make the page private again.
 - **Submit for labelling** sends rows you ticked on the **Results** tab to a labelling task, so people can listen and check them. See [Create a labelling task](/app/human-alignment/labelling-tasks).
+
+<Frame>
+  <img src="/images/app/tts-share.png" alt="The results page for Tutor replies in Hindi after sharing, with the Public and Copy link buttons at the top" />
+</Frame>
 
 ## Next steps
 

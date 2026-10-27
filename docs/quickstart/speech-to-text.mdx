@@ -11,6 +11,10 @@ You need a few short recordings, each a `.wav` file of under 60 seconds and unde
 
 In the sidebar, under **Voice evaluation**, click **Speech-to-Text**. Then click **New evaluation**.
 
+<Frame>
+  <img src="/images/app/stt-start.png" alt="The Evaluations tab of the Speech-to-Text page, with the New evaluation button at the top right" />
+</Frame>
+
 ## Add your recordings
 
 The **Dataset** tab opens first. Keep **Upload new** selected.
@@ -59,11 +63,19 @@ The recordings are saved as a dataset with this name, so you can use them again 
 2. Under **Language**, pick **Hindi**. The list shows only providers that support Hindi.
 3. Under **Select providers to evaluate**, tick Sarvam, Deepgram and Google. Each row shows the model that provider uses.
 
+<Frame>
+  <img src="/images/app/stt-models.png" alt="The Models tab with Hindi chosen as the language and a list of providers, most marked API key needed" />
+</Frame>
+
 If your workspace uses its own provider keys, a provider without a key shows **API key needed**. Tick it, paste the key in the field that opens under it, and click **Save**. The key is saved for the whole workspace. See [Bring your own keys (BYOK)](/reference/byok).
 
 ## Choose how transcripts are scored
 
 Click the **Evaluators** tab.
+
+<Frame>
+  <img src="/images/app/stt-evaluators-tab.png" alt="The Evaluators tab of a new speech-to-text evaluation, with the built-in LLM-based evaluation metrics switched on and no evaluators added" />
+</Frame>
 
 Every run measures WER (Word Error Rate) and CER (Character Error Rate). These count how many words and letters in each transcript differ from the words you typed.
 
@@ -75,12 +87,16 @@ To score transcripts with your own evaluator as well, click **Add evaluators**. 
 
 Click **Evaluate** at the top of the page. The results page opens and fills in as each provider finishes.
 
+<Frame>
+  <img src="/images/app/stt-running.png" alt="The results page for Tutor questions in Hindi while it is running, with a tick next to each provider that has finished" />
+</Frame>
+
 ## Read the results
 
 The **Leaderboard** tab puts the providers side by side, with one chart for each score. Lower WER and CER are better.
 
 <Frame>
-  <img src="/images/app/stt-results.png" alt="The Leaderboard tab for Tutor questions in Hindi, comparing WER for Sarvam, Deepgram and Google" />
+  <img src="/images/app/stt-results.png" alt="The Leaderboard tab for Tutor questions in Hindi, comparing WER, CER, LLM-WER and LLM-CER for Sarvam, Deepgram and Google" />
 </Frame>
 
 In this example Sarvam gets the fewest words wrong, with a WER of 0.08.
@@ -95,6 +111,10 @@ The **About** tab explains each score shown on the page.
 - **Download CSV** on the **Leaderboard** tab downloads the leaderboard table.
 - **Share** makes the results page public. Click **Copy link** to copy the link. Anyone with the link can see the results without a Calibrate account. Click **Public** to make the page private again.
 - **Submit for labelling** sends rows you ticked on the **Results** tab to a labelling task, so people can check the transcripts. See [Create a labelling task](/app/human-alignment/labelling-tasks).
+
+<Frame>
+  <img src="/images/app/stt-share.png" alt="The results page for Tutor questions in Hindi after sharing, with the Public and Copy link buttons at the top" />
+</Frame>
 
 ## Next steps
 
