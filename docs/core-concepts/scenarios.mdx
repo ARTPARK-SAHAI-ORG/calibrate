@@ -1,70 +1,70 @@
 ---
 title: "Scenarios"
-description: "Define what your simulated users should do in simulations"
+description: "Describe what the simulated student wants from the conversation"
 ---
 
-Scenarios define the specific task or goal for your [personas](/core-concepts/personas) in [agent simulations](/quickstart/simulations). They describe `WHAT` the simulated user should do during the conversation.
+A scenario describes what the student wants from the conversation in a [simulation](/app/simulations/overview). Who the student is and how they behave goes in a [persona](/core-concepts/personas).
 
-## Quickstart
+## See your scenarios
 
-### Create a new scenario
-
-From the sidebar, click **Scenarios** to view your existing scenarios. Click **Add scenario** to create a new scenario.
+In the sidebar, under **Agent simulations**, click **Scenarios**. The list shows each scenario's label and description.
 
 <Frame>
-  <img src="./images/scenarios-1.png" alt="Scenarios" />
+  <img src="/images/app/simulations-scenarios.png" alt="The Scenarios page with two scenarios: Asks for the answer only, and Fractions homework" />
 </Frame>
 
-### Add the label and description
+## Add a scenario
 
-Give a meaningful label to the scenario (e.g. `crop insurance inquiry`) and define the task or goal clearly.
-
-<Note>
-  Avoid defining personality traits in scenarios. Use
-  [**Personas**](/core-concepts/personas) to define `HOW` the simulated user
-  behaves
-</Note>
+Click **Add scenario**. A panel opens on the right. To change a scenario later, click it in the list.
 
 <Frame>
-  <img src="./images/scenarios-2.png" alt="Add label and description" />
+  <img src="/images/app/simulations-scenario-edit.png" alt="The Edit scenario panel for Fractions homework" />
 </Frame>
 
-### Save the scenario
+Fill in these fields:
 
-Click **Add scenario** to create the scenario.
+| Field | What to enter |
+| --- | --- |
+| **Label** | A short name you will recognise, such as "Fractions homework" |
+| **Description** | What the student wants to get done |
+
+Then click **Add scenario** at the bottom of the panel to save it. When you change a scenario, the button reads **Save**.
+
+### Example scenarios
+
+The two scenarios used across these docs:
+
+```text Fractions homework
+The student needs help adding 1/2 and 1/4 for homework.
+```
+
+```text Asks for the answer only
+The student asks the tutor to just give the answer to 3/5 + 1/5.
+```
+
+The first checks that the tutor can walk a student through a sum. The second checks that the tutor still explains a step when the student only wants the answer.
 
 ## Best practices
 
-### Writing effective scenarios
+1. Be specific. Put in the exact numbers, dates or details the student would bring up.
+2. Give one clear goal. Say what the student is trying to get out of the conversation.
+3. Leave personality out. "Gets frustrated quickly" belongs in a persona.
+4. Include hard cases. A student who pushes for the answer tests your agent more than one who follows along.
 
-1. **Be specific**: Include concrete details (order numbers, dates, amounts)
-2. **Set clear objectives**: What should the user aim to achieve?
-3. **Include conversation flow hints**: What questions should they ask?
-4. **Add realistic context**: Why is the user calling?
+### Scenarios and personas
 
-### Scenarios vs personas
-
-| Aspect  | Scenario                              | Persona                                  |
-| ------- | ------------------------------------- | ---------------------------------------- |
-| Focus   | WHAT to do                            | WHO and HOW                              |
-| Content | Task, goal, situation                 | Demographics, behavior                   |
-| Example | "Call to get a refund for order #123" | "A busy professional who speaks quickly" |
-
-### Scenario complexity levels
-
-| Level       | Description                      | Example                                             |
-| ----------- | -------------------------------- | --------------------------------------------------- |
-| **Simple**  | Single task, straightforward     | "Check account balance"                             |
-| **Medium**  | Multiple questions, some details | "Inquire about insurance and ask about eligibility" |
-| **Complex** | Edge cases, negotiations         | "Dispute a charge and escalate if unsatisfied"      |
+| | Scenario | Persona |
+| --- | --- | --- |
+| Says | What the student wants | Who the student is and how they behave |
+| Example | "The student needs help adding 1/2 and 1/4 for homework." | "A class 6 student who is stuck on fractions homework." |
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Create Personas" icon="user" href="/guides/personas">
-    Define who your simulated users are and how they behave
+  <Card title="Personas" icon="user" href="/core-concepts/personas">
+    Describe who the student is and how they behave
   </Card>
-  <Card title="Run Simulations" icon="comments" href="/guides/simulations">
-    Test your agent with combinations of personas and scenarios
+  <Card title="Run a simulation" icon="comments" href="/quickstart/simulations">
+    Pair personas with scenarios and run them
   </Card>
 </CardGroup>
