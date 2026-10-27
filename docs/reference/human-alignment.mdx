@@ -134,7 +134,13 @@ Inter-annotator agreement compares 👩 Asha's and 👨 Ben's answers on each it
 </Tab>
 <Tab title="Empathy (rating)">
 
-| Item | 👩 Asha | 👨 Ben | Agreement = 1 - difference / (highest rating on the scale - lowest rating on the scale) |
+Two ratings that are close still agree partly:
+
+**Agreement = 1 - difference between the two ratings / (highest rating on the scale - lowest rating on the scale)**
+
+On a scale of 1 to 5, that is 1 - difference / (5 - 1).
+
+| Item | 👩 Asha | 👨 Ben | Agreement |
 | --- | --- | --- | --- |
 | 1 | 4 | 4 | 1 - (4 - 4) / (5 - 1) = 1 |
 | 2 | 3 | 2 | 1 - (3 - 2) / (5 - 1) = 0.75 |
@@ -168,7 +174,9 @@ Evaluator agreement with humans compares the 🤖 evaluator's answer with each a
 </Tab>
 <Tab title="Empathy (rating)">
 
-| Item | 🤖 Evaluator | Annotator | Agreement = 1 - difference / (highest rating on the scale - lowest rating on the scale) |
+Each pair is worked out the same way as between the annotators.
+
+| Item | 🤖 Evaluator | Annotator | Agreement |
 | --- | --- | --- | --- |
 | 1 | 5 | 👩 Asha 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
 | 1 | 5 | 👨 Ben 4 | 1 - (5 - 4) / (5 - 1) = 0.75 |
