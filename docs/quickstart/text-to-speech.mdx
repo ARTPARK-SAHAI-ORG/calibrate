@@ -1,154 +1,107 @@
 ---
-title: "Text to Speech"
-description: "Learn how to evaluate and compare TTS providers with your data"
+title: "Benchmark text-to-speech providers"
+description: "Find the text-to-speech provider that reads your agent's replies most clearly"
 ---
 
-[Calibrate](https://calibrate.artpark.ai) lets you evaluate multiple TTS providers simultaneously using your own text samples. This guide will walk you through creating an evaluation, managing reusable datasets, and sharing your results.
+A text-to-speech provider reads your agent's replies aloud. This guide compares three providers on replies the Maths homework tutor gives a class 6 student in Hindi.
 
-<iframe
-  className="w-full aspect-video rounded-xl"
-  src="https://www.youtube.com/embed/MM8rW0m-Vr0"
-  title="Text-to-Speech Evaluation Walkthrough"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-  allowFullScreen
-></iframe>
+You need a few lines of text, each up to 200 characters long.
 
-## Start a new evaluation
+## Start an evaluation
 
-From the sidebar, click on **Text-to-Speech** to view all your evaluations and datasets. Click the **New evaluation** button to create a new evaluation.
+In the sidebar, under **Voice evaluation**, click **Text-to-Speech**. Then click **New evaluation**.
+
+## Add the text to read aloud
+
+The **Dataset** tab opens first. Keep **Enter manually** selected.
 
 <Frame>
-  <img src="./images/tts_new.png" alt="Text-to-Speech Evaluations List" />
+  <img src="/images/app/tts-new-evaluation.png" alt="The Dataset tab of a new text-to-speech evaluation, with a row for text and an Upload CSV box" />
 </Frame>
 
-## Add your dataset
+1. Under **Dataset name**, type `Tutor replies in Hindi`.
+2. In the first row, type a reply, for example `बहुत बढ़िया! तुमने सही जवाब दिया।`
+3. Click **Add another row** for each other reply. This example has three:
 
-On the **Dataset** tab, choose how to provide your text samples:
+| Reply |
+| --- |
+| बहुत बढ़िया! तुमने सही जवाब दिया। |
+| चलो साथ में करते हैं। 1/2 में कितने 1/4 होते हैं? |
+| कोई बात नहीं, एक बार फिर कोशिश करो। |
+
+The second reply has fractions written as numbers. It checks whether each provider reads "1/4" the way a Hindi speaker would.
+
+The text is saved as a dataset with this name, so you can use it again in later evaluations. Your datasets are listed on the **Datasets** tab of the **Text-to-Speech** page.
 
 <Frame>
-  <img
-    src="./images/tts_new_dataset.png"
-    alt="New TTS Evaluation - Dataset Tab"
-  />
+  <img src="/images/app/tts-datasets.png" alt="The Datasets tab of the Text-to-Speech page, listing Tutor replies in Hindi with 3 items" />
 </Frame>
 
-<AccordionGroup>
-  <Accordion title="Enter manually" icon="keyboard" defaultOpen>
-    Create a new dataset inline. Give it a name, then add text samples in one of two ways:
+<Accordion title="Upload many lines at once" icon="file-csv">
+  In the **Upload CSV** box, click **Choose CSV**. The CSV file has one column named `text`, with one line per row:
 
-    1. **Add samples inline** — Type the text to synthesize in each row. Click **+ Add another row** to add more entries.
+  ```csv
+  text
+  बहुत बढ़िया! तुमने सही जवाब दिया।
+  चलो साथ में करते हैं। 1/2 में कितने 1/4 होते हैं?
+  कोई बात नहीं, एक बार फिर कोशिश करो।
+  ```
 
-    2. **Bulk upload via CSV** — Upload a CSV file with a `text` column:
-
-    ```csv
-    text
-    Hello, how can I help you today?
-    Your appointment is confirmed for tomorrow at 3 PM.
-    Thank you for calling. Have a great day!
-    ```
-
-    <Tip>
-      Click **Download sample** to get a template with the correct format.
-    </Tip>
-
-    <Frame>
-      <img src="./images/tts_dataset_create.png" alt="Use Existing Dataset" />
-    </Frame>
-
-    Your dataset is automatically saved so you can reuse it in future evaluations.
-
-  </Accordion>
-  <Accordion title="Use existing dataset" icon="database">
-    If you've already created a dataset, switch to **Use existing dataset** to pick from your saved datasets.
-
-    <Frame>
-      <img src="./images/tts_existing_dataset.png" alt="Use Existing Dataset" />
-    </Frame>
-
-  </Accordion>
-</AccordionGroup>
+  Click **Download sample** to get a CSV file in the right shape.
+</Accordion>
 
 <Tip>
-  You can also create and manage datasets independently from the **Datasets**
-  tab. See [Datasets](/core-concepts/text-to-speech#datasets) to learn how to
-  create reusable datasets and run evaluations directly from them.
+  To run on text you already saved, click **Use existing dataset** and pick the dataset from the list.
 </Tip>
 
-## Configure settings
+## Choose the providers
 
-Switch to the **Settings** tab to select the language and the providers you want to compare:
+1. Click the **Models** tab.
+2. Under **Language**, pick **Hindi**. The list shows only providers that support Hindi.
+3. Under **Select providers to evaluate**, tick Sarvam, ElevenLabs and Google. Each row shows the model and the voice that provider uses.
 
-<Frame>
-  <img
-    src="./images/tts_settings.png"
-    alt="TTS Settings - Language and Providers"
-  />
-</Frame>
+If your workspace uses its own provider keys, a provider without a key shows **API key needed**. Tick it, paste the key in the field that opens under it, and click **Save**. The key is saved for the whole workspace. See [Bring your own keys (BYOK)](/reference/byok).
 
-Select a **Language** from the dropdown and check the providers you want to evaluate. Each provider shows the model and **Voice ID** it uses.
+## Choose how the speech is scored
 
-## Run evaluation
+Click the **Evaluators** tab. An evaluator listens to each recording and judges it against the text.
 
-Click the **Evaluate** button at the top to start the evaluation. You'll be redirected to the results page where you can monitor progress in real-time.
+The Pronunciation evaluator is already added. It checks that the spoken words match the text and are clear enough to understand. A run needs at least one evaluator.
 
-## View results
+To add more, click **Add evaluators**. See [Text-to-speech metrics](/core-concepts/text-to-speech#metrics) for what each score means.
 
-### Outputs
+## Run the evaluation
 
-The **Outputs** tab shows per-provider results. Select a provider from the list on the left to see its overall metrics and per-sample results.
+Click **Evaluate** at the top of the page. The results page opens and fills in as each provider finishes.
 
-<Frame>
-  <img src="./images/tts_outputs.png" alt="TTS Outputs with Audio Playback" />
-</Frame>
+## Read the results
 
-Each sample row includes:
-
-- **Text** — The input text you provided
-- **Audio** — An inline audio player to listen to the generated speech
-- **LLM Judge** — Pass/Fail based on audio quality evaluation
-
-### Leaderboard
-
-The **Leaderboard** tab shows a side-by-side comparison across all providers with aggregated metrics and bar charts.
+The **Leaderboard** tab puts the providers side by side, with a column and a chart for each evaluator and for **Latency (s)**. Latency is how long a provider takes to start sending audio. Lower is better.
 
 <Frame>
-  <img src="./images/tts_leaderboard.png" alt="TTS Leaderboard" />
+  <img src="/images/app/tts-results.png" alt="The Leaderboard tab for Tutor replies in Hindi, comparing latency for Sarvam, ElevenLabs and Google" />
 </Frame>
 
-## Sharing results publicly
+In this example Sarvam starts sending audio first, after 0.32 seconds.
 
-Once your evaluation completes, you can make the results publicly accessible by clicking the **Share** button on the results page.
+The **Results** tab shows every line of text. Pick a provider on the left. Each row has the **Text**, the **Audio** to play, and a pass or fail from each evaluator. Hover over the small info button next to a result to read the reason. For example, a reply fails when "1/4" is read out as "one by four" instead of "एक बटा चार".
 
-<Frame>
-  <img src="./images/tts_share.png" alt="Share button on evaluation results" />
-</Frame>
+The **About** tab explains each score shown on the page.
 
-This toggles the evaluation to **Public** and generates a shareable link. Anyone with the link can view the leaderboard and outputs without needing a Calibrate account.
+## Export and share the results
 
-<Frame>
-  <img src="./images/tts_public.png" alt="Public evaluation with copy link" />
-</Frame>
-
-Click the **Public** button again to make the evaluation private.
+- **Export results** downloads a ZIP file. It holds a CSV file with every provider's scores for each line, and an `audios` folder with the recording each provider made.
+- **Download CSV** on the **Leaderboard** tab downloads the leaderboard table.
+- **Share** makes the results page public. Click **Copy link** to copy the link. Anyone with the link can see the results without a Calibrate account. Click **Public** to make the page private again.
+- **Submit for labelling** sends rows you ticked on the **Results** tab to a labelling task, so people can listen and check them. See [Create a labelling task](/app/human-alignment/labelling-tasks).
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card
-    title="Core Concepts"
-    icon="chart-bar"
-    href="/core-concepts/text-to-speech"
-  >
-    Learn about TTS metrics — LLM Judge Score and TTFB
+  <Card title="Text-to-speech metrics" icon="chart-bar" href="/core-concepts/text-to-speech">
+    What the evaluators and latency measure
   </Card>
-  <Card
-    title="Datasets"
-    icon="database"
-    href="/core-concepts/text-to-speech#datasets"
-  >
-    Save and reuse text samples across multiple evaluations
-  </Card>
-  <Card title="Simulations" icon="microphone" href="/quickstart/simulations">
-    Run simulated conversations with your agent
+  <Card title="Benchmark speech-to-text providers" icon="microphone" href="/quickstart/speech-to-text">
+    Compare the providers that turn what students say into text
   </Card>
 </CardGroup>

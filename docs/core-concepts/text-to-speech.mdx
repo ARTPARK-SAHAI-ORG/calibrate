@@ -1,99 +1,86 @@
 ---
-title: "Text to Speech"
-description: "Understand the concepts for evaluating Text to Speech providers"
+title: "Text-to-speech metrics"
+description: "What each text-to-speech score means, and how to manage the text you test with"
 ---
 
 ## Metrics
 
-### LLM judge score
+The **About** tab on a results page explains every score that run produced.
 
-An audio LLM Judge (`gpt-audio-1.5`) listens to the generated audio and evaluates whether the pronunciation matches the input text.
+### Evaluators
 
-<Note>
-  The LLM Judge directly compares the raw audio against the input text. It does
-  **not** convert the generated speech to text first — it evaluates the audio
-  natively using an audio-capable model.
-</Note>
+An evaluator listens to the recording a provider made and judges it against the text it was given. It does not turn the speech back into text first.
 
-<Warning>
-  Evaluation accuracy may differ for low-resource languages like Sindhi, as the
-  underlying audio model has limited training data for these languages.
-</Warning>
+Every new evaluation starts with the Pronunciation evaluator added on the **Evaluators** tab. It checks that the spoken words match the text and are clear enough to understand. Each recording gets a pass or a fail, with a short reason.
 
-- **Range**: 0 to 1 (1 means all audio correctly pronounces the text, higher is better)
-- **Output**: Returns both a match (True/False) and reasoning for each audio file
+| Text | What the evaluator heard | Result |
+| --- | --- | --- |
+| बहुत बढ़िया! तुमने सही जवाब दिया। | Every word spoken clearly and correctly | Pass |
+| चलो साथ में करते हैं। 1/2 में कितने 1/4 होते हैं? | "1/4" read out as "one by four" instead of "एक बटा चार" | Fail |
 
-What the LLM Judge evaluates:
+The leaderboard shows, for each provider, the share of recordings that passed. Higher is better.
 
-- Correct pronunciation of words
-- Proper handling of numbers, abbreviations, and special characters
+A run needs at least one evaluator. To score something else, such as how natural the voice sounds, click **Add evaluators** on the **Evaluators** tab of a new evaluation. See [Create an evaluator](/app/evaluators/create).
 
-#### Example
+### Latency
 
-| Text                  | Audio                                                           | LLM Judge | Reasoning                                                        |
-| --------------------- | --------------------------------------------------------------- | --------- | ---------------------------------------------------------------- |
-| "Hello world"         | <audio controls src="/core-concepts/audios/hello_world.wav" />  | True      | The audio clearly says "hello world" with correct pronunciation. |
-| "Call 1-800-555-0123" | <audio controls src="/core-concepts/audios/phone_number.wav" /> | True      | The phone number is pronounced correctly.                        |
-| "Dr. Smith"           | <audio controls src="/core-concepts/audios/dr_smith.wav" />     | False     | "Dr." was pronounced as "dur" instead of "doctor".               |
+Latency is the time, in seconds, from asking a provider for speech until the first part of the audio arrives. The leaderboard shows it as **Latency (s)**. Each provider's number is the middle value across all lines of text.
 
-### Time to first byte (TTFB)
+- Range: 0 and up. Lower is better.
+- Every run measures it.
 
-Measures the time (in seconds) from when the request is made to the provider until the first audio chunk is received. It is critical for real-time voice agents where responsiveness matters.
+Latency matters for a voice agent, because a student waits this long before hearing the tutor start to speak.
 
 ## Datasets
 
-You can save and manage your text samples as **datasets** for reuse across multiple evaluations — avoiding re-entering the same text data every time.
+A dataset is a set of lines of text for the providers to read aloud. You can run many evaluations on the same dataset.
 
-### View your datasets
+### See your datasets
 
-From the **Text-to-Speech** page, click the **Datasets** tab.
+In the sidebar, click **Text-to-Speech**, then click the **Datasets** tab. Each row shows how many lines the dataset has (**Items**) and how many evaluations used it (**Evals**).
 
 <Frame>
-  <img src="./images/tts_datasets_tab.png" alt="TTS Datasets Tab" />
+  <img src="/images/app/tts-datasets.png" alt="The Datasets tab of the Text-to-Speech page, listing Tutor replies in Hindi" />
 </Frame>
 
 ### Create a dataset
 
-Click **New dataset**, enter a name, and click **Create**.
+1. On the **Datasets** tab, click **New dataset**.
+2. Under **Dataset name**, type a name, for example `Tutor replies in Hindi`, and click **Create**.
+3. On the dataset page, type a line of text in the first row.
+4. Click **Add another row** for each other line. To add many at once, click **Choose CSV** in the **Upload CSV** box.
+5. Click **Save**.
 
-<Frame>
-  <img src="./images/tts_new_dataset_dialog.png" alt="New TTS Dataset Dialog" />
-</Frame>
+Each line can be up to 200 characters long.
 
-You'll be taken to the dataset detail page where you can add text samples in two ways:
+A dataset is also created when you enter text on the **Dataset** tab of a new evaluation.
 
-<Frame>
-  <img src="./images/tts_dataset_detail.png" alt="TTS Dataset Detail Page" />
-</Frame>
+### Change a dataset
 
-1. **Add samples inline** — Type the text to synthesize in each row. Click **+ Add another row** to add more entries.
+Click a dataset on the **Datasets** tab to open it. On the dataset page you can:
 
-2. **Bulk upload via CSV** — Upload a CSV file with a `text` column containing your samples. Click **Download sample** to get a template with the correct format.
+- Add lines with **Add another row** or **Choose CSV**.
+- Change a line by typing in its box.
+- Remove a line with the bin button on its row. The button shows once your other changes are saved, and only while the dataset has more than one line.
+- Rename the dataset with the pencil button next to its name.
 
-Click **Save** to persist your changes.
+Click **Save** to keep your changes.
 
-### Update a dataset
+### Run an evaluation on a dataset
 
-Open an existing dataset from the **Datasets** tab to edit it. You can:
-
-- **Add more samples** — Add new text rows inline or upload another CSV to append more entries.
-- **Edit text** — Click on any text sample to update it.
-- **Remove samples** — Click the delete button on a row to remove that sample.
-
-Click **Save** after making changes to persist them.
+On the dataset page, click **New evaluation**. The dataset is already chosen, so you only pick the language and providers. Save any changes first.
 
 ### Delete a dataset
 
-From the **Datasets** tab, click the delete button next to a dataset to remove it entirely.
-
-### Run an evaluation from a dataset
-
-Once your dataset has samples, click the **New evaluation** button on the dataset page. This pre-selects the dataset and takes you to the evaluation settings where you choose the language and providers to compare.
+On the **Datasets** tab, click the bin button at the end of the dataset's row. This cannot be undone.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Quickstart" icon="play" href="/quickstart/text-to-speech">
-    Run your first evaluation on your dataset
+  <Card title="Benchmark text-to-speech providers" icon="play" href="/quickstart/text-to-speech">
+    Run an evaluation on your text
+  </Card>
+  <Card title="Speech-to-text metrics" icon="microphone" href="/core-concepts/speech-to-text">
+    How transcripts of what students say are scored
   </Card>
 </CardGroup>
