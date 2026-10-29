@@ -1,95 +1,117 @@
 ---
-title: "Agent Connections"
-description: "Connect your existing deployed agent to Calibrate"
+title: "Connect your own agent"
+description: "Point Calibrate at the agent you already run so you can test it, compare models and run simulations"
 ---
 
-If you already have a deployed agent, you can connect it to Calibrate and run evaluations, benchmarks, and simulations against it — without rebuilding your agent inside Calibrate.
+If your agent already runs on your own server, you can connect it to Calibrate. Calibrate then sends it messages to run tests, model comparisons and simulations. You do not rebuild the agent in Calibrate.
+
+This page connects a copy of the Maths homework tutor that runs at `https://example.org/tutor/chat`.
 
 <Tip>
-  If you don't have an existing agent and want to build one from scratch within
-  Calibrate, see [Core Concepts: Agents](/core-concepts/agents) instead.
+  No agent of your own yet? See [Build an agent in
+  Calibrate](/core-concepts/agents).
 </Tip>
 
 ## How the connection works
 
-Calibrate does not need to understand your whole agent. It needs a single HTTP
-endpoint that follows one contract:
+Calibrate needs one web address on your server that follows these rules:
 
-- **Request** — Calibrate sends a `POST` request with the conversation history as a `messages`
-  array in the OpenAI chat message format.
-- **Response** — your endpoint returns a JSON object with the agent's reply as a
-  `response` string, and/or its tool calls as a `tool_calls` array.
+- Request: Calibrate sends a `POST` request with the conversation so far as a `messages` list, in the OpenAI chat message format.
+- Response: your agent sends back JSON with its reply as a `response` text, its tool calls as a `tool_calls` list, or both.
 
 ### Request format
 
-Calibrate sends a `POST` request to your endpoint. The body carries the full
-conversation history in chronological order, using the OpenAI chat message
-format:
+Calibrate sends a `POST` request to your agent's URL. The body holds the whole conversation, oldest message first:
 
 ```json
 {
   "messages": [
     {
       "role": "assistant",
-      "content": "Namaste! Main aapki kaise madad kar sakti hoon?"
+      "content": "Hello! What are you working on today?"
     },
-    { "role": "user", "content": "Meri beti ka vaccination schedule kya hai?" }
+    { "role": "user", "content": "What is 1/2 + 1/4? Just tell me the answer." }
   ]
 }
 ```
 
-The request may also carry an optional `model` field. Calibrate adds it only when you [benchmark across models](#enable-benchmarking-across-models), so your endpoint knows which model to run for that request. Handle it only if your agent is set up to switch models from that input; otherwise ignore it.
+The body can also hold a `model` field. Calibrate adds it only when you [turn on benchmarking across models](#enable-benchmarking-across-models), so your agent knows which model to use for that request. If your agent cannot switch models, ignore it.
+
+Any **Custom fields** you add on the **Connection** tab are also sent in the body on every request, next to `messages`.
+
+### Request format for a Basic agent
+
+If you chose **Basic** when you created the agent, Calibrate sends only the student's latest message, as an `input` field:
+
+```json
+{ "input": "What is 1/2 + 1/4? Just tell me the answer." }
+```
+
+A Basic agent can only run tests that have a single student message. Pick **Conversation** for tests with several turns and for simulations.
 
 ### Response format
 
-By default, your endpoint returns a `response` field containing the agent's text
-reply:
+Your agent returns a `response` field with its text reply:
 
 ```json
 {
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye."
+  "response": "Let's do it together! First, can you turn 1/2 into quarters? How many quarters make one half?"
 }
 ```
 
-If your agent also returns tool calls, expand the body to include a `tool_calls`
-array — each item has a `tool` name and an `arguments` object:
+If your agent also calls tools, add a `tool_calls` list. Each item has a `tool` name and an `arguments` object:
 
 ```json
 {
-  "response": "Aapki beti ka agla vaccination 14 weeks pe hai — OPV aur DPT ke liye.",
+  "response": "Let's practise one more. Here is a question on fractions.",
   "tool_calls": [
-    { "tool": "get_schedule", "arguments": { "child_age_weeks": 14 } }
+    { "tool": "get_practice_question", "arguments": { "topic": "fractions" } }
   ]
 }
 ```
 
-Each tool call may also include an optional `output` field — the result the tool
-returned when your agent ran it. It can be any JSON value, is shown in the
-results view for review only, and never affects whether a test passes or fails:
+Each tool call can also have an `output` field. This is what the tool gave back when your agent ran it, and it can be any JSON value. Calibrate shows it next to the tool call in the test results. It does not change whether a test passes or fails:
 
 ```json
 {
   "tool_calls": [
     {
-      "tool": "get_schedule",
-      "arguments": { "child_age_weeks": 14 },
-      "output": { "next_visit_weeks": 14, "vaccines": ["OPV", "DPT"] }
+      "tool": "get_practice_question",
+      "arguments": { "topic": "fractions" },
+      "output": { "question": "What is 2/3 + 1/6?" }
     }
   ]
 }
 ```
 
 <Warning>
-  Your endpoint's output **must** include either a `response` field or a
-  `tool_calls` field.
+  Your agent's reply must include a `response` field, a `tool_calls` field, or
+  both.
 </Warning>
 
-### Add a Calibrate endpoint
+### Report cost, speed and tokens
 
-The change to your codebase: pull the model call out of your agent handler into a
-reusable function, then expose a new route that calls it directly.
+Your agent can also send a `metrics` object with each reply. Calibrate then shows the cost, speed and tokens for each test, and uses them when you compare models.
 
-**Before** — the LLM call is buried inside your request handler:
+```json
+{
+  "response": "...",
+  "metrics": {
+    "cost": 0.0021,
+    "prompt_tokens": 1200,
+    "completion_tokens": 340,
+    "latency_ms": 850
+  }
+}
+```
+
+Every field in `metrics` is optional, and so is the whole object. For tokens, send `total_tokens`, or send `prompt_tokens` and `completion_tokens` and Calibrate adds them up. `latency_ms` is how long your agent took to reply. Calibrate shows latency only when you send it.
+
+### Add a route for Calibrate
+
+Most agents already call a model somewhere inside their own code. Move that model call into its own function. Then add a route that Calibrate calls, which uses the same function.
+
+Before: the model call sits inside your request handler.
 
 ```python
 def inference(x1, x2, x3):
@@ -103,7 +125,7 @@ def inference(x1, x2, x3):
         {"role": "user", "content": "..."},
     ]
 
-    response = client.chat.completions.create(messages=messages)  # buried here
+    response = client.chat.completions.create(messages=messages)
     return transform(response)
 
 @app.get("/agent")
@@ -111,11 +133,11 @@ def agent():
     return inference(x1, x2, x3)
 ```
 
-**After** — the LLM call is modularized and re-used by a thin Calibrate route:
+After: the model call is its own function, and a short Calibrate route uses it.
 
 ```python
 def llm_inference(messages):
-    """The core model call — reused by both your agent and Calibrate."""
+    """The model call, used by both your agent and Calibrate."""
     response = client.chat.completions.create(messages=messages)
     return response.choices[0].message.content
 
@@ -130,101 +152,81 @@ def inference(x1, x2, x3):
         {"role": "user", "content": "..."},
     ]
 
-    response = llm_inference(messages)   # same call, now shared
+    response = llm_inference(messages)
     return transform(response)
 
 @app.get("/agent")
 def agent():
     return inference(x1, x2, x3)
 
-@app.post("/calibrate/test")           # the endpoint you connect to Calibrate
+@app.post("/calibrate/test")
 def calibrate_test(body):
     return {"response": llm_inference(body["messages"])}
 ```
 
-Point Calibrate at the new endpoint `POST /calibrate/test`, add any auth headers your agent needs, and verify the connection as shown below.
+You give Calibrate the URL of the `POST /calibrate/test` route in the next steps.
 
-## Create an agent connection
+## Create the agent
 
-From the sidebar, click **Agents** → **New agent**. Select **Connect your existing agent**, give it a name, and click **Create**.
-
-<Frame>
-  <img
-    src="./images/agent-conn-1.png"
-    alt="New Agent - Connect your existing agent"
-  />
-</Frame>
-
-You will be taken to the new agent page where you configure the connection details.
-
-## Configure your connection
-
-The **Connection** tab lets you set up everything Calibrate needs to communicate with your agent:
+1. From the sidebar, click **Agents** → **New agent**.
+2. Under **Agent name**, type a name.
+3. Under **Setup**, select **Connect your existing agent**.
 
 <Frame>
-  <img src="./images/agent-conn-2.png" alt="Agent Connection Configuration" />
+  <img src="/images/app/agents-new-agent-connect.png" alt="The New agent dialog with Connect your existing agent selected" />
 </Frame>
 
-Fill in the following:
+4. Click **Next**.
+5. Select **Conversation**, then click **Create**.
 
-1. **Agent URL** (required) — The HTTPS endpoint where your agent is deployed (e.g. `https://your-agent.example.com/chat`). Calibrate will send a `POST` request to this URL with conversation messages.
+## Fill in the connection details
 
-2. **Headers** (optional) — Add any headers your agent needs for authentication or custom metadata (e.g. `Authorization: Bearer YOUR_API_KEY`). Click **+ Add header** to add multiple headers.
+On the agent page, click the **Connection** tab.
 
-3. **Support benchmarking different models** (optional) — Turn this on if your agent can switch LLMs from the request `model` field, then pick your **Model provider**. The provider sets the format Calibrate sends in `model`: for OpenRouter it's provider-prefixed (e.g. `openai/gpt-4.1`), for OpenAI it's bare (e.g. `gpt-4.1`). In the API/SDK this is the `benchmark_provider` field on the agent config. See [Enable benchmarking across models](#enable-benchmarking-across-models) for the full flow.
+<Frame>
+  <img src="/images/app/agents-connection-verified.png" alt="The Connection tab of the Maths homework tutor (connected), with its URL filled in and the connection check showing Verified" />
+</Frame>
 
-The request and response formats your endpoint must follow are described in
-[How the connection works](#how-the-connection-works) above.
+1. **Agent URL** (required): the web address of your agent's route, for example `https://example.org/tutor/chat`. Calibrate sends a `POST` request here.
+2. **Headers** (optional): headers your agent needs, such as a key it checks before it answers. Click **Add header** for each one.
+3. **Custom fields** (optional): extra fields Calibrate sends with every request. Click **Add field** for each one.
+4. **Support benchmarking different models** (optional): turn this on if your agent can switch models. See [Enable benchmarking across models](#enable-benchmarking-across-models).
+
+The **Expected request & response format** panel on the right shows the request Calibrate sends and the reply your agent must return. Click **See an example** for a full example.
+
+Click **Save** at the top right.
 
 ## Verify your connection
 
-Before running any tests, we need to verify we can connect to your agent and that it returns the output in the correct format.
+Calibrate checks that it can reach your agent and that the reply has the right format. You must do this before you run tests or text simulations.
 
-Click the **Verify** button in the **Connection check** panel. A dialog will open where you can customize the sample request that will be sent to your agent:
+1. In the **Connection check** panel, click **Verify**.
+2. A dialog opens. Under **Messages**, edit the sample conversation Calibrate sends. The **Request body preview** shows the exact JSON.
 
 <Frame>
-  <img src="./images/agent-conn-3.png" alt="Verify Connection Dialog" />
+  <img src="/images/app/agents-verify-connection.png" alt="The Verify connection dialog, with one user message on the left and the request body preview on the right" />
 </Frame>
 
-- Edit the **Messages** to set the conversation history for the test request.
-- The **Request body preview** on the right updates live so you can see the exact JSON that will be sent.
-- Click **Send & Verify** to send the request to your agent.
+3. Click **Send & Verify**.
 
-After verification:
+If it works, the panel shows **Verified** and the date. If it fails, the panel shows **Failed**, the error, and what your agent sent back, so you can fix it and try again.
 
-- ✅ **Verified** — Your agent is reachable and returns the correct format
-- ❌ **Failed** — The panel will show the error along with the actual output received from your agent so you can debug and try again.
-
-<Note>
-  Connection verification is required before running LLM tests, benchmarks or
-  simulations
-</Note>
-
-Even after your agent is verified, if you make any changes to your agent you can come back here and verify the connection again.
+If you change your agent later, click **Re-verify** to check it again.
 
 ## Enable benchmarking across models
 
-Calibrate supports [benchmarking](/quickstart/text-to-text#find-the-best-llm-for-your-agent) different LLMs on your dataset to find the best model for your agent. For this, you need to instrument your agent API to support a `model` field in the request body that Calibrate will send along with the conversation history.
+Calibrate can run the same tests on several models so you can [compare them](/app/agents/compare-models). For a connected agent, your agent must read a `model` field from the request and use that model.
 
 <Warning>
-  Your agent is responsible for reading the `model` parameter and setting the
-  right model to perform the actual inference. Calibrate sends this field but
-  does not control which model your agent uses.
+  Calibrate sends the `model` field, but your agent decides which model it
+  actually uses. If your agent ignores the field, every model in the comparison
+  runs the same model.
 </Warning>
 
-To get started, turn on **Support benchmarking different models** from the **Connection** tab.
+1. On the **Connection** tab, turn on **Support benchmarking different models**.
+2. Under **Model provider**, pick the provider your agent uses to call models.
 
-<Frame>
-  <img
-    src="./images/agent-conn-4.png"
-    alt="Agent Connection with Benchmarking Enabled"
-  />
-</Frame>
-
-When enabled:
-
-1. Select your **Model provider** from the dropdown (OpenRouter, OpenAI, Anthropic, Google, etc.). This represents the provider you have configured for your agent on your system.
-2. Calibrate will include a `model` field in the request body:
+Calibrate then adds a `model` field to each request:
 
 ```json
 {
@@ -233,24 +235,20 @@ When enabled:
 }
 ```
 
-Depending on the provider you have selected, the format of the `model` field will be different. For example, if you have selected `OpenRouter`, the `model` field is provider-prefixed (e.g. `openai/gpt-4.1`). If you have selected OpenAI, the `model` field will just be `gpt-4.1`.
+The format of `model` depends on the provider you pick. For OpenRouter it includes the company name, such as `openai/gpt-4.1`. For OpenAI it is only the model name, such as `gpt-4.1`.
 
-3. When running a benchmark via **Compare models**, Calibrate will verify the connection for each selected model before starting the evaluation. See [this](/quickstart/text-to-text#verifying-agent-connection) for details.
+When you click **Start the comparison** in the **Compare models** dialog, Calibrate first checks the connection for each model you picked that it has not checked before. The comparison starts once those checks pass.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Run LLM Tests" icon="list-check" href="/quickstart/text-to-text">
-    Create and run test cases against your agent
+  <Card title="Write tests for an agent" icon="list-check" href="/app/agents/tests">
+    Write tests for your connected agent
   </Card>
-  <Card
-    title="Find the best LLM"
-    icon="list-check"
-    href="/quickstart/text-to-text#find-the-best-llm-for-your-agent"
-  >
-    Compare the performance of different LLMs on your agent
+  <Card title="Compare models on your tests" icon="chart-bar" href="/app/agents/compare-models">
+    See which model does best on your tests
   </Card>
-  <Card title="Run Simulations" icon="play" href="/quickstart/simulations">
-    Simulate conversations with realistic personas
+  <Card title="Run a text or voice simulation" icon="play" href="/quickstart/simulations">
+    Have simulated students talk to your agent. Connected agents run text simulations only.
   </Card>
 </CardGroup>

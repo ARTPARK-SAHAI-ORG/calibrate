@@ -1,121 +1,104 @@
 ---
-title: "Tools"
-description: "Learn how to create tools for your agents"
+title: "Add tools to an agent"
+description: "Let your agent save details from the conversation or call an outside service"
 ---
 
-Tools extend your agents' capabilities by enabling them to perform actions and produce structured outputs. There are two types of tools available:
+A tool is something your agent can call during a conversation. Calibrate has two kinds:
 
-- **Webhook tools** — Call external APIs or services to perform actions
-- **Structured output tools** — Extract information from conversations in a defined format
+- **Structured output tool**: the agent pulls set details out of the conversation, in a format you define.
+- **Webhook tool**: the agent calls an outside web address to do something or look something up.
 
-## Navigate to tools
+This page adds two tools to the Maths homework tutor:
 
-From the sidebar, click **Tools** to view and manage your tools.
+- `save_progress`, a structured output tool that saves which topic the student practised and whether they solved the question.
+- `get_practice_question`, a webhook tool that fetches one practice question for a topic.
 
-<Frame>
-  <img src="./images/tools-1.png" alt="Tools page" />
-</Frame>
+## Open the Tools tab
 
-## Webhook tools
-
-Webhook tools allow agents to call external APIs or services to perform actions like sending notifications or querying databases.
-
-### Create a webhook tool
-
-Click **Add webhook tool** to open the configuration panel.
+On the agent page, click the **Tools** tab.
 
 <Frame>
-  <img src="./images/tools-webhook-1.png" alt="Add webhook tool" />
+  <img src="/images/app/agents-tools-tab.png" alt="The Tools tab of the Maths homework tutor, listing get_practice_question and save_progress" />
 </Frame>
 
-### Configure the tool
+- **Add tool** adds a tool that already exists in your workspace.
+- **Create tool** makes a new tool and adds it to this agent.
 
-Provide the following details:
-
-**Name and Description**
-
-Add a descriptive name and explain when the agent should call this tool.
-
-**Request Configuration**
-
-- **Method** — Select HTTP method (GET, POST, PUT, PATCH, DELETE)
-- **URL** — The webhook endpoint URL
-- **Response timeout** — How long to wait before timing out (default: 20 seconds)
-
-<Frame>
-  <img src="./images/tools-webhook-2.png" alt="Configure webhook tool" />
-</Frame>
-
-**Headers** (Optional)
-
-Define headers to include in the request.
-
-**Query Parameters** (Optional)
-
-Define parameters the LLM will collect and send as query strings.
-
-**Body Parameters** (Optional)
-
-Define the request body structure with a description and properties the LLM should collect.
-
-Click **Add tool** to save.
+To make a new tool, click **Create tool**. Calibrate asks what the tool should do. Pick **Structured output tool** or **Webhook tool**.
 
 ## Structured output tools
 
-Structured output tools enable agents to extract information from conversations in a defined format, such as user names or order details.
-
-### Create a structured output tool
-
-Click **Add structured output tool** to open the configuration panel.
+A structured output tool lets the agent pull details out of the conversation in a fixed shape. The tutor uses `save_progress` to note the topic and whether the student got the answer.
 
 <Frame>
-  <img src="./images/tools-structured-1.png" alt="Add structured output tool" />
+  <img src="/images/app/agents-add-tool-structured-output.png" alt="The Add structured output tool form" />
 </Frame>
 
-### Configure the tool
+Fill in **Configuration**:
 
-Provide the following details:
+- **Name**: `save_progress`
+- **Description**: tell the LLM when to call the tool and what to pass. For example: `Save which topic the student practised and whether they solved the question.`
 
-**Name and Description**
+Under **Parameters**, define each detail the agent should fill in. Click **Add param** for each one. For every parameter, set:
 
-Add a descriptive name and explain when the agent should call this tool.
+- **Data type**: **String**, **Number**, **Integer**, **Boolean**, **Object** or **Array**.
+- **Name**: what the detail is called.
+- **Required**: tick it if the agent must always fill it in.
+- **Description**: tell the LLM what this detail means and how to fill it in.
 
-**Parameters**
+The tutor's two parameters:
 
-Define the structure of data the agent should extract.
+| Data type | Name | Description |
+| --- | --- | --- |
+| String | `topic` | The maths topic, for example fractions |
+| Boolean | `solved` | True if the student reached the right answer |
+
+Click **Add tool**.
+
+## Webhook tools
+
+A webhook tool lets the agent call a web address on your side. The tutor uses `get_practice_question` to fetch a question for the topic the student is working on.
 
 <Frame>
-  <img src="./images/tools-structured-2.png" alt="Configure parameters" />
+  <img src="/images/app/agents-add-tool-webhook.png" alt="The Add webhook tool form" />
 </Frame>
 
-For each parameter, specify:
+Fill in **Configuration**:
 
-- **Data type** — Boolean, Integer, Number, String, Object, or Array
-- **Name** — The parameter identifier
-- **Required** — Whether this field is mandatory
-- **Description** — Detailed guidance for the LLM on what this parameter represents
+- **Name**: `get_practice_question`
+- **Description**: tell the LLM when to call the tool and what to pass. For example: `Fetch one practice question for a topic.`
+- **Method**: how the request is sent. Pick **GET**, **POST**, **PUT**, **PATCH** or **DELETE**. The tutor uses **GET**.
+- **URL**: the web address to call. The tutor uses `https://example.org/tutor/practice-question`.
+- **Response timeout (seconds)**: how long to wait for an answer. The default is 20 seconds.
 
-Click **Add param** to add more parameters. Click **Add tool** to save.
+Then fill in the parts of the request your web address needs:
 
-## Inbuilt tools
+- **Headers**: values sent with every request, such as a key your service checks. Click **Add header** for each one.
+- **Query parameters**: details the LLM fills in and adds to the URL. Click **Add param** for each one. The tutor has one, `topic`, a **String** described as "The maths topic".
+- **Body parameters**: details the LLM fills in and sends in the request body. This section appears only for **POST**, **PUT** and **PATCH**.
 
-Some tools are built into the platform and enabled by default:
+Click **Add tool**.
 
-| Tool                 | Description                      |
-| -------------------- | -------------------------------- |
-| **End conversation** | Allows the agent to end the call |
+<Tip>
+  Both forms have a **Form** view and a **JSON** view at the top right. Use
+  **JSON** to paste a tool you already wrote out.
+</Tip>
+
+## In-built tools
+
+Every agent has these tools. They are listed under **In-built tools** on the **Tools** tab.
+
+| Tool | What it does |
+| --- | --- |
+| **End conversation** | Lets the agent end the call |
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Configure Agents" icon="robot" href="/core-concepts/agents">
-    Learn how to create and configure agents
+  <Card title="Build an agent in Calibrate" icon="robot" href="/core-concepts/agents">
+    Write the prompt and pick the models
   </Card>
-  <Card
-    title="Run Tests"
-    icon="flask"
-    href="/quickstart/text-to-text#create-a-tool-invocation-test"
-  >
-    Test tool invocations with your agent
+  <Card title="Write tests for an agent" icon="flask" href="/app/agents/tests">
+    Check that the agent calls the right tool with the right details
   </Card>
 </CardGroup>

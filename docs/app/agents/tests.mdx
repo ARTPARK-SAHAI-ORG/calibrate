@@ -1,0 +1,145 @@
+---
+title: "Write tests for an agent"
+description: "Create tests that check your agent's reply or the tools it calls"
+---
+
+A test is one short conversation and a check on what your agent does next. This page writes tests for the Maths homework tutor, such as "Fractions: asks for the next step".
+
+## Open the Tests tab
+
+1. In the sidebar, click **Agents**.
+2. Click "Maths homework tutor".
+3. Click the **Tests** tab.
+
+The tab lists every test linked to the agent. Use **Search tests** to find one by name. Use the **Agent Response** and **Tool Call** buttons to show only one kind of test.
+
+<Frame>
+  <img src="/images/app/agents-tests-tab.png" alt="The Tests tab of the Maths homework tutor with four tests, and the Run all tests, Compare models, Create test and Bulk upload buttons" />
+</Frame>
+
+Each row has three buttons:
+
+- **Run**: runs that one test. See [Run tests and read results](/app/agents/run-tests).
+- **Duplicate**: opens a copy of the test to edit.
+- **Delete**: removes the test.
+
+## Two kinds of test
+
+When you create a test, Calibrate asks what you want to check:
+
+- **Does the agent give the right reply?** This makes an **Agent Response** test. Evaluators grade the agent's reply to the last message.
+- **Does the agent use the right tool?** This makes a **Tool Call** test. The test passes only if the agent calls the right tools with the right values.
+
+## Create a test that checks the reply
+
+1. On the **Tests** tab, click **Create test**.
+2. Pick **Does the agent give the right reply?** and click **Next**.
+The form opens with a sample test already filled in. Replace it with your own test.
+
+3. Under **Test name**, replace the sample name with "Fractions: asks for the next step".
+4. On the right, replace the sample conversation. Delete the sample messages with the bin button next to each one, and type the student's message: "What is 1/2 + 1/4? Just tell me the answer."
+5. To add more messages, click the plus button (**Add message**) under the last message and pick **User message** or **Agent message**. The conversation must end with a user message.
+6. Under **Evaluators**, each evaluator that will grade the reply has its own card. The test starts with the evaluators on the agent's **Evaluators** tab, such as "Step-by-step reply" and "Warm tone". If the agent has none, it starts with **Correctness**. Click the X on a card to remove that evaluator.
+7. In the **Correctness** card, replace the sample criteria with what a good reply does: "The tutor does not give 3/4 straight away. It asks the student to make the bottoms of both fractions the same first."
+8. Click **Add evaluator** to add another evaluator.
+9. Click **Create**.
+
+<Frame>
+  <img src="/images/app/agents-new-test-response.png" alt="The create test window for Fractions: asks for the next step, with the Step-by-step reply, Warm tone and Correctness evaluators on the left and the student's message on the right" />
+</Frame>
+
+<Tip>
+  Click **Run test** at the bottom to save the test and run it straight away.
+</Tip>
+
+## Create a test that checks a tool call
+
+The Maths homework tutor has a tool called `save_progress`. It should call it when the student solves a question.
+
+1. On the **Tests** tab, click **Create test**.
+2. Pick **Does the agent use the right tool?** and click **Next**.
+The form opens with a sample test already filled in. Replace it with your own test.
+
+3. Under **Test name**, replace the sample name with "Saves progress after a solved question".
+4. On the right, replace the sample message with the student's message: "I got it! 1/2 + 1/4 is 3/4."
+5. Next to **Tools to test**, click **Add tool** and pick `save_progress`.
+6. Fill in the values the agent should send. Set `topic` to **Is exactly** "fractions" and `solved` to **Is exactly** true.
+7. Click **Create**.
+
+<Frame>
+  <img src="/images/app/agents-new-test-tool-call.png" alt="The create test window for Saves progress after a solved question, with save_progress under Tools to test and the student's message on the right" />
+</Frame>
+
+If you only care that the tool was called, tick **Accept any values for the parameters**. To make a tool the agent does not have yet, click **Create tool**. See [Add tools to an agent](/core-concepts/tools).
+
+## Upload many tests at once
+
+Use a CSV file when you have many tests. Each row in the file makes one test.
+
+1. On the **Tests** tab, click **Bulk upload**.
+2. Pick **Does the agent give the right reply?** or **Does the agent use the right tool?** and click **Next**.
+3. For reply tests, under **Select evaluators to attach**, pick the evaluators, such as "Step-by-step reply" and "Warm tone". The CSV columns depend on this choice.
+4. Click **download the sample CSV** to get a file with the right columns. Fill it in.
+5. Drop your file on the upload box, or click it to choose the file.
+6. Check the tests in the preview, then click the upload button at the bottom of the window. Its label shows how many tests it will make.
+
+<Frame>
+  <img src="/images/app/agents-bulk-upload.png" alt="The Bulk upload tests window asking what you want to test, with an example test on the right" />
+</Frame>
+
+Tests you upload from the agent's **Tests** tab are linked to that agent.
+
+<Tip>
+  Click **Download CSV format guidelines** for a PDF that explains every column with examples.
+</Tip>
+
+<AccordionGroup>
+  <Accordion title="Columns for reply tests" icon="file-csv">
+    | Column | What to put in it |
+    | --- | --- |
+    | `name` | A test name. Each name must be different. |
+    | `conversation_history` | The conversation so far, as a JSON list of messages. Each message has a `role` (`"user"` or `"assistant"`) and its `content`. |
+    | One column per evaluator, named after it | `true` or `false`. Says whether that evaluator grades this test. A blank cell means `true`. Each test needs at least one evaluator. |
+    | `Evaluator name/variable name` | A value for an evaluator's variable, such as `Correctness/criteria`. Leave it blank when that evaluator is `false` on the row. |
+
+    Example `conversation_history`:
+
+    ```json
+    [{"role": "user", "content": "What is 1/2 + 1/4? Just tell me the answer."}]
+    ```
+
+  </Accordion>
+  <Accordion title="Columns for tool call tests" icon="file-csv">
+    | Column | What to put in it |
+    | --- | --- |
+    | `name` | A test name. It must be different from every other test in the file and every test you already have. |
+    | `conversation_history` | The conversation so far, as a JSON list of messages. It should end with a user message. |
+    | `tool_calls` | A JSON list of the tool calls you expect. Order does not matter. |
+
+    Each tool call in `tool_calls` has these fields:
+
+    | Field | What it means |
+    | --- | --- |
+    | `tool` | The tool's name, exactly as it is set up in Calibrate. Required. |
+    | `arguments` | The values you expect, one entry per parameter. Each one is `{"match_type": "exact", "value": ...}`, `{"match_type": "llm_judge", "criteria": "..."}` or `{"match_type": "any"}`. Parameters you leave out are not checked. |
+    | `accept_any_arguments` | `true` passes the test whatever values the agent sends. Default `false`. |
+
+    Example `tool_calls`:
+
+    ```json
+    [{"tool": "save_progress", "arguments": {"topic": {"match_type": "exact", "value": "fractions"}, "solved": {"match_type": "exact", "value": true}}}]
+    ```
+
+  </Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Run tests and read results" icon="play" href="/app/agents/run-tests">
+    Run your tests and see why a test failed
+  </Card>
+  <Card title="Compare models on your tests" icon="chart-bar" href="/app/agents/compare-models">
+    Find the model that passes the most tests
+  </Card>
+</CardGroup>
