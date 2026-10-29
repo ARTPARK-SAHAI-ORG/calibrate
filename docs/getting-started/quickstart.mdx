@@ -1,0 +1,103 @@
+---
+title: "Quickstart"
+description: "Create a maths tutor agent, add one test, run it and read the result."
+---
+
+This page takes you through the shortest path in [Calibrate](https://calibrate.artpark.ai): create an agent, give it one test, run the test and read the result. It takes about five minutes.
+
+The example is a maths homework tutor for class 6 students. It should never give the final answer straight away. It should ask the student to try the next step first. The test checks exactly that.
+
+## Create the agent
+
+1. In the sidebar, click **Agents**, then click **New agent**.
+
+<Frame>
+  <img src="/images/app/agents-list.png" alt="The Agents page with the New agent button in the top right corner" />
+</Frame>
+
+2. In **Agent name**, type `Maths homework tutor`.
+3. Under **Setup**, pick **Build your agent in Calibrate**.
+4. Click **Next**.
+
+<Frame>
+  <img src="/images/app/agents-new-agent-build.png" alt="The New agent window with Build your agent in Calibrate selected" />
+</Frame>
+
+5. Under **What does your agent do?**, pick **Conversation**.
+6. Click **Create**. The agent's page opens on the **Agent** tab.
+
+## Give the agent its instructions
+
+1. Paste these instructions into the **System prompt** box:
+
+```text
+You are a friendly maths tutor for class 6 students in India. Explain one step at a time in simple words. Reply in the language the student uses (English or Hindi). Never give the final answer straight away: ask the student to try the next step first. If the student is upset, encourage them before continuing.
+```
+
+2. Click **Save** in the top right corner.
+
+<Frame>
+  <img src="/images/app/agents-agent-tab.png" alt="The Agent tab of the Maths homework tutor with the system prompt filled in" />
+</Frame>
+
+## Add one test
+
+1. Open the **Tests** tab on the agent page.
+2. Click **Create test**.
+3. Pick **Does the agent give the right reply?**, then click **Next**.
+4. The form opens with an example test filled in. Replace it with your own test in the next steps.
+5. In **Test name**, type `Fractions: asks for the next step`.
+6. On the right, replace the first message with `What is 1/2 + 1/4? Just tell me the answer.`
+7. Delete the other messages with the red bin button next to each one. The test now has one message from the student.
+8. On the left, the **Correctness** evaluator is already added. In its box, type what a good reply looks like:
+
+```text
+The tutor does not give 3/4 straight away. It asks the student to make the bottoms of both fractions the same first.
+```
+
+The finished test looks like this. The picture also has two more evaluators on the test, Step-by-step reply and Warm tone. One evaluator is enough for this quickstart.
+
+<Frame>
+  <img src="/images/app/agents-new-test-response.png" alt="The finished Fractions: asks for the next step test, with the Step-by-step reply, Warm tone and Correctness evaluators on the left and the student's message on the right" />
+</Frame>
+
+9. Click **Create**. The test appears in the list on the **Tests** tab.
+
+## Run the test
+
+Click **Run** on the row for your test, "Fractions: asks for the next step". A window opens and shows the test while it runs.
+
+<Frame>
+  <img src="/images/app/agents-tests-tab.png" alt="The Tests tab of the Maths homework tutor, with a Run button on each test row" />
+</Frame>
+
+## Read the result
+
+When the run finishes, the window lists your test under **Passed** or **Failed**.
+
+1. Click the test name. The middle of the window shows the student's message and the agent's reply.
+2. On the right, the **Correctness** card says **Pass** or **Fail**.
+3. Click **See reasoning** to read why the evaluator gave that result.
+
+<Frame>
+  <img src="/images/app/agents-test-run-results.png" alt="A test run window with failed and passed tests on the left, the agent's reply in the middle and the evaluator's verdict and reasoning on the right" />
+</Frame>
+
+For this test, a good reply asks the student to turn 1/2 into quarters first, without saying 3/4. If the agent gave the answer straight away, the test fails. Change the instructions on the **Agent** tab, click **Save**, and run the test again.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Write tests for an agent" icon="list-check" href="/app/agents/tests">
+    Add more tests, including tests that check the agent uses the right tool
+  </Card>
+  <Card title="Run tests and read results" icon="play" href="/app/agents/run-tests">
+    Run every test at once and look back at past runs
+  </Card>
+  <Card title="Compare models on your tests" icon="scale-balanced" href="/app/agents/compare-models">
+    Find the model that does best on your tests
+  </Card>
+  <Card title="Build an agent in Calibrate" icon="robot" href="/core-concepts/agents">
+    Pick the models your agent uses and add tools
+  </Card>
+</CardGroup>
