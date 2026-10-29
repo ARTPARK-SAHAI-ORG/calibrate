@@ -1,0 +1,35 @@
+---
+title: "Settings"
+description: "Rename a workspace and choose how models are compared"
+---
+
+## Open settings
+
+1. Click the workspace name at the top of the sidebar.
+2. Click **Workspace settings**.
+
+<Frame>
+  <img src="/images/app/workspace-settings-menu.png" alt="The workspace menu open under the workspace name, with Workspace settings below the list of workspaces" />
+</Frame>
+
+## General
+
+The **General** tab has two settings.
+
+<Frame>
+  <img src="/images/app/workspace-settings-general.png" alt="The General tab of Workspace settings, with the Name field and the Benchmarking choice" />
+</Frame>
+
+- **Name**: type a new name for the workspace and click **Save**.
+- **Benchmarking**: choose **Parallel** or **Sequential**. This sets how models run when you [compare models on your tests](/app/agents/compare-models). **Parallel** is quicker but puts more load on your agent's server. Pick **Sequential** to avoid overloading it.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Members" icon="users" href="/app/workspace-settings/members">
+    Invite your team to the workspace
+  </Card>
+  <Card title="Bring your own keys (BYOK)" icon="lock" href="/reference/byok">
+    Add your own provider keys
+  </Card>
+</CardGroup>
