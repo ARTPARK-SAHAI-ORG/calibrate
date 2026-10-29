@@ -47253,6 +47253,27 @@ function formatEvaluatorSummary(evaluators) {
   if (!evaluators || Object.keys(evaluators).length === 0) return "Done";
   return Object.entries(evaluators).map(([name, ev]) => `${name}: ${ev.display}`).join(" \xB7 ");
 }
+function readRunCounts(mj, readRows) {
+  const counts = {};
+  if (typeof mj?.total === "number") counts.total = mj.total;
+  if (typeof mj?.passed === "number") counts.passed = mj.passed;
+  if (typeof mj?.pass_rate === "number") counts.passRate = mj.pass_rate;
+  if (counts.total !== void 0 && counts.passed !== void 0 && counts.passRate !== void 0) {
+    return counts;
+  }
+  const rows = readRows();
+  if (!Array.isArray(rows)) return counts;
+  const answered = rows.filter((r) => !r.error);
+  const answeredPassed = answered.filter(
+    (r) => r.metrics?.passed
+  ).length;
+  counts.total ??= rows.length;
+  counts.passed ??= answeredPassed;
+  if (counts.passRate === void 0 && answered.length > 0) {
+    counts.passRate = answeredPassed / answered.length * 100;
+  }
+  return counts;
+}
 function LlmTestsApp({ onBack }) {
   const { exit } = use_app_default();
   const [step, setStep] = (0, import_react23.useState)("init");
@@ -47640,27 +47661,18 @@ function LlmTestsApp({ onBack }) {
       const evaluators = parseEvaluatorsFromMetrics(
         path3.join(getResultsDir(model), "metrics.json")
       );
-      let total;
-      let passed;
-      try {
-        const metricsPath = path3.join(getResultsDir(model), "metrics.json");
-        if (fs4.existsSync(metricsPath)) {
-          const mj = JSON.parse(fs4.readFileSync(metricsPath, "utf-8"));
-          if (typeof mj?.total === "number") total = mj.total;
-          if (typeof mj?.passed === "number") passed = mj.passed;
+      const readJson = (file) => {
+        try {
+          return JSON.parse(fs4.readFileSync(file, "utf-8"));
+        } catch {
+          return void 0;
         }
-        if (total === void 0 || passed === void 0) {
-          const data = JSON.parse(fs4.readFileSync(resultsPath, "utf-8"));
-          if (Array.isArray(data)) {
-            total = total ?? data.length;
-            passed = passed ?? data.filter(
-              (r) => r.metrics?.passed
-            ).length;
-          }
-        }
-      } catch {
-      }
-      results.push({ model, total, passed, evaluators });
+      };
+      const counts = readRunCounts(
+        readJson(path3.join(getResultsDir(model), "metrics.json")),
+        () => readJson(resultsPath)
+      );
+      results.push({ model, ...counts, evaluators });
     }
     setMetrics(results);
   };
@@ -48427,7 +48439,7 @@ function LlmTestsApp({ onBack }) {
                 const row = { model: m.model };
                 row.total = m.total != null ? String(m.total) : "-";
                 row.passed = m.passed != null ? String(m.passed) : "-";
-                row.pass_rate = m.total != null && m.passed != null && m.total > 0 ? `${(m.passed / m.total * 100).toFixed(1)}%` : "-";
+                row.pass_rate = m.passRate != null ? `${m.passRate.toFixed(1)}%` : "-";
                 for (const name of evaluatorNames) {
                   row[name] = m.evaluators?.[name]?.display ?? "-";
                 }

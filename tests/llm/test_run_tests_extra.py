@@ -1464,7 +1464,7 @@ class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(result["judge_results"]["helpful"]["match"])
 
     def test_scores_reach_metrics_aggregation(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         results = [
             {
@@ -1608,7 +1608,7 @@ class TestGeneralEvaluationType(unittest.IsolatedAsyncioTestCase):
 
 class TestAggregateCriteria(unittest.TestCase):
     def test_binary_aggregation(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {"x": dict(_bin_ev("x"), id="ev1")}
         results = [
@@ -1637,7 +1637,7 @@ class TestAggregateCriteria(unittest.TestCase):
         self.assertEqual(agg["x"]["evaluator_id"], "ev1")
 
     def test_rating_aggregation(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {"r": _rate_ev("r", 1, 5)}
         results = [
@@ -1655,7 +1655,7 @@ class TestAggregateCriteria(unittest.TestCase):
         self.assertEqual(agg["r"]["mean"], 4.0)
 
     def test_unknown_evaluator_skipped(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {}
         results = [
@@ -1835,6 +1835,9 @@ class TestRunEvalOnlyTests(unittest.IsolatedAsyncioTestCase):
                 ],
                 output_dir=tmp,
             )
+            log = (Path(tmp) / "results.log").read_text()
+        self.assertIn("No test case got an answer", log)
+        self.assertNotIn("Total Passed", log)
         # The command exits on these numbers, so they must reach the caller.
         self.assertEqual(result["metrics"]["errored"], 1)
         self.assertEqual(result["metrics"]["total"], 1)
@@ -1867,6 +1870,9 @@ class TestRunEvalOnlyTests(unittest.IsolatedAsyncioTestCase):
                 ],
                 output_dir=tmp,
             )
+            log = (Path(tmp) / "results.log").read_text()
+        self.assertIn("✅ Total Passed: 1/2 (50.0%)", log)
+        self.assertIn("❌ Total Failed: 1/2 (50.0%)", log)
         self.assertEqual(result["passed"], 1)
         self.assertEqual(result["total"], 2)
 
@@ -2648,7 +2654,7 @@ class TestRunTestExternalConversation(unittest.IsolatedAsyncioTestCase):
 
 class TestAggregateCriteriaConversation(unittest.TestCase):
     def test_conversation_cases_aggregated(self):
-        from calibrate_agent.llm.run_tests import _aggregate_criteria
+        from calibrate_agent.llm.summary import aggregate_criteria as _aggregate_criteria
 
         registry = {"tone": dict(_bin_ev("tone"), id="ev1")}
         results = [

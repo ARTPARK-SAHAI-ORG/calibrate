@@ -7,14 +7,12 @@ against a list of evaluators and aggregate per-evaluator scores.
 
 from typing import Callable, List, Optional
 
-import numpy as np
 import backoff
 from tqdm.asyncio import tqdm_asyncio
 
 from calibrate_agent.judges import (
+    aggregate_judge_scores,
     general_task_judge,
-    is_rating,
-    evaluator_result_value,
     ensure_known_evaluator_names,
     render_evaluator,
     require_unique_evaluator_names,
@@ -179,27 +177,4 @@ async def get_general_judge_score(
         desc="Running general evaluators",
     )
 
-    scores: dict = {}
-    for ev in evaluators:
-        name = ev["name"]
-        per_row_values = [evaluator_result_value(ev, row[name]) for row in results]
-        if is_rating(ev):
-            scores[name] = {
-                "type": "rating",
-                "mean": float(np.mean(per_row_values)),
-                "scale_min": int(ev["scale_min"]),
-                "scale_max": int(ev["scale_max"]),
-            }
-        else:
-            scores[name] = {
-                "type": "binary",
-                "mean": float(np.mean(per_row_values)),  # pass-rate fraction 0.0–1.0
-            }
-
-    overall_score = float(np.mean([s["mean"] for s in scores.values()]))
-
-    return {
-        "scores": scores,
-        "score": overall_score,
-        "per_row": results,
-    }
+    return {**aggregate_judge_scores(evaluators, results), "per_row": results}
