@@ -1871,6 +1871,33 @@ def get_gemini_api_key(required: bool = True) -> Optional[str]:
     return key
 
 
+def split_model_provider(model: str, provider: str) -> tuple[str, Optional[dict]]:
+    """Split a ``model@serving_provider`` string into the model id and the request
+    body that pins the call to that serving provider.
+
+    OpenRouter serves most models from several upstream providers and picks one
+    per request, so two runs of the same model can land on different hardware,
+    prices and speeds. Appending ``@together`` (or a full endpoint slug such as
+    ``@deepinfra/turbo``) fixes the choice for a whole run, which is what makes
+    two leaderboard rows for one model comparable. The second return value is
+    ``None`` when no serving provider is named.
+    """
+    model_id, at, slug = model.partition("@")
+    if not at:
+        return model, None
+    if not slug:
+        raise ValueError(
+            f"No serving provider named after '@' in model '{model}'. Use e.g. "
+            "'meta-llama/llama-3.3-70b-instruct@together'."
+        )
+    if provider != "openrouter":
+        raise ValueError(
+            f"Model '{model}' names a serving provider, which only OpenRouter "
+            f"routes to. Pass -p openrouter, or drop '@{slug}'."
+        )
+    return model_id, {"provider": {"only": [slug], "allow_fallbacks": False}}
+
+
 # Single source of truth for per-provider default model names. The live agent
 # (create_stt_service / create_tts_service below) AND the benchmarks
 # (calibrate_agent/stt/eval.py, calibrate_agent/tts/eval.py) both read these, so a change in
