@@ -1,120 +1,97 @@
 ---
-title: "Metrics"
-description: "Define how to evaluate agent performance in simulations"
+title: "Simulation evaluators"
+description: "Choose how each simulated conversation is scored"
 ---
 
-Metrics define how to evaluate whether a conversation was successful in [agent simulations](/quickstart/simulations).
+A simulation evaluator scores a whole conversation in a [simulation](/app/simulations/overview). After each conversation ends, an AI judge reads it from start to finish and scores it against each evaluator you picked for that simulation.
 
-## How metrics work
+There are two kinds of score:
 
-After each simulated conversation completes, an LLM judge reviews the full conversation transcript and evaluates it against each metric you have defined for the simulation. For every metric, the judge assigns a binary **pass** or **fail** result based on your evaluation instructions.
+- Pass or fail. "Explains step by step" asks: does the tutor explain the next step instead of giving the final answer straight away?
+- A rating on a scale. "Encouraging tone" rates the tutor from 1 (dismissive) to 5 (warm and patient).
 
-This means your evaluation instructions should be written clearly enough for an LLM to make a definitive yes/no decision about whether the criteria were met.
+## See your simulation evaluators
 
-## Quickstart
-
-### Create a new metric
-
-From the sidebar, click **Metrics** to view your existing metrics. Click **Add metric** to create a new metric.
+In the sidebar, under **Agent simulations**, click **Evaluators**. This page lists only the evaluators that score whole conversations.
 
 <Frame>
-  <img src="./images/metrics-1.png" alt="Metrics" />
+  <img src="/images/app/simulations-evaluators.png" alt="The simulation Evaluators page listing Encouraging tone, Explains step by step and three pre-built evaluators" />
 </Frame>
 
-### Add the name and evaluation instructions
+Evaluators marked **Pre-built** come with Calibrate:
 
-Give a meaningful name to the metric (e.g. `Data collection success`) and define how to evaluate success.
+| Evaluator | What it judges |
+| --- | --- |
+| Empathy & Tone | How empathetic and fitting the agent's tone was throughout the conversation |
+| Goal Completion | Whether the agent helped the user reach their goal |
+| Persona Adherence | Whether the agent stayed in its assigned role throughout the conversation |
+
+Each evaluator has three buttons:
+
+- **View** shows the instructions the judge follows.
+- **Duplicate** makes a copy you can change.
+- **Delete** removes the evaluator from the workspace.
+
+## Create a simulation evaluator
+
+1. Click **Create evaluator** at the top right of the page. The **Add evaluator** window opens.
+2. Enter a **Name**, such as "Explains step by step". **Description** is optional and shows in the list.
+3. Under **Review type**, pick **Binary** for pass or fail, or **Rating** for a score on a scale. For **Binary**, you can change the **Labels** shown for a pass and a fail. For **Rating**, set the levels of the scale.
 
 <Frame>
-  <img src="./images/metrics-2.png" alt="Add metric dialog" />
+  <img src="/images/app/simulations-create-evaluator.png" alt="The Add evaluator window with Name, Description, Review type set to Binary, and the True and False labels" />
 </Frame>
 
-#### Guidelines for evaluation instructions
+4. Under **Judge model**, pick the AI model that does the scoring.
+5. Under **Judge prompt**, write what the judge should check.
+6. Click **Create evaluator** at the bottom of the window.
 
-Define clear, measurable criteria that an LLM can evaluate with a yes/no answer:
+The judge reads the whole conversation, so the prompt cannot use `{{...}}` variables. Any you type are read as plain text.
 
-1. **Success conditions**: what must happen for the metric to pass?
-2. **Failure conditions**: what indicates failure?
-3. **Edge cases**: any special considerations?
+Write instructions the judge can answer clearly from the conversation alone. For example:
 
-**Example evaluation instructions:**
-
-```text
-The agent should have collected the user's name and phone number
-during the conversation.
-
-Success criteria:
-- Customer's full name was captured
-- Phone number was captured in valid format (10 digits)
-- Information was confirmed with the customer
-
-The metric fails if:
-- Either name or phone was not collected
-- Information was not verified with the customer
+```text Explains step by step
+Does the tutor explain the next step instead of giving the final answer
+straight away?
 ```
 
-### Save the metric
-
-Click **Add metric** to create the metric.
-
-## Best practices
-
-### Metrics vs personas vs scenarios
-
-| Aspect  | Metric                             | Persona                                  | Scenario                               |
-| ------- | ---------------------------------- | ---------------------------------------- | -------------------------------------- |
-| Focus   | HOW to evaluate                    | WHO and HOW to behave                    | WHAT to do                             |
-| Content | Success criteria, evaluation rules | Demographics, behavior                   | Task, goal, situation                  |
-| Example | "Agent collected name and phone"   | "A 45-year-old farmer who speaks slowly" | "Call to inquire about crop insurance" |
-
-## Example metrics
-
-### Data collection success
-
-```text
-The agent should have collected the user's name and phone number.
-
-Success criteria:
-- Customer's full name was captured
-- Phone number was captured in valid format
-- Information was confirmed with the customer
+```text Encouraging tone
+How encouraging and patient is the tutor's reply? 1 is dismissive,
+5 is warm and patient.
 ```
 
-### Issue resolution
+## Add evaluators to a simulation
 
-```text
-The agent should have successfully resolved the customer's issue
-or clearly explained the next steps.
+You pick evaluators on the **Config** tab of a simulation, under **Select evaluators**.
 
-Success criteria:
-- The customer's problem was clearly understood
-- A solution was provided OR clear next steps were given
-- The customer expressed satisfaction or understanding
-```
+1. Click **Add evaluators**.
+2. Tick the evaluators you want. Your own evaluators are listed first, then the pre-built ones. Click a name to see its model and prompt on the right.
+3. Click **Add**.
 
-### Appointment booking
+<Frame>
+  <img src="/images/app/simulations-add-evaluators.png" alt="The Add evaluators window listing Encouraging tone and Explains step by step, then three pre-built evaluators, with the prompt of Encouraging tone shown on the right" />
+</Frame>
 
-```text
-The agent should have successfully booked an appointment.
+To write a new one without leaving the simulation, click **Create evaluator** next to **Add evaluators**.
 
-Success criteria:
-- Date and time were confirmed
-- Patient/customer name was collected
-- Purpose of appointment was noted
-- Confirmation details were provided
-```
+You can only change the evaluators before you click **Create** to save the simulation. See [Run a text or voice simulation](/quickstart/simulations) for the full set-up.
+
+## How scores appear
+
+On a finished run, each evaluator gets a card under **Overall Metrics**:
+
+- A pass or fail evaluator shows the share of conversations that passed, such as 75%.
+- A rating evaluator shows the average score, such as 4.25/5.
+
+The table below the cards shows each conversation's own result. Hover over the small circle next to a result to read the judge's reasoning.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Create personas" icon="user" href="/core-concepts/personas">
-    Define who your simulated users are
+  <Card title="Run a simulation" icon="comments" href="/quickstart/simulations">
+    Run a text or voice simulation and read the results
   </Card>
-  <Card
-    title="Create scenarios"
-    icon="file-lines"
-    href="/core-concepts/scenarios"
-  >
-    Define what your simulated users should do
+  <Card title="Evaluators overview" icon="check" href="/app/evaluators/overview">
+    Learn how evaluators work across Calibrate
   </Card>
 </CardGroup>
