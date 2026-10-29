@@ -727,6 +727,14 @@ Examples:
                     _config["test_cases"], True, args.debug_count
                 )
 
+            if _config.get("model_variants") and not _config.get("agent_url"):
+                print(
+                    "✗ config model_variants: model variants describe the extra "
+                    "fields sent to an external agent, so the config also needs "
+                    "an agent_url."
+                )
+                sys.exit(1)
+
             if _config.get("agent_url"):
                 # Agent connection path
                 from calibrate_agent.connections import TextAgentConnection
@@ -742,15 +750,45 @@ Examples:
                 except ValueError as _e:
                     print(f"✗ config agent_type: {_e}")
                     sys.exit(1)
-                _models = args.model if args.model else []
+                from calibrate_agent.llm import normalize_variants
 
-                # Verify once per model (skip if already verified upstream e.g. interactive UI)
+                _models = args.model if args.model else []
+                # A model variant is one model plus its own extra request
+                # fields, so the same model can be run more than once. When the
+                # config lists variants they replace -m entirely.
+                _variants = []
+                if _config.get("model_variants"):
+                    try:
+                        _variants = normalize_variants(_config["model_variants"])
+                    except ValueError as _e:
+                        print(f"✗ config model_variants: {_e}")
+                        sys.exit(1)
+                    if _models:
+                        print(
+                            "Config lists model_variants, so -m is not used for "
+                            "this run."
+                        )
+                    _models = []
+
+                # Verify once per variant (or per model), sending that variant's
+                # extra request fields so a strict agent fails here rather than
+                # part-way through the benchmark. Skipped when already verified
+                # upstream, e.g. by the interactive UI.
                 if not getattr(args, "skip_verify", False):
-                    _models_to_verify = _models if _models else [None]
-                    for _m in _models_to_verify:
-                        _label = f"model: {_m}" if _m else "connection"
+                    if _variants:
+                        _to_verify = [
+                            (f"variant: {_v['label']}", _v["model"], _v["extra"])
+                            for _v in _variants
+                        ]
+                    elif _models:
+                        _to_verify = [(f"model: {_m}", _m, None) for _m in _models]
+                    else:
+                        _to_verify = [("connection", None, None)]
+                    for _label, _m, _extra in _to_verify:
                         print(f"\nVerifying agent {_label}: {_config['agent_url']}")
-                        _verify_result = asyncio.run(_agent.verify(model=_m))
+                        _verify_result = asyncio.run(
+                            _agent.verify(model=_m, extra=_extra)
+                        )
                         if not _verify_result["ok"]:
                             print(f"✗ Verification failed: {_verify_result['error']}")
                             _print_sample_output(_verify_result)
@@ -763,8 +801,43 @@ Examples:
                 from calibrate_agent.llm._output import print_benchmark_summary
                 from calibrate_agent.llm.run_tests import exit_if_run_failed
 
+                # Run — all variants together (tests.run fans them out in parallel)
+                if _variants:
+                    _variant_ids = [_v["id"] for _v in _variants]
+                    _labels = {_v["id"]: _v["label"] for _v in _variants}
+                    print(f"\n\033[92m{'='*60}\033[0m")
+                    print(
+                        f"\033[92m  Models: "
+                        f"{', '.join(_labels[_i] for _i in _variant_ids)}\033[0m"
+                    )
+                    print(f"\033[92m{'='*60}\033[0m\n")
+                    _results = asyncio.run(
+                        _tests.run(
+                            agent=_agent,
+                            test_cases=_config["test_cases"],
+                            output_dir=args.output_dir,
+                            variants=_variants,
+                            evaluators=_config.get("evaluators"),
+                            max_parallel=args.max_parallel,
+                            test_parallel=args.parallel,
+                            overwrite=args.overwrite,
+                        )
+                    )
+                    _variant_results = {_i: _results[_i] for _i in _variant_ids}
+
+                    _lb_dir = os.path.join(args.output_dir, "leaderboard")
+                    generate_leaderboard(output_dir=args.output_dir, save_dir=_lb_dir)
+                    _has_errors = print_benchmark_summary(
+                        models=_variant_ids,
+                        model_results=_variant_results,
+                        leaderboard_dir=_lb_dir,
+                        model_label=lambda _i: _labels[_i],
+                    )
+                    if _has_errors:
+                        sys.exit(1)
+                    exit_if_run_failed(_variant_results.values())
                 # Run — all models together (tests.run fans them out in parallel)
-                if _models:
+                elif _models:
                     print(f"\n\033[92m{'='*60}\033[0m")
                     print(f"\033[92m  Models: {', '.join(_models)}\033[0m")
                     print(f"\033[92m{'='*60}\033[0m\n")
