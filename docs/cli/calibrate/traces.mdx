@@ -30,3 +30,36 @@ calibrate traces create [flags]
 ```bash
 calibrate traces create --agent-id <id> --input '[]' --output-param '{}'
 ```
+
+## List traces
+
+List ingested traces, newest first
+
+```bash
+calibrate traces list [flags]
+```
+
+**Options**
+
+| Option | Type | Default | Description |
+| --- | --- | --- | --- |
+| `-a, --agent-id` | string | — | Return only traces from this agent |
+| `--conversation-id` | agent_id | — | Return only the turns of this conversation. Requires agent_id |
+| `--created-after` | string | — | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC |
+| `--created-before` | string | — | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC |
+| `--include-content` | limit | — | Also return each trace's full input, output and metadata. Use limit and `offset` to page through them |
+| `--include-score-averages` | — | — | Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page |
+| `--labels` | string | — | Return only traces carrying at least one of these labels. Repeat the parameter for each label |
+| `--limit` | int | `50` | Maximum number of items to return |
+| `--offset` | int | — | Number of items to skip before returning results |
+| `--output-type` | response | — | Return only traces whose output is of this kind. response covers every trace carrying a reply, including one that also issued tool calls. `tool_call` covers traces that only issued tool calls (options: response, tool_call) |
+| `--q` | string | — | Return only traces containing this text in their message ID, conversation ID, conversation history, output, or metadata |
+| `--score` | — | — | &lt;evaluator ID&gt;:&lt;condition&gt;   Return only traces whose latest scoring run matches this condition. Each is written as &lt;evaluator ID&gt;:&lt;condition&gt;, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once |
+| `--sort-by-evaluator` | string | — | Order traces by this evaluator's score on each trace's latest scoring run. Traces it has not scored come last whichever direction you pick |
+| `--sort-order` | sort_by_evaluator | `desc` | Whether sort_by_evaluator puts the highest scores first or the lowest. Ignored without it (options: asc, desc) |
+
+**Examples**
+
+```bash
+calibrate traces list
+```

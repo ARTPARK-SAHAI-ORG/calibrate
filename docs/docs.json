@@ -150,6 +150,13 @@
             ]
           },
           {
+            "group": "Organizations",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /organizations/current"
+            ]
+          },
+          {
             "group": "Tests",
             "openapi": "api-reference/openapi.json",
             "pages": [
@@ -164,6 +171,7 @@
             "group": "Traces",
             "openapi": "api-reference/openapi.json",
             "pages": [
+              "GET /traces",
               "POST /traces"
             ]
           }
@@ -188,6 +196,7 @@
               "cli/calibrate/annotators",
               "cli/calibrate/datasets",
               "cli/calibrate/evaluators",
+              "cli/calibrate/organizations",
               "cli/calibrate/tests",
               "cli/calibrate/traces"
             ]
@@ -273,6 +282,12 @@
             ]
           },
           {
+            "group": "Organizations",
+            "pages": [
+              "sdk/organizations/current"
+            ]
+          },
+          {
             "group": "Tests",
             "pages": [
               "sdk/tests/list",
@@ -285,6 +300,7 @@
           {
             "group": "Traces",
             "pages": [
+              "sdk/traces/list",
               "sdk/traces/create"
             ]
           }

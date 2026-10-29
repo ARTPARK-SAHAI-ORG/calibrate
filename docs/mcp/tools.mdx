@@ -412,7 +412,7 @@ See **GET /annotation-tasks** in the [API reference](/api-reference/introduction
 
 ### get-annotation-agreement
 
-Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a trend series.
+Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a chance-corrected kappa for each evaluator.
 
 **Scope:** `read` · **Access:** Read-only
 
@@ -421,8 +421,6 @@ Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a t
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_uuid` | string | Yes | Annotation task to act on |
-| `bucket` | string | No | How to bucket points in the trend series |
-| `days` | integer | No | Trailing window in days for the trend series |
 
 See **GET /annotation-tasks/&#123;task_uuid&#125;/agreement** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -749,6 +747,20 @@ Add a new version to an evaluator you created, optionally making it live. The va
 
 See **POST /evaluators/&#123;evaluator_uuid&#125;/versions** in the [API reference](/api-reference/introduction) tab for the full schema.
 
+## Organizations
+
+### get-current-workspace
+
+Get the workspace the caller's API key belongs to, as its ID and
+name. Put the ID at the front of a Calibrate web address to link
+straight to something in that workspace, as in `/<uuid>/tests`.
+Without it, a link opens whichever workspace the reader looked at
+last. Requires a Calibrate API key (CALIBRATE_API_KEY).
+
+**Scope:** `read` · **Access:** Read-only
+
+See **GET /organizations/current** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ## Tests
 
 ### list-tests
@@ -844,6 +856,39 @@ fields to change (name, config). Returns the updated test. Fails with
 See **PUT /tests/&#123;test_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ## Traces
+
+### list-traces
+
+List the traces in the caller's org, newest first, one page at a
+time. Each trace carries a short preview of its last user message
+and reply, its tool calls and labels, and the scores from its
+latest scoring run with each evaluator's reasoning and evaluator
+version. Filter by agent, label, creation time, text, or score.
+Set include_content to also get each trace's full input, output
+and metadata.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_id` | string | No | Return only traces from this agent |
+| `conversation_id` | string | No | Return only the turns of this conversation. Requires `agent_id` |
+| `q` | string | No | Return only traces containing this text in their message ID, conversation ID, conversation history, output, or metadata |
+| `output_type` | string | No | Return only traces whose output is of this kind. `response` covers every trace carrying a reply, including one that also issued tool calls. `tool_call` covers traces that only issued tool calls |
+| `labels` | array of string | No | Return only traces carrying at least one of these labels. Repeat the parameter for each label |
+| `score` | array of string | No | Return only traces whose latest scoring run matches this condition. Each is written as `<evaluator ID>:<condition>`, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once |
+| `created_after` | string | No | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC |
+| `created_before` | string | No | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC |
+| `sort_by_evaluator` | string | No | Order traces by this evaluator's score on each trace's latest scoring run. Traces it has not scored come last whichever direction you pick |
+| `sort_order` | string | No | Whether `sort_by_evaluator` puts the highest scores first or the lowest. Ignored without it |
+| `include_content` | boolean | No | Also return each trace's full input, output and metadata. Use `limit` and `offset` to page through them |
+| `include_score_averages` | boolean | No | Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page |
+| `limit` | integer | No | Maximum number of items to return |
+| `offset` | integer | No | Number of items to skip before returning results |
+
+See **GET /traces** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ### create-trace
 
