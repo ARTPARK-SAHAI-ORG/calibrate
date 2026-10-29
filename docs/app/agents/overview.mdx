@@ -1,0 +1,82 @@
+---
+title: "Agents overview"
+description: "What an agent is in Calibrate, the two ways to set one up, and the tabs on an agent page"
+---
+
+<video controls className="w-full aspect-video rounded-xl" src="/videos/app-agents-overview.mp4"></video>
+
+An agent is the AI you want to test. In these docs the agent is a maths tutor for class 6 students. It explains one step at a time and replies in English or Hindi.
+
+You add the agent to Calibrate once. Then you write tests for it, run them, compare models, and run simulated conversations with it.
+
+## Open your agents
+
+From the sidebar, click **Agents**. The list shows every agent in your workspace.
+
+<Frame>
+  <img src="/images/app/agents-list.png" alt="The Agents page listing the Maths homework tutor and Maths homework tutor (connected)" />
+</Frame>
+
+The **Type** column shows how each agent was set up. **Agent** means it was built in Calibrate. **Connection** means Calibrate calls your own agent at its URL.
+
+## Two ways to set up an agent
+
+Click **New agent**. Give the agent a name, then pick one of the two options under **Setup**.
+
+<AccordionGroup>
+  <Accordion title="Build your agent in Calibrate" icon="flask" defaultOpen>
+    You write the instructions, pick the LLM, speech-to-text and text-to-speech models, and add tools. All of it lives in Calibrate.
+
+    <Frame>
+      <img src="/images/app/agents-new-agent-build.png" alt="The New agent dialog with Build your agent in Calibrate selected" />
+    </Frame>
+
+    See [Build an agent in Calibrate](/core-concepts/agents).
+
+  </Accordion>
+  <Accordion title="Connect your existing agent" icon="link">
+    Your agent already runs somewhere else. You give Calibrate its URL, and Calibrate sends it messages to run tests, model comparisons and simulations.
+
+    <Frame>
+      <img src="/images/app/agents-new-agent-connect.png" alt="The New agent dialog with Connect your existing agent selected" />
+    </Frame>
+
+    See [Connect your own agent](/core-concepts/agent-connections).
+
+  </Accordion>
+</AccordionGroup>
+
+Click **Next**. Then choose what your agent does:
+
+- **Conversation**: your agent has a conversation with a user. The maths tutor is this kind.
+- **Basic**: the agent takes an input and gives back an output.
+
+Click **Create** to open the agent page.
+
+## Tabs on an agent page
+
+Each agent page has a row of tabs. Which tabs you see depends on how the agent was set up.
+
+| Tab | Build in Calibrate | Connect your own | What it is for |
+| --- | --- | --- | --- |
+| **Agent** | Yes | No | The system prompt and the models. See [Build an agent in Calibrate](/core-concepts/agents). |
+| **Connection** | No | Yes | Your agent's URL, headers and the connection check. See [Connect your own agent](/core-concepts/agent-connections). |
+| **Tools** | Yes | Yes | The tools the agent can call. See [Add tools to an agent](/core-concepts/tools). |
+| **Tests** | Yes | Yes | The tests for this agent. See [Write tests for an agent](/app/agents/tests). |
+| **Evaluations** | Yes | Yes | Past test runs and model comparisons. It appears after your first run. See [Run tests and read results](/app/agents/run-tests). |
+| **Evaluators** | Yes | Yes | The evaluators that score this agent's replies. See [Evaluators overview](/app/evaluators/overview). |
+| **Monitoring** | Yes | Yes | Conversations from your live agent. See [Monitor live conversations](/app/agents/monitoring). |
+| **Settings** | Yes | Yes | Who speaks first, the turn limit, and monitoring. |
+
+Click **Save** at the top right of the agent page to keep your changes.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Build an agent in Calibrate" icon="flask" href="/core-concepts/agents">
+    Write the prompt and pick the models
+  </Card>
+  <Card title="Connect your own agent" icon="link" href="/core-concepts/agent-connections">
+    Point Calibrate at your agent's URL
+  </Card>
+</CardGroup>

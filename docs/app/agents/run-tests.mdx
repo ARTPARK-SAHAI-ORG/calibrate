@@ -1,0 +1,106 @@
+---
+title: "Run tests and read results"
+description: "Run your agent's tests, see which failed and why, and share the results"
+---
+
+<video controls className="w-full aspect-video rounded-xl" src="/videos/app-agents-run-tests.mp4"></video>
+
+This page runs the four tests of the Maths homework tutor and reads the results. To write tests first, see [Write tests for an agent](/app/agents/tests).
+
+## Run your tests
+
+1. In the sidebar, click **Agents**, then click "Maths homework tutor".
+2. Click the **Tests** tab.
+3. Click **Run all tests**.
+4. Click **Start the run** to confirm.
+
+<Frame>
+  <img src="/images/app/agents-run-tests-confirm.png" alt="The Run the selected tests window for two ticked tests, with Cancel and Start the run buttons" />
+</Frame>
+
+To run only some tests, tick them in the list first. The button then shows how many tests it will run. To run one test, click **Run** on its row.
+
+The results window opens. Each test shows **Queued**, then **Running**, then **Passed** or **Failed**.
+
+<Note>
+  If you connected your own agent, Calibrate checks the connection before the
+  run starts. See [Verify your connection](/core-concepts/agent-connections#verify-your-connection).
+</Note>
+
+## Read the results
+
+The results window has three tabs:
+
+- **Results**: the pass rate and the score for each evaluator, such as "Step-by-step reply". Tool call tests have their own **Tool calls** pass rate.
+- **Tests**: every test with its conversation, the agent's reply and the evaluators' verdicts.
+- **About**: what each number on the **Results** tab means.
+
+## See why a test failed
+
+1. Click the **Tests** tab in the results window.
+2. Failed tests are listed first, under **Failed**. Click one, such as "Upset student: encourages first".
+
+The middle shows the conversation and the agent's reply. The right side shows each evaluator with **Pass** or **Fail**. Click **See reasoning** to read why the evaluator gave that verdict.
+
+<Frame>
+  <img src="/images/app/agents-test-run-results.png" alt="A test run of the Maths homework tutor with one failed test open, showing the agent's reply and the evaluator's reasoning" />
+</Frame>
+
+In this run, the tutor replied "Let's look at question 1 again. Write 2/3 as sixths." The evaluator failed it because the tutor did not first comfort the upset student.
+
+Use **Previous** and **Next** at the top to step through the tests.
+
+## Run the same tests again
+
+After you change the agent, click the circular arrow next to the run's name at the top of the results window. Calibrate runs the same tests again as a separate run.
+
+Every run is kept on the agent's **Evaluations** tab. Click a run there to open its results.
+
+<Frame>
+  <img src="/images/app/agents-evaluations-tab.png" alt="The Evaluations tab of the Maths homework tutor listing Model comparison 1 and Evaluation run 1 with their pass rates, tests, models and evaluators" />
+</Frame>
+
+## Export the results
+
+Click **Export results** at the top of the results window. You get a CSV file with each test's conversation, the agent's reply and the evaluators' verdicts.
+
+<Frame>
+  <img src="/images/app/agents-run-export.png" alt="The Results tab of Evaluation run 1 with pass rate, latency, average cost and average tokens, and the Export results button at the top" />
+</Frame>
+
+## Share a public link
+
+1. Click **Share** at the top of the results window. The button changes to **Public**.
+2. Click **Copy link** next to it.
+
+<Frame>
+  <img src="/images/app/agents-run-share.png" alt="The top of Evaluation run 1 with the Public button and the Copy link button next to it" />
+</Frame>
+
+Anyone with the link can see the results without a Calibrate account. To make the results private again, click **Public**.
+
+## Check the evaluator with people
+
+You can send tests to people who label them by hand. This shows whether the evaluator agrees with people.
+
+1. On the **Tests** tab of the results window, tick the tests you want to send.
+2. Click **Submit for labelling**.
+3. Under **Name**, enter a name for the labelling task. You can add a **Description**.
+4. Click **Create task & add**.
+
+<Frame>
+  <img src="/images/app/agents-submit-for-labelling.png" alt="The Submit 4 test results for labelling window with Name and Description boxes and the Create task & add button" />
+</Frame>
+
+If a labelling task already uses the same evaluator, you can add the tests to it with **Add to task**. See [Create a labelling task](/app/human-alignment/labelling-tasks).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Compare models on your tests" icon="chart-bar" href="/app/agents/compare-models">
+    Run the same tests on several models
+  </Card>
+  <Card title="Create an evaluator" icon="scale-balanced" href="/app/evaluators/create">
+    Write your own evaluator for your tests
+  </Card>
+</CardGroup>

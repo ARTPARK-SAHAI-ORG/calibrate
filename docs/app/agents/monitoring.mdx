@@ -1,0 +1,91 @@
+---
+title: "Monitor live conversations"
+description: "See your agent's real conversations in Calibrate and score them with evaluators"
+---
+
+<video controls className="w-full aspect-video rounded-xl" src="/videos/app-agents-monitoring.mp4"></video>
+
+Tests check your agent before it goes live. Monitoring shows what it does with real users afterwards. Your app sends each turn of a real conversation to Calibrate. Calibrate lists these turns on the agent's **Monitoring** tab and can score them with your evaluators.
+
+Each turn your app sends is called a trace. A trace holds what the student said, which is the input, and what the agent replied or which tools it called, which is the output.
+
+## Send your first trace
+
+1. In the sidebar, click **Agents**, then click "Maths homework tutor".
+2. Click the **Monitoring** tab.
+3. Under **Create an API key**, click **Create API key**, or paste a key you already have and click **Check key**.
+4. Under **Send your first trace**, pick **cURL**, **Python** or **JavaScript** and copy the code into your app. The agent's ID is already filled in. If you created or checked a key in the step above, it is filled in too. If not, replace `YOUR_API_KEY` with your key.
+
+<Frame>
+  <img src="/images/app/agents-monitoring-setup.png" alt="The Getting started steps on the Monitoring tab, with Send your first trace open showing the cURL code and what each value means" />
+</Frame>
+5. Run your app so it sends one trace.
+6. Under **Check that it arrived**, click **Check for traces**.
+
+To see the code again later, click **Integration guide** on the **Monitoring** tab.
+
+The code sends these values with each trace:
+
+- `agent_id`: which agent the trace belongs to.
+- `input`: what the agent was given. For a conversation, send the whole conversation so far.
+- `output`: the agent's text reply, the tools it called, or both.
+- `conversation_id` (optional): the same ID for every turn of one conversation. Calibrate uses it to group turns into conversations.
+- `message_id`, `labels` and `metadata` (optional): your own ID, tags you can filter by, and any other details.
+
+For the full details, see [Create trace](/sdk/traces/create) in the Python SDK, or **POST /traces** in the [API reference](/api-reference/introduction).
+
+## Look at traces and conversations
+
+The **Monitoring** tab has two views. Switch between them with the buttons at the top:
+
+- **Traces**: one row per trace. Click a row to see its input, its output and its scores.
+- **Conversations**: one row per conversation, built from traces that share a `conversation_id`. Each row shows the **First user message**, the **Last agent reply** and the **Last activity** time. Click a row to read the whole conversation.
+
+<Frame>
+  <img src="/images/app/agents-monitoring.png" alt="The Conversations view of the Monitoring tab for the Maths homework tutor, listing four conversations" />
+</Frame>
+
+Use **Search traces** or **Search conversations** to find one, and the filter button next to the search box to narrow the list.
+
+## Score traces with evaluators
+
+Calibrate can score each trace with the evaluators on the agent's **Evaluators** tab, such as "Step-by-step reply" and "Warm tone".
+
+1. On the **Traces** view, click **Continuous monitoring off**.
+2. Click **Turn on** to confirm.
+
+The button changes to **Continuous monitoring on**. From then on, every trace that arrives is scored. Traces that arrived earlier are not scored.
+
+To stop scoring, click **Continuous monitoring on**, then click **Turn off**. Scores already given are kept.
+
+<Frame>
+  <img src="/images/app/agents-monitoring-scoring.png" alt="The Turn off continuous monitoring window, saying new traces will not be scored, with Cancel and Turn off buttons" />
+</Frame>
+
+Above the list, **Production quality** shows the average score for each evaluator across your traces. It updates as more traces are scored. To score with a different evaluator, add it on the agent's **Evaluators** tab.
+
+## Turn traces into tests
+
+When a real conversation goes wrong, you can keep it as a test.
+
+1. On the **Traces** view, tick the traces you want.
+2. Click **Add to tests**. The button shows how many traces you ticked.
+
+<Frame>
+  <img src="/images/app/agents-traces-to-tests.png" alt="The Traces view with two traces ticked, the Add to tests (2) button, Production quality scores for Step-by-step reply and Warm tone, and Continuous monitoring on" />
+</Frame>
+
+The tests appear on the agent's **Tests** tab. See [Write tests for an agent](/app/agents/tests).
+
+You can also tick traces and click **Submit for labelling** to have people score them by hand. See [Create a labelling task](/app/human-alignment/labelling-tasks).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Evaluators overview" icon="scale-balanced" href="/app/evaluators/overview">
+    Learn how evaluators score your agent
+  </Card>
+  <Card title="API keys" icon="key" href="/reference/api-keys">
+    Create and manage the keys your app uses
+  </Card>
+</CardGroup>
