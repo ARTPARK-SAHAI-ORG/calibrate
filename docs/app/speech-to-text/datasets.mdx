@@ -1,0 +1,68 @@
+---
+title: "Speech-to-text datasets"
+description: "Create and manage the recordings you test with"
+---
+
+A dataset is a set of recordings with the words spoken in each one. You can run many evaluations on the same dataset.
+
+## See your datasets
+
+In the sidebar, click **Speech-to-Text**, then click the **Datasets** tab. Each row shows how many recordings the dataset has (**Items**) and how many evaluations used it (**Evals**).
+
+<Frame>
+  <img src="/images/app/stt-datasets.png" alt="The Datasets tab of the Speech-to-Text page, listing Tutor questions in Hindi" />
+</Frame>
+
+## Create a dataset
+
+1. On the **Datasets** tab, click **New dataset**.
+2. Under **Dataset name**, type a name, for example `Tutor questions in Hindi`, and click **Create**.
+3. On the dataset page, click **Upload .wav** and type the words spoken in the box next to it.
+4. Click **Add another sample** for each other recording. To add many at once, click **Choose ZIP file** in the **Upload ZIP** box.
+5. Click **Save**.
+
+Each recording must be a `.wav` file of under 60 seconds and under 5 MB.
+
+A dataset is also created when you upload recordings on the **Dataset** tab of a new evaluation.
+
+<Frame>
+  <img src="/images/app/stt-dataset-create.png" alt="The Dataset tab of a new evaluation, with Tutor questions in Hindi typed as the dataset name and the first row filled in" />
+</Frame>
+
+## Change a dataset
+
+Click a dataset on the **Datasets** tab to open it. On the dataset page you can:
+
+- Add recordings with **Add another sample** or **Choose ZIP file**.
+- Fix the words for a recording by typing in its box.
+- Remove a recording with the bin button on its row. The button shows once your other changes are saved, and only while the dataset has more than one recording.
+- Rename the dataset with the pencil button next to its name.
+
+Click **Save** to keep your changes. To change the audio of a recording, remove that row and add the recording again.
+
+<Frame>
+  <img src="/images/app/stt-dataset-edit.png" alt="The dataset page for Tutor questions in Hindi, with three saved rows, an empty fourth row, a pencil button next to the name and a New evaluation button" />
+</Frame>
+
+## Run an evaluation on a dataset
+
+On the dataset page, click **New evaluation**. The dataset is already chosen, so you only pick the language and providers. Save any changes first.
+
+## Delete a dataset
+
+On the **Datasets** tab, click the bin button at the end of the dataset's row, then click **Remove**. Evaluations that used it keep their results.
+
+<Frame>
+  <img src="/images/app/stt-dataset-delete.png" alt="The Delete dataset window, with Cancel and Remove buttons" />
+</Frame>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Benchmark speech-to-text providers" icon="play" href="/quickstart/speech-to-text">
+    Run an evaluation on your recordings
+  </Card>
+  <Card title="Speech-to-text metrics" icon="chart-simple" href="/core-concepts/speech-to-text">
+    What each score means
+  </Card>
+</CardGroup>

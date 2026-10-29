@@ -1,99 +1,41 @@
 ---
-title: "Text to Speech"
-description: "Understand the concepts for evaluating Text to Speech providers"
+title: "Text-to-speech metrics"
+description: "What each text-to-speech score means"
 ---
 
-## Metrics
+The **About** tab on a results page explains every score that run produced.
 
-### LLM judge score
+## Evaluators
 
-An audio LLM Judge (`gpt-audio-1.5`) listens to the generated audio and evaluates whether the pronunciation matches the input text.
+An evaluator listens to the recording a provider made and judges it against the text it was given. It does not turn the speech back into text first.
 
-<Note>
-  The LLM Judge directly compares the raw audio against the input text. It does
-  **not** convert the generated speech to text first — it evaluates the audio
-  natively using an audio-capable model.
-</Note>
+Every new evaluation starts with the Pronunciation evaluator added on the **Evaluators** tab. It checks that the spoken words match the text and are clear enough to understand. Each recording gets a pass or a fail, with a short reason.
 
-<Warning>
-  Evaluation accuracy may differ for low-resource languages like Sindhi, as the
-  underlying audio model has limited training data for these languages.
-</Warning>
+| Text | What the evaluator heard | Result |
+| --- | --- | --- |
+| बहुत बढ़िया! तुमने सही जवाब दिया। | Every word spoken clearly and correctly | Pass |
+| चलो साथ में करते हैं। 1/2 में कितने 1/4 होते हैं? | "1/4" read out as "one by four" instead of "एक बटा चार" | Fail |
 
-- **Range**: 0 to 1 (1 means all audio correctly pronounces the text, higher is better)
-- **Output**: Returns both a match (True/False) and reasoning for each audio file
+The leaderboard shows, for each provider, the share of recordings that passed. Higher is better.
 
-What the LLM Judge evaluates:
+A run needs at least one evaluator. To score something else, such as how natural the voice sounds, click **Add evaluators** on the **Evaluators** tab of a new evaluation. See [Create an evaluator](/app/evaluators/create).
 
-- Correct pronunciation of words
-- Proper handling of numbers, abbreviations, and special characters
+## Latency
 
-#### Example
+Latency is the time, in seconds, from asking a provider for speech until the first part of the audio arrives. The leaderboard shows it as **Latency (s)**. Each provider's number is the middle value across all lines of text.
 
-| Text                  | Audio                                                           | LLM Judge | Reasoning                                                        |
-| --------------------- | --------------------------------------------------------------- | --------- | ---------------------------------------------------------------- |
-| "Hello world"         | <audio controls src="/core-concepts/audios/hello_world.wav" />  | True      | The audio clearly says "hello world" with correct pronunciation. |
-| "Call 1-800-555-0123" | <audio controls src="/core-concepts/audios/phone_number.wav" /> | True      | The phone number is pronounced correctly.                        |
-| "Dr. Smith"           | <audio controls src="/core-concepts/audios/dr_smith.wav" />     | False     | "Dr." was pronounced as "dur" instead of "doctor".               |
+- Range: 0 and up. Lower is better.
+- Every run measures it.
 
-### Time to first byte (TTFB)
-
-Measures the time (in seconds) from when the request is made to the provider until the first audio chunk is received. It is critical for real-time voice agents where responsiveness matters.
-
-## Datasets
-
-You can save and manage your text samples as **datasets** for reuse across multiple evaluations — avoiding re-entering the same text data every time.
-
-### View your datasets
-
-From the **Text-to-Speech** page, click the **Datasets** tab.
-
-<Frame>
-  <img src="./images/tts_datasets_tab.png" alt="TTS Datasets Tab" />
-</Frame>
-
-### Create a dataset
-
-Click **New dataset**, enter a name, and click **Create**.
-
-<Frame>
-  <img src="./images/tts_new_dataset_dialog.png" alt="New TTS Dataset Dialog" />
-</Frame>
-
-You'll be taken to the dataset detail page where you can add text samples in two ways:
-
-<Frame>
-  <img src="./images/tts_dataset_detail.png" alt="TTS Dataset Detail Page" />
-</Frame>
-
-1. **Add samples inline** — Type the text to synthesize in each row. Click **+ Add another row** to add more entries.
-
-2. **Bulk upload via CSV** — Upload a CSV file with a `text` column containing your samples. Click **Download sample** to get a template with the correct format.
-
-Click **Save** to persist your changes.
-
-### Update a dataset
-
-Open an existing dataset from the **Datasets** tab to edit it. You can:
-
-- **Add more samples** — Add new text rows inline or upload another CSV to append more entries.
-- **Edit text** — Click on any text sample to update it.
-- **Remove samples** — Click the delete button on a row to remove that sample.
-
-Click **Save** after making changes to persist them.
-
-### Delete a dataset
-
-From the **Datasets** tab, click the delete button next to a dataset to remove it entirely.
-
-### Run an evaluation from a dataset
-
-Once your dataset has samples, click the **New evaluation** button on the dataset page. This pre-selects the dataset and takes you to the evaluation settings where you choose the language and providers to compare.
+Latency matters for a voice agent, because a student waits this long before hearing the tutor start to speak.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Quickstart" icon="play" href="/quickstart/text-to-speech">
-    Run your first evaluation on your dataset
+  <Card title="Benchmark text-to-speech providers" icon="play" href="/quickstart/text-to-speech">
+    Run an evaluation on your text
+  </Card>
+  <Card title="Text-to-speech datasets" icon="database" href="/app/text-to-speech/datasets">
+    Create and manage the text you test with
   </Card>
 </CardGroup>
