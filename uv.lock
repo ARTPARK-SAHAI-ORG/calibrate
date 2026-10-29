@@ -366,6 +366,7 @@ dependencies = [
     { name = "sarvamai" },
     { name = "simpleaudio" },
     { name = "sounddevice" },
+    { name = "transformers" },
     { name = "uvicorn" },
     { name = "whisper-normalizer" },
 ]
@@ -401,7 +402,7 @@ requires-dist = [
     { name = "opentelemetry-api", specifier = ">=1.38.0" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.38.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.38.0" },
-    { name = "pipecat-ai", extras = ["cartesia", "deepgram", "google", "groq", "local-smart-turn-v3", "openrouter", "smallest", "tracing", "webrtc", "websocket"], specifier = "==1.0.0" },
+    { name = "pipecat-ai", extras = ["cartesia", "deepgram", "google", "groq", "openrouter", "smallest", "tracing", "webrtc", "websocket"], specifier = "==1.3.0" },
     { name = "pipecat-ai-small-webrtc-prebuilt", specifier = "==1.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=4.0" },
@@ -411,6 +412,7 @@ requires-dist = [
     { name = "sarvamai", specifier = ">=0.1.21" },
     { name = "simpleaudio", specifier = ">=1.0.4" },
     { name = "sounddevice", specifier = ">=0.5.3" },
+    { name = "transformers", specifier = ">=4.48.0,<6" },
     { name = "uvicorn", specifier = ">=0.38.0" },
     { name = "whisper-normalizer", specifier = ">=0.1.12" },
 ]
@@ -3107,7 +3109,7 @@ wheels = [
 
 [[package]]
 name = "pipecat-ai"
-version = "1.0.0"
+version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiofiles" },
@@ -3127,12 +3129,11 @@ dependencies = [
     { name = "pyloudnorm" },
     { name = "resampy" },
     { name = "soxr" },
-    { name = "transformers" },
     { name = "wait-for2", marker = "python_full_version < '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e3/92/19d0cb662196833d15833dcad382157b915938ac8e694b57811e85d99876/pipecat_ai-1.0.0.tar.gz", hash = "sha256:24eb7d84c72d5845e50cbd8b95871bd132ca863cfecf6ebae236101a56c428be", size = 10996859, upload-time = "2026-04-14T19:11:22.977Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/cc/8352e30c47ee4fd075b9a0f3d91183294582578f07289180a30fc8228409/pipecat_ai-1.3.0.tar.gz", hash = "sha256:abeb9d95b1df2f35b855334cda1899fc603124d5448967c82ba08a94c604318f", size = 11260868, upload-time = "2026-05-29T01:03:00.532Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/74/13/6dec141ef56480d94ebc7529590889a43ea9f646ee97e3ce262410bc2e93/pipecat_ai-1.0.0-py3-none-any.whl", hash = "sha256:7acc813f8eb744ca37ae5a803d98c78bceb1e9a5b1503205030c071ca243b820", size = 10665769, upload-time = "2026-04-14T19:11:20.354Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/73/fff17b48cd254ad1c358d612ce92fcc342838e0fc43cc235aca3c70527fb/pipecat_ai-1.3.0-py3-none-any.whl", hash = "sha256:59d4950a61a0a201cf551354d8cdec038c1bdf457df080cd41d29d7ff53e0b2e", size = 10905336, upload-time = "2026-05-29T01:02:57.764Z" },
 ]
 
 [package.optional-dependencies]
