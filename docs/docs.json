@@ -14,39 +14,85 @@
         "tab": "Home",
         "groups": [
           {
-            "group": "Get Started",
+            "group": "Get started",
             "pages": [
-              "getting-started/introduction"
+              "getting-started/introduction",
+              "getting-started/create-account",
+              "getting-started/quickstart"
             ]
           },
           {
-            "group": "Quickstart",
+            "group": "Agents",
             "pages": [
-              "quickstart/speech-to-text",
-              "quickstart/text-to-text",
-              "quickstart/text-to-speech",
+              "app/agents/overview",
+              "core-concepts/agents",
+              "core-concepts/agent-connections",
+              "core-concepts/tools",
+              "app/agents/tests",
+              "app/agents/run-tests",
+              "app/agents/compare-models",
+              "app/agents/monitoring"
+            ]
+          },
+          {
+            "group": "Evaluators",
+            "pages": [
+              "app/evaluators/overview",
+              "app/evaluators/create",
+              "app/evaluators/versions"
+            ]
+          },
+          {
+            "group": "Human alignment",
+            "pages": [
+              "app/human-alignment/overview",
+              "app/human-alignment/labelling-tasks",
+              "app/human-alignment/annotators",
+              "app/human-alignment/agreement",
+              "reference/human-alignment"
+            ]
+          },
+          {
+            "group": "Simulations",
+            "pages": [
+              "app/simulations/overview",
+              "core-concepts/personas",
+              "core-concepts/scenarios",
+              "core-concepts/metrics",
               "quickstart/simulations"
             ]
           },
           {
-            "group": "Core Concepts",
+            "group": "Speech-to-text",
             "pages": [
+              "quickstart/speech-to-text",
               "core-concepts/speech-to-text",
+              "app/speech-to-text/datasets"
+            ]
+          },
+          {
+            "group": "Text-to-speech",
+            "pages": [
+              "quickstart/text-to-speech",
               "core-concepts/text-to-speech",
-              "core-concepts/agents",
-              "core-concepts/agent-connections",
-              "core-concepts/tools",
-              "core-concepts/personas",
-              "core-concepts/scenarios",
-              "core-concepts/metrics"
+              "app/text-to-speech/datasets"
+            ]
+          },
+          {
+            "group": "Workspaces for Teams",
+            "pages": [
+              "app/workspace-settings/overview",
+              "app/workspace-settings/members",
+              "app/workspace-settings/settings",
+              "reference/byok",
+              "reference/api-keys"
             ]
           },
           {
             "group": "Reference",
             "pages": [
-              "reference/api-keys",
-              "reference/byok",
-              "reference/human-alignment",
+              "reference/product-tour",
+              "reference/learning-resources",
               "reference/github-actions"
             ]
           }
@@ -449,5 +495,11 @@
     "socials": {
       "github": "https://github.com/artpark-sahai-org/calibrate"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/quickstart/text-to-text",
+      "destination": "/app/agents/tests"
+    }
+  ]
 }

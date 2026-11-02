@@ -1,0 +1,68 @@
+---
+title: "Evaluators overview"
+description: "What an evaluator is, the kinds Calibrate offers, and where you use them"
+---
+
+<video controls className="w-full aspect-video rounded-xl" src="/videos/app-evaluators-overview.mp4"></video>
+
+An evaluator is an AI judge. It reads what your agent said and scores it against instructions you write.
+
+For example, the Maths homework tutor has an evaluator called "Step-by-step reply". It checks one thing: "Does the tutor explain the next step instead of giving the final answer straight away?" Each time a test runs, the judge reads the tutor's reply, answers that question, and writes down why.
+
+## Find your evaluators
+
+In the sidebar, click **Evaluators**. The page lists every evaluator you can add to an agent.
+
+<Frame>
+  <img src="/images/app/evaluators-list.png" alt="The Evaluators page listing Step-by-step reply, Warm tone and the pre-built evaluators" />
+</Frame>
+
+Each evaluator is a card with its name and description. On each card:
+
+- **View** opens a window that shows how the evaluator judges. From that window, **Open** takes you to the evaluator's own page.
+- **Duplicate** makes a copy you can change.
+- **Delete** removes it.
+
+Use **Search evaluators** to find one by its name or description.
+
+Evaluators that come with Calibrate carry a **Pre-built** label. Some of them cannot be deleted, so their card has no **Delete** button.
+
+## What an evaluator judges
+
+Every evaluator on this page judges one of three things:
+
+| Kind | What it judges |
+| --- | --- |
+| **Agent reply** | The agent's next reply in a conversation |
+| **Basic** | The output of an agent that takes one input and gives one output |
+| **Tool call** | Whether the agent called the right tool |
+
+You create **Agent reply** and **Basic** evaluators yourself. **Tool call** evaluators come with Calibrate.
+
+## How an evaluator scores
+
+When you create an evaluator, you choose its review type:
+
+- **Binary** gives a pass or fail for each reply. By default the two answers are labelled "Correct" and "Wrong", and you can rename them.
+- **Rating** gives a score on a scale you set, such as 1 to 5.
+
+"Step-by-step reply" is a binary evaluator: the tutor either explained the next step or it did not. "Warm tone" is a rating evaluator: it scores the tutor's reply from 1 (dismissive) to 5 (warm and patient).
+
+## Where you use evaluators
+
+- In tests: add evaluators to an agent on the **Evaluators** tab of the agent page. They score each reply when you run tests. See [Write tests for an agent](/app/agents/tests) and [Run tests and read results](/app/agents/run-tests).
+- In monitoring: the same evaluators can score your agent's live conversations. See [Monitor live conversations](/app/agents/monitoring).
+- In human alignment: check how often an evaluator agrees with people who label the same replies. See [Human alignment overview](/app/human-alignment/overview).
+
+Evaluators that judge a whole conversation, such as "Explains step by step" and "Encouraging tone", are under **Agent simulations** → **Evaluators** in the sidebar. They are used for simulations and human alignment. See [Simulation evaluators](/core-concepts/metrics).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Create an evaluator" icon="plus" href="/app/evaluators/create">
+    Write a judge prompt and choose how it scores.
+  </Card>
+  <Card title="Edit an evaluator and manage versions" icon="code-branch" href="/app/evaluators/versions">
+    Change the prompt and choose which version is used.
+  </Card>
+</CardGroup>

@@ -1,228 +1,145 @@
 ---
-title: "Simulations"
-description: "Run simulated conversations with your agents"
+title: "Run a text or voice simulation"
+description: "Set up a simulation, run it, and read the scores and transcripts"
 ---
 
-[Calibrate](https://calibrate.artpark.ai) lets you simulate entire conversations with your agent using simulated users matching the personas of your target audience for specific scenarios defined by you. This guide walks you through setting up and running your first simulation.
+<video controls className="w-full aspect-video rounded-xl" src="/videos/quickstart-simulations.mp4"></video>
 
-## Create an agent
+This page walks through one simulation for the Maths homework tutor. An AI plays two students, Riya and Arjun, in two scenarios each. Calibrate scores all four conversations.
 
-From the sidebar, click **Agents** → **New agent**. You have two options for setting up your agent:
+## Before you start
 
-<Frame>
-  <img src="./images/agent-choice.png" alt="New Agent Dialog" />
-</Frame>
+You need these four things. Each link shows how to make them.
 
-<AccordionGroup>
-  <Accordion title="Build your agent in Calibrate" icon="flask" defaultOpen>
-    Configure the LLM/STT/TTS models, set instructions, and define the tools your agent can use — all within Calibrate. 
-    
-    See our [Core Concepts: Agents](/core-concepts/agents) guide for the full setup.
+- An agent: the [Maths homework tutor](/core-concepts/agents), or [your own agent connected to Calibrate](/core-concepts/agent-connections).
+- At least one [persona](/core-concepts/personas): "Riya, stuck on fractions" and "Arjun, wants the answer fast".
+- At least one [scenario](/core-concepts/scenarios): "Fractions homework" and "Asks for the answer only".
+- Any [simulation evaluators](/core-concepts/metrics) you want: "Explains step by step" and "Encouraging tone".
 
-  </Accordion>
-  <Accordion title="Connect your existing agent" icon="link">
-    If you already have a deployed agent, you can connect it to Calibrate via its HTTP endpoint. Calibrate will call your agent directly to run simulations.
+## Create the simulation
 
-    See our [Core Concepts: Agent Connections](/core-concepts/agent-connections) guide for the full setup.
-
-    <Note>
-      Agent connections support **text simulations** only. For **voice simulations** (with STT/TTS latency metrics), use an agent built within Calibrate with STT and TTS providers configured.
-    </Note>
-
-  </Accordion>
-</AccordionGroup>
-
-## Create personas
-
-From the sidebar under **End-to-End Tests**, click **Personas** → **Add persona**.
+1. In the sidebar, under **Agent simulations**, click **Simulations**.
+2. Click **Add simulation**.
+3. Enter a name, such as "Tutor practice sessions".
+4. Click **Create Simulation**.
 
 <Frame>
-  <img src="./images/sim_personas.png" alt="Personas List" />
+  <img src="/images/app/simulations-add-simulation.png" alt="The Create your simulation window with the name Tutor practice sessions entered" />
 </Frame>
 
-Define `WHO` the simulated user is - their personality, speaking style, and behavior.
+The simulation opens on its **Config** tab.
 
-<Tip>
-  Learn more about personas in [Core Concepts -
-  Personas](/core-concepts/personas)
-</Tip>
+## Fill in the Config tab
+
+1. Under **Select agent**, pick "Maths homework tutor".
+2. Under **Select personas**, pick both personas.
+3. Under **Select scenarios**, pick both scenarios.
+4. Under **Select evaluators**, click **Add evaluators**, tick "Explains step by step" and "Encouraging tone", then click **Add**.
+5. Click **Create** at the bottom to save the simulation.
 
 <Frame>
-  <img src="./images/sim_persona_add.png" alt="Add Persona Dialog" />
+  <img src="/images/app/simulations-config.png" alt="The Config tab of Tutor practice sessions with the agent, two personas, two scenarios and two evaluators chosen" />
 </Frame>
 
-## Create scenarios
-
-Click **Scenarios** → **Add scenario**.
-
-<Frame>
-  <img src="./images/sim_scenarios.png" alt="Scenarios List" />
-</Frame>
-
-Define `WHAT` the simulated user should accomplish during the conversation.
-
-<Tip>
-  Learn more about scenarios in [Core Concepts -
-  Scenarios](/core-concepts/scenarios)
-</Tip>
-
-<Frame>
-  <img src="./images/sim_scenario_add.png" alt="Add Scenario Dialog" />
-</Frame>
-
-## Create metrics
-
-Click **Metrics** → **Add metric**.
-
-<Frame>
-  <img src="./images/sim_metrics.png" alt="Metrics List" />
-</Frame>
-
-Define how to evaluate whether the agent performed well.
-
-<Tip>
-  Learn more about metrics in [Core Concepts - Metrics](/core-concepts/metrics)
-</Tip>
-
-<Frame>
-  <img src="./images/sim_metric_add.png" alt="Add Metric Dialog" />
-</Frame>
-
-## Create a simulation
-
-Click **Simulations** → **Add simulation** and enter a name.
-
-<Frame>
-  <img src="./images/sim_create.png" alt="Create Simulation" />
-</Frame>
-
-Select the agent, personas, scenarios, and metrics for your simulation.
-
-<Frame>
-  <img src="./images/sim_config.png" alt="Simulation Configuration" />
-</Frame>
-
-Click **Create** after filling in the details to save the simulation configuration. This creates the simulation but does not run it yet.
-
-## Run the simulation
-
-After creating, you'll see a **Launch** button. Click it to start a simulation run and choose between:
-
-- **Text simulation** — text-only conversations (faster)
-- **Voice simulation** — full STT/TTS pipeline with latency metrics
-
-<Frame>
-  <img src="./images/sim_launch_options.png" alt="Launch Options" />
-</Frame>
-
-Each run creates one simulated conversation for each persona × scenario combination.
-
-### Text simulation
-
-After launching a text simulation, the run page opens showing each conversation streaming in real-time.
-
-<Frame>
-  <img src="./images/sim_text_running.png" alt="Text Simulation Running" />
-</Frame>
-
-Once conversations complete, results show the metric evaluations for each row.
-
-<Frame>
-  <img src="./images/sim_text_results.png" alt="Text Simulation Results" />
-</Frame>
-
-Click any row to view the full transcript.
-
-<Frame>
-  <img src="./images/sim_text_transcript.png" alt="Transcript View" />
-</Frame>
-
-The **Overall metrics** show the aggregated values for each metric across all conversations.
-
-### Voice simulation
+After you click **Create**, these choices are fixed. To try a different mix, add another simulation.
 
 <Note>
-  [Agent connections](/core-concepts/agent-connections) support **text
-  simulations** only. For **voice simulations** (with STT/TTS latency metrics),
-  use an agent [built within Calibrate](/core-concepts/agents) with STT and TTS
-  providers configured.
+  An agent you connect from your own server must pass a connection check first.
+  If it has not, the Config tab shows **Verify the connection**, which takes you
+  to the agent's connection settings. See [Verify your
+  connection](/core-concepts/agent-connections#verify-your-connection). On a
+  saved simulation, click **Verify** next to **Launch** at the top of the page.
+  **Launch** stays greyed out until the check passes.
 </Note>
 
-Voice simulations use the full STT/TTS pipeline for more realistic testing. After launching, conversations stream in real-time like text simulations.
+## Launch a run
+
+Click **Launch** at the top right of the simulation, then pick one:
+
+- **Text Simulation**: the student and the agent type to each other. This is the faster run.
+- **Voice Simulation**: the student and the agent speak to each other.
 
 <Frame>
-  <img src="./images/sim_voice_running.png" alt="Voice Simulation Running" />
+  <img src="/images/app/simulations-launch-menu.png" alt="The Launch menu open with Text Simulation and Voice Simulation" />
 </Frame>
 
-Click any row to view the transcript with audio playback for each turn and the full conversation.
+Calibrate has one conversation for each persona and scenario pair. Two personas and two scenarios give four conversations. The run page opens and fills in as each conversation finishes.
+
+<Note>
+  Voice simulations work only for agents built in Calibrate. An agent you
+  connect from your own server can run text simulations, unless it uses custom
+  fields. Text simulations do not work for connections with custom fields.
+</Note>
+
+## Read the results of a text run
 
 <Frame>
-  <img
-    src="./images/sim_voice_transcript.png"
-    alt="Voice Transcript with Audio"
-  />
+  <img src="/images/app/simulations-text-run.png" alt="A finished text run of Tutor practice sessions showing Encouraging tone at 4.25/5, Explains step by step at 75%, and four conversations" />
 </Frame>
 
-Once complete, voice simulations show results with the **Performance** tab displaying aggregated evaluation metrics across all conversations.
+- **Overall Metrics** has one card per evaluator. "Encouraging tone" shows the average rating, 4.25/5. "Explains step by step" shows the share of conversations that passed, 75%.
+- **Simulation Results** has one row per conversation, with its persona, scenario and each evaluator's result.
+- Hover over the small circle next to a result to read why the judge scored it that way.
+
+In this run, Arjun asked for the answer only, and the tutor gave it straight away. That conversation failed "Explains step by step" and scored 2/5 for "Encouraging tone".
+
+## Read a transcript
+
+Click the play button at the start of a row to open its transcript.
 
 <Frame>
-  <img src="./images/sim_voice_results.png" alt="Voice Simulation Results" />
+  <img src="/images/app/simulations-transcript.png" alt="The transcript of Arjun asking the tutor for 1/2 plus 1/4 and reaching 3/4 himself" />
 </Frame>
 
-Switch to the **Latency** tab to view detailed timing metrics for each component:
+The agent's messages are on the left. The student's messages are on the right. Here Arjun asks for 1/2 plus 1/4 quickly. The tutor asks how many quarters are in one half, and Arjun works out 3/4 himself.
 
-- **stt/ttft** and **stt/processing_time** — Speech-to-Text latency
-- **llm/ttft** and **llm/processing_time** — LLM response latency
-- **tts/ttft** and **tts/processing_time** — Text-to-Speech latency
+## Read the results of a voice run
+
+A voice run has the same cards and table. The **Overall Metrics** section has two tabs.
 
 <Frame>
-  <img
-    src="./images/sim_voice_latency.png"
-    alt="Voice Simulation Latency Metrics"
-  />
+  <img src="/images/app/simulations-voice-run.png" alt="A finished voice run of Tutor practice sessions with Performance and Latency tabs" />
 </Frame>
 
-<Tip>
-  Voice simulations take longer than text simulations due to the full audio
-  pipeline, but provide more realistic testing of your agent's voice experience.
-</Tip>
+- **Performance** shows the evaluator scores, the same as a text run.
+- **Latency** shows how long each part of your agent took, averaged across the conversations:
 
-## Sharing simulation results publicly
+| Card | What it measures |
+| --- | --- |
+| `stt/ttft` and `stt/processing_time` | Speech to text: turning the student's speech into text |
+| `llm/ttft` and `llm/processing_time` | The language model: writing the agent's reply |
+| `tts/ttft` and `tts/processing_time` | Text to speech: turning the reply into speech |
 
-Once a simulation run completes, you can share the results publicly. Open a completed run and click the **Share** button.
+`ttft` is the time until the first part of the output arrives. `processing_time` is the total time that step took.
+
+The transcript of a voice run has an audio player for each turn. **Hear the full conversation** at the top plays the whole call.
+
+## Find past runs
+
+Every run of a simulation is listed on its **Runs** tab, with its status, whether it was text or voice, and when it was created. Click a run to open it.
 
 <Frame>
-  <img src="./images/sim_public.png" alt="Simulation run with Share button" />
+  <img src="/images/app/simulations-runs-tab.png" alt="The Runs tab of Tutor practice sessions listing Run 2, a voice run, and Run 1, a text run, both Done" />
 </Frame>
 
-This toggles the run to **Public** and generates a shareable link.
+## Share or label a run
 
-Anyone with the link can view the overall metrics, per-conversation results, and transcripts without needing a Calibrate account.
+On a finished run, two buttons sit at the top right:
+
+- **Share** makes the run public and gives you a link. Anyone with the link can see the scores and transcripts without a Calibrate account. Click **Copy link** to copy it, and click **Public** to make the run private again.
+- **Submit for labelling** sends the conversations you tick to people who score them by hand. See [Create a labelling task](/app/human-alignment/labelling-tasks).
 
 <Frame>
-  <img
-    src="./images/sim_public_preview.png"
-    alt="Simulation run with Share button"
-  />
+  <img src="/images/app/simulations-run-share.png" alt="A text run made public, with the Public and Copy link buttons next to Submit for labelling" />
 </Frame>
-
-Click the **Public** button again to make the run private.
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card
-    title="Personas"
-    icon="user"
-    href="/core-concepts/personas#best-practices"
-  >
-    Best practices for creating realistic personas
+  <Card title="Personas" icon="user" href="/core-concepts/personas#best-practices">
+    Write personas that test your agent well
   </Card>
-  <Card
-    title="Scenarios"
-    icon="list"
-    href="/core-concepts/scenarios#best-practices"
-  >
-    Best practices for creating effective scenarios
+  <Card title="Scenarios" icon="file-lines" href="/core-concepts/scenarios#best-practices">
+    Write scenarios that test your agent well
   </Card>
 </CardGroup>

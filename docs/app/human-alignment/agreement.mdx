@@ -1,0 +1,67 @@
+---
+title: "Check how well an evaluator agrees with people"
+description: "Run an evaluator on the labelled items and compare its answers with the annotators"
+---
+
+<video controls className="w-full aspect-video rounded-xl" src="/videos/app-human-alignment-agreement.mp4"></video>
+
+Once Meena and Kabir have labelled the items in "Check tutor replies", run the evaluator on the same items. Calibrate then compares the evaluator's answers with theirs.
+
+## Run the evaluator
+
+1. Open the task from the **Tasks** tab on the **Human alignment** page.
+2. On the **Dataset** tab, tick the items to evaluate. To pick every item, tick the box in the header row.
+3. Click **Evaluate selected**. To evaluate one item, click **Evaluate** on its row.
+4. In **Run evaluators**, select "Explains step by step" and pick the version to run.
+
+<Frame>
+  <img src="/images/app/human-alignment-run-evaluators.png" alt="The Run evaluators window with Explains step by step selected and version v2, marked Live, picked" />
+</Frame>
+
+5. Click **Run**.
+
+The evaluation run page opens. Every run is also listed on the **Evaluation runs** tab of the task.
+
+## Read the evaluation run
+
+The **Summary** tab of **Evaluator results** has one row per evaluator:
+
+- **Score**: what the evaluator scored across the items. Here, it marked 75% of the replies **Correct**.
+- **Agreement with humans**: how often the evaluator gave the same answer as the annotators, with its kappa. The line on the bar and the **Chance** figure under it show the agreement chance alone would produce.
+
+Here, the evaluator agreed with the annotators 88% of the time. Chance alone would give 56%, so the kappa is 0.71 and the bar is green. The evaluator agrees well with Meena and Kabir. It disagrees only with Kabir, on the reply "Saves progress after a solved question".
+
+<Frame><img src="/images/app/human-alignment-evaluation-run.png" alt="An evaluation run of Explains step by step v2, scoring 75% Correct with 88% agreement with humans, 56% chance and a kappa of 0.71" /></Frame>
+
+The **Items** tab shows the evaluator's answer and each annotator's answer on every item. Click **Show disagreements only** to see only the items where they differ.
+
+Other buttons at the top of the run page:
+
+- **Send for review**: send the items shown to annotators to label.
+- **Share**: make a public link to the run.
+
+## Read the task overview
+
+The **Overview** tab of the task brings the numbers together:
+
+- **Evaluator scores**: what each evaluator scored across the items.
+- **Human scores**: what the annotators scored across the same items.
+- **Score reliability**: the **Annotator agreement** and **Evaluator agreement with humans**, each with its kappa.
+
+<Frame><img src="/images/app/human-alignment-task-overview.png" alt="The Overview tab of Check tutor replies: evaluator score 75%, human score 63%, annotator agreement 75% and evaluator agreement with humans 88%" /></Frame>
+
+<Tip>
+  Agreement between annotators shows how clear the question is. If Meena and Kabir often disagree, make the evaluator's question clearer before trusting any evaluator on it.
+</Tip>
+
+## Track agreement across versions
+
+Each time you change the evaluator's prompt, run it again on the same items. To see whether a change helped, open the evaluator from **Agent simulations** → **Evaluators** in the sidebar and click the **Agreement** tab. The **Agreement trend** chart shows the agreement and kappa for each version.
+
+<Frame>
+  <img src="/images/app/human-alignment-agreement-trend.png" alt="The Agreement tab of Explains step by step, showing the Agreement trend chart with agreement and kappa for versions v1 and v2" />
+</Frame>
+
+## Learn how the numbers are worked out
+
+[How the agreement numbers are worked out](/reference/human-alignment) walks through a full example with Meena, Kabir and the tutor's evaluators.

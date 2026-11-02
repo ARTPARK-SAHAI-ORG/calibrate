@@ -1,107 +1,87 @@
 ---
 title: "Personas"
-description: "Create realistic personas matching your target audience"
+description: "Describe who the simulated student is and how they behave"
 ---
 
-Personas define facts for simulated users that interact with your agent in [agent simulations](/quickstart/simulations). They determine `WHO` the simulated user is and `HOW` they behave during conversations.
+<video controls className="w-full aspect-video rounded-xl" src="/videos/core-concepts-personas.mp4"></video>
 
-## Quickstart
+A persona describes the student that an AI plays in a [simulation](/app/simulations/overview). It says who the student is and how they talk. It does not say what they want from the conversation. That goes in a [scenario](/core-concepts/scenarios).
 
-### Create a new persona
+## See your personas
 
-From the sidebar, click **Personas** to view your existing personas. Click **Add persona** to create a new persona.
-
-<Frame>
-  <img src="./images/personas-1.png" alt="Personas" />
-</Frame>
-
-### Add the label and characteristics
+In the sidebar, under **Agent simulations**, click **Personas**. The list shows each persona's label, characteristics, gender, language and how often they interrupt.
 
 <Frame>
-  <img src="./images/personas-2.png" alt="Add label and characteristics" />
+  <img src="/images/app/simulations-personas.png" alt="The Personas page with two personas: Arjun, wants the answer fast, and Riya, stuck on fractions" />
 </Frame>
 
-Give a meaningful label to the persona (e.g. `shy, pregnant mother in her third trimester`) and define its characteristics.
+## Add a persona
 
-#### Guidelines for defining characteristics
+Click **Add persona**. A panel opens on the right. To change a persona later, click it in the list.
 
-Define two key aspects:
+<Frame>
+  <img src="/images/app/simulations-persona-edit.png" alt="The Edit persona panel for Riya, stuck on fractions, with Female, Hindi and Low selected" />
+</Frame>
 
-1. **WHO**: Specific details about the persona
-   - Name, age, occupation
-   - Location, background
-   - Language proficiency
-   - Any other relevant details required for your agent simulation
+Fill in these fields:
 
-2. **HOW**: Behavioral traits
-   - Communication style (polite, impatient, formal)
-   - Speech patterns (slow, uses filler words)
-   - Temperament (calm, easily frustrated)
+| Field | What to enter |
+| --- | --- |
+| **Label** | A short name you will recognise, such as "Riya, stuck on fractions" |
+| **Characteristics** | Who the student is and how they behave |
+| **Gender** | **Male** or **Female**. Voice simulations use a matching voice. |
+| **Language** | **English**, **Hindi** or **Kannada**. The language the student speaks. |
+| **Interruption sensitivity** | How likely the student is to cut the agent off mid-sentence |
 
-**Example Characteristics:**
+Then click **Add persona** at the bottom of the panel to save it. When you change a persona, the button reads **Save**.
 
-```text
-You are Rajesh, a 45-year-old farmer from rural Karnataka who
-speaks primarily in Kannada with limited English proficiency.
+### Example characteristics
 
-You are polite and friendly but speak slowly with natural
-pauses like "uhh" and "umm". You have a calm and patient
-demeanor but can become frustrated when technical jargon is used.
+The two personas used across these docs:
 
-You prefer simple, straightforward explanations and often ask
-for clarification. You tend to repeat important information
-to make sure you understood correctly.
+```text Riya, stuck on fractions
+A class 6 student who is stuck on fractions homework. Gets frustrated
+quickly and gives short answers.
 ```
 
-<Note>
-  Avoid including task instructions in characteristics. Use
-  [**Scenarios**](/core-concepts/scenarios) to define WHAT the persona should
-  do.
-</Note>
+```text Arjun, wants the answer fast
+A class 6 student in a hurry who keeps asking for the final answer.
+```
 
-### Configure voice settings
+Riya speaks Hindi and rarely interrupts. Arjun speaks English and interrupts more often.
 
-Select the gender and language for the persona.
+### Interruption sensitivity
 
-### Define interruption sensitivity
+Interruptions happen only in voice simulations. While the agent is speaking, the student gets a chance to cut in each time the agent says the next part of its reply. The level sets how big that chance is.
 
-Real users often interrupt agents mid-sentence. Configure how likely this persona is to interrupt:
-
-| Level      | Behavior                   |
-| ---------- | -------------------------- |
-| **None**   | Persona never interrupts   |
-| **Low**    | 25% chance of interrupting |
-| **Medium** | 50% chance of interrupting |
-| **High**   | 80% chance of interrupting |
-
-### Save the persona
-
-Click **Add persona** to create the persona.
+| Level | Chance of cutting in each time |
+| --- | --- |
+| **None** | Never |
+| **Low** | 25% |
+| **Medium** | 50% |
+| **High** | 80% |
 
 ## Best practices
 
-### Creating realistic personas
+1. Be specific. Give the student's age, class and anything else your agent should notice, such as being upset or in a hurry.
+2. Say how they talk. Short answers, long answers, polite, impatient.
+3. Leave the task out. "Needs help adding 1/2 and 1/4" belongs in a scenario.
+4. Make personas that differ. A patient student and an impatient one test your agent in different ways.
 
-1. **Be specific**: Include concrete details (name, age, occupation, etc.)
-2. **Define communication style**: How do they speak? Fast, slow, formal, casual?
-3. **Include limitations**: Language proficiency, technical knowledge, etc.
-4. **Add emotional traits**: Patient, impatient, friendly, formal
+### Personas and scenarios
 
-### Personas vs scenarios
-
-| Aspect  | Persona                                  | Scenario                               |
-| ------- | ---------------------------------------- | -------------------------------------- |
-| Focus   | WHO and HOW                              | WHAT to do                             |
-| Content | Demographics, behavior                   | Task, goal, situation                  |
-| Example | "A 45-year-old farmer who speaks slowly" | "Call to inquire about crop insurance" |
+| | Persona | Scenario |
+| --- | --- | --- |
+| Says | Who the student is and how they behave | What the student wants |
+| Example | "A class 6 student in a hurry who keeps asking for the final answer." | "The student asks the tutor to just give the answer to 3/5 + 1/5." |
 
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Create Scenarios" icon="file-lines" href="/guides/scenarios">
-    Define what your personas should do in simulations
+  <Card title="Scenarios" icon="file-lines" href="/core-concepts/scenarios">
+    Describe what the student wants from the conversation
   </Card>
-  <Card title="Run Simulations" icon="comments" href="/guides/simulations">
-    Test your agent with combinations of personas and scenarios
+  <Card title="Run a simulation" icon="comments" href="/quickstart/simulations">
+    Pair personas with scenarios and run them
   </Card>
 </CardGroup>

@@ -1,0 +1,51 @@
+---
+title: "Simulations overview"
+description: "Let an AI play a student and talk to your agent, then score each conversation"
+---
+
+A simulation is a set of practice conversations with your agent. An AI plays the student. It talks to your agent from start to finish, and Calibrate scores each conversation.
+
+For example, an AI can play Riya, a class 6 student stuck on fractions, and ask the Maths homework tutor for help with her homework. You then see whether the tutor explained the next step or simply gave the answer.
+
+## What a simulation is made of
+
+You set up three things before you run a simulation. Each one has its own page in the sidebar, under **Agent simulations**.
+
+| Part | What it says | Example |
+| --- | --- | --- |
+| [Persona](/core-concepts/personas) | Who the student is and how they talk | "Riya, stuck on fractions" |
+| [Scenario](/core-concepts/scenarios) | What the student wants from the conversation | "Fractions homework" |
+| [Simulation evaluator](/core-concepts/metrics) | How each conversation is scored | "Explains step by step" |
+
+When you run a simulation, Calibrate has one conversation for every persona and scenario pair. Two personas and two scenarios give four conversations.
+
+## Text or voice
+
+You choose the kind of run each time you click **Launch**:
+
+- **Text Simulation**: the student and the agent type to each other. This is the faster run.
+- **Voice Simulation**: the student and the agent speak to each other. You can listen to each conversation and see how long each part of your agent took to reply.
+
+<Note>
+  Voice simulations work only for agents built in Calibrate. An agent you
+  [connect from your own server](/core-concepts/agent-connections) can run text
+  simulations, unless it uses custom fields. Text simulations do not work for
+  connections with custom fields.
+</Note>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Personas" icon="user" href="/core-concepts/personas">
+    Describe who the student is
+  </Card>
+  <Card title="Scenarios" icon="file-lines" href="/core-concepts/scenarios">
+    Describe what the student wants
+  </Card>
+  <Card title="Simulation evaluators" icon="check" href="/core-concepts/metrics">
+    Choose how each conversation is scored
+  </Card>
+  <Card title="Run a simulation" icon="comments" href="/quickstart/simulations">
+    Run a text or voice simulation and read the results
+  </Card>
+</CardGroup>
