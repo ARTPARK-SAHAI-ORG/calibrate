@@ -15,9 +15,16 @@ A production trace is one input your agent received in production and the output
 
 ## How rows are counted
 
-- **Test run:** one row per test.
-- **Benchmark:** the number of tests multiplied by the number of models.
-- **Evaluator run on an annotation task:** the number of items multiplied by the number of evaluators.
+The limit on rows in one evaluation run is a single number shared by every kind of run below. It applies to each run separately, and raising it raises it for all of them.
+
+| Kind of run | Rows |
+| --- | --- |
+| Test run | The number of tests |
+| Benchmark | The number of tests multiplied by the number of models |
+| Speech-to-text evaluation | The number of rows in the dataset |
+| Text-to-speech evaluation | The number of rows in the dataset |
+| Simulation | The number of personas multiplied by the number of scenarios |
+| Evaluator run on an annotation task | The number of items multiplied by the number of evaluators |
 
 ## What happens when you go over a rate limit
 
