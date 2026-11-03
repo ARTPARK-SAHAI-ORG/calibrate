@@ -84,7 +84,8 @@
               "app/workspace-settings/members",
               "app/workspace-settings/settings",
               "reference/byok",
-              "reference/api-keys"
+              "reference/api-keys",
+              "reference/rate-limits"
             ]
           },
           {
