@@ -15,18 +15,6 @@ Calibrate runs your evaluations using AI providers such as OpenRouter and Deepgr
 | Total production traces scored | 100 | No limit |
 | Production traces stored | 50,000 | 50,000 |
 
-## How rows are counted
-
-Every run below shares one row limit, so raising it raises it for all of them.
-
-| Kind of run | Rows |
-| --- | --- |
-| Agent evaluation run | The number of tests |
-| Speech-to-text evaluation | The number of rows in the dataset |
-| Text-to-speech evaluation | The number of rows in the dataset |
-| Simulation | The number of personas multiplied by the number of scenarios |
-| Running evaluators on a labelling task | The number of items multiplied by the number of evaluators |
-
 ## What happens when you go over a rate limit
 
 - **Rows:** the run does not start and the request returns a `400` error. If you run many agents at once with `POST /agent-tests/run`, an agent over the rate limit appears under `skipped` with the reason `over_row_limit`, and the other agents still run.
