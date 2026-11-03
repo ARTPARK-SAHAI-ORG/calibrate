@@ -414,14 +414,7 @@
       },
       {
         "tab": "Use cases",
-        "groups": [
-          {
-            "group": "Browse use cases",
-            "pages": [
-              "examples/overview"
-            ]
-          }
-        ]
+        "href": "https://calibrate.artpark.ai/#use-cases"
       }
     ],
     "global": {
