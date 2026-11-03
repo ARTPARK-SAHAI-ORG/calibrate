@@ -1,5 +1,6 @@
 ---
 title: "Text-to-speech metrics"
+sidebarTitle: "Metrics"
 description: "What each text-to-speech score means"
 ---
 
@@ -7,7 +8,7 @@ The **About** tab on a results page explains every score that run produced.
 
 ## Evaluators
 
-An evaluator listens to the recording a provider made and judges it against the text it was given. It does not turn the speech back into text first.
+An evaluator listens to the recording a model made and judges it against the text it was given. It does not turn the speech back into text first.
 
 Every new evaluation starts with the Pronunciation evaluator added on the **Evaluators** tab. It checks that the spoken words match the text and are clear enough to understand. Each recording gets a pass or a fail, with a short reason.
 
@@ -16,13 +17,13 @@ Every new evaluation starts with the Pronunciation evaluator added on the **Eval
 | बहुत बढ़िया! तुमने सही जवाब दिया। | Every word spoken clearly and correctly | Pass |
 | चलो साथ में करते हैं। 1/2 में कितने 1/4 होते हैं? | "1/4" read out as "one by four" instead of "एक बटा चार" | Fail |
 
-The leaderboard shows, for each provider, the share of recordings that passed. Higher is better.
+The leaderboard shows, for each model, the share of recordings that passed. Higher is better.
 
 A run needs at least one evaluator. To score something else, such as how natural the voice sounds, click **Add evaluators** on the **Evaluators** tab of a new evaluation. See [Create an evaluator](/app/evaluators/create).
 
 ## Latency
 
-Latency is the time, in seconds, from asking a provider for speech until the first part of the audio arrives. The leaderboard shows it as **Latency (s)**. Each provider's number is the middle value across all lines of text.
+Latency is the time, in seconds, from asking a model for speech until the first part of the audio arrives. The leaderboard shows it as **Latency (s)**. Each model's number is the middle value across all lines of text.
 
 - Range: 0 and up. Lower is better.
 - Every run measures it.
@@ -32,7 +33,7 @@ Latency matters for a voice agent, because a student waits this long before hear
 ## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Benchmark text-to-speech providers" icon="play" href="/quickstart/text-to-speech">
+  <Card title="Benchmark text-to-speech models" icon="play" href="/quickstart/text-to-speech">
     Run an evaluation on your text
   </Card>
   <Card title="Text-to-speech datasets" icon="database" href="/app/text-to-speech/datasets">

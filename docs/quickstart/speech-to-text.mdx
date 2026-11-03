@@ -1,11 +1,12 @@
 ---
-title: "Benchmark speech-to-text providers"
-description: "Find the speech-to-text provider that best understands what your users say"
+title: "Benchmark speech-to-text models"
+sidebarTitle: "Benchmark different models"
+description: "Find the speech-to-text model that best understands what your users say"
 ---
 
 <video controls className="w-full aspect-video rounded-xl" src="/videos/quickstart-speech-to-text.mp4"></video>
 
-A speech-to-text provider turns what a student says into text that your agent reads. This guide compares three providers on short questions a class 6 student asks the Maths homework tutor in Hindi.
+A speech-to-text model turns what a student says into text that your agent reads. This guide compares three models on short questions a class 6 student asks the Maths homework tutor in Hindi.
 
 You need a few short recordings, each a `.wav` file of under 60 seconds and under 5 MB, and the exact words spoken in each one.
 
@@ -59,17 +60,17 @@ The recordings are saved as a dataset with this name, so you can use them again 
   To run on recordings you already uploaded, click **Use existing dataset** and pick the dataset from the list.
 </Tip>
 
-## Choose the providers
+## Choose the models
 
 1. Click the **Models** tab.
-2. Under **Language**, pick **Hindi**. The list shows only providers that support Hindi.
-3. Under **Select providers to evaluate**, tick Sarvam, Deepgram and Google. Each row shows the model that provider uses.
+2. Under **Language**, pick **Hindi**. The list shows only models that support Hindi.
+3. Under **Select providers to evaluate**, tick Sarvam, Deepgram and Google. Each row shows the exact model.
 
 <Frame>
-  <img src="/images/app/stt-models.png" alt="The Models tab with Hindi chosen as the language and a list of providers, most marked API key needed" />
+  <img src="/images/app/stt-models.png" alt="The Models tab with Hindi chosen as the language and a list of models, most marked API key needed" />
 </Frame>
 
-If your workspace uses its own provider keys, a provider without a key shows **API key needed**. Tick it, paste the key in the field that opens under it, and click **Save**. The key is saved for the whole workspace. See [Bring your own keys (BYOK)](/reference/byok).
+If your workspace uses its own provider keys, a model without a key shows **API key needed**. Tick it, paste the key in the field that opens under it, and click **Save**. The key is saved for the whole workspace. See [Bring your own keys (BYOK)](/reference/byok).
 
 ## Choose how transcripts are scored
 
@@ -87,15 +88,15 @@ To score transcripts with your own evaluator as well, click **Add evaluators**. 
 
 ## Run the evaluation
 
-Click **Evaluate** at the top of the page. The results page opens and fills in as each provider finishes.
+Click **Evaluate** at the top of the page. The results page opens and fills in as each model finishes.
 
 <Frame>
-  <img src="/images/app/stt-running.png" alt="The results page for Tutor questions in Hindi while it is running, with a tick next to each provider that has finished" />
+  <img src="/images/app/stt-running.png" alt="The results page for Tutor questions in Hindi while it is running, with a tick next to each model that has finished" />
 </Frame>
 
 ## Read the results
 
-The **Leaderboard** tab puts the providers side by side, with one chart for each score. Lower WER and CER are better.
+The **Leaderboard** tab puts the models side by side, with one chart for each score. Lower WER and CER are better.
 
 <Frame>
   <img src="/images/app/stt-results.png" alt="The Leaderboard tab for Tutor questions in Hindi, comparing WER, CER, LLM-WER and LLM-CER for Sarvam, Deepgram and Google" />
@@ -103,13 +104,13 @@ The **Leaderboard** tab puts the providers side by side, with one chart for each
 
 In this example Sarvam gets the fewest words wrong, with a WER of 0.08.
 
-The **Results** tab shows every recording. Pick a provider on the left. Each row has the recording to play, the **Ground Truth** you typed, the provider's **Prediction**, and the scores for that row.
+The **Results** tab shows every recording. Pick a model on the left. Each row has the recording to play, the **Ground Truth** you typed, the model's **Prediction**, and the scores for that row.
 
 The **About** tab explains each score shown on the page.
 
 ## Export and share the results
 
-- **Export results** downloads a ZIP file. It holds a CSV file with every provider's transcript and scores for each recording, and an `audios` folder with the recordings.
+- **Export results** downloads a ZIP file. It holds a CSV file with every model's transcript and scores for each recording, and an `audios` folder with the recordings.
 - **Download CSV** on the **Leaderboard** tab downloads the leaderboard table.
 - **Share** makes the results page public. Click **Copy link** to copy the link. Anyone with the link can see the results without a Calibrate account. Click **Public** to make the page private again.
 - **Submit for labelling** sends rows you ticked on the **Results** tab to a labelling task, so people can check the transcripts. See [Create a labelling task](/app/human-alignment/labelling-tasks).
@@ -124,7 +125,7 @@ The **About** tab explains each score shown on the page.
   <Card title="Speech-to-text metrics" icon="chart-bar" href="/core-concepts/speech-to-text">
     What WER, CER and the meaning-based scores measure
   </Card>
-  <Card title="Benchmark text-to-speech providers" icon="volume-high" href="/quickstart/text-to-speech">
+  <Card title="Benchmark text-to-speech models" icon="volume-high" href="/quickstart/text-to-speech">
     Compare the voices that read the tutor's replies aloud
   </Card>
 </CardGroup>

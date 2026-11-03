@@ -29,7 +29,6 @@
               "core-concepts/agent-connections",
               "core-concepts/tools",
               "app/agents/tests",
-              "app/agents/run-tests",
               "app/agents/compare-models",
               "app/agents/monitoring"
             ]
@@ -500,6 +499,10 @@
     {
       "source": "/quickstart/text-to-text",
       "destination": "/app/agents/tests"
+    },
+    {
+      "source": "/app/agents/run-tests",
+      "destination": "/app/agents/tests#run-unit-tests"
     }
   ]
 }
