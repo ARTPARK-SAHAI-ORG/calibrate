@@ -6093,7 +6093,7 @@
               }
             ],
             "title": "Score Averages",
-            "description": "One entry per evaluator that scored at least one matching trace, averaged over every matching trace rather than this page. Ask for it with `include_score_averages`"
+            "description": "One average for each evaluator linked to the agent that scored at least one trace matching the filters, covering all the matching traces it scored rather than this page. Ask for it with `include_score_averages`"
           }
         },
         "type": "object",
@@ -6535,7 +6535,7 @@
             },
             "type": "array",
             "title": "Results",
-            "description": "Results for each evaluator on the latest scoring run"
+            "description": "Results on the latest scoring run from the evaluators linked to the agent"
           }
         },
         "type": "object",
@@ -10525,10 +10525,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Order traces by this evaluator's score on each trace's latest scoring run. Traces it has not scored come last whichever direction you pick",
+              "description": "Order traces by this evaluator's score on each trace's latest scoring run. Traces this evaluator has not scored come last whichever direction you pick, and an evaluator not linked to the agent counts as having scored none",
               "title": "Sort By Evaluator"
             },
-            "description": "Order traces by this evaluator's score on each trace's latest scoring run. Traces it has not scored come last whichever direction you pick"
+            "description": "Order traces by this evaluator's score on each trace's latest scoring run. Traces this evaluator has not scored come last whichever direction you pick, and an evaluator not linked to the agent counts as having scored none"
           },
           {
             "name": "sort_order",

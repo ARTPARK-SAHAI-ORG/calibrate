@@ -887,7 +887,7 @@ and metadata.
 | `score` | array of string | No | Return only traces whose latest scoring run matches this condition. Each is written as `<evaluator ID>:<condition>`, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once |
 | `created_after` | string | No | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
 | `created_before` | string | No | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
-| `sort_by_evaluator` | string | No | Order traces by this evaluator's score on each trace's latest scoring run. Traces it has not scored come last whichever direction you pick |
+| `sort_by_evaluator` | string | No | Order traces by this evaluator's score on each trace's latest scoring run. Traces this evaluator has not scored come last whichever direction you pick, and an evaluator not linked to the agent counts as having scored none |
 | `sort_order` | string | No | Whether `sort_by_evaluator` puts the highest scores first or the lowest. Ignored without it |
 | `include_content` | boolean | No | Also return each trace's full input, output and metadata. Use `limit` and `offset` to page through them |
 | `include_score_averages` | boolean | No | Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page |
