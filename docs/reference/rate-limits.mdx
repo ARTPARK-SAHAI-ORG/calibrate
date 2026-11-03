@@ -15,12 +15,6 @@ Calibrate runs your evaluations using AI providers such as OpenRouter and Deepgr
 | Total production traces scored | 100 | No limit |
 | Production traces stored | 50,000 | 50,000 |
 
-## What happens when you go over a rate limit
-
-- **Rows:** the run does not start and the request returns a `400` error. If you run many agents at once with `POST /agent-tests/run`, an agent over the rate limit appears under `skipped` with the reason `over_row_limit`, and the other agents still run.
-- **Production traces scored:** the trace is stored but not scored.
-- **Production traces stored:** `POST /traces` returns a `429` error until you delete some.
-
 ## Request a rate limit increase
 
 To increase the rate limits on your workspace, reach out to us using [this form](https://forms.gle/Y3ogh31jqRNiUXMJ7).
