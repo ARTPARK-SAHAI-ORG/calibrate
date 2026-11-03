@@ -61,29 +61,7 @@ For using it with the [Calibrate GitHub Action](/reference/github-actions), stor
 
 ## Limits
 
-These limits apply to everything your workspace does, whether you use an API key or the app. Calibrate can set different limits for a workspace, so yours may differ from the defaults below. You can remove two of them by [bringing your own provider keys](/reference/byok).
-
-| Limit | Calibrate's provider keys | Your own provider keys |
-| --- | --- | --- |
-| Rows in one evaluation run | 20 | No limit |
-| [Live conversations](/app/agents/monitoring) scored automatically, counted over the lifetime of your workspace | 100 | No limit |
-| Live conversations stored | 50,000 | 50,000 |
-
-How rows are counted in one evaluation run:
-
-- **Test run:** one row per test.
-- **Benchmark:** the number of tests multiplied by the number of models.
-- **Evaluator run on an annotation task:** the number of items multiplied by the number of evaluators.
-
-What happens when you go over a limit:
-
-- **Rows in one evaluation run:** the run does not start and the request returns a `400` error. If you run many agents at once with `POST /agent-tests/run`, an agent over the limit appears under `skipped` with the reason `over_row_limit`, and the other agents still run.
-- **Live conversations scored:** the live conversation is stored but not scored.
-- **Live conversations stored:** `POST /traces` returns a `429` error until you delete some.
-
-Your workspace can also run only a limited number of evaluation runs at the same time, with either kind of key. A new run over that limit waits in a queue and starts when an earlier run finishes.
-
-Once you add any provider key, every run in your workspace uses only your keys and is billed to your provider accounts. See [Bring your own keys (BYOK)](/reference/byok).
+Requests made with an API key follow your workspace's [limits](/reference/limits). You can remove two of them by [bringing your own provider keys](/reference/byok).
 
 ## Managing keys
 
