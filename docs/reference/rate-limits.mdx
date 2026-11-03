@@ -37,10 +37,6 @@ The limit on rows is a single number shared by every kind of run below. It appli
 - **Production traces scored:** the trace is stored but not scored.
 - **Production traces stored:** `POST /traces` returns a `429` error until you delete some.
 
-## Runs at the same time
-
-Your workspace can run only a limited number of evaluation runs at the same time, with either kind of key. A new run over that rate limit waits in a queue and starts when an earlier run finishes.
-
 ## Using your own provider keys
 
 [Bring your own keys (BYOK)](/reference/byok) removes the rate limits on rows and on production traces scored. Once you add any provider key, every run in your workspace uses only your keys and is billed to your provider accounts.
