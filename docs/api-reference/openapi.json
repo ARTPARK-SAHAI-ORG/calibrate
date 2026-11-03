@@ -4875,7 +4875,7 @@
               "type": "object"
             },
             "type": "array",
-            "description": "One row per item, evaluator, and version on this page, with the evaluator's value and each annotator's label"
+            "description": "One row per item, evaluator, and version on this page, with the evaluator's value and each annotator's label. `item_added_at` is when the row was added (ISO 8601 UTC). Each label's `answered_at` is when the annotator first gave it in their latest labelling job, and editing does not change it"
           },
           "item_comments": {
             "anyOf": [
@@ -9793,6 +9793,60 @@
               "title": "Task Uuid"
             },
             "description": "Annotation task to act on"
+          },
+          {
+            "name": "date_field",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "row_added",
+                "annotator_answered"
+              ],
+              "type": "string",
+              "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`",
+              "default": "row_added",
+              "title": "Date Field"
+            },
+            "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date",
+              "title": "Start"
+            },
+            "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date",
+              "title": "End"
+            },
+            "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date"
           }
         ],
         "responses": {
@@ -9888,6 +9942,60 @@
               "title": "Disagreement Only"
             },
             "description": "When true, keep only rows where the evaluator disagreed with at least one annotator"
+          },
+          {
+            "name": "date_field",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "row_added",
+                "annotator_answered"
+              ],
+              "type": "string",
+              "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`",
+              "default": "row_added",
+              "title": "Date Field"
+            },
+            "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date",
+              "title": "Start"
+            },
+            "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date",
+              "title": "End"
+            },
+            "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date"
           },
           {
             "name": "q",
@@ -10380,10 +10488,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC",
+              "description": "Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date",
               "title": "Created After"
             },
-            "description": "Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC"
+            "description": "Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date"
           },
           {
             "name": "created_before",
@@ -10399,10 +10507,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC",
+              "description": "Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date",
               "title": "Created Before"
             },
-            "description": "Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC"
+            "description": "Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date"
           },
           {
             "name": "sort_by_evaluator",

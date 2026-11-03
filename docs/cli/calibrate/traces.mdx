@@ -45,8 +45,8 @@ calibrate traces list [flags]
 | --- | --- | --- | --- |
 | `-a, --agent-id` | string | — | Return only traces from this agent |
 | `--conversation-id` | agent_id | — | Return only the turns of this conversation. Requires agent_id |
-| `--created-after` | string | — | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC |
-| `--created-before` | string | — | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC |
+| `--created-after` | string | — | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `--created-before` | string | — | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
 | `--include-content` | limit | — | Also return each trace's full input, output and metadata. Use limit and `offset` to page through them |
 | `--include-score-averages` | — | — | Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page |
 | `--labels` | string | — | Return only traces carrying at least one of these labels. Repeat the parameter for each label |

@@ -421,6 +421,9 @@ Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a c
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_uuid` | string | Yes | Annotation task to act on |
+| `date_field` | string | No | Which date `start` and `end` apply to: |
+| `start` | string | No | Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `end` | string | No | Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
 
 See **GET /annotation-tasks/&#123;task_uuid&#125;/agreement** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -453,6 +456,9 @@ Get a paginated summary table for a task, with each item's evaluator values and 
 | `item_id` | string | No | Filter rows to a single item. The full task-wide annotator union is still returned in `annotators` |
 | `live_only` | boolean | No | When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded |
 | `disagreement_only` | boolean | No | When true, keep only rows where the evaluator disagreed with at least one annotator |
+| `date_field` | string | No | Which date `start` and `end` apply to: |
+| `start` | string | No | Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `end` | string | No | Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
 | `q` | string | No | Case-insensitive substring search on `payload.name`. Blank is a no-op |
 | `sort_by` | string | No | Sort key for the results |
 | `order` | string | No | Sort direction |
@@ -879,8 +885,8 @@ and metadata.
 | `output_type` | string | No | Return only traces whose output is of this kind. `response` covers every trace carrying a reply, including one that also issued tool calls. `tool_call` covers traces that only issued tool calls |
 | `labels` | array of string | No | Return only traces carrying at least one of these labels. Repeat the parameter for each label |
 | `score` | array of string | No | Return only traces whose latest scoring run matches this condition. Each is written as `<evaluator ID>:<condition>`, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once |
-| `created_after` | string | No | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC |
-| `created_before` | string | No | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC |
+| `created_after` | string | No | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `created_before` | string | No | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
 | `sort_by_evaluator` | string | No | Order traces by this evaluator's score on each trace's latest scoring run. Traces it has not scored come last whichever direction you pick |
 | `sort_order` | string | No | Whether `sort_by_evaluator` puts the highest scores first or the lowest. Ignored without it |
 | `include_content` | boolean | No | Also return each trace's full input, output and metadata. Use `limit` and `offset` to page through them |
