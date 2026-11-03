@@ -85,7 +85,7 @@
               "app/workspace-settings/settings",
               "reference/byok",
               "reference/api-keys",
-              "reference/limits"
+              "reference/rate-limits"
             ]
           },
           {
