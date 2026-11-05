@@ -2098,6 +2098,30 @@
             "title": "Reasoning Mode",
             "description": "How the labelling form treats the reasoning box on each judgement. `optional` shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out",
             "default": "optional"
+          },
+          "evaluator_reasoning_modes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "optional",
+                    "required",
+                    "hidden"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Map of evaluator ID to how the labelling form treats the reasoning box for that evaluator, with the same values as `reasoning_mode`. Every ID must be an evaluator on these jobs, otherwise you get a 400. An evaluator left out uses `reasoning_mode`",
+            "examples": [
+              {
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479": "required"
+              }
+            ]
           }
         },
         "type": "object",

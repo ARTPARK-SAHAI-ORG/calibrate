@@ -517,6 +517,7 @@ Assign items to annotators, creating one labelling job per annotator. Each job c
 | `evaluator_ids` | array of string | No | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (`None`) to snapshot every linked evaluator |
 | `comments_enabled` | boolean | No | When `true`, the labelling form lets the annotator leave a comment on each item |
 | `reasoning_mode` | string | No | How the labelling form treats the reasoning box on each judgement. `optional` shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out |
+| `evaluator_reasoning_modes` | object | No | Map of evaluator ID to how the labelling form treats the reasoning box for that evaluator, with the same values as `reasoning_mode`. Every ID must be an evaluator on these jobs, otherwise you get a 400. An evaluator left out uses `reasoning_mode` |
 
 See **POST /annotation-tasks/&#123;task_uuid&#125;/jobs** in the [API reference](/api-reference/introduction) tab for the full schema.
 

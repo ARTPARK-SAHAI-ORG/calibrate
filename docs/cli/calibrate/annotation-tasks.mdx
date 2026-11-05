@@ -88,7 +88,8 @@ calibrate annotation-tasks create-labelling-jobs [flags]
 | --- | --- | --- | --- |
 | `-a, --annotator-ids` | stringArray | — | **Required.** Annotator IDs to assign, creating one labelling job for each annotator. Must be in your workspace |
 | `-c, --comments-enabled` | true | `true` | When true, the labelling form lets the annotator leave a comment on each item |
-| `-e, --evaluator-ids` | None | — | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (None) to snapshot every linked evaluator |
+| `--evaluator-ids` | None | — | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (None) to snapshot every linked evaluator |
+| `--evaluator-reasoning-modes` | reasoning_mode | — | Map of evaluator ID to how the labelling form treats the reasoning box for that evaluator, with the same values as reasoning_mode. Every ID must be an evaluator on these jobs, otherwise you get a 400. An evaluator left out uses `reasoning_mode` |
 | `-i, --item-ids` | select_all=false | — | Item IDs to assign. **Required when select_all=false**. Ignored when `select_all=true` |
 | `--q` | payload.name | — | Case-insensitive substring filter on payload.name. Applies only when `select_all=true` |
 | `-r, --reasoning-mode` | optional | `optional` | How the labelling form treats the reasoning box on each judgement. optional shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out (options: optional, required, hidden) |
