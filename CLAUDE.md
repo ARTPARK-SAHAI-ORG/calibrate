@@ -386,12 +386,14 @@ The `ARTPARK-SAHAI-ORG/calibrate-frontend` prefix is required: a bare
 
 ### Git hooks
 `.githooks/pre-commit` runs `uv run --extra dev pytest tests/` **only when
-HEAD is on `main`**. Other branches commit instantly. Activated per-clone
-with `git config core.hooksPath .githooks` (also in the README).
+HEAD is on `main`** and the staged changes include `.py` or `.json` files
+outside `docs/`. Other branches commit instantly. Activated per-clone with
+`git config core.hooksPath .githooks` (also in the README).
 
 ### CI
 - **`.github/workflows/tests.yml`** — runs on push to `main` and on every PR
-  targeting `main`. Installs `libasound2-dev` (needed for `simpleaudio`),
+  targeting `main`, except when every changed file is under `docs/`. No test
+  reads the `docs/` folder. Installs `libasound2-dev` (needed for `simpleaudio`),
   syncs `--extra dev`, runs pytest with coverage, uploads to Codecov, and
   emails `aman.dalmia@artpark.in` on failure via `dawidd6/action-send-mail`.
 - **`.github/workflows/publish.yml`** — release-triggered. Has a `test` job
@@ -424,8 +426,8 @@ For any function block you add or modify:
    is genuinely untestable (e.g. a CLI flag wired through to a third-party
    SDK), say so explicitly in the response rather than implying coverage.
 
-This is not optional — every PR is gated by the test suite in CI and by the
-pre-commit hook on `main`.
+This is not optional — every PR that changes files outside `docs/` is gated by
+the test suite in CI and by the pre-commit hook on `main`.
 
 ### When the user asks "how do I test this?"
 
