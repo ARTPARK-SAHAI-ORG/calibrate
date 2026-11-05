@@ -7,9 +7,9 @@ if [ "$branch" != "main" ]; then
     exit 0
 fi
 
-# Only run tests when staged changes include .py or .json files.
-if ! git diff --cached --name-only --diff-filter=ACMR | grep -qE '\.(py|json)$'; then
-    echo "→ pre-commit: no .py or .json changes staged — skipping tests."
+# Only run tests when staged changes include .py or .json files outside docs/.
+if ! git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(py|json)$' | grep -qv '^docs/'; then
+    echo "→ pre-commit: no .py or .json changes staged outside docs/ — skipping tests."
     exit 0
 fi
 
