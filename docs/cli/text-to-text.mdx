@@ -205,7 +205,7 @@ A single-shot task with no conversation. The agent receives one user message, ta
 
 A general test case carries `input` and no `history`. Supplying `history` is an error, as is an empty `input`.
 
-With an [agent connection](/cli/agent-connections/chat), the `input` is sent as a single user message. An agent that takes a plain instruction rather than a conversation can receive it as `{"input": "..."}` instead, by setting `agent_type` to `general` in the config.
+With an [agent connection](/cli/agent-connections/chat), the `input` is wrapped as a single user message and sent as `{"messages": [{"role": "user", "content": "..."}]}`. Set `agent_type` to `general` in the config and the text is sent on its own instead, as `{"input": "..."}`.
 
 Its evaluators must be listed by name. There is no built-in evaluator for this type, so the plain criteria string that a [response test](#response-test) accepts is rejected here.
 
