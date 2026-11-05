@@ -1,6 +1,54 @@
 #!/usr/bin/env bash
-# Run the full test suite before committing to main.
-# On other branches, do nothing.
+# Two checks run before a commit:
+#
+#   1. Docs style, on every branch, when the commit stages a page under docs/.
+#      The mechanical rules abort the commit; the Claude review only prints.
+#   2. The test suite, on main only, when the commit stages .py or .json files
+#      outside docs/.
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root" || exit 1
+
+staged_docs=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^docs/.*\.mdx$')
+
+if [ -n "$staged_docs" ]; then
+    if ! python3 scripts/check_docs_style.py --staged; then
+        echo ""
+        echo "✗ Docs style check failed. Commit aborted."
+        echo "  Fix the lines above, or run 'git commit --no-verify' to bypass."
+        exit 1
+    fi
+
+    # The review reads the same rules and judges what a regular expression
+    # cannot. It never blocks: a commit must not wait on a model call.
+    if [ -z "$SKIP_DOCS_AI" ] && command -v claude >/dev/null 2>&1; then
+        run_with_timeout=""
+        if command -v timeout >/dev/null 2>&1; then
+            run_with_timeout="timeout 90"
+        elif command -v gtimeout >/dev/null 2>&1; then
+            run_with_timeout="gtimeout 90"
+        fi
+
+        echo "→ pre-commit: asking Claude to review the staged docs changes..."
+        {
+            printf 'Review the staged docs changes against these rules.\n\n'
+            printf '=== DOCS_STYLE.md ===\n'
+            cat DOCS_STYLE.md
+            printf '\n=== staged diff ===\n'
+            git diff --cached --unified=0 -- $staged_docs
+            printf '\n=== what to report ===\n'
+            printf 'Judge only the lines the diff adds. Ignore lines inside fenced code\n'
+            printf 'blocks and inside the frontmatter block. For each line that breaks a\n'
+            printf 'rule print one block:\n\n'
+            printf '  file:line  <rule heading>\n'
+            printf '  what is wrong, in one sentence a non-engineer understands\n'
+            printf '  suggested: <the line rewritten so it passes>\n\n'
+            printf 'Print nothing at all when the change breaks no rule. Do not edit any file.\n'
+        } | $run_with_timeout claude -p --model sonnet 2>/dev/null
+
+        echo "  (warning only, the commit is not blocked. SKIP_DOCS_AI=1 turns this off.)"
+    fi
+fi
 
 branch=$(git symbolic-ref --short HEAD 2>/dev/null)
 if [ "$branch" != "main" ]; then

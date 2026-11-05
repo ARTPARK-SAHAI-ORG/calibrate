@@ -113,6 +113,13 @@ examples/                  # Example datasets + scripts users can run
 ## Conventions in this codebase
 
 ### Docs (Mintlify) writing style
+**`DOCS_STYLE.md` at the repo root holds the writing rules. Read it before
+editing any page under `docs/`.** Two checks enforce it on the lines a change
+adds: `scripts/check_docs_style.py` blocks the commit on em-dashes and a list of
+banned phrases, and a Claude review judges the rest, printing at commit time and
+failing the **Docs style** check on a pull request
+(`.github/workflows/docs-style.yml`).
+
 The docs under `docs/` use **sentence case** for all headings (`##`/`###`),
 `Card`/`Step` titles, and frontmatter `title` fields — capitalize only the first
 word, e.g. `## Next steps`, `## Get started`, `### Launch run`. Do **not** use
