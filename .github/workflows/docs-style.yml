@@ -70,12 +70,28 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ github.event.pull_request.number }}
           RULES_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/DOCS_STYLE.md
+          BASE_REF: ${{ github.base_ref }}
         run: |
           python - <<'PY'
           import json, os, pathlib, subprocess, sys
 
           path = pathlib.Path("docs-style-findings.json")
           if not path.is_file():
+              # The action runs a workflow file only when it matches the one on the
+              # default branch, so a pull request that edits this file gets no review.
+              edits_this_workflow = subprocess.run(
+                  ["git", "diff", "--quiet",
+                   f"origin/{os.environ['BASE_REF']}...HEAD",
+                   "--", ".github/workflows/docs-style.yml"],
+              ).returncode != 0
+              if edits_this_workflow:
+                  print(
+                      "⚠ The Claude review was skipped: this pull request edits "
+                      ".github/workflows/docs-style.yml, and the action only runs a "
+                      "workflow that matches the default branch. The rules are judged "
+                      "again on the next pull request that leaves this file alone."
+                  )
+                  sys.exit(0)
               sys.exit("✗ The Claude review produced no verdict file. Re-run the job.")
 
           try:

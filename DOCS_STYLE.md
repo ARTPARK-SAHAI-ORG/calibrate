@@ -9,7 +9,9 @@ Two checks enforce them, on the lines a change adds:
   rule 8, and the banned list in rule 3.
 - A Claude review reads this file and judges every rule, including the ones a
   regular expression cannot. It prints what it finds at commit time without
-  blocking, and fails the check on a pull request.
+  blocking, and fails the check on a pull request. A pull request that edits
+  `.github/workflows/docs-style.yml` gets no review: the action runs a workflow
+  file only when it matches the one on `main`.
 
 Generated pages are exempt, since their wording comes from the backend spec, the
 cloud CLI, or the MCP server: `docs/api-reference/`, `docs/sdk/`, `docs/mcp/`,
