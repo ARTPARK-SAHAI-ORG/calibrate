@@ -697,7 +697,7 @@ Your config must include `agent_url`, and optionally `agent_headers` and `agent_
 }
 ```
 
-`agent_type` sets what the request body carries: `conversation`, the default, sends the test case's messages as `{"messages": [...]}`; `general` sends the single user message as `{"input": "..."}`, for an agent that takes one instruction per call. A `general` agent accepts a test case of exactly one user message, so it pairs with [general tests](#general-test). See [Chat agent](/cli/agent-connections/chat#request-format).
+`agent_type` sets what the request body carries: `conversation`, the default, sends the test case's messages as `{"messages": [...]}`; `general` sends the single user message as `{"input": "..."}`, for an agent that takes a single input and returns a response. A `general` agent accepts a test case of exactly one user message, so it pairs with [general tests](#general-test). See [Chat agent](/cli/agent-connections/chat#request-format).
 
 Single run (use the default model of the agent):
 
