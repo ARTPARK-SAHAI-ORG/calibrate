@@ -1,0 +1,115 @@
+name: Docs style
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "DOCS_STYLE.md"
+      - "scripts/check_docs_style.py"
+      - ".github/workflows/docs-style.yml"
+
+jobs:
+  docs-style:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Mechanical rules
+        run: |
+          git fetch --quiet origin ${{ github.base_ref }}
+          python scripts/check_docs_style.py --base origin/${{ github.base_ref }}
+
+      - name: Claude review
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          display_report: false
+          claude_args: '--allowedTools "Read,Write,Bash(git diff:*),Bash(git fetch:*)"'
+          prompt: |
+            Review this pull request's docs changes against DOCS_STYLE.md in this repository.
+
+            1. Read DOCS_STYLE.md. It holds every rule and the list of generated pages that are exempt.
+            2. Run: git diff --unified=0 origin/${{ github.base_ref }}...HEAD -- 'docs/**/*.mdx'
+            3. Judge only the lines that diff adds, and only in pages that are not exempt.
+               Ignore lines inside fenced code blocks and inside the frontmatter block.
+            4. Write your verdict to docs-style-findings.json in the repository root, in exactly this shape:
+
+               {"violations": [
+                 {"file": "docs/cli/text-to-text.mdx",
+                  "line": 208,
+                  "rule": "1. Show the shape, never describe it",
+                  "quote": "the exact text that breaks the rule",
+                  "why": "one sentence a non-engineer understands",
+                  "suggestion": "the line rewritten so it passes"}
+               ]}
+
+               Use an empty list when the change breaks no rule.
+
+            Report a rule only when the added line genuinely breaks it. A word on the
+            judgement list in rule 3 is a violation only when it is filler or compares the
+            page to an older version of itself, not when it describes what the reader sees
+            after a step they just took.
+
+            Write no other file, and change no docs page.
+
+      - name: Fail on findings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          RULES_URL: ${{ github.server_url }}/${{ github.repository }}/blob/main/DOCS_STYLE.md
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, subprocess, sys
+
+          path = pathlib.Path("docs-style-findings.json")
+          if not path.is_file():
+              sys.exit("✗ The Claude review produced no verdict file. Re-run the job.")
+
+          try:
+              violations = json.loads(path.read_text())["violations"]
+          except Exception as exc:
+              sys.exit(f"✗ The verdict file could not be read: {exc}")
+
+          if not violations:
+              print("✓ No docs style violations.")
+              sys.exit(0)
+
+          rules_url = os.environ["RULES_URL"]
+          lines = ["### Docs style check failed", "",
+                   f"Each rule is in [DOCS_STYLE.md]({rules_url}).", ""]
+          for v in violations:
+              lines += [
+                  f"**`{v.get('file')}:{v.get('line')}`** — {v.get('rule')}",
+                  "",
+                  f"> {v.get('quote')}",
+                  "",
+                  f"{v.get('why')}",
+                  "",
+                  f"Suggested: {v.get('suggestion')}",
+                  "",
+              ]
+          body = "\n".join(lines)
+
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              pathlib.Path(summary).write_text(body)
+
+          subprocess.run(
+              ["gh", "pr", "comment", os.environ["PR"], "--body", body], check=False
+          )
+          print(body)
+          sys.exit(1)
+          PY
