@@ -409,6 +409,43 @@ class TestResolveSerializer(unittest.TestCase):
             resolve_serializer("nope")
 
 
+class TestEvalAgentSerializer(unittest.IsolatedAsyncioTestCase):
+    """Frames the agent under test sends, as the eval agent decodes them."""
+
+    async def _round_trip(self, frame):
+        from calibrate_agent.agent.run_simulation import resolve_serializer
+        from pipecat.serializers.protobuf import ProtobufFrameSerializer
+
+        data = await ProtobufFrameSerializer().serialize(frame)
+        self.assertIsNotNone(data)
+        return await resolve_serializer("protobuf").deserialize(data)
+
+    async def test_drops_interruption(self):
+        from pipecat.frames.frames import InterruptionFrame
+
+        self.assertIsNone(await self._round_trip(InterruptionFrame()))
+
+    async def test_keeps_audio(self):
+        from pipecat.frames.frames import InputAudioRawFrame, OutputAudioRawFrame
+
+        frame = await self._round_trip(
+            OutputAudioRawFrame(audio=b"\x01\x02" * 160, sample_rate=16000, num_channels=1)
+        )
+        self.assertIsInstance(frame, InputAudioRawFrame)
+        self.assertEqual(frame.audio, b"\x01\x02" * 160)
+
+    async def test_keeps_rtvi_messages(self):
+        from pipecat.frames.frames import (
+            InputTransportMessageFrame,
+            OutputTransportMessageUrgentFrame,
+        )
+
+        message = {"label": "rtvi-ai", "type": "bot-interrupted"}
+        frame = await self._round_trip(OutputTransportMessageUrgentFrame(message=message))
+        self.assertIsInstance(frame, InputTransportMessageFrame)
+        self.assertEqual(frame.message, message)
+
+
 class TestIsExternalWsAgent(unittest.TestCase):
     def test_ws_scheme_is_external(self):
         from calibrate_agent.agent.run_simulation import is_external_ws_agent

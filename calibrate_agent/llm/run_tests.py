@@ -25,7 +25,6 @@ from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
     EndFrame,
-    EndWorkerFrame,
     LLMFullResponseEndFrame,
     CancelFrame,
     FunctionCallResultProperties,

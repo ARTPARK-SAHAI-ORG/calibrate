@@ -202,8 +202,20 @@ MAX_TURNS_FORCE_CANCEL_SECS = 2.0
 # fragments into a persona turn (covers Latin plus the Devanagari danda).
 _PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
 
+class EvalAgentProtobufSerializer(ProtobufFrameSerializer):
+    """Drops InterruptionFrames from the agent under test.
+
+    Applied here they would cut off the eval agent's own speech; the eval agent
+    detects being interrupted itself (``bot-started-speaking``).
+    """
+
+    async def deserialize(self, data):
+        frame = await super().deserialize(data)
+        return None if isinstance(frame, InterruptionFrame) else frame
+
+
 DEFAULT_SERIALIZER_NAME = "protobuf"
-SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
+SERIALIZER_REGISTRY = {"protobuf": EvalAgentProtobufSerializer}
 
 
 def build_simulated_user_llm() -> OpenRouterLLMService:
@@ -649,14 +661,11 @@ class RTVIMessageFrameAdapter(FrameProcessor):
     def _parse_bot_output(self, data: dict) -> tuple[str, bool]:
         """Return ``(text, spoken)`` for a ``bot-output`` payload in either RTVI format.
 
-        RTVI 1.x agents send one ``spoken=True`` message per spoken word. RTVI 2.x
-        agents (pipecat >= 1.4 talking to a client that declares no RTVI version)
-        suppress those and instead send progress messages (``spoken_status``
-        ``in-progress``/``completed``, no ``spoken``) whose ``text`` is the whole
-        sentence and whose ``spoken_progress.accumulated_text`` grows word by word;
-        the newly spoken words are the growth since the previous progress message
-        of the same segment. A 2.x ``completed`` message with ``spoken=True`` comes
-        from a TTS without word timestamps and already carries only its own text.
+        RTVI 2.x agents (pipecat >= 1.4, client with no declared RTVI version) send
+        progress messages whose ``accumulated_text`` grows word by word; the newly
+        spoken words are the growth since the last message of the same segment. A 2.x
+        ``completed`` message with ``spoken=True`` comes from a TTS without word
+        timestamps and already carries only its own text.
         """
         text = data.get("text") or ""
         status = data.get("spoken_status")

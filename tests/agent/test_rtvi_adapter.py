@@ -509,6 +509,8 @@ V2_MESSAGES = [
     _v2_progress(SENTENCE, "Hello there"),
     _v2_progress(SENTENCE, "Hello there friend."),
 ]
+# RTVI 2.x message from a TTS without word timestamps: one completed, spoken message.
+V2_COMPLETED_NO_TIMESTAMPS = {**_v2_progress(SENTENCE, SENTENCE, segment_id=7), "spoken": True}
 
 
 class TestParseBotOutput(unittest.TestCase):
@@ -543,16 +545,9 @@ class TestParseBotOutput(unittest.TestCase):
 
     def test_v2_without_word_timestamps_completed_spoken(self):
         adapter = _make_adapter()
-        data = {
-            "text": SENTENCE,
-            "spoken": True,
-            "will_be_spoken": True,
-            "aggregated_by": "sentence",
-            "segment_id": 7,
-            "spoken_status": "completed",
-            "spoken_progress": {"accumulated_text": SENTENCE, "remaining_text": ""},
-        }
-        self.assertEqual(adapter._parse_bot_output(data), (SENTENCE, True))
+        self.assertEqual(
+            adapter._parse_bot_output(V2_COMPLETED_NO_TIMESTAMPS), (SENTENCE, True)
+        )
 
 
 class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
@@ -601,16 +596,9 @@ class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(adapter._is_bot_interrupt_triggered)
 
     async def test_v2_without_word_timestamps_counted_once(self):
-        completed = {
-            "text": SENTENCE,
-            "spoken": True,
-            "will_be_spoken": True,
-            "aggregated_by": "sentence",
-            "segment_id": 2,
-            "spoken_status": "completed",
-            "spoken_progress": {"accumulated_text": SENTENCE, "remaining_text": ""},
-        }
-        adapter, _ = await self._run([_v2_sentence(SENTENCE), completed])
+        adapter, _ = await self._run(
+            [_v2_sentence(SENTENCE), V2_COMPLETED_NO_TIMESTAMPS]
+        )
         self.assertEqual(adapter._text_buffer, " " + SENTENCE)
         self.assertEqual(adapter._heard_text_buffer, " " + SENTENCE)
 
