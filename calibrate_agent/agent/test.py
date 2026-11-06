@@ -24,8 +24,8 @@ from pipecat.audio.vad.silero import SileroVADAnalyzer
 from pipecat.audio.vad.vad_analyzer import VADParams
 from pipecat.frames.frames import LLMRunFrame, FunctionCallResultProperties
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -309,7 +309,7 @@ async def run_bot(
     async def on_latency_measured(observer, latency_seconds):
         logger.info(f"User-bot latency: {latency_seconds:.3f}s")
 
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -375,9 +375,10 @@ async def run_bot(
 
         logger.info(f"Saved recording to {filename}")
 
-    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
 
-    await runner.run(task)
+    await runner.add_workers(task)
+    await runner.run()
 
     print("Conversation complete. Saving conversation transcript...")
 
