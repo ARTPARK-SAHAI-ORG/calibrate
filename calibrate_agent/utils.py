@@ -1527,14 +1527,8 @@ GEMINI_TTS_LANGUAGE_CODES = GOOGLE_TTS_LANGUAGE_CODES
 # Deepgram Flux: flux-general-en for English, flux-general-multi (with a Hindi
 # language hint) for Hindi; flux-general-multi covers no other Indian language.
 DEEPGRAM_FLUX_STT_LANGUAGE_CODES = {"english": "en", "hindi": "hi"}
-# gpt-live-transcribe: OpenAI's supported-language list. Its docs do not confirm
-# auto-detection, so unlisted languages are rejected.
-OPENAI_LIVE_STT_LANGUAGE_CODES = OPENAI_STT_LANGUAGE_CODES
 # saaras:v4 adds Sindhi to saaras:v3's languages.
 SARVAM_V4_STT_LANGUAGE_CODES = {**SARVAM_STT_LANGUAGE_CODES, "sindhi": "sd-IN"}
-# Sarvam's realtime endpoint serves saaras:v3-realtime and saaras:v4 with the
-# same connection parameters, protocol and languages.
-SARVAM_V3_REALTIME_STT_LANGUAGE_CODES = SARVAM_V4_STT_LANGUAGE_CODES
 SARVAM_REALTIME_STT_PROVIDERS = (
     "sarvam-saaras-v4-realtime",
     "sarvam-saaras-v3-realtime",
@@ -1586,36 +1580,9 @@ def get_stt_language_code(language: str, provider: str) -> Optional[str]:
     """
     language = language.lower()
 
-    if provider in SARVAM_FLUSH_STT_PROVIDERS:
-        return SARVAM_STT_LANGUAGE_CODES.get(language, "en-IN")
-    elif provider == "google-chirp-3":
-        return GOOGLE_STT_LANGUAGE_CODES.get(language, "en-US")
-    elif provider == "gemini-3.5-flash":
-        return GEMINI_STT_LANGUAGE_CODES.get(language, "en-US")
-    elif provider == "smallest-pulse":
-        return SMALLEST_STT_LANGUAGE_CODES.get(language, "multi")
-    elif provider == "cartesia-ink-whisper":
-        return CARTESIA_STT_LANGUAGE_CODES.get(language, "en")
-    elif provider == "elevenlabs-scribe-v2-realtime":
-        return ELEVENLABS_STT_LANGUAGE_CODES.get(language, "eng")
-    elif provider == "openai-gpt-4o-transcribe":
-        return OPENAI_STT_LANGUAGE_CODES.get(language, "en")
-    elif provider == "groq-whisper-large-v3-turbo":
-        return GROQ_STT_LANGUAGE_CODES.get(language, "en")
-    elif provider == "deepgram-nova-3":
-        return DEEPGRAM_STT_LANGUAGE_CODES.get(language, "en")
-    elif provider == "deepgram-flux":
-        return DEEPGRAM_FLUX_STT_LANGUAGE_CODES.get(language, "en")
-    elif provider == "openai-gpt-live-transcribe":
-        return OPENAI_LIVE_STT_LANGUAGE_CODES.get(language, "en")
-    elif provider == "openai-gpt-transcribe":
-        return OPENAI_TRANSCRIBE_STT_LANGUAGE_CODES.get(language)
-    elif provider == "sarvam-saaras-v4-realtime":
-        return SARVAM_V4_STT_LANGUAGE_CODES.get(language, "en-IN")
-    elif provider == "sarvam-saaras-v3-realtime":
-        return SARVAM_V3_REALTIME_STT_LANGUAGE_CODES.get(language, "en-IN")
-    elif provider == "cartesia-ink-preview":
-        return CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES.get(language, "en")
+    if provider in STT_LANGUAGE_TABLES:
+        codes, fallback = STT_LANGUAGE_TABLES[provider]
+        return codes.get(language, fallback)
 
     # Default: use ISO 639-1 codes
     return DEFAULT_LANGUAGE_CODES.get(language, "en")
@@ -1690,30 +1657,10 @@ def validate_stt_language(language: str, provider: str) -> None:
     """
     language = language.lower()
 
-    # Map providers to their STT language code dictionaries
-    provider_languages = {
-        "sarvam-saaras-v3": SARVAM_STT_LANGUAGE_CODES,
-        "google-chirp-3": GOOGLE_STT_LANGUAGE_CODES,
-        "gemini-3.5-flash": GEMINI_STT_LANGUAGE_CODES,
-        "smallest-pulse": SMALLEST_STT_LANGUAGE_CODES,
-        "cartesia-ink-whisper": CARTESIA_STT_LANGUAGE_CODES,
-        "elevenlabs-scribe-v2-realtime": ELEVENLABS_STT_LANGUAGE_CODES,
-        "openai-gpt-4o-transcribe": OPENAI_STT_LANGUAGE_CODES,
-        "groq-whisper-large-v3-turbo": GROQ_STT_LANGUAGE_CODES,
-        "deepgram-nova-3": DEEPGRAM_STT_LANGUAGE_CODES,
-        "deepgram-flux": DEEPGRAM_FLUX_STT_LANGUAGE_CODES,
-        "openai-gpt-live-transcribe": OPENAI_LIVE_STT_LANGUAGE_CODES,
-        "openai-gpt-transcribe": OPENAI_TRANSCRIBE_STT_LANGUAGE_CODES,
-        "sarvam-saaras-v4-realtime": SARVAM_V4_STT_LANGUAGE_CODES,
-        "sarvam-saaras-v4": SARVAM_STT_LANGUAGE_CODES,
-        "sarvam-saaras-v3-realtime": SARVAM_V3_REALTIME_STT_LANGUAGE_CODES,
-        "cartesia-ink-preview": CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES,
-    }
-
-    if provider not in provider_languages:
+    if provider not in STT_LANGUAGE_TABLES:
         raise ValueError(f"Unknown STT provider: {provider}")
 
-    supported_languages = provider_languages[provider]
+    supported_languages, _fallback = STT_LANGUAGE_TABLES[provider]
 
     if language not in supported_languages:
         supported_list = sorted(supported_languages.keys())
@@ -1797,6 +1744,32 @@ OPENAI_TRANSCRIBE_STT_LANGUAGE_CODES = {
     **OPENAI_STT_LANGUAGE_CODES,
 }
 
+# Each STT provider's languages: the code it is sent for each supported
+# language, and the code get_stt_language_code returns for any other language.
+# validate_stt_language accepts only the languages listed.
+STT_LANGUAGE_TABLES = {
+    "deepgram-nova-3": (DEEPGRAM_STT_LANGUAGE_CODES, "en"),
+    "openai-gpt-4o-transcribe": (OPENAI_STT_LANGUAGE_CODES, "en"),
+    "groq-whisper-large-v3-turbo": (GROQ_STT_LANGUAGE_CODES, "en"),
+    "google-chirp-3": (GOOGLE_STT_LANGUAGE_CODES, "en-US"),
+    "gemini-3.5-flash": (GEMINI_STT_LANGUAGE_CODES, "en-US"),
+    "cartesia-ink-whisper": (CARTESIA_STT_LANGUAGE_CODES, "en"),
+    "elevenlabs-scribe-v2-realtime": (ELEVENLABS_STT_LANGUAGE_CODES, "eng"),
+    "smallest-pulse": (SMALLEST_STT_LANGUAGE_CODES, "multi"),
+    "sarvam-saaras-v3": (SARVAM_STT_LANGUAGE_CODES, "en-IN"),
+    "sarvam-saaras-v4": (SARVAM_STT_LANGUAGE_CODES, "en-IN"),
+    "deepgram-flux": (DEEPGRAM_FLUX_STT_LANGUAGE_CODES, "en"),
+    # gpt-live-transcribe takes OpenAI's supported-language list. Its docs do
+    # not confirm auto-detection, so unlisted languages are rejected.
+    "openai-gpt-live-transcribe": (OPENAI_STT_LANGUAGE_CODES, "en"),
+    "openai-gpt-transcribe": (OPENAI_TRANSCRIBE_STT_LANGUAGE_CODES, None),
+    # Sarvam's realtime endpoint serves saaras:v4 and saaras:v3-realtime with
+    # the same languages.
+    "sarvam-saaras-v4-realtime": (SARVAM_V4_STT_LANGUAGE_CODES, "en-IN"),
+    "sarvam-saaras-v3-realtime": (SARVAM_V4_STT_LANGUAGE_CODES, "en-IN"),
+    "cartesia-ink-preview": (CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES, "en"),
+}
+
 _SARVAM_STT_LANGUAGE_ENUMS = {
     "english": Language.EN_IN,
     "hindi": Language.HI_IN,
@@ -1832,7 +1805,7 @@ def get_stt_language(
     language = language.lower()
     table = (
         _SARVAM_STT_LANGUAGE_ENUMS
-        if provider in SARVAM_FLUSH_STT_PROVIDERS or provider in SARVAM_REALTIME_STT_PROVIDERS
+        if provider.startswith("sarvam-")
         else _STT_LANGUAGE_ENUMS
     )
     return table.get(language, table["english"])

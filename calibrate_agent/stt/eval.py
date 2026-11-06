@@ -34,8 +34,8 @@ from calibrate_agent.utils import (
     resolve_stt_provider,
     STT_VENDOR_DEFAULTS,
     stt_provider_model,
+    DEEPGRAM_FLUX_MULTILINGUAL_MODEL,
     SARVAM_REALTIME_STT_PROVIDERS,
-    SARVAM_FLUSH_STT_PROVIDERS,
     create_stt_service,
     get_gemini_api_key,
     provider_log as _log,
@@ -76,12 +76,6 @@ from calibrate_agent.rate_limit import (
 # =============================================================================
 # STT Provider API Methods
 # =============================================================================
-
-
-def _default_stt_model(provider: str, language: str | None = None) -> str | None:
-    # The model each transcribe_* uses, so cost prices the model actually
-    # benchmarked.
-    return stt_provider_model(provider, language)
 
 
 def _stt_result_row(
@@ -193,6 +187,43 @@ async def _aiter_with_idle_timeout(aiter, timeout: float):
         yield msg
 
 
+async def _json_messages(ws):
+    """Yield each JSON-object message from an STT WebSocket, skipping others.
+
+    Stops with ``asyncio.TimeoutError`` after
+    ``STT_STREAMING_IDLE_TIMEOUT_SECONDS`` without a message.
+    """
+    async for message in _aiter_with_idle_timeout(
+        ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
+    ):
+        try:
+            output = json.loads(message)
+        except (json.JSONDecodeError, TypeError):
+            continue
+        if isinstance(output, dict):
+            yield output
+
+
+async def _stop_sender(sender: asyncio.Task) -> None:
+    """Wait for a finished audio-sending task, or cancel one still running.
+
+    Awaiting a finished task re-raises the error it failed with.
+    """
+    if sender.done():
+        await sender
+        return
+    sender.cancel()
+    try:
+        await sender
+    except asyncio.CancelledError:
+        pass
+
+
+def _join_transcript(parts: List[str]) -> str:
+    """Join transcript pieces with spaces, dropping empty ones."""
+    return " ".join(part.strip() for part in parts if part.strip())
+
+
 async def transcribe_deepgram_streaming(audio_path: Path, language: str) -> str:
     """Transcribe audio using Deepgram's live streaming WebSocket API.
 
@@ -245,17 +276,7 @@ async def transcribe_deepgram_streaming(audio_path: Path, language: str) -> str:
         transcript_parts = []
 
         try:
-            async for message in _aiter_with_idle_timeout(
-                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
-            ):
-                try:
-                    output = json.loads(message)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
-                if not isinstance(output, dict):
-                    continue
-
+            async for output in _json_messages(ws):
                 msg_type = output.get("type")
 
                 if msg_type == "Results":
@@ -271,20 +292,9 @@ async def transcribe_deepgram_streaming(audio_path: Path, language: str) -> str:
                     # final transcripts — safe to stop reading.
                     break
         finally:
-            if sender.done():
-                await sender
-            else:
-                sender.cancel()
-                try:
-                    await sender
-                except asyncio.CancelledError:
-                    pass
+            await _stop_sender(sender)
 
-    return {
-        "transcript": " ".join(
-            part.strip() for part in transcript_parts if part.strip()
-        ),
-    }
+    return {"transcript": _join_transcript(transcript_parts)}
 
 
 async def transcribe_openai_streaming(audio_path: Path, language: str) -> str:
@@ -702,17 +712,7 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
         transcript_parts = []
 
         try:
-            async for message in _aiter_with_idle_timeout(
-                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
-            ):
-                try:
-                    output = json.loads(message)
-                except json.JSONDecodeError:
-                    continue
-
-                if not isinstance(output, dict):
-                    continue
-
+            async for output in _json_messages(ws):
                 if output.get("type") == "error" or output.get("error"):
                     error = output.get("message") or output.get("error") or output
                     raise RuntimeError(f"Smallest streaming STT error: {error}")
@@ -724,20 +724,9 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
                 if output.get("is_last"):
                     break
         finally:
-            if sender.done():
-                await sender
-            else:
-                sender.cancel()
-                try:
-                    await sender
-                except asyncio.CancelledError:
-                    pass
+            await _stop_sender(sender)
 
-    return {
-        "transcript": " ".join(
-            part.strip() for part in transcript_parts if part.strip()
-        ),
-    }
+    return {"transcript": _join_transcript(transcript_parts)}
 
 
 # How long to wait for another ElevenLabs ``committed_transcript`` segment
@@ -873,11 +862,7 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
     if fatal_error["data"] is not None and not transcript_parts:
         raise RuntimeError(f"ElevenLabs streaming STT error: {fatal_error['data']}")
 
-    return {
-        "transcript": " ".join(
-            part.strip() for part in transcript_parts if part.strip()
-        ),
-    }
+    return {"transcript": _join_transcript(transcript_parts)}
 
 
 # =============================================================================
@@ -900,7 +885,7 @@ async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) ->
     model = stt_provider_model("deepgram-flux", language)
     params = [("model", model), ("encoding", "linear16"), ("sample_rate", "16000")]
     # Flux honors a language hint only on the multilingual model.
-    if model == "flux-general-multi":
+    if model == DEEPGRAM_FLUX_MULTILINGUAL_MODEL:
         params.append(
             ("language_hint", get_stt_language_code(language, "deepgram-flux"))
         )
@@ -921,16 +906,7 @@ async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) ->
         transcript_parts = []
 
         try:
-            async for message in _aiter_with_idle_timeout(
-                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
-            ):
-                try:
-                    output = json.loads(message)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-                if not isinstance(output, dict):
-                    continue
-
+            async for output in _json_messages(ws):
                 if output.get("type") == "Error":
                     raise RuntimeError(
                         f"Deepgram Flux STT error [{output.get('code', 'unknown')}]: "
@@ -942,20 +918,9 @@ async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) ->
                 ):
                     transcript_parts.append(output.get("transcript", ""))
         finally:
-            if sender.done():
-                await sender
-            else:
-                sender.cancel()
-                try:
-                    await sender
-                except asyncio.CancelledError:
-                    pass
+            await _stop_sender(sender)
 
-    return {
-        "transcript": " ".join(
-            part.strip() for part in transcript_parts if part.strip()
-        ),
-    }
+    return {"transcript": _join_transcript(transcript_parts)}
 
 
 async def transcribe_openai_realtime(
@@ -1026,17 +991,7 @@ async def transcribe_openai_realtime(
         transcript = ""
 
         try:
-            async for message in _aiter_with_idle_timeout(
-                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
-            ):
-                try:
-                    evt = json.loads(message)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
-                if not isinstance(evt, dict):
-                    continue
-
+            async for evt in _json_messages(ws):
                 evt_type = evt.get("type")
                 if evt_type in (
                     "error",
@@ -1051,14 +1006,7 @@ async def transcribe_openai_realtime(
                     transcript = evt.get("transcript") or ""
                     break
         finally:
-            if sender.done():
-                await sender
-            else:
-                sender.cancel()
-                try:
-                    await sender
-                except asyncio.CancelledError:
-                    pass
+            await _stop_sender(sender)
 
     return {"transcript": transcript.strip()}
 
@@ -1114,17 +1062,7 @@ async def transcribe_sarvam_realtime_streaming(
         transcript_parts = []
 
         try:
-            async for message in _aiter_with_idle_timeout(
-                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
-            ):
-                try:
-                    output = json.loads(message)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-
-                if not isinstance(output, dict):
-                    continue
-
+            async for output in _json_messages(ws):
                 event = output.get("event")
                 if event == "error":
                     raise RuntimeError(f"Sarvam realtime STT error: {output}")
@@ -1133,20 +1071,9 @@ async def transcribe_sarvam_realtime_streaming(
                 elif event == "session.end":
                     break
         finally:
-            if sender.done():
-                await sender
-            else:
-                sender.cancel()
-                try:
-                    await sender
-                except asyncio.CancelledError:
-                    pass
+            await _stop_sender(sender)
 
-    return {
-        "transcript": " ".join(
-            part.strip() for part in transcript_parts if part.strip()
-        ),
-    }
+    return {"transcript": _join_transcript(transcript_parts)}
 
 
 async def transcribe_cartesia_ink_preview_streaming(
@@ -1185,16 +1112,7 @@ async def transcribe_cartesia_ink_preview_streaming(
         transcript_parts = []
 
         try:
-            async for message in _aiter_with_idle_timeout(
-                ws, STT_STREAMING_IDLE_TIMEOUT_SECONDS
-            ):
-                try:
-                    output = json.loads(message)
-                except (json.JSONDecodeError, TypeError):
-                    continue
-                if not isinstance(output, dict):
-                    continue
-
+            async for output in _json_messages(ws):
                 if output.get("type") == "error":
                     raise RuntimeError(
                         f"Cartesia STT error [{output.get('error_code', 'unknown')}]: "
@@ -1203,20 +1121,9 @@ async def transcribe_cartesia_ink_preview_streaming(
                 if output.get("type") == "turn.end":
                     transcript_parts.append(output.get("transcript", ""))
         finally:
-            if sender.done():
-                await sender
-            else:
-                sender.cancel()
-                try:
-                    await sender
-                except asyncio.CancelledError:
-                    pass
+            await _stop_sender(sender)
 
-    return {
-        "transcript": " ".join(
-            part.strip() for part in transcript_parts if part.strip()
-        ),
-    }
+    return {"transcript": _join_transcript(transcript_parts)}
 
 
 # =============================================================================
@@ -1318,7 +1225,7 @@ async def transcribe_audio_pipeline(
     """
     # Sarvam's streaming endpoints are rate-limited per account; honour the same
     # limiter the direct engine uses so concurrent clips don't blow the cap.
-    if provider in SARVAM_FLUSH_STT_PROVIDERS or provider in SARVAM_REALTIME_STT_PROVIDERS:
+    if provider.startswith("sarvam-"):
         await SARVAM_STT_STREAMING_LIMITER.acquire()
 
     pcm = load_audio(audio_path, raw_pcm=True)
@@ -1583,24 +1490,7 @@ def validate_existing_results_csv(results_csv_path: str) -> tuple[bool, str]:
     return True, ""
 
 
-STT_PROVIDERS = [
-    "deepgram-nova-3",
-    "openai-gpt-4o-transcribe",
-    "cartesia-ink-whisper",
-    "smallest-pulse",
-    "groq-whisper-large-v3-turbo",
-    "google-chirp-3",
-    "gemini-3.5-flash",
-    "sarvam-saaras-v3",
-    "elevenlabs-scribe-v2-realtime",
-    "deepgram-flux",
-    "openai-gpt-live-transcribe",
-    "openai-gpt-transcribe",
-    "sarvam-saaras-v4-realtime",
-    "sarvam-saaras-v3-realtime",
-    "sarvam-saaras-v4",
-    "cartesia-ink-preview",
-]
+STT_PROVIDERS = list(STT_PROVIDER_MODELS)
 
 STT_LANGUAGES = [
     "english",
@@ -1770,7 +1660,7 @@ async def run_single_provider_eval(
         cost_metrics = _build_stt_cost_metrics(
             provider=provider,
             audio_duration_seconds=audio_durations,
-            model=_default_stt_model(provider, language),
+            model=stt_provider_model(provider, language),
         )
         if cost_metrics:
             cost_metrics["provider"] = stored_name

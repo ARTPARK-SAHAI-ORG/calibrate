@@ -919,7 +919,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         metrics = E._build_stt_cost_metrics(
             provider="google-chirp-3",
             audio_duration_seconds=[60.0],
-            model=E._default_stt_model("google-chirp-3", "sindhi"),
+            model=E.stt_provider_model("google-chirp-3", "sindhi"),
         )
 
         self.assertEqual(metrics["pricing_model"], "chirp_2")
@@ -931,7 +931,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         metrics = E._build_stt_cost_metrics(
             provider="gemini-3.5-flash",
             audio_duration_seconds=[60.0],
-            model=E._default_stt_model("gemini-3.5-flash", "english"),
+            model=E.stt_provider_model("gemini-3.5-flash", "english"),
         )
 
         self.assertIsNone(metrics)
@@ -950,7 +950,7 @@ class TestSTTCostMetrics(unittest.TestCase):
                 metrics = E._build_stt_cost_metrics(
                     provider=provider,
                     audio_duration_seconds=[60.0],
-                    model=E._default_stt_model(provider, "english"),
+                    model=E.stt_provider_model(provider, "english"),
                 )
                 self.assertIn("cost_usd", metrics)
 
@@ -961,7 +961,7 @@ class TestSTTCostMetrics(unittest.TestCase):
         metrics = E._build_stt_cost_metrics(
             provider="sarvam-saaras-v3",
             audio_duration_seconds=[120.0],  # 2 minutes
-            model=E._default_stt_model("sarvam-saaras-v3", "hindi"),
+            model=E.stt_provider_model("sarvam-saaras-v3", "hindi"),
         )
 
         self.assertEqual(metrics["currency"], "INR")
@@ -1678,3 +1678,36 @@ class TestTranscribeSarvamRealtimeStreaming(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestStreamingHelpers(unittest.IsolatedAsyncioTestCase):
+    async def test_json_messages_skips_non_objects(self):
+        from calibrate_agent.stt import eval as E
+
+        class _WS:
+            def __aiter__(self):
+                async def gen():
+                    for m in ["not json", "[1, 2]", None, '{"type": "ok"}']:
+                        yield m
+                return gen()
+
+        got = [m async for m in E._json_messages(_WS())]
+        self.assertEqual(got, [{"type": "ok"}])
+
+    async def test_stop_sender_reraises_a_failed_send(self):
+        from calibrate_agent.stt import eval as E
+
+        async def fail():
+            raise ConnectionError("socket closed")
+
+        sender = asyncio.create_task(fail())
+        await asyncio.sleep(0)
+        with self.assertRaises(ConnectionError):
+            await E._stop_sender(sender)
+
+    async def test_stop_sender_cancels_a_running_send(self):
+        from calibrate_agent.stt import eval as E
+
+        sender = asyncio.create_task(asyncio.sleep(60))
+        await E._stop_sender(sender)
+        self.assertTrue(sender.cancelled())
