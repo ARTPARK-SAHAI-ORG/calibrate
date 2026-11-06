@@ -307,9 +307,9 @@ def _count_frames(pushed, frame_cls):
 
 
 def _count_interruptions(pushed):
-    from pipecat.frames.frames import InterruptionTaskFrame
+    from pipecat.frames.frames import InterruptionWorkerFrame
 
-    return _count_frames(pushed, InterruptionTaskFrame)
+    return _count_frames(pushed, InterruptionWorkerFrame)
 
 
 class TestNaturalInterrupt(unittest.IsolatedAsyncioTestCase):
@@ -460,6 +460,147 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
         pushed = await _drive_frame(adapter, frame)
         # Dropped, not forwarded to the aggregator's VAD (would cancel the sim user).
         self.assertEqual(_count_frames(pushed, InputAudioRawFrame), 0)
+
+
+def _bot_output_data_frame(data):
+    from pipecat.frames.frames import InputTransportMessageFrame
+
+    return InputTransportMessageFrame(
+        message={"label": "rtvi-ai", "type": "bot-output", "data": data}
+    )
+
+
+def _v2_sentence(text, segment_id=1):
+    """RTVI 2.x sentence message sent before synthesis (word-timestamp TTS)."""
+    return {
+        "text": text,
+        "spoken": False,
+        "will_be_spoken": True,
+        "aggregated_by": "sentence",
+        "segment_id": segment_id,
+        "spoken_status": "new",
+        "spoken_progress": {"accumulated_text": "", "remaining_text": text},
+    }
+
+
+def _v2_progress(text, accumulated, segment_id=1):
+    """RTVI 2.x word progress message: ``text`` is the whole sentence."""
+    remaining = text[len(accumulated) :]
+    return {
+        "text": text,
+        "will_be_spoken": True,
+        "aggregated_by": "sentence",
+        "segment_id": segment_id,
+        "spoken_status": "completed" if remaining == "" else "in-progress",
+        "spoken_progress": {"accumulated_text": accumulated, "remaining_text": remaining},
+    }
+
+
+SENTENCE = "Hello there friend."
+LEGACY_MESSAGES = [
+    {"text": SENTENCE, "spoken": False, "aggregated_by": "sentence"},
+    {"text": "Hello", "spoken": True, "aggregated_by": "word"},
+    {"text": "there", "spoken": True, "aggregated_by": "word"},
+    {"text": "friend.", "spoken": True, "aggregated_by": "word"},
+]
+V2_MESSAGES = [
+    _v2_sentence(SENTENCE),
+    _v2_progress(SENTENCE, "Hello"),
+    _v2_progress(SENTENCE, "Hello there"),
+    _v2_progress(SENTENCE, "Hello there friend."),
+]
+# RTVI 2.x message from a TTS without word timestamps: one completed, spoken message.
+V2_COMPLETED_NO_TIMESTAMPS = {**_v2_progress(SENTENCE, SENTENCE, segment_id=7), "spoken": True}
+
+
+class TestParseBotOutput(unittest.TestCase):
+    def test_legacy_word_message(self):
+        adapter = _make_adapter()
+        self.assertEqual(
+            adapter._parse_bot_output({"text": "Hello", "spoken": True}), ("Hello", True)
+        )
+        self.assertEqual(
+            adapter._parse_bot_output({"text": SENTENCE, "spoken": False}),
+            (SENTENCE, False),
+        )
+
+    def test_v2_sentence_is_not_yet_spoken(self):
+        adapter = _make_adapter()
+        self.assertEqual(
+            adapter._parse_bot_output(_v2_sentence(SENTENCE)), (SENTENCE, False)
+        )
+
+    def test_v2_progress_yields_newly_spoken_words(self):
+        adapter = _make_adapter()
+        parsed = [adapter._parse_bot_output(m) for m in V2_MESSAGES[1:]]
+        self.assertEqual(parsed, [("Hello", True), ("there", True), ("friend.", True)])
+
+    def test_v2_new_segment_starts_from_its_own_accumulated_text(self):
+        adapter = _make_adapter()
+        adapter._parse_bot_output(_v2_progress("Hi.", "Hi.", segment_id=1))
+        self.assertEqual(
+            adapter._parse_bot_output(_v2_progress("Hi again.", "Hi", segment_id=2)),
+            ("Hi", True),
+        )
+
+    def test_v2_without_word_timestamps_completed_spoken(self):
+        adapter = _make_adapter()
+        self.assertEqual(
+            adapter._parse_bot_output(V2_COMPLETED_NO_TIMESTAMPS), (SENTENCE, True)
+        )
+
+
+class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
+    """Legacy (RTVI 1.x) and RTVI 2.x agents drive the same buffers and decisions."""
+
+    async def _run(self, messages, **overrides):
+        tmp = tempfile.mkdtemp()
+        adapter = _make_adapter(output_dir=tmp, audio_save_dir=tmp, **overrides)
+        pushed = []
+        for m in messages:
+            await _drive_frame(adapter, _bot_output_data_frame(m), pushed)
+        return adapter, pushed
+
+    async def test_v2_matches_legacy_without_interrupt(self):
+        from pipecat.frames.frames import InterimTranscriptionFrame
+
+        legacy, legacy_pushed = await self._run(LEGACY_MESSAGES)
+        v2, v2_pushed = await self._run(V2_MESSAGES)
+        for adapter in (legacy, v2):
+            self.assertEqual(adapter._heard_text_buffer, " Hello there friend.")
+            self.assertEqual(adapter._text_buffer, " " + SENTENCE)
+        self.assertEqual(
+            [f.text for f, _ in v2_pushed if isinstance(f, InterimTranscriptionFrame)],
+            [f.text for f, _ in legacy_pushed if isinstance(f, InterimTranscriptionFrame)],
+        )
+
+    async def test_v2_spoken_words_trigger_interrupt_like_legacy(self):
+        for messages in (LEGACY_MESSAGES, V2_MESSAGES):
+            tmp = tempfile.mkdtemp()
+            adapter = _make_adapter(output_dir=tmp, audio_save_dir=tmp)
+            adapter._is_bot_interrupt_decided = True
+            adapter._text_buffer = " Hello there"
+            pushed = []
+            for m in messages[:3]:
+                await _drive_frame(adapter, _bot_output_data_frame(m), pushed)
+            self.assertTrue(adapter._is_bot_interrupt_triggered)
+
+    async def test_v2_interrupt_waits_for_the_target_word(self):
+        tmp = tempfile.mkdtemp()
+        adapter = _make_adapter(output_dir=tmp, audio_save_dir=tmp)
+        adapter._is_bot_interrupt_decided = True
+        adapter._text_buffer = " Hello there"
+        for m in V2_MESSAGES[:2]:
+            await _drive_frame(adapter, _bot_output_data_frame(m))
+        self.assertEqual(adapter._spoken_text_buffer, " Hello")
+        self.assertFalse(adapter._is_bot_interrupt_triggered)
+
+    async def test_v2_without_word_timestamps_counted_once(self):
+        adapter, _ = await self._run(
+            [_v2_sentence(SENTENCE), V2_COMPLETED_NO_TIMESTAMPS]
+        )
+        self.assertEqual(adapter._text_buffer, " " + SENTENCE)
+        self.assertEqual(adapter._heard_text_buffer, " " + SENTENCE)
 
 
 if __name__ == "__main__":

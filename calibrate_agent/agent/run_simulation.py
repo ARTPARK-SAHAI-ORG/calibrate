@@ -139,14 +139,14 @@ from pipecat.frames.frames import (
     OutputTransportMessageUrgentFrame,
     Frame,
     InterruptionFrame,
-    InterruptionTaskFrame,
+    InterruptionWorkerFrame,
     TTSStoppedFrame,
     TTSAudioRawFrame,
     ErrorFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -202,8 +202,20 @@ MAX_TURNS_FORCE_CANCEL_SECS = 2.0
 # fragments into a persona turn (covers Latin plus the Devanagari danda).
 _PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
 
+class EvalAgentProtobufSerializer(ProtobufFrameSerializer):
+    """Drops InterruptionFrames from the agent under test.
+
+    Applied here they would cut off the eval agent's own speech; the eval agent
+    detects being interrupted itself (``bot-started-speaking``).
+    """
+
+    async def deserialize(self, data):
+        frame = await super().deserialize(data)
+        return None if isinstance(frame, InterruptionFrame) else frame
+
+
 DEFAULT_SERIALIZER_NAME = "protobuf"
-SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
+SERIALIZER_REGISTRY = {"protobuf": EvalAgentProtobufSerializer}
 
 
 def build_simulated_user_llm() -> OpenRouterLLMService:
@@ -500,6 +512,13 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._processing_time = processing_time
         self._text_buffer = ""  # buffer of the text that the bot has generated so far (received stream; used for interrupt completion matching)
         self._heard_text_buffer = ""  # buffer of agent text actually spoken (fed to simulated-user STT as what was heard)
+        # Newer agents (pipecat >= 1.4) resend the whole sentence spoken so far in
+        # every bot-output message, e.g. "Hello", then "Hello there". The buffers
+        # below are built by appending only the words not seen before, so we keep
+        # the last (segment_id, accumulated_text) and remove it from the front of
+        # the next message from the same sentence. A new segment_id means a new
+        # sentence, and its text is taken whole.
+        self._last_spoken_progress = (None, "")
         self._spoken_text_buffer = (
             ""  # buffer of the text that the bot has spoken so far
         )
@@ -642,6 +661,34 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._active_transcript_audio_index = candidate
         self._active_transcript_audio_role = role
         return candidate
+
+    def _parse_bot_output(self, data: dict) -> tuple[str, bool]:
+        """Return (text, spoken) for one bot-output message from the agent under test.
+
+        Agents send this message in one of two formats, depending on their pipecat version:
+
+        - Older agents send each piece of speech once, with spoken=True.
+          The text is returned as it is.
+        - Newer agents (pipecat >= 1.4) resend the whole sentence spoken so far,
+          e.g. "Hello", then "Hello there". Only the words added since the last
+          message from the same sentence (same segment_id) are returned, here "there".
+
+        Some text-to-speech providers cannot report word by word. With those, a newer
+        agent sends the finished sentence once, with spoken=True, and it is returned
+        as it is.
+        """
+        text = data.get("text") or ""
+        status = data.get("spoken_status")
+        if data.get("spoken") or status not in ("in-progress", "completed"):
+            return text, bool(data.get("spoken"))
+
+        segment_id = data.get("segment_id")
+        accumulated = (data.get("spoken_progress") or {}).get("accumulated_text") or ""
+        last_segment, last_accumulated = self._last_spoken_progress
+        self._last_spoken_progress = (segment_id, accumulated)
+        if segment_id == last_segment and accumulated.startswith(last_accumulated):
+            accumulated = accumulated[len(last_accumulated) :]
+        return accumulated.strip(), True
 
     async def _reset_buffers(self):
         concluded_turn = self._turn_index
@@ -899,7 +946,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         # start strategies (not a manual UserStartedSpeakingFrame),
                         # so start and the smart-turn stop stay audio-consistent.
                         await self.push_frame(
-                            InterruptionTaskFrame(), FrameDirection.UPSTREAM
+                            InterruptionWorkerFrame(), FrameDirection.UPSTREAM
                         )
                 elif msg_type == "bot-stopped-speaking" and self._pending_user_turn:
                     if self._awaiting_first_bot_audio_chunk:
@@ -939,8 +986,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     )
 
                 elif msg_type == "bot-output":
-                    text = data.get("text") or ""
-                    spoken = data.get("spoken") or False
+                    text, spoken = self._parse_bot_output(data)
 
                     if text:
                         # log_and_print(
@@ -1677,7 +1723,7 @@ async def _run_simulation_inner(
         ]
     )
 
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=16000,
@@ -1804,10 +1850,11 @@ async def _run_simulation_inner(
             f"Eval transcript: [{message.timestamp}] assistant: {message.content}"
         )
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
 
     try:
-        await runner.run(task)
+        await runner.add_workers(task)
+        await runner.run()
     finally:
         if elevenlabs_http_session is not None:
             await elevenlabs_http_session.close()
