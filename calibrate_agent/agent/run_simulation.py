@@ -512,8 +512,12 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._processing_time = processing_time
         self._text_buffer = ""  # buffer of the text that the bot has generated so far (received stream; used for interrupt completion matching)
         self._heard_text_buffer = ""  # buffer of agent text actually spoken (fed to simulated-user STT as what was heard)
-        # (segment_id, accumulated_text) of the last RTVI 2.x progress message,
-        # used to derive the newly spoken words from each progress update.
+        # Newer agents (pipecat >= 1.4) resend the whole sentence spoken so far in
+        # every bot-output message, e.g. "Hello", then "Hello there". The buffers
+        # below are built by appending only the words not seen before, so we keep
+        # the last (segment_id, accumulated_text) and remove it from the front of
+        # the next message from the same sentence. A new segment_id means a new
+        # sentence, and its text is taken whole.
         self._last_spoken_progress = (None, "")
         self._spoken_text_buffer = (
             ""  # buffer of the text that the bot has spoken so far
@@ -659,13 +663,19 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         return candidate
 
     def _parse_bot_output(self, data: dict) -> tuple[str, bool]:
-        """Return ``(text, spoken)`` for a ``bot-output`` payload in either RTVI format.
+        """Return (text, spoken) for one bot-output message from the agent under test.
 
-        RTVI 2.x agents (pipecat >= 1.4, client with no declared RTVI version) send
-        progress messages whose ``accumulated_text`` grows word by word; the newly
-        spoken words are the growth since the last message of the same segment. A 2.x
-        ``completed`` message with ``spoken=True`` comes from a TTS without word
-        timestamps and already carries only its own text.
+        Agents send this message in one of two formats, depending on their pipecat version:
+
+        - Older agents send each piece of speech once, with spoken=True.
+          The text is returned as it is.
+        - Newer agents (pipecat >= 1.4) resend the whole sentence spoken so far,
+          e.g. "Hello", then "Hello there". Only the words added since the last
+          message from the same sentence (same segment_id) are returned, here "there".
+
+        Some text-to-speech providers cannot report word by word. With those, a newer
+        agent sends the finished sentence once, with spoken=True, and it is returned
+        as it is.
         """
         text = data.get("text") or ""
         status = data.get("spoken_status")
