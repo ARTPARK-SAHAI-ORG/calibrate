@@ -1527,7 +1527,7 @@ GEMINI_TTS_LANGUAGE_CODES = GOOGLE_TTS_LANGUAGE_CODES
 # Deepgram Flux: flux-general-en for English, flux-general-multi (with a Hindi
 # language hint) for Hindi; flux-general-multi covers no other Indian language.
 DEEPGRAM_FLUX_STT_LANGUAGE_CODES = {"english": "en", "hindi": "hi"}
-# saaras:v4 adds Sindhi to saaras:v3's languages.
+# Sarvam's docs list Sindhi for saaras:v3 and saaras:v4 on every endpoint.
 SARVAM_V4_STT_LANGUAGE_CODES = {**SARVAM_STT_LANGUAGE_CODES, "sindhi": "sd-IN"}
 SARVAM_REALTIME_STT_PROVIDERS = (
     "sarvam-saaras-v4-realtime",
@@ -1757,7 +1757,7 @@ STT_LANGUAGE_TABLES = {
     "elevenlabs-scribe-v2-realtime": (ELEVENLABS_STT_LANGUAGE_CODES, "eng"),
     "smallest-pulse": (SMALLEST_STT_LANGUAGE_CODES, "multi"),
     "sarvam-saaras-v3": (SARVAM_STT_LANGUAGE_CODES, "en-IN"),
-    "sarvam-saaras-v4": (SARVAM_STT_LANGUAGE_CODES, "en-IN"),
+    "sarvam-saaras-v4": (SARVAM_V4_STT_LANGUAGE_CODES, "en-IN"),
     "deepgram-flux": (DEEPGRAM_FLUX_STT_LANGUAGE_CODES, "en"),
     # gpt-live-transcribe takes OpenAI's supported-language list. Its docs do
     # not confirm auto-detection, so unlisted languages are rejected.

@@ -46993,7 +46993,8 @@ var STT_PROVIDERS = [
       "punjabi",
       "tamil",
       "telugu",
-      "gujarati"
+      "gujarati",
+      "sindhi"
     ])
   },
   {

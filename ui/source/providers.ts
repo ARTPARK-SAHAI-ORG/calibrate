@@ -188,7 +188,7 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     envVar: 'SARVAM_API_KEY',
     languages: new Set([
       'english', 'hindi', 'kannada', 'bengali', 'malayalam',
-      'marathi', 'odia', 'punjabi', 'tamil', 'telugu', 'gujarati',
+      'marathi', 'odia', 'punjabi', 'tamil', 'telugu', 'gujarati', 'sindhi',
     ]),
   },
   {

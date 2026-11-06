@@ -44,18 +44,7 @@ from calibrate_agent.utils import (
 
 
 async def run(
-    providers: list[
-        Literal[
-            "deepgram-nova-3",
-            "openai-gpt-4o-transcribe",
-            "cartesia-ink-whisper",
-            "smallest-pulse",
-            "groq-whisper-large-v3-turbo",
-            "google-chirp-3",
-            "sarvam-saaras-v3",
-            "elevenlabs-scribe-v2-realtime",
-        ]
-    ],
+    providers: list[str],
     input_dir: str,
     output_dir: str = "./out",
     language: Literal[
@@ -91,7 +80,8 @@ async def run(
     then generates a comparison leaderboard.
 
     Args:
-        providers: List of STT providers to evaluate
+        providers: STT provider names (``STT_PROVIDERS``) or vendor names
+            (``STT_VENDOR_DEFAULTS``) to evaluate
         input_dir: Path to input directory containing audio files and stt.csv
         output_dir: Path to output directory for results (default: ./out)
         language: Language of the audio files

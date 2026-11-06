@@ -1359,12 +1359,31 @@ class TestDeepgramFluxStreaming(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("language_hint", ws.url)
         self.assertEqual(ws.headers, {"Authorization": "Token k"})
 
-    async def test_audio_sent_before_close_stream(self):
+    async def test_audio_and_trailing_silence_sent_before_close_stream(self):
+        from calibrate_agent.stt.eval import FLUX_TRAILING_SILENCE_SECONDS
+
         ws = _FakeTurnsWS(self.TURNS, "CloseStream")
         await _run_streaming("transcribe_deepgram_flux_streaming", "DEEPGRAM_API_KEY", ws)
 
-        self.assertEqual(b"".join(ws.sent[:-1]), b"\x01" * 9000)
+        silence = b"\x00" * int(32000 * FLUX_TRAILING_SILENCE_SECONDS)
+        self.assertEqual(b"".join(ws.sent[:-1]), b"\x01" * 9000 + silence)
         self.assertEqual(json.loads(ws.sent[-1]), {"type": "CloseStream"})
+
+    async def test_turn_open_at_close_keeps_its_latest_text(self):
+        # Flux can close the socket without an EndOfTurn for the last turn.
+        ws = _FakeTurnsWS(
+            [
+                {"type": "TurnInfo", "event": "EndOfTurn", "transcript": "hello"},
+                {"type": "TurnInfo", "event": "StartOfTurn", "transcript": "mad"},
+                {"type": "TurnInfo", "event": "Update", "transcript": "madam, my name"},
+            ],
+            "CloseStream",
+        )
+        result = await _run_streaming(
+            "transcribe_deepgram_flux_streaming", "DEEPGRAM_API_KEY", ws
+        )
+
+        self.assertEqual(result, {"transcript": "hello madam, my name"})
 
     async def test_hindi_uses_multi_model_with_language_hint(self):
         ws = _FakeTurnsWS(self.TURNS, "CloseStream")
@@ -1411,6 +1430,21 @@ class TestCartesiaInkPreviewStreaming(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result, {"transcript": "namaste aap kaise hain"})
+
+    async def test_turn_open_at_close_keeps_its_latest_text(self):
+        ws = _FakeTurnsWS(
+            [
+                {"type": "turn.end", "transcript": "namaste"},
+                {"type": "turn.start", "transcript": ""},
+                {"type": "turn.update", "transcript": "aap kaise"},
+            ],
+            "close",
+        )
+        result = await _run_streaming(
+            "transcribe_cartesia_ink_preview_streaming", "CARTESIA_API_KEY", ws, "hindi"
+        )
+
+        self.assertEqual(result, {"transcript": "namaste aap kaise"})
         self.assertTrue(
             ws.url.startswith("wss://api.cartesia.ai/stt/turns/websocket?")
         )

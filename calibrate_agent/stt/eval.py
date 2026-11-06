@@ -870,11 +870,17 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
 # =============================================================================
 
 
+# Flux sends EndOfTurn about 2 s after speech stops; 1 s is not enough.
+FLUX_TRAILING_SILENCE_SECONDS = 2.0
+
+
 async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) -> Dict:
     """Transcribe audio using Deepgram Flux (``wss://api.deepgram.com/v2/listen``).
 
     Flux reports speech as turns; the transcript is the text of each
-    ``EndOfTurn`` event joined in order.
+    ``EndOfTurn`` event joined in order. Flux sends ``EndOfTurn`` only after it
+    hears the speaker stop, so the clip is followed by silence. A turn still
+    open when the socket closes contributes its latest text.
     """
     from websockets.asyncio.client import connect as websocket_connect
 
@@ -891,7 +897,9 @@ async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) ->
         )
     ws_url = f"wss://api.deepgram.com/v2/listen?{urlencode(params)}"
     headers = {"Authorization": f"Token {api_key}"}
-    audio = load_audio(audio_path, raw_pcm=True)
+    # 16 kHz 16-bit mono is 32000 bytes per second.
+    silence = b"\x00" * int(32000 * FLUX_TRAILING_SILENCE_SECONDS)
+    audio = load_audio(audio_path, raw_pcm=True) + silence
     chunk_size = 4096
 
     async with websocket_connect(ws_url, additional_headers=headers) as ws:
@@ -899,11 +907,11 @@ async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) ->
         async def send_audio():
             for start in range(0, len(audio), chunk_size):
                 await ws.send(audio[start : start + chunk_size])
-            # Flux ends the turn still open on the buffered audio, then closes the socket.
             await ws.send(json.dumps({"type": "CloseStream"}))
 
         sender = asyncio.create_task(send_audio())
         transcript_parts = []
+        open_turn = ""
 
         try:
             async for output in _json_messages(ws):
@@ -912,14 +920,17 @@ async def transcribe_deepgram_flux_streaming(audio_path: Path, language: str) ->
                         f"Deepgram Flux STT error [{output.get('code', 'unknown')}]: "
                         f"{output.get('description', output)}"
                     )
-                if (
-                    output.get("type") == "TurnInfo"
-                    and output.get("event") == "EndOfTurn"
-                ):
+                if output.get("type") != "TurnInfo":
+                    continue
+                if output.get("event") == "EndOfTurn":
                     transcript_parts.append(output.get("transcript", ""))
+                    open_turn = ""
+                else:
+                    open_turn = output.get("transcript", "")
         finally:
             await _stop_sender(sender)
 
+    transcript_parts.append(open_turn)
     return {"transcript": _join_transcript(transcript_parts)}
 
 
@@ -1082,7 +1093,8 @@ async def transcribe_cartesia_ink_preview_streaming(
     """Transcribe audio using Cartesia's turns WebSocket (``/stt/turns/websocket``).
 
     The model detects the spoken language, so ``language`` is not sent. The
-    transcript is the text of each ``turn.end`` event joined in order.
+    transcript is the text of each ``turn.end`` event joined in order. A turn
+    still open when the socket closes contributes its latest text.
     """
     from websockets.asyncio.client import connect as websocket_connect
 
@@ -1110,19 +1122,25 @@ async def transcribe_cartesia_ink_preview_streaming(
 
         sender = asyncio.create_task(send_audio())
         transcript_parts = []
+        open_turn = ""
 
         try:
             async for output in _json_messages(ws):
-                if output.get("type") == "error":
+                event = output.get("type") or ""
+                if event == "error":
                     raise RuntimeError(
                         f"Cartesia STT error [{output.get('error_code', 'unknown')}]: "
                         f"{output.get('message', output)}"
                     )
-                if output.get("type") == "turn.end":
+                if event == "turn.end":
                     transcript_parts.append(output.get("transcript", ""))
+                    open_turn = ""
+                elif event.startswith("turn."):
+                    open_turn = output.get("transcript", "")
         finally:
             await _stop_sender(sender)
 
+    transcript_parts.append(open_turn)
     return {"transcript": _join_transcript(transcript_parts)}
 
 

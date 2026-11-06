@@ -170,6 +170,13 @@ class TestRealtimeProviderLanguages(unittest.TestCase):
         self.assertEqual(get_stt_language_code("maithili", "sarvam-saaras-v4"), "mai-IN")
         self.assertEqual(get_stt_language("hindi", "sarvam-saaras-v4"), Language.HI_IN)
 
+    def test_every_saaras_v4_provider_accepts_sindhi(self):
+        from calibrate_agent.utils import get_stt_language_code, validate_stt_language
+
+        for provider in ("sarvam-saaras-v4", "sarvam-saaras-v4-realtime"):
+            validate_stt_language("sindhi", provider)
+            self.assertEqual(get_stt_language_code("sindhi", provider), "sd-IN")
+
     def test_stt_provider_model_per_language(self):
         from calibrate_agent.utils import stt_provider_model
 
