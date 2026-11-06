@@ -201,6 +201,9 @@ EVAL_TIMEOUT_SECS = 3000
 # grace lets a normal call flush its final frames first; the fallback guarantees a
 # prompt end regardless.
 MAX_TURNS_FORCE_CANCEL_SECS = 2.0
+# How long the simulated user waits for the agent's server to start listening.
+# The agent opens it once its STT service has connected.
+BOT_READY_TIMEOUT_SECS = 30.0
 # Punctuation that should attach to the preceding word when joining TTS text
 # fragments into a persona turn (covers Latin plus the Devanagari danda).
 _PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
@@ -401,7 +404,9 @@ async def start_bot(
     tts_config: TTSConfig = TTSConfig(),
     llm_config: LLMConfig = LLMConfig(),
     agent_speaks_first: bool = True,
+    ready: Optional[asyncio.Event] = None,
 ):
+    """Run the agent on a local WebSocket server; ``ready`` is set once it listens."""
     current_context.set("BOT")
 
     transport = WebsocketServerTransport(
@@ -414,6 +419,11 @@ async def start_bot(
             session_timeout=60 * 3,  # 3 minutes
         ),
     )
+    if ready is not None:
+
+        @transport.event_handler("on_websocket_ready")
+        async def _on_websocket_ready(transport):
+            ready.set()
 
     runner_args = RunnerArguments()
     # runner_args.pipeline_idle_timeout_secs = PIPELINE_IDLE_TIMEOUT_SECS
@@ -2400,6 +2410,7 @@ async def _run_single_simulation_inner(
         sim_task = None
         try:
             if not external_ws_mode:
+                bot_ready = asyncio.Event()
                 bot_task = asyncio.create_task(
                     start_bot(
                         config["system_prompt"]
@@ -2411,10 +2422,18 @@ async def _run_single_simulation_inner(
                         tts_config=tts_config,
                         llm_config=llm_config,
                         agent_speaks_first=agent_speaks_first,
+                        ready=bot_ready,
                     )
                 )
-                # Give the bot a moment to start listening before connecting
-                await asyncio.sleep(1.0)
+                # Connect only once the agent's server is listening. A user
+                # that connects earlier is refused, and its retries fail too.
+                ready_wait = asyncio.create_task(bot_ready.wait())
+                await asyncio.wait(
+                    {bot_task, ready_wait},
+                    timeout=BOT_READY_TIMEOUT_SECS,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                ready_wait.cancel()
 
                 # Check if bot_task failed during startup - if so, get its result to surface the error
                 if bot_task.done():
@@ -2424,6 +2443,10 @@ async def _run_single_simulation_inner(
                     # this is still wrong because the bot should be running, not completed
                     raise RuntimeError(
                         "Bot task completed unexpectedly before simulation could connect"
+                    )
+                if not bot_ready.is_set():
+                    raise RuntimeError(
+                        f"Agent did not start listening within {BOT_READY_TIMEOUT_SECS:.0f}s"
                     )
 
             evaluators = config.get("evaluators") or []

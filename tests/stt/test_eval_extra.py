@@ -587,6 +587,18 @@ class TestTranscribeAudioRouter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["transcript"], "hello world")
         fake_fn.assert_called_once()
 
+    async def test_vendor_name_routes_to_default_provider(self):
+        from calibrate_agent.stt import eval as E
+
+        fake_fn = AsyncMock(return_value={"transcript": "hello"})
+        inner = E.transcribe_audio
+        while hasattr(inner, "__wrapped__"):
+            inner = inner.__wrapped__
+        with patch.object(E, "transcribe_deepgram_streaming", fake_fn):
+            result = await inner(Path("/tmp/x.wav"), "ref", "deepgram", "english", "u")
+        self.assertEqual(result["transcript"], "hello")
+        fake_fn.assert_called_once()
+
     async def test_with_langfuse(self):
         from calibrate_agent.stt import eval as E
 
@@ -885,6 +897,21 @@ class TestSTTCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["cost_per_minute_currency"], 0.006)
         self.assertEqual(metrics["cost_usd"], 0.006)
         self.assertNotIn("excluded_row_indices", metrics)
+        self.assertEqual(metrics["provider"], "openai-gpt-4o-transcribe")
+
+    def test_name_sets_reported_provider_but_not_pricing(self):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="deepgram-flux",
+            audio_duration_seconds=[60.0],
+            model="flux-general-multi",
+            name="deepgram-flux-general-multi",
+        )
+
+        self.assertEqual(metrics["provider"], "deepgram-flux-general-multi")
+        self.assertEqual(metrics["pricing_model"], "flux-general-multi")
+        self.assertEqual(metrics["cost_usd"], 0.0078)
 
     def test_builds_cost_metrics_from_multiple_durations(self):
         from calibrate_agent.stt import eval as E

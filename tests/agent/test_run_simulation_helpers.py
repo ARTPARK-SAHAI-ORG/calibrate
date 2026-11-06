@@ -206,6 +206,62 @@ class TestConfigWithoutTools(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(mock_start_bot.call_args.args[1], [])
 
 
+class TestSimulationWaitsForAgentServer(unittest.IsolatedAsyncioTestCase):
+    CONFIG = {
+        "system_prompt": "You are a helpful agent.",
+        "stt": {"provider": "google-chirp-3"},
+        "tts": {"provider": "google"},
+        "llm": {"provider": "openrouter", "model": "some/model"},
+        "settings": {"agent_speaks_first": True, "max_turns": 1},
+    }
+    PERSONA = {"characteristics": "polite", "gender": "neutral",
+               "language": "english",
+               "interruption_config": {"sensitivity": "none"}}
+
+    async def _run(self, start_bot, run_simulation):
+        import tempfile
+        from calibrate_agent.agent import run_simulation as RS
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch.object(RS, "start_bot", start_bot), \
+             patch.object(RS, "run_simulation", run_simulation), \
+             patch.object(RS, "find_available_port", return_value=54321), \
+             patch.object(RS, "BOT_READY_TIMEOUT_SECS", 0.2):
+            await RS._run_single_simulation_inner(
+                self.CONFIG, 0, self.PERSONA, 0, {"name": "s", "description": "d"},
+                tmp, {"none": 0.0},
+            )
+
+    async def test_agent_never_listening_stops_before_the_user_connects(self):
+        async def never_ready(*args, ready, **kwargs):
+            await asyncio.sleep(60)
+
+        sim = AsyncMock()
+        with self.assertRaisesRegex(RuntimeError, "did not start listening"):
+            await self._run(never_ready, sim)
+        sim.assert_not_called()
+
+    async def test_user_connects_after_the_agent_is_listening(self):
+        events = []
+
+        async def ready_late(*args, ready, **kwargs):
+            await asyncio.sleep(0.05)
+            events.append("ready")
+            ready.set()
+            await asyncio.sleep(60)
+
+        class Stop(Exception):
+            pass
+
+        async def sim(*args, **kwargs):
+            events.append("user connects")
+            raise Stop
+
+        with self.assertRaises(Stop):
+            await self._run(ready_late, sim)
+        self.assertEqual(events, ["ready", "user connects"])
+
+
 class TestMetricsLogger(unittest.IsolatedAsyncioTestCase):
     async def test_process_frame(self):
         from collections import defaultdict

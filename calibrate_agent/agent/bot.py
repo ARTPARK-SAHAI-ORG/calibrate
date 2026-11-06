@@ -8,7 +8,9 @@ from pydantic import BaseModel, field_validator
 from calibrate_agent.utils import (
     create_stt_service,
     create_tts_service,
+    LIVE_STT_PROVIDERS,
     resolve_stt_provider,
+    stt_decides_turns,
     build_tools_schema,
     make_webhook_call,
 )
@@ -112,15 +114,7 @@ class MetricsLogger(FrameProcessor):
 
 
 class STTConfig(BaseModel):
-    provider: Literal[
-        "deepgram-nova-3",
-        "google-chirp-3",
-        "openai-gpt-4o-transcribe",
-        "cartesia-ink-whisper",
-        "groq-whisper-large-v3-turbo",
-        "elevenlabs-scribe-v2-realtime",
-        "sarvam-saaras-v3",
-    ] = "deepgram-nova-3"
+    provider: Literal[LIVE_STT_PROVIDERS] = "deepgram-nova-3"
 
     _resolve_vendor = field_validator("provider", mode="before")(
         lambda name: resolve_stt_provider(name) if isinstance(name, str) else name
@@ -363,7 +357,9 @@ async def run_bot(
         context,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            user_turn_strategies=UserTurnStrategies(
+            user_turn_strategies=None
+            if stt_decides_turns(stt)
+            else UserTurnStrategies(
                 stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
             ),
         ),

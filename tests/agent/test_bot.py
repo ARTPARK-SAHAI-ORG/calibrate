@@ -23,6 +23,14 @@ class TestSTTConfig(unittest.TestCase):
         self.assertEqual(STTConfig(provider="google").provider, "google-chirp-3")
         self.assertEqual(STTConfig(provider="sarvam").provider, "sarvam-saaras-v3")
 
+    def test_realtime_providers_allowed(self):
+        from calibrate_agent.agent.bot import STTConfig
+
+        for provider in ("deepgram-flux", "openai-gpt-live-transcribe", "openai-gpt-transcribe",
+                         "sarvam-saaras-v4-realtime", "sarvam-saaras-v3-realtime",
+                         "sarvam-saaras-v4", "cartesia-ink-preview"):
+            self.assertEqual(STTConfig(provider=provider).provider, provider)
+
 
 class TestTTSConfig(unittest.TestCase):
     def test_default(self):

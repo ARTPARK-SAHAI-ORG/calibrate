@@ -46804,8 +46804,14 @@ var STT_PROVIDERS = [
       "english",
       "hindi",
       "kannada",
+      "bengali",
+      "malayalam",
       "marathi",
-      "tamil"
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati",
+      "sindhi"
     ])
   },
   {

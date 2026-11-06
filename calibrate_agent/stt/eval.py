@@ -34,6 +34,7 @@ from calibrate_agent.utils import (
     resolve_stt_provider,
     STT_VENDOR_DEFAULTS,
     stt_provider_model,
+    openai_transcription_language,
     DEEPGRAM_FLUX_MULTILINGUAL_MODEL,
     SARVAM_REALTIME_STT_PROVIDERS,
     create_stt_service,
@@ -96,8 +97,13 @@ def _build_stt_cost_metrics(
     provider: str,
     audio_duration_seconds: list[float | None] | None,
     model: str | None = None,
+    name: str | None = None,
 ) -> dict | None:
-    """Build STT cost metrics from audio duration and provider price config."""
+    """Build STT cost metrics from audio duration and provider price config.
+
+    ``name`` is the provider name reported in the metrics; it defaults to
+    ``provider``.
+    """
     durations = []
     excluded_row_indices = []
     for index, duration in enumerate(audio_duration_seconds or []):
@@ -115,7 +121,7 @@ def _build_stt_cost_metrics(
     total_seconds = float(sum(durations))
     total_minutes = total_seconds / 60.0
     metrics = {
-        "provider": provider,
+        "provider": name or provider,
         "pricing_model": pricing["model"],
         "billing_unit": "minute",
         "total_seconds": total_seconds,
@@ -951,11 +957,9 @@ async def transcribe_openai_realtime(
 
     transcription = {"model": STT_PROVIDER_MODELS[provider]}
     lang_code = get_stt_language_code(language, provider)
-    if provider == "openai-gpt-live-transcribe":
-        # gpt-live-transcribe reads a `languages` list and rejects `language`.
-        transcription["languages"] = [lang_code]
-    elif lang_code is not None:
+    if lang_code is not None:
         transcription["language"] = lang_code
+    openai_transcription_language(transcription, provider)
 
     # The Realtime API takes 24 kHz PCM only.
     audio = (
@@ -1159,6 +1163,7 @@ async def transcribe_audio(
     unique_id: str,
 ) -> str:
     """Route audio transcription to the appropriate provider."""
+    provider = resolve_stt_provider(provider)
     provider_methods = {
         "deepgram-nova-3": transcribe_deepgram_streaming,
         "openai-gpt-4o-transcribe": transcribe_openai_streaming,
@@ -1679,9 +1684,8 @@ async def run_single_provider_eval(
             provider=provider,
             audio_duration_seconds=audio_durations,
             model=stt_provider_model(provider, language),
+            name=stored_name,
         )
-        if cost_metrics:
-            cost_metrics["provider"] = stored_name
 
         # TTFS latency is only produced by the pipeline engine; NaN/absent -> None.
         if "ttfs" in results_df.columns:

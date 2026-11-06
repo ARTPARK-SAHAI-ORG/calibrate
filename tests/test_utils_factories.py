@@ -105,6 +105,36 @@ class TestCreateSTTService(unittest.TestCase):
              "sarvam-saaras-v4", "cartesia-ink-preview"},
         )
 
+    def test_unsupported_language_stops_with_alternative(self):
+        from calibrate_agent.utils import create_stt_service
+
+        for provider, alternative in (
+            ("deepgram-flux", "deepgram-nova-3"),
+            ("cartesia-ink-preview", "cartesia-ink-whisper"),
+        ):
+            with patch.dict(os.environ, ALL_KEYS), patch(STT_SERVICE_TARGETS[provider]) as svc:
+                with self.assertRaisesRegex(ValueError, alternative):
+                    create_stt_service(provider, "kannada")
+                svc.assert_not_called()
+
+    def test_agent_configs_accept_every_live_provider(self):
+        from typing import get_args, get_type_hints
+        from pydantic import ValidationError
+        from calibrate_agent.utils import LIVE_STT_PROVIDERS, STT_PROVIDER_MODELS
+        from calibrate_agent.agent import bot, test as agent_test
+
+        self.assertEqual(
+            set(LIVE_STT_PROVIDERS), set(STT_PROVIDER_MODELS) - BENCHMARK_ONLY_PROVIDERS
+        )
+        for provider in LIVE_STT_PROVIDERS:
+            self.assertEqual(bot.STTConfig(provider=provider).provider, provider)
+        with self.assertRaises(ValidationError):
+            bot.STTConfig(provider="gemini-3.5-flash")
+        self.assertEqual(
+            set(get_args(get_type_hints(agent_test.STTConfig)["provider"])),
+            set(LIVE_STT_PROVIDERS),
+        )
+
     def test_sarvam_stt_transcribes(self):
         """Sarvam STT must use saaras:v3 with mode="transcribe" so pipecat routes
         it to the plain STT streaming endpoint (not translate), matching
@@ -130,6 +160,16 @@ class TestCreateRealtimeSTTService(unittest.IsolatedAsyncioTestCase):
 
         with patch.dict(os.environ, ALL_KEYS):
             return create_stt_service(provider, language)
+
+    def test_providers_that_detect_turns_themselves(self):
+        from calibrate_agent.utils import stt_decides_turns
+
+        own_turns = {"deepgram-flux", "cartesia-ink-preview",
+                     "sarvam-saaras-v4-realtime", "sarvam-saaras-v3-realtime"}
+        for provider in own_turns | {"openai-gpt-live-transcribe", "openai-gpt-transcribe",
+                                     "sarvam-saaras-v4"}:
+            svc = self._build(provider, "english")
+            self.assertEqual(stt_decides_turns(svc), provider in own_turns, provider)
 
     def test_deepgram_flux_english_uses_english_model_without_hints(self):
         svc = self._build("deepgram-flux", "english")
@@ -218,6 +258,26 @@ class TestCreateRealtimeSTTService(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(transcription["languages"], ["hi"])
         self.assertNotIn("language", transcription)
         self.assertEqual(transcription["model"], "gpt-live-transcribe")
+
+    def test_openai_live_service_class_built_once(self):
+        first = self._build("openai-gpt-live-transcribe", "hindi")
+        second = self._build("openai-gpt-live-transcribe", "english")
+        self.assertIs(type(first), type(second))
+
+    def test_openai_transcription_language(self):
+        from calibrate_agent.utils import openai_transcription_language
+
+        self.assertEqual(
+            openai_transcription_language({"language": "hi"}, "openai-gpt-live-transcribe"),
+            {"languages": ["hi"]},
+        )
+        self.assertEqual(
+            openai_transcription_language({"language": "hi"}, "openai-gpt-transcribe"),
+            {"language": "hi"},
+        )
+        self.assertEqual(
+            openai_transcription_language({}, "openai-gpt-live-transcribe"), {}
+        )
 
 
 class TestCreateTTSService(unittest.TestCase):

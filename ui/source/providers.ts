@@ -92,7 +92,8 @@ export const STT_PROVIDERS: ProviderInfo[] = [
     name: 'Groq',
     envVar: 'GROQ_API_KEY',
     languages: new Set([
-      'english', 'hindi', 'kannada', 'marathi', 'tamil',
+      'english', 'hindi', 'kannada', 'bengali', 'malayalam', 'marathi',
+      'punjabi', 'tamil', 'telugu', 'gujarati', 'sindhi',
     ]),
   },
   {

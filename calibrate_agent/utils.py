@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import io
 import json
 import logging
@@ -1579,6 +1580,7 @@ def get_stt_language_code(language: str, provider: str) -> Optional[str]:
         'en-US'
     """
     language = language.lower()
+    provider = resolve_stt_provider(provider)
 
     if provider in STT_LANGUAGE_TABLES:
         codes, fallback = STT_LANGUAGE_TABLES[provider]
@@ -1656,6 +1658,7 @@ def validate_stt_language(language: str, provider: str) -> None:
         ValueError: If the language is not supported by the provider
     """
     language = language.lower()
+    provider = resolve_stt_provider(provider)
 
     if provider not in STT_LANGUAGE_TABLES:
         raise ValueError(f"Unknown STT provider: {provider}")
@@ -1805,7 +1808,7 @@ def get_stt_language(
     language = language.lower()
     table = (
         _SARVAM_STT_LANGUAGE_ENUMS
-        if provider.startswith("sarvam-")
+        if resolve_stt_provider(provider).startswith("sarvam-")
         else _STT_LANGUAGE_ENUMS
     )
     return table.get(language, table["english"])
@@ -1972,6 +1975,11 @@ STT_VENDOR_DEFAULTS = {
 }
 
 
+# STT providers the voice agent can run. gemini-3.5-flash has no streaming
+# service, so it is benchmark-only.
+LIVE_STT_PROVIDERS = tuple(p for p in STT_PROVIDER_MODELS if p != "gemini-3.5-flash")
+
+
 def resolve_stt_provider(name: str) -> str:
     """Return the full STT provider name for a vendor name; other names unchanged."""
     return STT_VENDOR_DEFAULTS.get(name, name)
@@ -2028,6 +2036,47 @@ TTS_PROVIDER_MODELS = {
 }
 
 
+def openai_transcription_language(transcription: dict, provider: str) -> dict:
+    """Put an OpenAI realtime transcription config's language in the field the model reads.
+
+    gpt-live-transcribe reads a ``languages`` list and rejects a session that
+    sets the singular ``language``; other models read ``language``.
+    """
+    if provider == "openai-gpt-live-transcribe" and "language" in transcription:
+        transcription["languages"] = [transcription.pop("language")]
+    return transcription
+
+
+@functools.cache
+def _openai_live_transcribe_service_class():
+    from pipecat.services.openai.stt import OpenAIRealtimeSTTService
+
+    class OpenAILiveTranscribeSTTService(OpenAIRealtimeSTTService):
+        async def _ws_send(self, message: dict):
+            transcription = (
+                message.get("session", {})
+                .get("audio", {})
+                .get("input", {})
+                .get("transcription", {})
+            )
+            openai_transcription_language(transcription, "openai-gpt-live-transcribe")
+            await super()._ws_send(message)
+
+    return OpenAILiveTranscribeSTTService
+
+
+def stt_decides_turns(stt) -> bool:
+    """Whether an STT service decides when the caller has finished speaking.
+
+    Deepgram Flux, Cartesia ink-preview and Sarvam's realtime endpoint detect
+    the end of a turn themselves and recommend turn strategies that follow
+    their decision. pipecat applies that recommendation only when the user
+    aggregator is given no strategies of its own, so the voice agent passes
+    none for these services.
+    """
+    return stt.service_metadata_frame().user_turn_strategies is not None
+
+
 def create_stt_service(
     provider: str,
     language: Literal["english", "hindi", "kannada"],
@@ -2057,6 +2106,7 @@ def create_stt_service(
     from pipecat.services.smallest.stt import SmallestSTTService
 
     provider = resolve_stt_provider(provider)
+    validate_stt_language(language, provider)
     stt_language = get_stt_language(language, provider)
 
     if provider == "deepgram-nova-3":
@@ -2144,24 +2194,11 @@ def create_stt_service(
     elif provider in ("openai-gpt-live-transcribe", "openai-gpt-transcribe"):
         from pipecat.services.openai.stt import OpenAIRealtimeSTTService
 
-        service_class = OpenAIRealtimeSTTService
-        if provider == "openai-gpt-live-transcribe":
-
-            class OpenAILiveTranscribeSTTService(OpenAIRealtimeSTTService):
-                # gpt-live-transcribe reads a `languages` list and rejects a
-                # session that also sets the singular `language` pipecat sends.
-                async def _ws_send(self, message: dict):
-                    transcription = (
-                        message.get("session", {})
-                        .get("audio", {})
-                        .get("input", {})
-                        .get("transcription", {})
-                    )
-                    if "language" in transcription:
-                        transcription["languages"] = [transcription.pop("language")]
-                    await super()._ws_send(message)
-
-            service_class = OpenAILiveTranscribeSTTService
+        service_class = (
+            _openai_live_transcribe_service_class()
+            if provider == "openai-gpt-live-transcribe"
+            else OpenAIRealtimeSTTService
+        )
 
         # openai-gpt-transcribe sends no language for the languages it auto-detects.
         send_language = get_stt_language_code(language, provider) is not None

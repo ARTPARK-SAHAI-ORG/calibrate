@@ -189,3 +189,47 @@ class TestRealtimeProviderLanguages(unittest.TestCase):
             stt_provider_model("sarvam-saaras-v3-realtime", "hindi"), "saaras:v3-realtime"
         )
         self.assertEqual(stt_provider_model("sarvam-saaras-v4", "hindi"), "saaras:v4")
+
+
+class TestUIProviderLanguagesMatchPython(unittest.TestCase):
+    """ui/source/providers.ts lists each STT provider's languages by hand; for
+    every language in the UI menu they must match STT_LANGUAGE_TABLES."""
+
+    def test_ui_stt_languages_match_python_tables(self):
+        import re
+        from pathlib import Path
+        from calibrate_agent.utils import STT_LANGUAGE_TABLES
+
+        src = (Path(__file__).parents[2] / "ui/source/providers.ts").read_text()
+        menu = set(re.findall(
+            r"'([^']+)'", re.search(r"export const LANGUAGES = \[(.*?)\]", src, re.S).group(1)
+        ))
+        stt_src = src[src.index("export const STT_PROVIDERS"):]
+        ui_langs = {
+            pid: set(re.findall(r"'([^']+)'", langs))
+            for pid, langs in re.findall(
+                r"id: '([^']+)'.*?languages: new Set\(\[(.*?)\]\)", stt_src, re.S
+            )
+        }
+        self.assertTrue(ui_langs)
+        for provider, langs in ui_langs.items():
+            python_langs = set(STT_LANGUAGE_TABLES[provider][0])
+            self.assertEqual(langs & menu, python_langs & menu, provider)
+
+
+class TestLanguageHelpersAcceptVendorNames(unittest.TestCase):
+    def test_vendor_name_matches_its_default_provider(self):
+        from calibrate_agent.utils import (
+            get_stt_language,
+            get_stt_language_code,
+            validate_stt_language,
+        )
+
+        self.assertEqual(get_stt_language_code("hindi", "sarvam"), "hi-IN")
+        self.assertEqual(
+            get_stt_language("hindi", "sarvam"),
+            get_stt_language("hindi", "sarvam-saaras-v3"),
+        )
+        validate_stt_language("hindi", "sarvam")
+        with self.assertRaises(ValueError):
+            validate_stt_language("sindhi", "sarvam")

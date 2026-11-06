@@ -16,8 +16,10 @@ from calibrate_agent.utils import (
     save_transcript,
     create_stt_service,
     create_tts_service,
+    LIVE_STT_PROVIDERS,
     build_tools_schema,
     make_webhook_call,
+    stt_decides_turns,
 )
 from pipecat.audio.turn.smart_turn.local_smart_turn_v3 import LocalSmartTurnAnalyzerV3
 from pipecat.audio.vad.silero import SileroVADAnalyzer
@@ -82,15 +84,7 @@ transport_params = {
 
 @dataclass
 class STTConfig:
-    provider: Literal[
-        "deepgram-nova-3",
-        "google-chirp-3",
-        "openai-gpt-4o-transcribe",
-        "elevenlabs-scribe-v2-realtime",
-        "sarvam-saaras-v3",
-        "cartesia-ink-whisper",
-        "smallest-pulse",
-    ] = "elevenlabs-scribe-v2-realtime"
+    provider: Literal[LIVE_STT_PROVIDERS] = "elevenlabs-scribe-v2-realtime"
     model: Optional[str] = None
 
 
@@ -281,7 +275,9 @@ async def run_bot(
         context,
         user_params=LLMUserAggregatorParams(
             vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            user_turn_strategies=UserTurnStrategies(
+            user_turn_strategies=None
+            if stt_decides_turns(stt)
+            else UserTurnStrategies(
                 stop=[TurnAnalyzerUserTurnStopStrategy(turn_analyzer=LocalSmartTurnAnalyzerV3())]
             ),
         ),
