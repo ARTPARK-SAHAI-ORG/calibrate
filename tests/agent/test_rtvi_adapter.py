@@ -267,11 +267,9 @@ class TestResetBuffers(unittest.IsolatedAsyncioTestCase):
             adapter = _make_adapter(output_dir=tmp)
             adapter._text_buffer = "hi"
             adapter._heard_text_buffer = "hi"
-            adapter._spoken_text_buffer = "hi"
             adapter._turn_index = 1
             await adapter._reset_buffers()
             self.assertEqual(adapter._text_buffer, "")
-            self.assertEqual(adapter._spoken_text_buffer, "")
 
 
 def _rtvi_frame(msg_type):
@@ -396,51 +394,36 @@ def _count_interrupt_messages(pushed):
 
 
 class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
-    """External agents get the block model: a decided interrupt cuts the agent off
-    at once and blocks its output until the sim user finishes. Internal agents keep
-    the word-level path (decision only; trigger later on stream/spoken match)."""
+    """A decided interrupt cuts the agent off at once, for internal and external
+    agents alike. External agents also get their output blocked until the sim user
+    finishes."""
 
-    async def test_external_interrupt_executes_immediately(self):
+    async def test_interrupt_executes_immediately(self):
         from pipecat.frames.frames import (
             TranscriptionFrame,
             UserStoppedSpeakingFrame,
             InterimTranscriptionFrame,
         )
 
-        with tempfile.TemporaryDirectory() as tmp:
-            adapter = _make_adapter(
-                output_dir=tmp, interrupt_probability=1.0, is_external=True
-            )
-            pushed = await _drive_frame(adapter, _bot_output_frame("नमस्ते!", True))
+        for is_external in (True, False):
+            with self.subTest(is_external=is_external):
+                with tempfile.TemporaryDirectory() as tmp:
+                    adapter = _make_adapter(
+                        output_dir=tmp,
+                        interrupt_probability=1.0,
+                        is_external=is_external,
+                    )
+                    pushed = await _drive_frame(
+                        adapter, _bot_output_frame("नमस्ते!", True)
+                    )
 
-        self.assertTrue(adapter._is_bot_interrupt_triggered)
-        # Tells the agent to stop, commits the partial, ends the turn.
-        self.assertEqual(_count_interrupt_messages(pushed), 1)
-        self.assertEqual(_count_frames(pushed, TranscriptionFrame), 1)
-        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 1)
-        # Nothing more is fed to the sim user (no interim after cutting in).
-        self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 0)
-
-    async def test_internal_interrupt_only_decides(self):
-        from pipecat.frames.frames import (
-            UserStoppedSpeakingFrame,
-            InterimTranscriptionFrame,
-        )
-
-        with tempfile.TemporaryDirectory() as tmp:
-            adapter = _make_adapter(
-                output_dir=tmp, interrupt_probability=1.0, is_external=False
-            )
-            pushed = await _drive_frame(adapter, _bot_output_frame("नमस्ते!", True))
-
-        # Internal: decision is made but the interrupt is NOT executed yet; it waits
-        # for the spoken text to catch up (word-level control).
-        self.assertTrue(adapter._is_bot_interrupt_decided)
-        self.assertFalse(adapter._is_bot_interrupt_triggered)
-        self.assertEqual(_count_interrupt_messages(pushed), 0)
-        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 0)
-        # Internal still feeds what was heard up to the cut-in point.
-        self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 1)
+                self.assertTrue(adapter._is_bot_interrupt_triggered)
+                # Tells the agent to stop, commits the partial, ends the turn.
+                self.assertEqual(_count_interrupt_messages(pushed), 1)
+                self.assertEqual(_count_frames(pushed, TranscriptionFrame), 1)
+                self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 1)
+                # Nothing more is fed to the sim user (no interim after cutting in).
+                self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 0)
 
     async def test_bot_started_blocked_while_external_interrupt_active(self):
         adapter = _make_adapter(is_external=True)

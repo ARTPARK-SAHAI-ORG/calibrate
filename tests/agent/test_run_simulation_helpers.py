@@ -542,13 +542,11 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
         # saw the clearing ``user-stopped-speaking``.
         adapter._is_bot_interrupt_decided = True
         adapter._is_bot_interrupt_triggered = True
-        adapter._spoken_text_buffer = "stale ack text"
 
         await self._send_bot_started(adapter)
 
         self.assertFalse(adapter._is_bot_interrupt_decided)
         self.assertFalse(adapter._is_bot_interrupt_triggered)
-        self.assertEqual(adapter._spoken_text_buffer, "")
 
 
 class TestBuildSimulatedUserLlm:
