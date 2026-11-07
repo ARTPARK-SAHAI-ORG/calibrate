@@ -146,3 +146,6 @@ site/
 
 # Audio, transcripts and page mapping behind the docs videos
 /docs-video-sources/
+
+# Generated noise assets (built locally via scripts/fetch_noise_assets.py; not committed)
+calibrate_agent/agent/assets/noise/
