@@ -45,7 +45,7 @@ You create **Agent reply** and **Basic** evaluators yourself. **Tool call** eval
 When you create an evaluator, you choose its review type:
 
 - **Binary** gives a pass or fail for each reply. By default the two answers are labelled "Correct" and "Wrong", and you can rename them.
-- **Rating** gives a score on a scale you set, such as 1 to 5.
+- **Rating** gives a score on a rating scale you set, such as 1 to 5. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number.
 
 "Step-by-step reply" is a binary evaluator: the tutor either explained the next step or it did not. "Warm tone" is a rating evaluator: it scores the tutor's reply from 1 (dismissive) to 5 (warm and patient).
 
