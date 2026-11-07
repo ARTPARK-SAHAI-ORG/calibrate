@@ -139,7 +139,6 @@ from pipecat.frames.frames import (
     OutputTransportMessageUrgentFrame,
     Frame,
     InterruptionFrame,
-    InterruptionWorkerFrame,
     TTSStoppedFrame,
     TTSAudioRawFrame,
     ErrorFrame,
@@ -939,9 +938,11 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         # Turn START is left to the aggregator's audio/transcription
                         # start strategies (not a manual UserStartedSpeakingFrame),
                         # so start and the smart-turn stop stay audio-consistent.
-                        await self.push_frame(
-                            InterruptionWorkerFrame(), FrameDirection.UPSTREAM
-                        )
+                        # Broadcast from here rather than asking the pipeline
+                        # worker: the interruption must reach the sim user's LLM
+                        # before any reply this adapter triggers afterwards (an
+                        # interrupt on the agent's first word), or it cancels it.
+                        await self.broadcast_interruption()
                 elif msg_type == "bot-stopped-speaking" and self._pending_user_turn:
                     if self._awaiting_first_bot_audio_chunk:
                         # Tool-only turn: no ``spoken=True`` ever fired, so any

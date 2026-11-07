@@ -292,7 +292,7 @@ async def _drive_rtvi(adapter, msg_type, pushed=None):
     if pushed is None:
         pushed = []
 
-    async def _capture(frame, direction):
+    async def _capture(frame, direction=FrameDirection.DOWNSTREAM):
         pushed.append((frame, direction))
 
     adapter.push_frame = _capture
@@ -305,9 +305,14 @@ def _count_frames(pushed, frame_cls):
 
 
 def _count_interruptions(pushed):
-    from pipecat.frames.frames import InterruptionWorkerFrame
+    from pipecat.frames.frames import InterruptionFrame
+    from pipecat.processors.frame_processor import FrameDirection
 
-    return _count_frames(pushed, InterruptionWorkerFrame)
+    return sum(
+        1
+        for f, d in pushed
+        if isinstance(f, InterruptionFrame) and d == FrameDirection.DOWNSTREAM
+    )
 
 
 class TestNaturalInterrupt(unittest.IsolatedAsyncioTestCase):
@@ -374,7 +379,7 @@ async def _drive_frame(adapter, frame, pushed=None):
     if pushed is None:
         pushed = []
 
-    async def _capture(f, direction):
+    async def _capture(f, direction=FrameDirection.DOWNSTREAM):
         pushed.append((f, direction))
 
     adapter.push_frame = _capture
@@ -424,6 +429,29 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 1)
                 # Nothing more is fed to the sim user (no interim after cutting in).
                 self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 0)
+
+    async def test_first_word_interrupt_follows_the_interruption(self):
+        from pipecat.frames.frames import (
+            InterruptionFrame,
+            TranscriptionFrame,
+            UserStoppedSpeakingFrame,
+        )
+        from pipecat.processors.frame_processor import FrameDirection
+
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(output_dir=tmp, interrupt_probability=1.0)
+            pushed = []
+            await _drive_frame(adapter, _rtvi_frame("bot-started-speaking"), pushed)
+            await _drive_frame(adapter, _bot_output_frame("नमस्ते", True), pushed)
+
+        downstream = [f for f, d in pushed if d == FrameDirection.DOWNSTREAM]
+        first = lambda cls: next(
+            i for i, f in enumerate(downstream) if isinstance(f, cls)
+        )
+        # The sim user's LLM must see the interruption before the reply it
+        # cancels, or the reply is dropped and the run hangs.
+        self.assertLess(first(InterruptionFrame), first(TranscriptionFrame))
+        self.assertLess(first(InterruptionFrame), first(UserStoppedSpeakingFrame))
 
     async def test_bot_started_blocked_while_external_interrupt_active(self):
         adapter = _make_adapter(is_external=True)
