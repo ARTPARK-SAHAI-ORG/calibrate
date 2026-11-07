@@ -938,10 +938,11 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         # Turn START is left to the aggregator's audio/transcription
                         # start strategies (not a manual UserStartedSpeakingFrame),
                         # so start and the smart-turn stop stay audio-consistent.
-                        # Broadcast from here rather than asking the pipeline
-                        # worker: the interruption must reach the sim user's LLM
-                        # before any reply this adapter triggers afterwards (an
-                        # interrupt on the agent's first word), or it cancels it.
+                        # The agent under test started speaking, so cancel any reply
+                        # the simulated user is making. The cancel is sent from here
+                        # so it takes effect immediately. If it took effect later, it
+                        # could wipe out the reply the simulated user starts when it
+                        # interrupts on the agent's first word, and the run would hang.
                         await self.broadcast_interruption()
                 elif msg_type == "bot-stopped-speaking" and self._pending_user_turn:
                     if self._awaiting_first_bot_audio_chunk:
