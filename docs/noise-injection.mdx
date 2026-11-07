@@ -5,14 +5,14 @@ description: "Simulate a caller in a noisy place to stress-test your agent's spe
 
 Background noise makes the **simulated caller** in a [voice
 simulation](/quickstart/simulations) sound like a real person calling from a
-real, noisy place — a busy street, a cafe, a home with a crying baby. Noise is
+real, noisy place: a busy street, a cafe, a home with a crying baby. Noise is
 mixed continuously into the simulated user's outgoing audio for the whole call,
 so your agent's speech-to-text hears `caller speech + background`, exactly as it
 would in production.
 
 This is an **evaluation-realism** feature: it measures how well your agent's STT
 and turn-taking hold up under realistic background conditions. It only affects
-the voice-agent simulation path — not standalone STT evaluation.
+the voice-agent simulation path, not standalone STT evaluation.
 
 <Note>
   Noise is **off by default**. Existing simulation runs are unchanged unless you
@@ -23,7 +23,7 @@ the voice-agent simulation path — not standalone STT evaluation.
 
 For each simulation, Calibrate assembles one looping background track (a "bed")
 and mixes it under the simulated caller's voice. The bed is **constant for the
-whole call** — a caller is in one place — while variety happens *across* the
+whole call**, a caller is in one place, while variety happens *across* the
 batch of simulations.
 
 When noise is on, each run saves **both** the noisy audio the agent actually
@@ -34,17 +34,17 @@ files), so you can compare the two.
 
 Steady sounds like rain or an engine sit in a different frequency band than
 speech, so recognizers can often still "hear" the words underneath. Background
-**people talking** is the hard case — it is speech masking speech, in the same
+**people talking** is the hard case: it is speech masking speech, in the same
 frequency band, so the recognizer can mistake background words for the caller's
 words. For Indian voice agents this matters specifically: an STT tuned for Indian
-languages exposed to background Hindi can hallucinate Hindi words — the exact
+languages exposed to background Hindi can hallucinate Hindi words, the exact
 production failure this feature helps you catch. Background speaker voices are
 therefore drawn from Indian-language speech and **matched to the simulation's
 language** automatically.
 
 ## The `noise` block
 
-Noise is a **per-persona** setting — a caller's environment belongs to that
+Noise is a **per-persona** setting: a caller's environment belongs to that
 caller. Add a `noise` block **inside a persona** in the `personas` array (the
 same config JSON you pass with `-c`). Different personas can have different
 noise; omit the block for a clean caller.
@@ -92,14 +92,14 @@ seed (this is the shape of the `noise` block you place inside a persona):
 
 `environment` and `people` are selected **independently** and merged into one
 bed. Set both for a mixed scene, one for environment-only or people-only, or
-neither for a clean call. You never set a language here — background people are
+neither for a clean call. You never set a language here. Background people are
 matched to the simulation's language automatically.
 
 ## Environment options
 
 `environment` accepts a single sound, a named scene, an explicit list of
 ingredients to merge (e.g. `["rain", "car_horn", "engine"]`), or `"none"`.
-Scenes are generated live from a recipe — every `busy_street` call is a
+Scenes are generated live from a recipe: every `busy_street` call is a
 different busy street.
 
 ### Single sounds (12)
@@ -130,8 +130,8 @@ where it makes sense):
 
 `people` controls how many background voices overlap. Each crowd is assembled
 fresh per simulation from the simulation-language speaker pool, then processed to
-sound like distant room chatter — muffled and reverberant, not crisp
-foreground speech — so it reads as real background speakers.
+sound like distant room chatter, muffled and reverberant, not crisp
+foreground speech, so it reads as real background speakers.
 
 | Level    | Voices | Feels like                                        |
 | -------- | ------ | ------------------------------------------------- |
@@ -141,7 +141,7 @@ foreground speech — so it reads as real background speakers.
 | `heavy`  | 8–12   | a packed cafe, market, or crowded station         |
 
 <Note>
-  `single` is its own hard case, not just "less crowd" — one clearly audible
+  `single` is its own hard case, not just "less crowd": one clearly audible
   voice gives the recognizer real words to grab onto.
 </Note>
 
@@ -164,14 +164,14 @@ is `moderate`; in the variety modes (`random`, `mixture`) the default is `any`.
 
 ## Modes
 
-Because `noise` lives on a **persona**, `noise.mode` is applied **per persona** —
+Because `noise` lives on a **persona**, `noise.mode` is applied **per persona**:
 it decides how conditions are assigned across *that persona's own runs* (a persona
 gets one run per scenario). Each persona has its own independent distribution; the
 draw is seeded per `(persona, scenario)` so it's reproducible.
 
 <Note>
   `random` and `mixture` only show variety when a persona runs across **several
-  scenarios** — a persona with a single scenario just gets one seeded draw. For one
+  scenarios**, a persona with a single scenario just gets one seeded draw. For one
   labelled condition per caller, use many personas on `fixed` (see
   `examples/agent/simulation/sample_voice_noise_matrix.json`); to spray one caller
   with varied noise, use one persona on `random`/`mixture` with several scenarios.
@@ -191,7 +191,7 @@ draw is seeded per `(persona, scenario)` so it's reproducible.
     ```
   </Tab>
   <Tab title="fixed">
-    One condition applied to every one of this persona's runs — a controlled A/B
+    One condition applied to every one of this persona's runs, a controlled A/B
     against a clean baseline.
 
     ```json
@@ -209,7 +209,7 @@ draw is seeded per `(persona, scenario)` so it's reproducible.
   <Tab title="random">
     Each of this persona's runs independently samples an environment, people
     density, and loudness. `clean_fraction` makes some of those runs clean
-    controls. (Varies across the persona's scenarios — one scenario yields one draw.)
+    controls. (Varies across the persona's scenarios: one scenario yields one draw.)
 
     ```json
     {
@@ -243,7 +243,7 @@ draw is seeded per `(persona, scenario)` so it's reproducible.
 
 <Note>
   A `sweep` mode is **not** supported. The batch size is fixed at `personas ×
-  scenarios`, so there is no run-count knob to sweep over — use `random` for
+  scenarios`, so there is no run-count knob to sweep over. Use `random` for
   variety within the fixed run count.
 </Note>
 
