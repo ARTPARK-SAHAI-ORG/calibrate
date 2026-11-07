@@ -45,7 +45,7 @@ calibrate evaluators create-version [flags]
 | `-e, --evaluator-uuid` | string | **Required.** Evaluator to add a version to |
 | `-j, --judge-model` | openai/gpt-4.1 | **Required.** The model that runs the judge, named the way its provider does, for example openai/gpt-4.1 or `anthropic/claude-sonnet-4` |
 | `-m, --make-live` | true | When true, immediately point the evaluator's live version at this new version |
-| `--output-config` | rating | The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own |
+| `--output-config` | rating | The rows of the rating scale, each a number and its label. Required for a rating evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own |
 | `-s, --system-prompt` | — | **Required.** &#123; &#123;variable&#125; &#125;   Judge system prompt. May contain &#123; &#123;variable&#125; &#125; placeholders |
 | `-v, --variables` | string | Declared prompt variables. Omit if the prompt has none. After the first version the variable names are fixed. You can change a variable's description or default, but not add, remove, or rename one |
 
