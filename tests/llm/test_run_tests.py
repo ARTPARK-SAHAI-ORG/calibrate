@@ -482,8 +482,9 @@ class TestRunTestExternalInputs(unittest.IsolatedAsyncioTestCase):
             def __init__(self):
                 self.recorded = {}
 
-            async def call(self, messages, model=None, inputs=None):
+            async def call(self, messages, model=None, inputs=None, extra=None):
                 self.recorded["inputs"] = inputs
+                self.recorded["extra"] = extra
                 return {"response": "hi", "tool_calls": []}
 
         agent = RecordingAgent()
@@ -504,6 +505,36 @@ class TestRunTestExternalInputs(unittest.IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(agent.recorded["inputs"], inputs)
+
+    async def test_variant_extra_passed_through_to_agent_call(self):
+        from calibrate_agent.llm.run_tests import run_test_external
+
+        class RecordingAgent:
+            def __init__(self):
+                self.recorded = {}
+
+            async def call(self, messages, model=None, inputs=None, extra=None):
+                self.recorded["extra"] = extra
+                return {"response": "hi", "tool_calls": []}
+
+        agent = RecordingAgent()
+        extra = {"reasoning": {"effort": "high"}}
+
+        mock_judge = AsyncMock(
+            return_value={"greeting": {"match": True, "reasoning": "ok"}}
+        )
+        with patch(
+            "calibrate_agent.llm.run_tests.test_response_llm_judge", mock_judge
+        ):
+            await run_test_external(
+                chat_history=[{"role": "user", "content": "Hi"}],
+                evaluation={"type": "response", "criteria": [{"name": "greeting"}]},
+                agent=agent,
+                extra=extra,
+                evaluators=[_binary_ev("greeting")],
+            )
+
+        self.assertEqual(agent.recorded["extra"], extra)
 
 
 if __name__ == "__main__":

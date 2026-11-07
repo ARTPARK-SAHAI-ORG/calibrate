@@ -581,5 +581,268 @@ class TestLLMSimulationsRun(unittest.IsolatedAsyncioTestCase):
             gl.assert_called_once_with(output_dir="/tmp/x", save_dir="/tmp/y")
 
 
+
+
+class TestModelVariants(unittest.IsolatedAsyncioTestCase):
+    """Two runs of the same model, each with its own request fields."""
+
+    @staticmethod
+    def _test_cases():
+        return [{
+            "id": "tc1",
+            "history": [{"role": "user", "content": "hi"}],
+            "evaluation": {"type": "response", "criteria": "respond"},
+        }]
+
+    async def test_two_variants_of_one_model_keep_separate_folders(self):
+        from calibrate_agent.llm import tests
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+        variants = [
+            {
+                "id": "gpt-5#1",
+                "model": "openai/gpt-5",
+                "label": "gpt-5 (high thinking)",
+                "extra": {"reasoning": {"effort": "high"}},
+            },
+            {
+                "id": "gpt-5#2",
+                "model": "openai/gpt-5",
+                "label": "gpt-5 (low thinking)",
+                "extra": {"reasoning": {"effort": "low"}},
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate_agent.llm.run_tests.run_test_external",
+                   AsyncMock(return_value=fake_test_result)) as mock_external:
+            result = await tests.run(
+                test_cases=self._test_cases(),
+                output_dir=tmp,
+                agent=MagicMock(),
+                variants=variants,
+            )
+
+            self.assertEqual(set(result.keys()), {"gpt-5#1", "gpt-5#2"})
+            for variant_id in ("gpt-5#1", "gpt-5#2"):
+                folder = Path(tmp) / variant_id
+                self.assertTrue((folder / "results.json").exists())
+                metrics = json.loads((folder / "metrics.json").read_text())
+                self.assertEqual(metrics["total"], 1)
+                self.assertEqual(
+                    result[variant_id]["output_dir"], str(folder)
+                )
+            self.assertEqual(
+                json.loads((Path(tmp) / "gpt-5#1" / "metrics.json").read_text())["label"],
+                "gpt-5 (high thinking)",
+            )
+
+        # Each variant sent its own extra fields, under the same model name.
+        sent = [call.kwargs for call in mock_external.await_args_list]
+        self.assertEqual({c["model"] for c in sent}, {"openai/gpt-5"})
+        self.assertEqual(
+            sorted((c["extra"]["reasoning"]["effort"] for c in sent)),
+            ["high", "low"],
+        )
+
+    async def test_variant_id_used_verbatim_including_colons(self):
+        from calibrate_agent.llm import tests
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate_agent.llm.run_tests.run_test_external",
+                   AsyncMock(return_value=fake_test_result)):
+            await tests.run(
+                test_cases=self._test_cases(),
+                output_dir=tmp,
+                agent=MagicMock(),
+                variants=[{"id": "qwen3:free", "model": "qwen/qwen3:free"}],
+            )
+            self.assertTrue((Path(tmp) / "qwen3:free" / "metrics.json").exists())
+
+    async def test_variant_failure_is_recorded_against_that_variant(self):
+        from calibrate_agent.llm import tests
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate_agent.llm._Tests._run_single_model",
+                   AsyncMock(side_effect=[RuntimeError("boom"),
+                                          {"status": "completed"}])):
+            result = await tests.run(
+                test_cases=self._test_cases(),
+                output_dir=tmp,
+                agent=MagicMock(),
+                variants=[
+                    {"id": "v1", "model": "m"},
+                    {"id": "v2", "model": "m"},
+                ],
+            )
+
+        self.assertEqual(result["v1"], {"status": "error", "error": "boom"})
+        self.assertEqual(result["v2"]["status"], "completed")
+
+    async def test_plain_model_list_is_unchanged(self):
+        """The existing ``-m model1 model2`` form keeps its folder names and
+        sends no extra fields."""
+        from calibrate_agent.llm import tests
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate_agent.llm.run_tests.run_test_external",
+                   AsyncMock(return_value=fake_test_result)) as mock_external:
+            result = await tests.run(
+                test_cases=self._test_cases(),
+                output_dir=tmp,
+                agent=MagicMock(),
+                models=["openai/gpt-5", "gpt-4o"],
+            )
+
+            self.assertEqual(set(result.keys()), {"openai/gpt-5", "gpt-4o"})
+            self.assertTrue((Path(tmp) / "openai__gpt-5" / "metrics.json").exists())
+            self.assertTrue((Path(tmp) / "gpt-4o" / "metrics.json").exists())
+            metrics = json.loads(
+                (Path(tmp) / "gpt-4o" / "metrics.json").read_text()
+            )
+            self.assertNotIn("label", metrics)
+
+        for call in mock_external.await_args_list:
+            self.assertIsNone(call.kwargs["extra"])
+
+    async def test_leaderboard_rows_follow_the_variant_folders(self):
+        """End to end: the leaderboard reads the variant folders, so its model
+        column is the variant id and its label column the variant label."""
+        import pandas as pd
+
+        from calibrate_agent.llm import tests
+        from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+
+        with tempfile.TemporaryDirectory() as tmp, \
+             patch("calibrate_agent.llm.run_tests.run_test_external",
+                   AsyncMock(return_value=fake_test_result)):
+            await tests.run(
+                test_cases=self._test_cases(),
+                output_dir=tmp,
+                agent=MagicMock(),
+                variants=[
+                    {"id": "gpt-5#1", "model": "openai/gpt-5", "label": "high"},
+                    {"id": "gpt-5#2", "model": "openai/gpt-5", "label": "low"},
+                ],
+            )
+            save_dir = Path(tmp) / "leaderboard"
+            generate_leaderboard(tmp, str(save_dir))
+            df = pd.read_csv(save_dir / "llm_leaderboard.csv")
+
+        self.assertEqual(list(df["model"]), ["gpt-5#1", "gpt-5#2"])
+        self.assertEqual(list(df["label"]), ["high", "low"])
+
+    async def test_changed_extra_reruns_instead_of_resuming(self):
+        """The same variant id with different request fields is a different
+        run, so the earlier results are replaced rather than reused."""
+        from calibrate_agent.llm import tests
+
+        fake_test_result = {
+            "output": {"response": "Hi", "tool_calls": []},
+            "metrics": {"passed": True, "judge_results": {}},
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            async def run_with_effort(effort):
+                mock_external = AsyncMock(return_value=fake_test_result)
+                with patch("calibrate_agent.llm.run_tests.run_test_external",
+                           mock_external):
+                    await tests.run(
+                        test_cases=self._test_cases(),
+                        output_dir=tmp,
+                        agent=MagicMock(),
+                        variants=[{
+                            "id": "gpt-5#1",
+                            "model": "openai/gpt-5",
+                            "extra": {"reasoning": {"effort": effort}},
+                        }],
+                    )
+                return mock_external.await_count
+
+            self.assertEqual(await run_with_effort("high"), 1)
+            # Same fields → the completed test case resumes, nothing re-runs.
+            self.assertEqual(await run_with_effort("high"), 0)
+            # Changed fields → the test case runs again.
+            self.assertEqual(await run_with_effort("low"), 1)
+
+            saved = json.loads(
+                (Path(tmp) / "gpt-5#1" / "variant.json").read_text()
+            )
+            self.assertEqual(saved["extra"], {"reasoning": {"effort": "low"}})
+
+    async def test_ids_differing_only_in_case_are_rejected(self):
+        """Two such ids would share one folder on macOS and overwrite each
+        other's results."""
+        from calibrate_agent.llm import tests
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                await tests.run(
+                    test_cases=self._test_cases(),
+                    output_dir=tmp,
+                    agent=MagicMock(),
+                    variants=[
+                        {"id": "gpt5-high", "model": "m"},
+                        {"id": "GPT5-high", "model": "m"},
+                    ],
+                )
+
+    async def test_leaderboard_id_is_rejected(self):
+        """That folder holds the leaderboard, so a variant with that id would
+        run and then be missing from the leaderboard."""
+        from calibrate_agent.llm import tests
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                await tests.run(
+                    test_cases=self._test_cases(),
+                    output_dir=tmp,
+                    agent=MagicMock(),
+                    variants=[{"id": "leaderboard", "model": "m"}],
+                )
+
+    async def test_variants_without_an_agent_are_rejected(self):
+        from calibrate_agent.llm import tests
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError) as cm:
+                await tests.run(
+                    test_cases=self._test_cases(),
+                    output_dir=tmp,
+                    variants=[{"id": "v1", "model": "m"}],
+                )
+        self.assertIn("agent", str(cm.exception))
+
+    async def test_bad_variants_are_rejected(self):
+        from calibrate_agent.llm import tests
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(ValueError):
+                await tests.run(
+                    test_cases=self._test_cases(),
+                    output_dir=tmp,
+                    agent=MagicMock(),
+                    variants=[{"id": "../escape", "model": "m"}],
+                )
+
+
 if __name__ == "__main__":
     unittest.main()
