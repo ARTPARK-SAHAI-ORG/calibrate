@@ -11,7 +11,7 @@ A simulation evaluator scores a whole conversation in a [simulation](/app/simula
 There are two kinds of score:
 
 - Pass or fail. "Explains step by step" asks: does the tutor explain the next step instead of giving the final answer straight away?
-- A rating on a scale. "Encouraging tone" rates the tutor from 1 (dismissive) to 5 (warm and patient).
+- A rating on a scale. "Encouraging tone" rates the tutor from 1 (dismissive) to 5 (warm and patient). For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number.
 
 ## See your simulation evaluators
 
@@ -39,7 +39,7 @@ Each evaluator has three buttons:
 
 1. Click **Create evaluator** at the top right of the page. The **Add evaluator** window opens.
 2. Enter a **Name**, such as "Explains step by step". **Description** is optional and shows in the list.
-3. Under **Review type**, pick **Binary** for pass or fail, or **Rating** for a score on a scale. For **Binary**, you can change the **Labels** shown for a pass and a fail. For **Rating**, set the levels of the scale.
+3. Under **Review type**, pick **Binary** for pass or fail, or **Rating** for a score on a scale. For **Binary**, you can change the **Labels** shown for a pass and a fail. For **Rating**, set the rows of the rating scale, each a number and a label. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number.
 
 <Frame>
   <img src="/images/app/simulations-create-evaluator.png" alt="The Add evaluator window with Name, Description, Review type set to Binary, and the True and False labels" />

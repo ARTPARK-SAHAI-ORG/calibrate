@@ -3231,7 +3231,7 @@
                 "type": "null"
               }
             ],
-            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+            "description": "The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
           },
           "variables": {
             "anyOf": [
@@ -3284,7 +3284,7 @@
                 "type": "null"
               }
             ],
-            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+            "description": "The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
           },
           "variables": {
             "anyOf": [
@@ -3331,7 +3331,7 @@
                 "type": "null"
               }
             ],
-            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+            "description": "The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
           },
           "variables": {
             "anyOf": [
@@ -4423,7 +4423,7 @@
               }
             ],
             "title": "Scale",
-            "description": "The ordered scale points that make up the rubric, each with its label"
+            "description": "The rows of the rating scale, each a number and its label. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number"
           }
         },
         "type": "object",
@@ -4433,12 +4433,12 @@
         "properties": {
           "value": {
             "title": "Value",
-            "description": "The value for this scale point. Use a boolean for a `binary` evaluator, a number for a `rating` one"
+            "description": "The value for this row. Use a boolean for a `binary` evaluator, a number for a `rating` one. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number"
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Short label for this scale point"
+            "description": "Short label for this row"
           },
           "description": {
             "anyOf": [
@@ -4450,7 +4450,7 @@
               }
             ],
             "title": "Description",
-            "description": "Rubric text for this level, added to the judge prompt. Omit to leave this level undescribed"
+            "description": "Rubric text for this row, added to the judge prompt. Omit to leave this row undescribed"
           },
           "color": {
             "anyOf": [
@@ -4462,7 +4462,7 @@
               }
             ],
             "title": "Color",
-            "description": "Color to show for this level. Omit for the default"
+            "description": "Color to show for this row. Omit for the default"
           }
         },
         "type": "object",
