@@ -15,14 +15,13 @@ and turn-taking hold up under realistic background conditions. It only affects
 the voice-agent simulation path, not standalone STT evaluation.
 
 <Note>
-  Noise is **off by default**. Existing simulation runs are unchanged unless you
-  add a `noise` block to your config.
+  Noise is **off by default**. Add a `noise` block to your config to turn it on.
 </Note>
 
 ## How it works
 
-For each simulation, Calibrate assembles one looping background track (a "bed")
-and mixes it under the simulated caller's voice. The bed is **constant for the
+For each simulation, Calibrate assembles one looping background track
+and mixes it under the simulated caller's voice. The track is **constant for the
 whole call**, a caller is in one place, while variety happens *across* the
 batch of simulations.
 
@@ -71,7 +70,7 @@ noise; omit the block for a clean caller.
   personas, but the recommended, per-caller place is inside each persona.
 </Note>
 
-A single condition (an "atom") is described by three knobs plus an optional
+A single noise condition is described by three fields plus an optional
 seed (this is the shape of the `noise` block you place inside a persona):
 
 ```json
@@ -91,7 +90,7 @@ seed (this is the shape of the `noise` block you place inside a persona):
 | `seed`        | Optional integer for reproducibility (see [Reproducibility](#reproducibility)). |
 
 `environment` and `people` are selected **independently** and merged into one
-bed. Set both for a mixed scene, one for environment-only or people-only, or
+track. Set both for a mixed scene, one for environment-only or people-only, or
 neither for a clean call. You never set a language here. Background people are
 matched to the simulation's language automatically.
 
@@ -179,8 +178,7 @@ draw is seeded per `(persona, scenario)` so it's reproducible.
 
 <Tabs>
   <Tab title="off">
-    Clean everywhere. Equivalent to omitting the `noise` block. Existing runs
-    are unchanged.
+    Clean everywhere. Equivalent to omitting the `noise` block.
 
     ```json
     {
@@ -223,7 +221,7 @@ draw is seeded per `(persona, scenario)` so it's reproducible.
   </Tab>
   <Tab title="mixture">
     Each of this persona's runs weighted-picks one condition from the list. Each
-    entry has a `weight` and a `spec` (an atom, or `"off"` for a clean slice).
+    entry has a `weight` and a `spec` (a noise condition, or `"off"` for a clean slice).
 
     ```json
     {
@@ -242,9 +240,8 @@ draw is seeded per `(persona, scenario)` so it's reproducible.
 </Tabs>
 
 <Note>
-  A `sweep` mode is **not** supported. The batch size is fixed at `personas ×
-  scenarios`, so there is no run-count knob to sweep over. Use `random` for
-  variety within the fixed run count.
+  The batch size is fixed at `personas × scenarios`. Use `random` for variety
+  within that fixed run count.
 </Note>
 
 ## Reproducibility
@@ -254,10 +251,10 @@ draw and the live crowd assembly are seeded from it, so run *i* always gets the
 same condition and the same background audio. Re-running with the same seed
 reproduces identical audio, which is useful for debugging a specific failure.
 
-## Next Steps
+## Next steps
 
 <CardGroup cols={2}>
-  <Card title="Run Simulations" icon="comments" href="/quickstart/simulations">
+  <Card title="Run simulations" icon="comments" href="/quickstart/simulations">
     Test your agent with combinations of personas and scenarios
   </Card>
   <Card title="Personas" icon="user" href="/core-concepts/personas">
