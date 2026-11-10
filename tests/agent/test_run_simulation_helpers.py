@@ -180,7 +180,7 @@ class TestConfigWithoutTools(unittest.IsolatedAsyncioTestCase):
             "characteristics": "polite",
             "gender": "neutral",
             "language": "english",
-            "interruption_sensitivity": "none",
+            "interruption_config": {"sensitivity": "none"},
         }
         scenario = {"name": "s", "description": "d"}
 
@@ -551,23 +551,40 @@ class TestInterruptionSettingsValidation(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_rejects_bad_word_counts(self):
-        for key in ("interruption_min_words", "interruption_max_words"):
+        for key in ("min_words", "max_words"):
             for value in (0, -1, 2.5, "5", True):
                 with self.subTest(key=key, value=value):
-                    with self.assertRaisesRegex(ValueError, f"Invalid {key}"):
-                        await self._run({key: value})
+                    with self.assertRaisesRegex(
+                        ValueError, f"Invalid interruption_config.{key}"
+                    ):
+                        await self._run({"interruption_config": {key: value}})
 
     async def test_rejects_max_below_min(self):
         with self.assertRaisesRegex(ValueError, "must be at least"):
             await self._run(
-                {"interruption_min_words": 5, "interruption_max_words": 4}
+                {"interruption_config": {"min_words": 5, "max_words": 4}}
             )
 
     async def test_rejects_empty_phrase(self):
         for value in ("", "  ", "?!", 5):
             with self.subTest(value=value):
-                with self.assertRaisesRegex(ValueError, "interrupt_when_agent_says"):
-                    await self._run(scenario_extra={"interrupt_when_agent_says": value})
+                with self.assertRaisesRegex(ValueError, "when_agent_says"):
+                    await self._run(
+                        scenario_extra={"interruption_config": {"when_agent_says": value}}
+                    )
+
+    async def test_rejects_old_top_level_sensitivity(self):
+        with self.assertRaisesRegex(ValueError, "interruption_config"):
+            await self._run({"interruption_sensitivity": "low"})
+
+    async def test_rejects_unknown_or_malformed_config(self):
+        for persona_extra in (
+            {"interruption_config": {"min_word": 3}},
+            {"interruption_config": "high"},
+        ):
+            with self.subTest(persona_extra=persona_extra):
+                with self.assertRaisesRegex(ValueError, "interruption_config"):
+                    await self._run(persona_extra)
 
 
 class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):

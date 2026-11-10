@@ -2124,6 +2124,20 @@ async def _run_simulation_inner(
     }
 
 
+def _interruption_config(item: dict, kind: str, allowed: set[str]) -> dict:
+    """Return the ``interruption_config`` dict of a persona or scenario, or {}."""
+    config = item.get("interruption_config") or {}
+    if not isinstance(config, dict):
+        raise ValueError(f"interruption_config on a {kind} must be an object.")
+    unknown = set(config) - allowed
+    if unknown:
+        raise ValueError(
+            f"Unknown key(s) {sorted(unknown)} in a {kind}'s interruption_config. "
+            f"Allowed: {sorted(allowed)}."
+        )
+    return config
+
+
 async def run_single_simulation_task(
     semaphore: asyncio.Semaphore,
     config: dict,
@@ -2163,40 +2177,52 @@ async def _run_single_simulation_inner(
     characteristics = user_persona.get("characteristics", "")
     gender = user_persona.get("gender", "")
     language = user_persona.get("language", "english")
-    interruption_sensitivity = user_persona.get("interruption_sensitivity", "none")
+    if "interruption_sensitivity" in user_persona:
+        raise ValueError(
+            "interruption_sensitivity on a persona is not supported. Put it inside "
+            'the persona\'s interruption_config as "sensitivity", e.g. '
+            '"interruption_config": {"sensitivity": "low"}.'
+        )
+    persona_interruption = _interruption_config(
+        user_persona, "persona", {"sensitivity", "min_words", "max_words"}
+    )
+    interruption_sensitivity = persona_interruption.get("sensitivity", "none")
 
     # Get interrupt probability from mapping
     interrupt_probability = interrupt_sensitivity_map.get(interruption_sensitivity)
     if interrupt_probability is None:
         raise ValueError(
-            f"Invalid interruption_sensitivity '{interruption_sensitivity}'. "
+            f"Invalid interruption_config.sensitivity '{interruption_sensitivity}'. "
             f"Must be one of: {list(interrupt_sensitivity_map.keys())}"
         )
-    interrupt_min_words = user_persona.get(
-        "interruption_min_words", DEFAULT_INTERRUPTION_MIN_WORDS
+    interrupt_min_words = persona_interruption.get(
+        "min_words", DEFAULT_INTERRUPTION_MIN_WORDS
     )
-    interrupt_max_words = user_persona.get(
-        "interruption_max_words", DEFAULT_INTERRUPTION_MAX_WORDS
+    interrupt_max_words = persona_interruption.get(
+        "max_words", DEFAULT_INTERRUPTION_MAX_WORDS
     )
     for key, value in (
-        ("interruption_min_words", interrupt_min_words),
-        ("interruption_max_words", interrupt_max_words),
+        ("min_words", interrupt_min_words),
+        ("max_words", interrupt_max_words),
     ):
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise ValueError(
-                f"Invalid {key} {value!r}. Must be a whole number of 1 or more."
+                f"Invalid interruption_config.{key} {value!r}. "
+                "Must be a whole number of 1 or more."
             )
     if interrupt_max_words < interrupt_min_words:
         raise ValueError(
-            f"interruption_max_words ({interrupt_max_words}) must be at least "
-            f"interruption_min_words ({interrupt_min_words})."
+            f"interruption_config.max_words ({interrupt_max_words}) must be at "
+            f"least interruption_config.min_words ({interrupt_min_words})."
         )
-    interrupt_phrase = scenario.get("interrupt_when_agent_says")
+    interrupt_phrase = _interruption_config(
+        scenario, "scenario", {"when_agent_says"}
+    ).get("when_agent_says")
     if interrupt_phrase is not None and (
         not isinstance(interrupt_phrase, str) or not _words(interrupt_phrase)
     ):
         raise ValueError(
-            f"Invalid interrupt_when_agent_says {interrupt_phrase!r}. "
+            f"Invalid interruption_config.when_agent_says {interrupt_phrase!r}. "
             "Must be a phrase with at least one word."
         )
 

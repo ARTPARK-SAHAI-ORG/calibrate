@@ -90,7 +90,7 @@ class _Simulation:
         Args:
             system_prompt: System prompt for the voice agent
             tools: List of tool definitions available to the agent
-            personas: List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_sensitivity'
+            personas: List of persona dicts with 'characteristics', 'gender', 'language', optional 'interruption_config'
             scenarios: List of scenario dicts with 'description'
             evaluators: List of evaluator dicts with 'name', 'system_prompt', and optional 'judge_model'/'type'/'scale_min'/'scale_max'
             output_dir: Path to output directory for results (default: ./out)
@@ -114,7 +114,7 @@ class _Simulation:
             ...         "characteristics": "A shy mother named Geeta...",
             ...         "gender": "female",
             ...         "language": "english",
-            ...         "interruption_sensitivity": "medium"
+            ...         "interruption_config": {"sensitivity": "medium"}
             ...     }],
             ...     scenarios=[{"description": "User completes the form"}],
             ...     evaluators=[{"name": "completeness", "system_prompt": "Evaluate whether all questions were answered..."}],
