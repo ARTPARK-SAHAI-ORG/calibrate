@@ -581,6 +581,8 @@ class TestInterruptionSettingsValidation(unittest.IsolatedAsyncioTestCase):
         for persona_extra in (
             {"interruption_config": {"min_word": 3}},
             {"interruption_config": "high"},
+            {"interruption_config": []},
+            {"interruption_config": False},
         ):
             with self.subTest(persona_extra=persona_extra):
                 with self.assertRaisesRegex(ValueError, "interruption_config"):

@@ -2126,7 +2126,9 @@ async def _run_simulation_inner(
 
 def _interruption_config(item: dict, kind: str, allowed: set[str]) -> dict:
     """Return the ``interruption_config`` dict of a persona or scenario, or {}."""
-    config = item.get("interruption_config") or {}
+    config = item.get("interruption_config")
+    if config is None:
+        return {}
     if not isinstance(config, dict):
         raise ValueError(f"interruption_config on a {kind} must be an object.")
     unknown = set(config) - allowed
@@ -2513,7 +2515,7 @@ async def main():
     os.makedirs(args.output_dir, exist_ok=True)
     write_evaluator_config(args.output_dir, config["evaluators"])
 
-    # Mapping from interruption_sensitivity labels to probabilities
+    # Mapping from interruption_config.sensitivity labels to probabilities
     interrupt_sensitivity_map = {
         "none": 0,
         "low": 0.2,
