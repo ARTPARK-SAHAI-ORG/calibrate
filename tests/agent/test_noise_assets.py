@@ -74,6 +74,8 @@ def test_env_ingredient_paths_steady():
 
 
 def test_speaker_pool_hindi():
+    if not (_bundle_root() / "speakers" / "hindi").is_dir():
+        pytest.skip("hindi speaker clips not built (env-only bundle)")
     assets = NoiseAssets(root=str(_bundle_root()))
     pool = assets.speaker_pool("hindi")
     assert pool, "hindi speaker pool empty"

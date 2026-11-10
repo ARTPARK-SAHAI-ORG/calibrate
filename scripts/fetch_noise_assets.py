@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -140,6 +141,32 @@ def fetch_speakers(languages: list[str], overwrite: bool) -> None:
                 print(f"[spk] WARNING: {config} yielded {got}/{count} {target_lang} clips")
 
 
+def check_speaker_access() -> str | None:
+    """Verify Hugging Face login and access to the gated Vaani dataset.
+
+    Returns a message explaining what to fix, or None when setup is good.
+    """
+    from huggingface_hub import HfApi, get_token
+
+    if get_token() is None:
+        return (
+            f"Not logged in to Hugging Face, which the {VAANI_DATASET} speaker "
+            "clips require.\n"
+            "    Fix: run `huggingface-cli login` (or set HF_TOKEN),\n"
+            "    or re-run with --skip-speakers to build environmental sounds only."
+        )
+    try:
+        HfApi().dataset_info(VAANI_DATASET)
+    except Exception as exc:
+        return (
+            f"Logged in, but cannot access the gated dataset {VAANI_DATASET} "
+            f"({type(exc).__name__}: {exc}).\n"
+            f"    Fix: accept its terms at https://huggingface.co/datasets/{VAANI_DATASET},\n"
+            "    or re-run with --skip-speakers."
+        )
+    return None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
@@ -153,13 +180,21 @@ def main() -> None:
     ap.add_argument("--overwrite", action="store_true", help="re-download clips that already exist")
     args = ap.parse_args()
 
-    if not args.skip_env:
-        fetch_env(args.overwrite)
+    # Verify everything before downloading anything, so a setup gap fails fast
+    # instead of part-way through and discarding what was already fetched.
+    languages: list[str] = []
     if not args.skip_speakers:
         languages = [l.strip() for l in args.languages.split(",") if l.strip()]
         unknown = [l for l in languages if l not in VAANI_LANGUAGES]
         if unknown:
             ap.error(f"unknown languages: {unknown} (choose from {list(VAANI_LANGUAGES)})")
+        problem = check_speaker_access()
+        if problem:
+            sys.exit(f"✗ Setup incomplete, nothing downloaded:\n    {problem}")
+
+    if not args.skip_env:
+        fetch_env(args.overwrite)
+    if not args.skip_speakers:
         fetch_speakers(languages, args.overwrite)
 
     if not args.no_prepare:
