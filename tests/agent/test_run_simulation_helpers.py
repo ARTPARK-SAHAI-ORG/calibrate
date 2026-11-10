@@ -2,6 +2,7 @@
 
 import asyncio
 import socket
+import tempfile
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -532,12 +533,49 @@ class TestEndToEndLatencyTracker(unittest.TestCase):
         self.assertGreater(tracker.mean(), 0)
 
 
+class TestInterruptionSettingsValidation(unittest.IsolatedAsyncioTestCase):
+    """Bad interruption settings stop the simulation with a clear error."""
+
+    async def _run(self, persona_extra=None, scenario_extra=None):
+        from calibrate_agent.agent import run_simulation as RS
+
+        persona = {"characteristics": "polite", **(persona_extra or {})}
+        scenario = {"description": "d", **(scenario_extra or {})}
+        # If a check is missing, the mocked bot ends at once and the run fails
+        # with a different error instead of starting a real simulation.
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            RS, "start_bot", AsyncMock()
+        ), patch.object(RS, "run_simulation", AsyncMock(return_value={})):
+            await RS._run_single_simulation_inner(
+                {}, 0, persona, 0, scenario, tmp, {"none": 0.0}
+            )
+
+    async def test_rejects_bad_word_counts(self):
+        for key in ("interruption_min_words", "interruption_max_words"):
+            for value in (0, -1, 2.5, "5", True):
+                with self.subTest(key=key, value=value):
+                    with self.assertRaisesRegex(ValueError, f"Invalid {key}"):
+                        await self._run({key: value})
+
+    async def test_rejects_max_below_min(self):
+        with self.assertRaisesRegex(ValueError, "must be at least"):
+            await self._run(
+                {"interruption_min_words": 5, "interruption_max_words": 4}
+            )
+
+    async def test_rejects_empty_phrase(self):
+        for value in ("", "  ", "?!", 5):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "interrupt_when_agent_says"):
+                    await self._run(scenario_extra={"interrupt_when_agent_says": value})
+
+
 class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
     """A new bot utterance must clear stale interrupt flags.
 
     Regression test: agents that speak a turn as separate utterances (a short
-    acknowledgement then the reply) previously left ``_is_bot_interrupt_decided``/
-    ``_is_bot_interrupt_triggered`` set across the utterance boundary, so the next
+    acknowledgement then the reply) previously left ``_is_bot_interrupt_triggered``
+    set across the utterance boundary, so the next
     utterance's audio was dropped and its text ignored — the simulated user never
     "heard" the reply and the run deadlocked.
     """
@@ -575,14 +613,12 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
 
     async def test_stale_interrupt_flags_cleared_on_new_utterance(self):
         adapter = self._make_adapter()
-        # Simulate a prior utterance that decided/triggered an interrupt but never
-        # saw the clearing ``user-stopped-speaking``.
-        adapter._is_bot_interrupt_decided = True
+        # Simulate a prior utterance that triggered an interrupt but never saw the
+        # clearing ``user-stopped-speaking``.
         adapter._is_bot_interrupt_triggered = True
 
         await self._send_bot_started(adapter)
 
-        self.assertFalse(adapter._is_bot_interrupt_decided)
         self.assertFalse(adapter._is_bot_interrupt_triggered)
 
 

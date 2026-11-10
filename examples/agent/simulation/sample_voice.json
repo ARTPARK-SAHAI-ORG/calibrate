@@ -41,7 +41,9 @@
       "characteristics": "You are an impatient customer who has been waiting a long time for your order. Your order ID is ORD-67890. You are frustrated but not rude.",
       "gender": "neutral",
       "language": "english",
-      "interruption_sensitivity": "high"
+      "interruption_sensitivity": "high",
+      "interruption_min_words": 3,
+      "interruption_max_words": 8
     }
   ],
   "scenarios": [

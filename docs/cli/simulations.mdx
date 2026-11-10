@@ -40,7 +40,11 @@ An array of user personas that simulate different types of users interacting wit
 | `characteristics`          | string | Detailed description of **who** the persona represents and **how** they behave                                                     |
 | `gender`                   | string | Gender for voice simulations: `male` or `female`                                                                                   |
 | `language`                 | string | Language the persona speaks: `english`, `hindi`, or `kannada` (more coming soon)                                                   |
-| `interruption_sensitivity` | string | (Voice only) The chance, checked after each word the agent speaks, that the persona cuts in: `none` (0%), `low` (20%), `medium` (40%), `high` (60%) |
+| `interruption_sensitivity` | string | (Voice only) The share of the agent's turns the persona cuts into: `none` (0%), `low` (20%), `medium` (40%), `high` (60%). Each time the agent starts speaking counts as one turn. Default `none`. |
+| `interruption_min_words`   | integer | (Voice only) When the persona cuts into a turn, the fewest words of that turn it hears first. Default `3`. |
+| `interruption_max_words`   | integer | (Voice only) When the persona cuts into a turn, the most words of that turn it hears first. Default `12`. Must be at least `interruption_min_words`. |
+
+For each turn it cuts into, the persona picks a random number of words between `interruption_min_words` and `interruption_max_words`, and cuts in once it has heard that many. If the agent finishes speaking first, the persona does not cut in. Agents that report speech a whole sentence at a time are cut into at the end of the sentence that reaches that number. Both values must be whole numbers of 1 or more. If you set `interruption_min_words` above 12, also set `interruption_max_words`.
 
 ```json
 {
@@ -69,6 +73,7 @@ An array of scenarios that define different conversation patterns to test. For a
 | ------------- | ------ | ------------------------------------------------------ |
 | `name`        | string | A short name for the scenario                          |
 | `description` | string | Instructions for **what** the simulated user should do |
+| `interrupt_when_agent_says` | string | (Voice only) A phrase. The persona cuts in the first time it hears the agent say this phrase. It matches whole words, and capital letters and punctuation are ignored. With agents that report speech a whole sentence at a time, the persona cuts in at the end of the sentence that has the phrase. When set, `interruption_sensitivity` is not used for this scenario. |
 
 ```json
 {
