@@ -50,7 +50,7 @@ An array of user personas that simulate different types of users interacting wit
 | `min_words`   | integer | When the persona cuts into a turn, the fewest words of that turn it hears first. Default `3`. |
 | `max_words`   | integer | When the persona cuts into a turn, the most words of that turn it hears first. Default `12`. Must be at least `min_words`. |
 
-For each turn it cuts into, the persona picks a random number of words between `min_words` and `max_words`, and cuts in once it has heard that many. If the agent finishes speaking first, the persona does not cut in. Agents that report speech a whole sentence at a time are cut into at the end of the sentence that reaches that number. Both values must be whole numbers of 1 or more. If you set `min_words` above 12, also set `max_words`.
+For each turn it cuts into, the persona picks a random number of words between `min_words` and `max_words`, and cuts in once it has heard that many. If the agent finishes speaking first, the persona does not cut in. Some text-to-speech providers do not report each word as the agent speaks it, only each finished sentence. If your agent uses one of these, the persona cuts in when the sentence that reaches that number of words ends. Both values must be whole numbers of 1 or more. If you set `min_words` above 12, also set `max_words`.
 
 ```json
 {
@@ -98,7 +98,7 @@ An array of scenarios that define different conversation patterns to test. For a
 
 | Key               | Type   | Description |
 | ----------------- | ------ | ----------- |
-| `when_agent_says` | string | A phrase. The persona cuts in the first time it hears the agent say this phrase. It matches whole words, and capital letters and punctuation are ignored. With agents that report speech a whole sentence at a time, the persona cuts in at the end of the sentence that has the phrase. When set, the persona's `sensitivity` is not used for this scenario. |
+| `when_agent_says` | string | A phrase. The persona cuts in the first time it hears the agent say this phrase. It matches whole words, and capital letters and punctuation are ignored. If your agent's text-to-speech provider reports only finished sentences, not each word, the persona cuts in when the sentence with the phrase ends. When set, the persona's `sensitivity` is not used for this scenario. |
 
 ```json
 {
