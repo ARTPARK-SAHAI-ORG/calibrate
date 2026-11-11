@@ -1086,7 +1086,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                                 )
                             else:
                                 log_and_print(
-                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message 2: {text}{RESET_COLOR}"
+                                    f"{GENERAL_LOG_COLOR}Agent kept speaking after the cut-in (ignored): {text}{RESET_COLOR}"
                                 )
                                 await self._ensure_bot_transcript_line_for_current_turn(
                                     text
