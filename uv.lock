@@ -346,6 +346,7 @@ source = { editable = "." }
 dependencies = [
     { name = "backoff" },
     { name = "cartesia" },
+    { name = "datasets" },
     { name = "elevenlabs" },
     { name = "evaluate" },
     { name = "indic-nlp-library" },
@@ -389,6 +390,7 @@ dev = [
 requires-dist = [
     { name = "backoff", specifier = ">=2.2.1" },
     { name = "cartesia", specifier = ">=2.0.15,<3" },
+    { name = "datasets", specifier = ">=2.14" },
     { name = "elevenlabs", specifier = ">=2.31.0" },
     { name = "evaluate", specifier = ">=0.4.6" },
     { name = "indic-nlp-library", specifier = ">=0.92" },

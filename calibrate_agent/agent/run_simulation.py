@@ -39,6 +39,7 @@ from calibrate_agent.utils import (
 )
 from calibrate_agent.agent.noise.resolver import resolve_for_run
 from calibrate_agent.agent.noise.assets import NoiseAssets
+from calibrate_agent.agent.noise.download import ensure_assets
 from calibrate_agent.agent.noise.simulation_noise_generator import (
     SimulationNoiseGenerator,
 )
@@ -1608,6 +1609,12 @@ async def _run_simulation_inner(
     )
     if noise is not None:
         assets = NoiseAssets()
+        ensure_assets(
+            assets,
+            env_names=assets.resolve_environment(noise.atom.environment),
+            need_speakers=noise.atom.people != "none",
+            language=language,
+        )
         noise_track_path = os.path.join(output_dir, "noise_track.wav")
         SimulationNoiseGenerator(assets).build(
             noise.atom,

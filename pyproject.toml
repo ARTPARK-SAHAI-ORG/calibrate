@@ -42,6 +42,7 @@ dependencies = [
     "pipecat-ai[cartesia,deepgram,google,groq,openrouter,runner,smallest,tracing,webrtc,websocket]==1.11.0",
     "python-dotenv>=1.2.1",
     "sarvamai>=0.1.21",
+    "datasets>=2.14",
     "scipy>=1.11",
     "simpleaudio>=1.0.4",
     "sounddevice>=0.5.3",

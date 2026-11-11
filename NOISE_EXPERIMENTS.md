@@ -403,11 +403,10 @@ Create a `.env` file at the **root of the calibrate repo** (`calibrate/.env`). T
 
 **If you don't know what to put in this file, ask Aman.**
 
-### 3. Build the noise assets  ⚠️ required, not in git
-The audio assets aren't in git — build them once with a single script. It downloads
-the raw clips (ESC-50 environmental sounds + Vaani speaker clips), places them under
-`data/`, and bundles them into `calibrate_agent/agent/assets/noise/` (resampled to
-16 kHz mono):
+### 3. Build the noise assets
+The audio assets aren't in git. The first simulation that turns on noise builds
+whatever that condition needs automatically (downloads once into
+`calibrate_agent/agent/assets/noise/`). To build everything up front instead, run:
 
 ```bash
 uv run python scripts/fetch_noise_assets.py
@@ -415,8 +414,9 @@ uv run python scripts/fetch_noise_assets.py
 
 The speaker clips come from the **gated ARTPARK-IISc/Vaani** HF dataset, so accept
 its terms and log in first (`huggingface-cli login`, or set `HF_TOKEN`). The ESC-50
-half needs no login. To build only the environmental half (no HF login), run
-`--skip-speakers`.
+environmental sounds need no login. To build only the environmental half, run
+`--skip-speakers`. A noise condition with background people needs the speaker clips,
+so it will stop with a clear message if you are not logged in.
 
 **Sanity check (no keys/assets needed):**
 ```bash
