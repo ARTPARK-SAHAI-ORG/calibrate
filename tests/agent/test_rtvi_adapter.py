@@ -397,11 +397,12 @@ def _count_interrupt_messages(pushed):
 
 
 class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
-    """A decided interrupt cuts the agent off at once, for internal and external
-    agents alike. External agents also get their output blocked until the sim user
-    finishes."""
+    """A decided interrupt ends the agent's turn at once, for internal and external
+    agents alike, so the sim user starts its reply. The agent is told to stop when
+    that reply starts playing. External agents also get their output blocked until
+    the sim user finishes."""
 
-    async def test_interrupt_executes_immediately(self):
+    async def test_cut_in_ends_turn_at_once_and_defers_stop(self):
         from pipecat.frames.frames import (
             TranscriptionFrame,
             ProposedUserStoppedSpeakingFrame,
@@ -460,6 +461,8 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
         # cancels, or the reply is dropped and the run hangs.
         self.assertLess(first(InterruptionFrame), first(TranscriptionFrame))
         self.assertLess(first(InterruptionFrame), first(ProposedUserStoppedSpeakingFrame))
+        # The stop must follow the heard text, or the turn waits for its timeout.
+        self.assertLess(first(TranscriptionFrame), first(ProposedUserStoppedSpeakingFrame))
 
     async def test_bot_started_blocked_while_external_interrupt_active(self):
         adapter = _make_adapter(is_external=True)

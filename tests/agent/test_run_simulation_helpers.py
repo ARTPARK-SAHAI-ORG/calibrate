@@ -318,8 +318,8 @@ class TestBuildUserContextAggregator(unittest.TestCase):
         self.assertTrue(
             any(isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop)
         )
-        # ExternalUserTurnStopStrategy is present ONLY to hard-stop the turn on an
-        # explicit interrupt UserStopped; timeout=None disables its auto-timeout so
+        # ExternalUserTurnStopStrategy is present ONLY to end the turn on a sim-user
+        # cut-in (ProposedUserStoppedSpeakingFrame); timeout=None disables its auto-timeout so
         # it never pre-empts smart-turn on normal turns.
         external_stops = [
             s for s in strategies.stop if isinstance(s, ExternalUserTurnStopStrategy)

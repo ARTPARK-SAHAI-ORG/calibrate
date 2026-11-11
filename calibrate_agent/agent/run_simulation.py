@@ -132,7 +132,6 @@ from pipecat.frames.frames import (
     TranscriptionFrame,
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
-    UserStoppedSpeakingFrame,
     ProposedUserStoppedSpeakingFrame,
     InputAudioRawFrame,
     OutputAudioRawFrame,
@@ -465,18 +464,6 @@ class EndToEndLatencyTracker:
         return float(np.mean(self.deltas))
 
 
-def _agent_stop_frame() -> OutputTransportMessageUrgentFrame:
-    """RTVI message telling the agent under test to stop speaking."""
-    return OutputTransportMessageUrgentFrame(
-        message={
-            "label": "rtvi-ai",
-            "type": "client-message",
-            "id": str(uuid4()),
-            "data": {"t": "interrupt"},
-        }
-    )
-
-
 def _words(text: str) -> list[str]:
     """Lowercase words of ``text`` with punctuation dropped, for phrase matching."""
     return "".join(
@@ -515,8 +502,8 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._agent_stop_pending = False
         self._latency_tracker = latency_tracker
         # Whether the agent under test is an external WS agent. An external agent may
-        # keep sending audio after being told to stop, so its output is blocked until
-        # the sim user finishes speaking.
+        # keep talking after being told to stop, so its attempts to start a new
+        # utterance are also ignored until the sim user finishes speaking.
         self._is_external = is_external
         self._agent_speaks_first = agent_speaks_first
         self._max_turns = max_turns
@@ -1033,8 +1020,8 @@ class RTVIMessageFrameAdapter(FrameProcessor):
 
                 elif msg_type == "user-stopped-speaking":
                     # The simulated user has finished. Clear the interrupt slate,
-                    # which also lifts an external-interrupt block so the agent may
-                    # speak again.
+                    # which lifts the block on the agent's audio and utterances so
+                    # it may speak again.
                     self._is_bot_interrupt_triggered = False
                     self._agent_stop_pending = False
                     await self._save_intermediate_state(
@@ -1301,7 +1288,17 @@ class SilencePadder(FrameProcessor):
                 # The sim user's cut-in reply starts playing now: stop the agent,
                 # so its voice ends as the sim user's begins.
                 self._rtvi_message_adapter._agent_stop_pending = False
-                await self.push_frame(_agent_stop_frame(), FrameDirection.DOWNSTREAM)
+                await self.push_frame(
+                    OutputTransportMessageUrgentFrame(
+                        message={
+                            "label": "rtvi-ai",
+                            "type": "client-message",
+                            "id": str(uuid4()),
+                            "data": {"t": "interrupt"},
+                        }
+                    ),
+                    FrameDirection.DOWNSTREAM,
+                )
             # Lazy allocation: only reserve a sim-user line when we actually have
             # audio to write. If the sim user got interrupted before any audio
             # flowed, no line is reserved — preserving bot role-stickiness.
