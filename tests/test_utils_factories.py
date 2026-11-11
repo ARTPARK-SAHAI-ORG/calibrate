@@ -16,6 +16,7 @@ STT_SERVICE_TARGETS = {
     "google-chirp-3": "pipecat.services.google.stt.GoogleSTTService",
     "cartesia-ink-whisper": "pipecat.services.cartesia.stt.CartesiaSTTService",
     "elevenlabs-scribe-v2-realtime": "pipecat.services.elevenlabs.stt.ElevenLabsRealtimeSTTService",
+    "elevenlabs-scribe-v3-live": "pipecat.services.elevenlabs.stt.ElevenLabsRealtimeSTTService",
     "smallest-pulse": "pipecat.services.smallest.stt.SmallestSTTService",
     "sarvam-saaras-v3": "pipecat.services.sarvam.stt.SarvamSTTService",
     "deepgram-flux": "pipecat.services.deepgram.flux.stt.DeepgramFluxSTTService",
@@ -24,6 +25,8 @@ STT_SERVICE_TARGETS = {
     "sarvam-saaras-v3-realtime": "pipecat.services.sarvam.stt.SarvamRealtimeSTTService",
     "sarvam-saaras-v4": "pipecat.services.sarvam.stt.SarvamSTTService",
     "cartesia-ink-preview": "pipecat.services.cartesia.turns.stt.CartesiaTurnsSTTService",
+    "gladia-solaria-1": "pipecat.services.gladia.stt.GladiaSTTService",
+    "bodhan-indic-transcribe": "pipecat.services.openai.stt.OpenAISTTService",
 }
 
 # openai-gpt-live-transcribe builds a subclass of OpenAIRealtimeSTTService, which a patched
@@ -45,7 +48,7 @@ TTS_SERVICE_TARGETS = {
 # not in the live-agent factories — pipecat 1.0.0 has no cascaded service for them.
 # Gemini STT/TTS run through google-genai in the eval path only, so they carry
 # shared model/voice constants but have no create_*_service branch to keep in sync.
-BENCHMARK_ONLY_PROVIDERS = {"gemini", "gemini-3.5-flash"}
+BENCHMARK_ONLY_PROVIDERS = {"gemini", "gemini-3.5-flash", "gnani-prisma-v3"}
 
 ALL_KEYS = {
     "DEEPGRAM_API_KEY": "k",
@@ -99,11 +102,38 @@ class TestCreateSTTService(unittest.TestCase):
             set(STT_PROVIDER_MODELS) - BENCHMARK_ONLY_PROVIDERS,
             {"deepgram-nova-3", "openai-gpt-4o-transcribe",
              "groq-whisper-large-v3-turbo", "google-chirp-3", "cartesia-ink-whisper",
-             "elevenlabs-scribe-v2-realtime", "smallest-pulse", "sarvam-saaras-v3",
+             "elevenlabs-scribe-v2-realtime", "elevenlabs-scribe-v3-live", "smallest-pulse", "sarvam-saaras-v3",
              "deepgram-flux", "openai-gpt-live-transcribe", "openai-gpt-transcribe",
              "sarvam-saaras-v4-realtime", "sarvam-saaras-v3-realtime",
-             "sarvam-saaras-v4", "cartesia-ink-preview"},
+             "sarvam-saaras-v4", "cartesia-ink-preview",
+             "gladia-solaria-1", "bodhan-indic-transcribe"},
         )
+
+    def test_gladia_sends_its_language_code(self):
+        from calibrate_agent.utils import create_stt_service
+
+        with patch.dict(os.environ, {"GLADIA_API_KEY": "k"}), \
+                patch(STT_SERVICE_TARGETS["gladia-solaria-1"]) as svc:
+            create_stt_service("gladia", "sindhi")
+        config = svc.Settings.call_args.kwargs["language_config"]
+        self.assertEqual(config.languages, ["sd"])
+        self.assertFalse(config.code_switching)
+        self.assertEqual(svc.call_args.kwargs["api_key"], "k")
+
+    def test_bodhan_uses_openai_service_at_bodhan_address(self):
+        from calibrate_agent.utils import BODHAN_API_BASE_URL, create_stt_service
+
+        with patch.dict(os.environ, {"BODHAN_API_KEY": "bk"}), \
+                patch(STT_SERVICE_TARGETS["bodhan-indic-transcribe"]) as svc:
+            create_stt_service("bodhan", "maithili")
+        self.assertEqual(svc.call_args.kwargs["api_key"], "bk")
+        self.assertEqual(svc.call_args.kwargs["base_url"], BODHAN_API_BASE_URL)
+
+    def test_gnani_has_no_agent_service(self):
+        from calibrate_agent.utils import create_stt_service
+
+        with self.assertRaisesRegex(ValueError, "Unsupported STT provider"):
+            create_stt_service("gnani", "hindi")
 
     def test_unsupported_language_stops_with_alternative(self):
         from calibrate_agent.utils import create_stt_service

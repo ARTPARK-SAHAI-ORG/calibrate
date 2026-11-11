@@ -25,6 +25,21 @@ named after the provider ID, so `-p sarvam` writes to `sarvam-saaras-v3/`.
 | **Gemini**      | `gemini`     | `gemini-3.5-flash`              | gemini-3.5-flash       | [ai.google.dev](https://ai.google.dev/gemini-api)           |
 | **Sarvam**      | `sarvam`     | `sarvam-saaras-v3`              | saaras:v3              | [sarvam.ai](https://sarvam.ai)                              |
 | **Smallest AI** | `smallest`   | `smallest-pulse`                | pulse                  | [smallest.ai](https://smallest.ai)                          |
+| **Gladia**      | `gladia`     | `gladia-solaria-1`              | solaria-1              | [gladia.io](https://www.gladia.io)                          |
+| **Gnani**       | `gnani`      | `gnani-prisma-v3`               | prisma-v3.0            | [gnani.ai](https://www.gnani.ai)                            |
+| **Bodhan**      | `bodhan`     | `bodhan-indic-transcribe`       | indic-transcribe       | [bodhan.ai](https://bodhan.ai)                              |
+
+`gnani-prisma-v3` and `gemini-3.5-flash` run on the direct engine only. Pass
+`--engine direct` when a run includes either of them.
+
+`bodhan-indic-transcribe` accepts at most 30 seconds of audio per request. A
+longer clip fails with an error that names the clip.
+
+| Provider ID               | Languages                                                                                         |
+| ------------------------- | ------------------------------------------------------------------------------------------------- |
+| `gladia-solaria-1`        | English, Hindi, Kannada, Bengali, Malayalam, Marathi, Punjabi, Tamil, Telugu, Gujarati, Sindhi   |
+| `gnani-prisma-v3`         | English, Hindi, Kannada, Bengali, Malayalam, Marathi, Punjabi, Tamil, Telugu, Gujarati           |
+| `bodhan-indic-transcribe` | All supported languages                                                                           |
 
 ## Realtime streaming providers
 
@@ -39,6 +54,7 @@ These providers stream audio to a realtime transcription API.
 | `sarvam-saaras-v3-realtime`  | saaras:v3-realtime                                    | `SARVAM_API_KEY`   | All supported languages                 |
 | `sarvam-saaras-v4`           | saaras:v4                                             | `SARVAM_API_KEY`   | All supported languages                 |
 | `cartesia-ink-preview`       | ink-preview                                           | `CARTESIA_API_KEY` | English, Hindi                          |
+| `elevenlabs-scribe-v3-live`  | scribe_v3_live                                        | `ELEVENLABS_API_KEY` | All supported languages except Maithili |
 
 `deepgram-flux` runs a different model for each language, so Calibrate stores
 its results under the model it ran: the folder `deepgram-flux-general-en` for

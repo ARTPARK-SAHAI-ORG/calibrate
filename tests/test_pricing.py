@@ -27,7 +27,11 @@ class TestSTTPricingResolver(unittest.TestCase):
         from calibrate_agent.utils import STT_PROVIDER_MODELS
 
         # Cartesia publishes no price for ink-preview.
-        providers_without_per_minute_pricing = {"gemini-3.5-flash", "cartesia-ink-preview"}
+        providers_without_per_minute_pricing = {
+            "gemini-3.5-flash", "cartesia-ink-preview",
+            # Gladia bills in euros and Gnani publishes no price.
+            "gladia-solaria-1", "gnani-prisma-v3",
+        }
         for provider, model in STT_PROVIDER_MODELS.items():
             if provider in providers_without_per_minute_pricing:
                 continue

@@ -17,6 +17,8 @@ from urllib.parse import urlencode
 import httpx
 
 from calibrate_agent.utils import (
+    BODHAN_API_BASE_URL,
+    STT_PROVIDER_MODELS,
     TTS_PROVIDER_MODELS,
     get_tts_voice,
     get_gemini_api_key,
@@ -72,6 +74,21 @@ PROVIDERS = [
         "name": "smallest",
         "types": ["stt", "tts"],
         "env_vars": ["SMALLEST_API_KEY"],
+    },
+    {
+        "name": "gladia",
+        "types": ["stt"],
+        "env_vars": ["GLADIA_API_KEY"],
+    },
+    {
+        "name": "gnani",
+        "types": ["stt"],
+        "env_vars": ["GNANI_API_KEY"],
+    },
+    {
+        "name": "bodhan",
+        "types": ["stt"],
+        "env_vars": ["BODHAN_API_KEY"],
     },
     {
         "name": "openrouter",
@@ -411,6 +428,53 @@ async def _check_deepgram(client: httpx.AsyncClient) -> str:
     return "stt"
 
 
+async def _check_gladia(client: httpx.AsyncClient) -> str:
+    """STT: open a Gladia live session."""
+    resp = await client.post(
+        "https://api.gladia.io/v2/live",
+        headers={"x-gladia-key": os.getenv("GLADIA_API_KEY")},
+        json={
+            "model": STT_PROVIDER_MODELS["gladia-solaria-1"],
+            "encoding": "wav/pcm",
+            "bit_depth": 16,
+            "sample_rate": 16000,
+            "channels": 1,
+        },
+    )
+    resp.raise_for_status()
+    return "stt"
+
+
+async def _check_gnani(client: httpx.AsyncClient) -> str:
+    """STT: transcribe silence via Gnani's REST API."""
+    resp = await client.post(
+        "https://api.vachana.ai/stt/v3",
+        headers={"X-API-Key-ID": os.getenv("GNANI_API_KEY")},
+        files={"audio_file": ("audio.wav", _SILENCE_WAV, "audio/wav")},
+        data={
+            "model": STT_PROVIDER_MODELS["gnani-prisma-v3"],
+            "language_code": "en-IN",
+        },
+    )
+    resp.raise_for_status()
+    return "stt"
+
+
+async def _check_bodhan(client: httpx.AsyncClient) -> str:
+    """STT: transcribe silence via Bodhan."""
+    resp = await client.post(
+        f"{BODHAN_API_BASE_URL}/audio/transcriptions",
+        headers={"Authorization": f"Bearer {os.getenv('BODHAN_API_KEY')}"},
+        files={"file": ("audio.wav", _SILENCE_WAV, "audio/wav")},
+        data={
+            "model": STT_PROVIDER_MODELS["bodhan-indic-transcribe"],
+            "language": "en",
+        },
+    )
+    resp.raise_for_status()
+    return "stt"
+
+
 async def _check_gemini(client: httpx.AsyncClient) -> str:
     """TTS: synthesize 'hi' via the Gemini TTS model (google-genai)."""
     from google import genai
@@ -447,6 +511,9 @@ _CHECK_FUNCTIONS = {
     "elevenlabs": _check_elevenlabs,
     "cartesia": _check_cartesia,
     "smallest": _check_smallest,
+    "gladia": _check_gladia,
+    "gnani": _check_gnani,
+    "bodhan": _check_bodhan,
     "openrouter": _check_openrouter,
 }
 

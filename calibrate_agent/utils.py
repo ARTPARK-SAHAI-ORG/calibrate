@@ -1552,6 +1552,38 @@ SARVAM_FLUSH_STT_PROVIDERS = ("sarvam-saaras-v3", "sarvam-saaras-v4")
 # Japanese and Spanish on its own.
 CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES = {"english": "en", "hindi": "hi"}
 
+# Gladia's solaria-1 lists every STT language except Odia and Maithili.
+GLADIA_STT_LANGUAGE_CODES = {
+    "english": "en",
+    "hindi": "hi",
+    "kannada": "kn",
+    "bengali": "bn",
+    "malayalam": "ml",
+    "marathi": "mr",
+    "punjabi": "pa",
+    "tamil": "ta",
+    "telugu": "te",
+    "gujarati": "gu",
+    "sindhi": "sd",
+}
+GNANI_STT_LANGUAGE_CODES = {
+    "english": "en-IN",
+    "hindi": "hi-IN",
+    "kannada": "kn-IN",
+    "bengali": "bn-IN",
+    "malayalam": "ml-IN",
+    "marathi": "mr-IN",
+    "punjabi": "pa-IN",
+    "tamil": "ta-IN",
+    "telugu": "te-IN",
+    "gujarati": "gu-IN",
+}
+BODHAN_STT_LANGUAGE_CODES = {
+    **GLADIA_STT_LANGUAGE_CODES,
+    "odia": "or",
+    "maithili": "mai",
+}
+
 # The provider to suggest when a realtime provider does not support a language.
 STT_PROVIDER_ALTERNATIVES = {
     "deepgram-flux": "deepgram-nova-3",
@@ -1758,6 +1790,7 @@ STT_LANGUAGE_TABLES = {
     "gemini-3.5-flash": (GEMINI_STT_LANGUAGE_CODES, "en-US"),
     "cartesia-ink-whisper": (CARTESIA_STT_LANGUAGE_CODES, "en"),
     "elevenlabs-scribe-v2-realtime": (ELEVENLABS_STT_LANGUAGE_CODES, "eng"),
+    "elevenlabs-scribe-v3-live": (ELEVENLABS_STT_LANGUAGE_CODES, "eng"),
     "smallest-pulse": (SMALLEST_STT_LANGUAGE_CODES, "multi"),
     "sarvam-saaras-v3": (SARVAM_STT_LANGUAGE_CODES, "en-IN"),
     "sarvam-saaras-v4": (SARVAM_V4_STT_LANGUAGE_CODES, "en-IN"),
@@ -1771,6 +1804,9 @@ STT_LANGUAGE_TABLES = {
     "sarvam-saaras-v4-realtime": (SARVAM_V4_STT_LANGUAGE_CODES, "en-IN"),
     "sarvam-saaras-v3-realtime": (SARVAM_V4_STT_LANGUAGE_CODES, "en-IN"),
     "cartesia-ink-preview": (CARTESIA_INK_PREVIEW_STT_LANGUAGE_CODES, "en"),
+    "gladia-solaria-1": (GLADIA_STT_LANGUAGE_CODES, "en"),
+    "gnani-prisma-v3": (GNANI_STT_LANGUAGE_CODES, "en-IN"),
+    "bodhan-indic-transcribe": (BODHAN_STT_LANGUAGE_CODES, "en"),
 }
 
 _SARVAM_STT_LANGUAGE_ENUMS = {
@@ -1944,6 +1980,7 @@ STT_PROVIDER_MODELS = {
     "gemini-3.5-flash": "gemini-3.5-flash",
     "cartesia-ink-whisper": "ink-whisper",
     "elevenlabs-scribe-v2-realtime": "scribe_v2_realtime",
+    "elevenlabs-scribe-v3-live": "scribe_v3_live",
     "smallest-pulse": "pulse",
     "sarvam-saaras-v3": "saaras:v3",
     # Realtime streaming models. deepgram-flux switches to flux-general-multi
@@ -1955,7 +1992,15 @@ STT_PROVIDER_MODELS = {
     "sarvam-saaras-v3-realtime": "saaras:v3-realtime",
     "sarvam-saaras-v4": "saaras:v4",
     "cartesia-ink-preview": "ink-preview",
+    "gladia-solaria-1": "solaria-1",
+    "gnani-prisma-v3": "prisma-v3.0",
+    "bodhan-indic-transcribe": "indic-transcribe",
 }
+
+# Bodhan serves an OpenAI-compatible transcription API at this address. It
+# rejects a request with more than BODHAN_MAX_AUDIO_SECONDS of audio.
+BODHAN_API_BASE_URL = "https://api.bodhan.ai/v1"
+BODHAN_MAX_AUDIO_SECONDS = 30
 
 DEEPGRAM_FLUX_MULTILINGUAL_MODEL = "flux-general-multi"
 
@@ -1972,12 +2017,20 @@ STT_VENDOR_DEFAULTS = {
     "elevenlabs": "elevenlabs-scribe-v2-realtime",
     "groq": "groq-whisper-large-v3-turbo",
     "smallest": "smallest-pulse",
+    "gladia": "gladia-solaria-1",
+    "gnani": "gnani-prisma-v3",
+    "bodhan": "bodhan-indic-transcribe",
 }
 
 
-# STT providers the voice agent can run. gemini-3.5-flash has no streaming
-# service, so it is benchmark-only.
-LIVE_STT_PROVIDERS = tuple(p for p in STT_PROVIDER_MODELS if p != "gemini-3.5-flash")
+# STT providers with no pipecat service. The voice agent and the benchmark's
+# pipeline engine cannot run them; the benchmark's direct engine can.
+DIRECT_ONLY_STT_PROVIDERS = ("gemini-3.5-flash", "gnani-prisma-v3")
+
+# STT providers the voice agent can run.
+LIVE_STT_PROVIDERS = tuple(
+    p for p in STT_PROVIDER_MODELS if p not in DIRECT_ONLY_STT_PROVIDERS
+)
 
 
 def resolve_stt_provider(name: str) -> str:
@@ -2127,7 +2180,7 @@ def create_stt_service(
                 model=STT_PROVIDER_MODELS[provider],
             ),
         )
-    elif provider == "elevenlabs-scribe-v2-realtime":
+    elif provider in ("elevenlabs-scribe-v2-realtime", "elevenlabs-scribe-v3-live"):
         return ElevenLabsRealtimeSTTService(
             api_key=os.getenv("ELEVENLABS_API_KEY"),
             settings=ElevenLabsRealtimeSTTService.Settings(
@@ -2228,6 +2281,28 @@ def create_stt_service(
             api_key=os.getenv("CARTESIA_API_KEY"),
             settings=CartesiaTurnsSTTService.Settings(
                 model=STT_PROVIDER_MODELS[provider],
+            ),
+        )
+    elif provider == "gladia-solaria-1":
+        from pipecat.services.gladia.config import LanguageConfig
+        from pipecat.services.gladia.stt import GladiaSTTService
+
+        return GladiaSTTService(
+            api_key=os.getenv("GLADIA_API_KEY"),
+            settings=GladiaSTTService.Settings(
+                model=STT_PROVIDER_MODELS[provider],
+                language_config=LanguageConfig(
+                    languages=[get_stt_language_code(language, provider)],
+                    code_switching=False,
+                ),
+            ),
+        )
+    elif provider == "bodhan-indic-transcribe":
+        return OpenAISTTService(
+            api_key=os.getenv("BODHAN_API_KEY"),
+            base_url=BODHAN_API_BASE_URL,
+            settings=OpenAISTTService.Settings(
+                language=stt_language, model=STT_PROVIDER_MODELS[provider]
             ),
         )
     else:

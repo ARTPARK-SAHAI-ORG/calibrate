@@ -213,6 +213,49 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
             result = await _check_deepgram(client)
         self.assertEqual(result, "stt")
 
+    async def test_check_gladia_ok(self):
+        from calibrate_agent.status import _check_gladia
+
+        client = _mk_client(_mk_resp())
+        with patch.dict(os.environ, {"GLADIA_API_KEY": "k"}):
+            self.assertEqual(await _check_gladia(client), "stt")
+        args, kwargs = client.post.call_args
+        self.assertEqual(args[0], "https://api.gladia.io/v2/live")
+        self.assertEqual(kwargs["headers"], {"x-gladia-key": "k"})
+        self.assertEqual(kwargs["json"]["model"], "solaria-1")
+
+    async def test_check_gnani_ok(self):
+        from calibrate_agent.status import _check_gnani
+
+        client = _mk_client(_mk_resp())
+        with patch.dict(os.environ, {"GNANI_API_KEY": "k"}):
+            self.assertEqual(await _check_gnani(client), "stt")
+        args, kwargs = client.post.call_args
+        self.assertEqual(args[0], "https://api.vachana.ai/stt/v3")
+        self.assertEqual(kwargs["headers"], {"X-API-Key-ID": "k"})
+        self.assertEqual(
+            kwargs["data"], {"model": "prisma-v3.0", "language_code": "en-IN"}
+        )
+        self.assertIn("audio_file", kwargs["files"])
+
+    async def test_check_bodhan_ok(self):
+        from calibrate_agent.status import _check_bodhan
+
+        client = _mk_client(_mk_resp())
+        with patch.dict(os.environ, {"BODHAN_API_KEY": "k"}):
+            self.assertEqual(await _check_bodhan(client), "stt")
+        args, kwargs = client.post.call_args
+        self.assertEqual(args[0], "https://api.bodhan.ai/v1/audio/transcriptions")
+        self.assertEqual(kwargs["headers"], {"Authorization": "Bearer k"})
+        self.assertEqual(kwargs["data"]["model"], "indic-transcribe")
+
+    async def test_new_stt_check_reports_a_rejected_key(self):
+        from calibrate_agent.status import _check_bodhan, _check_gladia, _check_gnani
+
+        for check in (_check_gladia, _check_gnani, _check_bodhan):
+            with self.assertRaises(httpx.HTTPStatusError):
+                await check(_mk_client(_mk_resp(status=401)))
+
     async def test_check_smallest_tts_ok(self):
         import json
         from calibrate_agent.status import _check_smallest_tts

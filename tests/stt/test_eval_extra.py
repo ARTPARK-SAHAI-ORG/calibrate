@@ -297,6 +297,32 @@ class TestProviderAPIKeyMissing(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(fake_conn.committed)
         self.assertTrue(fake_conn.closed)
 
+    async def test_elevenlabs_streaming_sends_the_providers_model(self):
+        import elevenlabs
+
+        from calibrate_agent.stt import eval as E
+
+        for provider, model in (
+            ("elevenlabs-scribe-v2-realtime", "scribe_v2_realtime"),
+            ("elevenlabs-scribe-v3-live", "scribe_v3_live"),
+        ):
+            fake_client = MagicMock()
+            fake_client.speech_to_text.realtime.connect = AsyncMock(
+                return_value=_FakeRealtimeConnection(committed_texts=["hello"])
+            )
+            inner = E.transcribe_audio
+            while hasattr(inner, "__wrapped__"):
+                inner = inner.__wrapped__
+            with patch.dict(os.environ, {"ELEVENLABS_API_KEY": "k"}), patch.object(
+                E, "load_audio", return_value=b"\x00\x00" * 1000
+            ), patch.object(elevenlabs, "ElevenLabs", return_value=fake_client), \
+                    patch.object(E, "langfuse_enabled", False):
+                result = await inner(Path("/tmp/x.wav"), "ref", provider, "hindi", "u")
+
+            self.assertEqual(result, {"transcript": "hello"})
+            options = fake_client.speech_to_text.realtime.connect.call_args.args[0]
+            self.assertEqual(options["model_id"], model)
+
     async def test_elevenlabs_streaming_accumulates_multiple_segments(self):
         # The server auto-segments long audio into MULTIPLE committed_transcript
         # messages (it auto-commits ~every 36s). All segments must be captured —
@@ -969,7 +995,11 @@ class TestSTTCostMetrics(unittest.TestCase):
         from calibrate_agent.stt.eval import STT_PROVIDERS
 
         # Cartesia publishes no price for ink-preview.
-        providers_without_per_minute_pricing = {"gemini-3.5-flash", "cartesia-ink-preview"}
+        providers_without_per_minute_pricing = {
+            "gemini-3.5-flash", "cartesia-ink-preview",
+            # Gladia bills in euros and Gnani publishes no price.
+            "gladia-solaria-1", "gnani-prisma-v3",
+        }
         for provider in STT_PROVIDERS:
             if provider in providers_without_per_minute_pricing:
                 continue
@@ -997,6 +1027,19 @@ class TestSTTCostMetrics(unittest.TestCase):
         self.assertEqual(metrics["conversion_rate"], 96.0)
         self.assertAlmostEqual(metrics["cost_usd"], 1.0 / 96.0)
         self.assertNotIn("cost_per_minute_usd", metrics)
+
+    @patch("calibrate_agent.pricing.get_usd_to_inr_rate", return_value=96.0)
+    def test_bodhan_stt_cost_reported_in_inr(self, _fx):
+        from calibrate_agent.stt import eval as E
+
+        metrics = E._build_stt_cost_metrics(
+            provider="bodhan-indic-transcribe",
+            audio_duration_seconds=[120.0],
+            model=E.stt_provider_model("bodhan-indic-transcribe", "hindi"),
+        )
+
+        self.assertEqual(metrics["currency"], "INR")
+        self.assertAlmostEqual(metrics["cost_in_currency"], 0.2)
 
 
 # --- run_eval_only --------------------------------------------------------
@@ -1739,6 +1782,243 @@ class TestTranscribeSarvamRealtimeStreaming(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGladiaStreaming(unittest.IsolatedAsyncioTestCase):
+    MESSAGES = [
+        {"type": "audio_chunk", "acknowledged": True},
+        {"type": "transcript", "data": {"is_final": False, "utterance": {"text": "nam"}}},
+        {"type": "transcript", "data": {"is_final": True, "utterance": {"text": "namaste"}}},
+        {"type": "transcript", "data": {"is_final": True, "utterance": {"text": "duniya"}}},
+        {"type": "post_final_transcript", "data": {}},
+    ]
+
+    async def _run(self, messages, language="hindi"):
+        from calibrate_agent.stt import eval as E
+
+        ws = _FakeTurnsWS(messages, "stop_recording")
+        response = MagicMock()
+        response.json.return_value = {"url": "wss://gladia.test/live?token=t"}
+        client = AsyncMock()
+        client.post.return_value = response
+        client.__aenter__.return_value = client
+        with patch("httpx.AsyncClient", return_value=client):
+            result = await _run_streaming(
+                "transcribe_gladia_streaming", "GLADIA_API_KEY", ws, language
+            )
+        return result, ws, client
+
+    async def test_joins_final_transcripts_only(self):
+        result, ws, client = await self._run(self.MESSAGES)
+
+        self.assertEqual(result, {"transcript": "namaste duniya"})
+        self.assertEqual(ws.url, "wss://gladia.test/live?token=t")
+        self.assertEqual(b"".join(ws.sent[:-1]), b"\x01" * 9000)
+        self.assertEqual(json.loads(ws.sent[-1]), {"type": "stop_recording"})
+
+    async def test_session_request_names_model_and_language(self):
+        _result, _ws, client = await self._run(self.MESSAGES, language="sindhi")
+
+        args, kwargs = client.post.call_args
+        self.assertEqual(args[0], "https://api.gladia.io/v2/live")
+        self.assertEqual(kwargs["headers"], {"x-gladia-key": "k"})
+        self.assertEqual(kwargs["json"]["model"], "solaria-1")
+        self.assertEqual(
+            kwargs["json"]["language_config"],
+            {"languages": ["sd"], "code_switching": False},
+        )
+        self.assertEqual(kwargs["json"]["sample_rate"], 16000)
+
+    async def test_error_message_raises(self):
+        with self.assertRaisesRegex(RuntimeError, "Gladia"):
+            await self._run([{"type": "error", "data": {"message": "nope"}}])
+
+    async def test_missing_key(self):
+        from calibrate_agent.stt.eval import transcribe_gladia_streaming
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "GLADIA_API_KEY"):
+                await transcribe_gladia_streaming(Path("/tmp/x.wav"), "english")
+
+
+class _FakeGnaniWS:
+    """Fake Gnani socket: replays ``messages`` once ``commit`` arrives, then stays silent."""
+
+    def __init__(self, messages, close_after=False):
+        self.sent = []
+        self.connect_args = None
+        self._queue = asyncio.Queue()
+        self._messages = messages
+        self._close_after = close_after
+
+    def connect(self, *args, **kwargs):
+        self.connect_args = (args, kwargs)
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *a):
+        return False
+
+    async def send(self, payload):
+        self.sent.append(payload)
+        if isinstance(payload, str):
+            for message in self._messages:
+                self._queue.put_nowait(json.dumps(message))
+            if self._close_after:
+                self._queue.put_nowait(None)
+
+    async def recv(self):
+        message = await self._queue.get()
+        if message is None:
+            from websockets.exceptions import ConnectionClosedOK
+
+            raise ConnectionClosedOK(None, None)
+        return message
+
+
+class TestGnaniStreaming(unittest.IsolatedAsyncioTestCase):
+    MESSAGES = [
+        {"type": "connected", "config": {"chunk_size": 512}},
+        {"type": "speech_start"},
+        {"type": "processing"},
+        {"type": "transcript", "text": "namaste", "is_final": True},
+        {"type": "processing"},
+        {"type": "transcript", "text": "duniya", "is_final": True},
+    ]
+
+    async def _run(self, ws, language="hindi", audio=b"\x01" * 2500):
+        from calibrate_agent.stt import eval as E
+
+        with patch.object(E, "GNANI_FRAME_SECONDS", 0), patch.object(
+            E, "GNANI_SEGMENT_IDLE_SECONDS", 0.05
+        ):
+            return await _run_streaming(
+                "transcribe_gnani_streaming", "GNANI_API_KEY", ws, language, audio
+            )
+
+    async def test_joins_transcripts_and_stops_when_idle(self):
+        ws = _FakeGnaniWS(self.MESSAGES)
+        result = await self._run(ws)
+
+        self.assertEqual(result, {"transcript": "namaste duniya"})
+        self.assertEqual(ws.connect_args[0][0], "wss://api.vachana.ai/stt/v3/stream")
+        self.assertEqual(
+            ws.connect_args[1]["additional_headers"],
+            {
+                "x-api-key-id": "k",
+                "model": "prisma-v3.0",
+                "language_code": "hi-IN",
+                "x-sample-rate": "16000",
+            },
+        )
+
+    async def test_sends_fixed_size_frames_then_commit(self):
+        ws = _FakeGnaniWS(self.MESSAGES)
+        await self._run(ws)
+
+        frames = ws.sent[:-1]
+        self.assertEqual([len(frame) for frame in frames], [1024, 1024, 1024])
+        self.assertEqual(frames[-1], b"\x01" * 452 + b"\x00" * 572)
+        self.assertEqual(json.loads(ws.sent[-1]), {"type": "commit"})
+
+    async def test_waits_for_an_utterance_being_transcribed(self):
+        # "processing" with no transcript yet: the idle gap alone must not end
+        # the stream; the socket closing does.
+        ws = _FakeGnaniWS([{"type": "processing"}], close_after=True)
+        result = await self._run(ws)
+
+        self.assertEqual(result, {"transcript": ""})
+
+    async def test_silent_clip_returns_empty_transcript(self):
+        result = await self._run(_FakeGnaniWS([]))
+
+        self.assertEqual(result, {"transcript": ""})
+
+    async def test_error_message_raises(self):
+        ws = _FakeGnaniWS([{"type": "error", "message": "STT engine failed"}])
+        with self.assertRaisesRegex(RuntimeError, "STT engine failed"):
+            await self._run(ws)
+
+    async def test_missing_key(self):
+        from calibrate_agent.stt.eval import transcribe_gnani_streaming
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "GNANI_API_KEY"):
+                await transcribe_gnani_streaming(Path("/tmp/x.wav"), "english")
+
+
+class TestTranscribeBodhan(unittest.IsolatedAsyncioTestCase):
+    async def _run(self, seconds, language="odia"):
+        from calibrate_agent.stt import eval as E
+
+        audio_file = io.BytesIO(b"\x00" * (44 + int(seconds * 32000)))
+        client = MagicMock()
+        client.audio.transcriptions.create = AsyncMock(
+            return_value=MagicMock(text="  namaste  ")
+        )
+        with patch.dict(os.environ, {"BODHAN_API_KEY": "bk"}), patch.object(
+            E, "load_audio", return_value=audio_file
+        ), patch.object(E, "AsyncOpenAI", return_value=client) as openai_class:
+            result = await E.transcribe_bodhan(Path("/tmp/x.wav"), language)
+        return result, client, openai_class
+
+    async def test_calls_bodhan_with_model_and_language(self):
+        from calibrate_agent.utils import BODHAN_API_BASE_URL
+
+        result, client, openai_class = await self._run(30)
+
+        self.assertEqual(result, {"transcript": "namaste"})
+        openai_class.assert_called_once_with(api_key="bk", base_url=BODHAN_API_BASE_URL)
+        kwargs = client.audio.transcriptions.create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "indic-transcribe")
+        self.assertEqual(kwargs["language"], "or")
+
+    async def test_clip_over_30_seconds_is_rejected_before_the_call(self):
+        from calibrate_agent.stt import eval as E
+
+        audio_file = io.BytesIO(b"\x00" * (44 + 31 * 32000))
+        with patch.dict(os.environ, {"BODHAN_API_KEY": "bk"}), patch.object(
+            E, "load_audio", return_value=audio_file
+        ), patch.object(E, "AsyncOpenAI") as openai_class:
+            with self.assertRaisesRegex(ValueError, "at most 30 seconds.*31.0 seconds"):
+                await E.transcribe_bodhan(Path("/tmp/x.wav"), "hindi")
+        openai_class.assert_not_called()
+
+    async def test_missing_key(self):
+        from calibrate_agent.stt.eval import transcribe_bodhan
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "BODHAN_API_KEY"):
+                await transcribe_bodhan(Path("/tmp/x.wav"), "english")
+
+
+class TestNewProviderRouting(unittest.IsolatedAsyncioTestCase):
+    async def test_router_reaches_each_new_provider_by_vendor_name(self):
+        from calibrate_agent.stt import eval as E
+
+        inner = E.transcribe_audio
+        while hasattr(inner, "__wrapped__"):
+            inner = inner.__wrapped__
+        for vendor, fn in (
+            ("gladia", "transcribe_gladia_streaming"),
+            ("gnani", "transcribe_gnani_streaming"),
+            ("bodhan", "transcribe_bodhan"),
+        ):
+            with patch.object(
+                E, fn, AsyncMock(return_value={"transcript": " hi "})
+            ) as method, patch.object(E, "langfuse_enabled", False):
+                result = await inner(Path("/tmp/x.wav"), "ref", vendor, "hindi", "id")
+            self.assertEqual(result, {"transcript": "hi"})
+            method.assert_awaited_once()
+
+    async def test_pipeline_engine_rejects_direct_only_providers(self):
+        from calibrate_agent.stt import eval as E
+
+        for provider in ("gnani", "gnani-prisma-v3", "gemini-3.5-flash"):
+            with self.assertRaisesRegex(ValueError, "--engine direct"):
+                await E.run_stt_eval([], Path("/tmp"), provider, "hindi", Path("/tmp/r.csv"))
 
 
 class TestStreamingHelpers(unittest.IsolatedAsyncioTestCase):

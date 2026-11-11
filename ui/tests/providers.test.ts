@@ -42,6 +42,21 @@ describe("realtime STT providers", () => {
     expect(getSttProviderById("cartesia-ink-preview")?.envVar).toBe("CARTESIA_API_KEY");
   });
 
+  it("offers ElevenLabs Scribe v3 Live with the ElevenLabs key", () => {
+    expect(ids("hindi")).toContain("elevenlabs-scribe-v3-live");
+    expect(getSttProviderById("elevenlabs-scribe-v3-live")?.envVar).toBe("ELEVENLABS_API_KEY");
+  });
+
+  it("offers Gladia and Bodhan for the languages they list", () => {
+    expect(ids("sindhi")).toEqual(
+      expect.arrayContaining(["gladia-solaria-1", "bodhan-indic-transcribe"]),
+    );
+    expect(ids("odia")).toContain("bodhan-indic-transcribe");
+    expect(ids("odia")).not.toContain("gladia-solaria-1");
+    expect(getSttProviderById("gladia-solaria-1")?.envVar).toBe("GLADIA_API_KEY");
+    expect(getSttProviderById("bodhan-indic-transcribe")?.envVar).toBe("BODHAN_API_KEY");
+  });
+
   it("stores deepgram-flux results under the model it runs for the language", () => {
     expect(outputDirName("deepgram-flux", "stt", "english")).toBe("deepgram-flux-general-en");
     expect(outputDirName("deepgram-flux", "stt", "hindi")).toBe("deepgram-flux-general-multi");

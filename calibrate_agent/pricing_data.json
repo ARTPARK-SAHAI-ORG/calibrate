@@ -34,6 +34,11 @@
         "price_per_minute_usd": 0.0065
       }
     },
+    "elevenlabs-scribe-v3-live": {
+      "scribe_v3_live": {
+        "price_per_minute_usd": 0.0036666667
+      }
+    },
     "cartesia-ink-whisper": {
       "ink-whisper": {
         "price_per_minute_usd": 0.003
@@ -78,6 +83,12 @@
       "saaras:v4": {
         "currency": "INR",
         "price_per_minute_inr": 0.5
+      }
+    },
+    "bodhan-indic-transcribe": {
+      "indic-transcribe": {
+        "currency": "INR",
+        "price_per_minute_inr": 0.1
       }
     }
   },

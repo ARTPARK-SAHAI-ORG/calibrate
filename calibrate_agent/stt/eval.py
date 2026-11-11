@@ -37,6 +37,9 @@ from calibrate_agent.utils import (
     openai_transcription_language,
     DEEPGRAM_FLUX_MULTILINGUAL_MODEL,
     SARVAM_REALTIME_STT_PROVIDERS,
+    DIRECT_ONLY_STT_PROVIDERS,
+    BODHAN_API_BASE_URL,
+    BODHAN_MAX_AUDIO_SECONDS,
     create_stt_service,
     get_gemini_api_key,
     provider_log as _log,
@@ -742,8 +745,13 @@ async def transcribe_smallest_streaming(audio_path: Path, language: str) -> str:
 ELEVENLABS_SEGMENT_IDLE_SECONDS = 3.0
 
 
-async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> str:
-    """Transcribe audio using ElevenLabs' Scribe v2 Realtime via the official SDK.
+async def transcribe_elevenlabs_streaming(
+    audio_path: Path, language: str, provider: str = "elevenlabs-scribe-v2-realtime"
+) -> str:
+    """Transcribe audio using an ElevenLabs realtime Scribe model via the official SDK.
+
+    ``provider`` selects the model: ``elevenlabs-scribe-v2-realtime`` or
+    ``elevenlabs-scribe-v3-live``. Both use the same realtime WebSocket.
 
     Uses the SDK's ``speech_to_text.realtime.connect`` (manual commit strategy).
     See https://elevenlabs.io/docs/eleven-api/guides/how-to/speech-to-text/realtime/server-side-streaming.
@@ -760,7 +768,7 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
     if not api_key:
         raise ValueError("ELEVENLABS_API_KEY environment variable not set")
 
-    lang_code = get_stt_language_code(language, "elevenlabs-scribe-v2-realtime")
+    lang_code = get_stt_language_code(language, provider)
 
     audio = load_audio(audio_path, raw_pcm=True)
     chunk_size = 32000  # 1s of 16 kHz, 16-bit mono PCM
@@ -809,7 +817,7 @@ async def transcribe_elevenlabs_streaming(audio_path: Path, language: str) -> st
     client = ElevenLabs(api_key=api_key)
     connection = await client.speech_to_text.realtime.connect(
         RealtimeAudioOptions(
-            model_id=STT_PROVIDER_MODELS["elevenlabs-scribe-v2-realtime"],
+            model_id=STT_PROVIDER_MODELS[provider],
             audio_format=AudioFormat.PCM_16000,
             sample_rate=16000,
             commit_strategy=CommitStrategy.MANUAL,
@@ -1148,6 +1156,171 @@ async def transcribe_cartesia_ink_preview_streaming(
     return {"transcript": _join_transcript(transcript_parts)}
 
 
+async def transcribe_gladia_streaming(audio_path: Path, language: str) -> Dict:
+    """Transcribe audio using Gladia's live API.
+
+    ``POST /v2/live`` opens a session and returns the WebSocket address to
+    stream to. After ``stop_recording`` Gladia sends the remaining final
+    transcripts and closes the socket.
+    """
+    import httpx
+    from websockets.asyncio.client import connect as websocket_connect
+
+    api_key = os.getenv("GLADIA_API_KEY")
+    if not api_key:
+        raise ValueError("GLADIA_API_KEY environment variable not set")
+
+    session_config = {
+        "model": STT_PROVIDER_MODELS["gladia-solaria-1"],
+        "encoding": "wav/pcm",
+        "bit_depth": 16,
+        "sample_rate": 16000,
+        "channels": 1,
+        "language_config": {
+            "languages": [get_stt_language_code(language, "gladia-solaria-1")],
+            "code_switching": False,
+        },
+    }
+    async with httpx.AsyncClient(timeout=STT_PROVIDER_TIMEOUT_SECONDS) as client:
+        response = await client.post(
+            "https://api.gladia.io/v2/live",
+            headers={"x-gladia-key": api_key},
+            json=session_config,
+        )
+        response.raise_for_status()
+        ws_url = response.json()["url"]
+
+    audio = load_audio(audio_path, raw_pcm=True)
+    chunk_size = 4096
+
+    async with websocket_connect(ws_url) as ws:
+
+        async def send_audio():
+            for start in range(0, len(audio), chunk_size):
+                await ws.send(audio[start : start + chunk_size])
+            await ws.send(json.dumps({"type": "stop_recording"}))
+
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+
+        try:
+            async for output in _json_messages(ws):
+                if output.get("type") == "error":
+                    raise RuntimeError(f"Gladia streaming STT error: {output}")
+                data = output.get("data") or {}
+                if output.get("type") == "transcript" and data.get("is_final"):
+                    transcript_parts.append(data["utterance"]["text"])
+        finally:
+            await _stop_sender(sender)
+
+    return {"transcript": _join_transcript(transcript_parts)}
+
+
+# Gnani accepts audio only as 1,024-byte frames (32 ms at 16 kHz) sent at the
+# pace it was spoken; faster sending degrades its voice detection.
+GNANI_FRAME_BYTES = 1024
+GNANI_FRAME_SECONDS = 0.032
+# Gnani sends no end-of-transcript message. The stream is finished once all
+# audio is sent, no utterance is being transcribed, and no message has arrived
+# for this long.
+GNANI_SEGMENT_IDLE_SECONDS = 3.0
+
+
+async def transcribe_gnani_streaming(audio_path: Path, language: str) -> Dict:
+    """Transcribe audio using Gnani's streaming WebSocket (``/stt/v3/stream``).
+
+    Gnani splits the audio into utterances with its own voice detection and
+    sends one ``transcript`` message per utterance. ``commit`` closes the
+    utterance still open when the audio ends.
+    """
+    from websockets.asyncio.client import connect as websocket_connect
+    from websockets.exceptions import ConnectionClosed
+
+    api_key = os.getenv("GNANI_API_KEY")
+    if not api_key:
+        raise ValueError("GNANI_API_KEY environment variable not set")
+
+    headers = {
+        "x-api-key-id": api_key,
+        "model": STT_PROVIDER_MODELS["gnani-prisma-v3"],
+        "language_code": get_stt_language_code(language, "gnani-prisma-v3"),
+        "x-sample-rate": "16000",
+    }
+    audio = load_audio(audio_path, raw_pcm=True)
+
+    async with websocket_connect(
+        "wss://api.vachana.ai/stt/v3/stream", additional_headers=headers
+    ) as ws:
+
+        async def send_audio():
+            for start in range(0, len(audio), GNANI_FRAME_BYTES):
+                frame = audio[start : start + GNANI_FRAME_BYTES]
+                await ws.send(frame.ljust(GNANI_FRAME_BYTES, b"\x00"))
+                await asyncio.sleep(GNANI_FRAME_SECONDS)
+            await ws.send(json.dumps({"type": "commit"}))
+
+        sender = asyncio.create_task(send_audio())
+        transcript_parts = []
+        transcribing = False
+
+        try:
+            while True:
+                try:
+                    message = await asyncio.wait_for(
+                        ws.recv(), timeout=GNANI_SEGMENT_IDLE_SECONDS
+                    )
+                except asyncio.TimeoutError:
+                    if sender.done() and not transcribing:
+                        break
+                    continue
+                except ConnectionClosed:
+                    break
+
+                output = json.loads(message)
+                event = output.get("type")
+                if event == "error":
+                    raise RuntimeError(
+                        f"Gnani streaming STT error: {output.get('message', output)}"
+                    )
+                if event == "processing":
+                    transcribing = True
+                elif event == "transcript":
+                    transcribing = False
+                    transcript_parts.append(output.get("text", ""))
+        finally:
+            await _stop_sender(sender)
+
+    return {"transcript": _join_transcript(transcript_parts)}
+
+
+async def transcribe_bodhan(audio_path: Path, language: str) -> Dict:
+    """Transcribe audio using Bodhan's OpenAI-compatible transcription API."""
+    api_key = os.getenv("BODHAN_API_KEY")
+    if not api_key:
+        raise ValueError("BODHAN_API_KEY environment variable not set")
+
+    audio_file = load_audio(audio_path, as_file=True)
+    # 16 kHz, 16-bit mono WAV: a 44-byte header, then 32,000 bytes per second.
+    seconds = (audio_file.getbuffer().nbytes - 44) / 32000
+    if seconds > BODHAN_MAX_AUDIO_SECONDS:
+        raise ValueError(
+            f"Bodhan accepts at most {BODHAN_MAX_AUDIO_SECONDS} seconds of audio "
+            f"per request; {audio_path} is {seconds:.1f} seconds"
+        )
+
+    client = AsyncOpenAI(api_key=api_key, base_url=BODHAN_API_BASE_URL)
+    transcription = await asyncio.wait_for(
+        client.audio.transcriptions.create(
+            file=audio_file,
+            model=STT_PROVIDER_MODELS["bodhan-indic-transcribe"],
+            language=get_stt_language_code(language, "bodhan-indic-transcribe"),
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+    )
+
+    return {"transcript": transcription.text.strip()}
+
+
 # =============================================================================
 # Main Transcription Router
 # =============================================================================
@@ -1173,6 +1346,9 @@ async def transcribe_audio(
         "sarvam-saaras-v3": transcribe_sarvam,
         "sarvam-saaras-v4": partial(transcribe_sarvam, provider="sarvam-saaras-v4"),
         "elevenlabs-scribe-v2-realtime": transcribe_elevenlabs_streaming,
+        "elevenlabs-scribe-v3-live": partial(
+            transcribe_elevenlabs_streaming, provider="elevenlabs-scribe-v3-live"
+        ),
         "cartesia-ink-whisper": transcribe_cartesia,
         "smallest-pulse": transcribe_smallest_streaming,
         "deepgram-flux": transcribe_deepgram_flux_streaming,
@@ -1187,6 +1363,9 @@ async def transcribe_audio(
             for provider in SARVAM_REALTIME_STT_PROVIDERS
         },
         "cartesia-ink-preview": transcribe_cartesia_ink_preview_streaming,
+        "gladia-solaria-1": transcribe_gladia_streaming,
+        "gnani-prisma-v3": transcribe_gnani_streaming,
+        "bodhan-indic-transcribe": transcribe_bodhan,
     }
 
     if provider not in provider_methods:
@@ -1381,6 +1560,10 @@ async def run_stt_eval(
     Returns:
         Number of files successfully transcribed (non-empty) in this run.
     """
+    if engine == "pipeline" and resolve_stt_provider(provider) in DIRECT_ONLY_STT_PROVIDERS:
+        raise ValueError(
+            f"{provider} runs only on the direct engine. Pass --engine direct."
+        )
     max_concurrency = resolve_stt_max_concurrency(engine, max_concurrency)
     transcribe_fn = (
         transcribe_audio_pipeline if engine == "pipeline" else transcribe_audio

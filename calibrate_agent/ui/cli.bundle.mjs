@@ -46907,6 +46907,25 @@ var STT_PROVIDERS = [
     ])
   },
   {
+    id: "elevenlabs-scribe-v3-live",
+    name: "ElevenLabs Scribe v3 Live",
+    envVar: "ELEVENLABS_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "bengali",
+      "malayalam",
+      "marathi",
+      "odia",
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati",
+      "sindhi"
+    ])
+  },
+  {
     id: "deepgram-flux",
     name: "Deepgram Flux",
     envVar: "DEEPGRAM_API_KEY",
@@ -47008,6 +47027,44 @@ var STT_PROVIDERS = [
     name: "Cartesia Ink Preview",
     envVar: "CARTESIA_API_KEY",
     languages: /* @__PURE__ */ new Set(["english", "hindi"])
+  },
+  {
+    id: "gladia-solaria-1",
+    name: "Gladia",
+    envVar: "GLADIA_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "bengali",
+      "malayalam",
+      "marathi",
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati",
+      "sindhi"
+    ])
+  },
+  {
+    id: "bodhan-indic-transcribe",
+    name: "Bodhan",
+    envVar: "BODHAN_API_KEY",
+    languages: /* @__PURE__ */ new Set([
+      "english",
+      "hindi",
+      "kannada",
+      "bengali",
+      "malayalam",
+      "marathi",
+      "odia",
+      "punjabi",
+      "tamil",
+      "telugu",
+      "gujarati",
+      "sindhi",
+      "maithili"
+    ])
   }
 ];
 var LANGUAGES = [

@@ -169,6 +169,10 @@ class TestLanguageCodes(unittest.TestCase):
         self.assertEqual(get_stt_language_code("hindi", "sarvam-saaras-v3"), "hi-IN")
         self.assertEqual(get_stt_language_code("english", "google-chirp-3"), "en-US")
         self.assertEqual(get_stt_language_code("english", "smallest-pulse"), "en")
+        self.assertEqual(get_stt_language_code("sindhi", "gladia"), "sd")
+        self.assertEqual(get_stt_language_code("hindi", "gnani"), "hi-IN")
+        self.assertEqual(get_stt_language_code("odia", "bodhan"), "or")
+        self.assertEqual(get_stt_language_code("maithili", "bodhan-indic-transcribe"), "mai")
         self.assertEqual(get_stt_language_code("english", "cartesia-ink-whisper"), "en")
         self.assertEqual(get_stt_language_code("english", "elevenlabs-scribe-v2-realtime"), "eng")
         self.assertEqual(get_stt_language_code("english", "openai-gpt-4o-transcribe"), "en")
@@ -182,6 +186,17 @@ class TestLanguageCodes(unittest.TestCase):
         self.assertEqual(get_stt_language_code("english", "deepgram-nova-3"), "en")
         # Unknown provider falls through to default
         self.assertEqual(get_stt_language_code("english", "unknown"), "en")
+
+    def test_new_stt_providers_reject_languages_they_do_not_list(self):
+        from calibrate_agent.utils import validate_stt_language
+
+        for provider, language in (
+            ("gladia", "odia"), ("gladia", "maithili"),
+            ("gnani", "odia"), ("gnani", "sindhi"),
+        ):
+            with self.assertRaises(ValueError):
+                validate_stt_language(language, provider)
+        validate_stt_language("maithili", "bodhan")
 
     def test_get_tts_language_codes_per_provider(self):
         from calibrate_agent.utils import get_tts_language_code
