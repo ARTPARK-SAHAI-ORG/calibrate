@@ -1,5 +1,5 @@
 {
-    "title": "Swasth kadam Health Survey V5",
+    "title": "Demo Health Survey V5",
     "questions": [
         {
             "name": "name",
@@ -289,7 +289,7 @@
             }
         }
     ],
-    "context": "This is a health survey call from Swasth Kadam to collect basic information from beneficiaries registered at Anganwadi centres. The agent is a health worker and the user is a pregnant mother or a mother with a young child. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother.",
+    "context": "This is a health survey call from Demo Health Survey to collect basic information from beneficiaries registered at Anganwadi centres. The agent is a health worker and the user is a pregnant mother or a mother with a young child. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother.",
     "validation_rules": "- 'name': Must be at least 2 characters long.\n- 'gestational_age_months': Must be between 1 and 9.\n- 'child_dob': Must be a valid DD-MM-YYYY date that is today or earlier.\n- 'anganwadi_linked_phone_number': Must be a valid phone number with exactly 10 digits.\n- 'whatsapp_number': Must be a valid phone number with exactly 10 digits.\n- 'last_4_digits_of_aadhar': Must be exactly 4 digits.",
     "instructions": "IMPORTANT RETRY AND CALL-END RULES:\n\n- When retrying, use the EXACT retry script text specified for that retry attempt. Do NOT paraphrase.\n- Some questions have an informational script that must be spoken BEFORE asking that question. Follow those instructions exactly.\n- A brief hearing-only acknowledgement is already spoken before your reply \u2014 do NOT start with any acknowledgement or phrase implying you recorded, noted, or registered their answer (e.g. avoid '\u0926\u0930\u094d\u091c \u0915\u0930 \u0932\u093f\u092f\u093e', '\u091c\u093e\u0928\u0915\u093e\u0930\u0940 \u092e\u093f\u0932 \u0917\u0908', '\u0938\u092e\u091d \u0917\u0908'). Go straight to the next question Script, retry, or correction.\n- If the user explicitly asks you to repeat the question (e.g., 'Phir se bolo', 'Repeat karo', 'Dobara bolo'), repeat the current question exactly and do NOT count it as a retry attempt. If the user says they did not understand (e.g., 'Samajh nahi aaya', 'Kya bola', 'Sunai nahi diya'), treat it as a failed attempt and proceed according to the retry rules.",
     "agent_speaks_first": true,

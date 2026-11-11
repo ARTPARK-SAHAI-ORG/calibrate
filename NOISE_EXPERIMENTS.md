@@ -32,19 +32,19 @@ own provider keys (STT/TTS/LLM). **If you don't know what to put in it, ask Aman
 
 The agent is now running on **http://localhost:7860**.
 
-### 2. Create the `swasth-kadam-v5` agent
+### 2. Create the `demo-health-survey` agent
 Create the agent folder and save the config below as its `config.json`:
 
 ```bash
-mkdir -p server/db/agents/swasth-kadam-v5
-# then create server/db/agents/swasth-kadam-v5/config.json with the JSON below
+mkdir -p server/db/agents/demo-health-survey
+# then create server/db/agents/demo-health-survey/config.json with the JSON below
 ```
 
-`server/db/agents/swasth-kadam-v5/config.json`:
+`server/db/agents/demo-health-survey/config.json`:
 
 ```json
 {
-    "title": "Swasth kadam Health Survey V5",
+    "title": "Demo Health Survey V5",
     "questions": [
         {
             "name": "name",
@@ -334,7 +334,7 @@ mkdir -p server/db/agents/swasth-kadam-v5
             }
         }
     ],
-    "context": "This is a health survey call from Swasth Kadam to collect basic information from beneficiaries registered at Anganwadi centres. The agent is a health worker and the user is a pregnant mother or a mother with a young child. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother.",
+    "context": "This is a health survey call from Demo Health Survey to collect basic information from beneficiaries registered at Anganwadi centres. The agent is a health worker and the user is a pregnant mother or a mother with a young child. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother. The agent is a health worker and the user is a pregnant mother.",
     "validation_rules": "- 'name': Must be at least 2 characters long.\n- 'gestational_age_months': Must be between 1 and 9.\n- 'child_dob': Must be a valid DD-MM-YYYY date that is today or earlier.\n- 'anganwadi_linked_phone_number': Must be a valid phone number with exactly 10 digits.\n- 'whatsapp_number': Must be a valid phone number with exactly 10 digits.\n- 'last_4_digits_of_aadhar': Must be exactly 4 digits.",
     "instructions": "IMPORTANT RETRY AND CALL-END RULES:\n\n- When retrying, use the EXACT retry script text specified for that retry attempt. Do NOT paraphrase.\n- Some questions have an informational script that must be spoken BEFORE asking that question. Follow those instructions exactly.\n- A brief hearing-only acknowledgement is already spoken before your reply \u2014 do NOT start with any acknowledgement or phrase implying you recorded, noted, or registered their answer (e.g. avoid '\u0926\u0930\u094d\u091c \u0915\u0930 \u0932\u093f\u092f\u093e', '\u091c\u093e\u0928\u0915\u093e\u0930\u0940 \u092e\u093f\u0932 \u0917\u0908', '\u0938\u092e\u091d \u0917\u0908'). Go straight to the next question Script, retry, or correction.\n- If the user explicitly asks you to repeat the question (e.g., 'Phir se bolo', 'Repeat karo', 'Dobara bolo'), repeat the current question exactly and do NOT count it as a retry attempt. If the user says they did not understand (e.g., 'Samajh nahi aaya', 'Kya bola', 'Sunai nahi diya'), treat it as a failed attempt and proceed according to the retry rules.",
     "agent_speaks_first": true,
@@ -357,9 +357,9 @@ Calibrate uses the pipecat non-telephony WebSocket endpoint:
 ws://localhost:7860/ws-client/<agent-id>
 ```
 `<agent-id>` is a folder name under `server/db/agents/`. The experiments use the
-**`swasth-kadam-v5`** agent (a Hindi child-enrollment form), so the URL is:
+**`demo-health-survey`** agent (a Hindi child-enrollment form), so the URL is:
 ```
-ws://localhost:7860/ws-client/swasth-kadam-v5
+ws://localhost:7860/ws-client/demo-health-survey
 ```
 This exact URL is already set as `agent_url` in the example configs. To use a
 different agent, drop its `config.json` under `server/db/agents/<its-id>/` and
@@ -368,7 +368,7 @@ point `agent_url` at `ws://localhost:7860/ws-client/<its-id>`.
 ### 4. Where the agent stores what it captured (ground truth)
 Every call creates a conversation folder on the agent side:
 ```
-server/db/agents/swasth-kadam-v5/conversations/<conversation-id>/
+server/db/agents/demo-health-survey/conversations/<conversation-id>/
 ├── data.json        # the FINAL filled form (form_data + form_status)  ← ground truth
 ├── transcript.json  # the agent's view of the conversation
 ├── recording.wav
@@ -450,18 +450,18 @@ loud→harsh; each ends with a clean baseline.
 ### `sample_voice_noise_easy.json`
 ```json
 {
-  "agent_url": "ws://localhost:7860/ws-client/swasth-kadam-v5",
+  "agent_url": "ws://localhost:7860/ws-client/demo-health-survey",
   "personas": [
-    { "label": "easy L1 · env · rain · faint", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. a little soft rain outside.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "rain", "people": "none", "loudness": "faint" } },
-    { "label": "easy L2 · env · wind · faint", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. a soft breeze outside.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "wind", "people": "none", "loudness": "faint" } },
-    { "label": "easy L3 · people · single · faint", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. one person talking quietly nearby.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "single", "loudness": "faint" } },
-    { "label": "easy L4 · env · busy street · moderate", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. standing near a moderately busy street.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "busy_street", "people": "none", "loudness": "moderate" } },
-    { "label": "easy L5 · people · light · moderate", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. a couple of people chatting nearby.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "light", "loudness": "moderate" } },
-    { "label": "easy L6 · mixed · street+light · moderate", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. a busy street with a few people around.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "busy_street", "people": "light", "loudness": "moderate" } },
-    { "label": "easy · baseline · clean", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. you are at home in a quiet room.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none" }
+    { "label": "easy L1 · env · rain · faint", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. a little soft rain outside.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "rain", "people": "none", "loudness": "faint" } },
+    { "label": "easy L2 · env · wind · faint", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. a soft breeze outside.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "wind", "people": "none", "loudness": "faint" } },
+    { "label": "easy L3 · people · single · faint", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. one person talking quietly nearby.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "single", "loudness": "faint" } },
+    { "label": "easy L4 · env · busy street · moderate", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. standing near a moderately busy street.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "busy_street", "people": "none", "loudness": "moderate" } },
+    { "label": "easy L5 · people · light · moderate", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. a couple of people chatting nearby.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "light", "loudness": "moderate" } },
+    { "label": "easy L6 · mixed · street+light · moderate", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. a busy street with a few people around.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "busy_street", "people": "light", "loudness": "moderate" } },
+    { "label": "easy · baseline · clean", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. you are at home in a quiet room.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none" }
   ],
   "scenarios": [
-    { "name": "straightforward enrollment", "description": "Complete the Swasth Kadham signup for your child. Answer clearly right away. Facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; not pregnant; child Aarav Mehta, born 22 July 2023; this number is linked to your Anganwadi; WhatsApp on this number; last 4 Aadhaar digits 4827." }
+    { "name": "straightforward enrollment", "description": "Complete the Demo Health Survey signup for your child. Answer clearly right away. Facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; not pregnant; child Aarav Mehta, born 22 July 2023; this number is linked to your Anganwadi; WhatsApp on this number; last 4 Aadhaar digits 4827." }
   ],
   "evaluators": [
     { "id": "form-complete-id", "name": "form_completed", "system_prompt": "Mark True if the agent collected the key enrollment fields (name, district, pregnancy status, child name+DOB, phone/WhatsApp linkage, last 4 Aadhaar digits) and gave a closing acknowledgment.", "judge_model": "openai/gpt-4.1" },
@@ -474,18 +474,18 @@ loud→harsh; each ends with a clean baseline.
 ### `sample_voice_noise_hard.json`
 ```json
 {
-  "agent_url": "ws://localhost:7860/ws-client/swasth-kadam-v5",
+  "agent_url": "ws://localhost:7860/ws-client/demo-health-survey",
   "personas": [
-    { "label": "hard L1 · env · vehicle · loud", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. on a moving bus, engine loud.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "vehicle", "people": "none", "loudness": "loud" } },
-    { "label": "hard L2 · people · medium · loud", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. in a cafe with several people talking.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "medium", "loudness": "loud" } },
-    { "label": "hard L3 · mixed · station+medium · loud", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. at a crowded, loud railway station.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "railway_station", "people": "medium", "loudness": "loud" } },
-    { "label": "hard L4 · env · vacuum · harsh", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. at home with a vacuum running right nearby.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "vacuum", "people": "none", "loudness": "harsh" } },
-    { "label": "hard L5 · people · heavy · harsh", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. in a packed, very noisy crowd.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "heavy", "loudness": "harsh" } },
-    { "label": "hard L6 · mixed · rainy+heavy · harsh", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. on a rainy street in a heavy crowd.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "rainy_street", "people": "heavy", "loudness": "harsh" } },
-    { "label": "hard · baseline · clean", "characteristics": "You are a Hindi-speaking mother enrolling your child in Swasth Kadham. You answer politely, one question at a time. you are at home in a quiet room.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none" }
+    { "label": "hard L1 · env · vehicle · loud", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. on a moving bus, engine loud.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "vehicle", "people": "none", "loudness": "loud" } },
+    { "label": "hard L2 · people · medium · loud", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. in a cafe with several people talking.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "medium", "loudness": "loud" } },
+    { "label": "hard L3 · mixed · station+medium · loud", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. at a crowded, loud railway station.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "railway_station", "people": "medium", "loudness": "loud" } },
+    { "label": "hard L4 · env · vacuum · harsh", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. at home with a vacuum running right nearby.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "vacuum", "people": "none", "loudness": "harsh" } },
+    { "label": "hard L5 · people · heavy · harsh", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. in a packed, very noisy crowd.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": null, "people": "heavy", "loudness": "harsh" } },
+    { "label": "hard L6 · mixed · rainy+heavy · harsh", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. on a rainy street in a heavy crowd.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none", "noise": { "mode": "fixed", "environment": "rainy_street", "people": "heavy", "loudness": "harsh" } },
+    { "label": "hard · baseline · clean", "characteristics": "You are a Hindi-speaking mother enrolling your child in Demo Health Survey. You answer politely, one question at a time. you are at home in a quiet room.", "gender": "female", "language": "hindi", "interruption_sensitivity": "none" }
   ],
   "scenarios": [
-    { "name": "straightforward enrollment", "description": "Complete the Swasth Kadham signup for your child. Answer clearly right away. Facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; not pregnant; child Aarav Mehta, born 22 July 2023; this number is linked to your Anganwadi; WhatsApp on this number; last 4 Aadhaar digits 4827." }
+    { "name": "straightforward enrollment", "description": "Complete the Demo Health Survey signup for your child. Answer clearly right away. Facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; not pregnant; child Aarav Mehta, born 22 July 2023; this number is linked to your Anganwadi; WhatsApp on this number; last 4 Aadhaar digits 4827." }
   ],
   "evaluators": [
     { "id": "form-complete-id", "name": "form_completed", "system_prompt": "Mark True if the agent collected the key enrollment fields (name, district, pregnancy status, child name+DOB, phone/WhatsApp linkage, last 4 Aadhaar digits) and gave a closing acknowledgment.", "judge_model": "openai/gpt-4.1" },

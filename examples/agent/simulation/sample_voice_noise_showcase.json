@@ -1,5 +1,5 @@
 {
-  "agent_url": "ws://localhost:7860/ws-client/swasth-kadam-v5",
+  "agent_url": "ws://localhost:7860/ws-client/demo-health-survey",
   "personas": [
     {
       "label": "patient rural mother (home)",
@@ -92,11 +92,11 @@
   "scenarios": [
     {
       "name": "straightforward enrollment",
-      "description": "Complete the Swasth Kadham signup for your child. When the agent asks a question, answer clearly right away. Your facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; you are not pregnant; child name Aarav Mehta, born 22 July 2023; this calling number is linked to your Anganwadi; WhatsApp is on this same number; last 4 digits of Aadhaar are 4827."
+      "description": "Complete the Demo Health Survey signup for your child. When the agent asks a question, answer clearly right away. Your facts: full name Priya Mehta; district Pune; Anganwadi Lakshmi Nagar Kendra; you are not pregnant; child name Aarav Mehta, born 22 July 2023; this calling number is linked to your Anganwadi; WhatsApp is on this same number; last 4 digits of Aadhaar are 4827."
     },
     {
       "name": "vague then complete",
-      "description": "You want to sign up for Swasth Kadham but start vague — say only that you contacted the Anganwadi and want health messages. Do not volunteer your district, Anganwadi name, child details, or phone/WhatsApp facts until the agent asks each one specifically. Once asked, give the correct answer. Your facts: full name Fatima Khan; district Aurangabad; Anganwadi Station Road centre; not pregnant; child name Zara Khan, born 8 March 2024; calling number is not the Anganwadi-linked number — Anganwadi phone is 9876543210; WhatsApp is on the number you are calling from; last 4 Aadhaar digits 6391."
+      "description": "You want to sign up for Demo Health Survey but start vague — say only that you contacted the Anganwadi and want health messages. Do not volunteer your district, Anganwadi name, child details, or phone/WhatsApp facts until the agent asks each one specifically. Once asked, give the correct answer. Your facts: full name Fatima Khan; district Aurangabad; Anganwadi Station Road centre; not pregnant; child name Zara Khan, born 8 March 2024; calling number is not the Anganwadi-linked number — Anganwadi phone is 9876543210; WhatsApp is on the number you are calling from; last 4 Aadhaar digits 6391."
     }
   ],
   "evaluators": [
