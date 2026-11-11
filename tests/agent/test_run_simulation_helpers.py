@@ -686,7 +686,7 @@ class TestBuildSimulatedUserLlm:
             RS.build_simulated_user_llm()
         kwargs = svc.call_args.kwargs
         assert kwargs["api_key"] == "or-fake"
-        svc.Settings.assert_called_once_with(model="openai/gpt-5.4-mini")
+        svc.Settings.assert_called_once_with(model="google/gemini-3.5-flash-lite")
 
 
 if __name__ == "__main__":
