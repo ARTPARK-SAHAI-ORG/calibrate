@@ -1,6 +1,7 @@
 """Tests for simple helpers in calibrate_agent/agent/run_simulation.py."""
 
 import asyncio
+import os
 import socket
 import tempfile
 import unittest
@@ -605,10 +606,8 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
 
         ctx = MagicMock()
         ctx.get_messages.return_value = []  # 0 agent turns < max_turns
-        audio_buffer = MagicMock()
         return RTVIMessageFrameAdapter(
             context=ctx,
-            audio_buffer=audio_buffer,
             interrupt_probability=0.0,
             tool_calls=[],
             stt_outputs=[],
@@ -657,3 +656,72 @@ class TestBuildSimulatedUserLlm:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCallRecorderKeepsGaps(unittest.IsolatedAsyncioTestCase):
+    """conversation.wav comes from pipecat's call recorder, which fills the time
+    between turns with silence, so the file is as long as the call."""
+
+    async def test_silence_between_turns_is_kept(self):
+        import wave
+        from pipecat.frames.frames import InputAudioRawFrame, OutputAudioRawFrame
+        from pipecat.processors.audio import audio_buffer_processor as ABP
+        from calibrate_agent.agent import run_simulation as RS
+
+        half_second = b"\x01\x00" * 8000
+        now = [100.0]
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            ABP.time, "monotonic", lambda: now[0]
+        ):
+            recorder = RS.build_call_recorder(tmp)
+            recorder._sample_rate = 16000  # normally set when the pipeline starts
+            await recorder.start_recording()
+            # The agent speaks for 0.5 s, then the sim user answers 3.5 s later.
+            await recorder._process_recording(
+                InputAudioRawFrame(audio=half_second, sample_rate=16000, num_channels=1)
+            )
+            now[0] = 103.5
+            await recorder._process_recording(
+                OutputAudioRawFrame(audio=half_second, sample_rate=16000, num_channels=1)
+            )
+            await recorder.stop_recording()
+            await recorder.cleanup()
+
+            with wave.open(os.path.join(tmp, "conversation.wav")) as wf:
+                seconds = wf.getnframes() / wf.getframerate()
+        self.assertGreater(seconds, 3.0)
+
+
+class TestConversationAudio(unittest.IsolatedAsyncioTestCase):
+    async def test_recorder_audio_saved_as_conversation_wav(self):
+        import wave
+        from calibrate_agent.agent import run_simulation as RS
+
+        with tempfile.TemporaryDirectory() as tmp:
+            await RS.save_conversation_audio(tmp, b"\x01\x00" * 16000, 16000, 1)
+            with wave.open(os.path.join(tmp, "conversation.wav")) as wf:
+                self.assertEqual(wf.getnframes() / wf.getframerate(), 1.0)
+
+    def test_turns_joined_only_when_recorder_wrote_nothing(self):
+        from calibrate_agent.agent import run_simulation as RS
+
+        for recorded in (True, False):
+            with self.subTest(recorded=recorded), tempfile.TemporaryDirectory() as tmp:
+                os.makedirs(os.path.join(tmp, "audios"))
+                if recorded:
+                    open(os.path.join(tmp, "conversation.wav"), "wb").close()
+                with patch.object(RS, "combine_turn_audio_chunks") as chunks, patch.object(
+                    RS, "combine_audio_files"
+                ) as join:
+                    RS.finish_simulation_audio(tmp)
+                chunks.assert_called_once()
+                self.assertEqual(join.called, not recorded)
+
+    def test_no_audio_folder_does_nothing(self):
+        from calibrate_agent.agent import run_simulation as RS
+
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            RS, "combine_audio_files"
+        ) as join:
+            RS.finish_simulation_audio(tmp)
+        join.assert_not_called()

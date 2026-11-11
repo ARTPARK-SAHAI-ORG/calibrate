@@ -16,11 +16,9 @@ def _make_adapter(**overrides):
     ctx = MagicMock()
     ctx.get_messages.return_value = []
 
-    audio_buffer = MagicMock()
 
     defaults = dict(
         context=ctx,
-        audio_buffer=audio_buffer,
         interrupt_probability=0.0,
         tool_calls=[],
         stt_outputs=[],
