@@ -64,6 +64,7 @@ INTERRUPTION_COLOR = "\033[91m"
 DEFAULT_MAX_TURNS = 10
 DEFAULT_PORT = 8765
 DEFAULT_AGENT_SPEAKS_FIRST = True
+CONVERSATION_AUDIO_FILE_NAME = "conversation.wav"
 DEFAULT_INTERRUPTION_MIN_WORDS = 3
 DEFAULT_INTERRUPTION_MAX_WORDS = 12
 
@@ -472,7 +473,6 @@ class RTVIMessageFrameAdapter(FrameProcessor):
     def __init__(
         self,
         context: LLMContext,
-        audio_buffer: AudioBufferProcessor,
         interrupt_probability: float,
         tool_calls: list[dict],
         stt_outputs: list[str],
@@ -490,7 +490,6 @@ class RTVIMessageFrameAdapter(FrameProcessor):
     ):
         super().__init__(enable_direct_mode=True, name="RTVIMessageFrameAdapter")
         self._context = context
-        self._audio_buffer = audio_buffer
         self._latency_tracker = latency_tracker
         # Whether the agent under test is an external WS agent. An external agent may
         # keep sending audio after being told to stop, so its output is blocked until
@@ -941,7 +940,6 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 user_id = ""
 
                 if msg_type == "bot-started-speaking":
-                    self._audio_buffer._reset_all_audio_buffers()
                     if self._is_external and self._is_bot_interrupt_triggered:
                         # External interrupt in progress: the sim user has the floor.
                         # Ignore the agent's attempt to speak — keep its output blocked
@@ -1687,7 +1685,7 @@ async def _run_simulation_inner(
     context = LLMContext(messages)
     context_aggregator = build_user_context_aggregator(context)
 
-    audio_buffer = AudioBufferProcessor(enable_turn_audio=True)
+    audio_buffer = AudioBufferProcessor()
 
     tool_calls = []
     function_call_handler = RTVIFunctionCallResponder(
@@ -1696,7 +1694,6 @@ async def _run_simulation_inner(
 
     rtvi_message_adapter = RTVIMessageFrameAdapter(
         context,
-        audio_buffer,
         interrupt_probability,
         tool_calls,
         stt_outputs,
@@ -1810,6 +1807,17 @@ async def _run_simulation_inner(
     #         audio_save_dir, f"{rtvi_message_adapter._turn_index}_user.wav"
     #     )
     #     await save_audio_chunk(audio_save_path, audio, sample_rate, num_channels)
+
+    @audio_buffer.event_handler("on_audio_data")
+    async def on_audio_data(buffer, audio, sample_rate, num_channels):
+        # The recorder fills the gaps between turns with silence by clock time,
+        # so the file is as long as the call.
+        await save_audio_chunk(
+            os.path.join(output_dir, CONVERSATION_AUDIO_FILE_NAME),
+            audio,
+            sample_rate,
+            num_channels,
+        )
 
     @transport.event_handler("on_connected")
     async def on_connected(transport, client):
@@ -2430,17 +2438,21 @@ async def _run_single_simulation_inner(
             # Clean up the print logger for this simulation using the unique run ID
             cleanup_print_logger(simulation_run_id)
 
-    # Combine audio chunks for each turn into single turn files, then combine all into conversation.wav
+    # Combine audio chunks for each turn into single turn files
     audio_dir = os.path.join(simulation_output_dir, "audios")
-    conversation_audio_path = os.path.join(simulation_output_dir, "conversation.wav")
+    conversation_audio_path = os.path.join(
+        simulation_output_dir, CONVERSATION_AUDIO_FILE_NAME
+    )
     if os.path.exists(audio_dir):
         # First, combine chunks for each turn (e.g., 0_bot_0.wav, 0_bot_1.wav -> 0_bot.wav)
         combine_turn_audio_chunks(audio_dir)
         log_and_print(f"Combined turn audio chunks in {audio_dir}")
-        # Then combine all turn files into conversation.wav, using transcript for correct ordering
-        transcript_path = os.path.join(simulation_output_dir, TRANSCRIPT_FILE_NAME)
-        combine_audio_files(audio_dir, conversation_audio_path, transcript_path)
-        log_and_print(f"Combined audio saved to {conversation_audio_path}")
+        if not os.path.exists(conversation_audio_path):
+            # The call recorder wrote nothing (e.g. the run stopped early): join
+            # the turn files in transcript order, without the gaps between turns.
+            transcript_path = os.path.join(simulation_output_dir, TRANSCRIPT_FILE_NAME)
+            combine_audio_files(audio_dir, conversation_audio_path, transcript_path)
+            log_and_print(f"Combined audio saved to {conversation_audio_path}")
 
     # Return metrics for aggregation
     if simulation_result:

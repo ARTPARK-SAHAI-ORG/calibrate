@@ -605,10 +605,8 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
 
         ctx = MagicMock()
         ctx.get_messages.return_value = []  # 0 agent turns < max_turns
-        audio_buffer = MagicMock()
         return RTVIMessageFrameAdapter(
             context=ctx,
-            audio_buffer=audio_buffer,
             interrupt_probability=0.0,
             tool_calls=[],
             stt_outputs=[],
@@ -657,3 +655,38 @@ class TestBuildSimulatedUserLlm:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCallRecorderKeepsGaps(unittest.IsolatedAsyncioTestCase):
+    """conversation.wav comes from pipecat's call recorder, which fills the time
+    between turns with silence, so the file is as long as the call."""
+
+    async def test_silence_between_turns_is_kept(self):
+        from pipecat.frames.frames import InputAudioRawFrame, OutputAudioRawFrame
+        from pipecat.processors.audio import audio_buffer_processor as ABP
+
+        recorder = ABP.AudioBufferProcessor(sample_rate=16000)
+        recorder._sample_rate = 16000  # normally set when the pipeline starts
+        saved = []
+
+        @recorder.event_handler("on_audio_data")
+        async def on_audio_data(buffer, audio, sample_rate, num_channels):
+            saved.append(audio)
+
+        half_second = b"\x01\x00" * 8000
+        now = [100.0]
+        with patch.object(ABP.time, "monotonic", lambda: now[0]):
+            await recorder.start_recording()
+            # The agent speaks for 0.5 s, then the sim user answers 3.5 s later.
+            await recorder._process_recording(
+                InputAudioRawFrame(audio=half_second, sample_rate=16000, num_channels=1)
+            )
+            now[0] = 103.5
+            await recorder._process_recording(
+                OutputAudioRawFrame(audio=half_second, sample_rate=16000, num_channels=1)
+            )
+            await recorder.stop_recording()
+            await recorder.cleanup()
+
+        seconds = len(saved[0]) / 2 / 16000
+        self.assertGreater(seconds, 3.0)
