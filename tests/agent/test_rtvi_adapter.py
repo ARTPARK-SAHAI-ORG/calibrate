@@ -397,14 +397,15 @@ def _count_interrupt_messages(pushed):
 
 
 class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
-    """A decided interrupt cuts the agent off at once, for internal and external
-    agents alike. External agents also get their output blocked until the sim user
-    finishes."""
+    """A decided interrupt ends the agent's turn at once, for internal and external
+    agents alike, so the sim user starts its reply. The agent is told to stop when
+    that reply starts playing. External agents also get their output blocked until
+    the sim user finishes."""
 
-    async def test_interrupt_executes_immediately(self):
+    async def test_cut_in_ends_turn_at_once_and_defers_stop(self):
         from pipecat.frames.frames import (
             TranscriptionFrame,
-            UserStoppedSpeakingFrame,
+            ProposedUserStoppedSpeakingFrame,
             InterimTranscriptionFrame,
         )
 
@@ -424,10 +425,12 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
                     )
 
                 self.assertTrue(adapter._is_bot_interrupt_triggered)
-                # Tells the agent to stop, commits the partial, ends the turn.
-                self.assertEqual(_count_interrupt_messages(pushed), 1)
+                # Commits the partial and ends the turn. The agent is told to stop
+                # later, when the sim user's reply starts playing.
+                self.assertEqual(_count_interrupt_messages(pushed), 0)
+                self.assertTrue(adapter._agent_stop_pending)
                 self.assertEqual(_count_frames(pushed, TranscriptionFrame), 1)
-                self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 1)
+                self.assertEqual(_count_frames(pushed, ProposedUserStoppedSpeakingFrame), 1)
                 # Nothing more is fed to the sim user (no interim after cutting in).
                 self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 0)
 
@@ -435,7 +438,7 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
         from pipecat.frames.frames import (
             InterruptionFrame,
             TranscriptionFrame,
-            UserStoppedSpeakingFrame,
+            ProposedUserStoppedSpeakingFrame,
         )
         from pipecat.processors.frame_processor import FrameDirection
 
@@ -457,7 +460,9 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
         # The sim user's LLM must see the interruption before the reply it
         # cancels, or the reply is dropped and the run hangs.
         self.assertLess(first(InterruptionFrame), first(TranscriptionFrame))
-        self.assertLess(first(InterruptionFrame), first(UserStoppedSpeakingFrame))
+        self.assertLess(first(InterruptionFrame), first(ProposedUserStoppedSpeakingFrame))
+        # The stop must follow the heard text, or the turn waits for its timeout.
+        self.assertLess(first(TranscriptionFrame), first(ProposedUserStoppedSpeakingFrame))
 
     async def test_bot_started_blocked_while_external_interrupt_active(self):
         adapter = _make_adapter(is_external=True)
@@ -602,7 +607,7 @@ class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
                     interrupt_max_words=1,
                 )
                 self.assertTrue(adapter._is_bot_interrupt_triggered)
-                self.assertEqual(_count_interrupt_messages(pushed), 1)
+                self.assertTrue(adapter._agent_stop_pending)
 
     async def test_v2_without_word_timestamps_counted_once(self):
         adapter, _ = await self._run(
@@ -621,7 +626,7 @@ async def _speak_utterance(adapter, words):
     cut_in_at = None
     for i, word in enumerate(words, start=1):
         await _drive_frame(adapter, _bot_output_frame(word, True), pushed)
-        if cut_in_at is None and _count_interrupt_messages(pushed):
+        if cut_in_at is None and adapter._is_bot_interrupt_triggered:
             cut_in_at = i
     await _drive_frame(adapter, _rtvi_frame("bot-stopped-speaking"), pushed)
     await _drive_frame(adapter, _rtvi_frame("user-stopped-speaking"), pushed)
@@ -677,6 +682,47 @@ class TestCutInTiming(unittest.IsolatedAsyncioTestCase):
                 output_dir=tmp, audio_save_dir=tmp, interrupt_phrase="no"
             )
             self.assertIsNone(await _speak_utterance(adapter, ["I", "know", "now"]))
+
+
+
+class TestCallerTalksOverAgent(unittest.IsolatedAsyncioTestCase):
+    """While the sim user prepares its cut-in reply, the agent keeps talking. Its
+    audio goes only to the call recorder, and it cannot cancel that reply."""
+
+    async def _cut_in(self, **overrides):
+        recorder = MagicMock()
+        recorder.process_frame = AsyncMock()
+        adapter = _make_adapter(
+            interrupt_probability=1.0,
+            interrupt_min_words=1,
+            interrupt_max_words=1,
+            recorder=recorder,
+            **overrides,
+        )
+        await _drive_bot_started(adapter)
+        await _drive_frame(adapter, _bot_output_frame("Hello", True))
+        self.assertTrue(adapter._agent_stop_pending)
+        return adapter, recorder
+
+    async def test_agent_audio_goes_to_recording_only(self):
+        from pipecat.frames.frames import InputAudioRawFrame
+
+        adapter, recorder = await self._cut_in()
+        frame = InputAudioRawFrame(audio=b"\x01\x00", sample_rate=16000, num_channels=1)
+        pushed = await _drive_frame(adapter, frame)
+        self.assertEqual(_count_frames(pushed, InputAudioRawFrame), 0)
+        recorder.process_frame.assert_awaited_once()
+
+    async def test_agent_starting_again_does_not_cancel_reply(self):
+        adapter, _ = await self._cut_in()
+        pushed = await _drive_bot_started(adapter)
+        self.assertEqual(_count_interruptions(pushed), 0)
+        self.assertTrue(adapter._is_bot_interrupt_triggered)
+
+    async def test_sim_user_finishing_clears_pending_stop(self):
+        adapter, _ = await self._cut_in()
+        await _drive_rtvi(adapter, "user-stopped-speaking")
+        self.assertFalse(adapter._agent_stop_pending)
 
 
 if __name__ == "__main__":

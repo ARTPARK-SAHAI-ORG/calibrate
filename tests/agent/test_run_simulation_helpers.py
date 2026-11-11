@@ -318,8 +318,8 @@ class TestBuildUserContextAggregator(unittest.TestCase):
         self.assertTrue(
             any(isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop)
         )
-        # ExternalUserTurnStopStrategy is present ONLY to hard-stop the turn on an
-        # explicit interrupt UserStopped; timeout=None disables its auto-timeout so
+        # ExternalUserTurnStopStrategy is present ONLY to end the turn on a sim-user
+        # cut-in (ProposedUserStoppedSpeakingFrame); timeout=None disables its auto-timeout so
         # it never pre-empts smart-turn on normal turns.
         external_stops = [
             s for s in strategies.stop if isinstance(s, ExternalUserTurnStopStrategy)
@@ -389,6 +389,41 @@ class TestSilencePadder(unittest.IsolatedAsyncioTestCase):
         padder = SilencePadder(silence_duration_ms=200, chunk_ms=20)
         self.assertEqual(padder._silence_duration_ms, 200)
         self.assertEqual(padder._chunk_ms, 20)
+
+    async def test_agent_told_to_stop_when_cut_in_reply_starts_playing(self):
+        from calibrate_agent.agent.run_simulation import SilencePadder
+        from pipecat.frames.frames import (
+            OutputAudioRawFrame,
+            OutputTransportMessageUrgentFrame,
+        )
+        from pipecat.processors.frame_processor import FrameDirection
+
+        adapter = MagicMock(_agent_stop_pending=True, _sim_user_turn_pending=False)
+        padder = SilencePadder(rtvi_message_adapter=adapter)
+        pushed = []
+
+        async def capture(frame, direction=FrameDirection.DOWNSTREAM):
+            pushed.append(frame)
+
+        padder.push_frame = capture
+        audio = lambda: OutputAudioRawFrame(
+            audio=b"\x01\x00", sample_rate=16000, num_channels=1
+        )
+        await padder.process_frame(audio(), FrameDirection.DOWNSTREAM)
+        await padder.process_frame(audio(), FrameDirection.DOWNSTREAM)
+
+        kinds = [type(f).__name__ for f in pushed]
+        # One stop message, sent just before the reply's first audio.
+        self.assertEqual(
+            kinds,
+            [
+                "OutputTransportMessageUrgentFrame",
+                "OutputAudioRawFrame",
+                "OutputAudioRawFrame",
+            ],
+        )
+        self.assertEqual(pushed[0].message["data"], {"t": "interrupt"})
+        self.assertFalse(adapter._agent_stop_pending)
 
 
 class TestResolveSerializer(unittest.TestCase):
@@ -651,7 +686,7 @@ class TestBuildSimulatedUserLlm:
             RS.build_simulated_user_llm()
         kwargs = svc.call_args.kwargs
         assert kwargs["api_key"] == "or-fake"
-        svc.Settings.assert_called_once_with(model="openai/gpt-5.4-mini")
+        svc.Settings.assert_called_once_with(model="google/gemini-3.5-flash-lite")
 
 
 if __name__ == "__main__":
