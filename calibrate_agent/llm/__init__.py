@@ -64,8 +64,87 @@ if TYPE_CHECKING:
 import os
 import json
 import asyncio
+import unicodedata
 from collections import defaultdict
 import pandas as pd
+
+
+# A model variant's ``id`` becomes its results folder name, so it cannot
+# contain anything that would move the folder elsewhere on disk.
+_UNSAFE_VARIANT_ID_CHARS = ("/", "\\", "\x00")
+
+
+def normalize_variants(variants: List[dict]) -> List[Dict[str, Any]]:
+    """Validate model variants and fill in their defaults.
+
+    A variant is one model plus the extra request fields to send with it, so
+    the same model can be benchmarked more than once in a run::
+
+        {"id": "gpt-5#1", "model": "openai/gpt-5",
+         "label": "gpt-5 (high thinking)",
+         "extra": {"reasoning": {"effort": "high"}}}
+
+    ``id`` names the variant's results folder and must be unique in the run and
+    usable as a folder name. ``label`` is for display and defaults to ``id``.
+    ``extra`` is free-form JSON, sent as-is.
+
+    Raises:
+        ValueError: When a variant has no ``id`` or ``model``, when an ``id``
+            repeats, when an ``id`` cannot be a folder name, or when ``extra``
+            is not a JSON object.
+    """
+    normalized: List[Dict[str, Any]] = []
+    seen: set = set()
+    for variant in variants:
+        if not isinstance(variant, dict):
+            raise ValueError(f"Each model variant must be an object; got {variant!r}")
+        variant_id = str(variant.get("id") or "").strip()
+        model = variant.get("model")
+        if not variant_id:
+            raise ValueError(f"Model variant is missing 'id': {variant!r}")
+        if not model:
+            raise ValueError(f"Model variant {variant_id!r} is missing 'model'")
+        if variant_id in (".", "..") or any(
+            c in variant_id for c in _UNSAFE_VARIANT_ID_CHARS
+        ):
+            raise ValueError(
+                f"Model variant id {variant_id!r} cannot be used as a folder "
+                f"name. Ids become results folder names as-is, so they may not "
+                f"be '.' or '..' or contain '/' or '\\'."
+            )
+        # The leaderboard is written to its own folder under the same output
+        # directory and is not read back as a variant, so a variant of that
+        # name would run and then be missing from the leaderboard.
+        if variant_id.casefold() == "leaderboard":
+            raise ValueError(
+                "Model variant id 'leaderboard' is taken by the leaderboard's "
+                "own results folder. Give the variant another id."
+            )
+        # macOS and Windows treat "gpt-5" and "GPT-5" as one folder, so two
+        # such ids would share a results folder and overwrite each other.
+        folder_key = unicodedata.normalize("NFC", variant_id).casefold()
+        if folder_key in seen:
+            raise ValueError(
+                f"Model variant id {variant_id!r} repeats an earlier id. Ids "
+                f"must differ by more than upper and lower case, because some "
+                f"filesystems treat those as the same folder."
+            )
+        seen.add(folder_key)
+        extra = variant.get("extra") or {}
+        if not isinstance(extra, dict):
+            raise ValueError(
+                f"Model variant {variant_id!r} has an 'extra' that is not an "
+                f"object: {extra!r}"
+            )
+        normalized.append(
+            {
+                "id": variant_id,
+                "model": model,
+                "label": variant.get("label") or variant_id,
+                "extra": extra,
+            }
+        )
+    return normalized
 
 
 class _Tests:
@@ -85,15 +164,19 @@ class _Tests:
         test_parallel: Optional[int] = None,
         label_output: bool = False,
         overwrite: bool = False,
+        variant: Optional[Dict[str, Any]] = None,
     ) -> dict:
         """Run tests for a single model (or external agent).
 
         Args:
-            label_output: When True, prefix per-test-case log lines with
-                ``[model]``. Set for multi-model parallel runs (internal or
-                agent) so interleaved output stays attributable.
+            label_output: When True, prefix per-test-case log lines with the
+                model (or variant) name. Set for multi-model parallel runs
+                (internal or agent) so interleaved output stays attributable.
             overwrite: When False, resume by skipping test cases already present
                 in a prior ``results.json``; when True, rerun everything.
+            variant: Optional model variant (``id``/``model``/``label``/
+                ``extra``, see :func:`normalize_variants`). Its ``id`` names the
+                results folder and its ``extra`` is sent with every request.
         """
         from calibrate_agent.llm.run_tests import (
             run_test as _run_test,
@@ -110,9 +193,11 @@ class _Tests:
         from calibrate_agent.utils import configure_print_logger, log_and_print
 
         # Create output directory
+        display_name = variant["label"] if variant else model
         if agent is not None and model:
-            # Benchmarking with agent: use model name as subfolder so leaderboard works.
-            save_folder_name = model.replace("/", "__")
+            # Benchmarking with agent: one subfolder per model (or per variant,
+            # named by its id) so the leaderboard has a row for each.
+            save_folder_name = variant["id"] if variant else model.replace("/", "__")
             if run_name:
                 final_output_dir = os.path.join(output_dir, run_name, save_folder_name)
             else:
@@ -141,6 +226,26 @@ class _Tests:
         configure_print_logger(print_log_save_path)
 
         results_file_path = os.path.join(final_output_dir, "results.json")
+
+        # A variant's results belong to the request fields that produced them.
+        # Reusing the same id with a different ``extra`` describes a different
+        # run, so the earlier results are replaced rather than resumed, and the
+        # fields that produced them are recorded beside the results.
+        if variant is not None:
+            variant_file_path = os.path.join(final_output_dir, "variant.json")
+            if os.path.exists(variant_file_path):
+                try:
+                    with open(variant_file_path) as f:
+                        previous_variant = json.load(f)
+                except (json.JSONDecodeError, OSError):
+                    previous_variant = None
+                if (
+                    isinstance(previous_variant, dict)
+                    and previous_variant.get("extra") != variant["extra"]
+                ):
+                    overwrite = True
+            with open(variant_file_path, "w") as f:
+                json.dump(variant, f, indent=4)
 
         # Pass model name to agent for benchmark routing; None for single runs.
         agent_model_hint: Optional[str] = model if (agent is not None and model) else None
@@ -172,6 +277,7 @@ class _Tests:
                     model=agent_model_hint,
                     inputs=test_case.get("inputs"),
                     evaluators=resolved_evaluators,
+                    extra=variant["extra"] if variant else None,
                 )
             else:
                 result = await _run_test(
@@ -185,7 +291,9 @@ class _Tests:
                     evaluators=resolved_evaluators,
                 )
 
-            label_prefix = f"[{model}] " if (label_output and model) else ""
+            label_prefix = (
+                f"[{display_name}] " if (label_output and display_name) else ""
+            )
             if result["metrics"]["passed"]:
                 log_and_print(f"{label_prefix}✅ Test case {test_case_index + 1} passed")
             else:
@@ -204,7 +312,9 @@ class _Tests:
         )
         resumed_count = sum(1 for r in initial_results if r is not None)
         if resumed_count:
-            label_prefix = f"[{model}] " if (label_output and model) else ""
+            label_prefix = (
+                f"[{display_name}] " if (label_output and display_name) else ""
+            )
             log_and_print(
                 f"{label_prefix}↻ Resuming: {resumed_count}/{len(test_cases)} "
                 f"test case(s) already completed; re-running the rest"
@@ -249,6 +359,8 @@ class _Tests:
             "criteria": _aggregate_criteria(results, name_to_evaluator),
             "tool_calls": _aggregate_tool_calls(results),
         }
+        if variant:
+            metrics["label"] = variant["label"]
         metrics["errored"] = errored_count(results)
         metrics["stopped_early"] = run_stopped_early(results)
         cost = _aggregate_cost(results)
@@ -286,6 +398,7 @@ class _Tests:
         evaluators: Optional[List[dict]] = None,
         test_parallel: Optional[int] = None,
         overwrite: bool = False,
+        variants: Optional[List[dict]] = None,
     ) -> dict:
         """
         Run LLM tests with the given configuration.
@@ -303,6 +416,12 @@ class _Tests:
             tools: List of tool definitions available to the LLM (ignored when agent is provided)
             output_dir: Path to output directory for results (default: ./out)
             models: List of model names to evaluate (if provided, runs in parallel)
+            variants: List of model variant dicts (``id``, ``model``, optional
+                ``label`` and ``extra``) for an external agent. Each variant is
+                one run with its own results folder named after its ``id``, so
+                the same model can be evaluated more than once with different
+                request fields. Takes precedence over ``models``. See
+                :func:`normalize_variants`.
             model: Single model name to use (used if models is not provided)
             provider: LLM provider (openai or openrouter)
             run_name: Optional name for this run (used in output folder name)
@@ -346,6 +465,49 @@ class _Tests:
         # Validate id uniqueness once, up front, so duplicate ids fail fast
         # before fanning models out. Cases without ids just won't resume.
         require_unique_test_case_ids(test_cases)
+
+        if variants and agent is None:
+            raise ValueError(
+                "Model variants describe the extra fields sent to an external "
+                "agent, so they need an 'agent'. Use 'models' to evaluate "
+                "internal models."
+            )
+
+        # External agent benchmark by variant: run once per variant, sending
+        # that variant's model and extra request fields.
+        if agent is not None and variants:
+            normalized_variants = normalize_variants(variants)
+            variant_semaphore = asyncio.Semaphore(max_parallel)
+
+            async def run_agent_variant(v: Dict[str, Any]) -> dict:
+                async with variant_semaphore:
+                    return await _Tests._run_single_model(
+                        system_prompt="",
+                        tools=[],
+                        test_cases=test_cases,
+                        output_dir=output_dir,
+                        model=v["model"],
+                        provider=provider,
+                        run_name=run_name,
+                        agent=agent,
+                        evaluators=evaluators,
+                        test_parallel=test_parallel,
+                        label_output=True,
+                        overwrite=overwrite,
+                        variant=v,
+                    )
+
+            variant_results = await asyncio.gather(
+                *[run_agent_variant(v) for v in normalized_variants],
+                return_exceptions=True,
+            )
+            results_by_variant: dict = {}
+            for v, r in zip(normalized_variants, variant_results):
+                if isinstance(r, Exception):
+                    results_by_variant[v["id"]] = {"status": "error", "error": str(r)}
+                else:
+                    results_by_variant[v["id"]] = r
+            return results_by_variant
 
         # External agent benchmark: run once per model, passing model hint in each request
         if agent is not None and models and len(models) > 0:
