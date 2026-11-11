@@ -39,7 +39,7 @@ from calibrate_agent.utils import (
 )
 from calibrate_agent.agent.noise.resolver import resolve_for_run
 from calibrate_agent.agent.noise.assets import NoiseAssets
-from calibrate_agent.agent.noise.download import ensure_assets
+from calibrate_agent.agent.noise.download import check_speaker_access, ensure_assets
 from calibrate_agent.agent.noise.simulation_noise_generator import (
     SimulationNoiseGenerator,
 )
@@ -2568,6 +2568,54 @@ async def _run_single_simulation_inner(
     return None, [], None
 
 
+def prepare_noise_for_batch(config: dict) -> None:
+    """Verify and build every noise asset the batch needs, before any live call.
+
+    Resolves the exact noise condition each run will use, checks the Hugging Face
+    login up front when any condition needs background voices (so a missing login
+    fails immediately with a clear message rather than partway through the run),
+    then downloads whatever is missing. Raises RuntimeError on a setup problem.
+    """
+    scenarios = config.get("scenarios") or []
+    personas = config.get("personas") or []
+    needs = []  # (env_names, need_speakers, language)
+    assets = None
+    for persona_index, persona in enumerate(personas):
+        noise_cfg = persona.get("noise", config.get("noise"))
+        if noise_cfg is None:
+            continue
+        language = persona.get("language", "english")
+        base_seed = noise_cfg.get("seed") if isinstance(noise_cfg, dict) else None
+        for scenario_index in range(len(scenarios)):
+            run_index = persona_index * len(scenarios) + scenario_index
+            resolved = resolve_for_run(
+                noise_cfg, language=language, run_index=run_index, base_seed=base_seed
+            )
+            if resolved is None:
+                continue
+            if assets is None:
+                assets = NoiseAssets()
+            needs.append(
+                (
+                    assets.resolve_environment(resolved.atom.environment),
+                    resolved.atom.people != "none",
+                    language,
+                )
+            )
+
+    if not needs:
+        return
+    # Verify before downloading anything.
+    if any(need_speakers for _, need_speakers, _ in needs):
+        problem = check_speaker_access()
+        if problem:
+            raise RuntimeError(f"Cannot build background-speaker noise.\n    {problem}")
+    for env_names, need_speakers, language in needs:
+        ensure_assets(
+            assets, env_names=env_names, need_speakers=need_speakers, language=language
+        )
+
+
 async def main():
     # Remove default loguru handler (stderr) to prevent all logs from showing on terminal
     # This is done once at startup, not per-simulation
@@ -2612,6 +2660,12 @@ async def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
     write_evaluator_config(args.output_dir, config["evaluators"])
+
+    try:
+        prepare_noise_for_batch(config)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Mapping from interruption_config.sensitivity labels to probabilities
     interrupt_sensitivity_map = {
