@@ -1685,7 +1685,7 @@ async def _run_simulation_inner(
     context = LLMContext(messages)
     context_aggregator = build_user_context_aggregator(context)
 
-    audio_buffer = AudioBufferProcessor()
+    audio_buffer = build_call_recorder(output_dir)
 
     tool_calls = []
     function_call_handler = RTVIFunctionCallResponder(
@@ -1807,10 +1807,6 @@ async def _run_simulation_inner(
     #         audio_save_dir, f"{rtvi_message_adapter._turn_index}_user.wav"
     #     )
     #     await save_audio_chunk(audio_save_path, audio, sample_rate, num_channels)
-
-    @audio_buffer.event_handler("on_audio_data")
-    async def on_audio_data(buffer, audio, sample_rate, num_channels):
-        await save_conversation_audio(output_dir, audio, sample_rate, num_channels)
 
     @transport.event_handler("on_connected")
     async def on_connected(transport, client):
@@ -2139,6 +2135,18 @@ def _interruption_config(item: dict, kind: str, allowed: set[str]) -> dict:
             f"Allowed: {sorted(allowed)}."
         )
     return config
+
+
+def build_call_recorder(output_dir: str) -> AudioBufferProcessor:
+    """Pipecat recorder that saves the whole call as conversation.wav when the
+    call ends."""
+    recorder = AudioBufferProcessor()
+
+    @recorder.event_handler("on_audio_data")
+    async def on_audio_data(buffer, audio, sample_rate, num_channels):
+        await save_conversation_audio(output_dir, audio, sample_rate, num_channels)
+
+    return recorder
 
 
 async def save_conversation_audio(

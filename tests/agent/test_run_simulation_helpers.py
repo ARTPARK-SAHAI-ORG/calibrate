@@ -663,20 +663,18 @@ class TestCallRecorderKeepsGaps(unittest.IsolatedAsyncioTestCase):
     between turns with silence, so the file is as long as the call."""
 
     async def test_silence_between_turns_is_kept(self):
+        import wave
         from pipecat.frames.frames import InputAudioRawFrame, OutputAudioRawFrame
         from pipecat.processors.audio import audio_buffer_processor as ABP
-
-        recorder = ABP.AudioBufferProcessor(sample_rate=16000)
-        recorder._sample_rate = 16000  # normally set when the pipeline starts
-        saved = []
-
-        @recorder.event_handler("on_audio_data")
-        async def on_audio_data(buffer, audio, sample_rate, num_channels):
-            saved.append(audio)
+        from calibrate_agent.agent import run_simulation as RS
 
         half_second = b"\x01\x00" * 8000
         now = [100.0]
-        with patch.object(ABP.time, "monotonic", lambda: now[0]):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            ABP.time, "monotonic", lambda: now[0]
+        ):
+            recorder = RS.build_call_recorder(tmp)
+            recorder._sample_rate = 16000  # normally set when the pipeline starts
             await recorder.start_recording()
             # The agent speaks for 0.5 s, then the sim user answers 3.5 s later.
             await recorder._process_recording(
@@ -689,7 +687,8 @@ class TestCallRecorderKeepsGaps(unittest.IsolatedAsyncioTestCase):
             await recorder.stop_recording()
             await recorder.cleanup()
 
-        seconds = len(saved[0]) / 2 / 16000
+            with wave.open(os.path.join(tmp, "conversation.wav")) as wf:
+                seconds = wf.getnframes() / wf.getframerate()
         self.assertGreater(seconds, 3.0)
 
 
