@@ -10,9 +10,8 @@ mixed continuously into the simulated user's outgoing audio for the whole call,
 so your agent's speech-to-text hears `caller speech + background`, exactly as it
 would in production.
 
-This is an **evaluation-realism** feature: it measures how well your agent's STT
-and turn-taking hold up under realistic background conditions. It only affects
-the voice-agent simulation path, not standalone STT evaluation.
+It measures how well your agent's speech-to-text and turn-taking hold up under
+realistic background noise. It applies to voice-agent simulations.
 
 <Note>
   Noise is **off by default**. Add a `noise` block to your config to turn it on.
@@ -32,7 +31,7 @@ files), so you can compare the two.
 ## Why noisy speech is a good stress test
 
 Steady sounds like rain or an engine sit in a different frequency band than
-speech, so recognizers can often still "hear" the words underneath. Background
+speech, so recognizers can often pick out the words underneath. Background
 **people talking** is the hard case: it is speech masking speech, in the same
 frequency band, so the recognizer can mistake background words for the caller's
 words. For Indian voice agents this matters specifically: an STT tuned for Indian
@@ -91,8 +90,8 @@ seed (this is the shape of the `noise` block you place inside a persona):
 
 `environment` and `people` are selected **independently** and merged into one
 track. Set both for a mixed scene, one for environment-only or people-only, or
-neither for a clean call. You never set a language here. Background people are
-matched to the simulation's language automatically.
+neither for a clean call. Background people are matched to the simulation's
+language automatically.
 
 ## Environment options
 
@@ -129,8 +128,8 @@ where it makes sense):
 
 `people` controls how many background voices overlap. Each crowd is assembled
 fresh per simulation from the simulation-language speaker pool, then processed to
-sound like distant room chatter, muffled and reverberant, not crisp
-foreground speech, so it reads as real background speakers.
+sound like distant room chatter, muffled and reverberant, so it reads as real
+background speakers.
 
 | Level    | Voices | Feels like                                        |
 | -------- | ------ | ------------------------------------------------- |
@@ -140,8 +139,8 @@ foreground speech, so it reads as real background speakers.
 | `heavy`  | 8–12   | a packed cafe, market, or crowded station         |
 
 <Note>
-  `single` is its own hard case, not just "less crowd": one clearly audible
-  voice gives the recognizer real words to grab onto.
+  `single` is its own hard case: one clearly audible voice gives the recognizer
+  real words to grab onto.
 </Note>
 
 ## Loudness
@@ -170,7 +169,7 @@ draw is seeded per `(persona, scenario)` so it's reproducible.
 
 <Note>
   `random` and `mixture` only show variety when a persona runs across **several
-  scenarios**, a persona with a single scenario just gets one seeded draw. For one
+  scenarios**. A persona with a single scenario gets one condition. For one
   labelled condition per caller, use many personas on `fixed` (see
   `examples/agent/simulation/sample_voice_noise_matrix.json`); to spray one caller
   with varied noise, use one persona on `random`/`mixture` with several scenarios.
