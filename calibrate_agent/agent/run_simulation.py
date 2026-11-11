@@ -37,6 +37,14 @@ from calibrate_agent.utils import (
     save_transcript,
     TRANSCRIPT_FILE_NAME,
 )
+from calibrate_agent.agent.noise.resolver import resolve_for_run
+from calibrate_agent.agent.noise.assets import NoiseAssets
+from calibrate_agent.agent.noise.download import check_speaker_access, ensure_assets
+from calibrate_agent.agent.noise.simulation_noise_generator import (
+    SimulationNoiseGenerator,
+)
+from calibrate_agent.agent.noise.save import write_clean_and_noisy
+from pipecat.audio.mixers.soundfile_mixer import SoundfileMixer
 from calibrate_agent.llm.metrics import evaluate_simuation, DEFAULT_SIMULATION_JUDGE_MODEL
 from calibrate_agent.stt.metrics import (
     get_llm_judge_score as stt_llm_judge_score,
@@ -1499,6 +1507,7 @@ async def run_simulation(
     fallback_stt_judge_model: str = DEFAULT_STT_JUDGE_MODEL,
     agent_uri: Optional[str] = None,
     serializer_name: str = DEFAULT_SERIALIZER_NAME,
+    noise=None,
 ) -> dict:
     require_simulation_evaluators(evaluators)
 
@@ -1556,6 +1565,7 @@ async def run_simulation(
             fallback_stt_judge_model=fallback_stt_judge_model,
             agent_uri=agent_uri,
             serializer_name=serializer_name,
+            noise=noise,
         )
     finally:
         logger.remove(error_sink_id)
@@ -1581,6 +1591,7 @@ async def _run_simulation_inner(
     fallback_stt_judge_model: str = DEFAULT_STT_JUDGE_MODEL,
     agent_uri: Optional[str] = None,
     serializer_name: str = DEFAULT_SERIALIZER_NAME,
+    noise=None,
 ) -> dict:
     if agent_uri:
         log_and_print(
@@ -1611,16 +1622,40 @@ async def _run_simulation_inner(
     latency_tracker = EndToEndLatencyTracker()
 
     uri = select_transport_uri(agent_uri, port)
+    noise_track_path = None
+    client_params_kwargs = dict(
+        audio_in_enabled=True,
+        audio_out_enabled=True,
+        add_wav_header=False,
+        serializer=resolve_serializer(serializer_name),
+        # vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
+        # turn_analyzer=LocalSmartTurnAnalyzerV3(),
+    )
+    if noise is not None:
+        assets = NoiseAssets()
+        ensure_assets(
+            assets,
+            env_names=assets.resolve_environment(noise.atom.environment),
+            need_speakers=noise.atom.people != "none",
+            language=language,
+        )
+        noise_track_path = os.path.join(output_dir, "noise_track.wav")
+        SimulationNoiseGenerator(assets).build(
+            noise.atom,
+            language=language,
+            out_path=noise_track_path,
+            seed=noise.seed,
+        )
+        client_params_kwargs["audio_out_mixer"] = SoundfileMixer(
+            sound_files={"bg": noise_track_path},
+            default_sound="bg",
+            volume=noise.volume,
+            loop=True,
+            mixing=True,
+        )
     transport = WebsocketClientTransport(
         uri=uri,
-        params=WebsocketClientParams(
-            audio_in_enabled=True,
-            audio_out_enabled=True,
-            add_wav_header=False,
-            serializer=resolve_serializer(serializer_name),
-            # vad_analyzer=SileroVADAnalyzer(params=VADParams(stop_secs=0.2)),
-            # turn_analyzer=LocalSmartTurnAnalyzerV3(),
-        ),
+        params=WebsocketClientParams(**client_params_kwargs),
     )
     session = transport._session
     connect_lock = asyncio.Lock()
@@ -2190,10 +2225,13 @@ async def save_conversation_audio(
     )
 
 
-def finish_simulation_audio(simulation_output_dir: str) -> None:
+def finish_simulation_audio(simulation_output_dir: str, resolved_noise=None) -> None:
     """Combine each turn's audio chunks into one file per turn, and build
     conversation.wav from the turn files if the call recorder wrote nothing
-    (e.g. the run stopped early). That fallback has no gaps between turns."""
+    (e.g. the run stopped early). That fallback has no gaps between turns.
+
+    When noise was mixed in, rebuild conversation.wav as the noisy audio the
+    agent heard and save a clean reference beside it."""
     audio_dir = os.path.join(simulation_output_dir, "audios")
     if not os.path.exists(audio_dir):
         return
@@ -2202,8 +2240,19 @@ def finish_simulation_audio(simulation_output_dir: str) -> None:
     conversation_audio_path = os.path.join(
         simulation_output_dir, CONVERSATION_AUDIO_FILE_NAME
     )
+    transcript_path = os.path.join(simulation_output_dir, TRANSCRIPT_FILE_NAME)
+    if resolved_noise is not None:
+        noise_track_path = os.path.join(simulation_output_dir, "noise_track.wav")
+        write_clean_and_noisy(
+            audio_dir=audio_dir,
+            transcript_path=transcript_path,
+            conversation_path=conversation_audio_path,
+            noise_track_path=noise_track_path,
+            volume=resolved_noise.volume,
+        )
+        log_and_print(f"Combined audio saved to {conversation_audio_path}")
+        return
     if not os.path.exists(conversation_audio_path):
-        transcript_path = os.path.join(simulation_output_dir, TRANSCRIPT_FILE_NAME)
         combine_audio_files(audio_dir, conversation_audio_path, transcript_path)
         log_and_print(f"Combined audio saved to {conversation_audio_path}")
 
@@ -2257,6 +2306,21 @@ async def _run_single_simulation_inner(
         user_persona, "persona", {"sensitivity", "min_words", "max_words"}
     )
     interruption_sensitivity = persona_interruption.get("sensitivity", "none")
+
+    # Resolve background noise for this run (default-off: no work when unset).
+    # Noise is a PER-PERSONA setting (a caller's environment); fall back to a
+    # top-level "noise" as a default that applies to all personas.
+    resolved_noise = None
+    noise_cfg = user_persona.get("noise", config.get("noise"))
+    if noise_cfg is not None:
+        run_index = persona_index * len(config.get("scenarios", [1])) + scenario_index
+        base_seed = noise_cfg.get("seed") if isinstance(noise_cfg, dict) else None
+        resolved_noise = resolve_for_run(
+            noise_cfg,
+            language=language,
+            run_index=run_index,
+            base_seed=base_seed,
+        )
 
     # Get interrupt probability from mapping
     interrupt_probability = interrupt_sensitivity_map.get(interruption_sensitivity)
@@ -2444,6 +2508,7 @@ async def _run_single_simulation_inner(
                     max_turns=max_turns,
                     tools=config.get("tools", []),
                     agent_uri=agent_uri,
+                    noise=resolved_noise,
                 )
             )
             # In external mode there is no bot task to wait on — the external
@@ -2498,7 +2563,7 @@ async def _run_single_simulation_inner(
             # Clean up the print logger for this simulation using the unique run ID
             cleanup_print_logger(simulation_run_id)
 
-    finish_simulation_audio(simulation_output_dir)
+    finish_simulation_audio(simulation_output_dir, resolved_noise=resolved_noise)
 
     # Return metrics for aggregation
     if simulation_result:
@@ -2526,6 +2591,54 @@ async def _run_single_simulation_inner(
         )
 
     return None, [], None
+
+
+def prepare_noise_for_batch(config: dict) -> None:
+    """Verify and build every noise asset the batch needs, before any live call.
+
+    Resolves the exact noise condition each run will use, checks the Hugging Face
+    login up front when any condition needs background voices (so a missing login
+    fails immediately with a clear message rather than partway through the run),
+    then downloads whatever is missing. Raises RuntimeError on a setup problem.
+    """
+    scenarios = config.get("scenarios") or []
+    personas = config.get("personas") or []
+    needs = []  # (env_names, need_speakers, language)
+    assets = None
+    for persona_index, persona in enumerate(personas):
+        noise_cfg = persona.get("noise", config.get("noise"))
+        if noise_cfg is None:
+            continue
+        language = persona.get("language", "english")
+        base_seed = noise_cfg.get("seed") if isinstance(noise_cfg, dict) else None
+        for scenario_index in range(len(scenarios)):
+            run_index = persona_index * len(scenarios) + scenario_index
+            resolved = resolve_for_run(
+                noise_cfg, language=language, run_index=run_index, base_seed=base_seed
+            )
+            if resolved is None:
+                continue
+            if assets is None:
+                assets = NoiseAssets()
+            needs.append(
+                (
+                    assets.resolve_environment(resolved.atom.environment),
+                    resolved.atom.people != "none",
+                    language,
+                )
+            )
+
+    if not needs:
+        return
+    # Verify before downloading anything.
+    if any(need_speakers for _, need_speakers, _ in needs):
+        problem = check_speaker_access()
+        if problem:
+            raise RuntimeError(f"Cannot build background-speaker noise.\n    {problem}")
+    for env_names, need_speakers, language in needs:
+        ensure_assets(
+            assets, env_names=env_names, need_speakers=need_speakers, language=language
+        )
 
 
 async def main():
@@ -2572,6 +2685,12 @@ async def main():
 
     os.makedirs(args.output_dir, exist_ok=True)
     write_evaluator_config(args.output_dir, config["evaluators"])
+
+    try:
+        prepare_noise_for_batch(config)
+    except RuntimeError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
     # Mapping from interruption_config.sensitivity labels to probabilities
     interrupt_sensitivity_map = {

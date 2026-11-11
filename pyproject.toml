@@ -42,8 +42,11 @@ dependencies = [
     "pipecat-ai[cartesia,deepgram,google,groq,openrouter,runner,smallest,tracing,webrtc,websocket]==1.11.0",
     "python-dotenv>=1.2.1",
     "sarvamai>=0.1.21",
+    "datasets>=2.14",
+    "scipy>=1.11",
     "simpleaudio>=1.0.4",
     "sounddevice>=0.5.3",
+    "soundfile>=0.12.1",
     "transformers>=4.57,<5",
     "uvicorn>=0.38.0",
     "whisper-normalizer>=0.1.12",
@@ -76,6 +79,8 @@ exclude = ["ui*", "examples*", "docs*", "images*"]
     "stt/sarvam_llm_wer/prompt_template.txt",
     "stt/semantic_wer/prompt_template.txt",
     "pricing_data.json",
+    "agent/assets/noise/**/*.wav",
+    "agent/assets/noise/**/*.ogg",
 ]
 
 [tool.setuptools_scm]

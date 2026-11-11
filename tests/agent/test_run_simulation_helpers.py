@@ -151,7 +151,7 @@ class TestPrepareSttJudgeInputs(unittest.TestCase):
         ]
         self.assertIsNone(
             prepare_stt_judge_inputs(
-                references, predictions, agent_uri="wss://swasth-kadam.example"
+                references, predictions, agent_uri="wss://demo-agent.example"
             )
         )
 

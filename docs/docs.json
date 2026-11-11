@@ -58,7 +58,8 @@
               "core-concepts/personas",
               "core-concepts/scenarios",
               "core-concepts/metrics",
-              "quickstart/simulations"
+              "quickstart/simulations",
+              "noise-injection"
             ]
           },
           {
