@@ -40,7 +40,30 @@ An array of user personas that simulate different types of users interacting wit
 | `characteristics`          | string | Detailed description of **who** the persona represents and **how** they behave                                                     |
 | `gender`                   | string | Gender for voice simulations: `male` or `female`                                                                                   |
 | `language`                 | string | Language the persona speaks: `english`, `hindi`, or `kannada` (more coming soon)                                                   |
-| `interruption_sensitivity` | string | (Voice only) The chance, checked after each word the agent speaks, that the persona cuts in: `none` (0%), `low` (20%), `medium` (40%), `high` (60%) |
+| `interruption_config`      | object | (Voice only) When and how the persona cuts into the agent. See the table below. |
+
+`interruption_config` on a persona can have these keys. All are optional.
+
+| Key           | Type    | Description |
+| ------------- | ------- | ----------- |
+| `sensitivity` | string  | The share of the agent's turns the persona cuts into: `none` (0%), `low` (20%), `medium` (40%), `high` (60%). Each time the agent starts speaking counts as one turn. Default `none`. |
+| `min_words`   | integer | When the persona cuts into a turn, the fewest words of that turn it hears first. Default `3`. |
+| `max_words`   | integer | When the persona cuts into a turn, the most words of that turn it hears first. Default `12`. Must be at least `min_words`. |
+
+For each turn it cuts into, the persona picks a random number of words between `min_words` and `max_words`, and cuts in once it has heard that many. If the agent finishes speaking first, the persona does not cut in. Some text-to-speech providers do not report each word as the agent speaks it, only each finished sentence. If your agent uses one of these, the persona cuts in when the sentence that reaches that number of words ends. Both values must be whole numbers of 1 or more. If you set `min_words` above 12, also set `max_words`.
+
+```json
+{
+  "label": "impatient customer",
+  "characteristics": "You are an impatient customer who has been waiting a long time for your order.",
+  "language": "english",
+  "interruption_config": {
+    "sensitivity": "high",
+    "min_words": 3,
+    "max_words": 8
+  }
+}
+```
 
 ```json
 {
@@ -69,6 +92,23 @@ An array of scenarios that define different conversation patterns to test. For a
 | ------------- | ------ | ------------------------------------------------------ |
 | `name`        | string | A short name for the scenario                          |
 | `description` | string | Instructions for **what** the simulated user should do |
+| `interruption_config` | object | (Voice only) Makes the persona cut in at a set point. See the table below. |
+
+`interruption_config` on a scenario can have this key:
+
+| Key               | Type   | Description |
+| ----------------- | ------ | ----------- |
+| `when_agent_says` | string | A phrase. The persona cuts in the first time it hears the agent say this phrase. It matches whole words, and capital letters and punctuation are ignored. If your agent's text-to-speech provider reports only finished sentences, not each word, the persona cuts in when the sentence with the phrase ends. When set, the persona's `sensitivity` is not used for this scenario. |
+
+```json
+{
+  "name": "date of birth check",
+  "description": "Ask to update your address.",
+  "interruption_config": {
+    "when_agent_says": "your date of birth"
+  }
+}
+```
 
 ```json
 {
@@ -191,7 +231,7 @@ For voice simulations, specify the STT, LLM, and TTS providers:
 
 <AccordionGroup>
   <Accordion title="Calibrate agent example">
-    See the [full text simulation file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_text_internal_agent.json) and the [full voice simulation file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_voice.json). The snippet below matches the **text** setup; voice runs add **`stt`**, **`tts`**, and **`llm`** (with **`model`**) and may set **`interruption_sensitivity`** on personas — see the voice sample for those keys.
+    See the [full text simulation file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_text_internal_agent.json) and the [full voice simulation file on GitHub](https://github.com/ARTPARK-SAHAI-ORG/calibrate/tree/main/examples/agent/simulation/sample_voice.json). The snippet below matches the **text** setup; voice runs add **`stt`**, **`tts`**, and **`llm`** (with **`model`**) and may set **`interruption_config`** on personas and scenarios. See the voice sample for those keys.
 
     ```json
     {

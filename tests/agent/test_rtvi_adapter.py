@@ -416,8 +416,11 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
                     adapter = _make_adapter(
                         output_dir=tmp,
                         interrupt_probability=1.0,
+                        interrupt_min_words=1,
+                        interrupt_max_words=1,
                         is_external=is_external,
                     )
+                    await _drive_bot_started(adapter)
                     pushed = await _drive_frame(
                         adapter, _bot_output_frame("नमस्ते!", True)
                     )
@@ -439,7 +442,12 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
         from pipecat.processors.frame_processor import FrameDirection
 
         with tempfile.TemporaryDirectory() as tmp:
-            adapter = _make_adapter(output_dir=tmp, interrupt_probability=1.0)
+            adapter = _make_adapter(
+                output_dir=tmp,
+                interrupt_probability=1.0,
+                interrupt_min_words=1,
+                interrupt_max_words=1,
+            )
             pushed = []
             await _drive_frame(adapter, _rtvi_frame("bot-started-speaking"), pushed)
             await _drive_frame(adapter, _bot_output_frame("नमस्ते", True), pushed)
@@ -568,6 +576,7 @@ class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
         tmp = tempfile.mkdtemp()
         adapter = _make_adapter(output_dir=tmp, audio_save_dir=tmp, **overrides)
         pushed = []
+        await _drive_bot_started(adapter, pushed)
         for m in messages:
             await _drive_frame(adapter, _bot_output_data_frame(m), pushed)
         return adapter, pushed
@@ -589,7 +598,10 @@ class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
         for messages in (LEGACY_MESSAGES, V2_MESSAGES):
             with self.subTest(v2=messages is V2_MESSAGES):
                 adapter, pushed = await self._run(
-                    messages, interrupt_probability=1.0
+                    messages,
+                    interrupt_probability=1.0,
+                    interrupt_min_words=1,
+                    interrupt_max_words=1,
                 )
                 self.assertTrue(adapter._is_bot_interrupt_triggered)
                 self.assertEqual(_count_interrupt_messages(pushed), 1)
@@ -600,6 +612,73 @@ class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(adapter._text_buffer, " " + SENTENCE)
         self.assertEqual(adapter._heard_text_buffer, " " + SENTENCE)
+
+
+
+async def _speak_utterance(adapter, words):
+    """Drive one agent utterance word by word. Return the 1-based number of words
+    heard when the sim user cut in, or None if it never cut in."""
+    pushed = []
+    await _drive_frame(adapter, _rtvi_frame("bot-started-speaking"), pushed)
+    cut_in_at = None
+    for i, word in enumerate(words, start=1):
+        await _drive_frame(adapter, _bot_output_frame(word, True), pushed)
+        if cut_in_at is None and _count_interrupt_messages(pushed):
+            cut_in_at = i
+    await _drive_frame(adapter, _rtvi_frame("bot-stopped-speaking"), pushed)
+    await _drive_frame(adapter, _rtvi_frame("user-stopped-speaking"), pushed)
+    return cut_in_at
+
+
+class TestCutInTiming(unittest.IsolatedAsyncioTestCase):
+    """The sim user decides once per agent utterance whether to cut in, then cuts
+    in after a random number of heard words between the persona's min and max."""
+
+    async def test_low_cuts_into_about_a_fifth_of_turns_within_word_range(self):
+        import numpy as np
+
+        np.random.seed(0)
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, audio_save_dir=tmp, interrupt_probability=0.2
+            )
+            words = [f"word{i}" for i in range(30)]
+            results = [await _speak_utterance(adapter, words) for _ in range(400)]
+
+        cut_ins = [r for r in results if r is not None]
+        self.assertAlmostEqual(len(cut_ins) / len(results), 0.2, delta=0.06)
+        self.assertTrue(all(3 <= r <= 12 for r in cut_ins), cut_ins)
+        # Every word count in the range gets picked, not just one end of it.
+        self.assertEqual(set(cut_ins), set(range(3, 13)))
+
+    async def test_two_word_utterance_never_cut_into_with_defaults(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, audio_save_dir=tmp, interrupt_probability=1.0
+            )
+            for _ in range(20):
+                self.assertIsNone(await _speak_utterance(adapter, ["Hi", "there"]))
+
+    async def test_phrase_cuts_in_on_the_phrase_only_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp,
+                audio_save_dir=tmp,
+                interrupt_probability=1.0,
+                interrupt_phrase="your date of birth?",
+            )
+            words = "Please tell me Your date, of BIRTH now".split()
+            # Cuts in on "BIRTH", the 7th word, not before; ignores case and commas.
+            self.assertEqual(await _speak_utterance(adapter, words), 7)
+            # The agent says it again: no second cut-in.
+            self.assertIsNone(await _speak_utterance(adapter, words))
+
+    async def test_phrase_matches_whole_words_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, audio_save_dir=tmp, interrupt_phrase="no"
+            )
+            self.assertIsNone(await _speak_utterance(adapter, ["I", "know", "now"]))
 
 
 if __name__ == "__main__":
