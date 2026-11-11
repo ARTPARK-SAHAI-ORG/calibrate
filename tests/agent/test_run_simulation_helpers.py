@@ -390,6 +390,41 @@ class TestSilencePadder(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(padder._silence_duration_ms, 200)
         self.assertEqual(padder._chunk_ms, 20)
 
+    async def test_agent_told_to_stop_when_cut_in_reply_starts_playing(self):
+        from calibrate_agent.agent.run_simulation import SilencePadder
+        from pipecat.frames.frames import (
+            OutputAudioRawFrame,
+            OutputTransportMessageUrgentFrame,
+        )
+        from pipecat.processors.frame_processor import FrameDirection
+
+        adapter = MagicMock(_agent_stop_pending=True, _sim_user_turn_pending=False)
+        padder = SilencePadder(rtvi_message_adapter=adapter)
+        pushed = []
+
+        async def capture(frame, direction=FrameDirection.DOWNSTREAM):
+            pushed.append(frame)
+
+        padder.push_frame = capture
+        audio = lambda: OutputAudioRawFrame(
+            audio=b"\x01\x00", sample_rate=16000, num_channels=1
+        )
+        await padder.process_frame(audio(), FrameDirection.DOWNSTREAM)
+        await padder.process_frame(audio(), FrameDirection.DOWNSTREAM)
+
+        kinds = [type(f).__name__ for f in pushed]
+        # One stop message, sent just before the reply's first audio.
+        self.assertEqual(
+            kinds,
+            [
+                "OutputTransportMessageUrgentFrame",
+                "OutputAudioRawFrame",
+                "OutputAudioRawFrame",
+            ],
+        )
+        self.assertEqual(pushed[0].message["data"], {"t": "interrupt"})
+        self.assertFalse(adapter._agent_stop_pending)
+
 
 class TestResolveSerializer(unittest.TestCase):
     def test_protobuf_returns_instance(self):
