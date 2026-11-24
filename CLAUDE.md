@@ -61,11 +61,13 @@ follow this process before writing code:
 
 ```
 calibrate_agent/                 # Python package (the importable library + CLI)
+├── chat.py                # agent_reply — one agent reply from a chat model, running its tool calls
 ├── cli.py                 # Top-level CLI entry — wires subcommands to UI/SDK
 ├── connections.py         # TextAgentConnection — HTTP client for external agents
 ├── judges.py              # text_judge / audio_judge / simulation_judge — LLM-as-judge core
 ├── langfuse.py            # Optional Langfuse tracing wrappers (@observe)
 ├── status.py              # Run-status reporting helpers
+├── tools.py               # Tool specs, webhook calls, filling missing tool results (no pipecat)
 ├── utils.py               # Provider language code maps, logging, validation
 ├── stt/
 │   ├── eval.py            # Per-provider transcribe_* + transcribe_audio router
@@ -96,7 +98,7 @@ tests/                     # Test suite — mirrors the calibrate_agent/ structu
 ├── llm/        test_benchmark.py, test_run_tests.py, test_run_simulation.py,
 │               test_run_simulation_integration.py, test_output.py,
 │               test_tests_leaderboard.py
-├── test_connections.py, test_cli.py, test_judges.py,
+├── test_connections.py, test_cli.py, test_judges.py, test_tools.py, test_chat.py,
 │   test_sdk_judge_regressions.py
 
 ui/                        # Ink (React + TypeScript) terminal UI
@@ -326,6 +328,20 @@ per-provider `logs` file under the output dir. Set `to_terminal=False` to
 suppress stdout. The active log file is held in a `contextvars.ContextVar`
 (`provider_log_file`) so concurrent benchmarks don't cross-write.
 
+### Tools and `agent_reply`
+`calibrate_agent/tools.py` holds the pipecat-free tool code: `build_tool_specs`
+(OpenAI-style function specs plus webhook configs), `make_webhook_call` (logs
+header names, never their values, since headers can hold keys) and
+`fill_missing_tool_results`. `utils.py` re-exports `make_webhook_call` and
+`_build_param_property`, and its `build_tools_schema` wraps `build_tool_specs`
+into pipecat `FunctionSchema`s; `llm/run_tests.py` keeps
+`preprocess_conversation_history` as a name for `fill_missing_tool_results`.
+
+`calibrate_agent/chat.py` (`agent_reply`) imports only the standard library,
+`openai` and `tools.py`, so a server can call it without loading pipecat or
+numpy. It never reads `os.environ`: the API key is always passed in.
+`tests/test_chat.py` checks the import stays light.
+
 ### Langfuse
 All judge / transcribe / synthesize functions are decorated with `@observe`.
 If `LANGFUSE_PUBLIC_KEY` is set, traces flow to Langfuse; otherwise the
@@ -401,8 +417,8 @@ outside `docs/`. Other branches commit instantly. Activated per-clone with
   reads the `docs/` folder. Installs `libasound2-dev` (needed for `simpleaudio`),
   syncs `--extra dev`, runs pytest with coverage, uploads to Codecov, and
   emails `aman.dalmia@artpark.in` on failure via `dawidd6/action-send-mail`.
-- **`.github/workflows/publish.yml`** — release-triggered. Has a `test` job
-  that `build` `needs:` — if tests fail, the PyPI publish is blocked.
+- **`.github/workflows/publish.yml`** — release-triggered. Builds the sdist
+  and wheel, then publishes them. It runs no tests of its own.
 - Secrets required: `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`,
   `MAIL_PASSWORD` (SMTP for failure emails) and `CODECOV_TOKEN`.
 

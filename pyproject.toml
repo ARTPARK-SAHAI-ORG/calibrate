@@ -21,6 +21,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    "aiohttp>=3.9",
     "backoff>=2.2.1",
     "cartesia>=2.0.15,<3",
     "elevenlabs>=2.31.0",

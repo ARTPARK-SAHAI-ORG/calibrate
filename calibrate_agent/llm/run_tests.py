@@ -21,6 +21,7 @@ from calibrate_agent.utils import (
     provider_log_file,
     apply_debug_limit,
 )
+from calibrate_agent.tools import get_webhook_tool_names, fill_missing_tool_results  # noqa: F401
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
@@ -685,77 +686,7 @@ def sort_tool_calls(tool_calls):
     return sorted(tool_calls, key=lambda val: val["tool"])
 
 
-def get_webhook_tool_names(tools: List[dict]) -> set:
-    """
-    Extract names of webhook tools from the tools configuration.
-
-    Args:
-        tools: List of tool definition dicts
-
-    Returns:
-        Set of webhook tool names
-    """
-    return {tool["name"] for tool in tools if tool.get("type") == "webhook"}
-
-
-def preprocess_conversation_history(
-    chat_history: List[dict], tools: List[dict]
-) -> List[dict]:
-    """
-    Preprocess conversation history to add tool responses for non-webhook tools.
-
-    For non-webhook tools that have tool calls but no corresponding tool response,
-    this function inserts a default tool response with {"status": "received"}.
-
-    If a non-webhook tool already has a tool response in the conversation, it is
-    left in place and no injection occurs for that tool call.
-
-    Args:
-        chat_history: The conversation history to preprocess
-        tools: List of tool definition dicts
-
-    Returns:
-        Preprocessed conversation history with tool responses inserted
-    """
-    webhook_tool_names = get_webhook_tool_names(tools)
-
-    # Build a set of existing tool response IDs
-    existing_tool_response_ids = set()
-    for message in chat_history:
-        if message.get("role") == "tool" and "tool_call_id" in message:
-            existing_tool_response_ids.add(message["tool_call_id"])
-
-    # Process conversation history and collect tool calls that need responses
-    processed_history = []
-    for message in chat_history:
-        processed_history.append(message)
-
-        # Check for assistant messages with tool calls
-        if message.get("role") == "assistant" and "tool_calls" in message:
-            for tool_call in message["tool_calls"]:
-                tool_call_id = tool_call.get("id")
-                tool_name = tool_call.get("function", {}).get("name")
-
-                # Skip webhook tools - they handle their own responses
-                if tool_name in webhook_tool_names:
-                    continue
-
-                if tool_call_id in existing_tool_response_ids:
-                    continue
-
-                # Insert a default tool response for non-webhook tools
-                tool_response = {
-                    "role": "tool",
-                    "content": '{"status": "received"}',
-                    "tool_call_id": tool_call_id,
-                }
-                processed_history.append(tool_response)
-                logger.info(
-                    f"Inserted tool response for structured output tool '{tool_name}' "
-                    f"(tool_call_id: {tool_call_id})"
-                )
-
-    return processed_history
+preprocess_conversation_history = fill_missing_tool_results
 
 
 def _sorted_union_dict_keys(left: dict, right: dict) -> List[Any]:
