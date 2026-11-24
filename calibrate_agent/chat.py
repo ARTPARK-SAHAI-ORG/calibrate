@@ -62,6 +62,10 @@ async def agent_reply(
     `messages` is the conversation so far in OpenAI format, without the system
     message. Provider errors are raised to the caller.
     """
+    # AsyncOpenAI falls back to OPENAI_API_KEY when given no key, which would
+    # spend the server's key, or send it to OpenRouter.
+    if client is None and not api_key:
+        raise ValueError("agent_reply needs an api_key")
     specs, webhook_configs = build_tool_specs(tools)
     api_tools = [{"type": "function", "function": spec} for spec in [END_CALL_SPEC] + specs]
 

@@ -153,8 +153,14 @@ class TestClientAndKeys(unittest.IsolatedAsyncioTestCase):
         with patch.object(C, "AsyncOpenAI", return_value=fake_client(response("ok"))), patch.object(
             os, "environ", _NoEnv()
         ), patch.object(os, "getenv", side_effect=AssertionError("read os.getenv")):
-            out = await agent_reply([], "s", [], "m", "openai", None)
+            out = await agent_reply([], "s", [], "m", "openai", "k")
         self.assertEqual(out["reply"], "ok")
+
+    async def test_missing_key_is_refused_rather_than_read_from_the_environment(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "server-key"}):
+            for key in (None, ""):
+                with self.assertRaises(ValueError):
+                    await agent_reply([], "s", [], "m", "openrouter", key)
 
     async def test_api_key_and_base_url_reach_client(self):
         made = []
