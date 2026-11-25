@@ -83,7 +83,7 @@ transport_params = {
 @dataclass
 class STTConfig:
     provider: Literal[
-        "deepgram", "google", "openai", "elevenlabs", "sarvam", "cartesia", "smallest"
+        "deepgram", "google", "openai", "oruk", "elevenlabs", "sarvam", "cartesia", "smallest"
     ] = "elevenlabs"
     model: Optional[str] = None
 

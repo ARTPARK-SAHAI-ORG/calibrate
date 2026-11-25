@@ -33,6 +33,85 @@ class TestTranscribeGroq(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["transcript"], "hello world")
 
 
+class TestTranscribeOruk(unittest.IsolatedAsyncioTestCase):
+    async def test_oruk_happy(self):
+        from calibrate_agent.stt import eval as E
+        from calibrate_agent.utils import ORUK_STT_BASE_URL
+
+        fake_resp = MagicMock()
+        fake_resp.text = "  hello from fourier  "
+        fake_client = MagicMock()
+        fake_client.audio.transcriptions.create = AsyncMock(return_value=fake_resp)
+
+        with patch.dict(os.environ, {"ORUK_API_KEY": "ok-test"}, clear=True), \
+             patch.object(E, "load_audio", side_effect=_mock_load_audio), \
+             patch.object(E, "AsyncOpenAI", return_value=fake_client) as openai_cls:
+            result = await E.transcribe_oruk(Path("/tmp/x.wav"), "english")
+
+        self.assertEqual(result["transcript"], "hello from fourier")
+        openai_cls.assert_called_once_with(
+            api_key="ok-test", base_url=ORUK_STT_BASE_URL
+        )
+        call_kwargs = fake_client.audio.transcriptions.create.await_args.kwargs
+        self.assertEqual(
+            set(call_kwargs.keys()),
+            {"file", "model", "response_format", "language"},
+        )
+        self.assertEqual(call_kwargs["model"], "oruk-fourier-2b")
+        self.assertEqual(call_kwargs["response_format"], "json")
+        self.assertEqual(call_kwargs["language"], "en")
+
+    async def test_oruk_custom_base_url(self):
+        from calibrate_agent.stt import eval as E
+
+        fake_client = MagicMock()
+        fake_client.audio.transcriptions.create = AsyncMock(return_value="plain text ")
+
+        with patch.dict(
+            os.environ,
+            {
+                "ORUK_API_KEY": "ok-test",
+                "ORUK_BASE_URL": "https://staging.oruk.example/v1",
+            },
+            clear=True,
+        ), patch.object(E, "load_audio", side_effect=_mock_load_audio), \
+             patch.object(E, "AsyncOpenAI", return_value=fake_client) as openai_cls:
+            result = await E.transcribe_oruk(Path("/tmp/x.wav"), "english")
+
+        self.assertEqual(result["transcript"], "plain text")
+        openai_cls.assert_called_once_with(
+            api_key="ok-test", base_url="https://staging.oruk.example/v1"
+        )
+
+    async def test_oruk_missing_key(self):
+        from calibrate_agent.stt import eval as E
+
+        with patch.dict(os.environ, {}, clear=True):
+            with self.assertRaises(ValueError):
+                await E.transcribe_oruk(Path("/tmp/x.wav"), "english")
+
+    async def test_oruk_rejects_non_english(self):
+        from calibrate_agent.stt import eval as E
+
+        with patch.dict(os.environ, {"ORUK_API_KEY": "ok-test"}, clear=True):
+            with self.assertRaises(ValueError):
+                await E.transcribe_oruk(Path("/tmp/x.wav"), "hindi")
+
+    async def test_transcribe_audio_routes_to_oruk(self):
+        from calibrate_agent.stt import eval as E
+
+        fake_fn = AsyncMock(return_value={"transcript": "  routed  "})
+        inner = E.transcribe_audio
+        while hasattr(inner, "__wrapped__"):
+            inner = inner.__wrapped__
+        with patch.object(E, "transcribe_oruk", fake_fn), \
+             patch.object(E, "langfuse_enabled", False):
+            result = await inner(Path("/tmp/x.wav"), "ref", "oruk", "english", "u1")
+
+        self.assertEqual(result["transcript"], "routed")
+        fake_fn.assert_awaited_once_with(Path("/tmp/x.wav"), "english")
+
+
 class TestTranscribeSarvam(unittest.IsolatedAsyncioTestCase):
     async def test_sarvam_happy(self):
         from calibrate_agent.stt import eval as E

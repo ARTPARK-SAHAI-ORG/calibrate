@@ -17,6 +17,8 @@ from urllib.parse import urlencode
 import httpx
 
 from calibrate_agent.utils import (
+    ORUK_STT_BASE_URL,
+    STT_PROVIDER_MODELS,
     TTS_PROVIDER_MODELS,
     get_tts_voice,
     get_gemini_api_key,
@@ -42,6 +44,11 @@ PROVIDERS = [
         "name": "groq",
         "types": ["stt", "tts"],
         "env_vars": ["GROQ_API_KEY"],
+    },
+    {
+        "name": "oruk",
+        "types": ["stt"],
+        "env_vars": ["ORUK_API_KEY"],
     },
     {
         "name": "google",
@@ -411,6 +418,24 @@ async def _check_deepgram(client: httpx.AsyncClient) -> str:
     return "stt"
 
 
+async def _check_oruk(client: httpx.AsyncClient) -> str:
+    """STT: transcribe silence via Oruk Fourier 2B."""
+    api_key = os.getenv("ORUK_API_KEY")
+    base_url = (os.getenv("ORUK_BASE_URL") or ORUK_STT_BASE_URL).rstrip("/")
+    resp = await client.post(
+        f"{base_url}/audio/transcriptions",
+        headers={"Authorization": f"Bearer {api_key}"},
+        files={"file": ("silence.wav", _SILENCE_WAV, "audio/wav")},
+        data={
+            "model": STT_PROVIDER_MODELS["oruk"],
+            "language": "en",
+            "response_format": "json",
+        },
+    )
+    resp.raise_for_status()
+    return "stt"
+
+
 async def _check_gemini(client: httpx.AsyncClient) -> str:
     """TTS: synthesize 'hi' via the Gemini TTS model (google-genai)."""
     from google import genai
@@ -441,6 +466,7 @@ _CHECK_FUNCTIONS = {
     "deepgram": _check_deepgram,
     "openai": _check_openai,
     "groq": _check_groq,
+    "oruk": _check_oruk,
     "google": _check_google,
     "gemini": _check_gemini,
     "sarvam": _check_sarvam,

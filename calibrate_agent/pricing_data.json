@@ -15,6 +15,11 @@
         "price_per_minute_usd": 0.0006666667
       }
     },
+    "oruk": {
+      "oruk-fourier-2b": {
+        "price_per_minute_usd": 0.008
+      }
+    },
     "google": {
       "chirp_2": {
         "price_per_minute_usd": 0.016

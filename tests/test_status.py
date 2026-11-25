@@ -144,6 +144,38 @@ class TestCheckProviders(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(ValueError):
                 await _check_groq(client)
 
+    async def test_check_oruk_ok(self):
+        from calibrate_agent.status import _check_oruk
+
+        client = _mk_client(_mk_resp({"text": ""}))
+        with patch.dict(os.environ, {"ORUK_API_KEY": "k"}, clear=True):
+            result = await _check_oruk(client)
+        self.assertEqual(result, "stt")
+        call_args = client.post.await_args
+        self.assertEqual(
+            call_args.args[0],
+            "https://speech-api.oruk.ai/v1/audio/transcriptions",
+        )
+        self.assertEqual(
+            call_args.kwargs["headers"], {"Authorization": "Bearer k"}
+        )
+        self.assertEqual(
+            call_args.kwargs["data"],
+            {
+                "model": "oruk-fourier-2b",
+                "language": "en",
+                "response_format": "json",
+            },
+        )
+
+    async def test_check_oruk_http_error(self):
+        from calibrate_agent.status import _check_oruk
+
+        client = _mk_client(_mk_resp(status=401))
+        with patch.dict(os.environ, {"ORUK_API_KEY": "bad"}, clear=True):
+            with self.assertRaises(httpx.HTTPStatusError):
+                await _check_oruk(client)
+
     async def test_check_google_missing_creds(self):
         from calibrate_agent.status import _check_google
 
