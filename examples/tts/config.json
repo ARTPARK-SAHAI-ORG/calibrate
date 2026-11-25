@@ -4,13 +4,13 @@
       "id": "intelligibility-id",
       "name": "intelligibility",
       "system_prompt": "You are a highly accurate evaluator that listens to an audio sample and compares it against the reference text it is supposed to speak.\n\nYou will be given an audio sample (the synthesized speech) and the reference text. Mark True if the spoken text is clearly understandable from the audio and the words match the reference text.",
-      "judge_model": "google/gemini-2.5-flash"
+      "judge_model": "google/gemini-3.5-flash-lite"
     },
     {
       "id": "naturalness-id",
       "name": "naturalness",
       "system_prompt": "You are a highly accurate evaluator that listens to an audio sample and judges whether the synthesized speech sounds natural and human-like.\n\nYou will be given an audio sample (the synthesized speech) and the reference text. Mark True only if the speech flows smoothly, the intonation, rhythm, and stress sound natural, and the voice does not sound overly robotic or artificial.",
-      "judge_model": "google/gemini-2.5-flash"
+      "judge_model": "google/gemini-3.5-flash-lite"
     }
   ]
 }
