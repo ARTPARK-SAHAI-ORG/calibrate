@@ -36,6 +36,7 @@ GENERAL_DATASET_FIELDS = ("id", "input", "output")
 
 def validate_general_eval_dataset(
     dataset_path: str,
+    evaluator_names: Optional[set] = None,
 ) -> tuple[bool, str, list[dict]]:
     """Validate a general eval dataset JSON file.
 
@@ -45,6 +46,12 @@ def validate_general_eval_dataset(
     that evaluator's ``{{var}}`` placeholders (mirroring ``llm`` per-criteria
     ``arguments``). If present, ``arguments`` and each of its values must be
     objects.
+
+    A row may also carry ``evaluators`` (the names of the evaluators to run on
+    it; omitted means all) and ``tool_calls`` / ``expected_tool_calls`` lists,
+    which make the row judged on the tool calls it made. ``evaluator_names``,
+    when given, is the set of known names an ``evaluators`` list is checked
+    against.
 
     Returns:
         tuple[bool, str, list[dict]]: (is_valid, error_message, parsed_rows)
@@ -89,6 +96,26 @@ def validate_general_eval_dataset(
                         f"object mapping variable names to values",
                         [],
                     )
+        if "evaluators" in row:
+            names = row["evaluators"]
+            if (
+                not isinstance(names, list)
+                or not names
+                or not all(isinstance(n, str) for n in names)
+            ):
+                return (
+                    False,
+                    f"Row {i} field 'evaluators' must be a non-empty list of "
+                    f"evaluator names",
+                    [],
+                )
+            if evaluator_names is not None:
+                unknown = [n for n in names if n not in evaluator_names]
+                if unknown:
+                    return False, f"Row {i} names unknown evaluators: {unknown}", []
+        for key in ("tool_calls", "expected_tool_calls"):
+            if key in row and not isinstance(row[key], list):
+                return False, f"Row {i} field '{key}' must be a list", []
         row_id = row["id"]
         if row_id in seen_ids:
             return False, f"Duplicate row id: {row_id!r}", []
@@ -127,6 +154,8 @@ async def _score_and_write_results(
     evaluators: List[dict],
     output_dir: str,
     arguments_list: Optional[List[Optional[dict]]] = None,
+    evaluator_names_list: Optional[List[Optional[List[str]]]] = None,
+    tool_calls_list: Optional[List[Optional[dict]]] = None,
 ) -> dict:
     """Run the general judge over (input, output) pairs and write outputs.
 
@@ -161,6 +190,8 @@ async def _score_and_write_results(
             evaluators=evaluators,
             arguments_list=arguments_list,
             on_row=partial_writer.write,
+            evaluator_names_list=evaluator_names_list,
+            tool_calls_list=tool_calls_list,
         )
     finally:
         partial_writer.close()
@@ -222,7 +253,9 @@ async def run_general_eval(
         _log("\033[33mRunning general task evaluation on dataset\033[0m")
         _log(f"Dataset: {dataset_path}")
 
-        is_valid, error_msg, rows = validate_general_eval_dataset(dataset_path)
+        is_valid, error_msg, rows = validate_general_eval_dataset(
+            dataset_path, {ev["name"] for ev in evaluators}
+        )
         if not is_valid:
             _log(f"\033[31mError: {error_msg}\033[0m")
             return {"status": "error", "error": error_msg}
@@ -239,6 +272,16 @@ async def run_general_eval(
             evaluators=evaluators,
             output_dir=output_dir,
             arguments_list=arguments_list,
+            evaluator_names_list=[r.get("evaluators") for r in rows],
+            tool_calls_list=[
+                {
+                    "tool_calls": r.get("tool_calls") or [],
+                    "expected_tool_calls": r.get("expected_tool_calls"),
+                }
+                if "tool_calls" in r or "expected_tool_calls" in r
+                else None
+                for r in rows
+            ],
         )
 
         return {

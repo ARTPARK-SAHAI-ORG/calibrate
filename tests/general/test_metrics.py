@@ -302,3 +302,72 @@ class TestGeneralJudgeOnRow(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestGeneralPerRowEvaluators(unittest.IsolatedAsyncioTestCase):
+    async def _score(self, names_list, judge_side_effect=None):
+        async def fake(_input, output, evaluators, **kwargs):
+            return {
+                ev["name"]: (
+                    {"reasoning": "r", "score": 4}
+                    if ev.get("type") == "rating"
+                    else {"reasoning": "r", "match": output == "good"}
+                )
+                for ev in evaluators
+            }
+
+        mock = AsyncMock(side_effect=judge_side_effect or fake)
+        with patch("calibrate_agent.general.metrics.general_judge", mock):
+            result = await get_general_judge_score(
+                ["a", "b"],
+                ["good", "bad"],
+                evaluators=[BINARY_EV, RATING_EV],
+                evaluator_names_list=names_list,
+            )
+        return result, mock
+
+    async def test_subset_runs_only_named(self):
+        result, mock = await self._score([["faithful"], None])
+        self.assertEqual(
+            [e["name"] for e in mock.call_args_list[0].kwargs["evaluators"]],
+            ["faithful"],
+        )
+        self.assertEqual(set(result["per_row"][0]), {"faithful"})
+        self.assertEqual(result["scores"]["faithful"]["mean"], 0.5)
+        self.assertEqual(result["scores"]["quality"]["mean"], 4.0)
+
+    async def test_mean_counts_only_rows_it_ran_on(self):
+        result, _ = await self._score([["faithful"], ["faithful"]])
+        self.assertNotIn("quality", result["scores"])
+        result, _ = await self._score([["faithful", "quality"], ["quality"]])
+        self.assertEqual(result["scores"]["faithful"]["mean"], 1.0)
+
+    async def test_omitted_runs_all(self):
+        result, _ = await self._score(None)
+        self.assertEqual(set(result["per_row"][1]), {"faithful", "quality"})
+
+    async def test_empty_or_unknown_raises(self):
+        with self.assertRaises(ValueError):
+            await self._score([[], None])
+        with self.assertRaises(ValueError):
+            await self._score([["nope"], None])
+
+
+class TestGeneralToolCallRow(unittest.IsolatedAsyncioTestCase):
+    async def test_tool_call_row_uses_tool_call_prompt(self):
+        judge = AsyncMock(return_value={"faithful": {"reasoning": "ok", "match": True}})
+        with patch("calibrate_agent.general.metrics.text_judge", judge):
+            result = await general_judge(
+                "Book it",
+                "",
+                evaluators=[BINARY_EV],
+                tool_calls={
+                    "tool_calls": [{"tool": "book", "arguments": {"t": 1}}],
+                    "expected_tool_calls": None,
+                },
+            )
+        self.assertTrue(result["faithful"]["match"])
+        prompt = judge.call_args.kwargs["user_prompt"]
+        self.assertTrue(prompt.startswith("`Chat history`:\n\nuser: Book it"))
+        self.assertNotIn("Reply from the agent", prompt)
+        self.assertIn('book {"t": 1}', prompt)

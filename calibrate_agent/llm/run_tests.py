@@ -49,7 +49,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from calibrate_agent.llm.metrics import test_response_llm_judge, evaluate_simuation
+from calibrate_agent.llm.metrics import (
+    test_response_llm_judge,
+    test_tool_call_llm_judge,
+    evaluate_simuation,
+)
 from calibrate_agent.general.metrics import general_judge
 from calibrate_agent.llm._metrics_utils import _numeric_or_none, _latency_percentiles
 from calibrate_agent.judges import (
@@ -67,10 +71,10 @@ from calibrate_agent.judges import (
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 
 
-# The four kinds of LLM test case. ``EVALUATOR_TEST_TYPES`` are the ones graded
+# The kinds of LLM test case. ``EVALUATOR_TEST_TYPES`` are the ones graded
 # by evaluators the test case names in ``evaluation.criteria``; ``tool_call``
 # cases are graded against an expected tool-call list instead.
-EVALUATOR_TEST_TYPES = ("response", "conversation", "general")
+EVALUATOR_TEST_TYPES = ("response", "conversation", "general", "tool_call_judge")
 TEST_TYPES = ("tool_call",) + EVALUATOR_TEST_TYPES
 
 
@@ -78,22 +82,25 @@ def test_case_history(test_case: dict) -> List[dict]:
     """Return the messages to send to the agent for ``test_case``.
 
     A ``general`` test case is single-shot: it carries a plain ``input`` string
-    and no conversation, so its one user message is built here. Every other kind
-    carries its own ``history``.
+    and no conversation, so its one user message is built here. A
+    ``tool_call_judge`` test case may carry either ``input`` or ``history``.
+    Every other kind carries its own ``history``.
     """
-    evaluation = test_case.get("evaluation") or {}
-    if evaluation.get("type") != "general":
+    ev_type = (test_case.get("evaluation") or {}).get("type")
+    if ev_type != "general" and not (
+        ev_type == "tool_call_judge" and "input" in test_case
+    ):
         return test_case["history"]
 
     if "history" in test_case:
         raise ValueError(
-            "A 'general' test case is single-shot: it takes a plain 'input' "
+            f"A '{ev_type}' test case is single-shot: it takes a plain 'input' "
             "string and must not carry a 'history'."
         )
     input_text = test_case.get("input")
     if not isinstance(input_text, str) or not input_text.strip():
         raise ValueError(
-            "A 'general' test case requires a non-empty 'input' string "
+            f"A '{ev_type}' test case requires a non-empty 'input' string "
             f"(got: {input_text!r})."
         )
     return [{"role": "user", "content": input_text}]
@@ -1510,6 +1517,15 @@ async def evaluate_test_case_output(
                 no_response_reasoning_no_tool_calls or "No reply was returned"
             ),
         )
+    if evaluation["type"] == "tool_call_judge":
+        result = await test_tool_call_llm_judge(
+            conversation=chat_history,
+            response=output.get("response"),
+            tool_calls=output.get("tool_calls"),
+            evaluators=evaluators or [],
+            expected_tool_calls=evaluation.get("expected_tool_calls"),
+        )
+        return _metrics_from_judge_results(evaluators or [], result)
     if evaluation["type"] == "tool_call":
         return await evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
@@ -2227,7 +2243,33 @@ def validate_llm_eval_only_dataset(
                 f"{', '.join(repr(t) for t in TEST_TYPES)} (got {ev_type!r})",
             )
 
-        if ev_type == "general":
+        if ev_type == "tool_call_judge":
+            if "input" not in tc and "history" not in tc:
+                return (
+                    False,
+                    f"Item {i}: 'test_case' needs either 'history' (list) or 'input' (str)",
+                )
+            if "history" in tc and not isinstance(tc["history"], list):
+                return False, f"Item {i}: 'test_case.history' must be a list"
+            try:
+                test_case_history(tc)
+            except ValueError as exc:
+                return False, f"Item {i}: {exc}"
+            criteria = tc["evaluation"].get("criteria")
+            if not isinstance(criteria, list) or not criteria:
+                return (
+                    False,
+                    f"Item {i}: 'test_case.evaluation.criteria' must be a non-empty list",
+                )
+            expected = tc["evaluation"].get("expected_tool_calls")
+            if expected is not None and not isinstance(expected, list):
+                return (
+                    False,
+                    f"Item {i}: 'test_case.evaluation.expected_tool_calls' must be a list",
+                )
+            if not isinstance(out.get("tool_calls"), list):
+                return False, f"Item {i}: 'output.tool_calls' must be a list"
+        elif ev_type == "general":
             try:
                 test_case_history(tc)
             except ValueError as exc:

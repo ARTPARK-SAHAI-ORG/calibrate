@@ -498,3 +498,106 @@ class TestCliDispatch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+RATING_EV = {
+    "name": "quality",
+    "type": "rating",
+    "scale_min": 1,
+    "scale_max": 5,
+    "system_prompt": "rate",
+}
+
+
+class TestGeneralPerRowFields(unittest.IsolatedAsyncioTestCase):
+    def _validate(self, row, names=None):
+        path = _write_json([{"id": "1", "input": "a", "output": "b", **row}])
+        try:
+            return validate_general_eval_dataset(path, names)
+        finally:
+            os.unlink(path)
+
+    def test_validation(self):
+        self.assertTrue(self._validate({"evaluators": ["faithful"]}, {"faithful"})[0])
+        self.assertTrue(self._validate({"tool_calls": [], "expected_tool_calls": []})[0])
+        for row in ({"evaluators": []}, {"evaluators": "faithful"}, {"evaluators": [1]}):
+            ok, err, _ = self._validate(row)
+            self.assertFalse(ok)
+            self.assertIn("'evaluators'", err)
+        ok, err, _ = self._validate({"evaluators": ["nope"]}, {"faithful"})
+        self.assertFalse(ok)
+        self.assertIn("unknown evaluators", err)
+        for key in ("tool_calls", "expected_tool_calls"):
+            ok, err, _ = self._validate({key: {}})
+            self.assertFalse(ok)
+            self.assertIn(key, err)
+
+    async def test_unknown_evaluator_returns_error_status(self):
+        path = _write_json([{"id": "1", "input": "a", "output": "b", "evaluators": ["x"]}])
+        try:
+            with tempfile.TemporaryDirectory() as out_dir:
+                result = await run_general_eval(path, out_dir, [BINARY_EV])
+        finally:
+            os.unlink(path)
+        self.assertEqual(result["status"], "error")
+
+    async def test_blank_cells_metrics_and_tool_call_rows(self):
+        rows = [
+            {"id": "row_a", "input": "doc A", "output": "good", "evaluators": ["faithful"]},
+            {"id": "row_b", "input": "doc B", "output": "bad"},
+            {
+                "id": "row_c",
+                "input": "Book it",
+                "output": "",
+                "evaluators": ["faithful"],
+                "tool_calls": [{"tool": "book", "arguments": {"t": 1}}],
+                "expected_tool_calls": [{"tool": "book", "arguments": {"t": 1}}],
+            },
+        ]
+        path = _write_json(rows)
+
+        async def fake_text_judge(evaluators, user_prompt, **kwargs):
+            return {ev["name"]: {"reasoning": "calls ok", "match": True} for ev in evaluators}
+
+        async def fake_task_judge(evaluators, output, **kwargs):
+            return {
+                ev["name"]: (
+                    {"reasoning": "r", "score": 2}
+                    if ev.get("type") == "rating"
+                    else {"reasoning": "r", "match": output == "good"}
+                )
+                for ev in evaluators
+            }
+
+        text_judge = AsyncMock(side_effect=fake_text_judge)
+        try:
+            with tempfile.TemporaryDirectory() as out_dir, patch(
+                "calibrate_agent.general.metrics.text_judge", text_judge
+            ), patch(
+                "calibrate_agent.general.metrics.general_task_judge",
+                AsyncMock(side_effect=fake_task_judge),
+            ):
+                result = await run_general_eval(path, out_dir, [BINARY_EV, RATING_EV])
+                self.assertTrue(os.path.exists(os.path.join(out_dir, "config.json")))
+                df = pd.read_csv(
+                    os.path.join(out_dir, "results.csv"), keep_default_na=False
+                )
+                metrics = json.load(open(os.path.join(out_dir, "metrics.json")))
+        finally:
+            os.unlink(path)
+
+        self.assertEqual(result["status"], "completed")
+        self.assertEqual(
+            list(df.columns),
+            ["id", "input", "output", "faithful", "faithful_reasoning",
+             "quality", "quality_reasoning"],
+        )
+        self.assertEqual(list(df["quality"]), ["", "2", ""])
+        self.assertEqual(list(df["quality_reasoning"]), ["", "r", ""])
+        self.assertEqual(df.iloc[2]["faithful_reasoning"], "calls ok")
+        self.assertAlmostEqual(metrics["faithful"]["mean"], 2 / 3)
+        self.assertEqual(metrics["quality"]["mean"], 2.0)
+        text_judge.assert_awaited_once()
+        prompt = text_judge.call_args.kwargs["user_prompt"]
+        self.assertIn("`Expected tool calls`", prompt)
+        self.assertNotIn("Reply from the agent", prompt)

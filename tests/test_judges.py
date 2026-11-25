@@ -893,3 +893,110 @@ class TestDefaultEvaluators(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestToolCallJudgePrompt(unittest.TestCase):
+    def _prompt(self, *args, **kwargs):
+        from calibrate_agent.judges import tool_call_judge_prompt
+
+        return tool_call_judge_prompt(*args, **kwargs)
+
+    def test_sections_in_order(self):
+        prompt = self._prompt(
+            [
+                {"role": "user", "content": "book it"},
+                {
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": [
+                        {"id": "c1", "type": "function",
+                         "function": {"name": "check", "arguments": '{"t": 1}'}}
+                    ],
+                },
+                {"role": "tool", "content": '{"ok": true}', "tool_call_id": "c1"},
+            ],
+            "Booked.",
+            [{"tool": "book", "arguments": {"t": 1}, "output": {"id": "A"}}],
+            [{"tool": "book", "arguments": {"t": 1}}],
+        )
+        self.assertEqual(
+            prompt,
+            "`Chat history`:\n\n"
+            "user: book it\n"
+            '[Tool Call] check({"t": 1})\n'
+            'tool: {"ok": true}\n\n'
+            "`Reply from the agent`:\n\nBooked.\n\n"
+            "`Tool calls made by the agent`:\n\n"
+            'book {"t": 1} returned {"id": "A"}\n\n'
+            "`Expected tool calls`:\n\n"
+            'book {"t": 1}',
+        )
+
+    def test_empty_reply_and_no_calls(self):
+        prompt = self._prompt([{"role": "user", "content": "hi"}], "", [], [])
+        self.assertNotIn("Reply from the agent", prompt)
+        self.assertNotIn("Expected tool calls", prompt)
+        self.assertIn("The agent made no tool calls.", prompt)
+
+    def test_openai_shape_calls(self):
+        prompt = self._prompt(
+            [],
+            None,
+            [{"id": "x", "type": "function",
+              "function": {"name": "f", "arguments": '{"a": [1, 2]}'}}],
+        )
+        self.assertNotIn("Chat history", prompt)
+        self.assertIn('f {"a": [1, 2]}', prompt)
+
+    def test_tool_shape_in_history(self):
+        prompt = self._prompt(
+            [{"role": "assistant", "tool_calls": [{"tool": "f", "arguments": {"a": 1}}]}],
+            "",
+            [],
+        )
+        self.assertIn('[Tool Call] f({"a": 1})', prompt)
+
+    def test_expected_argument_specs(self):
+        prompt = self._prompt(
+            [],
+            "",
+            [],
+            [
+                {
+                    "tool": "book",
+                    "arguments": {
+                        "time": {"match_type": "exact", "value": "19:00"},
+                        "note": {"match_type": "any"},
+                        "who": {"match_type": "llm_judge", "criteria": "a name"},
+                        "extra": {"tag": {"match_type": "any"}, "n": 2},
+                    },
+                },
+                {"tool": "log", "accept_any_arguments": True, "arguments": {"a": 1}},
+                {"function": {"name": "sms", "arguments": None}},
+                {"tool": "ping"},
+            ],
+        )
+        expected = prompt.split("`Expected tool calls`:\n\n")[1]
+        self.assertEqual(
+            expected,
+            'book {"time": "19:00", "who": {"match_type": "llm_judge", '
+            '"criteria": "a name"}, "extra": {"n": 2}}\n'
+            "(ignore these arguments, they may be missing or hold any value: "
+            "note, extra.tag)\n"
+            "log (any arguments accepted)\n"
+            "sms (any arguments accepted)\n"
+            "ping (any arguments accepted)",
+        )
+
+
+class TestEvaluatorRowColumnsMissing(unittest.TestCase):
+    def test_evaluator_not_run_leaves_blank_cells(self):
+        from calibrate_agent.judges import evaluator_row_columns
+
+        cols = evaluator_row_columns(
+            {"a": {"name": "a"}, "b": {"name": "b"}},
+            {"a": {"match": True, "reasoning": "ok"}},
+        )
+        self.assertEqual(
+            cols, {"a": True, "a_reasoning": "ok", "b": "", "b_reasoning": ""}
+        )

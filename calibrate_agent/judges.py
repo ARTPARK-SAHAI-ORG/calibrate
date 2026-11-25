@@ -198,10 +198,15 @@ def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:
     """Flatten one row's judge result into its ``results.csv`` columns.
 
     Produces ``{name: value, f"{name}_reasoning": str}`` per evaluator — the
-    score for rating evaluators, a bool for binary ones.
+    score for rating evaluators, a bool for binary ones. An evaluator that did
+    not run on the row gets two empty cells.
     """
     columns: dict = {}
     for name, evaluator in evaluators_by_name.items():
+        if name not in judge_row:
+            columns[name] = ""
+            columns[f"{name}_reasoning"] = ""
+            continue
         result = judge_row[name]
         if is_rating(evaluator):
             columns[name] = result["score"]
@@ -737,12 +742,104 @@ def format_conversation(conversation: list[dict]) -> str:
             lines.append(f"{role}: {content}")
 
         for tc in tool_calls or []:
-            func = tc.get("function", {})
-            func_name = func.get("name", "unknown")
-            func_args = func.get("arguments", "{}")
+            func_name, func_args = _tool_call_name_and_arguments(tc)
+            if not isinstance(func_args, str):
+                func_args = json.dumps(func_args if func_args is not None else {})
             lines.append(f"[Tool Call] {func_name}({func_args})")
 
     return "\n".join(lines)
+
+
+def _tool_call_name_and_arguments(tool_call: dict) -> tuple:
+    """Read a tool call in either ``{tool, arguments}`` or OpenAI
+    ``{function: {name, arguments}}`` shape. Arguments come back as stored."""
+    func = tool_call.get("function")
+    if isinstance(func, dict):
+        return func.get("name", "unknown"), func.get("arguments", "{}")
+    return tool_call.get("tool", "unknown"), tool_call.get("arguments")
+
+
+def _parsed_arguments(arguments):
+    if isinstance(arguments, str):
+        try:
+            return json.loads(arguments)
+        except ValueError:
+            return arguments
+    return arguments
+
+
+def _as_json(value) -> str:
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
+def _tool_call_line(tool_call: dict) -> str:
+    name, arguments = _tool_call_name_and_arguments(tool_call)
+    line = f"{name} {_as_json(_parsed_arguments(arguments))}"
+    if "output" in tool_call:
+        line += f" returned {_as_json(tool_call['output'])}"
+    return line
+
+
+def _expected_arguments(arguments, prefix: str, ignored: list) -> object:
+    """Turn expected-argument match specs into what the judge should read:
+    ``any`` values are dropped (their dotted paths collected in ``ignored``),
+    ``exact`` specs become their value, ``llm_judge`` specs stay as written."""
+    if not isinstance(arguments, dict):
+        return arguments
+    out = {}
+    for key, value in arguments.items():
+        path = f"{prefix}{key}"
+        if isinstance(value, dict) and value.get("match_type") == "any":
+            ignored.append(path)
+        elif isinstance(value, dict) and value.get("match_type") == "exact":
+            out[key] = value.get("value")
+        elif isinstance(value, dict) and "match_type" in value:
+            out[key] = value
+        else:
+            nested = _expected_arguments(value, f"{path}.", ignored)
+            if nested != {} or value == {}:
+                out[key] = nested
+    return out
+
+
+def _expected_tool_call_line(tool_call: dict) -> str:
+    name, arguments = _tool_call_name_and_arguments(tool_call)
+    arguments = _parsed_arguments(arguments)
+    if tool_call.get("accept_any_arguments") is True or arguments is None:
+        return f"{name} (any arguments accepted)"
+    ignored: list = []
+    line = f"{name} {_as_json(_expected_arguments(arguments, '', ignored))}"
+    if ignored:
+        line += (
+            "\n(ignore these arguments, they may be missing or hold any value: "
+            f"{', '.join(ignored)})"
+        )
+    return line
+
+
+def tool_call_judge_prompt(
+    conversation: list[dict],
+    response: Optional[str],
+    tool_calls: Optional[list],
+    expected_tool_calls: Optional[list] = None,
+) -> str:
+    """Build the judge prompt for grading the tool calls an agent made."""
+    sections: list[str] = []
+    history = format_conversation(conversation)
+    if history:
+        sections.append(f"`Chat history`:\n\n{history}")
+    if response:
+        sections.append(f"`Reply from the agent`:\n\n{response}")
+    calls = "\n".join(_tool_call_line(tc) for tc in tool_calls or [])
+    sections.append(
+        f"`Tool calls made by the agent`:\n\n{calls or 'The agent made no tool calls.'}"
+    )
+    if isinstance(expected_tool_calls, list) and expected_tool_calls:
+        expected = "\n".join(
+            _expected_tool_call_line(tc) for tc in expected_tool_calls
+        )
+        sections.append(f"`Expected tool calls`:\n\n{expected}")
+    return "\n\n".join(sections)
 
 
 def require_unique_evaluator_names(evaluators: object) -> None:
