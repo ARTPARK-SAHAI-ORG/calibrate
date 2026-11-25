@@ -344,6 +344,7 @@ wheels = [
 name = "calibrate-agent"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "backoff" },
     { name = "cartesia" },
     { name = "elevenlabs" },
@@ -384,6 +385,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "aiohttp", specifier = ">=3.9" },
     { name = "backoff", specifier = ">=2.2.1" },
     { name = "cartesia", specifier = ">=2.0.15,<3" },
     { name = "elevenlabs", specifier = ">=2.31.0" },
