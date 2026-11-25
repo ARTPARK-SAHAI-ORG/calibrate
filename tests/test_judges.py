@@ -924,13 +924,37 @@ class TestToolCallJudgePrompt(unittest.TestCase):
             "`Chat history`:\n\n"
             "user: book it\n"
             '[Tool Call] check({"t": 1})\n'
-            'tool: {"ok": true}\n\n'
+            'tool (c1): {"ok": true}\n\n'
             "`Reply from the agent`:\n\nBooked.\n\n"
             "`Tool calls made by the agent`:\n\n"
             'book {"t": 1} returned {"id": "A"}\n\n'
             "`Expected tool calls`:\n\n"
             'book {"t": 1}',
         )
+
+    def test_tool_result_named_by_name_then_call_id(self):
+        from calibrate_agent.judges import format_conversation
+
+        self.assertEqual(
+            format_conversation([
+                {"role": "tool", "content": "a", "name": "book", "tool_call_id": "c1"},
+                {"role": "tool", "content": "b", "tool_call_id": "c2"},
+                {"role": "tool", "content": "c"},
+            ]),
+            "tool (book): a\ntool (c2): b\ntool: c",
+        )
+
+    def test_openai_shape_without_arguments(self):
+        prompt = self._prompt(
+            [{"role": "assistant", "content": "",
+              "tool_calls": [{"function": {"name": "x"}}]}],
+            "",
+            [{"function": {"name": "x"}}],
+            [{"function": {"name": "x"}}],
+        )
+        self.assertIn("[Tool Call] x({})", prompt)
+        self.assertIn("`Tool calls made by the agent`:\n\nx {}", prompt)
+        self.assertIn("`Expected tool calls`:\n\nx (any arguments accepted)", prompt)
 
     def test_empty_reply_and_no_calls(self):
         prompt = self._prompt([{"role": "user", "content": "hi"}], "", [], [])

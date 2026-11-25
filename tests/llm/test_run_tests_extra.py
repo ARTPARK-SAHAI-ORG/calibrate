@@ -2605,7 +2605,7 @@ class TestRunTestConversation(unittest.IsolatedAsyncioTestCase):
         judged = sim.await_args.kwargs["conversation"]
         self.assertEqual(
             judged[-1]["tool_calls"],
-            [{"function": {"name": "check_order", "arguments": '{"id": "1"}'}}],
+            [{"tool": "check_order", "arguments": '{"id": "1"}'}],
         )
 
 
@@ -3409,7 +3409,7 @@ class TestToolCallJudgeType(unittest.IsolatedAsyncioTestCase):
 
         judge = AsyncMock(return_value={"right_tool": {"reasoning": "ok", "match": True}})
         with tempfile.TemporaryDirectory() as tmp, patch(
-            "calibrate_agent.llm.metrics.text_judge", judge
+            "calibrate_agent.judges.text_judge", judge
         ):
             result = await run_eval_only_tests(
                 config={"evaluators": [self.EV]},
@@ -3431,7 +3431,7 @@ class TestToolCallJudgeType(unittest.IsolatedAsyncioTestCase):
         ev = {**self.EV, "type": "rating", "scale_min": 1, "scale_max": 5}
         judge = AsyncMock(return_value={"right_tool": {"reasoning": "meh", "score": 3}})
         with tempfile.TemporaryDirectory() as tmp, patch(
-            "calibrate_agent.llm.metrics.text_judge", judge
+            "calibrate_agent.judges.text_judge", judge
         ):
             result = await run_eval_only_tests(
                 config={"evaluators": [ev]},
@@ -3440,6 +3440,73 @@ class TestToolCallJudgeType(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(result["passed"], 0)
         self.assertEqual(result["results"][0]["metrics"]["reasoning"], "meh")
+
+    async def _eval_only_prompt(self, item, ev_type="tool_call_judge"):
+        from calibrate_agent.llm.run_tests import run_eval_only_tests
+
+        judge = AsyncMock(return_value={"right_tool": {"reasoning": "ok", "match": True}})
+        with tempfile.TemporaryDirectory() as tmp, patch(
+            "calibrate_agent.judges.text_judge", judge
+        ):
+            await run_eval_only_tests(
+                config={"evaluators": [self.EV]}, dataset=[item], output_dir=tmp
+            )
+        return judge.call_args.kwargs["user_prompt"]
+
+    async def test_eval_only_adds_no_placeholder_tool_result(self):
+        history = [
+            {"role": "user", "content": "book"},
+            {"role": "assistant", "content": "", "tool_calls": [
+                {"id": "c1", "type": "function",
+                 "function": {"name": "book", "arguments": "{}"}}]},
+        ]
+        prompt = await self._eval_only_prompt(self._item(history=history))
+        self.assertNotIn("received", prompt)
+
+    async def test_eval_only_keeps_placeholder_for_other_types(self):
+        from calibrate_agent.llm import run_tests as RT
+
+        history = [{"role": "user", "content": "book"}]
+        item = {
+            "test_case": {"history": history, "evaluation": {
+                "type": "conversation", "criteria": [{"name": "right_tool"}]}},
+            "output": {"response": "ok", "tool_calls": []},
+        }
+        with patch.object(
+            RT, "preprocess_conversation_history", wraps=RT.preprocess_conversation_history
+        ) as pre:
+            await self._eval_only_prompt(item)
+        pre.assert_called_once()
+
+    def test_eval_only_rejects_tool_calls_that_are_not_objects(self):
+        from calibrate_agent.llm.run_tests import validate_llm_eval_only_dataset
+
+        bad_expected = self._item(input="hi")
+        bad_expected["test_case"]["evaluation"]["expected_tool_calls"] = ["book"]
+        bad_output = self._item(input="hi")
+        bad_output["output"]["tool_calls"] = ["book"]
+        for item, field in ((bad_expected, "expected_tool_calls"),
+                            (bad_output, "output.tool_calls")):
+            ok, err = validate_llm_eval_only_dataset([item])
+            self.assertFalse(ok)
+            self.assertIn(field, err)
+            self.assertIn("objects", err)
+
+    def test_resolve_rejects_bad_expected_calls_and_string_criteria(self):
+        from calibrate_agent.llm.run_tests import _resolve_evaluators_for_test_case
+
+        names = {"right_tool": self.EV}
+        for expected in ({"tool": "book"}, ["book"]):
+            with self.assertRaisesRegex(ValueError, "expected_tool_calls"):
+                _resolve_evaluators_for_test_case(
+                    {"type": "tool_call_judge", "criteria": [{"name": "right_tool"}],
+                     "expected_tool_calls": expected},
+                    names,
+                )
+        with self.assertRaisesRegex(ValueError, "must list its evaluators by name"):
+            _resolve_evaluators_for_test_case(
+                {"type": "tool_call_judge", "criteria": "be right"}, names
+            )
 
     def test_history_from_input(self):
         from calibrate_agent.llm.run_tests import test_case_history

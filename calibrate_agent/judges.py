@@ -739,7 +739,10 @@ def format_conversation(conversation: list[dict]) -> str:
         tool_calls = msg.get("tool_calls", [])
 
         if content:
-            lines.append(f"{role}: {content}")
+            label = role
+            if role == "tool" and (msg.get("name") or msg.get("tool_call_id")):
+                label = f"tool ({msg.get('name') or msg.get('tool_call_id')})"
+            lines.append(f"{label}: {content}")
 
         for tc in tool_calls or []:
             func_name, func_args = _tool_call_name_and_arguments(tc)
@@ -755,7 +758,7 @@ def _tool_call_name_and_arguments(tool_call: dict) -> tuple:
     ``{function: {name, arguments}}`` shape. Arguments come back as stored."""
     func = tool_call.get("function")
     if isinstance(func, dict):
-        return func.get("name", "unknown"), func.get("arguments", "{}")
+        return func.get("name", "unknown"), func.get("arguments")
     return tool_call.get("tool", "unknown"), tool_call.get("arguments")
 
 
@@ -774,7 +777,8 @@ def _as_json(value) -> str:
 
 def _tool_call_line(tool_call: dict) -> str:
     name, arguments = _tool_call_name_and_arguments(tool_call)
-    line = f"{name} {_as_json(_parsed_arguments(arguments))}"
+    arguments = {} if arguments is None else _parsed_arguments(arguments)
+    line = f"{name} {_as_json(arguments)}"
     if "output" in tool_call:
         line += f" returned {_as_json(tool_call['output'])}"
     return line
@@ -840,6 +844,24 @@ def tool_call_judge_prompt(
         )
         sections.append(f"`Expected tool calls`:\n\n{expected}")
     return "\n\n".join(sections)
+
+
+async def tool_call_judge(
+    conversation: list[dict],
+    response: Optional[str],
+    tool_calls: Optional[list],
+    evaluators: list[dict],
+    expected_tool_calls: Optional[list] = None,
+    fallback_model: str = DEFAULT_TEXT_JUDGE_MODEL,
+) -> dict:
+    """Judge the tool calls an agent made (and its reply, if any)."""
+    return await text_judge(
+        evaluators=evaluators,
+        user_prompt=tool_call_judge_prompt(
+            conversation, response, tool_calls, expected_tool_calls
+        ),
+        fallback_model=fallback_model,
+    )
 
 
 def require_unique_evaluator_names(evaluators: object) -> None:

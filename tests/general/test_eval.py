@@ -528,9 +528,10 @@ class TestGeneralPerRowFields(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(ok)
         self.assertIn("unknown evaluators", err)
         for key in ("tool_calls", "expected_tool_calls"):
-            ok, err, _ = self._validate({key: {}})
-            self.assertFalse(ok)
-            self.assertIn(key, err)
+            for bad in ({}, ["book"]):
+                ok, err, _ = self._validate({key: bad})
+                self.assertFalse(ok)
+                self.assertIn(key, err)
 
     async def test_unknown_evaluator_returns_error_status(self):
         path = _write_json([{"id": "1", "input": "a", "output": "b", "evaluators": ["x"]}])
@@ -572,7 +573,7 @@ class TestGeneralPerRowFields(unittest.IsolatedAsyncioTestCase):
         text_judge = AsyncMock(side_effect=fake_text_judge)
         try:
             with tempfile.TemporaryDirectory() as out_dir, patch(
-                "calibrate_agent.general.metrics.text_judge", text_judge
+                "calibrate_agent.judges.text_judge", text_judge
             ), patch(
                 "calibrate_agent.general.metrics.general_task_judge",
                 AsyncMock(side_effect=fake_task_judge),
@@ -597,6 +598,8 @@ class TestGeneralPerRowFields(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(df.iloc[2]["faithful_reasoning"], "calls ok")
         self.assertAlmostEqual(metrics["faithful"]["mean"], 2 / 3)
         self.assertEqual(metrics["quality"]["mean"], 2.0)
+        self.assertEqual(metrics["faithful"]["count"], 3)
+        self.assertEqual(metrics["quality"]["count"], 1)
         text_judge.assert_awaited_once()
         prompt = text_judge.call_args.kwargs["user_prompt"]
         self.assertIn("`Expected tool calls`", prompt)

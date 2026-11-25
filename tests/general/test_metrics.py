@@ -346,17 +346,16 @@ class TestGeneralPerRowEvaluators(unittest.IsolatedAsyncioTestCase):
         result, _ = await self._score(None)
         self.assertEqual(set(result["per_row"][1]), {"faithful", "quality"})
 
-    async def test_empty_or_unknown_raises(self):
-        with self.assertRaises(ValueError):
-            await self._score([[], None])
-        with self.assertRaises(ValueError):
-            await self._score([["nope"], None])
+    async def test_count_is_rows_each_evaluator_ran_on(self):
+        result, _ = await self._score([["faithful"], None])
+        self.assertEqual(result["scores"]["faithful"]["count"], 2)
+        self.assertEqual(result["scores"]["quality"]["count"], 1)
 
 
 class TestGeneralToolCallRow(unittest.IsolatedAsyncioTestCase):
     async def test_tool_call_row_uses_tool_call_prompt(self):
         judge = AsyncMock(return_value={"faithful": {"reasoning": "ok", "match": True}})
-        with patch("calibrate_agent.general.metrics.text_judge", judge):
+        with patch("calibrate_agent.judges.text_judge", judge):
             result = await general_judge(
                 "Book it",
                 "",

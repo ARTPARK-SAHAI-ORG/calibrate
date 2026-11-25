@@ -192,18 +192,36 @@ def _evaluators_for_config_output(config: dict) -> list[dict]:
     )
 
 
+def _tool_calls_error(tool_calls, field: str) -> Optional[str]:
+    """Describe what is wrong with an optional list of tool-call objects."""
+    if tool_calls is None:
+        return None
+    if not isinstance(tool_calls, list):
+        return f"'{field}' must be a list"
+    if not all(isinstance(tc, dict) for tc in tool_calls):
+        return f"'{field}' entries must be objects"
+    return None
+
+
 def _resolve_evaluators_for_test_case(
     evaluation: dict, name_to_evaluator: dict
 ) -> list[dict]:
     """Resolve a test case's ``evaluation.criteria`` to rendered evaluator dicts."""
     criteria = evaluation.get("criteria")
-    if evaluation.get("type") == "general" and isinstance(criteria, str):
+    ev_type = evaluation.get("type")
+    if ev_type in ("general", "tool_call_judge") and isinstance(criteria, str):
         raise ValueError(
-            "A 'general' test case must list its evaluators by name, e.g. "
+            f"A '{ev_type}' test case must list its evaluators by name, e.g. "
             '"criteria": [{"name": "helpful"}]. A plain criteria string selects '
             f"the built-in '{DEFAULT_LLM_TEST_EVALUATOR['name']}' evaluator, "
-            "which general test cases do not use."
+            f"which {ev_type} test cases do not use."
         )
+    if ev_type == "tool_call_judge":
+        error = _tool_calls_error(
+            evaluation.get("expected_tool_calls"), "evaluation.expected_tool_calls"
+        )
+        if error:
+            raise ValueError(f"A 'tool_call_judge' test case's {error}")
     refs = _normalize_criteria_refs(criteria)
     ensure_known_evaluator_names(
         [ref["name"] for ref in refs], name_to_evaluator, context="test case criteria"
@@ -1441,10 +1459,7 @@ async def _evaluate_conversation(
         return _no_response_metrics(evaluators, no_response_reasoning_no_tool_calls)
     turn: dict = {"role": "assistant", "content": response or ""}
     if tool_calls:
-        turn["tool_calls"] = [
-            {"function": {"name": tc.get("tool"), "arguments": tc.get("arguments")}}
-            for tc in tool_calls
-        ]
+        turn["tool_calls"] = tool_calls
     result = await evaluate_simuation(
         conversation=list(chat_history) + [turn],
         evaluators=evaluators,
@@ -2261,14 +2276,16 @@ def validate_llm_eval_only_dataset(
                     False,
                     f"Item {i}: 'test_case.evaluation.criteria' must be a non-empty list",
                 )
-            expected = tc["evaluation"].get("expected_tool_calls")
-            if expected is not None and not isinstance(expected, list):
-                return (
-                    False,
-                    f"Item {i}: 'test_case.evaluation.expected_tool_calls' must be a list",
-                )
             if not isinstance(out.get("tool_calls"), list):
                 return False, f"Item {i}: 'output.tool_calls' must be a list"
+            for value, field in (
+                (tc["evaluation"].get("expected_tool_calls"),
+                 "test_case.evaluation.expected_tool_calls"),
+                (out["tool_calls"], "output.tool_calls"),
+            ):
+                error = _tool_calls_error(value, field)
+                if error:
+                    return False, f"Item {i}: {error}"
         elif ev_type == "general":
             try:
                 test_case_history(tc)
@@ -2348,12 +2365,14 @@ async def run_eval_only_tests(
             else None
         )
 
-        preprocessed_history = preprocess_conversation_history(
-            test_case_history(test_case), tools
-        )
+        # A tool_call_judge item is judged on the history as recorded: no model
+        # saw the placeholder results preprocessing would add.
+        history = test_case_history(test_case)
+        if evaluation.get("type") != "tool_call_judge":
+            history = preprocess_conversation_history(history, tools)
         output = item["output"]
         metrics = await evaluate_test_case_output(
-            chat_history=preprocessed_history,
+            chat_history=history,
             evaluation=evaluation,
             output=output,
             evaluators=resolved_evaluators,

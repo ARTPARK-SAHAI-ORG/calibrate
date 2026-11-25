@@ -116,6 +116,8 @@ def validate_general_eval_dataset(
         for key in ("tool_calls", "expected_tool_calls"):
             if key in row and not isinstance(row[key], list):
                 return False, f"Row {i} field '{key}' must be a list", []
+            if key in row and not all(isinstance(tc, dict) for tc in row[key]):
+                return False, f"Row {i} field '{key}' entries must be objects", []
         row_id = row["id"]
         if row_id in seen_ids:
             return False, f"Duplicate row id: {row_id!r}", []

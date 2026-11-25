@@ -14,8 +14,7 @@ from tqdm.asyncio import tqdm_asyncio
 from calibrate_agent.judges import (
     general_task_judge,
     is_rating,
-    text_judge,
-    tool_call_judge_prompt,
+    tool_call_judge,
     evaluator_result_value,
     ensure_known_evaluator_names,
     render_evaluator,
@@ -75,14 +74,12 @@ async def general_judge(
         :func:`calibrate_agent.judges.text_judge`.
     """
     if tool_calls is not None:
-        result = await text_judge(
-            evaluators=evaluators,
-            user_prompt=tool_call_judge_prompt(
-                [{"role": "user", "content": input_text or ""}],
-                output,
-                tool_calls.get("tool_calls"),
-                tool_calls.get("expected_tool_calls"),
-            ),
+        result = await tool_call_judge(
+            [{"role": "user", "content": input_text or ""}],
+            output,
+            tool_calls.get("tool_calls"),
+            evaluators,
+            tool_calls.get("expected_tool_calls"),
             fallback_model=fallback_model,
         )
     else:
@@ -147,8 +144,8 @@ async def get_general_judge_score(
     Returns:
         {
             "scores": {
-                "<evaluator>": {"type": "binary", "mean": 0.83},
-                "<evaluator>": {"type": "rating", "mean": 4.0,
+                "<evaluator>": {"type": "binary", "mean": 0.83, "count": 6},
+                "<evaluator>": {"type": "rating", "mean": 4.0, "count": 6,
                                 "scale_min": 1, "scale_max": 5},
                 ...
             },
@@ -182,15 +179,11 @@ async def get_general_judge_score(
     for i, (input_text, output) in enumerate(zip(inputs, outputs)):
         row_arguments = arguments_list[i] if arguments_list is not None else None
         row_names = evaluator_names_list[i] if evaluator_names_list else None
-        if row_names is None:
-            row_evaluators = evaluators
-        else:
-            if not row_names:
-                raise ValueError(f"Row {i} evaluators must not be empty.")
-            ensure_known_evaluator_names(
-                row_names, evaluator_names, context=f"Row {i} evaluators"
-            )
-            row_evaluators = [ev for ev in evaluators if ev["name"] in row_names]
+        row_evaluators = (
+            evaluators
+            if row_names is None
+            else [ev for ev in evaluators if ev["name"] in row_names]
+        )
         if row_arguments:
             ensure_known_evaluator_names(
                 row_arguments, evaluator_names, context=f"Row {i} arguments"
@@ -226,6 +219,7 @@ async def get_general_judge_score(
             scores[name] = {
                 "type": "rating",
                 "mean": float(np.mean(per_row_values)),
+                "count": len(per_row_values),
                 "scale_min": int(ev["scale_min"]),
                 "scale_max": int(ev["scale_max"]),
             }
@@ -233,6 +227,7 @@ async def get_general_judge_score(
             scores[name] = {
                 "type": "binary",
                 "mean": float(np.mean(per_row_values)),  # pass-rate fraction 0.0–1.0
+                "count": len(per_row_values),
             }
 
     overall_score = float(np.mean([s["mean"] for s in scores.values()]))
