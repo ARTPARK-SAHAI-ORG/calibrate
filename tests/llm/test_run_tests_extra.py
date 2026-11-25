@@ -889,13 +889,18 @@ class TestToolCallAsyncMatchers(unittest.TestCase):
     def test_evaluate_fewer_output_than_expected(self):
         from calibrate_agent.llm.run_tests import evaluate_tool_calls
 
-        # Output has only "a"; expected wants "a" and "b". Per zip-min the case
-        # still passes, but the unmatched "b" slot is recorded as failed.
+        # Output has only "a"; expected wants "a" and "b". The missing "b"
+        # fails the case and its slot is recorded as failed.
         result = asyncio.run(evaluate_tool_calls(
             [{"tool": "a", "arguments": {}}],
             [{"tool": "a", "arguments": {}}, {"tool": "b", "arguments": {}}],
         ))
-        self.assertTrue(result["passed"])
+        self.assertFalse(result["passed"])
+        self.assertEqual(
+            result["reasoning"],
+            "Tool call mismatch - expected tool call: b but it was not called "
+            "(calls made: a)",
+        )
         self.assertEqual(
             result["tool_call_results"],
             [{"tool": "a", "passed": True}, {"tool": "b", "passed": False}],
@@ -3380,6 +3385,235 @@ class TestErroredCount(unittest.TestCase):
             _write_test_results_outputs(results, tmp, {})
             metrics = json.loads((Path(tmp) / "metrics.json").read_text())
         self.assertTrue(metrics["stopped_early"])
+
+
+def _route(category, urgent=None):
+    arguments = {"category": category}
+    if urgent is not None:
+        arguments["urgent"] = urgent
+    return {"tool": "route_feedback", "arguments": arguments}
+
+
+def _call(tool, **arguments):
+    return {"tool": tool, "arguments": arguments}
+
+
+class TestToolCallMatching(unittest.TestCase):
+    """Expected calls are paired one to one with produced calls in any order."""
+
+    def _evaluate(self, produced, expected):
+        from calibrate_agent.llm.run_tests import evaluate_tool_calls
+
+        return asyncio.run(evaluate_tool_calls(produced, expected))
+
+    def test_skipped_call_that_sorts_last_fails(self):
+        result = self._evaluate(
+            [_call("book_appointment")],
+            [_call("check_availability"), _call("book_appointment")],
+        )
+        self.assertFalse(result["passed"])
+        self.assertEqual(
+            result["reasoning"],
+            "Tool call mismatch - expected tool call: check_availability "
+            "but it was not called (calls made: book_appointment)",
+        )
+        self.assertEqual(
+            result["tool_call_results"],
+            [
+                {"tool": "book_appointment", "passed": True},
+                {"tool": "check_availability", "passed": False},
+            ],
+        )
+
+    def test_skipped_call_that_sorts_first_fails(self):
+        result = self._evaluate(
+            [_call("check_availability")],
+            [_call("check_availability"), _call("book_appointment")],
+        )
+        self.assertFalse(result["passed"])
+        self.assertEqual(
+            result["tool_call_results"],
+            [
+                {"tool": "book_appointment", "passed": False},
+                {"tool": "check_availability", "passed": True},
+            ],
+        )
+
+    def test_skipped_repeat_of_same_tool_fails(self):
+        result = self._evaluate(
+            [_route("hours", False)],
+            [_route("hours", False), _route("membership", True)],
+        )
+        self.assertFalse(result["passed"])
+        self.assertEqual(
+            result["reasoning"],
+            "Tool call mismatch - expected 2 calls to route_feedback but got 1",
+        )
+        self.assertEqual(
+            [slot["passed"] for slot in result["tool_call_results"]], [True, False]
+        )
+
+    def test_one_call_cannot_satisfy_two_identical_expected_calls(self):
+        result = self._evaluate([_route("hours")], [_route("hours"), _route("hours")])
+        self.assertFalse(result["passed"])
+
+    def test_same_tool_calls_pass_in_either_order(self):
+        hours, membership = _route("hours", False), _route("membership", True)
+        for produced in ([hours, membership], [membership, hours]):
+            for expected in ([hours, membership], [membership, hours]):
+                with self.subTest(produced=produced, expected=expected):
+                    result = self._evaluate(produced, expected)
+                    self.assertTrue(result["passed"])
+                    self.assertEqual(
+                        result["reasoning"],
+                        "The agent's tools calls matches the expected tool calls",
+                    )
+
+    def test_different_tools_pass_in_either_order(self):
+        result = self._evaluate(
+            [_call("book_appointment"), _call("check_availability")],
+            [_call("check_availability"), _call("book_appointment")],
+        )
+        self.assertTrue(result["passed"])
+
+    def test_wildcard_and_exact_call_to_same_tool_pair_correctly(self):
+        result = self._evaluate(
+            [_route("hours"), _route("membership")],
+            [
+                {"tool": "route_feedback",
+                 "arguments": {"category": {"match_type": "any"}}},
+                _route("hours"),
+            ],
+        )
+        self.assertTrue(result["passed"])
+        self.assertEqual(
+            [slot["passed"] for slot in result["tool_call_results"]], [True, True]
+        )
+
+    def test_wrong_argument_on_repeated_call_reports_the_difference(self):
+        result = self._evaluate(
+            [_route("hours"), _route("hours")],
+            [_route("hours"), _route("membership")],
+        )
+        self.assertFalse(result["passed"])
+        self.assertIn("Tool call arguments mismatch", result["reasoning"])
+        self.assertIn("'membership'", result["reasoning"])
+        self.assertEqual(
+            [slot["passed"] for slot in result["tool_call_results"]], [True, False]
+        )
+
+    def test_argument_failure_reported_before_missing_call(self):
+        result = self._evaluate(
+            [_call("book_appointment", day="Friday")],
+            [_call("book_appointment", day="Saturday"), _call("check_availability")],
+        )
+        self.assertFalse(result["passed"])
+        self.assertIn("Tool call arguments mismatch", result["reasoning"])
+        self.assertIn("'Saturday'", result["reasoning"])
+
+    def test_extra_call_that_sorts_first_is_ignored(self):
+        result = self._evaluate(
+            [
+                _call("check_availability"),
+                _call("book_appointment"),
+                _call("cancel_appointment"),
+            ],
+            [_call("check_availability"), _call("book_appointment")],
+        )
+        self.assertTrue(result["passed"])
+        self.assertEqual(
+            [slot["passed"] for slot in result["tool_call_results"]], [True, True]
+        )
+
+    def test_extra_call_to_same_tool_is_ignored(self):
+        result = self._evaluate(
+            [_route("hours", False), _route("membership", True)],
+            [_route("membership", True)],
+        )
+        self.assertTrue(result["passed"])
+
+    @staticmethod
+    def _judge_accepting(text):
+        async def fake_text_judge(evaluators, user_prompt, *a, **k):
+            name = evaluators[0]["name"]
+            return {name: {"match": text in user_prompt, "reasoning": "checked"}}
+
+        return fake_text_judge
+
+    def test_judged_and_exact_calls_to_same_tool_pair_in_either_order(self):
+        judged = {"tool": "route_feedback", "arguments": {
+            "category": {"match_type": "llm_judge", "criteria": "the second topic"}}}
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge",
+            side_effect=self._judge_accepting("membership"),
+        ):
+            result = self._evaluate(
+                [_route("hours"), _route("membership")],
+                [judged, _route("hours")],
+            )
+        self.assertTrue(result["passed"])
+        self.assertIn("criteria met", result["reasoning"])
+        judged_slots = [
+            slot for slot in result["tool_call_results"] if "param_judgments" in slot
+        ]
+        self.assertEqual(len(judged_slots), 1)
+        self.assertTrue(judged_slots[0]["param_judgments"][0]["match"])
+
+    def test_skipped_call_fails_even_when_judged_call_passes(self):
+        judged = {"tool": "send_sms", "arguments": {
+            "message": {"match_type": "llm_judge", "criteria": "a greeting"}}}
+        with patch(
+            "calibrate_agent.llm.run_tests.text_judge",
+            side_effect=self._judge_accepting("hello"),
+        ):
+            result = self._evaluate(
+                [_call("send_sms", message="hello")],
+                [judged, _call("log_visit")],
+            )
+        self.assertFalse(result["passed"])
+        self.assertIn("log_visit", result["reasoning"])
+
+
+class TestMatchToolCalls(unittest.TestCase):
+    def test_finds_pairing_that_first_match_would_miss(self):
+        from calibrate_agent.llm.run_tests import _match_tool_calls
+
+        allowed = {(0, 0), (0, 1), (1, 0)}
+        pairing = _match_tool_calls(2, 2, lambda i, j: (i, j) in allowed)
+        self.assertEqual(pairing, {0: 1, 1: 0})
+
+    def test_no_matches_gives_empty_pairing(self):
+        from calibrate_agent.llm.run_tests import _match_tool_calls
+
+        self.assertEqual(_match_tool_calls(2, 3, lambda i, j: False), {})
+
+    def test_each_produced_call_used_once(self):
+        from calibrate_agent.llm.run_tests import _match_tool_calls
+
+        pairing = _match_tool_calls(3, 1, lambda i, j: True)
+        self.assertEqual(len(pairing), 1)
+
+
+class TestPerSlotToolPassesPairing(unittest.TestCase):
+    def test_same_tool_in_either_order(self):
+        from calibrate_agent.llm.run_tests import _per_slot_tool_passes
+
+        hours, membership = _route("hours"), _route("membership")
+        self.assertEqual(
+            _per_slot_tool_passes([membership, hours], [hours, membership]),
+            [("route_feedback", True), ("route_feedback", True)],
+        )
+
+    def test_correct_call_counts_when_another_is_skipped(self):
+        from calibrate_agent.llm.run_tests import _per_slot_tool_passes
+
+        self.assertEqual(
+            _per_slot_tool_passes(
+                [_call("check_availability")],
+                [_call("check_availability"), _call("book_appointment")],
+            ),
+            [("book_appointment", False), ("check_availability", True)],
+        )
 
 
 if __name__ == "__main__":

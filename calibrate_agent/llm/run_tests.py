@@ -5,7 +5,7 @@ import sys
 import time
 import uuid
 from collections import defaultdict
-from typing import Any, Awaitable, Callable, Iterable, List, Optional, TYPE_CHECKING
+from typing import Any, Awaitable, Callable, Dict, Iterable, List, Optional, TYPE_CHECKING
 from loguru import logger
 
 if TYPE_CHECKING:
@@ -1265,6 +1265,56 @@ def _consolidated_pass_reasoning(pass_blocks: List[tuple], *, multi: bool) -> st
     return "\n".join(lines)
 
 
+def _match_tool_calls(
+    n_expected: int, n_produced: int, matches: Callable[[int, int], bool]
+) -> Dict[int, int]:
+    """Pair expected calls with produced calls, one to one, as many as possible.
+
+    ``matches(i, j)`` says whether produced call ``j`` satisfies expected call
+    ``i``. Returns ``{expected index: produced index}`` for a maximum matching,
+    found with augmenting paths. Taking the first match for each expected call
+    is not enough: with expected ``[any value, "hours"]`` and produced
+    ``["hours", "membership"]``, the wildcard would take ``"hours"`` and leave
+    the exact call unpaired, although pairing the wildcard with
+    ``"membership"`` satisfies both.
+    """
+    produced_to_expected: Dict[int, int] = {}
+
+    def assign(i: int, visited: set) -> bool:
+        for j in range(n_produced):
+            if j in visited or not matches(i, j):
+                continue
+            visited.add(j)
+            if j not in produced_to_expected or assign(
+                produced_to_expected[j], visited
+            ):
+                produced_to_expected[j] = i
+                return True
+        return False
+
+    for i in range(n_expected):
+        assign(i, set())
+    return {i: j for j, i in produced_to_expected.items()}
+
+
+def _missing_tool_call_message(
+    tool_name: str, expected_calls: List[dict], produced_calls: List[dict]
+) -> str:
+    """Failure reason for an expected call the agent did not make."""
+    expected_count = sum(1 for tc in expected_calls if tc.get("tool") == tool_name)
+    produced_count = sum(1 for tc in produced_calls if tc.get("tool") == tool_name)
+    if produced_count == 0:
+        made = ", ".join(tc["tool"] for tc in produced_calls)
+        return (
+            f"Tool call mismatch - expected tool call: {tool_name} "
+            f"but it was not called (calls made: {made})"
+        )
+    return (
+        f"Tool call mismatch - expected {expected_count} calls to {tool_name} "
+        f"but got {produced_count}"
+    )
+
+
 async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
     """Evaluate produced tool calls against expected ones.
 
@@ -1272,9 +1322,16 @@ async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
     expected value is a criteria spec (see :func:`_param_criteria_spec`) is
     instead graded by an LLM judge.
 
+    Each expected call is paired with a different produced call of the same
+    tool whose arguments match, whatever order the agent made them in (see
+    :func:`_match_tool_calls`). The test passes only when every expected call
+    is paired. Produced calls left unpaired are ignored, so an agent may make
+    calls the test does not list.
+
     Returns ``passed`` / ``reasoning`` plus ``tool_call_results`` — a per-slot
-    ``[{"tool": name, "passed": bool}]`` list (sorted order, missing output
-    slots marked failed) consumed by :func:`_aggregate_tool_calls`. A slot whose
+    ``[{"tool": name, "passed": bool}]`` list (one entry per expected call, in
+    sorted order, unpaired calls marked failed) consumed by
+    :func:`_aggregate_tool_calls`. A slot whose
     call involved at least one ``llm_judge`` parameter additionally carries a
     ``param_judgments`` list — one record per leaf parameter, exact *and* judged,
     matched *and* failed (``{"param", "match_type", "match", ...}``) — so the
@@ -1304,18 +1361,55 @@ async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
     output_sorted = sort_tool_calls(output_tool_calls)
     multi = len(evaluation_sorted) > 1
 
+    same_tool_pairs = [
+        (i, j)
+        for i, expected in enumerate(evaluation_sorted)
+        for j, produced in enumerate(output_sorted)
+        if produced["tool"] == expected["tool"]
+    ]
+    pair_evaluations = await asyncio.gather(
+        *[
+            _tool_call_pair_mismatch_async(output_sorted[j], evaluation_sorted[i])
+            for i, j in same_tool_pairs
+        ]
+    )
+    evaluated_pairs = dict(zip(same_tool_pairs, pair_evaluations))
+    pairing = _match_tool_calls(
+        len(evaluation_sorted),
+        len(output_sorted),
+        lambda i, j: (i, j) in evaluated_pairs
+        and evaluated_pairs[(i, j)]["mismatch"] is None,
+    )
+    paired_outputs = set(pairing.values())
+    unpaired_outputs = [
+        j for j in range(len(output_sorted)) if j not in paired_outputs
+    ]
+
     tool_call_results: List[dict] = []
     first_failure: Optional[str] = None
     pass_blocks: List[tuple] = []
     for i, evaluation_tool_call in enumerate(evaluation_sorted):
         name = evaluation_tool_call.get("tool")
-        if i >= len(output_sorted):
-            if name:
-                tool_call_results.append({"tool": name, "passed": False})
-            continue
-        evaluated = await _tool_call_pair_mismatch_async(
-            output_sorted[i], evaluation_tool_call
-        )
+        j = pairing.get(i)
+        if j is None:
+            # Report the arguments against a leftover call of the same tool,
+            # since that is the call the agent most likely meant.
+            j = next(
+                (k for k in unpaired_outputs if output_sorted[k]["tool"] == name),
+                None,
+            )
+            if j is not None:
+                unpaired_outputs.remove(j)
+        if j is None:
+            evaluated = {
+                "mismatch": _missing_tool_call_message(
+                    name, evaluation_sorted, output_sorted
+                ),
+                "records": [],
+                "had_llm": False,
+            }
+        else:
+            evaluated = evaluated_pairs[(i, j)]
         mismatch = evaluated["mismatch"]
         if name:
             slot: dict = {"tool": name, "passed": mismatch is None}
@@ -1344,10 +1438,11 @@ async def evaluate_tool_calls(output_tool_calls, evaluation_tool_calls):
 def _per_slot_tool_passes(
     output_tool_calls: list, evaluation_tool_calls: Optional[list]
 ) -> List[tuple]:
-    """For each expected tool slot (sorted), whether output matches at that index.
+    """For each expected tool slot (sorted), whether a produced call is paired with it.
 
-    Aligns with :func:`evaluate_tool_calls` ordering and pairwise rules. Used for
-    per-tool leaderboard stats so a failing slot does not mark other tools wrong.
+    Uses the same one-to-one pairing as :func:`evaluate_tool_calls`, with
+    arguments compared exactly. Used for per-tool leaderboard stats so a
+    failing slot does not mark other tools wrong.
     """
     evaluation_tool_calls = sort_tool_calls(evaluation_tool_calls or [])
     if not evaluation_tool_calls:
@@ -1356,22 +1451,19 @@ def _per_slot_tool_passes(
         return [(tc["tool"], False) for tc in evaluation_tool_calls if tc.get("tool")]
 
     output_tool_calls = sort_tool_calls(output_tool_calls)
-    out: List[tuple] = []
-    for i, evaluation_tool_call in enumerate(evaluation_tool_calls):
-        name = evaluation_tool_call.get("tool")
-        if not name:
-            continue
-        if i >= len(output_tool_calls):
-            out.append((name, False))
-        else:
-            out.append(
-                (
-                    name,
-                    _tool_call_pair_mismatch(output_tool_calls[i], evaluation_tool_call)
-                    is None,
-                )
-            )
-    return out
+    pairing = _match_tool_calls(
+        len(evaluation_tool_calls),
+        len(output_tool_calls),
+        lambda i, j: _tool_call_pair_mismatch(
+            output_tool_calls[j], evaluation_tool_calls[i]
+        )
+        is None,
+    )
+    return [
+        (tc["tool"], i in pairing)
+        for i, tc in enumerate(evaluation_tool_calls)
+        if tc.get("tool")
+    ]
 
 
 def _no_response_judge_results(evaluators: List[dict], reasoning: str) -> dict:
@@ -1893,9 +1985,9 @@ def _aggregate_tool_calls(results: List[dict]) -> dict:
     """Aggregate per-tool pass rates across tool_call-type test case results.
 
     Each expected tool slot (same sort order as :func:`evaluate_tool_calls`) adds
-    one to that tool's ``total``; ``passed`` increments only when the output
-    matches at that index (tool name and optional arguments), not from the
-    case-level ``metrics.passed`` flag.
+    one to that tool's ``total``; ``passed`` increments only when a produced
+    call is paired with that slot (tool name and optional arguments), not from
+    the case-level ``metrics.passed`` flag.
 
     Per-slot results are read from ``metrics.tool_call_results`` (produced by
     :func:`evaluate_tool_calls`) so LLM-judged parameters are not re-graded
