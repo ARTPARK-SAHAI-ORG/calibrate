@@ -244,7 +244,7 @@ An LLM judge grades the tool calls the agent made, using the evaluators you list
 }
 ```
 
-The test case takes either `history` or a single `input` string, never both. Its evaluators must be listed by name. A reply with no text does not fail the test, since the tool calls are what is graded.
+The test case takes either `history` or a single `input` string, never both. Its evaluators must be listed by name.
 
 The judge reads these parts, in this order:
 
@@ -255,7 +255,14 @@ The judge reads these parts, in this order:
 | `Tool calls made by the agent`   | Always. Reads "The agent made no tool calls." when there were none |
 | `Expected tool calls`            | When `expected_tool_calls` is given     |
 
-In `expected_tool_calls`, an `"any"` argument is left out and listed as one the judge may ignore, an `"exact"` argument is shown as its value, and an `"llm_judge"` argument is shown with its criteria. A call with `"accept_any_arguments": true`, or with no `arguments`, is shown as accepting any arguments.
+How each expected argument is shown to the judge:
+
+| In `expected_tool_calls`                              | What the judge sees                      |
+| ----------------------------------------------------- | ---------------------------------------- |
+| `{"match_type": "any"}`                               | Listed as an argument it may ignore      |
+| `{"match_type": "exact", "value": ...}`               | The value                                |
+| `{"match_type": "llm_judge", "criteria": ...}`        | The argument with its criteria           |
+| `"accept_any_arguments": true`, or no `arguments`     | The call, marked as accepting any arguments |
 
 ---
 
