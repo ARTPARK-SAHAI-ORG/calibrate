@@ -1,0 +1,24 @@
+---
+title: "Set trace feedback"
+description: "Set whether the agent's output on a trace was correct, replacing any earlier feedback, or clear it"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.traces.set_feedback(
+    trace_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+)
+```
+
+## API endpoint
+
+See **PUT /traces/\{trace_uuid}/feedback** in the [API reference](/api-reference/introduction) tab.

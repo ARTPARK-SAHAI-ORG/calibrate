@@ -218,7 +218,8 @@
             "openapi": "api-reference/openapi.json",
             "pages": [
               "GET /traces",
-              "POST /traces"
+              "POST /traces",
+              "PUT /traces/{trace_uuid}/feedback"
             ]
           }
         ]
@@ -347,7 +348,8 @@
             "group": "Traces",
             "pages": [
               "sdk/traces/list",
-              "sdk/traces/create"
+              "sdk/traces/create",
+              "sdk/traces/set_feedback"
             ]
           }
         ]

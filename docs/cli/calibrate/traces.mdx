@@ -19,6 +19,7 @@ calibrate traces create [flags]
 | --- | --- | --- |
 | `-a, --agent-id` | string | **Required.** ID of the agent that produced the turn. Must be an agent in your workspace |
 | `-c, --conversation-id` | string | Your own ID for the conversation this turn belongs to. Turns sharing it are grouped into one conversation. Omit if you have none |
+| `-f, --feedback` | string | A verdict on the agent's output, if you already have one. Omit if you have none |
 | `-i, --input` | string | JSON value (one of: string \| array of &#123; role: string, content: string, AdditionalProperties: object &#125;) |
 | `-l, --labels` | stringArray | Your own tags for this turn, such as an environment or a release. Matched exactly when filtering, so keep the spelling stable. Omit if you have none |
 | `--message-id` | input | Your own ID for the last user message in input, stored for reference only. Omit if you have none |
@@ -47,6 +48,7 @@ calibrate traces list [flags]
 | `--conversation-id` | agent_id | — | Return only the turns of this conversation. Requires agent_id |
 | `--created-after` | string | — | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
 | `--created-before` | string | — | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
+| `-f, --feedback` | correct | — | Return only traces with this feedback: |
 | `--include-content` | limit | — | Also return each trace's full input, output and metadata. Use limit and `offset` to page through them |
 | `--include-score-averages` | — | — | Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page |
 | `--labels` | string | — | Return only traces carrying at least one of these labels. Repeat the parameter for each label |
@@ -57,9 +59,32 @@ calibrate traces list [flags]
 | `--score` | — | — | &lt;evaluator ID&gt;:&lt;condition&gt;   Return only traces whose latest scoring run matches this condition. Each is written as &lt;evaluator ID&gt;:&lt;condition&gt;, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once |
 | `--sort-by-evaluator` | string | — | Order traces by this evaluator's score on each trace's latest scoring run. Traces this evaluator has not scored come last whichever direction you pick, and an evaluator not linked to the agent counts as having scored none |
 | `--sort-order` | sort_by_evaluator | `desc` | Whether sort_by_evaluator puts the highest scores first or the lowest. Ignored without it (options: asc, desc) |
+| `--source` | api | — | Return only traces from this source: |
 
 **Examples**
 
 ```bash
 calibrate traces list
+```
+
+## Set trace feedback
+
+Set whether the agent's output on a trace was correct, replacing any earlier feedback, or clear it
+
+```bash
+calibrate traces set-feedback [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-c, --comment` | string | What was right or wrong about the agent's output. Omit if you have none |
+| `-i, --is-correct` | null | **Required.** Whether the agent's output for this turn was correct. null clears the feedback |
+| `-t, --trace-uuid` | string | **Required.** The trace to give feedback on |
+
+**Examples**
+
+```bash
+calibrate traces set-feedback --trace-uuid f47ac10b-58cc-4372-a567-0e02b2c3d479 --is-correct false
 ```

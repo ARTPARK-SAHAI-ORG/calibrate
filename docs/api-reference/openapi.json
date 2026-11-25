@@ -50,7 +50,7 @@
                 "type": "null"
               }
             ],
-            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-3.5-flash-lite`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nFor `type=agent`, omitted keys inherit managed defaults. Omit `config` entirely to use all defaults. For `type=connection`, `config` is stored as-is and must contain `agent_url`"
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-3.5-flash-lite`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\n- `talk_to_agent.messages_per_day`: how many replies the agent's chat link may give in a day, counted from midnight UTC. From 1 up to `max_chat_replies_per_day` from `GET /org-limits/me`. Omit to use the workspace's `talk_to_agent.default_messages_per_day`\n\n```json\n{\"talk_to_agent\": {\"messages_per_day\": 50}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nFor `type=agent`, omitted keys inherit managed defaults. Omit `config` entirely to use all defaults. For `type=connection`, `config` is stored as-is and must contain `agent_url`"
           }
         },
         "type": "object",
@@ -595,7 +595,7 @@
                 "type": "null"
               }
             ],
-            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-3.5-flash-lite`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nReplaces the stored config. Omit to leave unchanged\n\nFor `type=connection`, changing `agent_url` or `agent_headers` resets the connection and benchmark verification flags"
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-3.5-flash-lite`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\n- `talk_to_agent.messages_per_day`: how many replies the agent's chat link may give in a day, counted from midnight UTC. From 1 up to `max_chat_replies_per_day` from `GET /org-limits/me`. Omit to use the workspace's `talk_to_agent.default_messages_per_day`\n\n```json\n{\"talk_to_agent\": {\"messages_per_day\": 50}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nReplaces the stored config. Omit to leave unchanged\n\nFor `type=connection`, changing `agent_url` or `agent_headers` resets the connection and benchmark verification flags"
           }
         },
         "type": "object",
@@ -5925,6 +5925,124 @@
         ],
         "title": "TraceEvalRunStatus"
       },
+      "TraceFeedback": {
+        "properties": {
+          "is_correct": {
+            "type": "boolean",
+            "title": "Is Correct",
+            "description": "Whether the agent's output for this turn was correct"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "What was right or wrong about the agent's output. Omit if you have none"
+          },
+          "at": {
+            "type": "string",
+            "title": "At",
+            "description": "When the feedback was last given (ISO 8601 UTC)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "is_correct",
+          "at"
+        ],
+        "title": "TraceFeedback"
+      },
+      "TraceFeedbackIngest": {
+        "properties": {
+          "is_correct": {
+            "type": "boolean",
+            "title": "Is Correct",
+            "description": "Whether the agent's output for this turn was correct"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "What was right or wrong about the agent's output. Omit if you have none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "is_correct"
+        ],
+        "title": "TraceFeedbackIngest",
+        "description": "Feedback sent with a new trace, which has nothing to clear."
+      },
+      "TraceFeedbackResponse": {
+        "properties": {
+          "feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceFeedback"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The feedback now on the trace"
+          }
+        },
+        "type": "object",
+        "required": [
+          "feedback"
+        ],
+        "title": "TraceFeedbackResponse"
+      },
+      "TraceFeedbackUpdate": {
+        "properties": {
+          "is_correct": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Correct",
+            "description": "Whether the agent's output for this turn was correct. `null` clears the feedback"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment",
+            "description": "What was right or wrong about the agent's output. Omit if you have none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "is_correct"
+        ],
+        "title": "TraceFeedbackUpdate"
+      },
       "TraceIngest": {
         "properties": {
           "agent_id": {
@@ -6011,6 +6129,17 @@
             "maxItems": 50,
             "title": "Labels",
             "description": "Your own tags for this turn, such as an environment or a release. Matched exactly when filtering, so keep the spelling stable. Omit if you have none"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceFeedbackIngest"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A verdict on the agent's output, if you already have one. Omit if you have none"
           }
         },
         "additionalProperties": false,
@@ -6182,6 +6311,18 @@
             ],
             "title": "Tool Calls",
             "description": "Tool calls the agent issued for this turn. Omit for plain text replies"
+          },
+          "stopped_early": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped Early",
+            "description": "True when the agent was stopped after calling tools as many times in a row as it may, before it replied"
           }
         },
         "additionalProperties": false,
@@ -6477,6 +6618,26 @@
             "title": "Labels",
             "description": "Your own tags for this turn, such as an environment or a release. Matched exactly when filtering, so keep the spelling stable"
           },
+          "source": {
+            "type": "string",
+            "enum": [
+              "api",
+              "chat"
+            ],
+            "title": "Source",
+            "description": "Where the trace came from:\n\n- `api`: sent to `POST /traces`\n- `chat`: a reply the agent gave on its chat link"
+          },
+          "feedback": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceFeedback"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The verdict and comment given on the trace, through the API or on the chat link"
+          },
           "input": {
             "anyOf": [
               {
@@ -6572,6 +6733,7 @@
           "tool_call_count",
           "metadata_count",
           "labels",
+          "source",
           "created_at"
         ],
         "title": "TraceSummary"
@@ -10537,6 +10699,51 @@
             "description": "Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date"
           },
           {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "api",
+                    "chat"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces from this source:\n\n- `api`: sent to `POST /traces`\n- `chat`: a reply the agent gave on its chat link",
+              "title": "Source"
+            },
+            "description": "Return only traces from this source:\n\n- `api`: sent to `POST /traces`\n- `chat`: a reply the agent gave on its chat link"
+          },
+          {
+            "name": "feedback",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "correct",
+                    "wrong",
+                    "any"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces with this feedback:\n\n- `correct`: marked correct\n- `wrong`: marked wrong\n- `any`: marked either way",
+              "title": "Feedback"
+            },
+            "description": "Return only traces with this feedback:\n\n- `correct`: marked correct\n- `wrong`: marked wrong\n- `any`: marked either way"
+          },
+          {
             "name": "sort_by_evaluator",
             "in": "query",
             "required": false,
@@ -10629,6 +10836,69 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TraceListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/traces/{trace_uuid}/feedback": {
+      "put": {
+        "tags": [
+          "traces"
+        ],
+        "summary": "Set trace feedback",
+        "description": "Set whether the agent's output on a trace was correct, replacing any earlier feedback, or clear it",
+        "operationId": "set_trace_feedback_endpoint_traces__trace_uuid__feedback_put",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trace_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The trace to give feedback on",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Trace Uuid"
+            },
+            "description": "The trace to give feedback on"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TraceFeedbackUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceFeedbackResponse"
                 }
               }
             }
