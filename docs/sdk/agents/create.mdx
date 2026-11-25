@@ -19,7 +19,7 @@ client.agents.create(
     type="agent",
     config={
         "system_prompt": "You are a helpful assistant.",
-        "llm": {"model": "google/gemini-2.5-flash"},
+        "llm": {"model": "google/gemini-3.5-flash-lite"},
         "stt": {"provider": "google"},
         "tts": {"provider": "google"},
         "settings": {"agent_speaks_first": True, "max_assistant_turns": 50}
@@ -40,7 +40,7 @@ client.agents.create(
     config={
         "system_prompt": "You are a helpful assistant.",
         "llm": {
-            "model": "google/gemini-2.5-flash"
+            "model": "google/gemini-3.5-flash-lite"
         },
         "stt": {
             "provider": "google"

@@ -18,9 +18,9 @@ from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 from calibrate_agent.utils import log_judge_io
 from calibrate_agent.stt.sarvam_intent_entity.main import IntentEntityResponse, build_prompt
 
-# Model used to grade intent/entity. Matches Sarvam's llm_intent_entity flow,
-# which judges with google/gemini-2.5-flash (reached here via OpenRouter).
-DEFAULT_INTENT_ENTITY_MODEL = "google/gemini-2.5-flash"
+# Model used to grade intent/entity. Sarvam's llm_intent_entity flow judges
+# with google/gemini-2.5-flash, which is retired, so this uses its successor.
+DEFAULT_INTENT_ENTITY_MODEL = "google/gemini-3.5-flash-lite"
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)
