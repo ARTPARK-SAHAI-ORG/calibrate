@@ -9,6 +9,7 @@ from typing import List, Optional
 from calibrate_agent.judges import (
     text_judge,
     simulation_judge,
+    tool_call_judge,
     DEFAULT_TEXT_JUDGE_MODEL,
     DEFAULT_SIMULATION_JUDGE_MODEL,
 )
@@ -54,6 +55,27 @@ async def test_response_llm_judge(
     return await text_judge(
         evaluators=evaluators,
         user_prompt=user_prompt,
+        fallback_model=fallback_model,
+    )
+
+
+@observe(name="llm_test_tool_call_judge", capture_input=False)
+async def test_tool_call_llm_judge(
+    conversation: List[dict],
+    response: Optional[str],
+    tool_calls: Optional[list],
+    evaluators: List[dict],
+    expected_tool_calls: Optional[list] = None,
+    fallback_model: str = DEFAULT_JUDGE_MODEL,
+) -> dict:
+    """Judge the tool calls an agent made (and its reply, if any) against
+    pre-rendered evaluators. Same result shape as :func:`test_response_llm_judge`."""
+    return await tool_call_judge(
+        conversation,
+        response,
+        tool_calls,
+        evaluators,
+        expected_tool_calls,
         fallback_model=fallback_model,
     )
 

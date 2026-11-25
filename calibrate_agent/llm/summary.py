@@ -15,7 +15,7 @@ DEFAULT_LLM_TEST_EVALUATOR_NAME = "correctness"
 
 # Test case types graded by the evaluators named in ``evaluation.criteria``;
 # ``tool_call`` cases are graded against an expected tool-call list instead.
-EVALUATOR_TEST_TYPES = ("response", "conversation", "general")
+EVALUATOR_TEST_TYPES = ("response", "conversation", "general", "tool_call_judge")
 
 
 def wilson_interval(passed: int, total: int) -> Optional[dict]:

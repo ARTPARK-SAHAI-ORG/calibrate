@@ -61,11 +61,13 @@ follow this process before writing code:
 
 ```
 calibrate_agent/                 # Python package (the importable library + CLI)
+├── chat.py                # agent_reply — one agent reply from a chat model, running its tool calls
 ├── cli.py                 # Top-level CLI entry — wires subcommands to UI/SDK
 ├── connections.py         # TextAgentConnection — HTTP client for external agents
 ├── judges.py              # text_judge / audio_judge / simulation_judge — LLM-as-judge core
 ├── langfuse.py            # Optional Langfuse tracing wrappers (@observe)
 ├── status.py              # Run-status reporting helpers
+├── tools.py               # Tool specs, webhook calls, filling missing tool results (no pipecat)
 ├── utils.py               # Provider language code maps, logging, validation
 ├── stt/
 │   ├── eval.py            # Per-provider transcribe_* + transcribe_audio router
@@ -96,7 +98,7 @@ tests/                     # Test suite — mirrors the calibrate_agent/ structu
 ├── llm/        test_benchmark.py, test_run_tests.py, test_run_simulation.py,
 │               test_run_simulation_integration.py, test_output.py,
 │               test_tests_leaderboard.py
-├── test_connections.py, test_cli.py, test_judges.py,
+├── test_connections.py, test_cli.py, test_judges.py, test_tools.py, test_chat.py,
 │   test_sdk_judge_regressions.py
 
 ui/                        # Ink (React + TypeScript) terminal UI
@@ -113,6 +115,13 @@ examples/                  # Example datasets + scripts users can run
 ## Conventions in this codebase
 
 ### Docs (Mintlify) writing style
+**`DOCS_STYLE.md` at the repo root holds the writing rules. Read it before
+editing any page under `docs/`.** Two checks enforce it on the lines a change
+adds: `scripts/check_docs_style.py` blocks the commit on em-dashes and a list of
+banned phrases, and a Claude review judges the rest, printing at commit time and
+failing the **Docs style** check on a pull request
+(`.github/workflows/docs-style.yml`).
+
 The docs under `docs/` use **sentence case** for all headings (`##`/`###`),
 `Card`/`Step` titles, and frontmatter `title` fields — capitalize only the first
 word, e.g. `## Next steps`, `## Get started`, `### Launch run`. Do **not** use
@@ -289,12 +298,10 @@ per-provider params still need manual mirroring.)
 and voice in `create_*_service` matches the shared source for every language. If
 you add a provider or change a default, update both sides
 and that test. **Sarvam STT** uses `saaras:v3` with `mode="transcribe"` (passed
-to pipecat's `SarvamSTTService`), which under pipecat 1.0.0 routes to the plain
-STT streaming endpoint — matching the benchmark's `transcribe_sarvam`. This was
-impossible under pipecat 0.0.98 (its wrapper forced `saaras` onto the *translate*
-endpoint with no `mode` param), so Sarvam STT was excluded there; the 1.0.0
-upgrade removed that limitation and it's now single-sourced like every other
-provider. Sarvam **TTS** is likewise in `TTS_PROVIDER_MODELS` (`bulbul:v3`).
+to pipecat's `SarvamSTTService`), which routes to the plain STT streaming
+endpoint — matching the benchmark's `transcribe_sarvam` — and is single-sourced
+like every other provider. Sarvam **TTS** is likewise in `TTS_PROVIDER_MODELS`
+(`bulbul:v3`).
 
 ### Resumability
 `run_stt_eval` / `run_tts_eval` write `results.csv` row-by-row and skip already
@@ -320,6 +327,20 @@ it always streams.
 per-provider `logs` file under the output dir. Set `to_terminal=False` to
 suppress stdout. The active log file is held in a `contextvars.ContextVar`
 (`provider_log_file`) so concurrent benchmarks don't cross-write.
+
+### Tools and `agent_reply`
+`calibrate_agent/tools.py` holds the pipecat-free tool code: `build_tool_specs`
+(OpenAI-style function specs plus webhook configs), `make_webhook_call` (logs
+header names, never their values, since headers can hold keys) and
+`fill_missing_tool_results`. `utils.py` re-exports `make_webhook_call` and
+`_build_param_property`, and its `build_tools_schema` wraps `build_tool_specs`
+into pipecat `FunctionSchema`s; `llm/run_tests.py` keeps
+`preprocess_conversation_history` as a name for `fill_missing_tool_results`.
+
+`calibrate_agent/chat.py` (`agent_reply`) imports only the standard library,
+`openai` and `tools.py`, so a server can call it without loading pipecat or
+numpy. It never reads `os.environ`: the API key is always passed in.
+`tests/test_chat.py` checks the import stays light.
 
 ### Langfuse
 All judge / transcribe / synthesize functions are decorated with `@observe`.
@@ -386,16 +407,18 @@ The `ARTPARK-SAHAI-ORG/calibrate-frontend` prefix is required: a bare
 
 ### Git hooks
 `.githooks/pre-commit` runs `uv run --extra dev pytest tests/` **only when
-HEAD is on `main`**. Other branches commit instantly. Activated per-clone
-with `git config core.hooksPath .githooks` (also in the README).
+HEAD is on `main`** and the staged changes include `.py` or `.json` files
+outside `docs/`. Other branches commit instantly. Activated per-clone with
+`git config core.hooksPath .githooks` (also in the README).
 
 ### CI
 - **`.github/workflows/tests.yml`** — runs on push to `main` and on every PR
-  targeting `main`. Installs `libasound2-dev` (needed for `simpleaudio`),
+  targeting `main`, except when every changed file is under `docs/`. No test
+  reads the `docs/` folder. Installs `libasound2-dev` (needed for `simpleaudio`),
   syncs `--extra dev`, runs pytest with coverage, uploads to Codecov, and
   emails `aman.dalmia@artpark.in` on failure via `dawidd6/action-send-mail`.
-- **`.github/workflows/publish.yml`** — release-triggered. Has a `test` job
-  that `build` `needs:` — if tests fail, the PyPI publish is blocked.
+- **`.github/workflows/publish.yml`** — release-triggered. Builds the sdist
+  and wheel, then publishes them. It runs no tests of its own.
 - Secrets required: `MAIL_SERVER`, `MAIL_PORT`, `MAIL_USERNAME`,
   `MAIL_PASSWORD` (SMTP for failure emails) and `CODECOV_TOKEN`.
 
@@ -424,8 +447,8 @@ For any function block you add or modify:
    is genuinely untestable (e.g. a CLI flag wired through to a third-party
    SDK), say so explicitly in the response rather than implying coverage.
 
-This is not optional — every PR is gated by the test suite in CI and by the
-pre-commit hook on `main`.
+This is not optional — every PR that changes files outside `docs/` is gated by
+the test suite in CI and by the pre-commit hook on `main`.
 
 ### When the user asks "how do I test this?"
 
@@ -470,8 +493,17 @@ one line, but still give the exact command.
   `tests/`.
 - The `out/` folder appears inside several module dirs (e.g. `calibrate_agent/stt/out`).
   These are gitignored runtime artifacts from local runs — don't commit them.
-- `pipecat-ai` is pinned to `1.0.0` because the API surface changes between
-  versions; bump deliberately and re-test the agent simulation paths.
+- `pipecat-ai` is pinned to `1.11.0` because the API surface changes between
+  versions; bump deliberately and re-test the agent simulation paths. Its
+  `runner` extra installs `pipecat-ai-prebuilt`, the browser UI the development
+  runner serves at `/client` for `calibrate_agent/agent/test.py`.
+- `openai` is capped at `<3`: openai 3 switches to `httpx2` and verifies TLS
+  against the OS trust store, which breaks in slim containers and behind
+  TLS-inspecting proxies. Lift the cap only when a feature needs it.
+- The RTVI `bot-output` parser in `agent/run_simulation.py` reads both RTVI
+  protocol formats: 1.x (`spoken: true` per word) and 2.x (`spoken_status` /
+  `spoken_progress`). Which one arrives depends on the pipecat version of the
+  agent under test, not ours.
 
 ## Useful pointers when debugging
 

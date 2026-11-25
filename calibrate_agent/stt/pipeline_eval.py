@@ -36,8 +36,8 @@ from pipecat.frames.frames import (
 from pipecat.metrics.metrics import TTFBMetricsData
 from pipecat.observers.base_observer import BaseObserver, FramePushed
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.transports.base_input import BaseInputTransport
 from pipecat.transports.base_transport import TransportParams
 from pipecat.processors.audio.vad_processor import VADProcessor
@@ -259,7 +259,7 @@ async def transcribe_via_pipeline(
     collector = _STTOutputCollector(transcription_received)
 
     pipeline = Pipeline([transport, vad, stt_service])
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -268,8 +268,9 @@ async def transcribe_via_pipeline(
         ),
         observers=[collector],
     )
-    runner = PipelineRunner(handle_sigint=False)
-    run_task = asyncio.create_task(runner.run(task))
+    runner = WorkerRunner(handle_sigint=False)
+    await runner.add_workers(task)
+    run_task = asyncio.create_task(runner.run())
 
     try:
         # Wait for the real audio to finish streaming, then for a transcript

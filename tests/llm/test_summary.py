@@ -261,12 +261,22 @@ class TestAggregateJudgeScores(unittest.TestCase):
             {"ok": {"match": False}, "flu": {"score": 2}},
         ]
         out = aggregate_judge_scores(evaluators, rows)
-        self.assertEqual(out["scores"]["ok"], {"type": "binary", "mean": 0.5})
+        self.assertEqual(out["scores"]["ok"], {"type": "binary", "mean": 0.5, "count": 2})
         self.assertEqual(
             out["scores"]["flu"],
-            {"type": "rating", "mean": 3.0, "scale_min": 1, "scale_max": 5},
+            {"type": "rating", "mean": 3.0, "count": 2, "scale_min": 1, "scale_max": 5},
         )
         self.assertEqual(out["score"], 1.75)
+
+    def test_counts_only_rows_an_evaluator_ran_on(self):
+        import math
+
+        from calibrate_agent.judges import aggregate_judge_scores
+
+        evaluators = [{"name": "ok", "type": "binary"}, {"name": "never", "type": "binary"}]
+        out = aggregate_judge_scores(evaluators, [{"ok": {"match": True}}, {}])
+        self.assertEqual(out["scores"], {"ok": {"type": "binary", "mean": 1.0, "count": 1}})
+        self.assertTrue(math.isnan(aggregate_judge_scores(evaluators, [{}])["score"]))
 
 
 if __name__ == "__main__":

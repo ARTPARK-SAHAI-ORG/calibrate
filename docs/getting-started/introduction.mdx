@@ -3,7 +3,7 @@ title: "Introduction"
 description: "Learn about Calibrate and how to get started."
 ---
 
-[Calibrate](https://calibrate.artpark.ai) is an open-source evaluation platform for AI agents — text or voice.
+[Calibrate](https://calibrate.artpark.ai) is an open-source evaluation platform for AI agents, text or voice.
 
 <iframe
   className="w-full aspect-video rounded-xl"
@@ -22,7 +22,7 @@ Testing AI agents manually is slow, inconsistent, and doesn't scale. Every agent
 
 It can be hard to even define what "the right response" means.
 
-If you're building a **voice agent**, there are further challenges on top:
+If you're building a voice agent, there are further challenges on top:
 
 - Transcribing the user's speech accurately and efficiently
 - Producing natural-sounding speech back to the user
@@ -39,7 +39,7 @@ Calibrate solves this by letting you evaluate the whole agent, whichever pieces 
 
 - `Text agents (LLMs)`: Evaluate the response quality and tool calling of your LLMs for multi-turn conversations, define custom evaluators, and find the best LLM for your agent
 - `Voice agents (STT & TTS)`: Benchmark speech-to-text and text-to-speech providers (Google, Sarvam, ElevenLabs and more) on your dataset across 10+ indic languages, using metrics optimised for agentic use cases
-- `Simulations`: Simulate realistic conversations using user personas and scenarios to surface failure modes — including interruptions — before you deploy
+- `Simulations`: Simulate realistic conversations using user personas and scenarios to find where your agent fails, including when it is interrupted, before you deploy
 - `Human alignment`: Collect human labels and iteratively align your LLM judges to them, so you can automate monitoring reliably
 
 Calibrate helps you continuously improve your agent, ensure a bug never repeats itself, and deploy with confidence.
@@ -47,35 +47,36 @@ Calibrate helps you continuously improve your agent, ensure a bug never repeats 
 ## Get started
 
 <CardGroup cols={2}>
-  <Card title="LLM tests" icon="brain" href="/quickstart/text-to-text">
-    Create test suites that verify model responses and tool calling behavior
+  <Card title="Create your account" icon="user-plus" href="/getting-started/create-account">
+    Sign up, confirm your email and join your team's workspace
   </Card>
-  <Card title="Simulations" icon="comments" href="/quickstart/simulations">
-    Simulate agent conversations with customizable personas and scenarios
+  <Card title="Product tour" icon="compass" href="/reference/product-tour">
+    Let the app walk you through your first test
   </Card>
-  <Card
-    title="Speech to Text"
-    icon="microphone"
-    href="/quickstart/speech-to-text"
-  >
-    Compare transcription accuracy across multiple providers on your dataset
+  <Card title="Quickstart" icon="play" href="/getting-started/quickstart">
+    Create a maths tutor agent, add one test, run it and read the result
   </Card>
-  <Card
-    title="Text to Speech"
-    icon="volume-high"
-    href="/quickstart/text-to-speech"
-  >
-    Benchmark generated audio quality across multiple providers
+  <Card title="Agents" icon="robot" href="/app/agents/overview">
+    Build or connect an agent, write tests for it and compare models
+  </Card>
+  <Card title="Simulations" icon="comments" href="/app/simulations/overview">
+    Run full conversations between your agent and simulated users
+  </Card>
+  <Card title="Human alignment" icon="users" href="/app/human-alignment/overview">
+    Check that your evaluators agree with the people who know the subject
+  </Card>
+  <Card title="Speech-to-text" icon="microphone" href="/quickstart/speech-to-text">
+    Compare how accurately providers turn your audio into text
+  </Card>
+  <Card title="Text-to-speech" icon="volume-high" href="/quickstart/text-to-speech">
+    Compare how well providers turn your text into speech
   </Card>
 </CardGroup>
 
 ## Learn more
 
 <CardGroup cols={2}>
-  <Card title="Core Concepts" icon="book" href="/core-concepts/speech-to-text">
-    Understand how Calibrate helps you evaluate effectively
-  </Card>
-  <Card title="Agents" icon="robot" href="/agents/overview">
+  <Card title="AI coding agents" icon="robot" href="/agents/overview">
     Give your AI coding agent the skills to evaluate on Calibrate
   </Card>
   <Card title="CLI" icon="terminal" href="/cli/calibrate/overview">
@@ -85,7 +86,7 @@ Calibrate helps you continuously improve your agent, ensure a bug never repeats 
     Script agents, tests, runs, and benchmarks from Python
   </Card>
   <Card title="MCP" icon="server" href="/mcp/overview">
-    Give your coding agent native Calibrate tools over MCP
+    Give your coding agent Calibrate tools over MCP
   </Card>
   <Card title="Integrations" icon="plug" href="/integrations/stt">
     See all supported providers for different components

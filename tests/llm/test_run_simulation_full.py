@@ -20,7 +20,9 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
 
         # Mock runner so it just completes
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
+        bot_worker, user_worker = MagicMock(), MagicMock()
 
         # Mock the bot context get_messages and access
         fake_bot_context = MagicMock()
@@ -34,8 +36,8 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(RS, "OpenAILLMService", side_effect=[fake_bot_llm, fake_user_llm]), \
              patch.object(RS, "OpenRouterLLMService"), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
+             patch.object(RS, "PipelineWorker", side_effect=[bot_worker, user_worker]), \
+             patch.object(RS, "WorkerRunner", return_value=fake_runner), \
              patch.object(RS, "Pipeline"), \
              patch.object(RS, "LLMContext", return_value=fake_bot_context), \
              patch.object(RS, "LLMContextAggregatorPair"), \
@@ -53,6 +55,15 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
             )
         self.assertIn("transcript", result)
         self.assertIn("evaluation_results", result)
+        # Both runners are the same mock, so each worker is registered once
+        # and run() is called once per runner, with no worker argument.
+        self.assertEqual(
+            [c.args for c in fake_runner.add_workers.await_args_list],
+            [(bot_worker,), (user_worker,)],
+        )
+        self.assertEqual(
+            [c.args for c in fake_runner.run.await_args_list], [(), ()]
+        )
 
     async def test_with_openrouter_provider(self):
         from calibrate_agent.llm import run_simulation as RS
@@ -60,6 +71,7 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
         fake_context = MagicMock()
         fake_context._messages = [{"role": "system", "content": "sp"}]
@@ -68,8 +80,8 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(RS, "OpenAILLMService"), \
              patch.object(RS, "OpenRouterLLMService", return_value=fake_llm), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
+             patch.object(RS, "PipelineWorker"), \
+             patch.object(RS, "WorkerRunner", return_value=fake_runner), \
              patch.object(RS, "Pipeline"), \
              patch.object(RS, "LLMContext", return_value=fake_context), \
              patch.object(RS, "LLMContextAggregatorPair"), \
@@ -92,6 +104,7 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
         fake_llm = MagicMock()
         fake_llm.register_function = MagicMock()
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(side_effect=RuntimeError("pipeline fail"))
         fake_context = MagicMock()
         fake_context._messages = []
@@ -99,8 +112,8 @@ class TestRunSimulationFullFlow(unittest.IsolatedAsyncioTestCase):
 
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(RS, "OpenRouterLLMService", return_value=fake_llm), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
+             patch.object(RS, "PipelineWorker"), \
+             patch.object(RS, "WorkerRunner", return_value=fake_runner), \
              patch.object(RS, "Pipeline"), \
              patch.object(RS, "LLMContext", return_value=fake_context), \
              patch.object(RS, "LLMContextAggregatorPair"):

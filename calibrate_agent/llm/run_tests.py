@@ -21,11 +21,11 @@ from calibrate_agent.utils import (
     provider_log_file,
     apply_debug_limit,
 )
+from calibrate_agent.tools import get_webhook_tool_names, fill_missing_tool_results  # noqa: F401
 from pipecat.frames.frames import (
     TranscriptionFrame,
     LLMRunFrame,
     EndFrame,
-    EndTaskFrame,
     LLMFullResponseEndFrame,
     CancelFrame,
     FunctionCallResultProperties,
@@ -39,8 +39,8 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.services.llm_service import FunctionCallParams
 from pipecat.adapters.schemas.tools_schema import ToolsSchema
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.frame_processor import FrameProcessor, FrameDirection
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
@@ -49,7 +49,11 @@ from pipecat.processors.aggregators.llm_response_universal import (
 from pipecat.services.openai.llm import OpenAILLMService
 from pipecat.services.openrouter.llm import OpenRouterLLMService
 from pipecat.observers.loggers.llm_log_observer import LLMLogObserver
-from calibrate_agent.llm.metrics import test_response_llm_judge, evaluate_simuation
+from calibrate_agent.llm.metrics import (
+    test_response_llm_judge,
+    test_tool_call_llm_judge,
+    evaluate_simuation,
+)
 from calibrate_agent.general.metrics import general_judge
 from calibrate_agent.llm._metrics_utils import _numeric_or_none, _latency_percentiles
 from calibrate_agent.llm.summary import (
@@ -83,22 +87,25 @@ def test_case_history(test_case: dict) -> List[dict]:
     """Return the messages to send to the agent for ``test_case``.
 
     A ``general`` test case is single-shot: it carries a plain ``input`` string
-    and no conversation, so its one user message is built here. Every other kind
-    carries its own ``history``.
+    and no conversation, so its one user message is built here. A
+    ``tool_call_judge`` test case may carry either ``input`` or ``history``.
+    Every other kind carries its own ``history``.
     """
-    evaluation = test_case.get("evaluation") or {}
-    if evaluation.get("type") != "general":
+    ev_type = (test_case.get("evaluation") or {}).get("type")
+    if ev_type != "general" and not (
+        ev_type == "tool_call_judge" and "input" in test_case
+    ):
         return test_case["history"]
 
     if "history" in test_case:
         raise ValueError(
-            "A 'general' test case is single-shot: it takes a plain 'input' "
+            f"A '{ev_type}' test case is single-shot: it takes a plain 'input' "
             "string and must not carry a 'history'."
         )
     input_text = test_case.get("input")
     if not isinstance(input_text, str) or not input_text.strip():
         raise ValueError(
-            "A 'general' test case requires a non-empty 'input' string "
+            f"A '{ev_type}' test case requires a non-empty 'input' string "
             f"(got: {input_text!r})."
         )
     return [{"role": "user", "content": input_text}]
@@ -161,18 +168,36 @@ def _evaluators_for_config_output(config: dict) -> list[dict]:
     )
 
 
+def _tool_calls_error(tool_calls, field: str) -> Optional[str]:
+    """Describe what is wrong with an optional list of tool-call objects."""
+    if tool_calls is None:
+        return None
+    if not isinstance(tool_calls, list):
+        return f"'{field}' must be a list"
+    if not all(isinstance(tc, dict) for tc in tool_calls):
+        return f"'{field}' entries must be objects"
+    return None
+
+
 def _resolve_evaluators_for_test_case(
     evaluation: dict, name_to_evaluator: dict
 ) -> list[dict]:
     """Resolve a test case's ``evaluation.criteria`` to rendered evaluator dicts."""
     criteria = evaluation.get("criteria")
-    if evaluation.get("type") == "general" and isinstance(criteria, str):
+    ev_type = evaluation.get("type")
+    if ev_type in ("general", "tool_call_judge") and isinstance(criteria, str):
         raise ValueError(
-            "A 'general' test case must list its evaluators by name, e.g. "
+            f"A '{ev_type}' test case must list its evaluators by name, e.g. "
             '"criteria": [{"name": "helpful"}]. A plain criteria string selects '
             f"the built-in '{DEFAULT_LLM_TEST_EVALUATOR['name']}' evaluator, "
-            "which general test cases do not use."
+            f"which {ev_type} test cases do not use."
         )
+    if ev_type == "tool_call_judge":
+        error = _tool_calls_error(
+            evaluation.get("expected_tool_calls"), "evaluation.expected_tool_calls"
+        )
+        if error:
+            raise ValueError(f"A 'tool_call_judge' test case's {error}")
     refs = _normalize_criteria_refs(criteria)
     ensure_known_evaluator_names(
         [ref["name"] for ref in refs], name_to_evaluator, context="test case criteria"
@@ -198,7 +223,7 @@ class Processor(FrameProcessor):
         self._chat_history = chat_history
         self._total_tokens: Optional[int] = None
 
-    def set_task(self, task: "PipelineTask"):
+    def set_task(self, task: "PipelineWorker"):
         """Set the task reference after task creation."""
         self._task = task
 
@@ -630,7 +655,7 @@ async def _run_inference_inner(
         ]
     )
 
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -643,10 +668,11 @@ async def _run_inference_inner(
     # Set task reference for text_input processor
     processor.set_task(task)
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
 
     try:
-        await runner.run(task)
+        await runner.add_workers(task)
+        await runner.run()
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
         raise
@@ -663,77 +689,7 @@ def sort_tool_calls(tool_calls):
     return sorted(tool_calls, key=lambda val: val["tool"])
 
 
-def get_webhook_tool_names(tools: List[dict]) -> set:
-    """
-    Extract names of webhook tools from the tools configuration.
-
-    Args:
-        tools: List of tool definition dicts
-
-    Returns:
-        Set of webhook tool names
-    """
-    return {tool["name"] for tool in tools if tool.get("type") == "webhook"}
-
-
-def preprocess_conversation_history(
-    chat_history: List[dict], tools: List[dict]
-) -> List[dict]:
-    """
-    Preprocess conversation history to add tool responses for non-webhook tools.
-
-    For non-webhook tools that have tool calls but no corresponding tool response,
-    this function inserts a default tool response with {"status": "received"}.
-
-    If a non-webhook tool already has a tool response in the conversation, it is
-    left in place and no injection occurs for that tool call.
-
-    Args:
-        chat_history: The conversation history to preprocess
-        tools: List of tool definition dicts
-
-    Returns:
-        Preprocessed conversation history with tool responses inserted
-    """
-    webhook_tool_names = get_webhook_tool_names(tools)
-
-    # Build a set of existing tool response IDs
-    existing_tool_response_ids = set()
-    for message in chat_history:
-        if message.get("role") == "tool" and "tool_call_id" in message:
-            existing_tool_response_ids.add(message["tool_call_id"])
-
-    # Process conversation history and collect tool calls that need responses
-    processed_history = []
-    for message in chat_history:
-        processed_history.append(message)
-
-        # Check for assistant messages with tool calls
-        if message.get("role") == "assistant" and "tool_calls" in message:
-            for tool_call in message["tool_calls"]:
-                tool_call_id = tool_call.get("id")
-                tool_name = tool_call.get("function", {}).get("name")
-
-                # Skip webhook tools - they handle their own responses
-                if tool_name in webhook_tool_names:
-                    continue
-
-                if tool_call_id in existing_tool_response_ids:
-                    continue
-
-                # Insert a default tool response for non-webhook tools
-                tool_response = {
-                    "role": "tool",
-                    "content": '{"status": "received"}',
-                    "tool_call_id": tool_call_id,
-                }
-                processed_history.append(tool_response)
-                logger.info(
-                    f"Inserted tool response for structured output tool '{tool_name}' "
-                    f"(tool_call_id: {tool_call_id})"
-                )
-
-    return processed_history
+preprocess_conversation_history = fill_missing_tool_results
 
 
 def _sorted_union_dict_keys(left: dict, right: dict) -> List[Any]:
@@ -1481,10 +1437,7 @@ async def _evaluate_conversation(
         return _no_response_metrics(evaluators, no_response_reasoning_no_tool_calls)
     turn: dict = {"role": "assistant", "content": response or ""}
     if tool_calls:
-        turn["tool_calls"] = [
-            {"function": {"name": tc.get("tool"), "arguments": tc.get("arguments")}}
-            for tc in tool_calls
-        ]
+        turn["tool_calls"] = tool_calls
     result = await evaluate_simuation(
         conversation=list(chat_history) + [turn],
         evaluators=evaluators,
@@ -1557,6 +1510,15 @@ async def evaluate_test_case_output(
                 no_response_reasoning_no_tool_calls or "No reply was returned"
             ),
         )
+    if evaluation["type"] == "tool_call_judge":
+        result = await test_tool_call_llm_judge(
+            conversation=chat_history,
+            response=output.get("response"),
+            tool_calls=output.get("tool_calls"),
+            evaluators=evaluators or [],
+            expected_tool_calls=evaluation.get("expected_tool_calls"),
+        )
+        return _metrics_from_judge_results(evaluators or [], result)
     if evaluation["type"] == "tool_call":
         return await evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":
@@ -2213,7 +2175,35 @@ def validate_llm_eval_only_dataset(
                 f"{', '.join(repr(t) for t in TEST_TYPES)} (got {ev_type!r})",
             )
 
-        if ev_type == "general":
+        if ev_type == "tool_call_judge":
+            if "input" not in tc and "history" not in tc:
+                return (
+                    False,
+                    f"Item {i}: 'test_case' needs either 'history' (list) or 'input' (str)",
+                )
+            if "history" in tc and not isinstance(tc["history"], list):
+                return False, f"Item {i}: 'test_case.history' must be a list"
+            try:
+                test_case_history(tc)
+            except ValueError as exc:
+                return False, f"Item {i}: {exc}"
+            criteria = tc["evaluation"].get("criteria")
+            if not isinstance(criteria, list) or not criteria:
+                return (
+                    False,
+                    f"Item {i}: 'test_case.evaluation.criteria' must be a non-empty list",
+                )
+            if not isinstance(out.get("tool_calls"), list):
+                return False, f"Item {i}: 'output.tool_calls' must be a list"
+            for value, field in (
+                (tc["evaluation"].get("expected_tool_calls"),
+                 "test_case.evaluation.expected_tool_calls"),
+                (out["tool_calls"], "output.tool_calls"),
+            ):
+                error = _tool_calls_error(value, field)
+                if error:
+                    return False, f"Item {i}: {error}"
+        elif ev_type == "general":
             try:
                 test_case_history(tc)
             except ValueError as exc:
@@ -2292,12 +2282,14 @@ async def run_eval_only_tests(
             else None
         )
 
-        preprocessed_history = preprocess_conversation_history(
-            test_case_history(test_case), tools
-        )
+        # A tool_call_judge item is judged on the history as recorded: no model
+        # saw the placeholder results preprocessing would add.
+        history = test_case_history(test_case)
+        if evaluation.get("type") != "tool_call_judge":
+            history = preprocess_conversation_history(history, tools)
         output = item["output"]
         metrics = await evaluate_test_case_output(
-            chat_history=preprocessed_history,
+            chat_history=history,
             evaluation=evaluation,
             output=output,
             evaluators=resolved_evaluators,

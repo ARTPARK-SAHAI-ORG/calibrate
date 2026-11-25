@@ -50,7 +50,7 @@
                 "type": "null"
               }
             ],
-            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nFor `type=agent`, omitted keys inherit managed defaults. Omit `config` entirely to use all defaults. For `type=connection`, `config` is stored as-is and must contain `agent_url`"
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-3.5-flash-lite`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nFor `type=agent`, omitted keys inherit managed defaults. Omit `config` entirely to use all defaults. For `type=connection`, `config` is stored as-is and must contain `agent_url`"
           }
         },
         "type": "object",
@@ -595,7 +595,7 @@
                 "type": "null"
               }
             ],
-            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-2.5-flash`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nReplaces the stored config. Omit to leave unchanged\n\nFor `type=connection`, changing `agent_url` or `agent_headers` resets the connection and benchmark verification flags"
+            "description": "Agent behavioral config. The keys depend on `type`.\n\n**`type=agent`**, built inside Calibrate:\n- `system_prompt`: the agent's instructions\n- `llm.model`: `provider/model`, e.g. `openai/gpt-4.1` or `google/gemini-3.5-flash-lite`\n- `stt.provider`: `deepgram`, `openai`, `cartesia`, `elevenlabs`, `google`, `sarvam`, or `smallest`\n- `tts.provider`: `cartesia`, `openai`, `google`, `elevenlabs`, `sarvam`, or `smallest`\n- `settings.agent_speaks_first`, `settings.max_assistant_turns`\n- `system_tools.end_call`: let the agent end the call\n- `data_extraction_fields`: `[{name, type, description, required}]`\n\n```json\n{\n  \"system_prompt\": \"You are a helpful support agent.\",\n  \"llm\": {\"model\": \"openai/gpt-4.1\"},\n  \"stt\": {\"provider\": \"deepgram\"},\n  \"tts\": {\"provider\": \"elevenlabs\"},\n  \"settings\": {\"agent_speaks_first\": true, \"max_assistant_turns\": 50}\n}\n```\n\n**`type=connection`**, your own HTTP endpoint:\n- `agent_url`: public HTTP(S) endpoint your agent is called at\n- `agent_headers`: headers sent on each request, e.g. auth\n- `benchmark_provider`: `openrouter` by default. Other values: `openai`, `google`, `anthropic`, `meta-llama`, `mistralai`, `deepseek`, `x-ai`, `cohere`, `qwen`, or `ai21`\n\n```json\n{\n  \"agent_url\": \"https://api.example.com/agent\",\n  \"agent_headers\": {\"Authorization\": \"Bearer <token>\"},\n  \"benchmark_provider\": \"openrouter\"\n}\n```\n\n**Either type**:\n- `traces.scoring.enabled`: whether the traces you send for this agent are scored by its linked evaluators. On unless you set it to `false`. Turning it back on needs at least one linked evaluator that can score traces\n\n```json\n{\"traces\": {\"scoring\": {\"enabled\": false}}}\n```\n\nEvery request Calibrate makes to your endpoint carries the header\n`X-Calibrate-Eval: 1`. Read it to tell a test run from a real user, for example\nto tag the trace you send back or to skip sending one.\n\nReplaces the stored config. Omit to leave unchanged\n\nFor `type=connection`, changing `agent_url` or `agent_headers` resets the connection and benchmark verification flags"
           }
         },
         "type": "object",
@@ -1084,6 +1084,21 @@
             ],
             "title": "Pair Count",
             "description": "Number of comparable annotation pairs behind the current agreement score"
+          },
+          "kappa_by_kind": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KappaOfAnswerKind"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa By Kind",
+            "description": "Agreement with the other annotators and its kappa, one entry for each kind of answer compared, binary answers first. The kinds are never combined into one kappa"
           }
         },
         "type": "object",
@@ -1112,6 +1127,46 @@
         },
         "type": "object",
         "title": "AnnotatorUpdate"
+      },
+      "AnswerSummary": {
+        "properties": {
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "How many answers there are"
+          },
+          "true_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "True Count",
+            "description": "How many pass/fail answers are a pass"
+          },
+          "mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean",
+            "description": "Mean of the rating answers"
+          }
+        },
+        "type": "object",
+        "required": [
+          "count",
+          "true_count",
+          "mean"
+        ],
+        "title": "AnswerSummary"
       },
       "BatchRunRequest": {
         "properties": {
@@ -1464,6 +1519,27 @@
           "status"
         ],
         "title": "BenchmarkStatusResponse"
+      },
+      "Body_upload_stt_item_datasets__dataset_id__items_upload_post": {
+        "properties": {
+          "audio": {
+            "type": "string",
+            "format": "binary",
+            "title": "Audio",
+            "description": "WAV file of the spoken audio, at most 25 MB and 10 minutes long"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Ground-truth transcript of the audio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "audio",
+          "text"
+        ],
+        "title": "Body_upload_stt_item_datasets__dataset_id__items_upload_post"
       },
       "BulkCreateItemsResponse": {
         "properties": {
@@ -2022,6 +2098,30 @@
             "title": "Reasoning Mode",
             "description": "How the labelling form treats the reasoning box on each judgement. `optional` shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out",
             "default": "optional"
+          },
+          "evaluator_reasoning_modes": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string",
+                  "enum": [
+                    "optional",
+                    "required",
+                    "hidden"
+                  ]
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Map of evaluator ID to how the labelling form treats the reasoning box for that evaluator, with the same values as `reasoning_mode`. Every ID must be an evaluator on these jobs, otherwise you get a 400. An evaluator left out uses `reasoning_mode`",
+            "examples": [
+              {
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479": "required"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2052,6 +2152,368 @@
           "count"
         ],
         "title": "CreateJobsResponse"
+      },
+      "CurrentWorkspaceResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Workspace ID. Put this at the front of a Calibrate web address to link straight to something in this workspace, as in `/<uuid>/tests`",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Workspace display name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name"
+        ],
+        "title": "CurrentWorkspaceResponse"
+      },
+      "DatasetCreateRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Dataset name, unique within the workspace"
+          },
+          "dataset_type": {
+            "type": "string",
+            "enum": [
+              "stt",
+              "tts"
+            ],
+            "title": "Dataset Type",
+            "description": "`stt` items carry audio + ground-truth text. `tts` items carry text only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "dataset_type"
+        ],
+        "title": "DatasetCreateRequest"
+      },
+      "DatasetDetailResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Dataset ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Dataset name"
+          },
+          "dataset_type": {
+            "type": "string",
+            "title": "Dataset Type",
+            "description": "Dataset type (`stt` or `tts`)"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "Number of items in the dataset"
+          },
+          "eval_count": {
+            "type": "integer",
+            "title": "Eval Count",
+            "description": "Number of evaluation jobs that used this dataset"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the dataset was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the dataset was last updated (ISO 8601 UTC)"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/DatasetItemResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "All items in the dataset, ordered by `order_index`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "dataset_type",
+          "item_count",
+          "eval_count",
+          "created_at",
+          "updated_at",
+          "items"
+        ],
+        "title": "DatasetDetailResponse"
+      },
+      "DatasetItemResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Dataset item ID",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "audio_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Path",
+            "description": "Presigned download URL for the item's audio"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Ground-truth transcript (STT) or synthesis text (TTS)"
+          },
+          "order_index": {
+            "type": "integer",
+            "title": "Order Index",
+            "description": "Position of the item within the dataset. The first item is 0"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the dataset item was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At",
+            "description": "When the dataset item was last updated (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "text",
+          "order_index",
+          "created_at"
+        ],
+        "title": "DatasetItemResponse"
+      },
+      "DatasetResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Dataset ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Dataset name"
+          },
+          "dataset_type": {
+            "type": "string",
+            "title": "Dataset Type",
+            "description": "Dataset type (`stt` or `tts`)"
+          },
+          "item_count": {
+            "type": "integer",
+            "title": "Item Count",
+            "description": "Number of items in the dataset"
+          },
+          "eval_count": {
+            "type": "integer",
+            "title": "Eval Count",
+            "description": "Number of evaluation jobs that used this dataset"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the dataset was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the dataset was last updated (ISO 8601 UTC)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "dataset_type",
+          "item_count",
+          "eval_count",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "DatasetResponse"
+      },
+      "EvaluatorAgreement": {
+        "properties": {
+          "kappa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa",
+            "description": "Agreement corrected for the agreement expected by chance, where 1 is perfect agreement, 0 is chance level, and below 0 is worse than chance"
+          },
+          "kappa_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "fleiss",
+                  "linear_weighted_fleiss",
+                  "cohen",
+                  "linear_weighted_cohen"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa Type",
+            "description": "The kind of kappa reported in `kappa`:\n\n- `fleiss`: Fleiss' kappa between three or more annotators\n- `linear_weighted_fleiss`: Fleiss' kappa between three or more annotators, giving partial credit to close ratings\n- `cohen`: Cohen's kappa between exactly two annotators, between a judge and the annotators, or between one annotator and the others\n- `linear_weighted_cohen`: Cohen's kappa between exactly two annotators, between a judge and the annotators, or between one annotator and the others, giving partial credit to close ratings\n"
+          },
+          "kappa_blank_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "too_few_items",
+                  "everyone_agreed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa Blank Reason",
+            "description": "Why `kappa` is blank when answers were compared:\n\n- `too_few_items`: every evaluator compared these answers on only one item, and one item cannot show the agreement expected by chance\n- `everyone_agreed`: every compared answer is the same, so agreement cannot be told apart from chance\n"
+          },
+          "chance_agreement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chance Agreement",
+            "description": "Agreement expected by chance alone, which `kappa` corrects for, on the same scale as the agreement"
+          },
+          "evaluator_id": {
+            "type": "string",
+            "title": "Evaluator Id",
+            "description": "ID of the evaluator",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name",
+            "description": "Name of the evaluator"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current",
+            "description": "Current mean agreement between this evaluator's judge and the annotators"
+          },
+          "pair_count": {
+            "type": "integer",
+            "title": "Pair Count",
+            "description": "How many judge and annotator pairs the current value averages over"
+          },
+          "inter_annotator": {
+            "$ref": "#/components/schemas/InterAnnotatorAgreement",
+            "description": "Agreement between annotators on this evaluator"
+          },
+          "result": {
+            "$ref": "#/components/schemas/AnswerSummary",
+            "description": "The evaluator's own scores on the task"
+          },
+          "human_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The annotators' answers for this evaluator"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kappa",
+          "kappa_type",
+          "kappa_blank_reason",
+          "chance_agreement",
+          "evaluator_id",
+          "name",
+          "current",
+          "pair_count",
+          "inter_annotator",
+          "result",
+          "human_result"
+        ],
+        "title": "EvaluatorAgreement"
       },
       "EvaluatorCreate": {
         "properties": {
@@ -2769,7 +3231,7 @@
                 "type": "null"
               }
             ],
-            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+            "description": "The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
           },
           "variables": {
             "anyOf": [
@@ -2822,7 +3284,7 @@
                 "type": "null"
               }
             ],
-            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+            "description": "The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
           },
           "variables": {
             "anyOf": [
@@ -2869,7 +3331,7 @@
                 "type": "null"
               }
             ],
-            "description": "The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
+            "description": "The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own"
           },
           "variables": {
             "anyOf": [
@@ -2900,6 +3362,33 @@
         ],
         "title": "EvaluatorVersionCreateRequest",
         "description": "Request body for adding a version to an existing evaluator."
+      },
+      "EvaluatorsWithHumansBlock": {
+        "properties": {
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current",
+            "description": "Current mean agreement between the evaluators and the annotators, weighted by how many pairs each evaluator compared"
+          },
+          "pair_count": {
+            "type": "integer",
+            "title": "Pair Count",
+            "description": "How many evaluator and annotator pairs the current value averages over"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current",
+          "pair_count"
+        ],
+        "title": "EvaluatorsWithHumansBlock"
       },
       "ExpectedToolCall": {
         "properties": {
@@ -2964,24 +3453,104 @@
             "type": "integer",
             "title": "Pair Count",
             "description": "How many annotator pairs the current value averages over"
-          },
-          "series": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "description": "Agreement over time, one point per time bucket"
           }
         },
         "additionalProperties": true,
         "type": "object",
         "required": [
           "current",
-          "pair_count",
-          "series"
+          "pair_count"
         ],
         "title": "HumanAgreementBlock"
+      },
+      "InterAnnotatorAgreement": {
+        "properties": {
+          "kappa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa",
+            "description": "Agreement corrected for the agreement expected by chance, where 1 is perfect agreement, 0 is chance level, and below 0 is worse than chance"
+          },
+          "kappa_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "fleiss",
+                  "linear_weighted_fleiss",
+                  "cohen",
+                  "linear_weighted_cohen"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa Type",
+            "description": "The kind of kappa reported in `kappa`:\n\n- `fleiss`: Fleiss' kappa between three or more annotators\n- `linear_weighted_fleiss`: Fleiss' kappa between three or more annotators, giving partial credit to close ratings\n- `cohen`: Cohen's kappa between exactly two annotators, between a judge and the annotators, or between one annotator and the others\n- `linear_weighted_cohen`: Cohen's kappa between exactly two annotators, between a judge and the annotators, or between one annotator and the others, giving partial credit to close ratings\n"
+          },
+          "kappa_blank_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "too_few_items",
+                  "everyone_agreed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa Blank Reason",
+            "description": "Why `kappa` is blank when answers were compared:\n\n- `too_few_items`: every evaluator compared these answers on only one item, and one item cannot show the agreement expected by chance\n- `everyone_agreed`: every compared answer is the same, so agreement cannot be told apart from chance\n"
+          },
+          "chance_agreement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chance Agreement",
+            "description": "Agreement expected by chance alone, which `kappa` corrects for, on the same scale as the agreement"
+          },
+          "current": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current",
+            "description": "Current mean pairwise agreement among annotators on this evaluator"
+          },
+          "pair_count": {
+            "type": "integer",
+            "title": "Pair Count",
+            "description": "How many annotator pairs the current value averages over"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kappa",
+          "kappa_type",
+          "kappa_blank_reason",
+          "chance_agreement",
+          "current",
+          "pair_count"
+        ],
+        "title": "InterAnnotatorAgreement"
       },
       "ItemMetadataEntry": {
         "properties": {
@@ -3419,6 +3988,105 @@
         "type": "object",
         "title": "JudgeResult"
       },
+      "KappaOfAnswerKind": {
+        "properties": {
+          "kappa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa",
+            "description": "Agreement corrected for the agreement expected by chance, where 1 is perfect agreement, 0 is chance level, and below 0 is worse than chance"
+          },
+          "kappa_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "fleiss",
+                  "linear_weighted_fleiss",
+                  "cohen",
+                  "linear_weighted_cohen"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa Type",
+            "description": "The kind of kappa reported in `kappa`:\n\n- `fleiss`: Fleiss' kappa between three or more annotators\n- `linear_weighted_fleiss`: Fleiss' kappa between three or more annotators, giving partial credit to close ratings\n- `cohen`: Cohen's kappa between exactly two annotators, between a judge and the annotators, or between one annotator and the others\n- `linear_weighted_cohen`: Cohen's kappa between exactly two annotators, between a judge and the annotators, or between one annotator and the others, giving partial credit to close ratings\n"
+          },
+          "kappa_blank_reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "too_few_items",
+                  "everyone_agreed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kappa Blank Reason",
+            "description": "Why `kappa` is blank when answers were compared:\n\n- `too_few_items`: every evaluator compared these answers on only one item, and one item cannot show the agreement expected by chance\n- `everyone_agreed`: every compared answer is the same, so agreement cannot be told apart from chance\n"
+          },
+          "chance_agreement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chance Agreement",
+            "description": "Agreement expected by chance alone, which `kappa` corrects for, on the same scale as the agreement"
+          },
+          "answer_kind": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "rating"
+            ],
+            "title": "Answer Kind",
+            "description": "Which answers this entry covers:\n\n- `binary`: answers that either match or do not, such as pass or fail\n- `rating`: ratings on a scale\n"
+          },
+          "agreement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agreement",
+            "description": "Mean agreement with the other annotators over the pairs `kappa` is worked out from, from 0 to 1. When `kappa_blank_reason` is `too_few_items`, over every compared pair of this kind"
+          },
+          "pair_count": {
+            "type": "integer",
+            "title": "Pair Count",
+            "description": "How many compared pairs `agreement` averages over"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kappa",
+          "kappa_type",
+          "kappa_blank_reason",
+          "chance_agreement",
+          "answer_kind",
+          "agreement",
+          "pair_count"
+        ],
+        "title": "KappaOfAnswerKind"
+      },
       "LabellingJobCreated": {
         "properties": {
           "uuid": {
@@ -3755,7 +4423,7 @@
               }
             ],
             "title": "Scale",
-            "description": "The ordered scale points that make up the rubric, each with its label"
+            "description": "The rows of the rating scale, each a number and its label. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number"
           }
         },
         "type": "object",
@@ -3765,12 +4433,12 @@
         "properties": {
           "value": {
             "title": "Value",
-            "description": "The value for this scale point. Use a boolean for a `binary` evaluator, a number for a `rating` one"
+            "description": "The value for this row. Use a boolean for a `binary` evaluator, a number for a `rating` one. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number"
           },
           "name": {
             "type": "string",
             "title": "Name",
-            "description": "Short label for this scale point"
+            "description": "Short label for this row"
           },
           "description": {
             "anyOf": [
@@ -3782,7 +4450,7 @@
               }
             ],
             "title": "Description",
-            "description": "Rubric text for this level, added to the judge prompt. Omit to leave this level undescribed"
+            "description": "Rubric text for this row, added to the judge prompt. Omit to leave this row undescribed"
           },
           "color": {
             "anyOf": [
@@ -3794,7 +4462,7 @@
               }
             ],
             "title": "Color",
-            "description": "Color to show for this level. Omit for the default"
+            "description": "Color to show for this row. Omit for the default"
           }
         },
         "type": "object",
@@ -4149,26 +4817,20 @@
               "f47ac10b-58cc-4372-a567-0e02b2c3d479"
             ]
           },
-          "bucket": {
-            "type": "string",
-            "title": "Bucket",
-            "description": "Time bucket used for the trend series"
-          },
-          "days": {
-            "type": "integer",
-            "title": "Days",
-            "description": "Length of the trailing window in days"
-          },
           "human_human": {
             "$ref": "#/components/schemas/HumanAgreementBlock",
             "description": "Agreement between annotators who labelled the same items"
           },
+          "evaluators_with_humans": {
+            "$ref": "#/components/schemas/EvaluatorsWithHumansBlock",
+            "description": "Agreement between the evaluators and the annotators, across every evaluator in `evaluators`"
+          },
           "evaluators": {
             "items": {
-              "additionalProperties": true,
-              "type": "object"
+              "$ref": "#/components/schemas/EvaluatorAgreement"
             },
             "type": "array",
+            "title": "Evaluators",
             "description": "Agreement between each evaluator and the annotators, plus that evaluator's own results and the human results, one entry per linked evaluator"
           }
         },
@@ -4176,9 +4838,8 @@
         "type": "object",
         "required": [
           "task_id",
-          "bucket",
-          "days",
           "human_human",
+          "evaluators_with_humans",
           "evaluators"
         ],
         "title": "TaskAgreementResponse"
@@ -4238,7 +4899,7 @@
               "type": "object"
             },
             "type": "array",
-            "description": "One row per item, evaluator, and version on this page, with the evaluator's value and each annotator's label"
+            "description": "One row per item, evaluator, and version on this page, with the evaluator's value and each annotator's label. `item_added_at` is when the row was added (ISO 8601 UTC). Each label's `answered_at` is when the annotator first gave it in their latest labelling job, and editing does not change it"
           },
           "item_comments": {
             "anyOf": [
@@ -5253,6 +5914,17 @@
         ],
         "title": "ToolCallOutput"
       },
+      "TraceEvalRunStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "processing",
+          "completed",
+          "failed",
+          "skipped"
+        ],
+        "title": "TraceEvalRunStatus"
+      },
       "TraceIngest": {
         "properties": {
           "agent_id": {
@@ -5399,6 +6071,63 @@
         ],
         "title": "TraceIngestResponse"
       },
+      "TraceListResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TraceSummary"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items matching the query, before pagination"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "The applied `limit` (null when unbounded)"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "The applied `offset`",
+            "default": 0
+          },
+          "score_averages": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceScoreAverage"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Averages",
+            "description": "One average for each evaluator linked to the agent that scored at least one trace matching the filters, covering all the matching traces it scored rather than this page. Ask for it with `include_score_averages`"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "TraceListResponse",
+        "description": "The page, plus the averages when `include_score_averages` asked for them."
+      },
       "TraceMetadataEntry": {
         "properties": {
           "key": {
@@ -5458,6 +6187,394 @@
         "additionalProperties": false,
         "type": "object",
         "title": "TraceOutput"
+      },
+      "TraceScoreAverage": {
+        "properties": {
+          "evaluator_uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Evaluator Uuid",
+            "description": "ID of the evaluator these numbers are for",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the evaluator. Uses the last stored name if it has been deleted"
+          },
+          "output_type": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "rating"
+            ],
+            "title": "Output Type",
+            "description": "How the evaluator scores:\n\n- `binary`: pass or fail\n- `rating`: a numeric score, using the scale in `output_config`\n"
+          },
+          "traces_scored": {
+            "type": "integer",
+            "title": "Traces Scored",
+            "description": "How many of the matching traces this evaluator scored"
+          },
+          "average": {
+            "type": "number",
+            "title": "Average",
+            "description": "Mean of those scores. A binary evaluator averages 0 and 1, so its mean is the share that passed"
+          },
+          "scale_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Min",
+            "description": "Lowest value on a rating scale"
+          },
+          "scale_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Max",
+            "description": "Highest value on a rating scale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_uuid",
+          "name",
+          "output_type",
+          "traces_scored",
+          "average"
+        ],
+        "title": "TraceScoreAverage"
+      },
+      "TraceScoreResult": {
+        "properties": {
+          "evaluator_uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Evaluator Uuid",
+            "description": "ID of the evaluator that produced this result",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the evaluator. Uses the last stored name if it has been deleted"
+          },
+          "evaluator_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "tts",
+                  "stt",
+                  "llm",
+                  "llm-general",
+                  "conversation",
+                  "tool-call"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluator Type",
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n"
+          },
+          "output_type": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "rating"
+            ],
+            "title": "Output Type",
+            "description": "How the evaluator scores:\n\n- `binary`: pass or fail\n- `rating`: a numeric score, using the scale in `output_config`\n"
+          },
+          "scale_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Min",
+            "description": "Lowest value on a rating scale"
+          },
+          "scale_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scale Max",
+            "description": "Highest value on a rating scale"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value",
+            "description": "The judged result. Binary stores 0 or 1. Rating stores the numeric score"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning",
+            "description": "The judge's rationale for this result"
+          },
+          "evaluator_version_id": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Evaluator Version Id",
+            "description": "ID of the evaluator version that produced this result",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "passed": {
+            "type": "boolean",
+            "title": "Passed",
+            "description": "Whether this evaluator passed. A binary result passes on 1. A rating passes at the top of its scale"
+          }
+        },
+        "type": "object",
+        "required": [
+          "evaluator_uuid",
+          "name",
+          "output_type",
+          "value",
+          "evaluator_version_id",
+          "passed"
+        ],
+        "title": "TraceScoreResult"
+      },
+      "TraceSummary": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Unique ID for the trace",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "agent_id": {
+            "type": "string",
+            "title": "Agent Id",
+            "description": "ID of the agent that produced the turn"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id",
+            "description": "The message ID you sent, if any"
+          },
+          "conversation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversation Id",
+            "description": "The conversation ID you sent, if any"
+          },
+          "input_preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Preview",
+            "description": "The standalone prompt or the last user message, truncated for display"
+          },
+          "response_preview": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Preview",
+            "description": "The agent reply, truncated for display"
+          },
+          "tool_names": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tool Names",
+            "description": "Names of the tools the agent issued on this turn, in order"
+          },
+          "tool_calls": {
+            "items": {
+              "$ref": "#/components/schemas/TraceToolCall"
+            },
+            "type": "array",
+            "title": "Tool Calls",
+            "description": "Tools the agent issued on this turn, with the arguments it passed"
+          },
+          "turn_count": {
+            "type": "integer",
+            "title": "Turn Count",
+            "description": "Number of turns in the stored input. A standalone prompt counts as 1"
+          },
+          "tool_call_count": {
+            "type": "integer",
+            "title": "Tool Call Count",
+            "description": "Number of tool calls the agent issued for this turn"
+          },
+          "metadata_count": {
+            "type": "integer",
+            "title": "Metadata Count",
+            "description": "Number of metadata entries stored with the trace"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Labels",
+            "description": "Your own tags for this turn, such as an environment or a release. Matched exactly when filtering, so keep the spelling stable"
+          },
+          "input": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 50000,
+                "minLength": 1
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceTurn"
+                },
+                "type": "array",
+                "maxItems": 500,
+                "minItems": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input",
+            "description": "What the agent was given for this turn. For a `general` agent, the standalone prompt as a string. For a `conversation` agent, the history up to the reported output, oldest turn first, in OpenAI chat format. Sent only with `include_content`"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceOutput"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the agent produced for this turn. Sent only with `include_content`"
+          },
+          "metadata": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TraceMetadataEntry"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metadata",
+            "description": "Key-value pairs stored with the trace. Sent only with `include_content`"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the trace was created (ISO 8601 UTC)"
+          },
+          "latest_run_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TraceEvalRunStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Status of the latest scoring run for this trace"
+          },
+          "latest_run_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest Run Error",
+            "description": "Why the latest scoring run was skipped or failed"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/TraceScoreResult"
+            },
+            "type": "array",
+            "title": "Results",
+            "description": "Results on the latest scoring run from the evaluators linked to the agent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "agent_id",
+          "tool_names",
+          "tool_calls",
+          "turn_count",
+          "tool_call_count",
+          "metadata_count",
+          "labels",
+          "created_at"
+        ],
+        "title": "TraceSummary"
       },
       "TraceToolCall": {
         "properties": {
@@ -6033,7 +7150,7 @@
                     "config": {
                       "system_prompt": "You are a helpful assistant.",
                       "llm": {
-                        "model": "google/gemini-2.5-flash"
+                        "model": "google/gemini-3.5-flash-lite"
                       },
                       "stt": {
                         "provider": "google"
@@ -6093,7 +7210,7 @@
           {
             "lang": "curl",
             "label": "Agent within Calibrate",
-            "source": "curl --request POST \\\n  --url https://api.calibrate.artpark.ai/agents \\\n  --header 'Content-Type: application/json' \\\n  --header 'X-API-Key: <api-key>' \\\n  --data '{\n  \"name\": \"Support Agent\",\n  \"type\": \"agent\",\n  \"config\": {\n    \"system_prompt\": \"You are a helpful assistant.\",\n    \"llm\": {\n      \"model\": \"google/gemini-2.5-flash\"\n    },\n    \"stt\": {\n      \"provider\": \"google\"\n    },\n    \"tts\": {\n      \"provider\": \"google\"\n    },\n    \"settings\": {\n      \"agent_speaks_first\": false,\n      \"max_assistant_turns\": 10\n    }\n  }\n}'"
+            "source": "curl --request POST \\\n  --url https://api.calibrate.artpark.ai/agents \\\n  --header 'Content-Type: application/json' \\\n  --header 'X-API-Key: <api-key>' \\\n  --data '{\n  \"name\": \"Support Agent\",\n  \"type\": \"agent\",\n  \"config\": {\n    \"system_prompt\": \"You are a helpful assistant.\",\n    \"llm\": {\n      \"model\": \"google/gemini-3.5-flash-lite\"\n    },\n    \"stt\": {\n      \"provider\": \"google\"\n    },\n    \"tts\": {\n      \"provider\": \"google\"\n    },\n    \"settings\": {\n      \"agent_speaks_first\": false,\n      \"max_assistant_turns\": 10\n    }\n  }\n}'"
           },
           {
             "lang": "curl",
@@ -7942,6 +9059,169 @@
         }
       }
     },
+    "/datasets": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Create dataset",
+        "description": "Create a new empty dataset. Add items separately",
+        "operationId": "create_new_dataset_datasets_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatasetCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/{dataset_id}": {
+      "get": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Get dataset",
+        "description": "Get a dataset with all of its items",
+        "operationId": "get_dataset_detail_datasets__dataset_id__get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The dataset to retrieve",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Dataset Id"
+            },
+            "description": "The dataset to retrieve"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetDetailResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/datasets/{dataset_id}/items/upload": {
+      "post": {
+        "tags": [
+          "datasets"
+        ],
+        "summary": "Upload STT dataset item",
+        "description": "Upload one audio clip with its transcript and append it to an STT dataset",
+        "operationId": "upload_stt_item_datasets__dataset_id__items_upload_post",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "dataset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The STT dataset to add the item to",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Dataset Id"
+            },
+            "description": "The STT dataset to add the item to"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_stt_item_datasets__dataset_id__items_upload_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetItemResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/annotation-tasks": {
       "post": {
         "tags": [
@@ -8539,35 +9819,58 @@
             "description": "Annotation task to act on"
           },
           {
-            "name": "bucket",
+            "name": "date_field",
             "in": "query",
             "required": false,
             "schema": {
               "enum": [
-                "week",
-                "month",
-                "year"
+                "row_added",
+                "annotator_answered"
               ],
               "type": "string",
-              "description": "How to bucket points in the trend series",
-              "default": "week",
-              "title": "Bucket"
+              "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`",
+              "default": "row_added",
+              "title": "Date Field"
             },
-            "description": "How to bucket points in the trend series"
+            "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`"
           },
           {
-            "name": "days",
+            "name": "start",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "integer",
-              "maximum": 3650,
-              "minimum": 1,
-              "description": "Trailing window in days for the trend series",
-              "default": 90,
-              "title": "Days"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date",
+              "title": "Start"
             },
-            "description": "Trailing window in days for the trend series"
+            "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date",
+              "title": "End"
+            },
+            "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date"
           }
         ],
         "responses": {
@@ -8663,6 +9966,60 @@
               "title": "Disagreement Only"
             },
             "description": "When true, keep only rows where the evaluator disagreed with at least one annotator"
+          },
+          {
+            "name": "date_field",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "row_added",
+                "annotator_answered"
+              ],
+              "type": "string",
+              "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`",
+              "default": "row_added",
+              "title": "Date Field"
+            },
+            "description": "Which date `start` and `end` apply to:\n\n- `row_added`: when the row was added to the task\n- `annotator_answered`: when the annotator first gave the answer in their latest labelling job. Editing does not change this date\n\nOmit to use `row_added`"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date",
+              "title": "Start"
+            },
+            "description": "Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date",
+              "title": "End"
+            },
+            "description": "Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date"
           },
           {
             "name": "q",
@@ -8923,6 +10280,43 @@
         }
       }
     },
+    "/organizations/current": {
+      "get": {
+        "tags": [
+          "organizations"
+        ],
+        "summary": "Get the current workspace",
+        "description": "Get the workspace your API key belongs to",
+        "operationId": "get_current_workspace_organizations_current_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentWorkspaceResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/traces": {
       "post": {
         "tags": [
@@ -8953,6 +10347,288 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TraceIngestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "traces"
+        ],
+        "summary": "List traces",
+        "description": "List ingested traces, newest first",
+        "operationId": "list_traces_endpoint_traces_get",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces from this agent",
+              "title": "Agent Id"
+            },
+            "description": "Return only traces from this agent"
+          },
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only the turns of this conversation. Requires `agent_id`",
+              "title": "Conversation Id"
+            },
+            "description": "Return only the turns of this conversation. Requires `agent_id`"
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces containing this text in their message ID, conversation ID, conversation history, output, or metadata",
+              "title": "Q"
+            },
+            "description": "Return only traces containing this text in their message ID, conversation ID, conversation history, output, or metadata"
+          },
+          {
+            "name": "output_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "response",
+                    "tool_call"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces whose output is of this kind. `response` covers every trace carrying a reply, including one that also issued tool calls. `tool_call` covers traces that only issued tool calls",
+              "title": "Output Type"
+            },
+            "description": "Return only traces whose output is of this kind. `response` covers every trace carrying a reply, including one that also issued tool calls. `tool_call` covers traces that only issued tool calls"
+          },
+          {
+            "name": "labels",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces carrying at least one of these labels. Repeat the parameter for each label",
+              "title": "Labels"
+            },
+            "description": "Return only traces carrying at least one of these labels. Repeat the parameter for each label"
+          },
+          {
+            "name": "score",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces whose latest scoring run matches this condition. Each is written as `<evaluator ID>:<condition>`, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once",
+              "title": "Score"
+            },
+            "description": "Return only traces whose latest scoring run matches this condition. Each is written as `<evaluator ID>:<condition>`, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once"
+          },
+          {
+            "name": "created_after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date",
+              "title": "Created After"
+            },
+            "description": "Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date"
+          },
+          {
+            "name": "created_before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date",
+              "title": "Created Before"
+            },
+            "description": "Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date"
+          },
+          {
+            "name": "sort_by_evaluator",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Order traces by this evaluator's score on each trace's latest scoring run. Traces this evaluator has not scored come last whichever direction you pick, and an evaluator not linked to the agent counts as having scored none",
+              "title": "Sort By Evaluator"
+            },
+            "description": "Order traces by this evaluator's score on each trace's latest scoring run. Traces this evaluator has not scored come last whichever direction you pick, and an evaluator not linked to the agent counts as having scored none"
+          },
+          {
+            "name": "sort_order",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string",
+              "description": "Whether `sort_by_evaluator` puts the highest scores first or the lowest. Ignored without it",
+              "default": "desc",
+              "title": "Sort Order"
+            },
+            "description": "Whether `sort_by_evaluator` puts the highest scores first or the lowest. Ignored without it"
+          },
+          {
+            "name": "include_content",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Also return each trace's full input, output and metadata. Use `limit` and `offset` to page through them",
+              "default": false,
+              "title": "Include Content"
+            },
+            "description": "Also return each trace's full input, output and metadata. Use `limit` and `offset` to page through them"
+          },
+          {
+            "name": "include_score_averages",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page",
+              "default": false,
+              "title": "Include Score Averages"
+            },
+            "description": "Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000000,
+              "minimum": 1,
+              "description": "Maximum number of items to return",
+              "default": 50,
+              "title": "Limit"
+            },
+            "description": "Maximum number of items to return"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "Number of items to skip before returning results",
+              "default": 0,
+              "title": "Offset"
+            },
+            "description": "Number of items to skip before returning results"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceListResponse"
                 }
               }
             }

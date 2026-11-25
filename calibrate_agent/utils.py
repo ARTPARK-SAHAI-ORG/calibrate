@@ -1,4 +1,3 @@
-import asyncio
 import io
 import json
 import logging
@@ -9,10 +8,9 @@ import wave
 from collections import defaultdict
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Literal, Optional, Any
+from typing import Literal, Optional
 
 import aiofiles
-import aiohttp
 import backoff
 import numpy as np
 from loguru import logger
@@ -20,6 +18,12 @@ from pipecat.adapters.schemas.function_schema import FunctionSchema
 from pipecat.frames.frames import InputTransportMessageFrame
 from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.transcriptions.language import Language
+
+from calibrate_agent.tools import (  # noqa: F401 (re-exported)
+    _build_param_property,
+    build_tool_specs,
+    make_webhook_call,
+)
 
 # Context variable to track current execution context (BOT or EVAL)
 current_context: ContextVar[str] = ContextVar("current_context", default="UNKNOWN")
@@ -2126,212 +2130,20 @@ def create_tts_service(
         raise ValueError(f"Unsupported TTS provider: {provider}")
 
 
-def _build_param_property(param: dict) -> dict:
-    """Build a property dict for a single parameter."""
-    prop = {
-        "type": param["type"],
-        "description": param["description"],
-    }
-    if "items" in param:
-        prop["items"] = param["items"]
-    if "enum" in param:
-        prop["enum"] = param["enum"]
-    return prop
-
-
 def build_tools_schema(
     tools: list[dict],
 ) -> tuple[list[FunctionSchema], dict[str, dict]]:
-    """
-    Build FunctionSchema objects from tool definitions.
-
-    Supports two tool types:
-    - structured_output (default): Parameters at top level in 'parameters' array
-    - webhook: Parameters in nested 'webhook.queryParameters' and 'webhook.body.parameters'
-
-    Args:
-        tools: List of tool definition dicts
-
-    Returns:
-        tuple of (list of FunctionSchema objects, dict of webhook configs keyed by tool name)
-
-    Raises:
-        ValueError: If webhook tool is missing required fields (url, method, headers)
-    """
-    function_schemas = []
-    webhook_configs = {}
-
-    for tool in tools:
-        properties = {}
-        required = []
-
-        if tool.get("type") == "webhook":
-            # For webhook tools, structure params as nested body and query dicts
-            webhook = tool.get("webhook", {})
-
-            # Validate required webhook fields
-            for field in ["url", "method"]:
-                if field not in webhook:
-                    raise ValueError(
-                        f"Webhook tool '{tool['name']}' is missing required '{field}' field"
-                    )
-
-            webhook_configs[tool["name"]] = {
-                "url": webhook["url"],
-                "method": webhook["method"],
-                "headers": webhook.get("headers", []),
-                "timeout": webhook.get("timeout", 20),
-            }
-
-            # Build query parameters schema
-            query_properties = {}
-            query_required = []
-            if "queryParameters" in webhook:
-                for param in webhook["queryParameters"]:
-                    query_properties[param["id"]] = _build_param_property(param)
-                    if param.get("required"):
-                        query_required.append(param["id"])
-
-            # Build body parameters schema
-            body_properties = {}
-            body_required = []
-            if "body" in webhook and "parameters" in webhook["body"]:
-                for param in webhook["body"]["parameters"]:
-                    body_properties[param["id"]] = _build_param_property(param)
-                    if param.get("required"):
-                        body_required.append(param["id"])
-
-            # Create nested structure with query and body as separate objects
-            if query_properties:
-                properties["query"] = {
-                    "type": "object",
-                    "description": "Query parameters for the webhook request",
-                    "properties": query_properties,
-                    "required": query_required,
-                }
-                if query_required:
-                    required.append("query")
-            if body_properties:
-                properties["body"] = {
-                    "type": "object",
-                    "description": webhook.get("body", {}).get(
-                        "description", "Request body parameters"
-                    ),
-                    "properties": body_properties,
-                    "required": body_required,
-                }
-                if body_required:
-                    required.append("body")
-        else:
-            # For structured_output or default type, use tool["parameters"]
-            parameters = tool.get("parameters", [])
-
-            for parameter in parameters:
-                if parameter.get("required"):
-                    required.append(parameter["id"])
-                properties[parameter["id"]] = _build_param_property(parameter)
-
-        function_schema = FunctionSchema(
-            name=tool["name"],
-            description=tool["description"],
-            properties=properties,
-            required=required,
+    """Pipecat FunctionSchemas for the tools, plus webhook configs keyed by tool name."""
+    specs, webhook_configs = build_tool_specs(tools)
+    return [
+        FunctionSchema(
+            name=spec["name"],
+            description=spec["description"],
+            properties=spec["parameters"]["properties"],
+            required=spec["parameters"]["required"],
         )
-        function_schemas.append(function_schema)
-
-    return function_schemas, webhook_configs
-
-
-async def make_webhook_call(
-    webhook_config: dict,
-    arguments: dict,
-) -> dict[str, Any]:
-    """
-    Make an HTTP webhook call with the provided configuration and arguments.
-
-    Args:
-        webhook_config: Dict containing url, method, headers, and timeout
-        arguments: Dict containing 'query' and/or 'body' parameters from LLM
-
-    Returns:
-        Dict with 'status', 'status_code', and 'response' (or 'error')
-    """
-    url = webhook_config["url"]
-    method = webhook_config["method"].upper()
-    headers_list = webhook_config["headers"]
-    timeout = webhook_config.get("timeout", 20)
-
-    # Convert headers list to dict
-    headers = {}
-    for header in headers_list:
-        headers[header["name"]] = header["value"]
-
-    # Extract query params and body from arguments
-    query_params = arguments.get("query", {})
-    body = arguments.get("body", {})
-
-    logger.info(
-        f"Making webhook call:\n"
-        f"  method: {method}\n"
-        f"  url: {url}\n"
-        f"  headers: {headers}\n"
-        f"  query: {query_params}\n"
-        f"  body: {body}\n"
-        f"  timeout: {timeout}s"
-    )
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            request_kwargs = {
-                "url": url,
-                "headers": headers,
-                "params": query_params if query_params else None,
-                "timeout": aiohttp.ClientTimeout(total=timeout),
-            }
-
-            # Add body for methods that support it
-            if method in ["POST", "PUT", "PATCH"] and body:
-                request_kwargs["json"] = body
-
-            async with session.request(method, **request_kwargs) as response:
-                status_code = response.status
-                try:
-                    response_data = await response.json()
-                except Exception:
-                    response_data = await response.text()
-
-                logger.info(
-                    f"Webhook response: status={status_code}, response={response_data}"
-                )
-
-                return {
-                    "type": "webhook_response",
-                    "status": "success" if 200 <= status_code < 300 else "error",
-                    "status_code": status_code,
-                    "response": response_data,
-                }
-
-    except asyncio.TimeoutError:
-        logger.error(f"Webhook call timed out after {timeout}s")
-        return {
-            "type": "webhook_response",
-            "status": "error",
-            "error": f"Request timed out after {timeout}s",
-        }
-    except aiohttp.ClientError as e:
-        logger.error(f"Webhook call failed: {e}")
-        return {
-            "type": "webhook_response",
-            "status": "error",
-            "error": str(e),
-        }
-    except Exception as e:
-        logger.error(f"Unexpected error during webhook call: {e}")
-        return {
-            "type": "webhook_response",
-            "status": "error",
-            "error": str(e),
-        }
+        for spec in specs
+    ], webhook_configs
 
 
 def summarize_metric_distribution(

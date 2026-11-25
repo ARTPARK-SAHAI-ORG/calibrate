@@ -88,7 +88,8 @@ calibrate annotation-tasks create-labelling-jobs [flags]
 | --- | --- | --- | --- |
 | `-a, --annotator-ids` | stringArray | — | **Required.** Annotator IDs to assign, creating one labelling job for each annotator. Must be in your workspace |
 | `-c, --comments-enabled` | true | `true` | When true, the labelling form lets the annotator leave a comment on each item |
-| `-e, --evaluator-ids` | None | — | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (None) to snapshot every linked evaluator |
+| `--evaluator-ids` | None | — | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (None) to snapshot every linked evaluator |
+| `--evaluator-reasoning-modes` | reasoning_mode | — | Map of evaluator ID to how the labelling form treats the reasoning box for that evaluator, with the same values as reasoning_mode. Every ID must be an evaluator on these jobs, otherwise you get a 400. An evaluator left out uses `reasoning_mode` |
 | `-i, --item-ids` | select_all=false | — | Item IDs to assign. **Required when select_all=false**. Ignored when `select_all=true` |
 | `--q` | payload.name | — | Case-insensitive substring filter on payload.name. Applies only when `select_all=true` |
 | `-r, --reasoning-mode` | optional | `optional` | How the labelling form treats the reasoning box on each judgement. optional shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out (options: optional, required, hidden) |
@@ -131,11 +132,12 @@ calibrate annotation-tasks get-agreement [flags]
 
 **Options**
 
-| Option | Type | Default | Description |
-| --- | --- | --- | --- |
-| `-b, --bucket` | string | `week` | How to bucket points in the trend series (options: week, month, year) |
-| `--days` | int | `90` | Trailing window in days for the trend series |
-| `-t, --task-uuid` | string | — | **Required.** Annotation task to act on |
+| Option | Type | Description |
+| --- | --- | --- |
+| `--date-field` | start | Which date start and `end` apply to: |
+| `-e, --end` | string | Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
+| `-s, --start` | string | Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `-t, --task-uuid` | string | **Required.** Annotation task to act on |
 
 **Examples**
 
@@ -177,14 +179,17 @@ calibrate annotation-tasks get-summary [flags]
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `-c, --compact` | rows.payload | — | Return a compact response that omits heavy detail fields (rows.payload, `rows.evaluator_reasoning`, `rows.annotations.reasoning`, `evaluators.versions.system_prompt`, `evaluators.versions.output_config`, `evaluators.versions.variables`, `item_comments`), keeping only the lightweight decision fields. Omit for full detail |
+| `--date-field` | start | — | Which date start and `end` apply to: |
 | `--disagreement-only` | — | — | When true, keep only rows where the evaluator disagreed with at least one annotator |
+| `-e, --end` | string | — | Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
 | `-i, --item-id` | annotators | — | Filter rows to a single item. The full task-wide annotator union is still returned in annotators |
 | `--limit` | int | `50` | Maximum number of items to return |
 | `--live-only` | — | — | When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded |
 | `--offset` | int | — | Number of items to skip before returning results |
 | `--order` | string | `desc` | Sort direction (options: asc, desc) |
 | `--q` | payload.name | — | Case-insensitive substring search on payload.name. Blank is a no-op |
-| `-s, --sort-by` | string | `created_at` | Sort key for the results |
+| `--sort-by` | string | `created_at` | Sort key for the results |
+| `--start` | string | — | Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
 | `-t, --task-uuid` | string | — | **Required.** Annotation task to act on |
 
 **Examples**

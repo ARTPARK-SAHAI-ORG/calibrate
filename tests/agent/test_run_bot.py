@@ -32,6 +32,7 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
         fake_transport.input.return_value = MagicMock()
         fake_transport.output.return_value = MagicMock()
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
 
         fake_context = MagicMock()
@@ -54,8 +55,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(T, "LocalSmartTurnAnalyzerV3"), \
              patch.object(T, "AudioBufferProcessor"), \
              patch.object(T, "Pipeline"), \
-             patch.object(T, "PipelineTask"), \
-             patch.object(T, "PipelineRunner", return_value=fake_runner), \
+             patch.object(T, "PipelineWorker"), \
+             patch.object(T, "WorkerRunner", return_value=fake_runner), \
              patch.object(T, "LLMContext", return_value=fake_context), \
              patch.object(T, "LLMContextAggregatorPair"):
             await T.run_bot(_make_bot_config("openrouter"), fake_transport, runner_args, tmp)
@@ -70,6 +71,7 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
         fake_transport.input.return_value = MagicMock()
         fake_transport.output.return_value = MagicMock()
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
 
         fake_context = MagicMock()
@@ -89,8 +91,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(T, "LocalSmartTurnAnalyzerV3"), \
              patch.object(T, "AudioBufferProcessor"), \
              patch.object(T, "Pipeline"), \
-             patch.object(T, "PipelineTask"), \
-             patch.object(T, "PipelineRunner", return_value=fake_runner), \
+             patch.object(T, "PipelineWorker"), \
+             patch.object(T, "WorkerRunner", return_value=fake_runner), \
              patch.object(T, "LLMContext", return_value=fake_context), \
              patch.object(T, "LLMContextAggregatorPair"):
             await T.run_bot(_make_bot_config("openai"), fake_transport, runner_args, tmp)
@@ -138,6 +140,7 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
         fake_transport.input.return_value = MagicMock()
         fake_transport.output.return_value = MagicMock()
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
         fake_context = MagicMock()
         fake_context.get_messages.return_value = []
@@ -155,8 +158,8 @@ class TestRunBot(unittest.IsolatedAsyncioTestCase):
              patch.object(T, "LocalSmartTurnAnalyzerV3"), \
              patch.object(T, "AudioBufferProcessor"), \
              patch.object(T, "Pipeline"), \
-             patch.object(T, "PipelineTask"), \
-             patch.object(T, "PipelineRunner", return_value=fake_runner), \
+             patch.object(T, "PipelineWorker"), \
+             patch.object(T, "WorkerRunner", return_value=fake_runner), \
              patch.object(T, "LLMContext", return_value=fake_context), \
              patch.object(T, "LLMContextAggregatorPair"):
             await T.run_bot(cfg, fake_transport, runner_args, tmp)

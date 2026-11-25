@@ -7,6 +7,7 @@ import sys
 import socket
 from os.path import join, exists
 import shutil
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Optional, Tuple, Literal
@@ -63,6 +64,9 @@ INTERRUPTION_COLOR = "\033[91m"
 DEFAULT_MAX_TURNS = 10
 DEFAULT_PORT = 8765
 DEFAULT_AGENT_SPEAKS_FIRST = True
+CONVERSATION_AUDIO_FILE_NAME = "conversation.wav"
+DEFAULT_INTERRUPTION_MIN_WORDS = 3
+DEFAULT_INTERRUPTION_MAX_WORDS = 12
 
 # Fallback for when the smart-turn analyzer can't decide the agent has yielded the
 # floor. Smart-turn v3 is trained on human prosody and often reads synthesized TTS
@@ -128,7 +132,7 @@ from pipecat.frames.frames import (
     TranscriptionFrame,
     BotStartedSpeakingFrame,
     BotStoppedSpeakingFrame,
-    UserStoppedSpeakingFrame,
+    ProposedUserStoppedSpeakingFrame,
     InputAudioRawFrame,
     OutputAudioRawFrame,
     LLMMessagesAppendFrame,
@@ -139,14 +143,13 @@ from pipecat.frames.frames import (
     OutputTransportMessageUrgentFrame,
     Frame,
     InterruptionFrame,
-    InterruptionTaskFrame,
     TTSStoppedFrame,
     TTSAudioRawFrame,
     ErrorFrame,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -202,8 +205,20 @@ MAX_TURNS_FORCE_CANCEL_SECS = 2.0
 # fragments into a persona turn (covers Latin plus the Devanagari danda).
 _PERSONA_TEXT_CLINGING_PUNCTUATION = frozenset(",.!?;:।॥")
 
+class EvalAgentProtobufSerializer(ProtobufFrameSerializer):
+    """Drops InterruptionFrames from the agent under test.
+
+    Applied here they would cut off the eval agent's own speech; the eval agent
+    detects being interrupted itself (``bot-started-speaking``).
+    """
+
+    async def deserialize(self, data):
+        frame = await super().deserialize(data)
+        return None if isinstance(frame, InterruptionFrame) else frame
+
+
 DEFAULT_SERIALIZER_NAME = "protobuf"
-SERIALIZER_REGISTRY = {"protobuf": ProtobufFrameSerializer}
+SERIALIZER_REGISTRY = {"protobuf": EvalAgentProtobufSerializer}
 
 
 def build_simulated_user_llm() -> OpenRouterLLMService:
@@ -277,12 +292,14 @@ def build_user_context_aggregator(context: LLMContext) -> LLMContextAggregatorPa
     needs (same as ``bot.py``).
 
     ``ExternalUserTurnStopStrategy(timeout=None)`` is included only so a
-    simulated-user interrupt (which emits an explicit ``UserStoppedSpeakingFrame``)
-    hard-stops the agent's turn immediately — for both internal (word-level) and
-    external (block) interrupts. ``timeout=None`` disables that strategy's built-in
-    transcription auto-timeout (which would otherwise pre-empt smart-turn on every
-    turn); it keeps the strategy's ``UserStoppedSpeakingFrame`` handling and its
-    transcription guards intact, so normal turn-ends are still decided by smart-turn.
+    simulated-user interrupt (which emits a ``ProposedUserStoppedSpeakingFrame`` right
+    after the heard text) ends the agent's turn immediately. The strategy ends the
+    turn only once it holds the turn's text, so the stop must arrive in order after
+    the ``TranscriptionFrame``: a ``UserStoppedSpeakingFrame`` is a system frame and
+    would overtake it, leaving the turn open until ``SIM_USER_TURN_STOP_TIMEOUT_SECS``.
+    ``timeout=None`` disables that strategy's built-in transcription auto-timeout
+    (which would otherwise pre-empt smart-turn on every turn), so normal turn-ends
+    are still decided by smart-turn.
     """
     return LLMContextAggregatorPair(
         context,
@@ -447,11 +464,17 @@ class EndToEndLatencyTracker:
         return float(np.mean(self.deltas))
 
 
+def _words(text: str) -> list[str]:
+    """Lowercase words of ``text`` with punctuation dropped, for phrase matching."""
+    return "".join(
+        " " if unicodedata.category(ch).startswith("P") else ch for ch in text.lower()
+    ).split()
+
+
 class RTVIMessageFrameAdapter(FrameProcessor):
     def __init__(
         self,
         context: LLMContext,
-        audio_buffer: AudioBufferProcessor,
         interrupt_probability: float,
         tool_calls: list[dict],
         stt_outputs: list[str],
@@ -463,19 +486,40 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         max_turns: int = DEFAULT_MAX_TURNS,
         latency_tracker: Optional["EndToEndLatencyTracker"] = None,
         is_external: bool = False,
+        interrupt_min_words: int = DEFAULT_INTERRUPTION_MIN_WORDS,
+        interrupt_max_words: int = DEFAULT_INTERRUPTION_MAX_WORDS,
+        interrupt_phrase: Optional[str] = None,
+        recorder: Optional[AudioBufferProcessor] = None,
     ):
         super().__init__(enable_direct_mode=True, name="RTVIMessageFrameAdapter")
         self._context = context
-        self._audio_buffer = audio_buffer
+        # Call recorder for conversation.wav. Agent audio kept away from the sim
+        # user's speech detection is still sent here, so the recording has it.
+        self._recorder = recorder
+        # The sim user has decided to cut in but its reply is not playing yet. The
+        # agent keeps talking until the reply's first audio, when SilencePadder
+        # tells it to stop, so the two voices overlap like a real interruption.
+        self._agent_stop_pending = False
         self._latency_tracker = latency_tracker
-        # Whether the agent under test is an external WS agent. External agents give
-        # no word-level control, so an interrupt cuts the agent off wholesale and
-        # blocks its output until the sim user finishes, rather than the internal
-        # path's stream-vs-spoken word matching.
+        # Whether the agent under test is an external WS agent. An external agent may
+        # keep talking after being told to stop, so its attempts to start a new
+        # utterance are also ignored until the sim user finishes speaking.
         self._is_external = is_external
         self._agent_speaks_first = agent_speaks_first
         self._max_turns = max_turns
         self._interrupt_probability = interrupt_probability
+        self._interrupt_min_words = interrupt_min_words
+        self._interrupt_max_words = interrupt_max_words
+        # The sim user cuts in the first time the agent says this phrase, in place
+        # of the random cut-in.
+        self._interrupt_phrase = (
+            " ".join(_words(interrupt_phrase)) if interrupt_phrase else None
+        )
+        self._interrupt_phrase_heard = False
+        # Words of the current agent utterance heard so far, and the word count at
+        # which the sim user cuts in (None: no cut-in this utterance).
+        self._utterance_words = 0
+        self._cut_in_at_word: Optional[int] = None
         self._tool_calls = tool_calls
         self._output_dir = Path(output_dir)
         self._audio_save_dir = audio_save_dir
@@ -500,11 +544,14 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._processing_time = processing_time
         self._text_buffer = ""  # buffer of the text that the bot has generated so far (received stream; used for interrupt completion matching)
         self._heard_text_buffer = ""  # buffer of agent text actually spoken (fed to simulated-user STT as what was heard)
-        self._spoken_text_buffer = (
-            ""  # buffer of the text that the bot has spoken so far
-        )
-        self._is_bot_interrupt_decided = False  # whether the decision to interrupt the bot by the user has been made yet
-        self._is_bot_interrupt_triggered = False  # whether the spoken text buffer is complete and matches the text buffer; only when this becomes true is when the intteruption actually triggered
+        # Newer agents (pipecat >= 1.4) resend the whole sentence spoken so far in
+        # every bot-output message, e.g. "Hello", then "Hello there". The buffers
+        # below are built by appending only the words not seen before, so we keep
+        # the last (segment_id, accumulated_text) and remove it from the front of
+        # the next message from the same sentence. A new segment_id means a new
+        # sentence, and its text is taken whole.
+        self._last_spoken_progress = (None, "")
+        self._is_bot_interrupt_triggered = False  # the sim user has cut in; agent output is ignored until the sim user stops speaking
         self._pending_user_turn = False  # set True on bot-started-speaking; False on bot-stopped-speaking after frames are pushed
         self._turns_concluded = set()
         self._serialized_transcript = []  # Store transcripts for return
@@ -595,28 +642,18 @@ class RTVIMessageFrameAdapter(FrameProcessor):
     ) -> None:
         """Execute a simulated-user interrupt of the agent.
 
-        Tells the agent to stop (RTVI ``interrupt``), commits ``_text_buffer`` (what
-        the sim user heard up to the cut-in point) as the agent's partial turn, and
-        marks the interrupt triggered so further agent output stays blocked until the
-        sim user finishes (the block is cleared on ``user-stopped-speaking``). The
-        emitted ``UserStoppedSpeakingFrame`` hard-stops the turn via
-        ``ExternalUserTurnStopStrategy``, immediately handing the floor to the sim
-        user. Shared by the internal word-level path and the external block path.
+        Commits ``_text_buffer`` (what the sim user heard up to the cut-in point) as
+        the agent's partial turn and marks the interrupt triggered, so further agent
+        output stays blocked until the sim user finishes (the block is cleared on
+        ``user-stopped-speaking``). The emitted ``ProposedUserStoppedSpeakingFrame``
+        ends the turn via ``ExternalUserTurnStopStrategy``, so the sim user starts its
+        reply at once. The agent is told to stop (RTVI ``interrupt``) by
+        SilencePadder when that reply's first audio plays.
         """
         self._is_bot_interrupt_triggered = True
+        self._agent_stop_pending = True
         self._pending_user_turn = False
         self._awaiting_first_bot_audio_chunk = False
-        await self.push_frame(
-            OutputTransportMessageUrgentFrame(
-                message={
-                    "label": "rtvi-ai",
-                    "type": "client-message",
-                    "id": str(uuid4()),
-                    "data": {"t": "interrupt"},
-                }
-            ),
-            FrameDirection.DOWNSTREAM,
-        )
         generated_frames.extend(
             [
                 TranscriptionFrame(
@@ -625,7 +662,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     timestamp=timestamp,
                     result={},
                 ),
-                UserStoppedSpeakingFrame(),
+                ProposedUserStoppedSpeakingFrame(),
             ]
         )
         await self._reset_buffers()
@@ -643,12 +680,52 @@ class RTVIMessageFrameAdapter(FrameProcessor):
         self._active_transcript_audio_role = role
         return candidate
 
+    def _should_cut_in(self) -> bool:
+        """Whether the sim user cuts into the agent's current utterance now."""
+        if self._interrupt_phrase is not None:
+            if self._interrupt_phrase_heard:
+                return False
+            heard = " ".join(_words(self._heard_text_buffer))
+            self._interrupt_phrase_heard = f" {self._interrupt_phrase} " in f" {heard} "
+            return self._interrupt_phrase_heard
+        return (
+            self._cut_in_at_word is not None
+            and self._utterance_words >= self._cut_in_at_word
+        )
+
+    def _parse_bot_output(self, data: dict) -> tuple[str, bool]:
+        """Return (text, spoken) for one bot-output message from the agent under test.
+
+        Agents send this message in one of two formats, depending on their pipecat version:
+
+        - Older agents send each piece of speech once, with spoken=True.
+          The text is returned as it is.
+        - Newer agents (pipecat >= 1.4) resend the whole sentence spoken so far,
+          e.g. "Hello", then "Hello there". Only the words added since the last
+          message from the same sentence (same segment_id) are returned, here "there".
+
+        Some text-to-speech providers cannot report word by word. With those, a newer
+        agent sends the finished sentence once, with spoken=True, and it is returned
+        as it is.
+        """
+        text = data.get("text") or ""
+        status = data.get("spoken_status")
+        if data.get("spoken") or status not in ("in-progress", "completed"):
+            return text, bool(data.get("spoken"))
+
+        segment_id = data.get("segment_id")
+        accumulated = (data.get("spoken_progress") or {}).get("accumulated_text") or ""
+        last_segment, last_accumulated = self._last_spoken_progress
+        self._last_spoken_progress = (segment_id, accumulated)
+        if segment_id == last_segment and accumulated.startswith(last_accumulated):
+            accumulated = accumulated[len(last_accumulated) :]
+        return accumulated.strip(), True
+
     async def _reset_buffers(self):
         concluded_turn = self._turn_index
         self._turns_concluded.add(concluded_turn)  # mark the turn as concluded
         self._text_buffer = ""
         self._heard_text_buffer = ""
-        self._spoken_text_buffer = ""
 
         # Save intermediate state after each turn
         await self._save_intermediate_state(concluded_turn)
@@ -820,12 +897,14 @@ class RTVIMessageFrameAdapter(FrameProcessor):
             # don't forward bot audio frames after the interruption has been triggered
             return
         elif isinstance(frame, InputAudioRawFrame):
-            if self._is_external and self._is_bot_interrupt_triggered:
-                # External interrupt in progress: block the agent's inbound audio so
-                # it never reaches the aggregator's VAD. Otherwise the agent's
-                # continued speech starts a phantom user turn and broadcasts an
-                # interruption that cancels the sim user's own reply mid-word. Drop
-                # it entirely (no latency mark, no save) until the block is lifted.
+            if self._is_bot_interrupt_triggered:
+                # The agent talks on while the sim user cuts in, and may keep
+                # talking for a moment after being told to stop. Keep that audio
+                # away from the aggregator's VAD: there it would start a phantom
+                # user turn and cancel the sim user's own reply mid-word. Send it
+                # only to the call recorder, so conversation.wav has the overlap.
+                if self._recorder is not None:
+                    await self._recorder.process_frame(frame, FrameDirection.DOWNSTREAM)
                 return
             # Inbound audio from the agent under test — the first such frame after
             # the simulated user stopped speaking marks the end-to-end response
@@ -863,13 +942,15 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                 user_id = ""
 
                 if msg_type == "bot-started-speaking":
-                    self._audio_buffer._reset_all_audio_buffers()
-                    if self._is_external and self._is_bot_interrupt_triggered:
-                        # External interrupt in progress: the sim user has the floor.
-                        # Ignore the agent's attempt to speak — keep its output blocked
-                        # and do NOT interrupt the sim user's TTS or reset the interrupt
-                        # slate. The block is lifted on ``user-stopped-speaking`` once
-                        # the sim user is done, and the agent may speak again.
+                    if self._agent_stop_pending or (
+                        self._is_external and self._is_bot_interrupt_triggered
+                    ):
+                        # The sim user has the floor: its cut-in reply is on the way,
+                        # or an external agent is talking over it. Ignore the agent's
+                        # attempt to speak — keep its output blocked and do NOT
+                        # interrupt the sim user's TTS or reset the interrupt slate.
+                        # The block is lifted on ``user-stopped-speaking`` once the
+                        # sim user is done, and the agent may speak again.
                         log_and_print(
                             f"{PARTIAL_AGENT_MESSAGE_COLOR_IGNORED}Agent tried to speak during user interrupt — blocked{RESET_COLOR}"
                         )
@@ -881,16 +962,25 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         self._awaiting_first_bot_audio_chunk = True
                         self._pending_user_turn = True
                         # A new bot utterance starts with a clean interrupt slate.
-                        # These flags are otherwise only cleared on
+                        # The flag is otherwise only cleared on
                         # ``user-stopped-speaking``; when an agent speaks a turn as
                         # separate utterances (e.g. a short acknowledgement followed
-                        # by the actual reply), a decided/triggered flag left over
-                        # from the previous utterance would cause this utterance's
-                        # audio to be dropped and its text ignored, so the simulated
-                        # user never "hears" it and the run deadlocks.
-                        self._is_bot_interrupt_decided = False
+                        # by the actual reply), a triggered flag left over from the
+                        # previous utterance would cause this utterance's audio to
+                        # be dropped and its text ignored, so the simulated user
+                        # never "hears" it and the run deadlocks.
                         self._is_bot_interrupt_triggered = False
-                        self._spoken_text_buffer = ""
+                        # Decide once per utterance whether the sim user cuts in,
+                        # and after how many heard words.
+                        self._utterance_words = 0
+                        self._cut_in_at_word = None
+                        if (
+                            self._interrupt_phrase is None
+                            and np.random.rand() < self._interrupt_probability
+                        ):
+                            self._cut_in_at_word = np.random.randint(
+                                self._interrupt_min_words, self._interrupt_max_words + 1
+                            )
                         self._sim_user_turn_pending = False
                         # Natural full-duplex: any agent utterance interrupts the sim
                         # user (cut its in-flight TTS, flush its aggregation). The sim
@@ -898,9 +988,12 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                         # Turn START is left to the aggregator's audio/transcription
                         # start strategies (not a manual UserStartedSpeakingFrame),
                         # so start and the smart-turn stop stay audio-consistent.
-                        await self.push_frame(
-                            InterruptionTaskFrame(), FrameDirection.UPSTREAM
-                        )
+                        # The agent under test started speaking, so cancel any reply
+                        # the simulated user is making. The cancel is sent from here
+                        # so it takes effect immediately. If it took effect later, it
+                        # could wipe out the reply the simulated user starts when it
+                        # interrupts on the agent's first word, and the run would hang.
+                        await self.broadcast_interruption()
                 elif msg_type == "bot-stopped-speaking" and self._pending_user_turn:
                     if self._awaiting_first_bot_audio_chunk:
                         # Tool-only turn: no ``spoken=True`` ever fired, so any
@@ -927,10 +1020,10 @@ class RTVIMessageFrameAdapter(FrameProcessor):
 
                 elif msg_type == "user-stopped-speaking":
                     # The simulated user has finished. Clear the interrupt slate,
-                    # which also lifts an external-interrupt block so the agent may
-                    # speak again.
-                    self._is_bot_interrupt_decided = False
+                    # which lifts the block on the agent's audio and utterances so
+                    # it may speak again.
                     self._is_bot_interrupt_triggered = False
+                    self._agent_stop_pending = False
                     await self._save_intermediate_state(
                         reason=(
                             "Saved intermediate transcript after simulated user stopped speaking "
@@ -939,39 +1032,14 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                     )
 
                 elif msg_type == "bot-output":
-                    text = data.get("text") or ""
-                    spoken = data.get("spoken") or False
+                    text, spoken = self._parse_bot_output(data)
 
                     if text:
                         # log_and_print(
                         #     f"{INTERRUPTION_COLOR}Agent message for debugging: {data}{RESET_COLOR}"
                         # )
-                        if (
-                            (
-                                not self._is_bot_interrupt_decided or spoken
-                            )  # only continue if either the decision to interrupt the bot by the user has not been made yet or the message is being spoken by the bot and does not match the interrupted text yet
-                            and not self._is_bot_interrupt_triggered  # bot has not been interrupted yet
-                        ):
-                            if spoken and self._is_bot_interrupt_decided:
-                                await self._ensure_bot_transcript_line_for_current_turn(
-                                    text
-                                )
-                                log_and_print(
-                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message before interruption: {text}{RESET_COLOR}"
-                                )
-
-                                # the text is being spoken by the bot and the decision to interrupt
-                                # the bot by the user has been made
-                                self._spoken_text_buffer += " " + text
-
-                                # Internal (word-level) path: once the spoken text has
-                                # caught up to the point the user decided to cut in,
-                                # execute the interrupt.
-                                if self._spoken_text_buffer == self._text_buffer:
-                                    await self._commit_user_interrupt(
-                                        generated_frames, user_id, timestamp
-                                    )
-                            elif not spoken and not self._is_bot_interrupt_decided:
+                        if not self._is_bot_interrupt_triggered:
+                            if not spoken:
                                 # Received stream only (not yet spoken): track for interrupt
                                 # completion matching but do not feed STT — the simulated user
                                 # should only react to spoken audio.
@@ -979,7 +1047,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                                     f"{PARTIAL_AGENT_MESSAGE_COLOR}Received agent message{RESET_COLOR}: {text}{RESET_COLOR}"
                                 )
                                 self._text_buffer += " " + text
-                            elif spoken and not self._is_bot_interrupt_decided:
+                            else:
                                 await self._ensure_bot_transcript_line_for_current_turn(
                                     text
                                 )
@@ -987,25 +1055,22 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                                     f"{GENERAL_LOG_COLOR}Agent speaking the generated message: {text}{RESET_COLOR}"
                                 )
                                 self._heard_text_buffer += " " + text
+                                self._utterance_words += len(_words(text))
                                 result_payload = data if data else None
 
-                                if np.random.rand() < self._interrupt_probability:
+                                if self._should_cut_in():
                                     log_and_print(
                                         f"--------------------------------\n{INTERRUPTION_COLOR}[User interrupts the bot]{RESET_COLOR}\n--------------------------------"
                                     )
-                                    self._is_bot_interrupt_decided = True
+                                    self._cut_in_at_word = None
                                     # Align interrupt target with heard text only (received may run ahead of TTS).
                                     self._text_buffer = self._heard_text_buffer
-                                    if self._is_external:
-                                        # No word-level control over an external agent:
-                                        # cut it off immediately and block its output
-                                        # until the sim user finishes speaking.
-                                        await self._commit_user_interrupt(
-                                            generated_frames, user_id, timestamp
-                                        )
+                                    await self._commit_user_interrupt(
+                                        generated_frames, user_id, timestamp
+                                    )
 
                                 # Feed what the sim user heard so far — unless we just
-                                # cut the agent off (external interrupt), in which case
+                                # cut the agent off, in which case
                                 # the partial is already committed and the sim user
                                 # should not "hear" anything more.
                                 if not self._is_bot_interrupt_triggered:
@@ -1025,7 +1090,7 @@ class RTVIMessageFrameAdapter(FrameProcessor):
                                 )
                             else:
                                 log_and_print(
-                                    f"{GENERAL_LOG_COLOR}Agent speaking the generated message 2: {text}{RESET_COLOR}"
+                                    f"{GENERAL_LOG_COLOR}Agent kept speaking after the cut-in (ignored): {text}{RESET_COLOR}"
                                 )
                                 await self._ensure_bot_transcript_line_for_current_turn(
                                     text
@@ -1216,6 +1281,24 @@ class SilencePadder(FrameProcessor):
         if isinstance(frame, OutputAudioRawFrame):
             self._last_sample_rate = frame.sample_rate
             self._last_num_channels = frame.num_channels
+            if (
+                self._rtvi_message_adapter
+                and self._rtvi_message_adapter._agent_stop_pending
+            ):
+                # The sim user's cut-in reply starts playing now: stop the agent,
+                # so its voice ends as the sim user's begins.
+                self._rtvi_message_adapter._agent_stop_pending = False
+                await self.push_frame(
+                    OutputTransportMessageUrgentFrame(
+                        message={
+                            "label": "rtvi-ai",
+                            "type": "client-message",
+                            "id": str(uuid4()),
+                            "data": {"t": "interrupt"},
+                        }
+                    ),
+                    FrameDirection.DOWNSTREAM,
+                )
             # Lazy allocation: only reserve a sim-user line when we actually have
             # audio to write. If the sim user got interrupted before any audio
             # flowed, no line is reserved — preserving bot role-stickiness.
@@ -1405,6 +1488,9 @@ async def run_simulation(
     evaluators: list[dict],
     output_dir: str,
     interrupt_probability: float,
+    interrupt_min_words: int = DEFAULT_INTERRUPTION_MIN_WORDS,
+    interrupt_max_words: int = DEFAULT_INTERRUPTION_MAX_WORDS,
+    interrupt_phrase: Optional[str] = None,
     port: int = DEFAULT_PORT,
     agent_speaks_first: bool = True,
     max_turns: int = DEFAULT_MAX_TURNS,
@@ -1457,6 +1543,9 @@ async def run_simulation(
             evaluators=evaluators,
             output_dir=output_dir,
             interrupt_probability=interrupt_probability,
+            interrupt_min_words=interrupt_min_words,
+            interrupt_max_words=interrupt_max_words,
+            interrupt_phrase=interrupt_phrase,
             port=port,
             agent_speaks_first=agent_speaks_first,
             max_turns=max_turns,
@@ -1479,6 +1568,9 @@ async def _run_simulation_inner(
     evaluators: list[dict],
     output_dir: str,
     interrupt_probability: float,
+    interrupt_min_words: int,
+    interrupt_max_words: int,
+    interrupt_phrase: Optional[str],
     port: int,
     agent_speaks_first: bool,
     max_turns: int,
@@ -1617,7 +1709,7 @@ async def _run_simulation_inner(
     context = LLMContext(messages)
     context_aggregator = build_user_context_aggregator(context)
 
-    audio_buffer = AudioBufferProcessor(enable_turn_audio=True)
+    audio_buffer = build_call_recorder(output_dir)
 
     tool_calls = []
     function_call_handler = RTVIFunctionCallResponder(
@@ -1626,7 +1718,6 @@ async def _run_simulation_inner(
 
     rtvi_message_adapter = RTVIMessageFrameAdapter(
         context,
-        audio_buffer,
         interrupt_probability,
         tool_calls,
         stt_outputs,
@@ -1638,6 +1729,10 @@ async def _run_simulation_inner(
         max_turns=max_turns,
         latency_tracker=latency_tracker,
         is_external=bool(agent_uri),
+        interrupt_min_words=interrupt_min_words,
+        interrupt_max_words=interrupt_max_words,
+        interrupt_phrase=interrupt_phrase,
+        recorder=audio_buffer,
     )
 
     simulated_user_turn_index_hook = SimulatedUserTurnIndexHook(rtvi_message_adapter)
@@ -1677,7 +1772,7 @@ async def _run_simulation_inner(
         ]
     )
 
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             audio_in_sample_rate=16000,
@@ -1804,10 +1899,11 @@ async def _run_simulation_inner(
             f"Eval transcript: [{message.timestamp}] assistant: {message.content}"
         )
 
-    runner = PipelineRunner(handle_sigint=False)
+    runner = WorkerRunner(handle_sigint=False)
 
     try:
-        await runner.run(task)
+        await runner.add_workers(task)
+        await runner.run()
     finally:
         if elevenlabs_http_session is not None:
             await elevenlabs_http_session.close()
@@ -2050,6 +2146,68 @@ async def _run_simulation_inner(
     }
 
 
+def _interruption_config(item: dict, kind: str, allowed: set[str]) -> dict:
+    """Return the ``interruption_config`` dict of a persona or scenario, or {}."""
+    config = item.get("interruption_config")
+    if config is None:
+        return {}
+    if not isinstance(config, dict):
+        raise ValueError(f"interruption_config on a {kind} must be an object.")
+    unknown = set(config) - allowed
+    if unknown:
+        raise ValueError(
+            f"Unknown key(s) {sorted(unknown)} in a {kind}'s interruption_config. "
+            f"Allowed: {sorted(allowed)}."
+        )
+    return config
+
+
+def build_call_recorder(output_dir: str) -> AudioBufferProcessor:
+    """Pipecat recorder that saves the whole call as conversation.wav when the
+    call ends."""
+    recorder = AudioBufferProcessor()
+
+    @recorder.event_handler("on_audio_data")
+    async def on_audio_data(buffer, audio, sample_rate, num_channels):
+        await save_conversation_audio(output_dir, audio, sample_rate, num_channels)
+
+    return recorder
+
+
+async def save_conversation_audio(
+    output_dir: str, audio: bytes, sample_rate: int, num_channels: int
+) -> None:
+    """Save the call recorder's audio as conversation.wav.
+
+    The recorder fills the gaps between turns with silence by clock time, so the
+    file is as long as the call.
+    """
+    await save_audio_chunk(
+        os.path.join(output_dir, CONVERSATION_AUDIO_FILE_NAME),
+        audio,
+        sample_rate,
+        num_channels,
+    )
+
+
+def finish_simulation_audio(simulation_output_dir: str) -> None:
+    """Combine each turn's audio chunks into one file per turn, and build
+    conversation.wav from the turn files if the call recorder wrote nothing
+    (e.g. the run stopped early). That fallback has no gaps between turns."""
+    audio_dir = os.path.join(simulation_output_dir, "audios")
+    if not os.path.exists(audio_dir):
+        return
+    combine_turn_audio_chunks(audio_dir)
+    log_and_print(f"Combined turn audio chunks in {audio_dir}")
+    conversation_audio_path = os.path.join(
+        simulation_output_dir, CONVERSATION_AUDIO_FILE_NAME
+    )
+    if not os.path.exists(conversation_audio_path):
+        transcript_path = os.path.join(simulation_output_dir, TRANSCRIPT_FILE_NAME)
+        combine_audio_files(audio_dir, conversation_audio_path, transcript_path)
+        log_and_print(f"Combined audio saved to {conversation_audio_path}")
+
+
 async def run_single_simulation_task(
     semaphore: asyncio.Semaphore,
     config: dict,
@@ -2089,20 +2247,59 @@ async def _run_single_simulation_inner(
     characteristics = user_persona.get("characteristics", "")
     gender = user_persona.get("gender", "")
     language = user_persona.get("language", "english")
-    interruption_sensitivity = user_persona.get("interruption_sensitivity", "none")
+    if "interruption_sensitivity" in user_persona:
+        raise ValueError(
+            "interruption_sensitivity on a persona is not supported. Put it inside "
+            'the persona\'s interruption_config as "sensitivity", e.g. '
+            '"interruption_config": {"sensitivity": "low"}.'
+        )
+    persona_interruption = _interruption_config(
+        user_persona, "persona", {"sensitivity", "min_words", "max_words"}
+    )
+    interruption_sensitivity = persona_interruption.get("sensitivity", "none")
 
     # Get interrupt probability from mapping
     interrupt_probability = interrupt_sensitivity_map.get(interruption_sensitivity)
     if interrupt_probability is None:
         raise ValueError(
-            f"Invalid interruption_sensitivity '{interruption_sensitivity}'. "
+            f"Invalid interruption_config.sensitivity '{interruption_sensitivity}'. "
             f"Must be one of: {list(interrupt_sensitivity_map.keys())}"
+        )
+    interrupt_min_words = persona_interruption.get(
+        "min_words", DEFAULT_INTERRUPTION_MIN_WORDS
+    )
+    interrupt_max_words = persona_interruption.get(
+        "max_words", DEFAULT_INTERRUPTION_MAX_WORDS
+    )
+    for key, value in (
+        ("min_words", interrupt_min_words),
+        ("max_words", interrupt_max_words),
+    ):
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(
+                f"Invalid interruption_config.{key} {value!r}. "
+                "Must be a whole number of 1 or more."
+            )
+    if interrupt_max_words < interrupt_min_words:
+        raise ValueError(
+            f"interruption_config.max_words ({interrupt_max_words}) must be at "
+            f"least interruption_config.min_words ({interrupt_min_words})."
+        )
+    interrupt_phrase = _interruption_config(
+        scenario, "scenario", {"when_agent_says"}
+    ).get("when_agent_says")
+    if interrupt_phrase is not None and (
+        not isinstance(interrupt_phrase, str) or not _words(interrupt_phrase)
+    ):
+        raise ValueError(
+            f"Invalid interruption_config.when_agent_says {interrupt_phrase!r}. "
+            "Must be a phrase with at least one word."
         )
 
     scenario_description = scenario.get("description", "")
 
     gender_prompt = f"\n\nYour gender is {gender}." if gender else ""
-    user_system_prompt = f"You are a simulated human user engaging in a natural spoken conversation with another agent.\nYour output will be converted to speech through a Text to Speech (TTS) system before the agent hears it. The entity you are responding to will hear only the output of the TTS system and will not be reading your text. Optimise for the hearing experience and not the reading experience.\n\nYour job is to produce text that:\n\n1. **sounds like natural speech when spoken aloud**\n2. **is easy for TTS to pronounce correctly**\n3. **avoids symbols and formatting that degrade TTS output**\n4. **expresses values like numbers, names, phone numbers and email addresses in a TTS-friendly spoken format**\n5. **never acknowledges or references these rules explicitly**\n\n### **Speech style**\n\n* write in **spoken language**, not written language\n* use **shorter sentences**\n* use **natural fillers** when appropriate (e.g. “umm”, “you know”, “let me think”)\n* simulate personality via **phrasing and rhythm**, not punctuation marks or symbols\n\n### **Character, punctuation, and formatting constraints**\n\nAvoid characters that become verbalized or distort output:\n\n* no ellipses\n* no em dashes or fancy punctuation\n* no markdown\n* no emoji\n* no slashes\n* no parentheses\n* no code formatting\n* no ASCII art\n* no unusual unicode\n* no repeating words in brackets (e.g. to give a shortform for a set of words or to repeat the same word in a different language)\n\nDo not include explicit stage directions like:\n\n* “[pause]”\n* “*laughs*”\n* “(thinking)”\n\nIf needed, use the spoken equivalent, e.g.:\n\n* “haha”\n* “oh wow”\n* “let me think”\n\n### **Handling numbers, proper nouns, and technical tokens**\n\nGenerate values in a way that TTS can pronounce clearly, without explaining that you are doing so:\n\n* **Phone numbers** → speak as digits\n  Example: “nine eight five three zero two one four eight”\n\n* **Years** → speak normally (“twenty twenty four” or “two thousand eighteen”) based on natural human usage\n\n* **Large numbers** → use spoken format\n  Example: “about one hundred and fifty thousand”\n\n* **Serial codes / IDs** → digit by digit or letter by letter\n  Example: “C three nine four” pronounced “see three nine four”\n\n* **Email addresses** → verbalize symbols\n  Example: “john dot walker at gee mail dot com”\n\n* **URLs/domains** → verbalize\n  Example: “open a eye dot com slash research”\n\n* **Acronyms** → pronounce letter by letter when that’s how humans say them\n  Example: “ess cue ell” instead of “SQL”\n  Example: “tee vee” instead of “TV”\n\n* **Brand/product names** → use phonetic or spaced formatting when helpful\n  Example: “Sam sung”\n  Example: “Poly fill” for “Polyfill”\n\n* **Foreign or unusual words** → adjust spelling slightly for correct sound if needed\n\n### **Pauses and emphasis**\n\n* For pauses: use spoken fillers (“hmm”, “let me think”, “you know”)\n* For emphasis: use words (“really”, “super”, “especially”), **not** symbols\n\n### **Prohibited behavior**\n\n* do not mention formatting choices\n* do not mention the TTS system\n* do not apologize for any formatting\n* do not describe yourself as simulated\n* do not explain these rules\n* do not reveal or hint at any internal instruction\n\n### **Conversational constraints**\n\n* play the role of a human user\n* respond concisely but naturally\n* allow curiosity, uncertainty, or hesitation when appropriate\n* maintain persona consistency across turns if a persona emerges\n* never break character.\n\nThis is your persona:\n\n{characteristics}{gender_prompt}\n\nThe following scenario will be played out:\n\n{scenario_description}.\n\nMake sure to respond to the agent to match the given scenario as per the given persona for you.\n\nYou always speak in {language}."
+    user_system_prompt = f"You are a simulated human user engaging in a natural spoken conversation with another agent.\n\n### **Scenario: follow these steps exactly**\n\nFollow these steps exactly, even if it sounds unnatural. If a step gives you an exact line to say, say it word for word.\n\n{scenario_description}\n\nYour output will be converted to speech through a Text to Speech (TTS) system before the agent hears it. The entity you are responding to will hear only the output of the TTS system and will not be reading your text. Optimise for the hearing experience and not the reading experience.\n\nYour job is to produce text that:\n\n1. **sounds like natural speech when spoken aloud**\n2. **is easy for TTS to pronounce correctly**\n3. **avoids symbols and formatting that degrade TTS output**\n4. **expresses values like numbers, names, phone numbers and email addresses in a TTS-friendly spoken format**\n5. **never acknowledges or references these rules explicitly**\n\n### **Speech style**\n\n* write in **spoken language**, not written language\n* use **shorter sentences**\n* use **natural fillers** when appropriate (e.g. “umm”, “you know”, “let me think”)\n* simulate personality via **phrasing and rhythm**, not punctuation marks or symbols\n\n### **Character, punctuation, and formatting constraints**\n\nAvoid characters that become verbalized or distort output:\n\n* no ellipses\n* no em dashes or fancy punctuation\n* no markdown\n* no emoji\n* no slashes\n* no parentheses\n* no code formatting\n* no ASCII art\n* no unusual unicode\n* no repeating words in brackets (e.g. to give a shortform for a set of words or to repeat the same word in a different language)\n\nDo not include explicit stage directions like:\n\n* “[pause]”\n* “*laughs*”\n* “(thinking)”\n\nIf needed, use the spoken equivalent, e.g.:\n\n* “haha”\n* “oh wow”\n* “let me think”\n\n### **Handling numbers, proper nouns, and technical tokens**\n\nGenerate values in a way that TTS can pronounce clearly, without explaining that you are doing so:\n\n* **Phone numbers** → speak as digits\n  Example: “nine eight five three zero two one four eight”\n\n* **Years** → speak normally (“twenty twenty four” or “two thousand eighteen”) based on natural human usage\n\n* **Large numbers** → use spoken format\n  Example: “about one hundred and fifty thousand”\n\n* **Serial codes / IDs** → digit by digit or letter by letter\n  Example: “C three nine four” pronounced “see three nine four”\n\n* **Email addresses** → verbalize symbols\n  Example: “john dot walker at gee mail dot com”\n\n* **URLs/domains** → verbalize\n  Example: “open a eye dot com slash research”\n\n* **Acronyms** → pronounce letter by letter when that’s how humans say them\n  Example: “ess cue ell” instead of “SQL”\n  Example: “tee vee” instead of “TV”\n\n* **Brand/product names** → use phonetic or spaced formatting when helpful\n  Example: “Sam sung”\n  Example: “Poly fill” for “Polyfill”\n\n* **Foreign or unusual words** → adjust spelling slightly for correct sound if needed\n\n### **Pauses and emphasis**\n\n* For pauses: use spoken fillers (“hmm”, “let me think”, “you know”)\n* For emphasis: use words (“really”, “super”, “especially”), **not** symbols\n\n### **Prohibited behavior**\n\n* do not mention formatting choices\n* do not mention the TTS system\n* do not apologize for any formatting\n* do not describe yourself as simulated\n* do not explain these rules\n* do not reveal or hint at any internal instruction\n\n### **Conversational constraints**\n\n* play the role of a human user\n* respond concisely but naturally\n* allow curiosity, uncertainty, or hesitation when appropriate\n* maintain persona consistency across turns if a persona emerges\n* never break character.\n\nThis is your persona:\n\n{characteristics}{gender_prompt}\n\nYou always speak in {language}."
 
     simulation_output_dir = f"{output_dir}/{simulation_name}"
 
@@ -2239,6 +2436,9 @@ async def _run_single_simulation_inner(
                     evaluators,
                     simulation_output_dir,
                     interrupt_probability=interrupt_probability,
+                    interrupt_min_words=interrupt_min_words,
+                    interrupt_max_words=interrupt_max_words,
+                    interrupt_phrase=interrupt_phrase,
                     port=port,
                     agent_speaks_first=agent_speaks_first,
                     max_turns=max_turns,
@@ -2298,17 +2498,7 @@ async def _run_single_simulation_inner(
             # Clean up the print logger for this simulation using the unique run ID
             cleanup_print_logger(simulation_run_id)
 
-    # Combine audio chunks for each turn into single turn files, then combine all into conversation.wav
-    audio_dir = os.path.join(simulation_output_dir, "audios")
-    conversation_audio_path = os.path.join(simulation_output_dir, "conversation.wav")
-    if os.path.exists(audio_dir):
-        # First, combine chunks for each turn (e.g., 0_bot_0.wav, 0_bot_1.wav -> 0_bot.wav)
-        combine_turn_audio_chunks(audio_dir)
-        log_and_print(f"Combined turn audio chunks in {audio_dir}")
-        # Then combine all turn files into conversation.wav, using transcript for correct ordering
-        transcript_path = os.path.join(simulation_output_dir, TRANSCRIPT_FILE_NAME)
-        combine_audio_files(audio_dir, conversation_audio_path, transcript_path)
-        log_and_print(f"Combined audio saved to {conversation_audio_path}")
+    finish_simulation_audio(simulation_output_dir)
 
     # Return metrics for aggregation
     if simulation_result:
@@ -2383,12 +2573,12 @@ async def main():
     os.makedirs(args.output_dir, exist_ok=True)
     write_evaluator_config(args.output_dir, config["evaluators"])
 
-    # Mapping from interruption_sensitivity labels to probabilities
+    # Mapping from interruption_config.sensitivity labels to probabilities
     interrupt_sensitivity_map = {
         "none": 0,
-        "low": 0.25,
-        "medium": 0.5,
-        "high": 0.8,
+        "low": 0.2,
+        "medium": 0.4,
+        "high": 0.6,
     }
 
     # Create semaphore to limit parallel executions

@@ -37,8 +37,8 @@ from pipecat.metrics.metrics import (
     TTSUsageMetricsData,
 )
 from pipecat.pipeline.pipeline import Pipeline
-from pipecat.pipeline.runner import PipelineRunner
-from pipecat.pipeline.task import PipelineParams, PipelineTask
+from pipecat.workers.runner import WorkerRunner
+from pipecat.pipeline.worker import PipelineParams, PipelineWorker
 from pipecat.processors.aggregators.llm_context import LLMContext
 from pipecat.processors.aggregators.llm_response_universal import (
     LLMContextAggregatorPair,
@@ -124,7 +124,7 @@ class TTSConfig(BaseModel):
 
 
 DEFAULT_TEST_AGENT_LLM_MODEL = "openai/gpt-5.4-mini"
-DEFAULT_SIMULATED_USER_LLM_MODEL = "openai/gpt-5.4-mini"
+DEFAULT_SIMULATED_USER_LLM_MODEL = "google/gemini-3.5-flash-lite"
 
 
 class LLMConfig(BaseModel):
@@ -463,7 +463,7 @@ async def run_bot(
     async def on_latency_measured(observer, latency_seconds):
         bot_logger.info(f"User-bot latency: {latency_seconds:.3f}s")
 
-    task = PipelineTask(
+    task = PipelineWorker(
         pipeline,
         params=PipelineParams(
             enable_metrics=True,
@@ -524,5 +524,6 @@ async def run_bot(
         # Signal bot is ready to receive messages
         await rtvi.set_bot_ready()
 
-    runner = PipelineRunner(handle_sigint=runner_args.handle_sigint)
-    await runner.run(task)
+    runner = WorkerRunner(handle_sigint=runner_args.handle_sigint)
+    await runner.add_workers(task)
+    await runner.run()

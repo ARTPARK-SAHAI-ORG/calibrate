@@ -299,7 +299,7 @@ Build a voice/chat agent inside Calibrate. This config is the managed defaults s
     "config": {
       "system_prompt": "You are a helpful assistant.",
       "llm": {
-        "model": "google/gemini-2.5-flash"
+        "model": "google/gemini-3.5-flash-lite"
       },
       "stt": {
         "provider": "google"
@@ -412,7 +412,7 @@ See **GET /annotation-tasks** in the [API reference](/api-reference/introduction
 
 ### get-annotation-agreement
 
-Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a trend series.
+Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a chance-corrected kappa for each evaluator.
 
 **Scope:** `read` · **Access:** Read-only
 
@@ -421,8 +421,9 @@ Get human-vs-human and human-vs-evaluator agreement metrics for a task, with a t
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_uuid` | string | Yes | Annotation task to act on |
-| `bucket` | string | No | How to bucket points in the trend series |
-| `days` | integer | No | Trailing window in days for the trend series |
+| `date_field` | string | No | Which date `start` and `end` apply to: |
+| `start` | string | No | Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `end` | string | No | Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
 
 See **GET /annotation-tasks/&#123;task_uuid&#125;/agreement** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -455,6 +456,9 @@ Get a paginated summary table for a task, with each item's evaluator values and 
 | `item_id` | string | No | Filter rows to a single item. The full task-wide annotator union is still returned in `annotators` |
 | `live_only` | boolean | No | When true, emit only one row for each (item, evaluator) pair using the evaluator's live version. Versions other than the live one that have runs are excluded |
 | `disagreement_only` | boolean | No | When true, keep only rows where the evaluator disagreed with at least one annotator |
+| `date_field` | string | No | Which date `start` and `end` apply to: |
+| `start` | string | No | Return only rows or answers dated at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `end` | string | No | Return only rows or answers dated before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
 | `q` | string | No | Case-insensitive substring search on `payload.name`. Blank is a no-op |
 | `sort_by` | string | No | Sort key for the results |
 | `order` | string | No | Sort direction |
@@ -513,6 +517,7 @@ Assign items to annotators, creating one labelling job per annotator. Each job c
 | `evaluator_ids` | array of string | No | Subset of the task's linked evaluators to show in these jobs. Must be a subset of the current links, an empty list gives a 400. Applies to every annotator's job. Omit (`None`) to snapshot every linked evaluator |
 | `comments_enabled` | boolean | No | When `true`, the labelling form lets the annotator leave a comment on each item |
 | `reasoning_mode` | string | No | How the labelling form treats the reasoning box on each judgement. `optional` shows it, `required` shows it and asks the annotator to fill it in, `hidden` leaves it out |
+| `evaluator_reasoning_modes` | object | No | Map of evaluator ID to how the labelling form treats the reasoning box for that evaluator, with the same values as `reasoning_mode`. Every ID must be an evaluator on these jobs, otherwise you get a 400. An evaluator left out uses `reasoning_mode` |
 
 See **POST /annotation-tasks/&#123;task_uuid&#125;/jobs** in the [API reference](/api-reference/introduction) tab for the full schema.
 
@@ -624,6 +629,57 @@ Rename an annotator in your workspace.
 
 See **PUT /annotators/&#123;annotator_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
+## Datasets
+
+### get-dataset
+
+Get one dataset in the caller's org with all of its items, each with
+a download link for its audio (STT) and its text.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `dataset_id` | string | Yes | The dataset to retrieve |
+
+See **GET /datasets/&#123;dataset_id&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### create-dataset
+
+Create an empty STT or TTS dataset in the caller's org. The name must
+be unique in the workspace (409 otherwise). Add items separately.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `name` | string | Yes | Dataset name, unique within the workspace |
+| `dataset_type` | string | Yes | `stt` items carry audio + ground-truth text. `tts` items carry text only |
+
+See **POST /datasets** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+### upload-dataset-item
+
+Upload one WAV clip (at most 25 MB and 10 minutes) with its
+ground-truth transcript and append it to an STT dataset in the
+caller's org.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `dataset_id` | string | Yes | The STT dataset to add the item to |
+| `audio` | string | Yes | WAV file of the spoken audio, at most 25 MB and 10 minutes long |
+| `text` | string | Yes | Ground-truth transcript of the audio |
+
+See **POST /datasets/&#123;dataset_id&#125;/items/upload** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ## Evaluators
 
 ### list-evaluators
@@ -692,11 +748,25 @@ Add a new version to an evaluator you created, optionally making it live. The va
 | `evaluator_uuid` | string | Yes | Evaluator to add a version to |
 | `judge_model` | string | Yes | The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4` |
 | `system_prompt` | string | Yes | Judge system prompt. May contain `{{variable}}` placeholders |
-| `output_config` | OutputConfig | No | The scale points and their labels. Required for a `rating` evaluator. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own |
+| `output_config` | OutputConfig | No | The rows of the rating scale, each a number and its label. Required for a `rating` evaluator. For a rating evaluator, give the label for the worst result the lowest number and the label for the best result the highest number. A `binary` evaluator uses the default Correct/Wrong labels unless you set your own |
 | `variables` | array of VariableSpec | No | Declared prompt variables. Omit if the prompt has none. After the first version the variable names are fixed. You can change a variable's description or default, but not add, remove, or rename one |
 | `make_live` | boolean | No | When `true`, immediately point the evaluator's live version at this new version |
 
 See **POST /evaluators/&#123;evaluator_uuid&#125;/versions** in the [API reference](/api-reference/introduction) tab for the full schema.
+
+## Organizations
+
+### get-current-workspace
+
+Get the workspace the caller's API key belongs to, as its ID and
+name. Put the ID at the front of a Calibrate web address to link
+straight to something in that workspace, as in `/<uuid>/tests`.
+Without it, a link opens whichever workspace the reader looked at
+last. Requires a Calibrate API key (CALIBRATE_API_KEY).
+
+**Scope:** `read` · **Access:** Read-only
+
+See **GET /organizations/current** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ## Tests
 
@@ -793,6 +863,39 @@ fields to change (name, config). Returns the updated test. Fails with
 See **PUT /tests/&#123;test_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ## Traces
+
+### list-traces
+
+List the traces in the caller's org, newest first, one page at a
+time. Each trace carries a short preview of its last user message
+and reply, its tool calls and labels, and the scores from its
+latest scoring run with each evaluator's reasoning and evaluator
+version. Filter by agent, label, creation time, text, or score.
+Set include_content to also get each trace's full input, output
+and metadata.
+
+**Scope:** `read` · **Access:** Read-only
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_id` | string | No | Return only traces from this agent |
+| `conversation_id` | string | No | Return only the turns of this conversation. Requires `agent_id` |
+| `q` | string | No | Return only traces containing this text in their message ID, conversation ID, conversation history, output, or metadata |
+| `output_type` | string | No | Return only traces whose output is of this kind. `response` covers every trace carrying a reply, including one that also issued tool calls. `tool_call` covers traces that only issued tool calls |
+| `labels` | array of string | No | Return only traces carrying at least one of these labels. Repeat the parameter for each label |
+| `score` | array of string | No | Return only traces whose latest scoring run matches this condition. Each is written as `<evaluator ID>:<condition>`, where the condition is `passed`, `failed`, or one of `=`, `!=`, `<`, `<=`, `>`, `>=` followed by a number, such as `>=4`. Repeat the parameter to require every condition at once |
+| `created_after` | string | No | Return only traces created at or after this time (ISO 8601). A time with no timezone is read as UTC. Omit for no earliest date |
+| `created_before` | string | No | Return only traces created before this time (ISO 8601). A time with no timezone is read as UTC. Omit for no latest date |
+| `sort_by_evaluator` | string | No | Order traces by this evaluator's score on each trace's latest scoring run. Traces this evaluator has not scored come last whichever direction you pick, and an evaluator not linked to the agent counts as having scored none |
+| `sort_order` | string | No | Whether `sort_by_evaluator` puts the highest scores first or the lowest. Ignored without it |
+| `include_content` | boolean | No | Also return each trace's full input, output and metadata. Use `limit` and `offset` to page through them |
+| `include_score_averages` | boolean | No | Also return each evaluator's mean score over every matching trace, not just this page. Costs a pass over those traces, so ask for it when the filters change rather than on every page |
+| `limit` | integer | No | Maximum number of items to return |
+| `offset` | integer | No | Number of items to skip before returning results |
+
+See **GET /traces** in the [API reference](/api-reference/introduction) tab for the full schema.
 
 ### create-trace
 

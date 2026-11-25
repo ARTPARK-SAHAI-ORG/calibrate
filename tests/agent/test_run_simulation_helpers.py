@@ -1,7 +1,9 @@
 """Tests for simple helpers in calibrate_agent/agent/run_simulation.py."""
 
 import asyncio
+import os
 import socket
+import tempfile
 import unittest
 from unittest.mock import patch, AsyncMock, MagicMock
 
@@ -179,7 +181,7 @@ class TestConfigWithoutTools(unittest.IsolatedAsyncioTestCase):
             "characteristics": "polite",
             "gender": "neutral",
             "language": "english",
-            "interruption_sensitivity": "none",
+            "interruption_config": {"sensitivity": "none"},
         }
         scenario = {"name": "s", "description": "d"}
 
@@ -316,8 +318,8 @@ class TestBuildUserContextAggregator(unittest.TestCase):
         self.assertTrue(
             any(isinstance(s, TurnAnalyzerUserTurnStopStrategy) for s in strategies.stop)
         )
-        # ExternalUserTurnStopStrategy is present ONLY to hard-stop the turn on an
-        # explicit interrupt UserStopped; timeout=None disables its auto-timeout so
+        # ExternalUserTurnStopStrategy is present ONLY to end the turn on a sim-user
+        # cut-in (ProposedUserStoppedSpeakingFrame); timeout=None disables its auto-timeout so
         # it never pre-empts smart-turn on normal turns.
         external_stops = [
             s for s in strategies.stop if isinstance(s, ExternalUserTurnStopStrategy)
@@ -388,6 +390,41 @@ class TestSilencePadder(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(padder._silence_duration_ms, 200)
         self.assertEqual(padder._chunk_ms, 20)
 
+    async def test_agent_told_to_stop_when_cut_in_reply_starts_playing(self):
+        from calibrate_agent.agent.run_simulation import SilencePadder
+        from pipecat.frames.frames import (
+            OutputAudioRawFrame,
+            OutputTransportMessageUrgentFrame,
+        )
+        from pipecat.processors.frame_processor import FrameDirection
+
+        adapter = MagicMock(_agent_stop_pending=True, _sim_user_turn_pending=False)
+        padder = SilencePadder(rtvi_message_adapter=adapter)
+        pushed = []
+
+        async def capture(frame, direction=FrameDirection.DOWNSTREAM):
+            pushed.append(frame)
+
+        padder.push_frame = capture
+        audio = lambda: OutputAudioRawFrame(
+            audio=b"\x01\x00", sample_rate=16000, num_channels=1
+        )
+        await padder.process_frame(audio(), FrameDirection.DOWNSTREAM)
+        await padder.process_frame(audio(), FrameDirection.DOWNSTREAM)
+
+        kinds = [type(f).__name__ for f in pushed]
+        # One stop message, sent just before the reply's first audio.
+        self.assertEqual(
+            kinds,
+            [
+                "OutputTransportMessageUrgentFrame",
+                "OutputAudioRawFrame",
+                "OutputAudioRawFrame",
+            ],
+        )
+        self.assertEqual(pushed[0].message["data"], {"t": "interrupt"})
+        self.assertFalse(adapter._agent_stop_pending)
+
 
 class TestResolveSerializer(unittest.TestCase):
     def test_protobuf_returns_instance(self):
@@ -407,6 +444,43 @@ class TestResolveSerializer(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             resolve_serializer("nope")
+
+
+class TestEvalAgentSerializer(unittest.IsolatedAsyncioTestCase):
+    """Frames the agent under test sends, as the eval agent decodes them."""
+
+    async def _round_trip(self, frame):
+        from calibrate_agent.agent.run_simulation import resolve_serializer
+        from pipecat.serializers.protobuf import ProtobufFrameSerializer
+
+        data = await ProtobufFrameSerializer().serialize(frame)
+        self.assertIsNotNone(data)
+        return await resolve_serializer("protobuf").deserialize(data)
+
+    async def test_drops_interruption(self):
+        from pipecat.frames.frames import InterruptionFrame
+
+        self.assertIsNone(await self._round_trip(InterruptionFrame()))
+
+    async def test_keeps_audio(self):
+        from pipecat.frames.frames import InputAudioRawFrame, OutputAudioRawFrame
+
+        frame = await self._round_trip(
+            OutputAudioRawFrame(audio=b"\x01\x02" * 160, sample_rate=16000, num_channels=1)
+        )
+        self.assertIsInstance(frame, InputAudioRawFrame)
+        self.assertEqual(frame.audio, b"\x01\x02" * 160)
+
+    async def test_keeps_rtvi_messages(self):
+        from pipecat.frames.frames import (
+            InputTransportMessageFrame,
+            OutputTransportMessageUrgentFrame,
+        )
+
+        message = {"label": "rtvi-ai", "type": "bot-interrupted"}
+        frame = await self._round_trip(OutputTransportMessageUrgentFrame(message=message))
+        self.assertIsInstance(frame, InputTransportMessageFrame)
+        self.assertEqual(frame.message, message)
 
 
 class TestIsExternalWsAgent(unittest.TestCase):
@@ -495,12 +569,68 @@ class TestEndToEndLatencyTracker(unittest.TestCase):
         self.assertGreater(tracker.mean(), 0)
 
 
+class TestInterruptionSettingsValidation(unittest.IsolatedAsyncioTestCase):
+    """Bad interruption settings stop the simulation with a clear error."""
+
+    async def _run(self, persona_extra=None, scenario_extra=None):
+        from calibrate_agent.agent import run_simulation as RS
+
+        persona = {"characteristics": "polite", **(persona_extra or {})}
+        scenario = {"description": "d", **(scenario_extra or {})}
+        # If a check is missing, the mocked bot ends at once and the run fails
+        # with a different error instead of starting a real simulation.
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            RS, "start_bot", AsyncMock()
+        ), patch.object(RS, "run_simulation", AsyncMock(return_value={})):
+            await RS._run_single_simulation_inner(
+                {}, 0, persona, 0, scenario, tmp, {"none": 0.0}
+            )
+
+    async def test_rejects_bad_word_counts(self):
+        for key in ("min_words", "max_words"):
+            for value in (0, -1, 2.5, "5", True):
+                with self.subTest(key=key, value=value):
+                    with self.assertRaisesRegex(
+                        ValueError, f"Invalid interruption_config.{key}"
+                    ):
+                        await self._run({"interruption_config": {key: value}})
+
+    async def test_rejects_max_below_min(self):
+        with self.assertRaisesRegex(ValueError, "must be at least"):
+            await self._run(
+                {"interruption_config": {"min_words": 5, "max_words": 4}}
+            )
+
+    async def test_rejects_empty_phrase(self):
+        for value in ("", "  ", "?!", 5):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "when_agent_says"):
+                    await self._run(
+                        scenario_extra={"interruption_config": {"when_agent_says": value}}
+                    )
+
+    async def test_rejects_old_top_level_sensitivity(self):
+        with self.assertRaisesRegex(ValueError, "interruption_config"):
+            await self._run({"interruption_sensitivity": "low"})
+
+    async def test_rejects_unknown_or_malformed_config(self):
+        for persona_extra in (
+            {"interruption_config": {"min_word": 3}},
+            {"interruption_config": "high"},
+            {"interruption_config": []},
+            {"interruption_config": False},
+        ):
+            with self.subTest(persona_extra=persona_extra):
+                with self.assertRaisesRegex(ValueError, "interruption_config"):
+                    await self._run(persona_extra)
+
+
 class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
     """A new bot utterance must clear stale interrupt flags.
 
     Regression test: agents that speak a turn as separate utterances (a short
-    acknowledgement then the reply) previously left ``_is_bot_interrupt_decided``/
-    ``_is_bot_interrupt_triggered`` set across the utterance boundary, so the next
+    acknowledgement then the reply) previously left ``_is_bot_interrupt_triggered``
+    set across the utterance boundary, so the next
     utterance's audio was dropped and its text ignored — the simulated user never
     "heard" the reply and the run deadlocked.
     """
@@ -511,10 +641,8 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
 
         ctx = MagicMock()
         ctx.get_messages.return_value = []  # 0 agent turns < max_turns
-        audio_buffer = MagicMock()
         return RTVIMessageFrameAdapter(
             context=ctx,
-            audio_buffer=audio_buffer,
             interrupt_probability=0.0,
             tool_calls=[],
             stt_outputs=[],
@@ -538,17 +666,13 @@ class TestBotStartedResetsInterruptState(unittest.IsolatedAsyncioTestCase):
 
     async def test_stale_interrupt_flags_cleared_on_new_utterance(self):
         adapter = self._make_adapter()
-        # Simulate a prior utterance that decided/triggered an interrupt but never
-        # saw the clearing ``user-stopped-speaking``.
-        adapter._is_bot_interrupt_decided = True
+        # Simulate a prior utterance that triggered an interrupt but never saw the
+        # clearing ``user-stopped-speaking``.
         adapter._is_bot_interrupt_triggered = True
-        adapter._spoken_text_buffer = "stale ack text"
 
         await self._send_bot_started(adapter)
 
-        self.assertFalse(adapter._is_bot_interrupt_decided)
         self.assertFalse(adapter._is_bot_interrupt_triggered)
-        self.assertEqual(adapter._spoken_text_buffer, "")
 
 
 class TestBuildSimulatedUserLlm:
@@ -562,8 +686,77 @@ class TestBuildSimulatedUserLlm:
             RS.build_simulated_user_llm()
         kwargs = svc.call_args.kwargs
         assert kwargs["api_key"] == "or-fake"
-        svc.Settings.assert_called_once_with(model="openai/gpt-5.4-mini")
+        svc.Settings.assert_called_once_with(model="google/gemini-3.5-flash-lite")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestCallRecorderKeepsGaps(unittest.IsolatedAsyncioTestCase):
+    """conversation.wav comes from pipecat's call recorder, which fills the time
+    between turns with silence, so the file is as long as the call."""
+
+    async def test_silence_between_turns_is_kept(self):
+        import wave
+        from pipecat.frames.frames import InputAudioRawFrame, OutputAudioRawFrame
+        from pipecat.processors.audio import audio_buffer_processor as ABP
+        from calibrate_agent.agent import run_simulation as RS
+
+        half_second = b"\x01\x00" * 8000
+        now = [100.0]
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            ABP.time, "monotonic", lambda: now[0]
+        ):
+            recorder = RS.build_call_recorder(tmp)
+            recorder._sample_rate = 16000  # normally set when the pipeline starts
+            await recorder.start_recording()
+            # The agent speaks for 0.5 s, then the sim user answers 3.5 s later.
+            await recorder._process_recording(
+                InputAudioRawFrame(audio=half_second, sample_rate=16000, num_channels=1)
+            )
+            now[0] = 103.5
+            await recorder._process_recording(
+                OutputAudioRawFrame(audio=half_second, sample_rate=16000, num_channels=1)
+            )
+            await recorder.stop_recording()
+            await recorder.cleanup()
+
+            with wave.open(os.path.join(tmp, "conversation.wav")) as wf:
+                seconds = wf.getnframes() / wf.getframerate()
+        self.assertGreater(seconds, 3.0)
+
+
+class TestConversationAudio(unittest.IsolatedAsyncioTestCase):
+    async def test_recorder_audio_saved_as_conversation_wav(self):
+        import wave
+        from calibrate_agent.agent import run_simulation as RS
+
+        with tempfile.TemporaryDirectory() as tmp:
+            await RS.save_conversation_audio(tmp, b"\x01\x00" * 16000, 16000, 1)
+            with wave.open(os.path.join(tmp, "conversation.wav")) as wf:
+                self.assertEqual(wf.getnframes() / wf.getframerate(), 1.0)
+
+    def test_turns_joined_only_when_recorder_wrote_nothing(self):
+        from calibrate_agent.agent import run_simulation as RS
+
+        for recorded in (True, False):
+            with self.subTest(recorded=recorded), tempfile.TemporaryDirectory() as tmp:
+                os.makedirs(os.path.join(tmp, "audios"))
+                if recorded:
+                    open(os.path.join(tmp, "conversation.wav"), "wb").close()
+                with patch.object(RS, "combine_turn_audio_chunks") as chunks, patch.object(
+                    RS, "combine_audio_files"
+                ) as join:
+                    RS.finish_simulation_audio(tmp)
+                chunks.assert_called_once()
+                self.assertEqual(join.called, not recorded)
+
+    def test_no_audio_folder_does_nothing(self):
+        from calibrate_agent.agent import run_simulation as RS
+
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            RS, "combine_audio_files"
+        ) as join:
+            RS.finish_simulation_audio(tmp)
+        join.assert_not_called()

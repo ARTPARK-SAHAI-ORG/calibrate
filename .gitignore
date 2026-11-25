@@ -143,3 +143,6 @@ site/
 .claude/*
 !.claude/skills
 !.claude/skills/**
+
+# Audio, transcripts and page mapping behind the docs videos
+/docs-video-sources/

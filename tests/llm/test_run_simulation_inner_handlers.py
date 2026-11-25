@@ -26,6 +26,7 @@ class TestRunSimulationWithTools(unittest.IsolatedAsyncioTestCase):
         fake_user_llm.register_function = MagicMock()
 
         fake_runner = MagicMock()
+        fake_runner.add_workers = AsyncMock()
         fake_runner.run = AsyncMock(return_value=None)
         fake_context = MagicMock()
         fake_context._messages = []
@@ -41,8 +42,8 @@ class TestRunSimulationWithTools(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as tmp, \
              patch.object(RS, "OpenRouterLLMService",
                           side_effect=[fake_bot_llm, fake_user_llm]), \
-             patch.object(RS, "PipelineTask"), \
-             patch.object(RS, "PipelineRunner", return_value=fake_runner), \
+             patch.object(RS, "PipelineWorker"), \
+             patch.object(RS, "WorkerRunner", return_value=fake_runner), \
              patch.object(RS, "Pipeline"), \
              patch.object(RS, "LLMContext", return_value=fake_context), \
              patch.object(RS, "LLMContextAggregatorPair"), \

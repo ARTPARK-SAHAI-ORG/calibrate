@@ -19,9 +19,9 @@ from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
 from calibrate_agent.utils import log_judge_io
 from calibrate_agent.stt.sarvam_llm_wer.main import LLMEquivalenceResponse, build_prompt
 
-# Model used to grade segment equivalence. Matches Sarvam's llm_wer flow, which
-# judges with google/gemini-2.5-flash (reached here via OpenRouter).
-DEFAULT_LLM_WER_MODEL = "google/gemini-2.5-flash"
+# Model used to grade segment equivalence. Sarvam's llm_wer flow judges with
+# google/gemini-2.5-flash, which is retired, so this uses its successor.
+DEFAULT_LLM_WER_MODEL = "google/gemini-3.5-flash-lite"
 
 
 @backoff.on_exception(backoff.expo, Exception, max_tries=5, factor=2)

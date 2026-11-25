@@ -1,0 +1,20 @@
+---
+title: "Rate limits"
+description: "The rate limits on your workspace"
+---
+
+Calibrate runs your evaluations using AI providers such as OpenRouter and Deepgram. By default, Calibrate uses its own API keys for these providers and pays for the usage, so the rate limits are lower. If you [add your own API keys (BYOK)](/reference/byok) for these providers, your provider accounts pay instead, and the rate limits are removed.
+
+| Rate limit | Default | BYOK |
+| --- | --- | --- |
+| Number of tests in one agent evaluation run | 20 | No limit |
+| Rows in one speech-to-text evaluation | 20 | No limit |
+| Rows in one text-to-speech evaluation | 20 | No limit |
+| Rows in one simulation | 20 | No limit |
+| Number of evaluator scores in one run on a [labelling task](/app/human-alignment/labelling-tasks) | 20 | No limit |
+| Total production traces scored | 100 | No limit |
+| Production traces stored | 50,000 | 50,000 |
+
+## Request a rate limit increase
+
+If you want to continue using Calibrate's default API keys but want your rate limits increased, reach out to us using [this form](https://forms.gle/Y3ogh31jqRNiUXMJ7).

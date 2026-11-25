@@ -16,11 +16,9 @@ def _make_adapter(**overrides):
     ctx = MagicMock()
     ctx.get_messages.return_value = []
 
-    audio_buffer = MagicMock()
 
     defaults = dict(
         context=ctx,
-        audio_buffer=audio_buffer,
         interrupt_probability=0.0,
         tool_calls=[],
         stt_outputs=[],
@@ -267,11 +265,9 @@ class TestResetBuffers(unittest.IsolatedAsyncioTestCase):
             adapter = _make_adapter(output_dir=tmp)
             adapter._text_buffer = "hi"
             adapter._heard_text_buffer = "hi"
-            adapter._spoken_text_buffer = "hi"
             adapter._turn_index = 1
             await adapter._reset_buffers()
             self.assertEqual(adapter._text_buffer, "")
-            self.assertEqual(adapter._spoken_text_buffer, "")
 
 
 def _rtvi_frame(msg_type):
@@ -294,7 +290,7 @@ async def _drive_rtvi(adapter, msg_type, pushed=None):
     if pushed is None:
         pushed = []
 
-    async def _capture(frame, direction):
+    async def _capture(frame, direction=FrameDirection.DOWNSTREAM):
         pushed.append((frame, direction))
 
     adapter.push_frame = _capture
@@ -307,9 +303,14 @@ def _count_frames(pushed, frame_cls):
 
 
 def _count_interruptions(pushed):
-    from pipecat.frames.frames import InterruptionTaskFrame
+    from pipecat.frames.frames import InterruptionFrame
+    from pipecat.processors.frame_processor import FrameDirection
 
-    return _count_frames(pushed, InterruptionTaskFrame)
+    return sum(
+        1
+        for f, d in pushed
+        if isinstance(f, InterruptionFrame) and d == FrameDirection.DOWNSTREAM
+    )
 
 
 class TestNaturalInterrupt(unittest.IsolatedAsyncioTestCase):
@@ -376,7 +377,7 @@ async def _drive_frame(adapter, frame, pushed=None):
     if pushed is None:
         pushed = []
 
-    async def _capture(f, direction):
+    async def _capture(f, direction=FrameDirection.DOWNSTREAM):
         pushed.append((f, direction))
 
     adapter.push_frame = _capture
@@ -396,51 +397,72 @@ def _count_interrupt_messages(pushed):
 
 
 class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
-    """External agents get the block model: a decided interrupt cuts the agent off
-    at once and blocks its output until the sim user finishes. Internal agents keep
-    the word-level path (decision only; trigger later on stream/spoken match)."""
+    """A decided interrupt ends the agent's turn at once, for internal and external
+    agents alike, so the sim user starts its reply. The agent is told to stop when
+    that reply starts playing. External agents also get their output blocked until
+    the sim user finishes."""
 
-    async def test_external_interrupt_executes_immediately(self):
+    async def test_cut_in_ends_turn_at_once_and_defers_stop(self):
         from pipecat.frames.frames import (
             TranscriptionFrame,
-            UserStoppedSpeakingFrame,
+            ProposedUserStoppedSpeakingFrame,
             InterimTranscriptionFrame,
         )
 
-        with tempfile.TemporaryDirectory() as tmp:
-            adapter = _make_adapter(
-                output_dir=tmp, interrupt_probability=1.0, is_external=True
-            )
-            pushed = await _drive_frame(adapter, _bot_output_frame("नमस्ते!", True))
+        for is_external in (True, False):
+            with self.subTest(is_external=is_external):
+                with tempfile.TemporaryDirectory() as tmp:
+                    adapter = _make_adapter(
+                        output_dir=tmp,
+                        interrupt_probability=1.0,
+                        interrupt_min_words=1,
+                        interrupt_max_words=1,
+                        is_external=is_external,
+                    )
+                    await _drive_bot_started(adapter)
+                    pushed = await _drive_frame(
+                        adapter, _bot_output_frame("नमस्ते!", True)
+                    )
 
-        self.assertTrue(adapter._is_bot_interrupt_triggered)
-        # Tells the agent to stop, commits the partial, ends the turn.
-        self.assertEqual(_count_interrupt_messages(pushed), 1)
-        self.assertEqual(_count_frames(pushed, TranscriptionFrame), 1)
-        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 1)
-        # Nothing more is fed to the sim user (no interim after cutting in).
-        self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 0)
+                self.assertTrue(adapter._is_bot_interrupt_triggered)
+                # Commits the partial and ends the turn. The agent is told to stop
+                # later, when the sim user's reply starts playing.
+                self.assertEqual(_count_interrupt_messages(pushed), 0)
+                self.assertTrue(adapter._agent_stop_pending)
+                self.assertEqual(_count_frames(pushed, TranscriptionFrame), 1)
+                self.assertEqual(_count_frames(pushed, ProposedUserStoppedSpeakingFrame), 1)
+                # Nothing more is fed to the sim user (no interim after cutting in).
+                self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 0)
 
-    async def test_internal_interrupt_only_decides(self):
+    async def test_first_word_interrupt_follows_the_interruption(self):
         from pipecat.frames.frames import (
-            UserStoppedSpeakingFrame,
-            InterimTranscriptionFrame,
+            InterruptionFrame,
+            TranscriptionFrame,
+            ProposedUserStoppedSpeakingFrame,
         )
+        from pipecat.processors.frame_processor import FrameDirection
 
         with tempfile.TemporaryDirectory() as tmp:
             adapter = _make_adapter(
-                output_dir=tmp, interrupt_probability=1.0, is_external=False
+                output_dir=tmp,
+                interrupt_probability=1.0,
+                interrupt_min_words=1,
+                interrupt_max_words=1,
             )
-            pushed = await _drive_frame(adapter, _bot_output_frame("नमस्ते!", True))
+            pushed = []
+            await _drive_frame(adapter, _rtvi_frame("bot-started-speaking"), pushed)
+            await _drive_frame(adapter, _bot_output_frame("नमस्ते", True), pushed)
 
-        # Internal: decision is made but the interrupt is NOT executed yet; it waits
-        # for the spoken text to catch up (word-level control).
-        self.assertTrue(adapter._is_bot_interrupt_decided)
-        self.assertFalse(adapter._is_bot_interrupt_triggered)
-        self.assertEqual(_count_interrupt_messages(pushed), 0)
-        self.assertEqual(_count_frames(pushed, UserStoppedSpeakingFrame), 0)
-        # Internal still feeds what was heard up to the cut-in point.
-        self.assertEqual(_count_frames(pushed, InterimTranscriptionFrame), 1)
+        downstream = [f for f, d in pushed if d == FrameDirection.DOWNSTREAM]
+        first = lambda cls: next(
+            i for i, f in enumerate(downstream) if isinstance(f, cls)
+        )
+        # The sim user's LLM must see the interruption before the reply it
+        # cancels, or the reply is dropped and the run hangs.
+        self.assertLess(first(InterruptionFrame), first(TranscriptionFrame))
+        self.assertLess(first(InterruptionFrame), first(ProposedUserStoppedSpeakingFrame))
+        # The stop must follow the heard text, or the turn waits for its timeout.
+        self.assertLess(first(TranscriptionFrame), first(ProposedUserStoppedSpeakingFrame))
 
     async def test_bot_started_blocked_while_external_interrupt_active(self):
         adapter = _make_adapter(is_external=True)
@@ -460,6 +482,247 @@ class TestExternalAgentInterrupt(unittest.IsolatedAsyncioTestCase):
         pushed = await _drive_frame(adapter, frame)
         # Dropped, not forwarded to the aggregator's VAD (would cancel the sim user).
         self.assertEqual(_count_frames(pushed, InputAudioRawFrame), 0)
+
+
+def _bot_output_data_frame(data):
+    from pipecat.frames.frames import InputTransportMessageFrame
+
+    return InputTransportMessageFrame(
+        message={"label": "rtvi-ai", "type": "bot-output", "data": data}
+    )
+
+
+def _v2_sentence(text, segment_id=1):
+    """RTVI 2.x sentence message sent before synthesis (word-timestamp TTS)."""
+    return {
+        "text": text,
+        "spoken": False,
+        "will_be_spoken": True,
+        "aggregated_by": "sentence",
+        "segment_id": segment_id,
+        "spoken_status": "new",
+        "spoken_progress": {"accumulated_text": "", "remaining_text": text},
+    }
+
+
+def _v2_progress(text, accumulated, segment_id=1):
+    """RTVI 2.x word progress message: ``text`` is the whole sentence."""
+    remaining = text[len(accumulated) :]
+    return {
+        "text": text,
+        "will_be_spoken": True,
+        "aggregated_by": "sentence",
+        "segment_id": segment_id,
+        "spoken_status": "completed" if remaining == "" else "in-progress",
+        "spoken_progress": {"accumulated_text": accumulated, "remaining_text": remaining},
+    }
+
+
+SENTENCE = "Hello there friend."
+LEGACY_MESSAGES = [
+    {"text": SENTENCE, "spoken": False, "aggregated_by": "sentence"},
+    {"text": "Hello", "spoken": True, "aggregated_by": "word"},
+    {"text": "there", "spoken": True, "aggregated_by": "word"},
+    {"text": "friend.", "spoken": True, "aggregated_by": "word"},
+]
+V2_MESSAGES = [
+    _v2_sentence(SENTENCE),
+    _v2_progress(SENTENCE, "Hello"),
+    _v2_progress(SENTENCE, "Hello there"),
+    _v2_progress(SENTENCE, "Hello there friend."),
+]
+# RTVI 2.x message from a TTS without word timestamps: one completed, spoken message.
+V2_COMPLETED_NO_TIMESTAMPS = {**_v2_progress(SENTENCE, SENTENCE, segment_id=7), "spoken": True}
+
+
+class TestParseBotOutput(unittest.TestCase):
+    def test_legacy_word_message(self):
+        adapter = _make_adapter()
+        self.assertEqual(
+            adapter._parse_bot_output({"text": "Hello", "spoken": True}), ("Hello", True)
+        )
+        self.assertEqual(
+            adapter._parse_bot_output({"text": SENTENCE, "spoken": False}),
+            (SENTENCE, False),
+        )
+
+    def test_v2_sentence_is_not_yet_spoken(self):
+        adapter = _make_adapter()
+        self.assertEqual(
+            adapter._parse_bot_output(_v2_sentence(SENTENCE)), (SENTENCE, False)
+        )
+
+    def test_v2_progress_yields_newly_spoken_words(self):
+        adapter = _make_adapter()
+        parsed = [adapter._parse_bot_output(m) for m in V2_MESSAGES[1:]]
+        self.assertEqual(parsed, [("Hello", True), ("there", True), ("friend.", True)])
+
+    def test_v2_new_segment_starts_from_its_own_accumulated_text(self):
+        adapter = _make_adapter()
+        adapter._parse_bot_output(_v2_progress("Hi.", "Hi.", segment_id=1))
+        self.assertEqual(
+            adapter._parse_bot_output(_v2_progress("Hi again.", "Hi", segment_id=2)),
+            ("Hi", True),
+        )
+
+    def test_v2_without_word_timestamps_completed_spoken(self):
+        adapter = _make_adapter()
+        self.assertEqual(
+            adapter._parse_bot_output(V2_COMPLETED_NO_TIMESTAMPS), (SENTENCE, True)
+        )
+
+
+class TestBotOutputFormats(unittest.IsolatedAsyncioTestCase):
+    """Legacy (RTVI 1.x) and RTVI 2.x agents drive the same buffers and decisions."""
+
+    async def _run(self, messages, **overrides):
+        tmp = tempfile.mkdtemp()
+        adapter = _make_adapter(output_dir=tmp, audio_save_dir=tmp, **overrides)
+        pushed = []
+        await _drive_bot_started(adapter, pushed)
+        for m in messages:
+            await _drive_frame(adapter, _bot_output_data_frame(m), pushed)
+        return adapter, pushed
+
+    async def test_v2_matches_legacy_without_interrupt(self):
+        from pipecat.frames.frames import InterimTranscriptionFrame
+
+        legacy, legacy_pushed = await self._run(LEGACY_MESSAGES)
+        v2, v2_pushed = await self._run(V2_MESSAGES)
+        for adapter in (legacy, v2):
+            self.assertEqual(adapter._heard_text_buffer, " Hello there friend.")
+            self.assertEqual(adapter._text_buffer, " " + SENTENCE)
+        self.assertEqual(
+            [f.text for f, _ in v2_pushed if isinstance(f, InterimTranscriptionFrame)],
+            [f.text for f, _ in legacy_pushed if isinstance(f, InterimTranscriptionFrame)],
+        )
+
+    async def test_v2_spoken_word_triggers_interrupt_like_legacy(self):
+        for messages in (LEGACY_MESSAGES, V2_MESSAGES):
+            with self.subTest(v2=messages is V2_MESSAGES):
+                adapter, pushed = await self._run(
+                    messages,
+                    interrupt_probability=1.0,
+                    interrupt_min_words=1,
+                    interrupt_max_words=1,
+                )
+                self.assertTrue(adapter._is_bot_interrupt_triggered)
+                self.assertTrue(adapter._agent_stop_pending)
+
+    async def test_v2_without_word_timestamps_counted_once(self):
+        adapter, _ = await self._run(
+            [_v2_sentence(SENTENCE), V2_COMPLETED_NO_TIMESTAMPS]
+        )
+        self.assertEqual(adapter._text_buffer, " " + SENTENCE)
+        self.assertEqual(adapter._heard_text_buffer, " " + SENTENCE)
+
+
+
+async def _speak_utterance(adapter, words):
+    """Drive one agent utterance word by word. Return the 1-based number of words
+    heard when the sim user cut in, or None if it never cut in."""
+    pushed = []
+    await _drive_frame(adapter, _rtvi_frame("bot-started-speaking"), pushed)
+    cut_in_at = None
+    for i, word in enumerate(words, start=1):
+        await _drive_frame(adapter, _bot_output_frame(word, True), pushed)
+        if cut_in_at is None and adapter._is_bot_interrupt_triggered:
+            cut_in_at = i
+    await _drive_frame(adapter, _rtvi_frame("bot-stopped-speaking"), pushed)
+    await _drive_frame(adapter, _rtvi_frame("user-stopped-speaking"), pushed)
+    return cut_in_at
+
+
+class TestCutInTiming(unittest.IsolatedAsyncioTestCase):
+    """The sim user decides once per agent utterance whether to cut in, then cuts
+    in after a random number of heard words between the persona's min and max."""
+
+    async def test_low_cuts_into_about_a_fifth_of_turns_within_word_range(self):
+        import numpy as np
+
+        np.random.seed(0)
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, audio_save_dir=tmp, interrupt_probability=0.2
+            )
+            words = [f"word{i}" for i in range(30)]
+            results = [await _speak_utterance(adapter, words) for _ in range(400)]
+
+        cut_ins = [r for r in results if r is not None]
+        self.assertAlmostEqual(len(cut_ins) / len(results), 0.2, delta=0.06)
+        self.assertTrue(all(3 <= r <= 12 for r in cut_ins), cut_ins)
+        # Every word count in the range gets picked, not just one end of it.
+        self.assertEqual(set(cut_ins), set(range(3, 13)))
+
+    async def test_two_word_utterance_never_cut_into_with_defaults(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, audio_save_dir=tmp, interrupt_probability=1.0
+            )
+            for _ in range(20):
+                self.assertIsNone(await _speak_utterance(adapter, ["Hi", "there"]))
+
+    async def test_phrase_cuts_in_on_the_phrase_only_once(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp,
+                audio_save_dir=tmp,
+                interrupt_probability=1.0,
+                interrupt_phrase="your date of birth?",
+            )
+            words = "Please tell me Your date, of BIRTH now".split()
+            # Cuts in on "BIRTH", the 7th word, not before; ignores case and commas.
+            self.assertEqual(await _speak_utterance(adapter, words), 7)
+            # The agent says it again: no second cut-in.
+            self.assertIsNone(await _speak_utterance(adapter, words))
+
+    async def test_phrase_matches_whole_words_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            adapter = _make_adapter(
+                output_dir=tmp, audio_save_dir=tmp, interrupt_phrase="no"
+            )
+            self.assertIsNone(await _speak_utterance(adapter, ["I", "know", "now"]))
+
+
+
+class TestCallerTalksOverAgent(unittest.IsolatedAsyncioTestCase):
+    """While the sim user prepares its cut-in reply, the agent keeps talking. Its
+    audio goes only to the call recorder, and it cannot cancel that reply."""
+
+    async def _cut_in(self, **overrides):
+        recorder = MagicMock()
+        recorder.process_frame = AsyncMock()
+        adapter = _make_adapter(
+            interrupt_probability=1.0,
+            interrupt_min_words=1,
+            interrupt_max_words=1,
+            recorder=recorder,
+            **overrides,
+        )
+        await _drive_bot_started(adapter)
+        await _drive_frame(adapter, _bot_output_frame("Hello", True))
+        self.assertTrue(adapter._agent_stop_pending)
+        return adapter, recorder
+
+    async def test_agent_audio_goes_to_recording_only(self):
+        from pipecat.frames.frames import InputAudioRawFrame
+
+        adapter, recorder = await self._cut_in()
+        frame = InputAudioRawFrame(audio=b"\x01\x00", sample_rate=16000, num_channels=1)
+        pushed = await _drive_frame(adapter, frame)
+        self.assertEqual(_count_frames(pushed, InputAudioRawFrame), 0)
+        recorder.process_frame.assert_awaited_once()
+
+    async def test_agent_starting_again_does_not_cancel_reply(self):
+        adapter, _ = await self._cut_in()
+        pushed = await _drive_bot_started(adapter)
+        self.assertEqual(_count_interruptions(pushed), 0)
+        self.assertTrue(adapter._is_bot_interrupt_triggered)
+
+    async def test_sim_user_finishing_clears_pending_stop(self):
+        adapter, _ = await self._cut_in()
+        await _drive_rtvi(adapter, "user-stopped-speaking")
+        self.assertFalse(adapter._agent_stop_pending)
 
 
 if __name__ == "__main__":

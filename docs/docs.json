@@ -14,38 +14,85 @@
         "tab": "Home",
         "groups": [
           {
-            "group": "Get Started",
+            "group": "Get started",
             "pages": [
-              "getting-started/introduction"
+              "getting-started/introduction",
+              "getting-started/create-account",
+              "getting-started/quickstart"
             ]
           },
           {
-            "group": "Quickstart",
+            "group": "Agents",
             "pages": [
-              "quickstart/speech-to-text",
-              "quickstart/text-to-text",
-              "quickstart/text-to-speech",
+              "app/agents/overview",
+              "core-concepts/agents",
+              "core-concepts/agent-connections",
+              "core-concepts/tools",
+              "app/agents/tests",
+              "app/agents/compare-models",
+              "app/agents/monitoring"
+            ]
+          },
+          {
+            "group": "Evaluators",
+            "pages": [
+              "app/evaluators/overview",
+              "app/evaluators/create",
+              "app/evaluators/versions"
+            ]
+          },
+          {
+            "group": "Human alignment",
+            "pages": [
+              "app/human-alignment/overview",
+              "app/human-alignment/labelling-tasks",
+              "app/human-alignment/annotators",
+              "app/human-alignment/agreement",
+              "reference/human-alignment"
+            ]
+          },
+          {
+            "group": "Simulations",
+            "pages": [
+              "app/simulations/overview",
+              "core-concepts/personas",
+              "core-concepts/scenarios",
+              "core-concepts/metrics",
               "quickstart/simulations"
             ]
           },
           {
-            "group": "Core Concepts",
+            "group": "Speech-to-text",
             "pages": [
+              "quickstart/speech-to-text",
               "core-concepts/speech-to-text",
+              "app/speech-to-text/datasets"
+            ]
+          },
+          {
+            "group": "Text-to-speech",
+            "pages": [
+              "quickstart/text-to-speech",
               "core-concepts/text-to-speech",
-              "core-concepts/agents",
-              "core-concepts/agent-connections",
-              "core-concepts/tools",
-              "core-concepts/personas",
-              "core-concepts/scenarios",
-              "core-concepts/metrics"
+              "app/text-to-speech/datasets"
+            ]
+          },
+          {
+            "group": "Workspaces for Teams",
+            "pages": [
+              "app/workspace-settings/overview",
+              "app/workspace-settings/members",
+              "app/workspace-settings/settings",
+              "reference/byok",
+              "reference/api-keys",
+              "reference/rate-limits"
             ]
           },
           {
             "group": "Reference",
             "pages": [
-              "reference/api-keys",
-              "reference/byok",
+              "reference/product-tour",
+              "reference/learning-resources",
               "reference/github-actions"
             ]
           }
@@ -130,6 +177,15 @@
             ]
           },
           {
+            "group": "Datasets",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "POST /datasets",
+              "GET /datasets/{dataset_id}",
+              "POST /datasets/{dataset_id}/items/upload"
+            ]
+          },
+          {
             "group": "Evaluators",
             "openapi": "api-reference/openapi.json",
             "pages": [
@@ -137,6 +193,13 @@
               "POST /evaluators",
               "GET /evaluators/{evaluator_uuid}",
               "POST /evaluators/{evaluator_uuid}/versions"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "openapi": "api-reference/openapi.json",
+            "pages": [
+              "GET /organizations/current"
             ]
           },
           {
@@ -154,6 +217,7 @@
             "group": "Traces",
             "openapi": "api-reference/openapi.json",
             "pages": [
+              "GET /traces",
               "POST /traces"
             ]
           }
@@ -176,7 +240,9 @@
               "cli/calibrate/agents",
               "cli/calibrate/annotation-tasks",
               "cli/calibrate/annotators",
+              "cli/calibrate/datasets",
               "cli/calibrate/evaluators",
+              "cli/calibrate/organizations",
               "cli/calibrate/tests",
               "cli/calibrate/traces"
             ]
@@ -245,12 +311,26 @@
             ]
           },
           {
+            "group": "Datasets",
+            "pages": [
+              "sdk/datasets/create",
+              "sdk/datasets/get",
+              "sdk/datasets/upload_item"
+            ]
+          },
+          {
             "group": "Evaluators",
             "pages": [
               "sdk/evaluators/list",
               "sdk/evaluators/create",
               "sdk/evaluators/get",
               "sdk/evaluators/create_version"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "sdk/organizations/current"
             ]
           },
           {
@@ -266,6 +346,7 @@
           {
             "group": "Traces",
             "pages": [
+              "sdk/traces/list",
               "sdk/traces/create"
             ]
           }
@@ -333,14 +414,7 @@
       },
       {
         "tab": "Use cases",
-        "groups": [
-          {
-            "group": "Browse use cases",
-            "pages": [
-              "examples/overview"
-            ]
-          }
-        ]
+        "href": "https://calibrate.artpark.ai/#use-cases"
       }
     ],
     "global": {
@@ -414,5 +488,15 @@
     "socials": {
       "github": "https://github.com/artpark-sahai-org/calibrate"
     }
-  }
+  },
+  "redirects": [
+    {
+      "source": "/quickstart/text-to-text",
+      "destination": "/app/agents/tests"
+    },
+    {
+      "source": "/app/agents/run-tests",
+      "destination": "/app/agents/tests#run-unit-tests"
+    }
+  ]
 }

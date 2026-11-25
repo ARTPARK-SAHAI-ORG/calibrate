@@ -1,0 +1,69 @@
+---
+title: "Datasets"
+description: "Operations for datasets"
+---
+
+{/* Generated from calibrate-cli/docs by scripts/generate_cli_docs.py — do not edit directly. */}
+
+## Create dataset
+
+Create a new empty dataset. Add items separately
+
+```bash
+calibrate datasets create [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `--dataset-type` | stt | **Required.** stt items carry audio + ground-truth text. `tts` items carry text only (options: stt, tts) |
+| `-n, --name` | string | **Required.** Dataset name, unique within the workspace |
+
+**Examples**
+
+```bash
+calibrate datasets create --name <value> --dataset-type stt
+```
+
+## Get dataset
+
+Get a dataset with all of its items
+
+```bash
+calibrate datasets get [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `--dataset-id` | string | **Required.** The dataset to retrieve |
+
+**Examples**
+
+```bash
+calibrate datasets get --dataset-id f47ac10b-58cc-4372-a567-0e02b2c3d479
+```
+
+## Upload STT dataset item
+
+Upload one audio clip with its transcript and append it to an STT dataset
+
+```bash
+calibrate datasets upload-item [flags]
+```
+
+**Options**
+
+| Option | Type | Description |
+| --- | --- | --- |
+| `-a, --audio` | string | **Required.** WAV file of the spoken audio, at most 25 MB and 10 minutes long |
+| `--dataset-id` | string | **Required.** The STT dataset to add the item to |
+| `-t, --text` | string | **Required.** Ground-truth transcript of the audio |
+
+**Examples**
+
+```bash
+calibrate datasets upload-item --dataset-id f47ac10b-58cc-4372-a567-0e02b2c3d479
+```

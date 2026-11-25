@@ -148,7 +148,8 @@ class TextAgentConnection:
 
     ``"conversation"`` (default) sends the whole exchange so far as
     ``{"messages": [...]}``. ``"general"`` sends only the latest user text as
-    ``{"input": "..."}``, for agents that take one instruction per call.
+    ``{"input": "..."}``, for agents that take a single input and return a
+    response.
     """
 
     def __post_init__(self) -> None:
@@ -163,8 +164,8 @@ class TextAgentConnection:
 
         Raises:
             ValueError: For a ``general`` agent, when ``messages`` is not a
-                single user message — that agent takes one instruction per call
-                and cannot be given a conversation.
+                single user message — that agent takes a single input and
+                returns a response, and cannot be given a conversation.
         """
         if self.type == "general":
             if len(messages) != 1 or messages[0].get("role") != "user":
