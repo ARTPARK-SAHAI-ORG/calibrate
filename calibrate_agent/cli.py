@@ -341,7 +341,11 @@ Examples:
         "--model",
         type=str,
         nargs="+",
-        help="Model(s) to use for evaluation (space-separated for multiple)",
+        help=(
+            "Model(s) to use for evaluation (space-separated for multiple). "
+            "Append @<serving-provider> to pin an OpenRouter model to one "
+            "upstream provider, e.g. meta-llama/llama-3.3-70b-instruct@together"
+        ),
     )
     llm_parser.add_argument(
         "-p",
