@@ -22,6 +22,16 @@ class TestSTTPricingResolver(unittest.TestCase):
         self.assertEqual(pricing["model"], "chirp_2")
         self.assertEqual(pricing["native_rate"], 0.016)
 
+    def test_resolves_oruk_stt_pricing(self):
+        from calibrate_agent.pricing import resolve_pricing
+
+        pricing = resolve_pricing("stt", "oruk")
+
+        self.assertEqual(pricing["billing_unit"], "minute")
+        self.assertEqual(pricing["currency"], "USD")
+        self.assertEqual(pricing["model"], "oruk-fourier-2b")
+        self.assertEqual(pricing["native_rate"], 0.008)
+
     def test_resolves_supported_stt_provider_defaults_with_pricing(self):
         from calibrate_agent.pricing import resolve_pricing
         from calibrate_agent.utils import STT_PROVIDER_MODELS

@@ -1507,6 +1507,12 @@ GROQ_TTS_LANGUAGE_CODES = {
 # Smallest TTS supported language codes (same as STT)
 SMALLEST_TTS_LANGUAGE_CODES = SMALLEST_STT_LANGUAGE_CODES
 
+# Oruk Fourier 2B STT supported language codes (English-only)
+ORUK_STT_BASE_URL = "https://speech-api.oruk.ai/v1"
+ORUK_STT_LANGUAGE_CODES = {
+    "english": "en",
+}
+
 # =============================================================================
 # Legacy aliases for backwards compatibility
 # =============================================================================
@@ -1517,6 +1523,7 @@ CARTESIA_LANGUAGE_CODES = CARTESIA_STT_LANGUAGE_CODES
 GOOGLE_LANGUAGE_CODES = GOOGLE_STT_LANGUAGE_CODES
 ELEVENLABS_LANGUAGE_CODES = ELEVENLABS_STT_LANGUAGE_CODES
 SMALLEST_LANGUAGE_CODES = SMALLEST_STT_LANGUAGE_CODES
+ORUK_LANGUAGE_CODES = ORUK_STT_LANGUAGE_CODES
 
 # Gemini is a Google model and uses the same BCP-47 language codes, so it reuses
 # Google's maps. Benchmark-only (calibrate_agent/{stt,tts}/eval.py via
@@ -1562,6 +1569,8 @@ def get_stt_language_code(language: str, provider: str) -> str:
         return OPENAI_STT_LANGUAGE_CODES.get(language, "en")
     elif provider == "groq":
         return GROQ_STT_LANGUAGE_CODES.get(language, "en")
+    elif provider == "oruk":
+        return ORUK_STT_LANGUAGE_CODES.get(language, "en")
     elif provider == "deepgram":
         return DEEPGRAM_STT_LANGUAGE_CODES.get(language, "en")
 
@@ -1648,6 +1657,7 @@ def validate_stt_language(language: str, provider: str) -> None:
         "elevenlabs": ELEVENLABS_STT_LANGUAGE_CODES,
         "openai": OPENAI_STT_LANGUAGE_CODES,
         "groq": GROQ_STT_LANGUAGE_CODES,
+        "oruk": ORUK_STT_LANGUAGE_CODES,
         "deepgram": DEEPGRAM_STT_LANGUAGE_CODES,
     }
 
@@ -1892,6 +1902,7 @@ STT_PROVIDER_MODELS = {
     "deepgram": "nova-3",
     "openai": "gpt-4o-transcribe",
     "groq": "whisper-large-v3-turbo",
+    "oruk": "oruk-fourier-2b",
     "google": "chirp_3",
     "gemini": "gemini-3.5-flash",
     "cartesia": "ink-whisper",
@@ -1934,7 +1945,7 @@ def create_stt_service(
     """Create an STT service instance for the given provider and language.
 
     Args:
-        provider: STT provider name (deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq)
+        provider: STT provider name (deepgram, openai, cartesia, google, sarvam, elevenlabs, smallest, groq, oruk)
         language: Language for transcription (english, hindi, kannada)
         model: Optional model name (uses default for provider if not specified)
 
@@ -2009,6 +2020,15 @@ def create_stt_service(
         return GroqSTTService(
             api_key=os.getenv("GROQ_API_KEY"),
             settings=GroqSTTService.Settings(
+                language=stt_language, model=model or STT_PROVIDER_MODELS[provider]
+            ),
+        )
+    elif provider == "oruk":
+        validate_stt_language(language, "oruk")
+        return OpenAISTTService(
+            api_key=os.getenv("ORUK_API_KEY"),
+            base_url=os.getenv("ORUK_BASE_URL") or ORUK_STT_BASE_URL,
+            settings=OpenAISTTService.Settings(
                 language=stt_language, model=model or STT_PROVIDER_MODELS[provider]
             ),
         )

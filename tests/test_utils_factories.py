@@ -13,6 +13,7 @@ STT_SERVICE_TARGETS = {
     "deepgram": "pipecat.services.deepgram.stt.DeepgramSTTService",
     "openai": "pipecat.services.openai.stt.OpenAISTTService",
     "groq": "pipecat.services.groq.stt.GroqSTTService",
+    "oruk": "pipecat.services.openai.stt.OpenAISTTService",
     "google": "pipecat.services.google.stt.GoogleSTTService",
     "cartesia": "pipecat.services.cartesia.stt.CartesiaSTTService",
     "elevenlabs": "pipecat.services.elevenlabs.stt.ElevenLabsRealtimeSTTService",
@@ -42,6 +43,7 @@ ALL_KEYS = {
     "SARVAM_API_KEY": "k",
     "OPENAI_API_KEY": "k",
     "GROQ_API_KEY": "k",
+    "ORUK_API_KEY": "k",
     "CARTESIA_API_KEY": "k",
     "ELEVENLABS_API_KEY": "k",
     "SMALLEST_API_KEY": "k",
@@ -79,9 +81,42 @@ class TestCreateSTTService(unittest.TestCase):
         # parity coverage here (benchmark-only providers excepted).
         self.assertEqual(
             set(STT_PROVIDER_MODELS) - BENCHMARK_ONLY_PROVIDERS,
-            {"deepgram", "openai", "groq", "google", "cartesia",
+            {"deepgram", "openai", "groq", "oruk", "google", "cartesia",
              "elevenlabs", "smallest", "sarvam"},
         )
+
+    def test_oruk_stt_uses_base_url_and_validates_language(self):
+        """Oruk STT routes through OpenAISTTService with Oruk's base URL and
+        rejects non-English languages."""
+        from calibrate_agent.utils import (
+            ORUK_STT_BASE_URL,
+            STT_PROVIDER_MODELS,
+            create_stt_service,
+        )
+
+        with patch.dict(os.environ, ALL_KEYS, clear=True), \
+                patch(STT_SERVICE_TARGETS["oruk"]) as svc:
+            create_stt_service("oruk", "english")
+            self.assertEqual(svc.call_args.kwargs["api_key"], "k")
+            self.assertEqual(svc.call_args.kwargs["base_url"], ORUK_STT_BASE_URL)
+            self.assertEqual(
+                svc.Settings.call_args.kwargs["model"], STT_PROVIDER_MODELS["oruk"]
+            )
+
+        with patch.dict(
+            os.environ,
+            {**ALL_KEYS, "ORUK_BASE_URL": "https://custom.oruk.example/v1"},
+            clear=True,
+        ), patch(STT_SERVICE_TARGETS["oruk"]) as svc:
+            create_stt_service("oruk", "english")
+            self.assertEqual(
+                svc.call_args.kwargs["base_url"], "https://custom.oruk.example/v1"
+            )
+
+        with patch.dict(os.environ, ALL_KEYS, clear=True), \
+                patch(STT_SERVICE_TARGETS["oruk"]):
+            with self.assertRaises(ValueError):
+                create_stt_service("oruk", "hindi")
 
     def test_sarvam_stt_transcribes(self):
         """Sarvam STT must use saaras:v3 with mode="transcribe" so pipecat routes

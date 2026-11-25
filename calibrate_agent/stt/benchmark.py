@@ -46,6 +46,7 @@ async def run(
             "cartesia",
             "smallest",
             "groq",
+            "oruk",
             "google",
             "sarvam",
             "elevenlabs",

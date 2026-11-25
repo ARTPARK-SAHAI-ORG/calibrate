@@ -27,6 +27,7 @@ from calibrate_agent.utils import (
     get_stt_language_code,
     get_audio_duration_seconds,
     validate_stt_language,
+    ORUK_STT_BASE_URL,
     STT_PROVIDER_MODELS,
     google_stt_model_and_location,
     create_stt_service,
@@ -356,6 +357,42 @@ async def transcribe_groq(audio_path: Path, language: str) -> str:
 
     return {
         "transcript": transcription.strip(),
+    }
+
+
+async def transcribe_oruk(audio_path: Path, language: str) -> Dict:
+    """Transcribe audio using Oruk Fourier 2B's OpenAI-compatible API."""
+    api_key = os.getenv("ORUK_API_KEY")
+    if not api_key:
+        raise ValueError("ORUK_API_KEY environment variable not set")
+
+    validate_stt_language(language, "oruk")
+    lang_code = get_stt_language_code(language, "oruk")
+
+    base_url = os.getenv("ORUK_BASE_URL") or ORUK_STT_BASE_URL
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+
+    audio_file = load_audio(audio_path, as_file=True)
+
+    # Oruk enforces a strict request schema (additionalProperties: false), so
+    # send only file, model, response_format, and language.
+    transcription = await asyncio.wait_for(
+        client.audio.transcriptions.create(
+            file=audio_file,
+            model=STT_PROVIDER_MODELS["oruk"],
+            response_format="json",
+            language=lang_code,
+        ),
+        timeout=STT_PROVIDER_TIMEOUT_SECONDS,
+    )
+
+    if isinstance(transcription, str):
+        text = transcription
+    else:
+        text = getattr(transcription, "text", None) or ""
+
+    return {
+        "transcript": text.strip(),
     }
 
 
@@ -894,6 +931,7 @@ async def transcribe_audio(
         "deepgram": transcribe_deepgram_streaming,
         "openai": transcribe_openai_streaming,
         "groq": transcribe_groq,
+        "oruk": transcribe_oruk,
         "google": transcribe_google,
         "gemini": transcribe_gemini,
         "sarvam": transcribe_sarvam,
@@ -1232,6 +1270,7 @@ STT_PROVIDERS = [
     "cartesia",
     "smallest",
     "groq",
+    "oruk",
     "google",
     "gemini",
     "sarvam",

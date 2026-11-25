@@ -173,6 +173,7 @@ class TestLanguageCodes(unittest.TestCase):
         self.assertEqual(get_stt_language_code("english", "elevenlabs"), "eng")
         self.assertEqual(get_stt_language_code("english", "openai"), "en")
         self.assertEqual(get_stt_language_code("english", "groq"), "en")
+        self.assertEqual(get_stt_language_code("english", "oruk"), "en")
         self.assertEqual(get_stt_language_code("bengali", "groq"), "bn")
         self.assertEqual(get_stt_language_code("mandarin", "groq"), "zh")
         self.assertEqual(get_stt_language_code("myanmar", "groq"), "my")
@@ -250,6 +251,17 @@ class TestLanguageCodes(unittest.TestCase):
             validate_tts_language("maithili", "sarvam")
         # Unsupported TTS lookup falls back to default
         self.assertEqual(get_tts_language_code("maithili", "sarvam"), "en-IN")
+
+    def test_oruk_english_only_stt(self):
+        from calibrate_agent.utils import (
+            get_stt_language_code,
+            validate_stt_language,
+        )
+
+        self.assertEqual(get_stt_language_code("english", "oruk"), "en")
+        validate_stt_language("english", "oruk")
+        with self.assertRaises(ValueError):
+            validate_stt_language("hindi", "oruk")
 
 
 class TestGetSTTLanguageEnum(unittest.TestCase):
