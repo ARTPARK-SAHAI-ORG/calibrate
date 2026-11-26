@@ -774,7 +774,7 @@
                 "type": "null"
               }
             ],
-            "description": "Evaluator scores to record, keyed by evaluator ID. Each evaluator ID must be linked to the task. Put the score in `value`, a bool for binary or a number within the scale for rating, with optional `reasoning` and `version_number`. Omit `version_number` to record against the evaluator's live version. An item recording a tool call takes the tool-call evaluator and no other, and every other item takes any evaluator except that one",
+            "description": "Evaluator scores to record, keyed by evaluator ID. Each evaluator ID must be linked to the task. Put the score in `value`, a bool for binary or a number within the scale for rating, with optional `reasoning` and `version_number`. Omit `version_number` to record against the evaluator's live version. An item recording a tool call takes only tool-call evaluators, and every other item takes any evaluator that is not a tool-call evaluator",
             "examples": [
               {
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479": {
@@ -960,7 +960,7 @@
               "type": "object"
             },
             "type": "array",
-            "description": "The task's items, each with its agreement stats and an `is_tool_call` flag marking the rows a person labels on the tool call rather than a text reply. You get these when you fetch one task by ID, not when you list tasks",
+            "description": "The task's items, each with its agreement stats and an `is_tool_call` flag that says whether the item is judged on tool calls rather than a text reply. You get these when you fetch one task by ID, not when you list tasks",
             "default": []
           },
           "jobs": {
@@ -2546,7 +2546,7 @@
               "tool-call"
             ],
             "title": "Evaluator Type",
-            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n",
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: the tool calls an agent made\n",
             "default": "llm"
           },
           "data_type": {
@@ -2651,7 +2651,7 @@
               "tool-call"
             ],
             "title": "Evaluator Type",
-            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n"
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: the tool calls an agent made\n"
           },
           "data_type": {
             "type": "string",
@@ -3066,7 +3066,7 @@
             },
             "type": "array",
             "title": "Evaluators",
-            "description": "The evaluators to run. Each must be linked to the task"
+            "description": "The evaluators to run. Each must be linked to the task. Items that none of the chosen evaluators can judge are left out, and so are evaluators that can judge none of the chosen items, so `item_count` and `evaluator_count` can be lower than what you sent"
           },
           "item_ids": {
             "items": {
@@ -3110,7 +3110,7 @@
             },
             "type": "array",
             "title": "Evaluator Ids",
-            "description": "The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. Each must be one you created or a built-in default",
+            "description": "The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. A task holding tool-call items always keeps one tool-call evaluator, so Tool call correctness is linked back if none is left. Each must be one you created or a built-in default",
             "examples": [
               [
                 "f47ac10b-58cc-4372-a567-0e02b2c3d479"
@@ -3267,11 +3267,13 @@
         "properties": {
           "judge_model": {
             "type": "string",
+            "pattern": "\\S",
             "title": "Judge Model",
             "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
           },
           "system_prompt": {
             "type": "string",
+            "pattern": "\\S",
             "title": "System Prompt",
             "description": "Judge system prompt. May contain `{{variable}}` placeholders"
           },
@@ -3314,11 +3316,13 @@
         "properties": {
           "judge_model": {
             "type": "string",
+            "pattern": "\\S",
             "title": "Judge Model",
             "description": "The model that runs the judge, named the way its provider does, for example `openai/gpt-4.1` or `anthropic/claude-sonnet-4`"
           },
           "system_prompt": {
             "type": "string",
+            "pattern": "\\S",
             "title": "System Prompt",
             "description": "Judge system prompt. May contain `{{variable}}` placeholders"
           },
@@ -3733,7 +3737,7 @@
               }
             ],
             "title": "Tool Calls",
-            "description": "Tool calls the agent made in place of a text reply. With no text reply, sending this marks the item as a tool call for a person to judge. For `llm` and `llm-general` tasks"
+            "description": "Tool calls the agent made. With no text reply, sending at least one marks the item as a tool call, which only a tool-call evaluator scores. Omit when the agent made no tool calls. For `llm` and `llm-general` tasks"
           },
           "expected_tool_calls": {
             "anyOf": [
@@ -3748,7 +3752,7 @@
               }
             ],
             "title": "Expected Tool Calls",
-            "description": "Tool calls the agent should have made. Sending this marks the item as a tool call for a person to judge. For `llm` and `llm-general` tasks"
+            "description": "Tool calls the agent should have made, shown to the judge beside the calls the agent made. Omit to judge without expected calls. Sending this marks the item as a tool call, which only a tool-call evaluator scores. For `llm` and `llm-general` tasks"
           },
           "actual_tool_calls": {
             "anyOf": [
@@ -3763,7 +3767,7 @@
               }
             ],
             "title": "Actual Tool Calls",
-            "description": "Tool calls the agent made. Sending this marks the item as a tool call for a person to judge. For `llm` and `llm-general` tasks"
+            "description": "Tool calls the agent made. Sending this marks the item as a tool call, which only a tool-call evaluator scores. Omit for an item judged on its text reply. For `llm` and `llm-general` tasks"
           },
           "evaluator_variables": {
             "anyOf": [
@@ -6435,7 +6439,7 @@
               }
             ],
             "title": "Evaluator Type",
-            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n"
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: the tool calls an agent made\n"
           },
           "output_type": {
             "type": "string",
@@ -7017,7 +7021,7 @@
               "tool-call"
             ],
             "title": "Evaluator Type",
-            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: whether the agent called the right tool, labelled by a person\n"
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: the tool calls an agent made\n"
           },
           "data_type": {
             "type": "string",

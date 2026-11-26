@@ -532,7 +532,7 @@ Run one or more of a task's evaluators over its items as a background job. Retur
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_uuid` | string | Yes | Annotation task to act on |
-| `evaluators` | array of EvaluatorRunRequestEntry | Yes | The evaluators to run. Each must be linked to the task |
+| `evaluators` | array of EvaluatorRunRequestEntry | Yes | The evaluators to run. Each must be linked to the task. Items that none of the chosen evaluators can judge are left out, and so are evaluators that can judge none of the chosen items, so `item_count` and `evaluator_count` can be lower than what you sent |
 | `item_ids` | array of string | No | Item IDs to run on. **Required when `select_all=false`**. Ignored when `select_all=true` |
 | `select_all` | boolean | No | When `true`, run on every item in the task. Set `q` to run only items whose name matches it |
 | `q` | string | No | Case-insensitive substring filter on `payload.name`. Applies only when `select_all=true` |
@@ -585,7 +585,7 @@ must be in your workspace.
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
 | `task_uuid` | string | Yes | Annotation task to act on |
-| `evaluator_ids` | array of string | Yes | The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. Each must be one you created or a built-in default |
+| `evaluator_ids` | array of string | Yes | The full ordered set of evaluators the task should end up linked to, in display order. Missing ones are unlinked, new ones are linked, and the order sets their position. Send an empty list to unlink all. A task holding tool-call items always keeps one tool-call evaluator, so Tool call correctness is linked back if none is left. Each must be one you created or a built-in default |
 | `optional_evaluator_ids` | array of string | No | Which of `evaluator_ids` annotators may leave blank. Applied as a whole set, so an ID left out becomes required again. Optional evaluators do not hold a labelling job back from completing. Omit to leave every evaluator as it is |
 
 See **PUT /annotation-tasks/&#123;task_uuid&#125;/evaluators** in the [API reference](/api-reference/introduction) tab for the full schema.
