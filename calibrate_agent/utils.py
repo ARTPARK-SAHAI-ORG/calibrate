@@ -619,7 +619,6 @@ def combine_turn_audio_chunks(audio_dir: str) -> bool:
 TRANSCRIPT_FILE_NAME = "transcript.json"
 
 
-
 def save_transcript(output_dir: str | Path | None, transcript: list[dict]) -> None:
     """Write conversation messages to transcript.json under output_dir."""
     if not output_dir:
