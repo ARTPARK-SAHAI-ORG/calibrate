@@ -681,6 +681,7 @@ async def run_simulation_with_agent(
         user_resp = await user_client.chat.completions.create(
             model=user_model,
             messages=user_messages,
+            max_completion_tokens=MAX_REPLY_TOKENS,
         )
         user_message = user_resp.choices[0].message.content.strip()
         user_messages.append({"role": "assistant", "content": user_message})

@@ -104,7 +104,10 @@ async def agent_reply(
     try:
         for _ in range(max_tool_rounds):
             response = await client.chat.completions.create(
-                model=model, messages=history + new_messages, tools=api_tools
+                model=model,
+                messages=history + new_messages,
+                tools=api_tools,
+                max_completion_tokens=8192,
             )
             usage = response.usage
             if usage is not None:
