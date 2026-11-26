@@ -764,7 +764,8 @@ class TestConversationAudio(unittest.IsolatedAsyncioTestCase):
         join.assert_not_called()
 
 
-def test_simulated_user_request_caps_reply_tokens():
+def test_simulated_user_request_caps_reply_tokens(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-fake")
     from calibrate_agent.agent import run_simulation as RS
     from calibrate_agent.utils import MAX_REPLY_TOKENS
 
