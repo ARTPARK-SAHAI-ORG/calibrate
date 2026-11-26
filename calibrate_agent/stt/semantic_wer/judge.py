@@ -30,6 +30,7 @@ import backoff
 
 from calibrate_agent.judges import _build_openrouter_client
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
+from calibrate_agent.limits import SEMANTIC_WER_MAX_TOKENS
 from calibrate_agent.utils import log_judge_io
 from calibrate_agent.stt.semantic_wer.main import (
     SYSTEM_PROMPT,
@@ -132,7 +133,7 @@ async def semantic_wer_judge(
             {"role": "user", "content": user_msg},
         ],
         temperature=0,
-        max_tokens=4096,
+        max_tokens=SEMANTIC_WER_MAX_TOKENS,
     )
     reasoning = reason_resp.choices[0].message.content or ""
 
@@ -163,7 +164,7 @@ async def semantic_wer_judge(
         # long utterance can exceed a tight cap. A truncated call is unparseable
         # and, at temperature 0, fails identically on every retry — so undersize
         # here would deterministically drop the whole run's semantic WER.
-        max_tokens=4096,
+        max_tokens=SEMANTIC_WER_MAX_TOKENS,
     )
     message = commit_resp.choices[0].message
     wer_call = next(

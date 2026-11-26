@@ -13,8 +13,8 @@ from os.path import join, exists, splitext, basename
 import shutil
 from collections import defaultdict
 import traceback
+from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.utils import (
-    MAX_REPLY_TOKENS,
     configure_print_logger,
     log_and_print,
     build_tools_schema,
