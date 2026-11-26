@@ -3218,6 +3218,30 @@ class TestRunItemsParallelErrors(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(results[0]["error"])
         self.assertEqual(results[0]["test_case_id"], "run-a")
+        self.assertEqual(results[0]["test_case"], {"id": "run-a"})
+
+    async def test_a_failed_eval_only_tool_call_counts_against_its_tool(self):
+        from calibrate_agent.llm.run_tests import (
+            _aggregate_tool_calls,
+            _run_items_parallel,
+        )
+
+        async def process(index, item):
+            raise RuntimeError("Error code: 402 - out of credits")
+
+        evaluation = {"type": "tool_call", "tool_calls": [{"tool": "book"}]}
+        items = [
+            {
+                "test_case": {"id": "run-a", "evaluation": evaluation},
+                "output": {"response": "", "tool_calls": [{"tool": "book"}]},
+            }
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = str(Path(tmp) / "results.json")
+            results = await _run_items_parallel(items, process, path, test_parallel=1)
+
+        self.assertEqual(_aggregate_tool_calls(results)["book"]["total"], 1)
+        self.assertEqual(_aggregate_tool_calls(results)["book"]["passed"], 0)
 
     async def test_skipped_message_carries_the_last_error(self):
         from calibrate_agent.llm.run_tests import (
