@@ -15,6 +15,7 @@ from os.path import join, exists
 import json
 from pathlib import Path
 from calibrate_agent.utils import (
+    MAX_REPLY_TOKENS,
     configure_print_logger,
     log_and_print,
     build_tools_schema,
@@ -599,12 +600,16 @@ async def _run_inference_inner(
         llm = CostTrackingOpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=model),
+            settings=OpenRouterLLMService.Settings(
+                model=model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
     else:
         llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=model),
+            settings=OpenAILLMService.Settings(
+                model=model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
 
     # Create context with system prompt

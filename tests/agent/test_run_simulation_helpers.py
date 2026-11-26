@@ -686,7 +686,9 @@ class TestBuildSimulatedUserLlm:
             RS.build_simulated_user_llm()
         kwargs = svc.call_args.kwargs
         assert kwargs["api_key"] == "or-fake"
-        svc.Settings.assert_called_once_with(model="google/gemini-3.5-flash-lite")
+        svc.Settings.assert_called_once_with(
+            model="google/gemini-3.5-flash-lite", max_completion_tokens=8192
+        )
 
 
 if __name__ == "__main__":
@@ -760,3 +762,13 @@ class TestConversationAudio(unittest.IsolatedAsyncioTestCase):
         ) as join:
             RS.finish_simulation_audio(tmp)
         join.assert_not_called()
+
+
+def test_simulated_user_request_caps_reply_tokens(monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "or-fake")
+    from calibrate_agent.agent import run_simulation as RS
+    from calibrate_agent.utils import MAX_REPLY_TOKENS
+
+    llm = RS.build_simulated_user_llm()
+    params = llm.build_chat_completion_params({"messages": []})
+    assert params["max_completion_tokens"] == MAX_REPLY_TOKENS == 8192

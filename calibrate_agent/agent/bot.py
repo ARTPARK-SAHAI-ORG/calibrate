@@ -6,6 +6,7 @@ import asyncio
 
 from pydantic import BaseModel
 from calibrate_agent.utils import (
+    MAX_REPLY_TOKENS,
     create_stt_service,
     create_tts_service,
     build_tools_schema,
@@ -162,13 +163,17 @@ async def run_bot(
     if llm_config.provider == "openai":
         llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=llm_config.model),
+            settings=OpenAILLMService.Settings(
+                model=llm_config.model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
     elif llm_config.provider == "openrouter":
         llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=llm_config.model),
+            settings=OpenRouterLLMService.Settings(
+                model=llm_config.model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
 
     ml = MetricsLogger()

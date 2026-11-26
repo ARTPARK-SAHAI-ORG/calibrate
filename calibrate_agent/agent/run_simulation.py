@@ -20,6 +20,7 @@ import numpy as np
 from collections import defaultdict
 
 from calibrate_agent.utils import (
+    MAX_REPLY_TOKENS,
     current_context,
     current_simulation_name,
     add_default_source,
@@ -224,7 +225,9 @@ SERIALIZER_REGISTRY = {"protobuf": EvalAgentProtobufSerializer}
 def build_simulated_user_llm() -> OpenRouterLLMService:
     return OpenRouterLLMService(
         api_key=os.getenv("OPENROUTER_API_KEY"),
-        settings=OpenRouterLLMService.Settings(model=DEFAULT_SIMULATED_USER_LLM_MODEL),
+        settings=OpenRouterLLMService.Settings(
+            model=DEFAULT_SIMULATED_USER_LLM_MODEL, max_completion_tokens=MAX_REPLY_TOKENS
+        ),
     )
 
 
