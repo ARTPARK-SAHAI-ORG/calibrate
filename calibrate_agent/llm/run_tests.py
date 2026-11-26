@@ -384,8 +384,11 @@ def _error_result(item: dict, exc: BaseException, not_run: bool = False) -> dict
     }
     if not_run:
         result["not_run"] = True
-    if "id" in item:
-        result["test_case_id"] = item["id"]
+    # An eval-only item wraps its test case: {"test_case": {...}, "output": {...}}.
+    inner = item.get("test_case")
+    case_id = item.get("id", inner.get("id") if isinstance(inner, dict) else None)
+    if case_id is not None:
+        result["test_case_id"] = case_id
     return result
 
 
