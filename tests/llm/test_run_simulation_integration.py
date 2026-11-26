@@ -347,7 +347,7 @@ class TestRunSingleSimulationTask:
 class TestSimulationMain:
     """5 tests for the main() function (called via asyncio.run with mocked dependencies)."""
 
-    def _run_main(self, agent_url, tmp_path, num_personas=1, num_scenarios=1):
+    def _run_main(self, agent_url, tmp_path, num_personas=1, num_scenarios=1, extra=None):
         """Call sim_main() with sys.argv patched, mocking openai and evaluate_simuation."""
         from calibrate_agent.llm.run_simulation import main as sim_main
 
@@ -357,6 +357,7 @@ class TestSimulationMain:
             num_personas=num_personas,
             num_scenarios=num_scenarios,
         )
+        config.update(extra or {})
         config_path = tmp_path / "sim_config.json"
         output_dir = tmp_path / "out"
         with open(config_path, "w") as f:
@@ -371,6 +372,16 @@ class TestSimulationMain:
             asyncio.run(sim_main())
 
         return output_dir
+
+    def test_agent_default_inputs_sent_on_every_turn(self, agent_server, tmp_path):
+        self._run_main(
+            agent_server.url_for("/chat"),
+            tmp_path,
+            extra={"agent_default_inputs": {"condition_area": "cardiology"}},
+        )
+        bodies = [json.loads(req.data) for req, _ in agent_server.log]
+        assert bodies
+        assert all(b["condition_area"] == "cardiology" and "messages" in b for b in bodies)
 
     def test_2_personas_2_scenarios_creates_4_dirs(self, agent_server, tmp_path):
         """With 2 personas and 2 scenarios, 4 simulation dirs are created."""
