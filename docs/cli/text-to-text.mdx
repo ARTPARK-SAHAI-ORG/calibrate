@@ -360,7 +360,7 @@ The simplest setup needs no top-level `evaluators`. Pass `criteria` as a string 
 | `evaluators[].type`          | string  | `"binary"` (default) or `"rating"`.                                                                                                |
 | `evaluators[].scale_min`     | integer | Required when `type` is `"rating"`. Lowest allowed score.                                                                          |
 | `evaluators[].scale_max`     | integer | Required when `type` is `"rating"`. Highest allowed score.                                                                         |
-| `evaluators[].tool_call`     | boolean | `true` marks an evaluator that grades the tool calls of a [tool call judge test](#tool-call-judge-test). Ignored by other test types. |
+| `evaluators[].tool_call`     | boolean | `true` marks an evaluator that grades the tool calls of a [tool call judge test](#tool-call-judge-test), or of a `calibrate-agent general` row with tool calls. Ignored everywhere else. |
 
 ### Variable substitution
 
