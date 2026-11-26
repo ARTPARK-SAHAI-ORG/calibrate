@@ -63,7 +63,7 @@ from calibrate_agent.judges import (
     is_rating,
     render_evaluator,
     require_unique_evaluator_names,
-    split_tool_call_evaluators,
+    judge_tool_calls_and_reply,
     text_judge,
     tool_call_param_evaluator,
     write_evaluator_config,
@@ -1541,39 +1541,34 @@ async def evaluate_test_case_output(
     if evaluation["type"] == "tool_call_judge":
         evaluators = evaluators or []
         tool_calls = output.get("tool_calls") or []
-        tool_evaluators, reply_evaluators = split_tool_call_evaluators(evaluators)
-        judging = [
-            test_tool_call_llm_judge(
+        async def judge_reply(reply_evaluators):
+            metrics = await _evaluate_response(
+                chat_history=chat_history,
+                response=output.get("response"),
+                tool_calls=tool_calls,
+                evaluators=reply_evaluators,
+                no_response_reasoning_with_tool_calls=(
+                    no_response_reasoning_with_tool_calls
+                    or f"Tool calls were generated: {tool_calls}, but no reply was returned"
+                ),
+                no_response_reasoning_no_tool_calls=(
+                    no_response_reasoning_no_tool_calls or "No reply was returned"
+                ),
+                show_tool_calls=True,
+            )
+            return metrics["judge_results"]
+
+        result = await judge_tool_calls_and_reply(
+            evaluators,
+            lambda tool_evaluators: test_tool_call_llm_judge(
                 conversation=chat_history,
                 tool_calls=tool_calls,
                 evaluators=tool_evaluators,
                 expected_tool_calls=evaluation.get("expected_tool_calls"),
-            )
-        ]
-        if reply_evaluators:
-            judging.append(
-                _evaluate_response(
-                    chat_history=chat_history,
-                    response=output.get("response"),
-                    tool_calls=tool_calls,
-                    evaluators=reply_evaluators,
-                    no_response_reasoning_with_tool_calls=(
-                        no_response_reasoning_with_tool_calls
-                        or f"Tool calls were generated: {tool_calls}, but no reply was returned"
-                    ),
-                    no_response_reasoning_no_tool_calls=(
-                        no_response_reasoning_no_tool_calls or "No reply was returned"
-                    ),
-                    show_tool_calls=True,
-                )
-            )
-        judged = await asyncio.gather(*judging)
-        result = dict(judged[0])
-        if reply_evaluators:
-            result.update(judged[1]["judge_results"])
-        return _metrics_from_judge_results(
-            evaluators, {ev["name"]: result[ev["name"]] for ev in evaluators}
+            ),
+            judge_reply,
         )
+        return _metrics_from_judge_results(evaluators, result)
     if evaluation["type"] == "tool_call":
         return await evaluate_tool_calls(output["tool_calls"], evaluation["tool_calls"])
     if evaluation["type"] == "response":

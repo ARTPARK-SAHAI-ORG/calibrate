@@ -837,6 +837,19 @@ def split_tool_call_evaluators(evaluators: list[dict]) -> tuple[list, list]:
     return tool, [ev for ev in evaluators if ev.get("tool_call") is not True]
 
 
+async def judge_tool_calls_and_reply(evaluators: list[dict], judge_tool_calls, judge_reply) -> dict:
+    """Run the tool call evaluators through ``judge_tool_calls`` and the rest
+    through ``judge_reply`` at the same time. Each takes a list of evaluators
+    and returns results keyed by evaluator name; a group with no evaluators is
+    not run. Returns one dict in the order of ``evaluators``."""
+    tool, reply = split_tool_call_evaluators(evaluators)
+    results = await asyncio.gather(
+        *(judge(group) for judge, group in ((judge_tool_calls, tool), (judge_reply, reply)) if group)
+    )
+    merged = {name: r for result in results for name, r in result.items()}
+    return {ev["name"]: merged[ev["name"]] for ev in evaluators}
+
+
 def tool_call_judge_prompt(
     conversation: list[dict],
     tool_calls: Optional[list],

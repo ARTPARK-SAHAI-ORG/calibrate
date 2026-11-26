@@ -3523,7 +3523,7 @@ class TestToolCallJudgeType(unittest.IsolatedAsyncioTestCase):
             "calibrate_agent.judges.text_judge", judge
         ):
             await run_eval_only_tests(
-                config={"evaluators": [self.EV]}, dataset=[item], output_dir=tmp
+                config={"evaluators": [{**self.EV, "tool_call": True}]}, dataset=[item], output_dir=tmp
             )
         return judge.call_args.kwargs["user_prompt"]
 
