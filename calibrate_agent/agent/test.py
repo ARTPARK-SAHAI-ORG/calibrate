@@ -12,6 +12,7 @@ from typing import Any, Dict, Optional
 from typing import Literal
 
 from calibrate_agent.utils import (
+    MAX_REPLY_TOKENS,
     save_audio_chunk,
     save_transcript,
     create_stt_service,
@@ -192,12 +193,16 @@ async def run_bot(
         llm = OpenRouterLLMService(
             api_key=llm_config.api_key or os.getenv("OPENROUTER_API_KEY"),
             base_url=llm_config.base_url or "https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=llm_config.model),
+            settings=OpenRouterLLMService.Settings(
+                model=llm_config.model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
     elif llm_config.provider == "openai":
         llm = OpenAILLMService(
             api_key=llm_config.api_key or os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=llm_config.model),
+            settings=OpenAILLMService.Settings(
+                model=llm_config.model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
     else:
         raise ValueError(f"Unknown LLM provider: {llm_config.provider}")

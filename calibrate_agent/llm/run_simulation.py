@@ -14,6 +14,7 @@ import shutil
 from collections import defaultdict
 import traceback
 from calibrate_agent.utils import (
+    MAX_REPLY_TOKENS,
     configure_print_logger,
     log_and_print,
     build_tools_schema,
@@ -341,24 +342,32 @@ async def run_simulation(
         bot_llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=bot_model),
+            settings=OpenRouterLLMService.Settings(
+                model=bot_model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
     else:
         bot_llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=bot_model),
+            settings=OpenAILLMService.Settings(
+                model=bot_model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
 
     if user_provider == "openrouter":
         user_llm = OpenRouterLLMService(
             api_key=os.getenv("OPENROUTER_API_KEY"),
             base_url="https://openrouter.ai/api/v1",
-            settings=OpenRouterLLMService.Settings(model=user_model),
+            settings=OpenRouterLLMService.Settings(
+                model=user_model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
     else:
         user_llm = OpenAILLMService(
             api_key=os.getenv("OPENAI_API_KEY"),
-            settings=OpenAILLMService.Settings(model=user_model),
+            settings=OpenAILLMService.Settings(
+                model=user_model, max_completion_tokens=MAX_REPLY_TOKENS
+            ),
         )
 
     conversation_state = ConversationState(max_turns=max_turns)
