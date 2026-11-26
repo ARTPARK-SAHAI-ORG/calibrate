@@ -1,0 +1,122 @@
+[
+  {
+    "_scenario": "The weather tool said heavy rain, the reply says sunny. Expect: Tool call correctness passes, Faithfulness fails.",
+    "test_case": {
+      "id": "weather_contradicts",
+      "history": [
+        {
+          "role": "user",
+          "content": "Will it rain in Bangalore today?"
+        }
+      ],
+      "evaluation": {
+        "type": "tool_call_judge",
+        "criteria": [
+          {
+            "name": "Tool call correctness"
+          },
+          {
+            "name": "Faithfulness"
+          }
+        ]
+      }
+    },
+    "output": {
+      "response": "No, it will be sunny all day.",
+      "tool_calls": [
+        {
+          "tool": "get_weather",
+          "arguments": {
+            "city": "Bangalore"
+          },
+          "output": {
+            "forecast": "heavy rain"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "_scenario": "Right booking call and a reply that matches it. Expect: both pass.",
+    "test_case": {
+      "id": "booking_correct",
+      "history": [
+        {
+          "role": "user",
+          "content": "Book me a table for 2 at 8pm"
+        }
+      ],
+      "evaluation": {
+        "type": "tool_call_judge",
+        "criteria": [
+          {
+            "name": "Tool call correctness"
+          },
+          {
+            "name": "Faithfulness"
+          }
+        ],
+        "expected_tool_calls": [
+          {
+            "tool": "book_table",
+            "arguments": {
+              "people": 2,
+              "time": "20:00"
+            }
+          }
+        ]
+      }
+    },
+    "output": {
+      "response": "Done, your table for 2 at 8pm is booked.",
+      "tool_calls": [
+        {
+          "tool": "book_table",
+          "arguments": {
+            "people": 2,
+            "time": "20:00"
+          },
+          "output": {
+            "status": "confirmed"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "_scenario": "The booking call was expected but never made; the reply only asks a question. Expect: Tool call correctness fails, Faithfulness passes.",
+    "test_case": {
+      "id": "missed_call",
+      "history": [
+        {
+          "role": "user",
+          "content": "Book me a table for 2 at 8pm"
+        }
+      ],
+      "evaluation": {
+        "type": "tool_call_judge",
+        "criteria": [
+          {
+            "name": "Tool call correctness"
+          },
+          {
+            "name": "Faithfulness"
+          }
+        ],
+        "expected_tool_calls": [
+          {
+            "tool": "book_table",
+            "arguments": {
+              "people": 2,
+              "time": "20:00"
+            }
+          }
+        ]
+      }
+    },
+    "output": {
+      "response": "Sure, what name should I put it under?",
+      "tool_calls": []
+    }
+  }
+]

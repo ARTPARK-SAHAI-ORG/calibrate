@@ -578,7 +578,7 @@ class TestGeneralPerRowFields(unittest.IsolatedAsyncioTestCase):
                 "calibrate_agent.general.metrics.general_task_judge",
                 AsyncMock(side_effect=fake_task_judge),
             ):
-                result = await run_general_eval(path, out_dir, [BINARY_EV, RATING_EV])
+                result = await run_general_eval(path, out_dir, [{**BINARY_EV, "tool_call": True}, RATING_EV])
                 self.assertTrue(os.path.exists(os.path.join(out_dir, "config.json")))
                 df = pd.read_csv(
                     os.path.join(out_dir, "results.csv"), keep_default_na=False
