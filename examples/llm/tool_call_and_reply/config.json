@@ -1,0 +1,15 @@
+{
+  "evaluators": [
+    {
+      "name": "Tool call correctness",
+      "tool_call": true,
+      "type": "binary",
+      "system_prompt": "You are evaluating the tool calls an agent made in answer to the user's last message. You are given the Chat history, the Tool calls made by the agent, and possibly Expected tool calls. Decide if the tool calls are right: right tools, right arguments, nothing missing, nothing extra. If Expected tool calls are given, compare against them."
+    },
+    {
+      "name": "Faithfulness",
+      "type": "binary",
+      "system_prompt": "You are evaluating an agent's reply. Pass it only if the reply is consistent with what the tools the agent called returned, and does not claim anything the tool calls do not support."
+    }
+  ]
+}
