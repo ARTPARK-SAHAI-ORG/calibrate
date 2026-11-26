@@ -370,3 +370,42 @@ class TestGeneralToolCallRow(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(prompt.startswith("`Chat history`:\n\nuser: Book it"))
         self.assertNotIn("Reply from the agent", prompt)
         self.assertIn('book {"t": 1}', prompt)
+
+
+class TestGeneralToolCallRowSplit(unittest.IsolatedAsyncioTestCase):
+    async def _judge(self, evaluators):
+        prompts = {}
+
+        async def fake(evaluators, user_prompt, **kwargs):
+            prompts.update({ev["name"]: user_prompt for ev in evaluators})
+            return {ev["name"]: {"reasoning": "ok", "match": True} for ev in evaluators}
+
+        with patch("calibrate_agent.judges.text_judge", AsyncMock(side_effect=fake)):
+            result = await general_judge(
+                "Book it",
+                "Booked.",
+                evaluators=evaluators,
+                tool_calls={
+                    "tool_calls": [{"tool": "book", "arguments": {"t": 1}, "output": "A"}],
+                    "expected_tool_calls": [{"tool": "book", "arguments": {"t": 2}}],
+                },
+            )
+        return result, prompts
+
+    async def test_marked_and_unmarked_evaluators_read_different_text(self):
+        tool_ev = {"name": "calls", "system_prompt": "x", "tool_call": True}
+        result, prompts = await self._judge([BINARY_EV, tool_ev])
+        self.assertEqual(list(result), ["faithful", "calls"])
+        self.assertTrue(prompts["calls"].startswith("`Chat history`:\n\nuser: Book it"))
+        self.assertNotIn("Booked.", prompts["calls"])
+        self.assertIn('book {"t": 2}', prompts["calls"])
+        self.assertIn("`Input`:\n\nBook it", prompts["faithful"])
+        self.assertIn("`Output`:\n\nBooked.", prompts["faithful"])
+        self.assertIn('book {"t": 1} returned "A"', prompts["faithful"])
+        self.assertNotIn("Expected tool calls", prompts["faithful"])
+
+    async def test_no_marked_evaluator_all_read_tool_call_text(self):
+        result, prompts = await self._judge([BINARY_EV])
+        self.assertTrue(result["faithful"]["match"])
+        self.assertIn("Expected tool calls", prompts["faithful"])
+        self.assertNotIn("Booked.", prompts["faithful"])

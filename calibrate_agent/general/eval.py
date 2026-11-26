@@ -49,7 +49,8 @@ def validate_general_eval_dataset(
 
     A row may also carry ``evaluators`` (the names of the evaluators to run on
     it; omitted means all) and ``tool_calls`` / ``expected_tool_calls`` lists,
-    which make the row judged on the tool calls it made. ``evaluator_names``,
+    which make the row judged on the tool calls it made (see
+    :func:`calibrate_agent.general.metrics.general_judge`). ``evaluator_names``,
     when given, is the set of known names an ``evaluators`` list is checked
     against.
 

@@ -10,6 +10,7 @@ from calibrate_agent.judges import (
     text_judge,
     simulation_judge,
     tool_call_judge,
+    tool_calls_made_section,
     DEFAULT_TEXT_JUDGE_MODEL,
     DEFAULT_SIMULATION_JUDGE_MODEL,
 )
@@ -28,6 +29,7 @@ async def test_response_llm_judge(
     response: str,
     evaluators: List[dict],
     fallback_model: str = DEFAULT_JUDGE_MODEL,
+    tool_calls: Optional[list] = None,
 ) -> dict:
     """Evaluate an LLM response against a list of pre-rendered evaluators.
 
@@ -37,6 +39,7 @@ async def test_response_llm_judge(
         evaluators: List of evaluator dicts with their ``system_prompt``
             already rendered (placeholders substituted) by the caller.
         fallback_model: Model id for evaluators that don't set ``judge_model``.
+        tool_calls: Tool calls the agent made, listed after the response when given.
 
     Returns:
         Dict keyed by evaluator name. Binary entries are
@@ -51,6 +54,8 @@ async def test_response_llm_judge(
         f"`Chat history`:\n\n{conversation_as_prompt}\n\n"
         f"`Response to evaluate`:\n\n{response}"
     )
+    if tool_calls is not None:
+        user_prompt += "\n\n" + tool_calls_made_section(tool_calls)
 
     return await text_judge(
         evaluators=evaluators,
@@ -62,17 +67,15 @@ async def test_response_llm_judge(
 @observe(name="llm_test_tool_call_judge", capture_input=False)
 async def test_tool_call_llm_judge(
     conversation: List[dict],
-    response: Optional[str],
     tool_calls: Optional[list],
     evaluators: List[dict],
     expected_tool_calls: Optional[list] = None,
     fallback_model: str = DEFAULT_JUDGE_MODEL,
 ) -> dict:
-    """Judge the tool calls an agent made (and its reply, if any) against
-    pre-rendered evaluators. Same result shape as :func:`test_response_llm_judge`."""
+    """Judge the tool calls an agent made against pre-rendered evaluators.
+    Same result shape as :func:`test_response_llm_judge`."""
     return await tool_call_judge(
         conversation,
-        response,
         tool_calls,
         evaluators,
         expected_tool_calls,

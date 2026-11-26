@@ -915,7 +915,6 @@ class TestToolCallJudgePrompt(unittest.TestCase):
                 },
                 {"role": "tool", "content": '{"ok": true}', "tool_call_id": "c1"},
             ],
-            "Booked.",
             [{"tool": "book", "arguments": {"t": 1}, "output": {"id": "A"}}],
             [{"tool": "book", "arguments": {"t": 1}}],
         )
@@ -925,7 +924,6 @@ class TestToolCallJudgePrompt(unittest.TestCase):
             "user: book it\n"
             '[Tool Call] check({"t": 1})\n'
             'tool (c1): {"ok": true}\n\n'
-            "`Reply from the agent`:\n\nBooked.\n\n"
             "`Tool calls made by the agent`:\n\n"
             'book {"t": 1} returned {"id": "A"}\n\n'
             "`Expected tool calls`:\n\n"
@@ -948,7 +946,6 @@ class TestToolCallJudgePrompt(unittest.TestCase):
         prompt = self._prompt(
             [{"role": "assistant", "content": "",
               "tool_calls": [{"function": {"name": "x"}}]}],
-            "",
             [{"function": {"name": "x"}}],
             [{"function": {"name": "x"}}],
         )
@@ -957,15 +954,13 @@ class TestToolCallJudgePrompt(unittest.TestCase):
         self.assertIn("`Expected tool calls`:\n\nx (any arguments accepted)", prompt)
 
     def test_empty_reply_and_no_calls(self):
-        prompt = self._prompt([{"role": "user", "content": "hi"}], "", [], [])
-        self.assertNotIn("Reply from the agent", prompt)
+        prompt = self._prompt([{"role": "user", "content": "hi"}], [], [])
         self.assertNotIn("Expected tool calls", prompt)
         self.assertIn("The agent made no tool calls.", prompt)
 
     def test_openai_shape_calls(self):
         prompt = self._prompt(
             [],
-            None,
             [{"id": "x", "type": "function",
               "function": {"name": "f", "arguments": '{"a": [1, 2]}'}}],
         )
@@ -975,7 +970,6 @@ class TestToolCallJudgePrompt(unittest.TestCase):
     def test_tool_shape_in_history(self):
         prompt = self._prompt(
             [{"role": "assistant", "tool_calls": [{"tool": "f", "arguments": {"a": 1}}]}],
-            "",
             [],
         )
         self.assertIn('[Tool Call] f({"a": 1})', prompt)
@@ -983,7 +977,6 @@ class TestToolCallJudgePrompt(unittest.TestCase):
     def test_expected_argument_specs(self):
         prompt = self._prompt(
             [],
-            "",
             [],
             [
                 {
@@ -1024,3 +1017,17 @@ class TestEvaluatorRowColumnsMissing(unittest.TestCase):
         self.assertEqual(
             cols, {"a": True, "a_reasoning": "ok", "b": "", "b_reasoning": ""}
         )
+
+
+class TestSplitToolCallEvaluators(unittest.TestCase):
+    def test_marked_evaluators_split_from_the_rest(self):
+        from calibrate_agent.judges import split_tool_call_evaluators
+
+        tool, reply = {"name": "t", "tool_call": True}, {"name": "r"}
+        self.assertEqual(split_tool_call_evaluators([reply, tool]), ([tool], [reply]))
+
+    def test_none_marked_all_grade_tool_calls(self):
+        from calibrate_agent.judges import split_tool_call_evaluators
+
+        evs = [{"name": "a"}, {"name": "b", "tool_call": False}]
+        self.assertEqual(split_tool_call_evaluators(evs), (evs, []))

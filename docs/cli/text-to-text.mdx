@@ -246,14 +246,19 @@ An LLM judge grades the tool calls the agent made, using the evaluators you list
 
 The test case takes either `history` or a single `input` string, never both. Its evaluators must be listed by name.
 
-The judge reads these parts, in this order:
+A test case can be graded on both its tool calls and its reply. Mark each evaluator that grades the tool calls with `"tool_call": true` in its definition. Every other evaluator listed for the test case grades the reply. When no listed evaluator is marked, all of them grade the tool calls.
+
+An evaluator that grades the tool calls reads these parts, in this order:
 
 | Part                             | When it is included                     |
 | -------------------------------- | --------------------------------------- |
 | `Chat history`                   | Always, with earlier tool calls and tool results |
-| `Reply from the agent`           | When the agent replied with text        |
 | `Tool calls made by the agent`   | Always. Reads "The agent made no tool calls." when there were none |
 | `Expected tool calls`            | When `expected_tool_calls` is given     |
+
+An evaluator that grades the reply reads what it reads in a [response test](#response-test): the `Chat history` and the `Response to evaluate`. After them comes `Tool calls made by the agent`, each call with what it returned. It never sees the expected tool calls. When the agent gave no reply, a reply evaluator fails without a judge call, as in a response test.
+
+A `calibrate-agent general` row that carries `tool_calls` or `expected_tool_calls` splits its evaluators the same way. A reply evaluator there reads the row's `Input` and `Output`, then the tool calls made, and is judged even when `Output` is empty.
 
 How each expected argument is shown to the judge:
 
@@ -355,6 +360,7 @@ The simplest setup needs no top-level `evaluators`. Pass `criteria` as a string 
 | `evaluators[].type`          | string  | `"binary"` (default) or `"rating"`.                                                                                                |
 | `evaluators[].scale_min`     | integer | Required when `type` is `"rating"`. Lowest allowed score.                                                                          |
 | `evaluators[].scale_max`     | integer | Required when `type` is `"rating"`. Highest allowed score.                                                                         |
+| `evaluators[].tool_call`     | boolean | `true` marks an evaluator that grades the tool calls of a [tool call judge test](#tool-call-judge-test). Ignored by other test types. |
 
 ### Variable substitution
 

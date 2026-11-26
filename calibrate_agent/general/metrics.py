@@ -5,6 +5,7 @@ Thin, non-conversational counterpart to ``calibrate_agent.stt.metrics`` /
 against a list of evaluators and aggregate per-evaluator scores.
 """
 
+import asyncio
 from typing import Callable, List, Optional
 
 import numpy as np
@@ -19,6 +20,7 @@ from calibrate_agent.judges import (
     ensure_known_evaluator_names,
     render_evaluator,
     require_unique_evaluator_names,
+    split_tool_call_evaluators,
     with_row_callback,
     DEFAULT_TEXT_JUDGE_MODEL,
 )
@@ -66,22 +68,36 @@ async def general_judge(
         evaluators: List of evaluator dicts (already rendered).
         fallback_model: Model id used when an evaluator lacks ``judge_model``.
         tool_calls: For a row that made tool calls, ``{"tool_calls": [...],
-            "expected_tool_calls": [...]}``; the row is then judged with the
-            tool-call prompt.
+            "expected_tool_calls": [...]}``. Evaluators marked ``"tool_call":
+            true`` then read the tool-call prompt and the rest read the input
+            and output plus the tool calls made (see
+            :func:`calibrate_agent.judges.split_tool_call_evaluators`).
 
     Returns:
         Dict keyed by evaluator name — same shape as
         :func:`calibrate_agent.judges.text_judge`.
     """
     if tool_calls is not None:
-        result = await tool_call_judge(
-            [{"role": "user", "content": input_text or ""}],
-            output,
-            tool_calls.get("tool_calls"),
-            evaluators,
-            tool_calls.get("expected_tool_calls"),
-            fallback_model=fallback_model,
+        made = tool_calls.get("tool_calls") or []
+        tool_evaluators, reply_evaluators = split_tool_call_evaluators(evaluators)
+        tool_result, reply_result = await asyncio.gather(
+            tool_call_judge(
+                [{"role": "user", "content": input_text or ""}],
+                made,
+                tool_evaluators,
+                tool_calls.get("expected_tool_calls"),
+                fallback_model=fallback_model,
+            ),
+            general_task_judge(
+                evaluators=reply_evaluators,
+                output=output,
+                input_text=input_text,
+                fallback_model=fallback_model,
+                tool_calls=made,
+            ),
         )
+        merged = {**tool_result, **reply_result}
+        result = {ev["name"]: merged[ev["name"]] for ev in evaluators}
     else:
         result = await general_task_judge(
             evaluators=evaluators,

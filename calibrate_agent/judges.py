@@ -821,9 +821,26 @@ def _expected_tool_call_line(tool_call: dict) -> str:
     return line
 
 
+def tool_calls_made_section(tool_calls: Optional[list]) -> str:
+    """List the tool calls an agent made, each with what it returned when known."""
+    calls = "\n".join(_tool_call_line(tc) for tc in tool_calls or [])
+    return f"`Tool calls made by the agent`:\n\n{calls or 'The agent made no tool calls.'}"
+
+
+def split_tool_call_evaluators(evaluators: list[dict]) -> tuple[list, list]:
+    """Split evaluators into ``(tool call evaluators, reply evaluators)``.
+
+    An evaluator marked ``"tool_call": true`` grades the tool calls; the rest
+    grade the reply. When none is marked, all of them grade the tool calls.
+    """
+    tool = [ev for ev in evaluators if ev.get("tool_call") is True]
+    if not tool:
+        return list(evaluators), []
+    return tool, [ev for ev in evaluators if ev.get("tool_call") is not True]
+
+
 def tool_call_judge_prompt(
     conversation: list[dict],
-    response: Optional[str],
     tool_calls: Optional[list],
     expected_tool_calls: Optional[list] = None,
 ) -> str:
@@ -832,12 +849,7 @@ def tool_call_judge_prompt(
     history = format_conversation(conversation)
     if history:
         sections.append(f"`Chat history`:\n\n{history}")
-    if response:
-        sections.append(f"`Reply from the agent`:\n\n{response}")
-    calls = "\n".join(_tool_call_line(tc) for tc in tool_calls or [])
-    sections.append(
-        f"`Tool calls made by the agent`:\n\n{calls or 'The agent made no tool calls.'}"
-    )
+    sections.append(tool_calls_made_section(tool_calls))
     if isinstance(expected_tool_calls, list) and expected_tool_calls:
         expected = "\n".join(
             _expected_tool_call_line(tc) for tc in expected_tool_calls
@@ -848,17 +860,16 @@ def tool_call_judge_prompt(
 
 async def tool_call_judge(
     conversation: list[dict],
-    response: Optional[str],
     tool_calls: Optional[list],
     evaluators: list[dict],
     expected_tool_calls: Optional[list] = None,
     fallback_model: str = DEFAULT_TEXT_JUDGE_MODEL,
 ) -> dict:
-    """Judge the tool calls an agent made (and its reply, if any)."""
+    """Judge the tool calls an agent made."""
     return await text_judge(
         evaluators=evaluators,
         user_prompt=tool_call_judge_prompt(
-            conversation, response, tool_calls, expected_tool_calls
+            conversation, tool_calls, expected_tool_calls
         ),
         fallback_model=fallback_model,
     )
@@ -936,6 +947,7 @@ async def general_task_judge(
     output: str,
     input_text: Optional[str] = None,
     fallback_model: str = DEFAULT_TEXT_JUDGE_MODEL,
+    tool_calls: Optional[list] = None,
 ) -> dict:
     """Evaluate a task output (with optional input) against a list of evaluators.
 
@@ -956,6 +968,7 @@ async def general_task_judge(
         input_text: Optional task input the output was produced for. Omitted from
             the prompt when ``None`` or blank.
         fallback_model: Model id used when an evaluator has no ``judge_model``.
+        tool_calls: Tool calls the agent made, listed after the output when given.
 
     Returns:
         Dict keyed by ``evaluator["name"]`` — same shape as :func:`text_judge`.
@@ -964,6 +977,8 @@ async def general_task_judge(
         return {}
 
     user_prompt = format_task_io(output, input_text)
+    if tool_calls is not None:
+        user_prompt += "\n\n" + tool_calls_made_section(tool_calls)
     return await text_judge(
         evaluators=evaluators,
         user_prompt=user_prompt,
