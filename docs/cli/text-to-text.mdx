@@ -256,7 +256,7 @@ An evaluator that grades the tool calls reads these parts, in this order:
 | `Tool calls made by the agent`   | Always. Reads "The agent made no tool calls." when there were none |
 | `Expected tool calls`            | When `expected_tool_calls` is given     |
 
-An evaluator that grades the reply reads what it reads in a [response test](#response-test): the `Chat history` and the `Response to evaluate`. After them comes `Tool calls made by the agent`, each call with what it returned. It never sees the expected tool calls. When the agent gave no reply, a reply evaluator fails without a judge call, as in a response test.
+An evaluator that grades the reply reads what it reads in a [response test](#response-test): the `Chat history` and the `Response to evaluate`. After them comes `Tool calls made by the agent`, each call with what it returned, when the agent made any. It never sees the expected tool calls. When the agent gave no reply, a reply evaluator fails without a judge call, as in a response test.
 
 A `calibrate-agent general` row that carries `tool_calls` or `expected_tool_calls` splits its evaluators the same way. A reply evaluator there reads the row's `Input` and `Output`, then the tool calls made, and is judged even when `Output` is empty.
 

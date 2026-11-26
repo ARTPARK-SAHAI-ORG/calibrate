@@ -966,7 +966,7 @@ async def general_task_judge(
         input_text: Optional task input the output was produced for. Omitted from
             the prompt when ``None`` or blank.
         fallback_model: Model id used when an evaluator has no ``judge_model``.
-        tool_calls: Tool calls the agent made, listed after the output when given.
+        tool_calls: Tool calls the agent made, listed after the output when there are any.
 
     Returns:
         Dict keyed by ``evaluator["name"]`` — same shape as :func:`text_judge`.
@@ -975,7 +975,7 @@ async def general_task_judge(
         return {}
 
     user_prompt = format_task_io(output, input_text)
-    if tool_calls is not None:
+    if tool_calls:
         user_prompt += "\n\n" + tool_calls_made_section(tool_calls)
     return await text_judge(
         evaluators=evaluators,

@@ -688,6 +688,17 @@ class TestGeneralTaskJudge(unittest.IsolatedAsyncioTestCase):
         # Neutral framing — not a chat transcript
         self.assertNotIn("Chat history", prompt)
 
+    async def test_reply_judge_sees_no_tool_call_section_when_none_were_made(self):
+        judge = AsyncMock(return_value={"x": {"reasoning": "ok", "match": True}})
+        ev = [{"name": "x", "system_prompt": "y", "judge_model": "m"}]
+        with patch("calibrate_agent.judges.text_judge", judge):
+            await general_task_judge(evaluators=ev, output="Sure", tool_calls=[])
+            self.assertNotIn("Tool calls made", judge.call_args.kwargs["user_prompt"])
+            await general_task_judge(
+                evaluators=ev, output="Done", tool_calls=[{"tool": "book"}]
+            )
+            self.assertIn("book {}", judge.call_args.kwargs["user_prompt"])
+
     async def test_output_only_omits_input_section(self):
         mock_text_judge = AsyncMock(
             return_value={"x": {"reasoning": "ok", "match": True}}

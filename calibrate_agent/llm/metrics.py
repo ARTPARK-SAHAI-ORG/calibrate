@@ -39,7 +39,7 @@ async def test_response_llm_judge(
         evaluators: List of evaluator dicts with their ``system_prompt``
             already rendered (placeholders substituted) by the caller.
         fallback_model: Model id for evaluators that don't set ``judge_model``.
-        tool_calls: Tool calls the agent made, listed after the response when given.
+        tool_calls: Tool calls the agent made, listed after the response when there are any.
 
     Returns:
         Dict keyed by evaluator name. Binary entries are
@@ -54,7 +54,7 @@ async def test_response_llm_judge(
         f"`Chat history`:\n\n{conversation_as_prompt}\n\n"
         f"`Response to evaluate`:\n\n{response}"
     )
-    if tool_calls is not None:
+    if tool_calls:
         user_prompt += "\n\n" + tool_calls_made_section(tool_calls)
 
     return await text_judge(
