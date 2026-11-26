@@ -600,18 +600,26 @@ class TestMainDispatch(unittest.TestCase):
                         "-c", str(cfg), "-o", tmp,
                     ])
 
-    def test_simulations_text_rejects_agent_default_inputs(self):
+    def test_simulations_text_verifies_with_agent_default_inputs(self):
         with tempfile.TemporaryDirectory() as tmp:
             cfg = Path(tmp) / "cfg.json"
             cfg.write_text(json.dumps({
                 "agent_url": "http://x",
                 "agent_default_inputs": {"condition_area": "cardiology"},
             }))
-            with self.assertRaises(SystemExit):
+            with patch("calibrate_agent.connections.TextAgentConnection") as MockConn, \
+                 patch("calibrate_agent.llm.run_simulation.main", AsyncMock(return_value=None)):
+                MockConn.return_value.verify = AsyncMock(
+                    return_value={"ok": True, "sample_output": {}}
+                )
                 self._run_with_argv([
                     "calibrate_agent", "simulations", "--type", "text",
                     "-c", str(cfg), "-o", tmp,
                 ])
+                _, kwargs = MockConn.call_args
+                self.assertEqual(
+                    kwargs.get("default_inputs"), {"condition_area": "cardiology"}
+                )
 
     def test_simulations_text_rejects_general_agent_type(self):
         with tempfile.TemporaryDirectory() as tmp:
