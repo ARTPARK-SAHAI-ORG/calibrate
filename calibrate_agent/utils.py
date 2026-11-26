@@ -19,6 +19,7 @@ from pipecat.frames.frames import InputTransportMessageFrame
 from pipecat.processors.frame_processor import FrameProcessor
 from pipecat.transcriptions.language import Language
 
+from calibrate_agent.limits import MAX_REPLY_TOKENS  # noqa: F401 (re-exported)
 from calibrate_agent.tools import (  # noqa: F401 (re-exported)
     _build_param_property,
     build_tool_specs,
@@ -617,9 +618,6 @@ def combine_turn_audio_chunks(audio_dir: str) -> bool:
 
 TRANSCRIPT_FILE_NAME = "transcript.json"
 
-# Without a limit, OpenRouter checks the key can pay for the model's longest
-# possible reply (often 65,536 tokens) and refuses calls once the balance is lower.
-MAX_REPLY_TOKENS = 8192
 
 
 def save_transcript(output_dir: str | Path | None, transcript: list[dict]) -> None:

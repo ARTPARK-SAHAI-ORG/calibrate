@@ -6,6 +6,7 @@ from typing import Literal
 
 from openai import AsyncOpenAI
 
+from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.tools import (
     build_tool_specs,
     fill_missing_tool_results,
@@ -107,7 +108,7 @@ async def agent_reply(
                 model=model,
                 messages=history + new_messages,
                 tools=api_tools,
-                max_completion_tokens=8192,
+                max_completion_tokens=MAX_REPLY_TOKENS,
             )
             usage = response.usage
             if usage is not None:
