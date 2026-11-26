@@ -3426,7 +3426,7 @@ class TestToolCallJudgeType(unittest.IsolatedAsyncioTestCase):
             "calibrate_agent.judges.text_judge", judge
         ):
             result = await run_eval_only_tests(
-                config={"evaluators": [self.EV]},
+                config={"evaluators": [{**self.EV, "tool_call": True}]},
                 dataset=[self._item(input="Book a table")],
                 output_dir=tmp,
             )
@@ -3442,7 +3442,7 @@ class TestToolCallJudgeType(unittest.IsolatedAsyncioTestCase):
     async def test_failing_rating_fails_case(self):
         from calibrate_agent.llm.run_tests import run_eval_only_tests
 
-        ev = {**self.EV, "type": "rating", "scale_min": 1, "scale_max": 5}
+        ev = {**self.EV, "tool_call": True, "type": "rating", "scale_min": 1, "scale_max": 5}
         judge = AsyncMock(return_value={"right_tool": {"reasoning": "meh", "score": 3}})
         with tempfile.TemporaryDirectory() as tmp, patch(
             "calibrate_agent.judges.text_judge", judge
@@ -3494,14 +3494,15 @@ class TestToolCallJudgeType(unittest.IsolatedAsyncioTestCase):
         self.assertIn('book {"t": 1} returned {"id": "A"}', prompts["polite"])
         self.assertNotIn("Expected tool calls", prompts["polite"])
 
-    async def test_no_marked_evaluator_all_read_tool_call_text(self):
+    async def test_no_marked_evaluator_reads_the_reply_and_calls(self):
         metrics, prompts = await self._split(
             [self.EV, {"name": "polite", "system_prompt": "judge"}]
         )
         self.assertTrue(metrics["passed"])
         for prompt in prompts.values():
-            self.assertIn("Expected tool calls", prompt)
-            self.assertNotIn("Booked for 7.", prompt)
+            self.assertNotIn("Expected tool calls", prompt)
+            self.assertIn("Booked for 7.", prompt)
+            self.assertIn("Tool calls made by the agent", prompt)
 
     async def test_reply_evaluator_on_empty_reply_fails_without_judging(self):
         metrics, prompts = await self._split(

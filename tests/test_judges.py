@@ -1026,8 +1026,8 @@ class TestSplitToolCallEvaluators(unittest.TestCase):
         tool, reply = {"name": "t", "tool_call": True}, {"name": "r"}
         self.assertEqual(split_tool_call_evaluators([reply, tool]), ([tool], [reply]))
 
-    def test_none_marked_all_grade_tool_calls(self):
+    def test_none_marked_all_grade_the_reply(self):
         from calibrate_agent.judges import split_tool_call_evaluators
 
         evs = [{"name": "a"}, {"name": "b", "tool_call": False}]
-        self.assertEqual(split_tool_call_evaluators(evs), (evs, []))
+        self.assertEqual(split_tool_call_evaluators(evs), ([], evs))

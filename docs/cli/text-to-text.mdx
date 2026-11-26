@@ -246,7 +246,7 @@ An LLM judge grades the tool calls the agent made, using the evaluators you list
 
 The test case takes either `history` or a single `input` string, never both. Its evaluators must be listed by name.
 
-A test case can be graded on both its tool calls and its reply. Mark each evaluator that grades the tool calls with `"tool_call": true` in its definition. Every other evaluator listed for the test case grades the reply. When no listed evaluator is marked, all of them grade the tool calls.
+A test case can be graded on both its tool calls and its reply. Mark each evaluator that grades the tool calls with `"tool_call": true` in its definition. Every other evaluator listed for the test case grades the reply.
 
 An evaluator that grades the tool calls reads these parts, in this order:
 

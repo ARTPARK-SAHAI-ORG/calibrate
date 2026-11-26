@@ -831,11 +831,9 @@ def split_tool_call_evaluators(evaluators: list[dict]) -> tuple[list, list]:
     """Split evaluators into ``(tool call evaluators, reply evaluators)``.
 
     An evaluator marked ``"tool_call": true`` grades the tool calls; the rest
-    grade the reply. When none is marked, all of them grade the tool calls.
+    grade the reply.
     """
     tool = [ev for ev in evaluators if ev.get("tool_call") is True]
-    if not tool:
-        return list(evaluators), []
     return tool, [ev for ev in evaluators if ev.get("tool_call") is not True]
 
 

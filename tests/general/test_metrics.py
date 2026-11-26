@@ -359,7 +359,7 @@ class TestGeneralToolCallRow(unittest.IsolatedAsyncioTestCase):
             result = await general_judge(
                 "Book it",
                 "",
-                evaluators=[BINARY_EV],
+                evaluators=[{**BINARY_EV, "tool_call": True}],
                 tool_calls={
                     "tool_calls": [{"tool": "book", "arguments": {"t": 1}}],
                     "expected_tool_calls": None,
@@ -404,8 +404,9 @@ class TestGeneralToolCallRowSplit(unittest.IsolatedAsyncioTestCase):
         self.assertIn('book {"t": 1} returned "A"', prompts["faithful"])
         self.assertNotIn("Expected tool calls", prompts["faithful"])
 
-    async def test_no_marked_evaluator_all_read_tool_call_text(self):
+    async def test_no_marked_evaluator_reads_the_reply_and_calls(self):
         result, prompts = await self._judge([BINARY_EV])
         self.assertTrue(result["faithful"]["match"])
-        self.assertIn("Expected tool calls", prompts["faithful"])
-        self.assertNotIn("Booked.", prompts["faithful"])
+        self.assertNotIn("Expected tool calls", prompts["faithful"])
+        self.assertIn("Booked.", prompts["faithful"])
+        self.assertIn("Tool calls made by the agent", prompts["faithful"])
