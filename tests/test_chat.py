@@ -62,6 +62,7 @@ class TestAgentReply(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(sent["messages"][0], {"role": "system", "content": "You are a bot"})
         self.assertEqual(sent["tools"][0]["function"]["name"], "end_call")
         self.assertEqual(out["total_tokens"], 12)
+        self.assertEqual(sent["max_completion_tokens"], 8192)
 
     async def test_structured_tool_then_text(self):
         client = fake_client(response(tool_calls=[call("plan_next", '{"q": 1}')]), response("Done"))

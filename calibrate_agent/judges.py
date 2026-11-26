@@ -49,6 +49,7 @@ import instructor
 from pydantic import BaseModel, Field, create_model
 
 from calibrate_agent.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
+from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.utils import log_judge_io, provider_log
 
 
@@ -548,7 +549,7 @@ async def _judge_one_text(
         ],
         response_model=Output,
         temperature=0,
-        max_completion_tokens=8192,
+        max_completion_tokens=MAX_REPLY_TOKENS,
     )
 
     result = _normalize_judge_api_result(response.model_dump(), Output.__name__)
@@ -613,7 +614,7 @@ async def _judge_one_audio(
         ],
         response_model=Output,
         temperature=0,
-        max_completion_tokens=8192,
+        max_completion_tokens=MAX_REPLY_TOKENS,
     )
 
     result = _normalize_judge_api_result(response.model_dump(), Output.__name__)

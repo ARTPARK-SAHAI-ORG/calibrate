@@ -15,6 +15,7 @@ import instructor
 
 from calibrate_agent.judges import _build_openrouter_client
 from calibrate_agent.langfuse import observe, langfuse, langfuse_enabled
+from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.utils import log_judge_io
 from calibrate_agent.stt.sarvam_intent_entity.main import IntentEntityResponse, build_prompt
 
@@ -60,7 +61,7 @@ async def intent_entity_judge(
         messages=[{"role": "user", "content": prompt}],
         response_model=IntentEntityResponse,
         temperature=0,
-        max_completion_tokens=8192,
+        max_completion_tokens=MAX_REPLY_TOKENS,
     )
 
     result = response.model_dump()

@@ -216,6 +216,8 @@ class TestRunSimulationWithAgent(unittest.IsolatedAsyncioTestCase):
             )
         self.assertGreater(len(result["transcript"]), 0)
         self.assertEqual(len(result["evaluation_results"]), 1)
+        sent = fake_user_client.chat.completions.create.call_args.kwargs
+        self.assertEqual(sent["max_completion_tokens"], 8192)
 
     async def test_agent_no_response_ends_early(self):
         from calibrate_agent.llm import run_simulation as RS

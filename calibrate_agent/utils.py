@@ -617,10 +617,6 @@ def combine_turn_audio_chunks(audio_dir: str) -> bool:
 
 TRANSCRIPT_FILE_NAME = "transcript.json"
 
-# Without a limit, OpenRouter checks the key can pay for the model's longest
-# possible reply (often 65,536 tokens) and refuses calls once the balance is lower.
-MAX_REPLY_TOKENS = 8192
-
 
 def save_transcript(output_dir: str | Path | None, transcript: list[dict]) -> None:
     """Write conversation messages to transcript.json under output_dir."""

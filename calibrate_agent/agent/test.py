@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from typing import Literal
 
+from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.utils import (
-    MAX_REPLY_TOKENS,
     save_audio_chunk,
     save_transcript,
     create_stt_service,

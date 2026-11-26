@@ -19,8 +19,8 @@ from dataclasses import dataclass
 import numpy as np
 from collections import defaultdict
 
+from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.utils import (
-    MAX_REPLY_TOKENS,
     current_context,
     current_simulation_name,
     add_default_source,

@@ -13,8 +13,8 @@ from os.path import join, exists, splitext, basename
 import shutil
 from collections import defaultdict
 import traceback
+from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.utils import (
-    MAX_REPLY_TOKENS,
     configure_print_logger,
     log_and_print,
     build_tools_schema,
@@ -681,6 +681,7 @@ async def run_simulation_with_agent(
         user_resp = await user_client.chat.completions.create(
             model=user_model,
             messages=user_messages,
+            max_completion_tokens=MAX_REPLY_TOKENS,
         )
         user_message = user_resp.choices[0].message.content.strip()
         user_messages.append({"role": "assistant", "content": user_message})

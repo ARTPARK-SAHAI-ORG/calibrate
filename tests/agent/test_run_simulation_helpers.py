@@ -767,7 +767,7 @@ class TestConversationAudio(unittest.IsolatedAsyncioTestCase):
 def test_simulated_user_request_caps_reply_tokens(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "or-fake")
     from calibrate_agent.agent import run_simulation as RS
-    from calibrate_agent.utils import MAX_REPLY_TOKENS
+    from calibrate_agent.limits import MAX_REPLY_TOKENS
 
     llm = RS.build_simulated_user_llm()
     params = llm.build_chat_completion_params({"messages": []})
