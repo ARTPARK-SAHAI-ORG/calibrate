@@ -376,19 +376,18 @@ def _error_result(item: dict, exc: BaseException, not_run: bool = False) -> dict
     :func:`_load_resumable_results` re-runs it instead of treating the failure
     as a completed result.
     """
+    # An eval-only item wraps its test case: {"test_case": {...}, "output": {...}}.
+    test_case = item["test_case"] if isinstance(item.get("test_case"), dict) else item
     result: dict = {
         "output": {"response": None, "tool_calls": []},
         "metrics": {"passed": False, "reasoning": str(exc)},
         "error": True,
-        "test_case": item,
+        "test_case": test_case,
     }
     if not_run:
         result["not_run"] = True
-    # An eval-only item wraps its test case: {"test_case": {...}, "output": {...}}.
-    inner = item.get("test_case")
-    case_id = item.get("id", inner.get("id") if isinstance(inner, dict) else None)
-    if case_id is not None:
-        result["test_case_id"] = case_id
+    if "id" in test_case:
+        result["test_case_id"] = test_case["id"]
     return result
 
 
