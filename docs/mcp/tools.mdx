@@ -364,7 +364,7 @@ See **PUT /agents/&#123;agent_uuid&#125;** in the [API reference](/api-reference
 Choose which part of a trace fills each variable of an evaluator linked
 to an agent, replacing any earlier choices. Each value is input,
 output.response, output.tool_calls, labels, conversation_id, message_id,
-or metadata.&lt;key&gt;. Traces are scored by the evaluator once every variable
+feedback.comment, or metadata.&lt;key&gt;. Traces are scored by the evaluator once every variable
 has a value.
 
 **Scope:** `write` · **Access:** Write
