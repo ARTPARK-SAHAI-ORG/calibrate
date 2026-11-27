@@ -777,6 +777,65 @@ class TestAgentType(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             agent.build_body([{"role": "assistant", "content": "Hello"}])
 
+    async def test_variant_extra_lands_beside_model(self):
+        """A model variant's extra fields go in at the top level of the body,
+        over ``default_inputs`` and under the test case's own inputs."""
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(
+            url="http://fake-agent/chat",
+            default_inputs={"lang": "en", "temperature": 0.1},
+        )
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            await agent.call(
+                [{"role": "user", "content": "Hi"}],
+                model="openai/gpt-5",
+                extra={"reasoning": {"effort": "high"}, "temperature": 0.5},
+                inputs={"temperature": 0.9},
+            )
+
+        self.assertEqual(
+            self._sent_body(mock_client),
+            {
+                "messages": [{"role": "user", "content": "Hi"}],
+                "lang": "en",
+                "reasoning": {"effort": "high"},
+                "temperature": 0.9,
+                "model": "openai/gpt-5",
+            },
+        )
+
+    def test_variant_extra_cannot_override_model(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+
+        body = agent.build_body(
+            [{"role": "user", "content": "Hi"}],
+            model="openai/gpt-5",
+            extra={"model": "something-else"},
+        )
+
+        self.assertEqual(body["model"], "openai/gpt-5")
+
+    async def test_verify_sends_variant_extra(self):
+        from calibrate_agent.connections import TextAgentConnection
+
+        agent = TextAgentConnection(url="http://fake-agent/chat")
+
+        ctx, mock_client = _patch_httpx({"response": "ok"})
+        with ctx:
+            result = await agent.verify(
+                model="openai/gpt-5", extra={"reasoning": {"effort": "low"}}
+            )
+
+        self.assertTrue(result["ok"])
+        body = self._sent_body(mock_client)
+        self.assertEqual(body["reasoning"], {"effort": "low"})
+        self.assertEqual(body["model"], "openai/gpt-5")
+
     def test_unknown_type_is_rejected(self):
         from calibrate_agent.connections import TextAgentConnection
 

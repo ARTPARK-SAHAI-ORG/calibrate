@@ -127,7 +127,7 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             # No criterion columns (latency percentiles, cost and total_tokens
             # are standard columns, empty here)
             expected_cols = {
-                "model", "passed", "total", "pass_rate", "latency_p50",
+                "model", "label", "passed", "total", "pass_rate", "latency_p50",
                 "latency_p95", "latency_p99", "cost", "total_tokens",
             }
             self.assertEqual(set(df.columns), expected_cols)
@@ -276,6 +276,43 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             # Leaderboard dir was created but CSV not written
             self.assertTrue(save_dir.exists())
             self.assertFalse((save_dir / "llm_leaderboard.csv").exists())
+
+
+
+class TestVariantLabels(unittest.TestCase):
+    def test_variant_rows_are_named_by_id_and_carry_their_label(self):
+        """Two variants of one model each get a row, told apart by the folder
+        name (the variant id) and read via the label column."""
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_model(base, "gpt-5#1", {
+                "total": 2, "passed": 2, "label": "gpt-5 (high thinking)",
+            })
+            _write_model(base, "gpt-5#2", {
+                "total": 2, "passed": 1, "label": "gpt-5 (low thinking)",
+            })
+
+            save_dir = base / "leaderboard"
+            generate_leaderboard(str(base), str(save_dir))
+
+            df = pd.read_csv(save_dir / "llm_leaderboard.csv")
+            self.assertEqual(list(df["model"]), ["gpt-5#1", "gpt-5#2"])
+            self.assertEqual(
+                list(df["label"]),
+                ["gpt-5 (high thinking)", "gpt-5 (low thinking)"],
+            )
+            self.assertEqual(list(df["pass_rate"]), [100.0, 50.0])
+
+    def test_label_is_empty_without_variants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            _write_model(base, "gpt-4o", {"total": 2, "passed": 2})
+
+            save_dir = base / "leaderboard"
+            generate_leaderboard(str(base), str(save_dir))
+
+            df = pd.read_csv(save_dir / "llm_leaderboard.csv")
+            self.assertTrue(df["label"].isna().all())
 
 
 if __name__ == "__main__":

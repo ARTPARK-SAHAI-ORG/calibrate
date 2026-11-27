@@ -22,6 +22,7 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
 
     The leaderboard shows:
     - Overall `pass_rate` (all test cases)
+    - `label`, the display name of a model variant (empty for a plain model run)
     - Per-criterion pass rate columns when the suite has response-type tests
       (e.g., `accuracy`, `tone`)
 
@@ -99,8 +100,13 @@ def _build_leaderboard(
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, latency_p50, latency_p95,
+    Columns: model, label, passed, total, pass_rate, latency_p50, latency_p95,
     latency_p99, cost, total_tokens, [criterion_1, ...]
+
+    ``model`` is the results folder name — the model name for a plain model
+    run, or the variant id when the run was fanned out over model variants.
+    ``label`` is the variant's display name, and ``None`` when the run had no
+    variants.
 
     ``latency_p50``/``latency_p95``/``latency_p99`` are percentiles of the
     per-test-case response-generation latency (in milliseconds, judge time
@@ -131,6 +137,7 @@ def _build_leaderboard(
         )
         row: Dict[str, object] = {
             "model": model_name,
+            "label": data.get("label"),
             "passed": passed,
             "total": total,
             "pass_rate": _to_percent(passed, total),
