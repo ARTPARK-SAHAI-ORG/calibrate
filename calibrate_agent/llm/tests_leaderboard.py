@@ -6,6 +6,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from calibrate_agent.llm._metrics_utils import _numeric_or_none
+from calibrate_agent.llm.summary import answered_count, pass_rate_from_metrics
 
 
 def generate_leaderboard(output_dir: str, save_dir: str) -> None:
@@ -21,7 +22,7 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
             ...
 
     The leaderboard shows:
-    - Overall `pass_rate` (all test cases)
+    - Overall `pass_rate` over the test cases that got an answer
     - Per-criterion pass rate columns when the suite has response-type tests
       (e.g., `accuracy`, `tone`)
 
@@ -72,6 +73,20 @@ def generate_leaderboard(output_dir: str, save_dir: str) -> None:
     print(f"Saved leaderboard CSV to {csv_path}")
 
 
+def write_leaderboard(output_dir: str, results: dict) -> str:
+    """Build the leaderboard under ``<output_dir>/leaderboard`` and return that folder.
+
+    A failure is recorded as ``results["leaderboard"]`` instead of raised, so the
+    model results already collected are still returned.
+    """
+    save_dir = str(Path(output_dir) / "leaderboard")
+    try:
+        generate_leaderboard(output_dir=output_dir, save_dir=save_dir)
+    except Exception as e:
+        results["leaderboard"] = f"error: {e}"
+    return save_dir
+
+
 def _read_metrics(metrics_path: Path) -> Optional[dict]:
     if not metrics_path.exists():
         print(f"[WARN] metrics.json missing for {metrics_path.parent}")
@@ -87,20 +102,19 @@ def _read_metrics(metrics_path: Path) -> Optional[dict]:
     return data
 
 
-def _to_percent(passed: int, total: int) -> Optional[float]:
-    if total <= 0:
-        return None
-    return (passed / total) * 100
-
-
 def _build_leaderboard(
     model_data: Dict[str, dict],
     criterion_names: List[str],
 ) -> pd.DataFrame:
     """Build leaderboard DataFrame.
 
-    Columns: model, passed, total, pass_rate, latency_p50, latency_p95,
-    latency_p99, cost, total_tokens, [criterion_1, ...]
+    Columns: model, passed, total, answered, pass_rate, pass_rate_low,
+    pass_rate_high, latency_p50, latency_p95, latency_p99, cost, total_tokens,
+    [criterion_1, criterion_1_low, criterion_1_high, ...]
+
+    ``answered`` counts the test cases that got an answer, and ``pass_rate``
+    is ``passed / answered``. Each ``_low`` / ``_high`` pair is the 95% likely
+    range of the column before it (``None`` when the run did not record one).
 
     ``latency_p50``/``latency_p95``/``latency_p99`` are percentiles of the
     per-test-case response-generation latency (in milliseconds, judge time
@@ -129,11 +143,16 @@ def _build_leaderboard(
             if isinstance(data.get("total_tokens"), dict)
             else {}
         )
+        summary = pass_rate_from_metrics(data)
+        ci = summary["pass_rate_ci"] or {}
         row: Dict[str, object] = {
             "model": model_name,
             "passed": passed,
             "total": total,
-            "pass_rate": _to_percent(passed, total),
+            "answered": answered_count(data),
+            "pass_rate": summary["pass_rate"],
+            "pass_rate_low": ci.get("low"),
+            "pass_rate_high": ci.get("high"),
             "latency_p50": latency.get("p50"),
             "latency_p95": latency.get("p95"),
             "latency_p99": latency.get("p99"),
@@ -143,13 +162,11 @@ def _build_leaderboard(
 
         criteria = data.get("criteria") or {}
         for name in criterion_names:
-            crit = criteria.get(name)
-            if not crit:
-                row[name] = None
-            elif crit.get("type") == "rating":
-                row[name] = crit.get("mean")
-            else:
-                row[name] = crit.get("pass_rate")
+            crit = criteria.get(name) or {}
+            row[name] = crit.get("mean" if crit.get("type") == "rating" else "pass_rate")
+            crit_ci = crit.get("ci") or {}
+            row[f"{name}_low"] = crit_ci.get("low")
+            row[f"{name}_high"] = crit_ci.get("high")
 
         rows.append(row)
 

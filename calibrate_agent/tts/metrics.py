@@ -4,14 +4,12 @@ TTS evaluation metrics.
 
 from typing import Callable, List, Optional
 
-import numpy as np
 from tqdm.asyncio import tqdm_asyncio
 import backoff
 
 from calibrate_agent.judges import (
+    aggregate_judge_scores,
     audio_judge,
-    is_rating,
-    evaluator_result_value,
     with_row_callback,
     DEFAULT_AUDIO_JUDGE_MODEL,
     DEFAULT_TTS_EVALUATOR,
@@ -106,28 +104,4 @@ async def get_tts_llm_judge_score(
         desc="Running TTS evaluators",
     )
 
-    # Aggregate per-evaluator scores — binary: mean 0/1, rating: mean score
-    scores: dict = {}
-    for ev in evaluators:
-        name = ev["name"]
-        per_row_values = [evaluator_result_value(ev, row[name]) for row in results]
-        if is_rating(ev):
-            scores[name] = {
-                "type": "rating",
-                "mean": float(np.mean(per_row_values)),
-                "scale_min": int(ev["scale_min"]),
-                "scale_max": int(ev["scale_max"]),
-            }
-        else:
-            scores[name] = {
-                "type": "binary",
-                "mean": float(np.mean(per_row_values)),
-            }
-
-    overall_score = float(np.mean([s["mean"] for s in scores.values()]))
-
-    return {
-        "scores": scores,
-        "score": overall_score,
-        "per_row": results,
-    }
+    return {**aggregate_judge_scores(evaluators, results), "per_row": results}

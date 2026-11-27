@@ -87,7 +87,7 @@ A longer `history` is rejected before the request is sent, with an error naming 
   To benchmark across models, Calibrate adds a `model` field to the request
   body: `{ "messages": [...], "model": "..." }` for a `conversation` agent,
   `{ "input": "...", "model": "..." }` for a `general` one. Your agent must
-  read it and route to the right model — the easiest way is a framework like
+  read it and route to the right model. The easiest way is a framework like
   OpenRouter. For a Calibrate agent, the model is selected directly.
 </Note>
 

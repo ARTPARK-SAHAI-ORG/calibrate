@@ -31,7 +31,7 @@ from calibrate_agent.llm.run_tests import (
     exit_if_run_failed,
     run_model_tests,
 )
-from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
+from calibrate_agent.llm.tests_leaderboard import write_leaderboard
 from calibrate_agent.llm._output import print_benchmark_summary
 from calibrate_agent._env import env_int
 from calibrate_agent.utils import StreamTee, apply_debug_limit
@@ -103,17 +103,10 @@ async def run(
     for model, result in model_results:
         results[model] = result
 
-    # Generate leaderboard from output_dir (which contains model folders)
-    leaderboard_dir = join(output_dir, "leaderboard")
-    try:
-        generate_leaderboard(output_dir=output_dir, save_dir=leaderboard_dir)
-    except Exception as e:
-        results["leaderboard"] = f"error: {e}"
-
     return {
         "status": "completed",
         "output_dir": output_dir,
-        "leaderboard_dir": leaderboard_dir,
+        "leaderboard_dir": write_leaderboard(output_dir, results),
         "models": results,
     }
 

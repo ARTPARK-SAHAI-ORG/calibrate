@@ -759,7 +759,7 @@ Examples:
                         _print_sample_output(_verify_result)
                         print()
 
-                from calibrate_agent.llm.tests_leaderboard import generate_leaderboard
+                from calibrate_agent.llm.tests_leaderboard import write_leaderboard
                 from calibrate_agent.llm._output import print_benchmark_summary
                 from calibrate_agent.llm.run_tests import exit_if_run_failed
 
@@ -784,8 +784,7 @@ Examples:
                         _m: _results.get(_m, _results) for _m in _models
                     }
 
-                    _lb_dir = os.path.join(args.output_dir, "leaderboard")
-                    generate_leaderboard(output_dir=args.output_dir, save_dir=_lb_dir)
+                    _lb_dir = write_leaderboard(args.output_dir, _model_results)
                     _has_errors = print_benchmark_summary(
                         models=_models,
                         model_results=_model_results,

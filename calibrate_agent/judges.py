@@ -43,6 +43,7 @@ import csv
 import json
 import os
 import re
+import statistics
 from typing import Callable, Optional
 
 import instructor
@@ -51,6 +52,7 @@ from pydantic import BaseModel, Field, create_model
 from calibrate_agent.langfuse import AsyncOpenAI, observe, langfuse, langfuse_enabled
 from calibrate_agent.limits import MAX_REPLY_TOKENS
 from calibrate_agent.utils import log_judge_io, provider_log
+from calibrate_agent.llm.summary import DEFAULT_LLM_TEST_EVALUATOR_NAME
 
 
 # ── OpenRouter configuration ────────────────────────────────────────────────
@@ -89,7 +91,7 @@ RATING = "rating"
 # default evaluator's name). Simulation has no implicit default.
 
 DEFAULT_LLM_TEST_EVALUATOR = {
-    "name": "correctness",
+    "name": DEFAULT_LLM_TEST_EVALUATOR_NAME,
     "system_prompt": (
         "You are a highly accurate evaluator evaluating the response of an agent to a "
         "user's message.\n\n"
@@ -193,6 +195,41 @@ def evaluator_result_value(evaluator: dict, result: dict) -> float:
     if is_rating(evaluator):
         return float(result["score"])
     return float(int(bool(result["match"])))
+
+
+def aggregate_judge_scores(evaluators: list, results: list) -> dict:
+    """Mean per evaluator across judged rows, plus the mean of those means.
+
+    Returns ``{"scores": {name: {"type", "mean", ...}}, "score": float}``. A
+    binary mean is the pass fraction (0.0-1.0); a rating mean is on its scale.
+    """
+    scores: dict = {}
+    for ev in evaluators:
+        name = ev["name"]
+        per_row_values = [
+            evaluator_result_value(ev, row[name]) for row in results if name in row
+        ]
+        if not per_row_values:
+            continue
+        mean = float(statistics.fmean(per_row_values))
+        if is_rating(ev):
+            scores[name] = {
+                "type": RATING,
+                "mean": mean,
+                "count": len(per_row_values),
+                "scale_min": int(ev["scale_min"]),
+                "scale_max": int(ev["scale_max"]),
+            }
+        else:
+            scores[name] = {"type": BINARY, "mean": mean, "count": len(per_row_values)}
+    return {
+        "scores": scores,
+        "score": (
+            statistics.fmean([s["mean"] for s in scores.values()])
+            if scores
+            else float("nan")
+        ),
+    }
 
 
 def evaluator_row_columns(evaluators_by_name: dict, judge_row: dict) -> dict:

@@ -2,6 +2,8 @@
 
 import sys
 
+from calibrate_agent.llm.summary import answered_count, format_share
+
 
 def print_benchmark_summary(
     models: list,
@@ -10,6 +12,10 @@ def print_benchmark_summary(
     model_label=None,
 ) -> bool:
     """Print the standard benchmark summary and return True if any errors occurred.
+
+    A leaderboard that could not be written, recorded by
+    :func:`calibrate_agent.llm.tests_leaderboard.write_leaderboard` as
+    ``model_results["leaderboard"]``, counts as an error.
 
     Args:
         models: Ordered list of model names.
@@ -31,10 +37,11 @@ def print_benchmark_summary(
             has_errors = True
         else:
             metrics = mr.get("metrics", {})
-            passed = metrics.get("passed", 0)
-            total = metrics.get("total", 0)
-            pct = (passed / total * 100) if total > 0 else 0
-            print(f"  {label}: {passed}/{total} ({pct:.1f}%)")
+            print(f"  {label}: {format_share(int(metrics.get('passed', 0)), answered_count(metrics))}")
 
+    leaderboard_error = model_results.get("leaderboard")
+    if leaderboard_error:
+        print(f"\n\033[31mLeaderboard not saved: {leaderboard_error}\033[0m")
+        return True
     print(f"\n\033[92mLeaderboard saved to {leaderboard_dir}\033[0m")
     return has_errors

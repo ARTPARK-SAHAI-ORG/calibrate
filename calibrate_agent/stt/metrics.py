@@ -13,10 +13,9 @@ from tqdm.asyncio import tqdm_asyncio
 import backoff
 
 from calibrate_agent.judges import (
+    aggregate_judge_scores,
     text_judge,
     with_row_callback,
-    is_rating,
-    evaluator_result_value,
     DEFAULT_TEXT_JUDGE_MODEL,
     DEFAULT_STT_EVALUATOR,
 )
@@ -483,32 +482,7 @@ async def get_llm_judge_score(
         desc="Running STT evaluators",
     )
 
-    # Aggregate per-evaluator scores — mean of 0/1 for binary, mean of scores for rating.
-    scores: dict = {}
-    for ev in evaluators:
-        name = ev["name"]
-        per_row_values = [evaluator_result_value(ev, row[name]) for row in results]
-        if is_rating(ev):
-            scores[name] = {
-                "type": "rating",
-                "mean": float(np.mean(per_row_values)),
-                "scale_min": int(ev["scale_min"]),
-                "scale_max": int(ev["scale_max"]),
-            }
-        else:
-            scores[name] = {
-                "type": "binary",
-                "mean": float(np.mean(per_row_values)),  # pass-rate fraction 0.0–1.0
-            }
-
-    # Backward compat: top-level "score" = mean across evaluator means.
-    overall_score = float(np.mean([s["mean"] for s in scores.values()]))
-
-    return {
-        "scores": scores,
-        "score": overall_score,
-        "per_row": results,
-    }
+    return {**aggregate_judge_scores(evaluators, results), "per_row": results}
 
 
 async def get_intent_entity_score(

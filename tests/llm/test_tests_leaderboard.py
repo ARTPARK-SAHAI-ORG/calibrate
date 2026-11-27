@@ -127,8 +127,9 @@ class TestLeaderboardMultiCriteria(unittest.TestCase):
             # No criterion columns (latency percentiles, cost and total_tokens
             # are standard columns, empty here)
             expected_cols = {
-                "model", "passed", "total", "pass_rate", "latency_p50",
-                "latency_p95", "latency_p99", "cost", "total_tokens",
+                "model", "passed", "total", "answered", "pass_rate", "pass_rate_low",
+                "pass_rate_high", "latency_p50", "latency_p95", "latency_p99",
+                "cost", "total_tokens",
             }
             self.assertEqual(set(df.columns), expected_cols)
             # Cost is absent in old-style metrics → empty column
