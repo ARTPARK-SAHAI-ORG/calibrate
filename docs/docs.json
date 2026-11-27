@@ -147,6 +147,7 @@
               "PUT /agents/{agent_uuid}",
               "GET /agents/{agent_uuid}/evaluators",
               "POST /agents/{agent_uuid}/evaluators",
+              "PUT /agents/{agent_uuid}/evaluators/{evaluator_uuid}/trace-variables",
               "POST /agents/{agent_uuid}/verify-connection"
             ]
           },
@@ -284,6 +285,7 @@
               "sdk/agents/update",
               "sdk/agents/list_evaluators",
               "sdk/agents/link_evaluators",
+              "sdk/agents/update_evaluator_trace_variables",
               "sdk/agents/verify_connection"
             ]
           },

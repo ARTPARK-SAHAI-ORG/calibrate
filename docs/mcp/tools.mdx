@@ -359,6 +359,26 @@ Fails with 404 if the agent does not exist or belongs to another org.
 
 See **PUT /agents/&#123;agent_uuid&#125;** in the [API reference](/api-reference/introduction) tab for the full schema.
 
+### update-agent-evaluator-trace-variables
+
+Choose which part of a trace fills each variable of an evaluator linked
+to an agent, replacing any earlier choices. Each value is input,
+output.response, output.tool_calls, labels, conversation_id, message_id,
+or metadata.&lt;key&gt;. Traces are scored by the evaluator once every variable
+has a value.
+
+**Scope:** `write` · **Access:** Write
+
+**Parameters**
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `agent_uuid` | string | Yes | The agent the evaluator is linked to |
+| `evaluator_uuid` | string | Yes | The evaluator whose variables to fill |
+| `trace_variables` | object | Yes | Which part of a trace fills each variable, keyed by variable name. Each value is one of: |
+
+See **PUT /agents/&#123;agent_uuid&#125;/evaluators/&#123;evaluator_uuid&#125;/trace-variables** in the [API reference](/api-reference/introduction) tab for the full schema.
+
 ### link-evaluators-to-agent
 
 Link one or more evaluators to an agent, skipping any already linked.

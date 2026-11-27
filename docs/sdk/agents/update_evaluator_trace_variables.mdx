@@ -1,0 +1,28 @@
+---
+title: "Update evaluator trace variables"
+description: "Choose which part of a trace fills each variable of an evaluator"
+---
+
+{/* Generated from Fern reference.md — do not edit directly. */}
+
+## Usage
+
+```python
+from calibrate import Calibrate
+
+client = Calibrate(
+    api_key="your_api_key",
+)
+
+client.agents.update_evaluator_trace_variables(
+    agent_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    evaluator_uuid="f47ac10b-58cc-4372-a567-0e02b2c3d479",
+    trace_variables={
+        "key": "value"
+    },
+)
+```
+
+## API endpoint
+
+See **PUT /agents/\{agent_uuid}/evaluators/\{evaluator_uuid}/trace-variables** in the [API reference](/api-reference/introduction) tab.

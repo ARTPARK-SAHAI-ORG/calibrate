@@ -84,6 +84,161 @@
         ],
         "title": "AgentCreateResponse"
       },
+      "AgentEvaluatorResponse": {
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "maxLength": 36,
+            "minLength": 36,
+            "title": "Uuid",
+            "description": "Evaluator ID",
+            "examples": [
+              "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Evaluator name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "What the evaluator checks"
+          },
+          "evaluator_type": {
+            "type": "string",
+            "enum": [
+              "tts",
+              "stt",
+              "llm",
+              "llm-general",
+              "conversation",
+              "tool-call"
+            ],
+            "title": "Evaluator Type",
+            "description": "What the evaluator judges:\n\n- `tts`: TTS audio\n- `stt`: one transcript\n- `llm`: a reply with its conversation history\n- `llm-general`: a standalone input and output pair\n- `conversation`: a full conversation\n- `tool-call`: the tool calls an agent made\n"
+          },
+          "data_type": {
+            "type": "string",
+            "enum": [
+              "text",
+              "audio"
+            ],
+            "title": "Data Type",
+            "description": "The modality the judge reads:\n\n- `text`\n- `audio`\n"
+          },
+          "output_type": {
+            "type": "string",
+            "enum": [
+              "binary",
+              "rating"
+            ],
+            "title": "Output Type",
+            "description": "How the evaluator scores:\n\n- `binary`: pass or fail\n- `rating`: a numeric score, using the scale in `output_config`\n"
+          },
+          "is_default": {
+            "type": "boolean",
+            "title": "Is Default",
+            "description": "True when the evaluator is a built-in default or your workspace's editable copy of one. False for an evaluator you created yourself"
+          },
+          "is_protected": {
+            "type": "boolean",
+            "title": "Is Protected",
+            "description": "True when the evaluator is locked. A locked evaluator cannot be deleted, and only its name, description and rubric can change"
+          },
+          "slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Slug",
+            "description": "Stable slug for a built-in default evaluator"
+          },
+          "source_default_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Default Slug",
+            "description": "Stable slug of the built-in default this evaluator is your editable copy of. Set on your default forks so you can identify a specific default by it"
+          },
+          "live_version_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 36,
+                "minLength": 36
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Live Version Id",
+            "description": "ID of the version that is currently live",
+            "examples": [
+              "6ba7b810-9dad-11d1-80b4-00c04fd430c8"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At",
+            "description": "When the evaluator was created (ISO 8601 UTC)"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At",
+            "description": "When the evaluator was last updated (ISO 8601 UTC)"
+          },
+          "live_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EvaluatorLiveVersionSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The version that is currently live"
+          },
+          "trace_variables": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "description": "Which part of a trace fills each variable of the evaluator when it scores an agent's traces"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uuid",
+          "name",
+          "evaluator_type",
+          "data_type",
+          "output_type",
+          "is_default",
+          "is_protected",
+          "created_at",
+          "updated_at",
+          "trace_variables"
+        ],
+        "title": "AgentEvaluatorResponse"
+      },
       "AgentResponse": {
         "properties": {
           "uuid": {
@@ -3567,7 +3722,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 8192,
+            "maxLength": 50000,
             "title": "Value",
             "description": "Value of the metadata entry"
           }
@@ -4476,6 +4631,47 @@
         ],
         "title": "OutputScaleEntry",
         "description": "One entry in an evaluator's output_config.scale. `value` is bool|number|string\ndepending on output_type."
+      },
+      "PaginatedResponse_AgentEvaluatorResponse_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentEvaluatorResponse"
+            },
+            "type": "array",
+            "title": "Items",
+            "description": "The page of results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Total number of items matching the query, before pagination"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Limit",
+            "description": "The applied `limit` (null when unbounded)"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "description": "The applied `offset`",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total"
+        ],
+        "title": "PaginatedResponse[AgentEvaluatorResponse]"
       },
       "PaginatedResponse_AgentSummary_": {
         "properties": {
@@ -6272,7 +6468,7 @@
           },
           "value": {
             "type": "string",
-            "maxLength": 8192,
+            "maxLength": 50000,
             "title": "Value",
             "description": "Value of the metadata entry"
           }
@@ -6804,6 +7000,44 @@
           "role"
         ],
         "title": "TraceTurn"
+      },
+      "TraceVariablesRequest": {
+        "properties": {
+          "trace_variables": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "description": "Which part of a trace fills each variable, keyed by variable name. Each value is one of:\n\n- `input`: the trace's input\n- `output.response`: the agent's reply\n- `output.tool_calls`: the tool calls the agent issued\n- `labels`: the trace's labels\n- `conversation_id`: the conversation ID sent with the trace\n- `message_id`: the message ID sent with the trace\n- `metadata.<key>`: the metadata entry with that key\n\nEvery variable needs a value. Replaces the stored choices, and an empty object clears them",
+            "examples": [
+              {
+                "ai_reply": "output.response",
+                "nurse_reply": "metadata.expert_answer"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "trace_variables"
+        ],
+        "title": "TraceVariablesRequest"
+      },
+      "TraceVariablesResponse": {
+        "properties": {
+          "trace_variables": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "description": "Which part of a trace fills each variable"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trace_variables"
+        ],
+        "title": "TraceVariablesResponse"
       },
       "TurnText": {
         "properties": {
@@ -7674,7 +7908,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PaginatedResponse_EvaluatorResponse_"
+                  "$ref": "#/components/schemas/PaginatedResponse_AgentEvaluatorResponse_"
                 }
               }
             }
@@ -7736,6 +7970,83 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/EvaluatorLinkResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agents/{agent_uuid}/evaluators/{evaluator_uuid}/trace-variables": {
+      "put": {
+        "tags": [
+          "agents"
+        ],
+        "summary": "Update evaluator trace variables",
+        "description": "Choose which part of a trace fills each variable of an evaluator",
+        "operationId": "update_evaluator_trace_variables_agents__agent_uuid__evaluators__evaluator_uuid__trace_variables_put",
+        "security": [
+          {
+            "ApiKeyAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "agent_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The agent the evaluator is linked to",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Agent Uuid"
+            },
+            "description": "The agent the evaluator is linked to"
+          },
+          {
+            "name": "evaluator_uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The evaluator whose variables to fill",
+              "examples": [
+                "f47ac10b-58cc-4372-a567-0e02b2c3d479"
+              ],
+              "title": "Evaluator Uuid"
+            },
+            "description": "The evaluator whose variables to fill"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TraceVariablesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceVariablesResponse"
                 }
               }
             }
